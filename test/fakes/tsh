@@ -1,0 +1,4 @@
+#!/bin/bash
+# test $SHELL: `-lic cmd` / `-l` without anyone's profile
+if [ "$1" = "-lic" ] || [ "$1" = "-lc" ]; then exec /bin/bash --noprofile --norc -c "$2"; fi
+PS1='$ ' exec /bin/bash --noprofile --norc -i

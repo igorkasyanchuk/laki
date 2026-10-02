@@ -1,0 +1,95 @@
+// Snapshot fidelity: a fresh xterm fed only the snapshot ends up in the same state as the live one.
+import assert from 'node:assert/strict'
+import { test } from 'node:test'
+import headless from '@xterm/headless'
+import { Session } from '../src/daemon/session.ts'
+import { sleep, until } from './helpers.ts'
+
+type Term = InstanceType<typeof headless.Terminal>
+
+function state(t: Term) {
+  const core = (t as any)._core
+  const dump = (b: any) => Array.from({ length: b.length }, (_, i) => b.getLine(i)?.translateToString(false))
+  return {
+    type: t.buffer.active.type,
+    cursor: [t.buffer.active.cursorX, t.buffer.active.cursorY],
+    normal: dump(t.buffer.normal),
+    alt: t.buffer.active.type === 'alternate' ? dump(t.buffer.alternate) : null,
+    modes: { ...t.modes },
+    hidden: core.coreService.isCursorHidden,
+    encoding: core.coreMouseService.activeEncoding,
+    style: [core.coreService.decPrivateModes.cursorStyle, core.coreService.decPrivateModes.cursorBlink],
+    region: [core.buffer.scrollTop, core.buffer.scrollBottom],
+  }
+}
+
+async function replay(s: Session) {
+  const fresh = new headless.Terminal({ cols: s.term.cols, rows: s.term.rows, scrollback: 5000, allowProposedApi: true })
+  await new Promise<void>(r => fresh.write(s.snapshot(), r))
+  return fresh
+}
+
+// a program that prints `out` and then waits
+function session(out: string) {
+  const s = new Session('t', '/bin/sh', ['-c', `printf '%b' "$OUT"; sleep 30`], { cwd: '/tmp', env: { ...process.env, OUT: out } as any, cols: 60, rows: 12 })
+  return s
+}
+
+const colored = Array.from({ length: 30 }, (_, i) => `\\033[3${i % 8};1mline ${i}\\033[0m \\033[48;2;10;20;${i * 8}mtrue\\033[0m\\r\\n`).join('')
+
+test('normal screen: colors, scrollback, cursor, modes', async t => {
+  const s = session(`${colored}\\033[?2004h\\033[?1h\\033[?1000h\\033[?1006h\\033[5 q\\033[3;9r\\033[5;7Hcursor-here\\033[?25l`)
+  t.after(() => s.kill())
+  await until(async () => (await s.flushed(), s.term.modes.bracketedPasteMode && s.term.buffer.active.cursorX > 10), 'output')
+  await s.flushed()
+  const fresh = await replay(s)
+  assert.deepEqual(state(fresh), state(s.term))
+  assert.equal(state(fresh).modes.bracketedPasteMode, true)
+  assert.equal(state(fresh).encoding, 'SGR')
+  assert.equal(state(fresh).hidden, true)
+  // colors and attributes: a session fed the snapshot serializes to the very same thing
+  const again = new Session('u', '/bin/sh', ['-c', 'sleep 30'], { cwd: '/tmp', env: process.env as any, cols: 60, rows: 12 })
+  t.after(() => again.kill())
+  again.term.write(s.snapshot())
+  await again.flushed()
+  assert.equal(again.snapshot(), s.snapshot())
+})
+
+test('alternate screen with a TUI on it', async t => {
+  const s = session(`before alt\\r\\n\\033[?1049h\\033[H\\033[2J\\033[44m TUI \\033[0m\\033[10;3Hstatus \\033[1;31mred\\033[0m\\033[?2004h\\033[4;4H`)
+  t.after(() => s.kill())
+  await until(async () => (await s.flushed(), s.term.buffer.active.type === 'alternate' && s.term.buffer.active.cursorY === 3), 'alt screen')
+  const fresh = await replay(s)
+  assert.deepEqual(state(fresh), state(s.term))
+  assert.equal(fresh.buffer.active.type, 'alternate')
+  assert.match(fresh.buffer.normal.getLine(0)!.translateToString(true), /before alt/)
+})
+
+test('queries are answered once: by the headless terminal only while no client is attached', async t => {
+  // on each "q" the program asks for the cursor position (DSR 6) and prints the reply it read, or "none"
+  const prog = String.raw`stty raw -echo; while IFS= read -r -n1 c; do if [ "$c" = q ]; then printf '\033[6n'; if IFS= read -r -d R -t 1 r; then printf 'got:%q\r\n' "$r"; else printf 'none\r\n'; fi; fi; done`
+  const s = new Session('q', '/bin/bash', ['--noprofile', '--norc', '-c', prog], { cwd: '/tmp', env: process.env as any, cols: 40, rows: 10 })
+  t.after(() => s.kill())
+  const count = (re: RegExp) => (s.screenText(50).match(re) ?? []).length
+  const ask = async (re: RegExp, n: number) => {
+    s.write('q')
+    await until(async () => (await s.flushed(), count(re) === n), String(re))
+  }
+  await sleep(200)
+  await ask(/got:/g, 1) // nobody attached: the headless terminal answered
+  const sent: any[] = []
+  const client = { id: 1, send: (m: any) => sent.push(m) }
+  let snap = ''
+  s.attach(client, 40, 10, r => (snap = r.snapshot))
+  await until(() => sent.some(m => m.ev === 'responder' && m.on), 'responder')
+  assert.ok(snap.includes('got:'))
+  await ask(/none/g, 1) // attached: the headless terminal kept quiet (this fake client doesn't answer)
+  assert.ok(sent.some(m => m.ev === 'data' && m.d.includes('\x1b[6n')), 'the client saw the query')
+  s.write('q')
+  await until(() => sent.filter(m => m.ev === 'data' && m.d.includes('\x1b[6n')).length === 2, 'second query')
+  s.write('\x1b[3;3R') // the client's xterm.js answers
+  await until(async () => (await s.flushed(), count(/got:/g) === 2), 'client reply')
+  s.detach(client)
+  assert.equal(s.responder, null)
+  await ask(/got:/g, 3) // detached: the headless terminal answers again
+})

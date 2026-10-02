@@ -1,0 +1,36 @@
+#!/usr/bin/env node
+// fake claude: records its args, reports states through the hook commands in --settings, echoes input
+const fs = require('fs'), { execSync } = require('child_process')
+const args = process.argv.slice(2)
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.WB_TAB, port: process.env.PORT, args }) + '\n')
+const settings = JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8'))
+const hook = (ev, payload) => {
+  const cmd = settings.hooks[ev][0].hooks[0].command
+  try { execSync(cmd, { input: JSON.stringify(payload), stdio: ['pipe', 'ignore', 'inherit'], timeout: 3000 }) } catch {}
+}
+const ri = args.indexOf('--resume')
+const session = ri >= 0 && !args.includes('--fork-session') ? args[ri + 1] : 'sess-' + Math.random().toString(36).slice(2, 8)
+process.stdout.write('\x1b[?2004h') // bracketed paste on, like the real one
+process.stdout.write(`fake claude ${args.filter(a => !a.includes('/')).join(' ')}\r\n`)
+hook('SessionStart', { session_id: session })
+const turn = text => {
+  hook('UserPromptSubmit', { prompt: text })
+  if (text.startsWith('ask')) { process.stdout.write('allow? (y/n)\r\n'); hook('Notification', { message: 'needs permission' }); return }
+  setTimeout(() => {
+    process.stdout.write(`answer: ${text}\r\n> `)
+    hook('Stop', { last_assistant_message: `answer: ${text}` })
+  }, Number(process.env.FAKE_TURN_MS || 300))
+}
+const positional = args.filter((a, i) => !a.startsWith('--') && !['--settings', '--resume'].includes(args[i - 1]))
+if (positional.length) turn(positional.at(-1))
+else process.stdout.write('> ')
+let line = ''
+process.stdin.setRawMode(true)
+process.stdin.on('data', d => {
+  const s = d.toString().replace(/\x1b\[20[01]~/g, '')
+  for (const ch of s) {
+    if (ch === '\r') { process.stdout.write('\r\n'); const t = line; line = ''; if (t === 'exit') process.exit(0); turn(t) }
+    else if (ch === '\x03') process.exit(130)
+    else { line += ch; process.stdout.write(ch) }
+  }
+})
