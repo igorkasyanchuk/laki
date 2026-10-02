@@ -25,12 +25,15 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message'])
+const BOOL = new Set(['json', 'local', 'when-idle'])
+// only known flags are flags (message text may start with "-"); after "--" everything is text
+let textOnly = false
 for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
-  if (a.startsWith('-') && a.length > 1 && args[0] !== 'hook') {
-    const k = a.replace(/^-+/, '')
-    flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
-  } else args.push(a)
+  const k = a.replace(/^-+/, '')
+  if (!textOnly && a === '--') textOnly = true
+  else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
+  else args.push(a)
 }
 const json = !!flags.json
 const out = (v: unknown, text?: string) => console.log(json || text === undefined ? JSON.stringify(v, null, 2) : text)

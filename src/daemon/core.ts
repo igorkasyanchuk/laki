@@ -34,7 +34,7 @@ let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start
 // ---------- persistence
 
 export function load() {
-  mkdirSync(runDir, { recursive: true })
+  mkdirSync(runDir, { recursive: true, mode: 0o700 })
   try {
     state = JSON.parse(readFileSync(statePath, 'utf8'))
   } catch {}
@@ -193,9 +193,19 @@ const slug = (s: string) =>
     .slice(0, 32)
     .replace(/-+$/, '')
 
-function uniqueWsId(want: string) {
-  let id = want || `ws-${randomUUID().slice(0, 4)}`
-  for (let n = 2; state.workspaces.some(w => w.id === id) || existsSync(join(dir, 'worktrees', '_', id)); n++) id = `${want}-${n}`
+// uniqueWsId: an id no workspace, worktree dir or kept wb/<id> branch (wsRm keeps branches) uses yet
+async function uniqueWsId(want: string, proj?: Project) {
+  const base = want || `ws-${randomUUID().slice(0, 4)}`
+  const taken = async (id: string) =>
+    state.workspaces.some(w => w.id === id) ||
+    (!!proj &&
+      (existsSync(join(dir, 'worktrees', proj.id, id)) ||
+        (await git(proj.path, 'rev-parse', '--verify', '--quiet', `refs/heads/wb/${id}`).then(
+          () => true,
+          () => false,
+        ))))
+  let id = base
+  for (let n = 2; await taken(id); n++) id = `${base}-${n}`
   return id
 }
 
@@ -316,14 +326,14 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   return s
 }
 
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string }): Tab {
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string }): Tab {
   const ws = findWs(wsRef)
   const preset = o.preset || (o.cmd ? 'custom' : 'shell')
   const kind = o.kind ?? (preset === 'shell' && !o.cmd ? 'shell' : 'agent')
   let name = o.name || (kind === 'agent' ? (preset === 'custom' ? basename(o.cmd!.split(/\s/)[0]) : preset) : kind)
   const base = name
   for (let n = 2; tabsOf(ws.id).some(t => t.name === name); n++) name = `${base} ${n}`
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(o.cmd ? { cmd: o.cmd } : {}) }
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}) }
   state.tabs.push(tab)
   save()
   try {
@@ -357,10 +367,10 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   if (o.local) {
     const have = state.workspaces.find(w => w.project === proj.id && w.kind === 'local')
     if (have) return have
-    ws = { id: uniqueWsId(proj.id), project: proj.id, path: proj.path, branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
+    ws = { id: await uniqueWsId(proj.id), project: proj.id, path: proj.path, branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
   } else {
     const want = slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' '))
-    const id = uniqueWsId(want)
+    const id = await uniqueWsId(want, proj)
     const path = join(dir, 'worktrees', proj.id, id)
     const base = o.base || current
     const branch = `wb/${id}`
@@ -377,14 +387,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     writeFileSync(setupMarker(ws), String(Date.now()))
     addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
   }
-  if (o.preset !== 'none') {
-    const tab = addTab(ws.id, { preset: o.preset || 'claude', cmd: o.cmd, prompt: o.prompt })
-    if (o.forkOf) {
-      tab.forkOf = o.forkOf
-      save()
-      spawnTab(tab) // again, now with --fork-session
-    }
-  }
+  if (o.preset !== 'none') addTab(ws.id, { preset: o.preset || 'claude', cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf })
   changed()
   return ws
 }
@@ -399,10 +402,10 @@ async function teardown(ws: Workspace) {
     await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, { id: '', workspace: ws.id, name: '', kind: 'shell' }), timeout: 60000 }).catch(() => {})
   if (ws.kind === 'worktree') {
     const proj = state.projects.find(p => p.id === ws.project)
-    if (proj) {
-      await git(proj.path, 'worktree', 'remove', '--force', ws.path).catch(() => git(proj.path, 'worktree', 'prune').catch(() => {}))
-    }
+    if (proj) await git(proj.path, 'worktree', 'remove', '--force', ws.path).catch(() => {})
     rmSync(ws.path, { recursive: true, force: true })
+    // after the dir is gone: drops the registration a failed remove left, which would block re-adding the branch
+    if (proj) await git(proj.path, 'worktree', 'prune').catch(() => {})
   }
   rmSync(setupMarker(ws), { force: true })
 }
@@ -673,20 +676,27 @@ export function checksOf(rollup: any[] | undefined): PR['checks'] {
   return 'pass'
 }
 
-export async function scanPRs() {
-  for (const ws of state.workspaces) {
-    if (ws.archived || ws.kind !== 'worktree' || !existsSync(ws.path)) continue
-    try {
-      const { stdout } = await run('gh', ['pr', 'view', ws.branch, '--json', 'number,state,url,statusCheckRollup'], { cwd: ws.path, timeout: 20000 })
-      const j = JSON.parse(stdout)
-      const pr: PR = { number: j.number, state: j.state, url: j.url, checks: checksOf(j.statusCheckRollup) }
-      if (JSON.stringify(prs.get(ws.id)) !== JSON.stringify(pr)) {
-        prs.set(ws.id, pr)
-        changed()
-      }
-    } catch {
-      if (prs.delete(ws.id)) changed()
+let prScan: Promise<void> | null = null
+export function scanPRs() {
+  // one scan at a time; workspaces in parallel (each gh call may take seconds)
+  prScan ??= Promise.all(state.workspaces.filter(ws => !ws.archived && ws.kind === 'worktree' && existsSync(ws.path)).map(scanPR)).then(
+    () => void (prScan = null),
+    () => void (prScan = null),
+  )
+  return prScan
+}
+
+async function scanPR(ws: Workspace) {
+  try {
+    const { stdout } = await run('gh', ['pr', 'view', ws.branch, '--json', 'number,state,url,statusCheckRollup'], { cwd: ws.path, timeout: 20000 })
+    const j = JSON.parse(stdout)
+    const pr: PR = { number: j.number, state: j.state, url: j.url, checks: checksOf(j.statusCheckRollup) }
+    if (JSON.stringify(prs.get(ws.id)) !== JSON.stringify(pr)) {
+      prs.set(ws.id, pr)
+      changed()
     }
+  } catch {
+    if (prs.delete(ws.id)) changed()
   }
 }
 
@@ -709,11 +719,17 @@ export async function diff(ref: string) {
       return { path: p.join('\t'), add: Number(add) || 0, del: Number(del) || 0, status: 'M' }
     })
   let out = text
-  for (const f of untracked.split('\n').filter(Boolean).slice(0, 100)) {
-    const d = await run('git', ['diff', '--no-color', '--no-index', '--', '/dev/null', f], { cwd: ws.path, maxBuffer: 16 << 20 }).then(
-      r => r.stdout,
-      e => String(e.stdout ?? ''),
-    )
+  const newFiles = untracked.split('\n').filter(Boolean).slice(0, 100)
+  const diffs = await Promise.all(
+    newFiles.map(f =>
+      run('git', ['diff', '--no-color', '--no-index', '--', '/dev/null', f], { cwd: ws.path, maxBuffer: 16 << 20 }).then(
+        r => r.stdout,
+        e => String(e.stdout ?? ''), // exit 1: there are differences
+      ),
+    ),
+  )
+  for (const [i, f] of newFiles.entries()) {
+    const d = diffs[i]
     out += (out ? '\n' : '') + d.trimEnd()
     files.push({ path: f, add: d.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).length, del: 0, status: 'A' })
   }

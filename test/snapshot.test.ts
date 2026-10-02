@@ -80,7 +80,7 @@ test('queries are answered once: by the headless terminal only while no client i
   const sent: any[] = []
   const client = { id: 1, send: (m: any) => sent.push(m) }
   let snap = ''
-  s.attach(client, 40, 10, r => (snap = r.snapshot))
+  s.attach(client, 40, 10, r => (snap = r!.snapshot))
   await until(() => sent.some(m => m.ev === 'responder' && m.on), 'responder')
   assert.ok(snap.includes('got:'))
   await ask(/none/g, 1) // attached: the headless terminal kept quiet (this fake client doesn't answer)

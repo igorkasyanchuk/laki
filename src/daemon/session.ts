@@ -60,13 +60,14 @@ export class Session {
   }
 
   // attach hands the snapshot to reply; live data for this client follows it, in order, on the same channel.
-  attach(c: Client, cols: number | undefined, rows: number | undefined, reply: (r: { snapshot: string; cols: number; rows: number }) => void) {
+  // reply gets null when a newer attach (or a detach) of the same client came first.
+  attach(c: Client, cols: number | undefined, rows: number | undefined, reply: (r: { snapshot: string; cols: number; rows: number } | null) => void) {
     if (cols && rows) this.resize(cols, rows)
     const st = { ready: false, pending: [] as string[] }
     this.clients.set(c, st)
     // the callback runs once the headless terminal parsed everything written so far
     this.term.write('', () => {
-      if (this.clients.get(c) !== st) return
+      if (this.clients.get(c) !== st) return reply(null)
       reply({ snapshot: this.snapshot(), cols: this.term.cols, rows: this.term.rows })
       for (const d of st.pending) c.send({ ev: 'data', tab: this.tab, d })
       st.ready = true

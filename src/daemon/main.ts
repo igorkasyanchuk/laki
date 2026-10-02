@@ -2,36 +2,45 @@
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, closeSync, mkdirSync, openSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage } from 'node:http'
 import { join } from 'node:path'
 import { WebSocketServer } from 'ws'
 import * as core from './core.ts'
 
 const { dir } = core
-mkdirSync(dir, { recursive: true })
+mkdirSync(dir, { recursive: true, mode: 0o700 })
+chmodSync(dir, 0o700) // state, queued messages and agents' answers live here
 
-// ---------- single instance: a lock file with our pid
+// ---------- single instance: a lock file with our pid. It's hard-linked from a file already holding the
+// pid, so no one ever reads it empty and takes a starting daemon's lock for a stale one.
+// ponytail: two starters that both find the same stale lock can still both remove it; flock if that matters.
 const lockPath = join(dir, 'daemon.lock')
 function takeLock(): boolean {
-  for (let i = 0; i < 2; i++) {
-    try {
-      const fd = openSync(lockPath, 'wx')
-      writeFileSync(fd, String(process.pid))
-      closeSync(fd)
-      return true
-    } catch {
-      const pid = Number(readFileSync(lockPath, 'utf8').trim() || 0)
+  const tmp = `${lockPath}.${process.pid}`
+  writeFileSync(tmp, String(process.pid))
+  try {
+    for (let i = 0; i < 2; i++) {
       try {
+        linkSync(tmp, lockPath)
+        return true
+      } catch {}
+      let pid = 0
+      try {
+        pid = Number(readFileSync(lockPath, 'utf8').trim())
         if (pid && pid !== process.pid) {
           process.kill(pid, 0)
           return false // alive: it's the daemon
         }
-      } catch {}
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === 'EPERM') return false // alive, someone else's
+      }
       rmSync(lockPath, { force: true }) // stale
     }
+    return false
+  } finally {
+    rmSync(tmp, { force: true })
   }
-  return false
 }
 if (!takeLock()) {
   console.log('wbs daemon already running')
@@ -134,7 +143,9 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         const s = core.sessions.get(m.params?.tab)
         if (!s) return c.send({ id: m.id, error: `no session ${m.params?.tab}` })
         if (m.params.cols) core.resize(s.tab, m.params.cols, m.params.rows)
-        return s.attach(c, m.params.cols, m.params.rows, r => c.send({ id: m.id, result: { ...r, responder: true, exited: s.exited } }))
+        return s.attach(c, m.params.cols, m.params.rows, r =>
+          c.send(r ? { id: m.id, result: { ...r, responder: true, exited: s.exited } } : { id: m.id, error: 'superseded by a newer attach' }),
+        )
       }
       try {
         const result = await call(m.method, m.params, c)

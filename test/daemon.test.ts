@@ -63,6 +63,10 @@ test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch
   // the freed port is reused
   const ws3 = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'three' })
   assert.equal(ws3.port, 3100)
+  // the same name again: wb/feat-one is kept, so the new one gets its own id and branch
+  const again = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'feat one' })
+  assert.equal(again.id, 'feat-one-2')
+  assert.equal(again.branch, 'wb/feat-one-2')
   // a local workspace is the repo root itself
   const local = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'shell' })
   assert.equal(local.path, p.path)

@@ -49,7 +49,7 @@ export function daemonScript(): string {
 // ensureDaemon starts the daemon detached (it outlives the caller) unless one answers already.
 export async function ensureDaemon(env: Record<string, string> = {}): Promise<DaemonInfo> {
   if (await alive()) return daemonInfo()!
-  mkdirSync(dataDir(), { recursive: true })
+  mkdirSync(dataDir(), { recursive: true, mode: 0o700 })
   const log = openSync(join(dataDir(), 'daemon.log'), 'a')
   const args = [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), daemonScript()]
   spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log], env: { ...process.env, ...env } }).unref()

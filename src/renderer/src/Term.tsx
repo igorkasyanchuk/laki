@@ -70,7 +70,7 @@ export function Term({ tab, onReady }: { tab: string; onReady?: (t: Terminal) =>
         term.reset()
         term.write(r.snapshot)
       } catch (e) {
-        term.write(`\r\n\x1b[2m[${(e as Error).message}]\x1b[0m\r\n`)
+        if (alive) term.write(`\r\n\x1b[2m[${(e as Error).message}]\x1b[0m\r\n`)
       }
     }
     const off = api.on(m => {

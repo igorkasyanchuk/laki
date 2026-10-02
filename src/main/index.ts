@@ -8,6 +8,7 @@ import { ensureDaemon } from '../shared/conn.ts'
 const dev = !!process.env.ELECTRON_RENDERER_URL
 let win: BrowserWindow | null = null
 let pendingTab: string | null = null
+let quitting = false
 
 if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', () => show())
@@ -40,6 +41,12 @@ function create() {
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', e => e.preventDefault())
+  // closing hides: the renderer keeps posting notifications for agents while the app runs windowless
+  win.on('close', e => {
+    if (quitting) return
+    e.preventDefault()
+    win?.hide()
+  })
   win.on('closed', () => (win = null))
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
@@ -96,6 +103,7 @@ app.whenReady().then(async () => {
   await daemon().catch(e => dialog.showErrorBox('wbs', `The daemon didn't start: ${e.message}`))
   create()
 })
+app.on('before-quit', () => (quitting = true))
 app.on('activate', () => show())
 // macOS: the app (and always the daemon) keeps running without windows
 app.on('window-all-closed', () => {
