@@ -1,6 +1,7 @@
 // The terminal host: owns PTYs, state and scans; outlives the app. Reached over 127.0.0.1 only:
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
+import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { chmodSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage } from 'node:http'
@@ -16,6 +17,15 @@ chmodSync(dir, 0o700) // state, queued messages and agents' answers live here
 // pid, so no one ever reads it empty and takes a starting daemon's lock for a stale one.
 // ponytail: two starters that both find the same stale lock can still both remove it; flock if that matters.
 const lockPath = join(dir, 'daemon.lock')
+// a live process running the daemon (node …/daemon/main.ts, Electron-as-node …/daemon.js, or `wbs daemon`)
+function isDaemon(pid: number) {
+  try {
+    return /daemon(\.js|\/main\.ts)|\sdaemon\s*$/m.test(execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }))
+  } catch {
+    return false
+  }
+}
+
 function takeLock(): boolean {
   const tmp = `${lockPath}.${process.pid}`
   writeFileSync(tmp, String(process.pid))
@@ -28,14 +38,9 @@ function takeLock(): boolean {
       let pid = 0
       try {
         pid = Number(readFileSync(lockPath, 'utf8').trim())
-        if (pid && pid !== process.pid) {
-          process.kill(pid, 0)
-          return false // alive: it's the daemon
-        }
-      } catch (e) {
-        if ((e as NodeJS.ErrnoException).code === 'EPERM') return false // alive, someone else's
-      }
-      rmSync(lockPath, { force: true }) // stale
+      } catch {}
+      if (pid && pid !== process.pid && isDaemon(pid)) return false
+      rmSync(lockPath, { force: true }) // stale: dead, or its pid now belongs to another program
     }
     return false
   } finally {
@@ -129,7 +134,16 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     return
   }
   wss.handleUpgrade(req, socket, head, ws => {
-    const c: core.Conn = { id: ++clientSeq, send: msg => ws.readyState === ws.OPEN && ws.send(JSON.stringify(msg)) }
+    const c: core.Conn = {
+      id: ++clientSeq,
+      send: msg => {
+        if (ws.readyState !== ws.OPEN) return
+        // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and
+        // re-attaches from a snapshot
+        if (ws.bufferedAmount > 32 << 20) return ws.terminate()
+        ws.send(JSON.stringify(msg))
+      },
+    }
     core.clients.add(c)
     c.send({ ev: 'state', view: core.view() })
     ws.on('message', async raw => {

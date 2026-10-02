@@ -535,9 +535,22 @@ export function hook(p: { tab: string; state: string; payload?: any }) {
 
 // ---------- typing into agents, queue
 
+// typeInto pastes text and presses Enter. One message at a time per tab: a queued delivery and a send
+// at the same moment must not interleave their text and Enters.
+const typing = new WeakMap<Session, Promise<void>>()
 export function typeInto(s: Session, text: string) {
-  s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${text}\x1b[201~` : text)
-  setTimeout(() => s.write('\r'), 150) // as a separate key, so it isn't part of the paste
+  const next = (typing.get(s) ?? Promise.resolve()).then(
+    () =>
+      new Promise<void>(done => {
+        s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${text}\x1b[201~` : text)
+        setTimeout(() => {
+          s.write('\r') // as a separate key, so it isn't part of the paste
+          setTimeout(done, 50)
+        }, 150)
+      }),
+  )
+  typing.set(s, next)
+  return next
 }
 
 export function send(p: { target: string; text: string; whenIdle?: boolean }) {
@@ -606,7 +619,8 @@ function checkLimit(tab: Tab, text: string) {
   let t = limitReset(text, now)
   // codex: a notice at the bottom of its screen, below the one handled already
   if (!t && tab.preset === 'codex' && s && (t = limitReset(s.screenText(8, r.seen), now))) r.seen = s.lineCount()
-  if (t && t <= now) t = new Date(t.getTime() + 86400000) // "9am" at noon: tomorrow's
+  // a time gone by: "9am" at noon is tomorrow's, but "3pm" read at 15:00:01 has just reset
+  if (t && t <= now) t = now.getTime() - t.getTime() < 5 * 60e3 ? now : new Date(t.getTime() + 86400000)
   if (t) r.limit = t.getTime()
 }
 
@@ -677,12 +691,21 @@ export function checksOf(rollup: any[] | undefined): PR['checks'] {
 }
 
 let prScan: Promise<void> | null = null
-export function scanPRs() {
-  // one scan at a time; workspaces in parallel (each gh call may take seconds)
-  prScan ??= Promise.all(state.workspaces.filter(ws => !ws.archived && ws.kind === 'worktree' && existsSync(ws.path)).map(scanPR)).then(
-    () => void (prScan = null),
-    () => void (prScan = null),
-  )
+let prAgain = false
+export function scanPRs(): Promise<void> {
+  if (prScan) {
+    prAgain = true // asked mid-scan (e.g. a ship just opened a PR): scan again when this one ends
+    return prScan
+  }
+  // workspaces in parallel: each gh call may take seconds
+  const live = state.workspaces.filter(ws => !ws.archived && ws.kind === 'worktree' && existsSync(ws.path))
+  prScan = Promise.all(live.map(scanPR)).then(() => {
+    prScan = null
+    if (prAgain) {
+      prAgain = false
+      return scanPRs()
+    }
+  })
   return prScan
 }
 
