@@ -79,7 +79,7 @@ const api: Record<string, Handler> = {
   view: (p, c) => c && core.setView(c, p),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
-  shutdown: () => setTimeout(shutdown, 50),
+  shutdown: () => void setTimeout(shutdown, 50),
 }
 
 async function call(method: string, params: any, c?: core.Conn) {
@@ -90,8 +90,9 @@ async function call(method: string, params: any, c?: core.Conn) {
 
 const server = createServer(async (req, res) => {
   const reply = (code: number, body: unknown) => {
+    const text = JSON.stringify(body) // before the head: a body that won't serialize becomes an error reply
     res.writeHead(code, { 'content-type': 'application/json' })
-    res.end(JSON.stringify(body))
+    res.end(text)
   }
   if (!originOk(req.headers.origin)) return reply(403, { error: 'origin not allowed' })
   if (req.method !== 'POST' || req.url !== '/rpc') return reply(404, { error: 'not found' })
