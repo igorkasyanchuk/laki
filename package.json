@@ -5,14 +5,18 @@
   "description": "Workbench for coding agents in parallel git worktrees",
   "type": "module",
   "main": "out/main/index.js",
-  "bin": { "wbs": "bin/wbs.js" },
+  "bin": {
+    "wbs": "bin/wbs.js"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=4 test/*.test.ts",
     "pack": "electron-vite build && electron-builder --dir",
-    "daemon": "node --experimental-strip-types --no-warnings src/daemon/main.ts"
+    "daemon": "node --experimental-strip-types --no-warnings src/daemon/main.ts",
+    "dev:web": "vite src/renderer --port 5199 --strictPort --host 127.0.0.1",
+    "demo": "node --experimental-strip-types --no-warnings scripts/demo.ts"
   },
   "dependencies": {
     "@lydell/node-pty": "1.2.0-beta.15",
@@ -37,5 +41,22 @@
     "react-dom": "^19.3.0",
     "typescript": "^7.0.2",
     "vite": "^7.3.6"
+  },
+  "build": {
+    "appId": "dev.wbs.app",
+    "productName": "wbs",
+    "files": [
+      "out/**/*",
+      "package.json"
+    ],
+    "asar": false,
+    "directories": {
+      "output": "dist"
+    },
+    "mac": {
+      "target": "dir",
+      "category": "public.app-category.developer-tools",
+      "identity": null
+    }
   }
 }

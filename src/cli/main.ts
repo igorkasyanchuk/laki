@@ -1,8 +1,9 @@
 // wbs: the command line for the daemon. `wbs hook <state>` is what agents' hooks run: it never fails or
 // blocks the agent for more than a second.
 import { execFileSync } from 'node:child_process'
-import { resolve } from 'node:path'
-import { pathToFileURL } from 'node:url'
+import { existsSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
 import type { View } from '../shared/types.ts'
 
@@ -66,13 +67,17 @@ async function main() {
     case undefined:
     case 'help':
       return console.log(USAGE)
-    case 'open':
+    case 'open': {
+      // the app this CLI ships in, else this checkout's build, else whatever LaunchServices knows as wbs
+      const here = dirname(fileURLToPath(import.meta.url))
+      const app = [process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, ''), resolve(here, '../../dist/mac-arm64/wbs.app'), resolve(here, '../../../dist/mac-arm64/wbs.app')].find(p => p.endsWith('.app') && existsSync(p))
       try {
-        execFileSync('open', ['-b', 'dev.wbs.app'], { stdio: 'ignore' })
+        execFileSync('open', app ? [app] : ['-b', 'dev.wbs.app'], { stdio: 'ignore' })
       } catch {
-        throw new Error('wbs.app not installed: build it with `npm run pack` and copy dist/mac-arm64/wbs.app to /Applications')
+        throw new Error('wbs.app not found: build it with `npm run pack` (dist/mac-arm64/wbs.app), or copy it to /Applications')
       }
       return
+    }
     case 'stop':
       return rpc('shutdown').catch(() => {})
   }
@@ -87,7 +92,7 @@ async function main() {
           const tabs = v.tabs.filter(t => t.workspace === w.id)
           const extra = [w.archived ? 'archived' : `:${w.port}`, w.pr ? `PR #${w.pr.number} ${w.pr.state}` : '', w.ports.length ? `listening ${w.ports.join(',')}` : '']
           console.log(`  ${w.id}  ${w.branch}  ${extra.filter(Boolean).join('  ')}`)
-          for (const t of tabs) console.log(`    ${glyph[t.status] ?? ' '}${t.done ? '●' : ' '} ${t.name} (${t.id})${t.queue?.length ? ` +${t.queue.length} queued` : ''}`)
+          for (const t of tabs) console.log(`    ${t.status === 'exited' && t.code === 0 ? '✓' : (glyph[t.status] ?? ' ')}${t.done ? '●' : ' '} ${t.name} (${t.id})${t.queue?.length ? ` +${t.queue.length} queued` : ''}`)
         }
       }
       return

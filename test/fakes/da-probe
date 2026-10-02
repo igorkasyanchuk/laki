@@ -1,0 +1,10 @@
+#!/bin/bash
+# on each Enter: one DA1 query (ESC [ c), then how many replies came back within a second
+stty raw -echo
+printf 'press Enter to probe\r\n'
+while IFS= read -r -n1 ch; do
+  [ "$ch" = $'\r' ] || [ -z "$ch" ] || continue
+  printf '\033[c'
+  n=0; while IFS= read -r -t 1 -d c x; do n=$((n+1)); done
+  printf 'replies: %d\r\n' "$n"
+done

@@ -282,7 +282,7 @@ export function App() {
               onAuxClick={e => e.button === 1 && closeTab(t)}
               title={`${t.name} (⌘${i + 1})${t.cmd ? `\n${t.cmd}` : ''}`}
             >
-              <Glyph s={t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status} />
+              <Glyph s={t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status} />
               <span>{t.name}</span>
               {!!t.queue?.length && <span className="badge">+{t.queue.length}</span>}
               <button className="x" onClick={e => (e.stopPropagation(), closeTab(t))} title="Close (⌘W)">

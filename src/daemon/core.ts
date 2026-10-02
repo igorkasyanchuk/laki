@@ -99,11 +99,11 @@ export function view(): View {
     const s = sessions.get(t.id)
     const r = rtOf(t.id)
     const status: Status = !s || s.exited ? 'exited' : hasHooks(t) ? r.status : 'idle'
-    return { ...t, status, done: r.done, limit: r.limit, last: r.last }
+    return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last }
   })
   return {
     projects: state.projects,
-    workspaces: state.workspaces.map(w => ({ ...w, name: w.id, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], pr: prs.get(w.id) })),
+    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], pr: prs.get(w.id) })),
     tabs,
     presets: PRESETS,
   }
@@ -320,7 +320,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const ws = findWs(wsRef)
   const preset = o.preset || (o.cmd ? 'custom' : 'shell')
   const kind = o.kind ?? (preset === 'shell' && !o.cmd ? 'shell' : 'agent')
-  let name = o.name || (kind === 'agent' ? (preset === 'custom' ? o.cmd!.split(/\s/)[0] : preset) : kind)
+  let name = o.name || (kind === 'agent' ? (preset === 'custom' ? basename(o.cmd!.split(/\s/)[0]) : preset) : kind)
   const base = name
   for (let n = 2; tabsOf(ws.id).some(t => t.name === name); n++) name = `${base} ${n}`
   const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(o.cmd ? { cmd: o.cmd } : {}) }

@@ -201,13 +201,15 @@ test('diff: committed and uncommitted changes since the base, new files too', as
 })
 
 test('ports of the workspace process tree, PR from gh, dev server', async t => {
-  const rig = await fresh(t, { config: { run: `exec node -e 'require("http").createServer().listen(process.env.PORT, "127.0.0.1", () => console.log("listening " + process.env.PORT))'` } })
+  // listens on a free port (3100+ may be taken on this machine) and says which, and what $PORT was
+  const rig = await fresh(t, { config: { run: `exec node -e 'const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port + " PORT=" + process.env.PORT))'` } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const dev = await rig.rpc('run', { ws: ws.id })
   assert.equal(dev.name, 'dev')
-  await until(async () => (await rig.screen(dev.id)).includes(`listening ${ws.port}`), 'dev server up')
-  await until(async () => (await rig.rpc('state')).workspaces[0].ports.includes(ws.port), 'port scanned')
+  const m = (await until(async () => (await rig.screen(dev.id)).match(/listening (\d+) PORT=(\d+)/), "dev server up"))!
+  assert.equal(Number(m[2]), ws.port)
+  await until(async () => (await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'port scanned')
   const pr = await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
   assert.deepEqual(pr, { number: 42, state: 'OPEN', url: 'https://example.invalid/pr/42', checks: 'pending' })
 })

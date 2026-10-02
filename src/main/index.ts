@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links.
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell } from 'electron'
-import { writeFileSync } from 'node:fs'
+import { appendFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ensureDaemon } from '../shared/conn.ts'
 
@@ -69,6 +69,7 @@ ipcMain.handle('conn', async () => {
   return { port, token }
 })
 ipcMain.on('notify', (_e, title: string, body: string, tab: string) => {
+  if (process.env.WBS_NOTIFY_LOG) appendFileSync(process.env.WBS_NOTIFY_LOG, JSON.stringify({ title, body, tab }) + '\n') // smoke tests
   const n = new Notification({ title, body, silent: false })
   n.on('click', () => show(tab))
   n.show()

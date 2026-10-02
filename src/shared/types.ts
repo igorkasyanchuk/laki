@@ -34,8 +34,8 @@ export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
 export type PR = { number: number; state: string; url: string; checks: '' | 'pass' | 'fail' | 'pending' }
 
-export type TabView = Tab & { status: Status; done: boolean; limit?: number; last?: string }
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string }
 
-export type WorkspaceView = Workspace & { name: string; setup: boolean; ports: number[]; pr?: PR }
+export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; pr?: PR }
 
 export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: string[] }

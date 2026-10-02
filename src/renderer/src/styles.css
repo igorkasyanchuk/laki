@@ -84,12 +84,14 @@ textarea { resize: vertical; font-family: inherit; }
 .g-idle { color: var(--muted); }
 .g-exited { color: var(--error); opacity: 0.7; }
 .g-limit { color: var(--muted); }
+.g-ok { color: var(--muted); }
 .glyph.spin { width: 10px; height: 10px; margin: 0 2px; border: 2px solid color-mix(in srgb, var(--running) 25%, transparent); border-top-color: var(--running); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .tabbar { height: 42px; flex: none; display: flex; align-items: flex-end; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--line); background: var(--side); }
 .tab { display: flex; align-items: center; gap: 6px; padding: 6px 6px 7px 10px; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; cursor: pointer; color: var(--muted); max-width: 220px; white-space: nowrap; margin-bottom: -1px; }
+.tab > span:not(.glyph):not(.badge) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tab:hover { color: var(--fg); background: var(--hover); }
 .tab.sel { color: var(--fg); background: var(--term-bg); border-color: var(--line); }
 .tab .x { background: none; border: none; padding: 0 4px; color: var(--muted); visibility: hidden; }
