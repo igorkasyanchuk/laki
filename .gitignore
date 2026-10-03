@@ -1,3 +1,8 @@
-electron/
-go/
+node_modules/
+out/
+dist/
+*.log
 .DS_Store
+# left from before the move, until their apps quit: electron/dist (Laki Electron.app), go -> ../laki-go
+/electron/
+/go

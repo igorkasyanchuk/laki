@@ -1,0 +1,11 @@
+#!/bin/sh
+# fake gh: a PR for every branch, CI pending; files in $FAKE_GH answer instead when there
+echo "gh $*" >> "${FAKE_LOG:-/dev/null}"
+f() { [ -n "$FAKE_GH" ] && [ -f "$FAKE_GH/$1" ] && cat "$FAKE_GH/$1"; }
+case "$1 $2" in
+  "pr view") f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;
+  "pr checks") f checks.json || echo '[]'; exit 8 ;;
+  "run view") f run.log ;;
+  "api graphql") f graphql.json || exit 1 ;;
+  *) exit 1 ;;
+esac
