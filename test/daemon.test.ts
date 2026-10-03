@@ -248,7 +248,6 @@ test('a tab whose program ends cleanly closes, and a shell on any exit; a failed
   const ok = await rig.rpc('tabNew', { ws: ws.id, cmd: 'true' })
   const bad = await rig.rpc('tabNew', { ws: ws.id, cmd: 'exit 3' })
   const sh = await rig.rpc('tabNew', { ws: ws.id })
-  await until(async () => (await rig.rpc('state')).tabs.find((x: { id: string }) => x.id === sh.id)?.status !== 'exited', 'shell up')
   await rig.rpc('send', { target: sh.id, text: 'exit 3' })
   await until(async () => {
     const v = await rig.rpc('state')
