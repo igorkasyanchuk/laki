@@ -28,7 +28,7 @@ features and UI. What Laki is and where it's going: [requirements](../requiremen
 - **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
   run script in its tab, ■ stops it; listening ports you click to open.
-- **Look**: 9 themes, including Warp-style gradients; tab and workspace colors.
+- **Look**: 14 themes, including Warp-style gradients; tab and workspace colors.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 
 ## Install
@@ -201,8 +201,8 @@ notification; click it to jump there. Follow-ups queued with `laki-electron send
 `state.json`. The page grows and shrinks with the terminal font size.
 - *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `laki/`),
   notifications, and environment variables for every session (a project's or preset's env wins over them).
-- *Appearance*: the theme: Midnight (default), Dawn (light), Synthwave, Forest, Ember, and the Warp-style
-  gradients Cyber Wave, Koi, Pink City, Leafy and Snowy (light). Terminals take its 16 colors.
+- *Appearance*: the theme: Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
+  Paper (light), and the Warp-style gradients Cyber Wave, Koi, Pink City, Leafy, Aurora and Snowy (light). Terminals take its 16 colors.
 - *Terminal*: font (the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
   cursor style (block, bar, underline) and blinking, and copy selected text to the clipboard (on by default),
@@ -291,4 +291,3 @@ old build until it restarts: run `laki-electron stop`, then open the app. Agents
 - **Codex** has no prompt hook, so "running" is a guess (Enter in an idle codex tab).
 - **Snapshots** keep 5,000 lines of scrollback.
 - **Fork** copies commits only; uncommitted changes stay behind.
-- **Theme**: dark only.

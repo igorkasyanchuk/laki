@@ -71,6 +71,40 @@ export const THEMES: Theme[] = [
     ansi: ['#32302f', '#fb4934', '#b8bb26', '#fabd2f', '#83a598', '#d3869b', '#8ec07c', '#d5c4a1',
       '#7c6f64', '#ff6b57', '#d0d23e', '#ffd25a', '#9fc1b4', '#e5a0b3', '#a6d494', '#fbf1c7'],
   },
+  {
+    id: 'fjord',
+    name: 'Fjord',
+    c: {
+      bg: '#2e3440', side: '#272c36', panel: '#323946', raised: '#3b4252', line: '#434c5e', fg: '#d8dee9', muted: '#8a93a6',
+      accent: '#88c0d0', accentFg: '#2e3440', sel: '#4c566a', running: '#81a1c1', waiting: '#ebcb8b', done: '#a3be8c', error: '#bf616a',
+      orange: '#d08770', pink: '#e39fc2', purple: '#a093d9',
+    },
+    ansi: ['#3b4252', '#bf616a', '#a3be8c', '#ebcb8b', '#81a1c1', '#b48ead', '#88c0d0', '#e5e9f0',
+      '#4c566a', '#d06f79', '#b1d196', '#f0d399', '#8cafd2', '#c895bf', '#93ccdc', '#eceff4'],
+  },
+  {
+    id: 'graphite',
+    name: 'Graphite',
+    c: {
+      bg: '#1c1c1e', side: '#18181a', panel: '#232325', raised: '#2c2c2e', line: '#3a3a3c', fg: '#e5e5e7', muted: '#8e8e93',
+      accent: '#0a84ff', accentFg: '#ffffff', sel: '#3a3a3c', running: '#64d2ff', waiting: '#ffd60a', done: '#30d158', error: '#ff453a',
+      orange: '#ff9f0a', pink: '#ff7ab8', purple: '#bf5af2',
+    },
+    ansi: ['#2c2c2e', '#ff453a', '#30d158', '#ffd60a', '#0a84ff', '#bf5af2', '#64d2ff', '#d1d1d6',
+      '#636366', '#ff6961', '#4ae374', '#ffe066', '#409cff', '#da8fff', '#8fe2ff', '#ffffff'],
+  },
+  {
+    id: 'paper',
+    name: 'Paper',
+    light: true,
+    c: {
+      bg: '#fbfaf7', side: '#f3f1ec', panel: '#ffffff', raised: '#ebe8e1', line: '#dedad1', fg: '#24292f', muted: '#6e7781',
+      accent: '#0969da', accentFg: '#ffffff', sel: '#d6e4f5', running: '#0969da', waiting: '#9a6700', done: '#1a7f37', error: '#cf222e',
+      orange: '#bc4c00', pink: '#bf3989', purple: '#8250df',
+    },
+    ansi: ['#ebe8e1', '#cf222e', '#1a7f37', '#9a6700', '#0969da', '#8250df', '#1b7c83', '#57606a',
+      '#8c959f', '#a40e26', '#116329', '#7d4e00', '#0550ae', '#6639ba', '#3192aa', '#24292f'],
+  },
   // Warp-style: a gradient behind everything
   {
     id: 'cyberwave',
@@ -119,6 +153,18 @@ export const THEMES: Theme[] = [
     },
     ansi: ['#112a1c', '#ff7b72', '#7ee081', '#f2d16b', '#7cc7ff', '#d2a8ff', '#5fd7c0', '#d9ecdc',
       '#4f7a5c', '#ff9d96', '#a7f0a9', '#f7e095', '#a5d8ff', '#e2c4ff', '#8be6d4', '#ffffff'],
+  },
+  {
+    id: 'aurora',
+    name: 'Aurora',
+    grad: ['#06202a', '#2b1650'],
+    c: {
+      bg: '#0f1d33', side: '#0a162880', panel: '#122440', raised: '#1b3152', line: '#25406a', fg: '#e4f6f2', muted: '#8fb3b5',
+      accent: '#5ef2c4', accentFg: '#06202a', sel: '#264d6b', running: '#5ec8f2', waiting: '#f2d35e', done: '#5ef2c4', error: '#ff6b8b',
+      orange: '#ffa36b', pink: '#ff8bd1', purple: '#b39dff',
+    },
+    ansi: ['#122440', '#ff6b8b', '#5ef2c4', '#f2d35e', '#6fa8ff', '#c08bff', '#5ec8f2', '#d6ebe8',
+      '#4f6d85', '#ff8fa6', '#8ff7d6', '#f7e08f', '#9cc3ff', '#d4adff', '#8fdcf7', '#ffffff'],
   },
   {
     id: 'snowy',
