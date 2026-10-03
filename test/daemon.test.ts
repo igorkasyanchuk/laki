@@ -262,6 +262,7 @@ test('agent skill: installed in HOME for claude and codex, its launcher drives t
   await rig.rpc('skillSet', { agent: 'codex', on: false })
   assert.ok(!existsSync(join(rig.home, '.codex/skills/wbs'))) // an emptied folder goes too
   await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
+  await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key
 })
 
 test('ports of the workspace process tree, PR from gh, dev server', async t => {
