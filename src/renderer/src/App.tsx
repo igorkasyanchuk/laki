@@ -450,14 +450,16 @@ export function App() {
       if (devRunning) a({ label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
-      if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: '⌘W', run: () => closeTabs([tab]) })
+      const previewing = preview?.ws === ws.id
+      if (previewing) a({ label: 'Close the file preview', icon: 'x', hint: '⌘W', run: () => setPreview(null) })
+      if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: previewing ? undefined : '⌘W', run: () => closeTabs([tab]) })
       if (ws.pr) a({ label: `Open PR #${ws.pr.number}`, icon: 'pr', run: () => openExternal(ws.pr!.url) })
       for (const p of ws.ports) a({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
       if (project) a({ label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
     }
     for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${wsName(w)}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
-  }, [view, live, ws, tab, group, sideOpen, apps])
+  }, [view, live, ws, tab, group, sideOpen, apps, preview])
 
   if (!view)
     return (

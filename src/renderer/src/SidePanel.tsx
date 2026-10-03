@@ -386,7 +386,7 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
         <button className="small" onClick={p.onOpen}>
           Open in editor
         </button>
-        <IconButton icon="x" title="Close" onClick={p.onClose} />
+        <IconButton icon="x" title="Close (⌘W)" onClick={p.onClose} />
       </div>
       <div className="pv-body" ref={body}>
         {err && <div className="warn small pad">{err}</div>}
@@ -448,7 +448,7 @@ export function FileFinder(p: { files: () => Promise<FileList>; onPick: (path: s
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
   const list = useRef<HTMLDivElement>(null)
-  useEffect(() => void p.files().then(f => setAll(f.files), e => setErr(String(e?.message ?? e))), [])
+  useEffect(() => void p.files().then(f => setAll(f.files ?? []), e => setErr(String(e?.message ?? e))), [])
   const found = useMemo(() => findFiles(q, all ?? []), [q, all])
   useEffect(() => setI(0), [q])
   useEffect(() => list.current?.querySelector('.ff-item.sel')?.scrollIntoView({ block: 'nearest' }), [i])
