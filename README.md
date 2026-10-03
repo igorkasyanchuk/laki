@@ -62,7 +62,7 @@ Read from the workspace, else from the repo root (so it works before it's commit
 | ⌘1…⌘9 | tabs |
 | ⌘↑ ⌘↓ | previous / next workspace |
 | ⌘K | palette: fuzzy jump to any workspace or tab, and every action (diff, run, ship, fork, archive, restore, open PR/ports…) |
-| ⌘D | diff panel · ⌘I inbox |
+| ⌘D | diff panel |
 
 Status: spinner running · ◆ waiting for you · ● finished while you weren't looking (goes once you look) ·
 ◷ usage limit · ○ idle · ✓/✖ process ended (ok / failed). A workspace shows its most urgent tab.
@@ -123,7 +123,7 @@ wbs CLI / hooks (node) ─────── /rpc ──────▶   WBS_DE
 | 15 | PR + CI status; Ship (commit, push, `gh pr create --fill`) in a ship tab | done |
 | 16 | send now / queue when idle (UI + CLI) | done |
 | 17 | CLI with `--json` | done |
-| 18 | inbox with screen previews | done |
+| 18 | inbox | removed for now (status glyphs and notifications stay) |
 | 19 | archive / restore | done |
 | 20 | fork (`claude --resume <id> --fork-session` in a new worktree from this branch) | done (commits only: uncommitted changes aren't copied) |
 | 21 | usage limits: ◷ until reset, then `continue`; queue waits | done |

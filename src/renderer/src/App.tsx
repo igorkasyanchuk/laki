@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
-import { AddProject, DiffPanel, Inbox, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
+import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'inbox'
+type Dialog = null | 'new' | 'project' | 'palette' | 'ship'
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -156,7 +156,6 @@ export function App() {
       w: () => closeTab(tab),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       d: () => setDiff(d => !d),
-      i: () => setDialog(d => (d === 'inbox' ? null : 'inbox')),
       arrowup: () => moveWs(-1),
       arrowdown: () => moveWs(1),
     }
@@ -182,7 +181,6 @@ export function App() {
     const a = (label: string, run: () => void, hint = 'action') => items.push({ label, hint, run })
     a('New workspace', () => setDialog('new'), '⌘N')
     a('Open project folder…', openProject, '⌘O')
-    a('Inbox', () => setDialog('inbox'), '⌘I')
     if (ws) {
       a('New shell tab', () => newTab('shell'), '⌘T')
       a('New claude tab', () => newTab('claude'))
@@ -283,7 +281,6 @@ export function App() {
         </div>
         <div className="side-foot">
           <button title="Open a project folder (⌘O)" onClick={openProject}>+ Add project</button>
-          <InboxButton view={view} onClick={() => setDialog('inbox')} />
         </div>
       </aside>
 
@@ -403,28 +400,7 @@ export function App() {
           }}
         />
       )}
-      {dialog === 'inbox' && (
-        <Inbox
-          view={view}
-          onClose={() => setDialog(null)}
-          onPick={id => {
-            selectTab(id)
-            setDialog(null)
-          }}
-        />
-      )}
     </div>
-  )
-}
-
-function InboxButton({ view, onClick }: { view: View; onClick: () => void }) {
-  const waiting = view.tabs.filter(t => t.status === 'waiting').length
-  const done = view.tabs.filter(t => t.done && t.status === 'idle').length
-  return (
-    <button onClick={onClick} title="Inbox (⌘I)" className="inbox-btn">
-      Inbox{waiting > 0 && <span className="g-waiting"> ◆{waiting}</span>}
-      {done > 0 && <span className="g-done"> ●{done}</span>}
-    </button>
   )
 }
 

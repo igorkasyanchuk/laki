@@ -316,32 +316,3 @@ export function DiffPanel({ ws, onClose }: { ws: string; onClose: () => void }) 
     </div>
   )
 }
-
-export function Inbox({ view, onClose, onPick }: { view: View; onClose: () => void; onPick: (tab: string) => void }) {
-  const items = view.tabs
-    .filter(t => t.status === 'waiting' || (t.done && t.status === 'idle') || t.limit)
-    .sort((a, b) => (a.status === 'waiting' ? 0 : 1) - (b.status === 'waiting' ? 0 : 1))
-  const [preview, setPreview] = useState<Record<string, string>>({})
-  useEffect(() => {
-    for (const t of items) if (preview[t.id] === undefined) api.call<string>('screen', { target: t.id, lines: 8 }).then(s => setPreview(p => ({ ...p, [t.id]: s })), () => {})
-  }, [items.map(t => t.id).join()])
-  return (
-    <Modal title="Inbox" onClose={onClose} wide>
-      {!items.length && <div className="muted pad">Nothing needs you.</div>}
-      <div className="inbox">
-        {items.map(t => (
-          <div key={t.id} className="inbox-item" onClick={() => onPick(t.id)}>
-            <div className="inbox-head">
-              <Glyph s={t.limit ? 'limit' : t.status === 'waiting' ? 'waiting' : 'done'} />
-              <b>
-                {t.workspace} / {t.name}
-              </b>
-              <span className="muted">{t.status === 'waiting' ? 'needs you' : t.limit ? `limit until ${new Date(t.limit).toLocaleTimeString()}` : 'finished'}</span>
-            </div>
-            <pre className="preview">{preview[t.id] ?? '…'}</pre>
-          </div>
-        ))}
-      </div>
-    </Modal>
-  )
-}
