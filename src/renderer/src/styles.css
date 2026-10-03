@@ -379,3 +379,25 @@ kbd { font-family: var(--mono); }
 .term-preview .xterm-viewport { background: var(--term-bg) !important; }
 .side-panel .row { display: flex; flex-wrap: wrap; gap: 6px; }
 .side-panel .toggle { font-size: 12px; }
+/* file preview and finder (SidePanel.tsx), projects in Settings: as in the other app */
+.preview { width: 46%; min-width: 320px; flex: none; display: flex; flex-direction: column; min-height: 0; border-left: 1px solid var(--line); background: var(--bg); }
+.pv-head { display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 10px; border-bottom: 1px solid var(--line); background: var(--panel); color: var(--muted); }
+.pv-head > svg { flex: none; }
+.pv-path { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--fg); font-size: 12.5px; }
+.pv-head button.small { font-size: 12px; padding: 2px 8px; flex: none; }
+.pv-body { flex: 1; overflow: auto; font-family: var(--mono); font-size: 12px; line-height: 1.5; padding: 6px 0 24px; user-select: text; -webkit-user-select: text; }
+.pv-line { white-space: pre; min-width: max-content; padding-right: 12px; }
+.pv-line.at { background: color-mix(in srgb, var(--waiting) 18%, transparent); }
+.pv-n { display: inline-block; width: 48px; padding-right: 12px; text-align: right; color: var(--muted); opacity: 0.6; user-select: none; -webkit-user-select: none; }
+.pv-image { padding: 16px; display: flex; justify-content: center; background: repeating-conic-gradient(var(--panel) 0 25%, var(--bg) 0 50%) 0 0 / 16px 16px; min-height: 100%; }
+.pv-image img { max-width: 100%; object-fit: contain; align-self: flex-start; }
+.finder { width: 620px; max-width: calc(100vw - 32px); align-self: flex-start; background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); overflow: hidden; display: flex; flex-direction: column; }
+.finder > input { border: none; border-bottom: 1px solid var(--line); border-radius: 0; padding: 12px 14px; font-size: 14px; background: none; }
+.ff-list { max-height: 52vh; overflow-y: auto; padding: 4px; }
+.ff-item { display: flex; align-items: center; gap: 8px; padding: 5px 10px; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; color: var(--fg); font-size: 13px; }
+.ff-item > svg { flex: none; color: var(--muted); }
+.ff-item .muted { overflow: hidden; text-overflow: ellipsis; font-size: 12px; }
+.ff-item.sel { background: var(--sel); }
+.ff-item b { color: var(--accent); font-weight: 700; }
+.settings-nav-head { margin: 14px 10px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
+.settings-nav button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

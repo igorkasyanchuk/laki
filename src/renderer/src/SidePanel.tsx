@@ -1,7 +1,8 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
-// checks and review comments; and the header's Run button. The same file is in both apps (wb-superset,
-// wb-spike); each passes in how its daemon lists and makes files, opens one, diffs and reads reviews.
-import { useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+// checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. The
+// same file is in both apps (wb-superset, wb-spike); each passes in how its daemon lists, reads and makes
+// files, opens one in the editor, diffs and reads reviews.
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { type AutoKey, PRSection, type WsInfo } from './Info'
 import { Icon, IconButton, type IconName } from './ui'
 
@@ -9,10 +10,13 @@ export type PanelTab = 'files' | 'changes' | 'review'
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
 export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string }[] }
+// a file to show: text (up to a size), an image as a data: URL, or neither (binary)
+export type FileContent = { size: number; text?: string; image?: string; cut?: boolean }
 export type PanelApi = {
   files: () => Promise<FileList>
   newFile: (path: string, dir: boolean) => Promise<string> // the path made
   openFile: (path: string) => void // in the editor
+  preview: (path: string, line?: number) => void // in the app
   changes: () => Promise<Changes>
   threads: () => Promise<Thread[]>
 }
@@ -156,7 +160,7 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
         {!d && !err && <div className="muted small pad">Loading…</div>}
         {query
           ? found.map(f => (
-              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} onClick={() => (setSel(f), api.openFile(f))}>
+              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} onClick={() => (setSel(f), api.preview(f))}>
                 <Icon name="file" />
                 <span className="sp-name">
                   {f.slice(f.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f)}</span>
@@ -169,7 +173,8 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
                 key={n.path}
                 className={`sp-row ${sel === n.path ? 'sel' : ''} ${n.dir ? '' : `ch-${changed[n.path] ?? ''}`}`}
                 style={{ paddingLeft: 8 + depth * 14 }}
-                onClick={() => (setSel(n.path), n.dir ? toggle(n.path) : api.openFile(n.path))}
+                onClick={() => (setSel(n.path), n.dir ? toggle(n.path) : api.preview(n.path))}
+                onDoubleClick={() => !n.dir && api.openFile(n.path)}
               >
                 <span className="sp-chev">{n.dir && <Icon name={open.has(n.path) ? 'chevron' : 'chevronRight'} />}</span>
                 <span className="sp-name">{n.name}</span>
@@ -234,9 +239,14 @@ function ChangesTab({ api, ws }: { api: PanelApi; ws: string }) {
                     {l || ' '}
                   </div>
                 ))}
-                <button className="link small" onClick={() => api.openFile(f.path)}>
-                  open in the editor
-                </button>
+                <span className="row">
+                  <button className="link small" onClick={() => api.preview(f.path)}>
+                    show the file
+                  </button>
+                  <button className="link small" onClick={() => api.openFile(f.path)}>
+                    open in the editor
+                  </button>
+                </span>
               </div>
             )}
           </div>
@@ -266,7 +276,7 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
           {threads && !open.length && <span className="muted small">No open threads{resolved ? ` (${resolved} resolved)` : ''}.</span>}
           {open.map((t, i) => (
             <div key={i} className="sp-thread">
-              <div className="sp-thread-head mono small" onClick={() => p.api.openFile(t.path)} data-tip="Open in the editor">
+              <div className="sp-thread-head mono small" onClick={() => p.api.preview(t.path, t.line)} data-tip="Show the file">
                 {t.path}
                 {t.line ? `:${t.line}` : ''}
                 {t.outdated && <span className="tag">outdated</span>}
@@ -336,6 +346,153 @@ export function RunButton({ running, onRun, onStop, onMenu }: { running: boolean
       <button className="run-more" aria-label="Run options" data-tip="Restart, the run tab, scripts…" onClick={onMenu}>
         <Icon name="chevron" />
       </button>
+    </div>
+  )
+}
+
+const sizeText = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
+
+// a file in the app, next to the panel: text with line numbers, an image, or what it is
+export function FilePreview(p: { path: string; line?: number; load: () => Promise<FileContent>; onOpen: () => void; onClose: () => void }) {
+  const [f, setF] = useState<FileContent | null>(null)
+  const [err, setErr] = useState('')
+  const [n, setN] = useState(0)
+  const body = useRef<HTMLDivElement>(null)
+  const load = useRef(p.load)
+  load.current = p.load
+  useEffect(() => {
+    let alive = true
+    setErr('')
+    load.current().then(x => alive && setF(x), e => alive && (setF(null), setErr(String(e?.message ?? e))))
+    return () => void (alive = false)
+  }, [p.path, n])
+  useEffect(() => setF(null), [p.path])
+  useLayoutEffect(() => {
+    if (p.line) body.current?.querySelector('.pv-line.at')?.scrollIntoView({ block: 'center' })
+    else body.current?.scrollTo(0, 0)
+  }, [f, p.line])
+  const lines = useMemo(() => f?.text?.split('\n') ?? [], [f])
+  const cut = p.path.lastIndexOf('/') + 1
+  return (
+    <div className="preview">
+      <div className="pv-head">
+        <Icon name="file" />
+        <span className="pv-path" data-tip={p.path}>
+          {p.path.slice(cut)} <span className="muted">{p.path.slice(0, cut)}</span>
+        </span>
+        {f && <span className="muted small">{sizeText(f.size)}</span>}
+        <IconButton icon="refresh" title="Reload" onClick={() => setN(x => x + 1)} />
+        <button className="small" onClick={p.onOpen}>
+          Open in editor
+        </button>
+        <IconButton icon="x" title="Close" onClick={p.onClose} />
+      </div>
+      <div className="pv-body" ref={body}>
+        {err && <div className="warn small pad">{err}</div>}
+        {f?.image && (
+          <div className="pv-image">
+            <img src={f.image} alt={p.path} />
+          </div>
+        )}
+        {f?.text !== undefined &&
+          lines.map((l, i) => (
+            <div key={i} className={`pv-line ${p.line === i + 1 ? 'at' : ''}`}>
+              <span className="pv-n">{i + 1}</span>
+              {l || ' '}
+            </div>
+          ))}
+        {f?.cut && <div className="muted small pad">Showing the first {sizeText(f.text?.length ?? 0)}. Open it in the editor for the rest.</div>}
+        {f && f.text === undefined && !f.image && <div className="muted small pad">A binary file ({sizeText(f.size)}): open it in the editor or Finder.</div>}
+      </div>
+    </div>
+  )
+}
+
+// q's characters in order in s, case aside: a score (contiguous runs and word starts count more) and
+// where they matched; null when they don't
+function match(q: string, s: string) {
+  const ls = s.toLowerCase()
+  const hits: number[] = []
+  let score = 0
+  let j = 0
+  for (const c of q) {
+    j = ls.indexOf(c, j)
+    if (j < 0) return null
+    const start = j === 0 || '/_-. '.includes(s[j - 1]) || (s[j] !== ls[j] && s[j - 1] === ls[j - 1])
+    score += 1 + (hits.at(-1) === j - 1 ? 3 : 0) + (start ? 2 : 0)
+    hits.push(j++)
+  }
+  return { score, hits }
+}
+
+// the files matching q best: its letters in the file name first, else anywhere in the path
+// ponytail: greedy first match per letter, not the best alignment; fine for picking files
+export function findFiles(q: string, files: string[], max = 60) {
+  q = q.toLowerCase().replace(/\s+/g, '')
+  if (!q) return files.slice(0, max).map(path => ({ path, hits: [] as number[] }))
+  const out: { path: string; hits: number[]; score: number }[] = []
+  for (const path of files) {
+    const at = path.lastIndexOf('/') + 1
+    const b = match(q, path.slice(at))
+    const m = b ? { score: b.score * 2 + 10, hits: b.hits.map(h => h + at) } : match(q, path)
+    if (m) out.push({ path, hits: m.hits, score: m.score - path.length * 0.02 })
+  }
+  return out.sort((a, b) => b.score - a.score).slice(0, max)
+}
+
+// ⌘P: find a file in the workspace by a few letters of its name or path
+export function FileFinder(p: { files: () => Promise<FileList>; onPick: (path: string) => void; onClose: () => void }) {
+  const [all, setAll] = useState<string[] | null>(null)
+  const [err, setErr] = useState('')
+  const [q, setQ] = useState('')
+  const [i, setI] = useState(0)
+  const list = useRef<HTMLDivElement>(null)
+  useEffect(() => void p.files().then(f => setAll(f.files), e => setErr(String(e?.message ?? e))), [])
+  const found = useMemo(() => findFiles(q, all ?? []), [q, all])
+  useEffect(() => setI(0), [q])
+  useEffect(() => list.current?.querySelector('.ff-item.sel')?.scrollIntoView({ block: 'nearest' }), [i])
+  const pick = (path?: string) => path && (p.onClose(), p.onPick(path))
+  const mark = (path: string, hits: number[]) => {
+    const at = path.lastIndexOf('/') + 1
+    const span = (from: number, to: number) =>
+      [...path.slice(from, to)].map((c, k) => (hits.includes(from + k) ? <b key={k}>{c}</b> : c))
+    return (
+      <>
+        <span className="ff-name">{span(at, path.length)}</span> <span className="muted">{span(0, at)}</span>
+      </>
+    )
+  }
+  return (
+    <div className="overlay top" onMouseDown={e => e.target === e.currentTarget && p.onClose()}>
+      <div className="finder" role="dialog" aria-label="Find a file">
+        <input
+          autoFocus
+          value={q}
+          placeholder={all ? `Find a file (${all.length.toLocaleString()} files)` : 'Find a file…'}
+          spellCheck={false}
+          onChange={e => setQ(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+              e.preventDefault()
+              setI(x => Math.max(0, Math.min(found.length - 1, x + (e.key === 'ArrowDown' ? 1 : -1))))
+            } else if (e.key === 'Enter') {
+              e.preventDefault() // or its keypress reaches the terminal focused after the finder closes
+              pick(found[i]?.path)
+            }
+            else if (e.key === 'Escape') (e.stopPropagation(), p.onClose())
+          }}
+        />
+        <div className="ff-list" ref={list}>
+          {err && <div className="warn small pad">{err}</div>}
+          {found.map((f, k) => (
+            <div key={f.path} className={`ff-item ${k === i ? 'sel' : ''}`} onMouseEnter={() => setI(k)} onClick={() => pick(f.path)}>
+              <Icon name="file" />
+              {mark(f.path, f.hits)}
+            </div>
+          ))}
+          {all && q && !found.length && <div className="muted small pad">No file matches.</div>}
+        </div>
+      </div>
     </div>
   )
 }

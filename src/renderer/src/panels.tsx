@@ -1,9 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import type { Project, ProjectConfig, View } from '../../shared/types'
+import type { View } from '../../shared/types'
 import { api, bridge } from './api'
 import { Glyph } from './Glyph'
 import { type Img, PromptInput, withImages } from './PromptInput'
-import { EnvField, ScriptsField } from './Settings'
 import { Icon, type IconName } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -169,57 +168,6 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
           </button>
           <button type="submit" className="primary" disabled={!path.trim()}>
             Add
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-// a project's name and commands; empty fields fall back to the repo's .wb.json (shown as placeholders)
-export function ProjectSettings({ project, script, onClose, onSave }: { project: Project; script?: 'run'; onClose: () => void; onSave: (p: { name: string; config: ProjectConfig }) => Promise<void> }) {
-  const [name, setName] = useState(project.name)
-  const [c, setC] = useState<ProjectConfig>(project.config ?? {})
-  const [file, setFile] = useState<ProjectConfig>({})
-  const [busy, setBusy] = useState(false)
-  useEffect(() => void api.call<ProjectConfig>('projectFile', { id: project.id }).then(setFile, () => {}), [project.id])
-  return (
-    <Modal title="Project settings" onClose={onClose} wide>
-      <form
-        className="form"
-        onSubmit={async e => {
-          e.preventDefault()
-          setBusy(true)
-          await onSave({ name, config: c }).catch(() => setBusy(false))
-        }}
-      >
-        <label>
-          Name
-          <input value={name} autoFocus onChange={e => setName(e.target.value)} />
-        </label>
-        <div className="muted small mono">
-          {project.path} · {project.git === false ? 'folder (no git)' : 'git'}
-        </div>
-        <div className="field">
-          <span>
-            Scripts <span className="muted">· for workspace setup, teardown and the Run button</span>
-          </span>
-          <ScriptsField value={c} file={file} git={project.git !== false} tab={script} onChange={x => setC(c => ({ ...c, ...x }))} />
-        </div>
-        <label>
-          <span>
-            Env <span className="muted">· for every tab, setup and teardown{file.env && Object.keys(file.env).length ? ` · .wb.json has ${Object.keys(file.env).join(', ')}` : ''}</span>
-          </span>
-          <EnvField value={c.env} onChange={env => setC(x => ({ ...x, env }))} />
-        </label>
-        <div className="buttons">
-          <span className="muted small">Empty: the repo's .wb.json</span>
-          <span className="spacer" />
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="primary" disabled={busy || !name.trim()}>
-            Save
           </button>
         </div>
       </form>

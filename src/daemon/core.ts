@@ -2,9 +2,9 @@
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { type Dirent, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { closeSync, type Dirent, existsSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
-import { basename, dirname, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
@@ -1234,6 +1234,27 @@ export function fileNew(o: { ws: string; path: string; dir?: boolean }) {
   mkdirSync(o.dir ? abs : dirname(abs), { recursive: true })
   if (!o.dir) writeFileSync(abs, '', { flag: 'wx' })
   return { path: abs.slice(ws.path.length + 1) }
+}
+
+const IMAGES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', bmp: 'image/bmp' }
+const MAX_TEXT = 512 << 10
+
+// fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size
+export function fileRead(o: { ws: string; path: string }) {
+  const abs = inside(findWs(o.ws), o.path)
+  const st = statSync(abs)
+  if (!st.isFile()) throw new Error(`${o.path} isn't a file`)
+  const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
+  if (mime) return st.size > 10 << 20 ? { size: st.size } : { size: st.size, image: `data:${mime};base64,${readFileSync(abs).toString('base64')}` }
+  const buf = Buffer.alloc(Math.min(st.size, MAX_TEXT))
+  const fd = openSync(abs, 'r')
+  try {
+    readSync(fd, buf, 0, buf.length, 0)
+  } finally {
+    closeSync(fd)
+  }
+  if (buf.subarray(0, 8000).includes(0)) return { size: st.size } // binary
+  return { size: st.size, text: buf.toString('utf8'), cut: st.size > MAX_TEXT || undefined }
 }
 
 // prThreads: the PR's review threads, for the side panel

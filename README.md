@@ -20,8 +20,8 @@ Electron + a terminal-host daemon (node-pty + @xterm/headless) + React + xterm.j
   and the images' paths.
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI or new review
   comments to the agent on their own; an info panel with the PR, its checks and what the agents said last.
-- **Side panel** (⌥⌘B): the workspace's files (search, new file or folder, changed files marked), its
-  changes against the base branch, and its PR's checks and review comments.
+- **Side panel** (⌥⌘B): the workspace's files (search, preview, new file or folder, changed files marked),
+  its changes against the base branch, and its PR's checks and review comments. ⌘P finds a file by name.
 - **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
   run script in its tab, ■ stops it; listening ports you click to open.
@@ -123,12 +123,17 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 **Side panel** (⌥⌘B, the panel icon; drag its edge to resize; one panel at a time with the info panel):
 - *Files*: the workspace's files (git's, ignored ones left out; a plain folder's, without `node_modules` and
   the like). Search filters by path. New file and new folder go in the selected folder; a new file opens in
-  your editor, and so does a click on a file. Changed files are colored (modified, new, deleted) and their
+  your editor. A click on a file previews it next to the terminal (text with line numbers, or an image),
+  with *Open in editor*; a double-click opens it in the editor. Changed files are colored (modified, new, deleted) and their
   folders get a dot. Refresh, collapse all.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
-  for its diff.
+  for its diff, with links to preview the file or open it in the editor.
 - *Review*: the PR with its checks, the *fix CI* / *review* switches and the send buttons, and the open
-  review threads (from reviewers with write access and bots: what the agent would get).
+  review threads (from reviewers with write access and bots: what the agent would get). Click a thread's
+  file to preview it at that line.
+
+**Find file** (⌘P, or *Find file…* in ⌘K): type parts of a path (`crt` finds `src/cart.ts`); names match
+before folders. ↑↓ and Enter preview the file.
 
 **Info panel** (ⓘ or ⌘I): the workspace's name, branch, path and `$PORT`; its PR's title, author, state,
 review decision, size, checks (each links to its run) and description; buttons that send the failing CI or
@@ -175,6 +180,7 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘K | palette |
+| ⌘P | find a file in the workspace |
 | ⌘D | changes (the side panel) |
 | ⌥⌘B | side panel: files, changes, review |
 | ⌘I | workspace info |
@@ -187,7 +193,7 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 ## Settings
 
 ⌘, or the gear at the top of the sidebar opens the settings page. Changes save as you make them, into
-`state.json`.
+`state.json`. The page grows and shrinks with the terminal font size.
 - *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `wb/`),
   notifications, and environment variables for every session (a project's or preset's env wins over them).
 - *Appearance*: the theme: Midnight (default), Dawn (light), Synthwave, Forest, Ember, and the Warp-style
@@ -201,13 +207,15 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
   `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each one is in
   the new-tab menu and the new-workspace dialog. Edit `claude` and `codex` to change how every new one
   starts; a tab started from a preset uses its current settings when it restarts or resumes.
+- *Projects*: each project's settings (below).
 
 Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle, and so does one
 whose turn ends without a word (a resumed chat's recap): quiet for a few seconds, no "esc to interrupt".
 
 ## Project settings
 
-⋯ on a project, then *Settings…*:
+Settings → *Projects*, or ⋯ on a project then *Settings…* (Run ▾ → *Edit the run script…* opens its Run
+tab). Saved as you type:
 - Name.
 - *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:
   - *Setup*: runs in each new worktree, e.g. `npm install`; agent and dev tabs wait for it.
@@ -217,7 +225,7 @@ whose turn ends without a word (a resumed chat's recap): quiet for a few seconds
 - *Env*: `KEY=value` lines for every tab of the project's workspaces, and its setup and teardown.
 
 These are saved in the app. A field left empty falls back to a `.wb.json` in the repo, which a team can
-commit. The dialog shows that file's values as placeholders:
+commit. The page shows that file's values as placeholders:
 
 ```json
 { "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT", "env": { "NODE_ENV": "development" } }

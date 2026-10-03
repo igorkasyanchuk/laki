@@ -1,18 +1,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
+import type { Project, ProjectConfig, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
-import { AddProject, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
+import { AddProject, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
 import { type AppInfo, FONT_SIZE, SettingsPage, termLook } from './Settings'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { type Changes, type FileList, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
+import { type Changes, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { applyTheme } from './themes'
 import { colorVar, IconButton, type IconName, type MenuItem, moveId, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | 'settings' | { settings: string; script?: 'run' } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | { settings: string; script?: 'run' } | { rename: string } | { renameWs: string }
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -60,6 +60,7 @@ export function App() {
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('wbs.panel', false)) // the right panel: files, changes, review
   const [panelTab, setPanelTab] = useState<PanelTab>(() => load('wbs.panelTab', 'files'))
   const [panelW, setPanelW] = useState<number>(() => load('wbs.panelW', PANEL_WIDTH))
+  const [preview, setPreview] = useState<{ ws: string; path: string; line?: number } | null>(null) // a file shown in the app
   const [info, setInfo] = useState<boolean>(() => load('wbs.info', false)) // the workspace info panel
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('wbs.groups', {})) // tabs (of panes) per workspace
@@ -253,6 +254,7 @@ export function App() {
     files: () => api.call<FileList>('files', { ws: w.id }),
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
     openFile: file => void call('openIn', { ws: w.id, app: 'editor', file }).catch(() => {}),
+    preview: (path, line) => setPreview({ ws: w.id, path, line }),
     changes: () => api.call<Changes>('diff', { ws: w.id }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
   })
@@ -373,6 +375,7 @@ export function App() {
       t: () => newTab('shell'),
       w: () => tab && closeTabs([tab]),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
+      p: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
       d: () => git && togglePanel('changes'),
       i: () => showInfo(),
       arrowup: () => moveWs(-1),
@@ -436,6 +439,7 @@ export function App() {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
       for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
       a({ label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
+      a({ label: 'Find file…', icon: 'file', hint: '⌘P', run: () => setDialog('files') })
       a({ label: 'Files', icon: 'file', hint: '⌥⌘B', run: () => showPanel('files') })
       if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
       if (git) a({ label: 'Review: PR checks and comments', icon: 'review', run: () => showPanel('review') })
@@ -626,6 +630,15 @@ export function App() {
               </div>
             )}
           </div>
+          {preview && ws && preview.ws === ws.id && (
+            <FilePreview
+              path={preview.path}
+              line={preview.line}
+              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: preview.path })}
+              onOpen={() => panelApi(ws).openFile(preview.path)}
+              onClose={() => setPreview(null)}
+            />
+          )}
           {panelOpen && ws && (
             <SidePanel
               w={infoOf(ws)}
@@ -653,8 +666,20 @@ export function App() {
             />
           )}
         </div>
-        {dialog === 'settings' && (
-          <SettingsPage settings={view.settings} apps={apps} onClose={() => setDialog(null)} onSave={s => call('settingsSet', s).catch(() => {})} />
+        {(dialog === 'settings' || settingsFor) && (
+          <SettingsPage
+            key={settingsFor?.id ?? ''}
+            settings={view.settings}
+            apps={apps}
+            onClose={() => setDialog(null)}
+            onSave={s => call('settingsSet', s).catch(() => {})}
+            projects={view.projects.map(p => ({ ...p, git: p.git !== false }))}
+            projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
+            onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
+            renameProjects
+            section={settingsFor && `project:${settingsFor.id}`}
+            script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
+          />
         )}
         <div className="status">
           {ws && (
@@ -717,6 +742,7 @@ export function App() {
           }}
         />
       )}
+      {dialog === 'files' && ws && <FileFinder files={() => api.call<FileList>('files', { ws: ws.id })} onPick={path => panelApi(ws).preview(path)} onClose={() => setDialog(null)} />}
       {dialog === 'palette' && <Palette items={palette} onClose={() => setDialog(null)} />}
       {dialog === 'ship' && ws && (
         <Prompt
@@ -761,17 +787,6 @@ export function App() {
           onClose={() => setDialog(null)}
           onSubmit={async name => {
             await call('wsSet', { id: dialog.renameWs, name })
-            setDialog(null)
-          }}
-        />
-      )}
-      {settingsFor && (
-        <ProjectSettings
-          project={settingsFor}
-          script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
-          onClose={() => setDialog(null)}
-          onSave={async p => {
-            await call('projectSet', { id: settingsFor.id, ...p })
             setDialog(null)
           }}
         />

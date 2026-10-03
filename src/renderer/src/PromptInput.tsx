@@ -102,9 +102,12 @@ export function PromptInput(p: {
             type="button"
             className="ib"
             data-tip="Dictate (macOS dictation; or press Fn twice)"
+            onMouseDown={e => e.preventDefault()} // the text box keeps the focus
             onClick={() => {
               box.current?.focus()
-              p.dictate!()
+              // dictation types into what macOS sees as the text field, which it learns from the web view a
+              // moment after focus: started at once, it finds none and stops (the start sound, then nothing)
+              setTimeout(() => p.dictate!(), 150)
             }}
           >
             <Icon name="mic" />

@@ -228,6 +228,13 @@ test('side panel: files with their changes, new files and folders, only inside t
   f = await rig.rpc('files', { ws: ws.id })
   assert.ok(f.files.includes('src/lib/a.ts'))
   assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), []) // no PR
+  // the preview: text, an image, a binary file
+  assert.deepEqual(await rig.rpc('fileRead', { ws: ws.id, path: 'README.md' }), { size: 8, text: 'changed\n' })
+  writeFileSync(join(ws.path, 'dot.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))
+  assert.equal((await rig.rpc('fileRead', { ws: ws.id, path: 'dot.png' })).image, 'data:image/png;base64,iVBORw==')
+  writeFileSync(join(ws.path, 'blob.bin'), Buffer.from([1, 0, 2]))
+  assert.deepEqual(await rig.rpc('fileRead', { ws: ws.id, path: 'blob.bin' }), { size: 3 })
+  await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: '../../etc/hosts' }), /inside the workspace/)
 })
 
 test('ports of the workspace process tree, PR from gh, dev server', async t => {

@@ -97,6 +97,7 @@ const api: Record<string, Handler> = {
   diff: p => core.diff(p.ws),
   files: p => core.files(p.ws),
   fileNew: p => core.fileNew(p),
+  fileRead: p => core.fileRead(p),
   prThreads: p => core.prThreads(p.ws),
   run: p => core.runDev(p.ws),
   ship: p => core.ship(p.ws, p.message),

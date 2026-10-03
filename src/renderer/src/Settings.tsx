@@ -185,6 +185,53 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
+export type ProjectConfig = Scripts & { env?: Record<string, string> }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; config?: ProjectConfig }
+
+// a project's page: name, scripts, env; saved as you type, like the rest
+function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promise<ProjectConfig>; rename?: boolean; script?: keyof Scripts; onSave: (o: { name?: string; config: ProjectConfig }) => unknown }) {
+  const [name, setName] = useState(p.project.name)
+  const [c, setC] = useState<ProjectConfig>(p.project.config ?? {})
+  const [file, setFile] = useState<ProjectConfig>({})
+  useEffect(() => void p.file?.(p.project.id).then(setFile, () => {}), [p.project.id])
+  const first = useRef(true)
+  const unsaved = useRef<(() => unknown) | null>(null)
+  useEffect(() => {
+    if (first.current) return void (first.current = false)
+    const save = () => p.onSave({ name: p.rename && name.trim() ? name.trim() : undefined, config: c })
+    unsaved.current = save
+    const t = setTimeout(() => ((unsaved.current = null), save()), 400)
+    return () => clearTimeout(t)
+  }, [name, c])
+  useEffect(() => () => void unsaved.current?.(), [])
+  return (
+    <>
+      <h2>{p.project.name}</h2>
+      <div className="muted small mono">
+        {p.project.path} · {p.project.git ? 'git' : 'folder (no git)'}
+      </div>
+      {p.rename && (
+        <label>
+          Name
+          <input value={name} onChange={e => setName(e.target.value)} />
+        </label>
+      )}
+      <div className="field">
+        <span>
+          Scripts <span className="muted">· for workspace setup, teardown and the Run button; empty: the repo's .wb.json</span>
+        </span>
+        <ScriptsField value={c} file={file} git={p.project.git} tab={p.script} onChange={x => setC(y => ({ ...y, ...x }))} />
+      </div>
+      <label>
+        <span>
+          Env <span className="muted">· for every tab, setup and teardown{file.env && Object.keys(file.env).length ? ` · .wb.json has ${Object.keys(file.env).join(', ')}` : ''}</span>
+        </span>
+        <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
+      </label>
+    </>
+  )
+}
+
 const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' }
 const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
 
@@ -196,10 +243,27 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'presets', label: 'Agent presets', icon: 'agent' },
 ]
 
-export function SettingsPage({ settings, apps, onSave, onClose }: { settings: AppSettings; apps: AppInfo[]; onSave: (s: AppSettings) => void; onClose: () => void }) {
+export function SettingsPage(p: {
+  settings: AppSettings
+  apps: AppInfo[]
+  onSave: (s: AppSettings) => void
+  onClose: () => void
+  projects?: ProjectInfo[]
+  projectFile?: (id: string) => Promise<ProjectConfig> // its .wb.json
+  onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig }) => unknown
+  renameProjects?: boolean
+  section?: string // where it opens: a section's id, or project:<id>
+  script?: keyof Scripts // a project's script tab to show
+}) {
+  const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
-  const [sec, setSec] = useState('general')
+  const [sec, setSec] = useState(p.section ?? 'general')
   const set = (k: Partial<AppSettings>) => setS(x => ({ ...x, ...k }))
+  // ⌘+ / ⌘− while the page is open change the size behind its back
+  useEffect(() => setS(x => (x.fontSize === settings.fontSize ? x : { ...x, fontSize: settings.fontSize })), [settings.fontSize])
+  // the page grows with the terminal's font size, from 13px as 100%
+  const scale = (s.fontSize ?? FONT_SIZE) / FONT_SIZE
+  const project = p.projects?.find(x => `project:${x.id}` === sec)
   // saved a moment after the last change, or on closing before that
   const first = useRef(true)
   const unsaved = useRef<AppSettings | null>(null)
@@ -253,7 +317,7 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
     )
   }
   return (
-    <div className="settings-page">
+    <div className="settings-page" style={{ zoom: scale }}>
       <div className="settings-head">
         <b>Settings</b>
         <span className="grow" />
@@ -266,8 +330,24 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
               <Icon name={x.icon} /> {x.label}
             </button>
           ))}
+          {!!p.projects?.length && <div className="settings-nav-head">Projects</div>}
+          {p.projects?.map(x => (
+            <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => setSec(`project:${x.id}`)} data-tip={x.path}>
+              <Icon name="folder" /> {x.name}
+            </button>
+          ))}
         </nav>
         <div className="settings-main form">
+          {project && (
+            <ProjectSection
+              key={project.id}
+              project={project}
+              file={p.projectFile}
+              rename={p.renameProjects}
+              script={p.script}
+              onSave={o => p.onSaveProject?.(project.id, o)}
+            />
+          )}
           {sec === 'general' && (
             <>
               <h2>General</h2>
@@ -392,7 +472,9 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
                   {s.fontSize ?? FONT_SIZE}px · {s.lineHeight ?? 1.15} line height · {s.fontWeight || '400'}
                 </span>
               </div>
-              <TermPreview s={s} />
+              <div style={{ zoom: 1 / scale }}>
+                <TermPreview s={s} />
+              </div>
               <p className="muted small">Ligatures (=&gt; as one glyph) aren't drawn: xterm needs an add-on for them that wb doesn't ship.</p>
             </>
           )}
