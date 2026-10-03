@@ -28,11 +28,11 @@ wbs runs each task in a **workspace**: a git worktree on its own branch (\`wb/<i
 (\`--local\`), with tabs for agents (claude, codex), shells and a dev server. A **project** is a repo (or a
 folder) added to wbs. The app shows all of it live; the CLI drives the same daemon.
 
-Run the CLI through this launcher (an absolute path: it works from any shell):
+Run the CLI through this launcher (an absolute path: it works from any shell; keep the quotes):
 
-    ${cli}
+    "${cli}"
 
-For example \`${cli} ls --json\`. Below, \`wbs\` stands for it.
+For example \`"${cli}" ls --json\`. Below, \`wbs\` stands for it.
 
 ## Where you are
 
@@ -80,7 +80,7 @@ export const skills = () => (Object.keys(AGENTS) as SkillAgent[]).map(info)
 
 // install (or update) the skill for an agent, or remove it: only our files, and the folder if that empties it
 export function skillSet(o: { agent: SkillAgent; on: boolean }) {
-  if (!(o.agent in AGENTS)) throw new Error(`no agent ${o.agent}`)
+  if (!Object.hasOwn(AGENTS, o.agent)) throw new Error(`no agent ${o.agent}`)
   const at = skillDir(o.agent)
   const fs = files(at)
   if (o.on) {
