@@ -51,7 +51,8 @@ wbs CLI / hooks (node) ─────── /rpc ──────▶   WBS_DE
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`), `openIn` (an app id, or `editor`: the default);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `reorder` (projects or workspaces by id), `wsSet` (color), `projectFile` (the repo's `.wb.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color), `send`, `queueClear`;
-- worktree actions: `diff`, `run`, `ship`;
+- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `prThreads`, `openIn` with a `file` (paths must stay inside the
+  workspace: `inside`);
 - terminals: `screen`, `input`, `resize`, `view`, `detach`.
 
 WebSocket events:
@@ -176,14 +177,21 @@ they work).
   each item has a key: its own `key` or a free initial, `menuKeys`),
   tooltips (`Tips`: any element with `data-tip`), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
   and sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`).
-- **`Settings.tsx`**: the settings page (⌘,), autosaved; presets, `EnvField` (KEY=value lines), fonts.
-- **`panels.tsx`**: the new-workspace dialog, palette, app settings, project settings, prompt, diff panel and add-project dialog (the last
+- **`Settings.tsx`**: the settings page (⌘,), autosaved; presets, `EnvField` (KEY=value lines), fonts,
+  `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
+  (`TermPreview`), and `ScriptsField` (a project's setup/teardown/run scripts, Import from a file). A
+  setting back at its default is saved as that value: an unset key wouldn't replace the saved one.
+- **`SidePanel.tsx`**: the right panel (⌥⌘B): Files (tree from the daemon's file list, search, new
+  file/folder, changed files marked), Changes (the diff by file), Review (`PRSection` from `Info.tsx`, review
+  threads); and `RunButton`. Each app passes a `PanelApi` over its daemon. One right panel at a time: it or
+  the info panel.
+- **`panels.tsx`**: the new-workspace dialog, palette, app settings, project settings, prompt and add-project dialog (the last
   only for the web dev renderer, which has no folder picker).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
 
 **Shared files:** `layout.ts`, `Panes.tsx`, `Find.tsx`, `ui.tsx`, `Settings.tsx`, `themes.ts`, `PromptInput.tsx`,
-`Info.tsx` and `Glyph.tsx` are identical copies of the files in
+`Info.tsx`, `Glyph.tsx` and `SidePanel.tsx` are identical copies of the files in
 `~/projects/wb-spike/frontend/src/`. Change both copies.
 
 ## Files

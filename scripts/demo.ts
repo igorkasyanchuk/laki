@@ -40,6 +40,16 @@ writeFileSync(
     statusCheckRollup: [check('lint', 'SUCCESS'), check('test (node 22)', 'FAILURE'), check('build', 'SUCCESS'), check('e2e', '', 'IN_PROGRESS')],
   }),
 )
+// review threads, for the side panel's Review tab
+const said = (login: string, body: string) => ({ author: { login, __typename: 'User' }, authorAssociation: 'MEMBER', body })
+writeFileSync(
+  join(home, 'gh/graphql.json'),
+  JSON.stringify({ data: { viewer: { login: 'demo' }, repository: { pullRequest: { reviewThreads: { nodes: [
+    { id: 't1', isResolved: false, isOutdated: false, path: 'src/cart.js', line: 2, comments: { nodes: [said('ann', 'Round to cents before summing, or 0.1 + 0.2 shows up in totals.')] } },
+    { id: 't2', isResolved: false, isOutdated: true, path: 'src/cart.test.js', line: 5, comments: { nodes: [said('bob', 'Add a case for an empty cart.'), said('demo', 'On it.')] } },
+    { id: 't3', isResolved: true, isOutdated: false, path: 'README.md', line: 1, comments: { nodes: [said('ann', 'Typo.')] } },
+  ] } } } } }),
+)
 mkdirSync(join(repo, 'src'), { recursive: true })
 git('init', '-q', '-b', 'main')
 writeFileSync(join(repo, 'README.md'), '# shop\n\nA tiny shop.\n')

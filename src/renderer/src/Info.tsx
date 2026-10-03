@@ -110,6 +110,62 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
   )
 }
 
+// the PR: title, state, checks, the auto switches and what to send the agent (info panel, side panel)
+export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: 'ci' | 'review') => void }) {
+  const pr = w.pr
+  return (
+    <section>
+      <h3>
+        <Icon name="pr" /> Pull request
+      </h3>
+      {!pr ? (
+        <p className="muted small">{w.kind === 'worktree' ? `None for ${w.branch} yet. Ship opens one.` : 'None.'}</p>
+      ) : (
+        <>
+          <a className="info-title" href={pr.url} onClick={e => (e.preventDefault(), onOpen(pr.url))}>
+            #{pr.number} {pr.title}
+          </a>
+          <div className="info-tags">
+            <span className={`tag tag-${prState(pr)}`}>{prState(pr)}</span>
+            {pr.review && <span className={`tag tag-${pr.review.toLowerCase()}`}>{REVIEW[pr.review] ?? pr.review.toLowerCase()}</span>}
+            {pr.author && <span className="muted">by {pr.author}</span>}
+            {!!(pr.additions || pr.deletions) && (
+              <span className="mono small">
+                <span className="add">+{pr.additions ?? 0}</span> <span className="del">−{pr.deletions ?? 0}</span>
+              </span>
+            )}
+            {pr.updated && <span className="muted small">updated {ago(pr.updated)}</span>}
+          </div>
+          {pr.state === 'OPEN' && (
+            <>
+              <div className="info-checks">
+                {(pr.list ?? []).map((c, i) => (
+                  <a key={i} className={`info-check ck-${c.state}`} href={c.url} onClick={e => (e.preventDefault(), c.url && onOpen(c.url))}>
+                    <span className="ck">{{ pass: '✓', fail: '✗', pending: '…', skip: '–' }[c.state]}</span>
+                    {c.name}
+                  </a>
+                ))}
+                {!pr.list?.length && <span className="muted small">No checks.</span>}
+              </div>
+              <div className="info-auto">
+                <AutoToggles w={w} onToggle={onToggle} />
+                {w.autoFix && (w.fixTries ?? 0) > MAX_CI_FIXES && <span className="warn small">gave up after {MAX_CI_FIXES} fixes; push to try again</span>}
+              </div>
+              <div className="row">
+                <button onClick={() => onFix('ci')} disabled={pr.checks !== 'fail'}>
+                  Send failing CI to the agent
+                </button>
+                <button onClick={() => onFix('review')}>Send review comments</button>
+              </div>
+            </>
+          )}
+          {pr.body?.trim() && <div className="info-pr-body">{pr.body.trim()}</div>}
+        </>
+      )}
+    </section>
+  )
+}
+
 export function InfoPanel(p: {
   w: WsInfo
   onClose: () => void
@@ -120,7 +176,6 @@ export function InfoPanel(p: {
   onAgent: (tab: string) => void
 }) {
   const { w } = p
-  const pr = w.pr
   return (
     <div className="info">
       <div className="diff-head">
@@ -148,55 +203,7 @@ export function InfoPanel(p: {
           {w.created ? <Row k="created">{ago(w.created)}</Row> : null}
         </section>
 
-        <section>
-          <h3>
-            <Icon name="pr" /> Pull request
-          </h3>
-          {!pr ? (
-            <p className="muted small">{w.kind === 'worktree' ? `None for ${w.branch} yet. Ship opens one.` : 'None.'}</p>
-          ) : (
-            <>
-              <a className="info-title" href={pr.url} onClick={e => (e.preventDefault(), p.onOpen(pr.url))}>
-                #{pr.number} {pr.title}
-              </a>
-              <div className="info-tags">
-                <span className={`tag tag-${prState(pr)}`}>{prState(pr)}</span>
-                {pr.review && <span className={`tag tag-${pr.review.toLowerCase()}`}>{REVIEW[pr.review] ?? pr.review.toLowerCase()}</span>}
-                {pr.author && <span className="muted">by {pr.author}</span>}
-                {!!(pr.additions || pr.deletions) && (
-                  <span className="mono small">
-                    <span className="add">+{pr.additions ?? 0}</span> <span className="del">−{pr.deletions ?? 0}</span>
-                  </span>
-                )}
-                {pr.updated && <span className="muted small">updated {ago(pr.updated)}</span>}
-              </div>
-              {pr.state === 'OPEN' && (
-                <>
-                  <div className="info-checks">
-                    {(pr.list ?? []).map((c, i) => (
-                      <a key={i} className={`info-check ck-${c.state}`} href={c.url} onClick={e => (e.preventDefault(), c.url && p.onOpen(c.url))}>
-                        <span className="ck">{{ pass: '✓', fail: '✗', pending: '…', skip: '–' }[c.state]}</span>
-                        {c.name}
-                      </a>
-                    ))}
-                    {!pr.list?.length && <span className="muted small">No checks.</span>}
-                  </div>
-                  <div className="info-auto">
-                    <AutoToggles w={w} onToggle={p.onToggle} />
-                    {w.autoFix && (w.fixTries ?? 0) > MAX_CI_FIXES && <span className="warn small">gave up after {MAX_CI_FIXES} fixes; push to try again</span>}
-                  </div>
-                  <div className="row">
-                    <button onClick={() => p.onFix('ci')} disabled={pr.checks !== 'fail'}>
-                      Send failing CI to the agent
-                    </button>
-                    <button onClick={() => p.onFix('review')}>Send review comments</button>
-                  </div>
-                </>
-              )}
-              {pr.body?.trim() && <div className="info-pr-body">{pr.body.trim()}</div>}
-            </>
-          )}
-        </section>
+        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} />
 
         <section>
           <h3>

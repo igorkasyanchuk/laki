@@ -9,7 +9,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { api, openExternal } from './api'
 import { FindBar } from './Find'
-import { FONT_SIZE, fontStack } from './Settings'
+import { FONT_SIZE, fontStack, termLook } from './Settings'
 import { termTheme, transparent } from './themes'
 
 export function Term({
@@ -20,6 +20,7 @@ export function Term({
   fontFamily,
   copyOnSelect = true,
   theme = '',
+  look = termLook({}),
 }: {
   tab: string
   active?: boolean
@@ -28,6 +29,7 @@ export function Term({
   fontFamily?: string
   copyOnSelect?: boolean
   theme?: string // the app's (themes.ts): the colors come from its CSS
+  look?: ReturnType<typeof termLook> // line height, weight, cursor… (Settings)
 }) {
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
@@ -39,12 +41,11 @@ export function Term({
     const term = new Terminal({
       fontFamily: fontStack(fontFamily),
       fontSize,
-      lineHeight: 1.15,
+      ...look,
       scrollback: 5000,
       allowProposedApi: true,
       allowTransparency: transparent(theme),
       macOptionIsMeta: true,
-      cursorBlink: true,
       theme: termTheme(),
     })
     const fit = new FitAddon()
@@ -130,6 +131,12 @@ export function Term({
     xt.term.options.fontFamily = family
     xt.fit.fit()
   }, [fontSize, fontFamily, xt])
+  const lookKey = JSON.stringify(look)
+  useEffect(() => {
+    if (!xt) return
+    Object.assign(xt.term.options, look)
+    xt.fit.fit()
+  }, [lookKey, xt])
   useEffect(() => {
     if (!xt) return
     xt.term.options.allowTransparency = transparent(theme)

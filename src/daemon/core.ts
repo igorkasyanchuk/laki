@@ -2,7 +2,7 @@
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { type Dirent, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -329,6 +329,7 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
     WB_TAB: tab.id,
     PORT: String(ws.port),
     WBS_HOME: dir,
+    WB_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
     ...extra,
   }
 }
@@ -502,8 +503,8 @@ export function apps() {
 }
 
 // open a workspace's (or a project's) folder in an app; 'editor' is the one in Settings
-export async function openIn(o: { ws?: string; project?: string; app: string }) {
-  const path = o.ws ? findWs(o.ws).path : findProject(o.project ?? '').path
+export async function openIn(o: { ws?: string; project?: string; app: string; file?: string }) {
+  const path = o.file && o.ws ? inside(findWs(o.ws), o.file) : o.ws ? findWs(o.ws).path : findProject(o.project ?? '').path
   const s = state.settings ?? {}
   const app = o.app === 'editor' ? s.editor || 'cursor' : o.app
   const fail = (e: any) => {
@@ -1058,7 +1059,9 @@ const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
 
 // a PR's review threads, and who you are on GitHub
 async function reviewThreads(cwd: string, pr: number): Promise<{ threads: Thread[]; me: string }> {
-  const { stdout } = await run('gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { cwd, timeout: 20000 })
+  const { stdout } = await run('gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { cwd, timeout: 20000 }).catch(e => {
+    throw new Error(`gh couldn't read the review comments: ${String(e.stderr || '').trim().split('\n')[0] || 'it failed'}`)
+  })
   const d = JSON.parse(stdout).data
   const threads: Thread[] | undefined = d?.repository?.pullRequest?.reviewThreads?.nodes
   if (!threads) throw new Error(`no review threads for PR #${pr} (gh api graphql)`)
@@ -1174,6 +1177,78 @@ export function ship(ref: string, message: string) {
     scanPRs()
   }
   return tab
+}
+
+// ---------- files: the side panel's tree, changed files marked
+
+// a path in the workspace; ponytail: by name only, a symlink inside may still point out
+function inside(ws: Workspace, rel: string) {
+  const abs = resolve(ws.path, rel)
+  if (!rel.trim() || !abs.startsWith(ws.path + '/')) throw new Error(`${rel}: not a path inside the workspace`)
+  return abs
+}
+
+const MAX_FILES = 50000
+
+// files lists the workspace's files (git's: tracked and untracked, not ignored; a plain folder's: all
+// but dependencies), and how the changed ones changed: M, A (new), D, R
+export async function files(ref: string) {
+  const ws = findWs(ref)
+  if (!existsSync(join(ws.path, '.git'))) {
+    const out: string[] = []
+    const walk = (dir: string) => {
+      let es: Dirent[]
+      try {
+        es = readdirSync(join(ws.path, dir), { withFileTypes: true })
+      } catch {
+        return // unreadable: left out
+      }
+      for (const e of es) {
+        if (out.length >= MAX_FILES) return
+        const rel = dir ? `${dir}/${e.name}` : e.name
+        if (e.isDirectory()) !SKIP_DIRS.has(e.name) && walk(rel)
+        else out.push(rel)
+      }
+    }
+    walk('')
+    return { files: out, changed: {}, cut: out.length >= MAX_FILES }
+  }
+  const z = (args: string[]) => run('git', args, { cwd: ws.path, maxBuffer: 64 << 20 }).then(r => r.stdout.split('\0'))
+  const [list, st] = await Promise.all([z(['ls-files', '-z', '--cached', '--others', '--exclude-standard']), z(['status', '--porcelain', '-z', '--untracked-files=all'])])
+  const changed: Record<string, string> = {}
+  for (let i = 0; i < st.length; i++) {
+    const [xy, path] = [st[i].slice(0, 2), st[i].slice(3)]
+    if (!path) continue
+    changed[path] = xy === '??' ? 'A' : xy.includes('D') ? 'D' : xy.includes('R') ? 'R' : xy.includes('A') ? 'A' : 'M'
+    if (xy.includes('R') || xy.includes('C')) i++ // the old name follows
+  }
+  const all = [...new Set(list.filter(Boolean))]
+  return { files: all.slice(0, MAX_FILES), changed, cut: all.length > MAX_FILES }
+}
+const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'target', 'dist', 'build', '.venv', '__pycache__'])
+
+export function fileNew(o: { ws: string; path: string; dir?: boolean }) {
+  const ws = findWs(o.ws)
+  const abs = inside(ws, o.path)
+  if (existsSync(abs)) throw new Error(`${o.path} is there already`)
+  mkdirSync(o.dir ? abs : dirname(abs), { recursive: true })
+  if (!o.dir) writeFileSync(abs, '', { flag: 'wx' })
+  return { path: abs.slice(ws.path.length + 1) }
+}
+
+// prThreads: the PR's review threads, for the side panel
+export async function prThreads(ref: string) {
+  const ws = findWs(ref)
+  const pr = prs.get(ws.id)
+  if (!pr) return []
+  const { threads } = await reviewThreads(ws.path, pr.number)
+  return threads.map(t => ({
+    path: t.path,
+    line: t.line ?? undefined,
+    resolved: t.isResolved,
+    outdated: t.isOutdated,
+    comments: t.comments.nodes.map(c => ({ author: c.author?.login ?? 'ghost', body: c.body })),
+  }))
 }
 
 export function screen(target: string, lines = 30) {

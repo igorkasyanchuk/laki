@@ -3,7 +3,7 @@
 A macOS app for running coding agents (Claude Code, Codex, or any command) side by side, each in its own
 git worktree. You get a sidebar of projects and workspaces, tabs per workspace, real terminals you can split
 into panes, and live agent status (running, waiting for you, finished). It also has a follow-up queue, a
-diff panel, dev servers, listening ports, PRs and ship. Agents keep running when you quit the app.
+side panel (files, changes, review), a Run button, dev servers, listening ports, PRs and ship. Agents keep running when you quit the app.
 
 Electron + a terminal-host daemon (node-pty + @xterm/headless) + React + xterm.js, the same shape as Superset.
 
@@ -14,13 +14,17 @@ Electron + a terminal-host daemon (node-pty + @xterm/headless) + React + xterm.j
 - **Agents**: Claude Code, Codex or any command, started from presets (args, env). Live status per tab and
   workspace; notifications; a follow-up queue; resume after a restart; usage limits wait and continue.
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
-  closed. ⌘F finds with every match in yellow; copy on select; font, size and zoom.
+  closed. ⌘F finds with every match in yellow; copy on select; font, size, line height, weight, cursor
+  and zoom, with a live preview.
 - **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots; the agent gets the text
   and the images' paths.
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI or new review
   comments to the agent on their own; an info panel with the PR, its checks and what the agents said last.
-- **Git**: diff panel, ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
-- **Dev servers and ports**: a dev tab per workspace, listening ports you click to open.
+- **Side panel** (⌥⌘B): the workspace's files (search, new file or folder, changed files marked), its
+  changes against the base branch, and its PR's checks and review comments.
+- **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
+- **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
+  run script in its tab, ■ stops it; listening ports you click to open.
 - **Look**: 9 themes, including Warp-style gradients; tab and workspace colors.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 
@@ -105,15 +109,26 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - info (⌘I): the workspace info panel (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
-- diff (⌘D): changes against the base branch, including uncommitted and new files;
-- run: the project's dev command, in a *dev* tab (shown when the project has one);
+- panel (⌥⌘B): the side panel (below); ⌘D opens it on *Changes*;
 - ship: commit, push and open a PR, in a *ship* tab;
 - search: the command palette (⌘K);
-- ⋯: split right/down, fork, archive, delete.
+- ⋯: split right/down, fork, archive, delete;
+- ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,
+  opens `localhost:$PORT` or edits the script. With no run script, Run opens the project's scripts.
 
 **Status bar** (bottom): branch ← base, `$PORT` and listening ports (click one to open it in the browser), the PR
 (click to open it), its CI (`✓ 4/4`, `✗ 1 failing`, `… 2 running`; click for the checks), the *fix CI* and
 *review* switches (see PRs below), and the workspace's path.
+
+**Side panel** (⌥⌘B, the panel icon; drag its edge to resize; one panel at a time with the info panel):
+- *Files*: the workspace's files (git's, ignored ones left out; a plain folder's, without `node_modules` and
+  the like). Search filters by path. New file and new folder go in the selected folder; a new file opens in
+  your editor, and so does a click on a file. Changed files are colored (modified, new, deleted) and their
+  folders get a dot. Refresh, collapse all.
+- *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
+  for its diff.
+- *Review*: the PR with its checks, the *fix CI* / *review* switches and the send buttons, and the open
+  review threads (from reviewers with write access and bots: what the agent would get).
 
 **Info panel** (ⓘ or ⌘I): the workspace's name, branch, path and `$PORT`; its PR's title, author, state,
 review decision, size, checks (each links to its run) and description; buttons that send the failing CI or
@@ -160,7 +175,8 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘K | palette |
-| ⌘D | diff |
+| ⌘D | changes (the side panel) |
+| ⌥⌘B | side panel: files, changes, review |
 | ⌘I | workspace info |
 | ⌘F | find in the terminal |
 | ⌘E | open in the editor |
@@ -177,7 +193,9 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 - *Appearance*: the theme: Midnight (default), Dawn (light), Synthwave, Forest, Ember, and the Warp-style
   gradients Cyber Wave, Koi, Pink City, Leafy and Snowy (light). Terminals take its 16 colors.
 - *Terminal*: font (the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
-  copy selected text to the clipboard (on by default).
+  line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
+  cursor style (block, bar, underline) and blinking, and copy selected text to the clipboard (on by default),
+  with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
 - *Agent presets*: how agents start. A preset is Claude Code or Codex with extra arguments (e.g.
   `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each one is in
@@ -191,9 +209,11 @@ whose turn ends without a word (a resumed chat's recap): quiet for a few seconds
 
 ⋯ on a project, then *Settings…*:
 - Name.
-- *Setup*: runs in each new worktree, e.g. `npm install`; agent and dev tabs wait for it.
-- *Run*: the dev server, e.g. `npm run dev -- --port $PORT`.
-- *Teardown*: runs when a workspace is deleted or archived.
+- *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:
+  - *Setup*: runs in each new worktree, e.g. `npm install`; agent and dev tabs wait for it.
+    `$WB_PROJECT_PATH` is the repo itself, e.g. `cp "$WB_PROJECT_PATH/.env" .env`.
+  - *Teardown*: runs when a workspace is deleted or archived.
+  - *Run*: what ▷ Run starts, e.g. `npm run dev -- --port $PORT`.
 - *Env*: `KEY=value` lines for every tab of the project's workspaces, and its setup and teardown.
 
 These are saved in the app. A field left empty falls back to a `.wb.json` in the repo, which a team can

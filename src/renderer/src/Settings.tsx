@@ -1,7 +1,9 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The same file is in both apps
 // (wb-superset, wb-spike); each app's daemon keeps the settings and its CSS styles the page.
+import { FitAddon } from '@xterm/addon-fit'
+import { type FontWeight, Terminal } from '@xterm/xterm'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { applyTheme, preview, THEMES } from './themes'
+import { applyTheme, preview, termTheme, THEMES, transparent } from './themes'
 import { Icon, IconButton, type IconName } from './ui'
 
 // how an agent starts: claude or codex with extra args, or any command; env on top of the project's
@@ -15,6 +17,12 @@ export type AppSettings = {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  lineHeight?: number
+  letterSpacing?: number // px
+  fontWeight?: string // 300…700
+  minContrast?: number // 1: the theme's colors as they are
+  cursorStyle?: 'block' | 'bar' | 'underline'
+  cursorBlink?: boolean
   theme?: string // themes.ts
   env?: Record<string, string> // every session's
   notify?: boolean
@@ -51,6 +59,100 @@ export function installedFonts() {
 // a font name for xterm, with fallbacks
 export const fontStack = (f?: string) => [f?.trim() && JSON.stringify(f.trim()), '"SF Mono"', 'Menlo', 'Monaco', 'monospace'].filter(Boolean).join(', ')
 
+// the terminal's typography and cursor, as xterm options (size and family: Term's props, zoom changes them)
+export const termLook = (s: AppSettings) => ({
+  lineHeight: s.lineHeight ?? 1.15,
+  letterSpacing: s.letterSpacing ?? 0,
+  fontWeight: (s.fontWeight || 'normal') as FontWeight,
+  fontWeightBold: 'bold' as FontWeight,
+  minimumContrastRatio: s.minContrast ?? 1,
+  cursorStyle: s.cursorStyle ?? 'block',
+  cursorBlink: s.cursorBlink !== false,
+})
+
+const SAMPLE = [
+  '\x1b[32m~/projects/app\x1b[0m \x1b[35mmain\x1b[0m ❯ npm run dev -- --port $PORT',
+  '\x1b[2m→ ready on http://localhost:3000 in 412 ms\x1b[0m',
+  '\x1b[32m~/projects/app\x1b[0m ❯ npm test',
+  '\x1b[32m✓\x1b[0m 14 tests passed · 0.24s',
+  '\x1b[32m~/projects/app\x1b[0m ❯ git status --short',
+  '\x1b[33m M\x1b[0m src/settings.tsx   \x1b[31m D\x1b[0m old.ts   \x1b[32m??\x1b[0m panel.tsx',
+  '\x1b[1mbold\x1b[0m \x1b[3mitalic\x1b[0m \x1b[4munderline\x1b[0m \x1b[2mdim\x1b[0m  => !== >= <= -> ||',
+  '\x1b[32m~/projects/app\x1b[0m ❯ ',
+].join('\r\n')
+
+// a terminal drawing SAMPLE with the settings; click it to see the cursor as in a focused tab
+function TermPreview({ s }: { s: AppSettings }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [xt, setXt] = useState<{ term: Terminal; fit: FitAddon } | null>(null)
+  const opts = () => ({ fontFamily: fontStack(s.fontFamily), fontSize: s.fontSize ?? FONT_SIZE, ...termLook(s), theme: termTheme(), allowTransparency: transparent(s.theme ?? '') })
+  useEffect(() => {
+    const term = new Terminal({ ...opts(), disableStdin: true, allowProposedApi: true, scrollback: 0 }) // transparency only takes at the start
+    const fit = new FitAddon()
+    term.loadAddon(fit)
+    term.open(box.current!)
+    term.write(SAMPLE)
+    setXt({ term, fit })
+    return () => term.dispose()
+  }, [])
+  const look = JSON.stringify([s.fontFamily, s.fontSize, s.theme, termLook(s)])
+  useEffect(() => {
+    if (!xt) return
+    Object.assign(xt.term.options, opts())
+    xt.fit.fit()
+  }, [xt, look])
+  return <div className="term-preview" ref={box} />
+}
+
+const SCRIPTS = [
+  { k: 'setup', label: 'Setup', hint: 'Runs in each new worktree, in a setup tab; agents and Run wait for it. $WB_PROJECT_PATH is the repo itself.', eg: 'npm install\ncp "$WB_PROJECT_PATH/.env" .env' },
+  { k: 'teardown', label: 'Teardown', hint: 'Runs when a workspace is deleted or archived, for a minute at most.', eg: 'docker compose down' },
+  { k: 'run', label: 'Run', hint: 'The Run button: starts it in a run tab, e.g. a dev server on $PORT.', eg: 'npm run dev -- --port $PORT' },
+] as const
+export type Scripts = { setup?: string; teardown?: string; run?: string }
+
+// a project's lifecycle scripts: one at a time, any number of lines; Import fills one from a file
+export function ScriptsField({ value, file = {}, git = true, tab, onChange }: { value: Scripts; file?: Scripts; git?: boolean; tab?: keyof Scripts; onChange: (s: Scripts) => void }) {
+  const tabs = SCRIPTS.filter(t => git || t.k !== 'setup')
+  const [k, setK] = useState<keyof Scripts>(tab ?? tabs[0].k)
+  const t = tabs.find(x => x.k === k) ?? tabs[0]
+  return (
+    <div className="scripts">
+      <div className="scripts-tabs">
+        {tabs.map(x => (
+          <button key={x.k} type="button" className={x.k === t.k ? 'on' : ''} onClick={() => setK(x.k)}>
+            {x.label}
+            {(value[x.k] || file[x.k]) && <span className="scripts-dot" />}
+          </button>
+        ))}
+      </div>
+      <div className="scripts-box">
+        <textarea
+          className="mono"
+          rows={7}
+          spellCheck={false}
+          value={value[t.k] ?? ''}
+          placeholder={file[t.k] ? `${file[t.k]}\n\n(the repo's .wb.json)` : t.eg}
+          onChange={e => onChange({ ...value, [t.k]: e.target.value })}
+        />
+        <label className="scripts-import" data-tip="Fill it from a script file">
+          <Icon name="import" /> Import
+          <input
+            type="file"
+            hidden
+            onChange={async e => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) onChange({ ...value, [t.k]: (await f.text()).replace(/^#!.*\n/, '').trim() })
+            }}
+          />
+        </label>
+      </div>
+      <div className="muted small">{t.hint}</div>
+    </div>
+  )
+}
+
 // an env object as KEY=value lines, and back (lines without = and # comments are skipped)
 export const envText = (e?: Record<string, string>) =>
   Object.entries(e ?? {})
@@ -83,6 +185,9 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
+const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' }
+const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
+
 const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
@@ -112,8 +217,8 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
   useEffect(() => () => void (unsaved.current && save.current(unsaved.current)), [])
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
-    window.addEventListener('keydown', f)
-    return () => window.removeEventListener('keydown', f)
+    window.addEventListener('keydown', f, true) // before the preview terminal takes it
+    return () => window.removeEventListener('keydown', f, true)
   }, [onClose])
 
   const presets = presetsOf(s)
@@ -130,6 +235,23 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
   const fonts = useMemo(installedFonts, [])
   const font = s.fontFamily?.trim() ?? ''
   const [otherFont, setOtherFont] = useState(() => !!font && !FONTS.includes(font))
+  // a select for one setting; the default is saved as a value (an unset key wouldn't replace the saved one)
+  const pick = <K extends keyof AppSettings, V extends string | number>(label: string, k: K, def: V, opts: V[], text: (v: V) => string = String) => {
+    const v = (s[k] ?? def) as V
+    return (
+      <label>
+        {label}
+        <select value={String(v)} onChange={e => set({ [k]: typeof def === 'number' ? Number(e.target.value) : e.target.value } as Partial<AppSettings>)}>
+          {[...new Set([...opts, v])].map(o => (
+            <option key={o} value={String(o)}>
+              {text(o)}
+              {o === def ? ' (default)' : ''}
+            </option>
+          ))}
+        </select>
+      </label>
+    )
+  }
   return (
     <div className="settings-page">
       <div className="settings-head">
@@ -212,48 +334,66 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
           {sec === 'terminal' && (
             <>
               <h2>Terminal</h2>
-              <label>
-                Font
-                <select
-                  value={otherFont ? 'other' : font}
-                  onChange={e => {
-                    setOtherFont(e.target.value === 'other')
-                    if (e.target.value !== 'other') set({ fontFamily: e.target.value || undefined })
-                  }}
-                >
-                  <option value="">Default (SF Mono)</option>
-                  {font && !otherFont && !fonts.includes(font) && <option value={font}>{font} (not found)</option>}
-                  {fonts.map(f => (
-                    <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>
-                      {f}
-                    </option>
-                  ))}
-                  <option value="other">Other…</option>
-                </select>
-              </label>
-              {otherFont && <input value={s.fontFamily ?? ''} placeholder="a font's name, as in Font Book" onChange={e => set({ fontFamily: e.target.value })} autoFocus />}
-              <label>
-                <span>
-                  Font size <span className="muted">· ⌘+ / ⌘− / ⌘0 anywhere</span>
-                </span>
-                <select value={s.fontSize ?? FONT_SIZE} onChange={e => set({ fontSize: Number(e.target.value) })}>
-                  {[...new Set([...FONT_SIZES, s.fontSize ?? FONT_SIZE])]
-                    .sort((a, b) => a - b)
-                    .map(n => (
-                      <option key={n} value={n}>
-                        {n}
-                        {n === FONT_SIZE ? ' (default)' : ''}
+              <div className="grid2">
+                <label>
+                  Font
+                  <select
+                    value={otherFont ? 'other' : font}
+                    onChange={e => {
+                      setOtherFont(e.target.value === 'other')
+                      if (e.target.value !== 'other') set({ fontFamily: e.target.value }) // '': the default (undefined wouldn't be saved)
+                    }}
+                  >
+                    <option value="">Default (SF Mono)</option>
+                    {font && !otherFont && !fonts.includes(font) && <option value={font}>{font} (not found)</option>}
+                    {fonts.map(f => (
+                      <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>
+                        {f}
                       </option>
                     ))}
-                </select>
-              </label>
-              <label className="check">
-                <input type="checkbox" checked={s.copyOnSelect !== false} onChange={e => set({ copyOnSelect: e.target.checked })} />
-                Copy selected text to the clipboard
-              </label>
-              <div className="sample mono" style={{ fontFamily: fontStack(s.fontFamily), fontSize: s.fontSize ?? FONT_SIZE }}>
-                ~/projects/app main ❯ npm run dev -- --port $PORT
+                    <option value="other">Other…</option>
+                  </select>
+                </label>
+                <label>
+                  <span>
+                    Font size <span className="muted">· ⌘+ / ⌘− / ⌘0</span>
+                  </span>
+                  <select value={s.fontSize ?? FONT_SIZE} onChange={e => set({ fontSize: Number(e.target.value) })}>
+                    {[...new Set([...FONT_SIZES, s.fontSize ?? FONT_SIZE])]
+                      .sort((a, b) => a - b)
+                      .map(n => (
+                        <option key={n} value={n}>
+                          {n}px{n === FONT_SIZE ? ' (default)' : ''}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                {otherFont && <input className="span2" value={s.fontFamily ?? ''} placeholder="a font's name, as in Font Book" onChange={e => set({ fontFamily: e.target.value })} autoFocus />}
+                {pick('Line height', 'lineHeight', 1.15, [1, 1.1, 1.15, 1.2, 1.25, 1.3, 1.4, 1.5, 1.6, 1.8])}
+                {pick('Letter spacing', 'letterSpacing', 0, [-1, -0.5, 0, 0.5, 1, 1.5, 2, 3], n => `${n}px`)}
+                {pick('Font weight', 'fontWeight', '400', ['300', '400', '500', '600', '700'], w => `${w} · ${WEIGHTS[w]}`)}
+                {pick('Minimum contrast', 'minContrast', 1, [1, 3, 4.5, 7], n => CONTRAST[n])}
+                {pick('Cursor style', 'cursorStyle', 'block', ['block', 'bar', 'underline'], c => c[0].toUpperCase() + c.slice(1))}
+                <div className="checks">
+                  <label className="check">
+                    <input type="checkbox" checked={s.cursorBlink !== false} onChange={e => set({ cursorBlink: e.target.checked })} />
+                    Blinking cursor
+                  </label>
+                  <label className="check">
+                    <input type="checkbox" checked={s.copyOnSelect !== false} onChange={e => set({ copyOnSelect: e.target.checked })} />
+                    Copy selected text
+                  </label>
+                </div>
               </div>
+              <div className="preview-head muted small">
+                <span>Live preview · click it for the cursor</span>
+                <span className="grow" />
+                <span>
+                  {s.fontSize ?? FONT_SIZE}px · {s.lineHeight ?? 1.15} line height · {s.fontWeight || '400'}
+                </span>
+              </div>
+              <TermPreview s={s} />
+              <p className="muted small">Ligatures (=&gt; as one glyph) aren't drawn: xterm needs an add-on for them that wb doesn't ship.</p>
             </>
           )}
           {sec === 'open' && (

@@ -2,16 +2,17 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
-import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
-import { type AppInfo, FONT_SIZE, SettingsPage } from './Settings'
+import { AddProject, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
+import { type AppInfo, FONT_SIZE, SettingsPage, termLook } from './Settings'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
+import { type Changes, type FileList, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { applyTheme } from './themes'
 import { colorVar, IconButton, type IconName, type MenuItem, moveId, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | 'settings' | { settings: string } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | 'settings' | { settings: string; script?: 'run' } | { rename: string } | { renameWs: string }
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -56,7 +57,9 @@ export function App() {
   const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('wbs.tabs', {})) // the focused pane's session
   const [dialog, setDialog] = useState<Dialog>(null)
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
-  const [diff, setDiff] = useState(false)
+  const [panelOpen, setPanelOpen] = useState<boolean>(() => load('wbs.panel', false)) // the right panel: files, changes, review
+  const [panelTab, setPanelTab] = useState<PanelTab>(() => load('wbs.panelTab', 'files'))
+  const [panelW, setPanelW] = useState<number>(() => load('wbs.panelW', PANEL_WIDTH))
   const [info, setInfo] = useState<boolean>(() => load('wbs.info', false)) // the workspace info panel
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('wbs.groups', {})) // tabs (of panes) per workspace
@@ -87,6 +90,11 @@ export function App() {
   useEffect(() => void localStorage.setItem('wbs.side', JSON.stringify(sideW)), [sideW])
   useEffect(() => void localStorage.setItem('wbs.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('wbs.info', JSON.stringify(info)), [info])
+  useEffect(() => {
+    localStorage.setItem('wbs.panel', JSON.stringify(panelOpen))
+    localStorage.setItem('wbs.panelTab', JSON.stringify(panelTab))
+    localStorage.setItem('wbs.panelW', JSON.stringify(panelW))
+  }, [panelOpen, panelTab, panelW])
 
   // the theme, painted before the terminals read it (their effects run before ours)
   const theme = view?.settings.theme ?? ''
@@ -222,6 +230,32 @@ export function App() {
   }
 
   const run = async () => ws && selectTab(await call<TabView>('run', { ws: ws.id }))
+  // one panel on the right: the side panel (on a tab) or the info panel
+  const showPanel = (t: PanelTab) => (setPanelTab(t), setPanelOpen(true), setInfo(false))
+  const togglePanel = (t = panelTab) => (panelOpen && t === panelTab ? setPanelOpen(false) : showPanel(t))
+  const showInfo = (on = !info) => (setInfo(on), on && setPanelOpen(false))
+  // the run script: its tab, Run ▾
+  const devTab = ws ? view?.tabs.find(t => t.workspace === ws.id && t.kind === 'dev') : undefined
+  const devRunning = !!devTab && devTab.status !== 'exited'
+  const editScripts = () => project && setDialog({ settings: project.id, script: 'run' })
+  const runMenu = (): MenuItem[] =>
+    ws
+      ? [
+          { label: devTab ? 'Restart' : 'Run', icon: 'run', key: 'r', run: () => (ws.run ? run() : editScripts()) },
+          ...(devRunning ? [{ label: 'Stop', icon: 'stop', key: 's', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) } as MenuItem] : []),
+          ...(devTab ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', run: () => selectTab(devTab.id) } as MenuItem] : []),
+          { label: `Open localhost:${ws.port}`, icon: 'link', key: 'o', run: () => openPort(ws.port) },
+          null,
+          { label: ws.run ? 'Edit the run script…' : 'Set a run script…', icon: 'pencil', key: 'e', run: editScripts },
+        ]
+      : []
+  const panelApi = (w: WorkspaceView): PanelApi => ({
+    files: () => api.call<FileList>('files', { ws: w.id }),
+    newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
+    openFile: file => void call('openIn', { ws: w.id, app: 'editor', file }).catch(() => {}),
+    changes: () => api.call<Changes>('diff', { ws: w.id }),
+    threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
+  })
   const settings = view?.settings ?? {}
   const editor = settings.editor || 'cursor'
   const targets: AppInfo[] = [...apps, ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
@@ -256,7 +290,7 @@ export function App() {
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
     { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
-    { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), setInfo(true)) },
+    { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true)) },
     null,
     { head: 'Open in' },
     ...openInItems({ ws: w.id }),
@@ -322,6 +356,7 @@ export function App() {
   // keys: capture phase, before xterm.js sees them
   const keys = useRef<(e: KeyboardEvent) => void>(() => {})
   keys.current = e => {
+    if (e.metaKey && e.altKey && !e.ctrlKey && e.code === 'KeyB') return void (e.preventDefault(), e.stopPropagation(), ws && togglePanel())
     if (!e.metaKey || e.altKey || e.ctrlKey) return
     const k = e.key.toLowerCase()
     const act: Record<string, () => void> = {
@@ -338,8 +373,8 @@ export function App() {
       t: () => newTab('shell'),
       w: () => tab && closeTabs([tab]),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
-      d: () => git && setDiff(d => !d),
-      i: () => setInfo(i => !i),
+      d: () => git && togglePanel('changes'),
+      i: () => showInfo(),
       arrowup: () => moveWs(-1),
       arrowdown: () => moveWs(1),
     }
@@ -401,9 +436,12 @@ export function App() {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
       for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
       a({ label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
-      if (git) a({ label: 'Diff', icon: 'diff', hint: '⌘D', run: () => setDiff(true) })
-      a({ label: 'Workspace info', icon: 'info', hint: '⌘I', run: () => setInfo(true) })
-      if (ws.run) a({ label: 'Run dev server', icon: 'run', run })
+      a({ label: 'Files', icon: 'file', hint: '⌥⌘B', run: () => showPanel('files') })
+      if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
+      if (git) a({ label: 'Review: PR checks and comments', icon: 'review', run: () => showPanel('review') })
+      a({ label: 'Workspace info', icon: 'info', hint: '⌘I', run: () => showInfo(true) })
+      a({ label: ws.run ? 'Run the run script' : 'Set a run script…', icon: 'run', run: ws.run ? run : editScripts })
+      if (devRunning) a({ label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
       if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: '⌘W', run: () => closeTabs([tab]) })
@@ -524,12 +562,17 @@ export function App() {
           {ws && (
             <div className="actions nodrag">
               <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
-              <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => setInfo(i => !i)} />
-              {git && <IconButton icon="diff" title="Diff (⌘D)" on={diff} onClick={() => setDiff(d => !d)} />}
-              {ws.run && <IconButton icon="run" title="Run the dev server" onClick={run} />}
+              <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => showInfo()} />
+              <IconButton icon="panel" title="Files, changes, review (⌥⌘B)" on={panelOpen} onClick={() => togglePanel()} />
               {ws.kind === 'worktree' && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
               <IconButton icon="search" title="Commands (⌘K)" onClick={() => setDialog('palette')} />
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
+              <RunButton
+                running={devRunning}
+                onRun={() => (ws.run ? run() : editScripts())}
+                onStop={() => devTab && api.send('input', { tab: devTab.id, data: '\x03' })}
+                onMenu={e => openMenu(e, runMenu(), 'right')}
+              />
             </div>
           )}
         </div>
@@ -553,6 +596,7 @@ export function App() {
                     fontFamily={settings.fontFamily}
                     copyOnSelect={settings.copyOnSelect !== false}
                     theme={theme}
+                    look={termLook(settings)}
                   />
                 )}
                 onFocus={id => id !== tab?.id && selectTab(id)}
@@ -582,7 +626,21 @@ export function App() {
               </div>
             )}
           </div>
-          {diff && ws && git && <DiffPanel ws={ws.id} onClose={() => setDiff(false)} />}
+          {panelOpen && ws && (
+            <SidePanel
+              w={infoOf(ws)}
+              git={git}
+              tab={panelTab}
+              onTab={setPanelTab}
+              api={panelApi(ws)}
+              width={panelW}
+              onWidth={setPanelW}
+              onClose={() => setPanelOpen(false)}
+              onOpen={openExternal}
+              onToggle={(k, v) => setAuto(ws, k, v)}
+              onFix={what => prFix(ws, what)}
+            />
+          )}
           {info && ws && (
             <InfoPanel
               w={infoOf(ws)}
@@ -710,6 +768,7 @@ export function App() {
       {settingsFor && (
         <ProjectSettings
           project={settingsFor}
+          script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
           onClose={() => setDialog(null)}
           onSave={async p => {
             await call('projectSet', { id: settingsFor.id, ...p })

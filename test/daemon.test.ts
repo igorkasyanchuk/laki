@@ -204,6 +204,32 @@ test('diff: committed and uncommitted changes since the base, new files too', as
   assert.match(d.diff, /\+brand new/)
 })
 
+test('side panel: files with their changes, new files and folders, only inside the workspace', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  writeFileSync(join(ws.path, 'README.md'), 'changed\n')
+  mkdirSync(join(ws.path, 'src'))
+  writeFileSync(join(ws.path, 'src', 'new.ts'), 'x\n')
+  writeFileSync(join(ws.path, '.gitignore'), 'ignored.log\n')
+  writeFileSync(join(ws.path, 'ignored.log'), 'x\n')
+  let f = await rig.rpc('files', { ws: ws.id })
+  assert.ok(f.files.includes('README.md') && f.files.includes('src/new.ts'))
+  assert.ok(!f.files.includes('ignored.log'))
+  assert.equal(f.changed['README.md'], 'M')
+  assert.equal(f.changed['src/new.ts'], 'A')
+  assert.deepEqual(await rig.rpc('fileNew', { ws: ws.id, path: 'src/lib/a.ts' }), { path: 'src/lib/a.ts' })
+  assert.ok(existsSync(join(ws.path, 'src/lib/a.ts')))
+  await rig.rpc('fileNew', { ws: ws.id, path: 'docs', dir: true })
+  assert.ok(statSync(join(ws.path, 'docs')).isDirectory())
+  await assert.rejects(rig.rpc('fileNew', { ws: ws.id, path: 'src/lib/a.ts' }), /there already/)
+  await assert.rejects(rig.rpc('fileNew', { ws: ws.id, path: '../escape.txt' }), /inside the workspace/)
+  await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'finder', file: '/etc/passwd' }), /inside the workspace/)
+  f = await rig.rpc('files', { ws: ws.id })
+  assert.ok(f.files.includes('src/lib/a.ts'))
+  assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), []) // no PR
+})
+
 test('ports of the workspace process tree, PR from gh, dev server', async t => {
   // listens on a free port (3100+ may be taken on this machine) and says which, and what $PORT was
   const rig = await fresh(t, { config: { run: `exec node -e 'const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port + " PORT=" + process.env.PORT))'` } })

@@ -3,7 +3,7 @@ import type { Project, ProjectConfig, View } from '../../shared/types'
 import { api, bridge } from './api'
 import { Glyph } from './Glyph'
 import { type Img, PromptInput, withImages } from './PromptInput'
-import { EnvField } from './Settings'
+import { EnvField, ScriptsField } from './Settings'
 import { Icon, type IconName } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -177,22 +177,14 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
 }
 
 // a project's name and commands; empty fields fall back to the repo's .wb.json (shown as placeholders)
-export function ProjectSettings({ project, onClose, onSave }: { project: Project; onClose: () => void; onSave: (p: { name: string; config: ProjectConfig }) => Promise<void> }) {
+export function ProjectSettings({ project, script, onClose, onSave }: { project: Project; script?: 'run'; onClose: () => void; onSave: (p: { name: string; config: ProjectConfig }) => Promise<void> }) {
   const [name, setName] = useState(project.name)
   const [c, setC] = useState<ProjectConfig>(project.config ?? {})
   const [file, setFile] = useState<ProjectConfig>({})
   const [busy, setBusy] = useState(false)
   useEffect(() => void api.call<ProjectConfig>('projectFile', { id: project.id }).then(setFile, () => {}), [project.id])
-  const field = (k: 'setup' | 'run' | 'teardown', title: string, hint: string) => (
-    <label>
-      <span>
-        {title} <span className="muted">· {hint}</span>
-      </span>
-      <input className="mono" value={c[k] ?? ''} placeholder={file[k] ? `${file[k]}   (.wb.json)` : ''} onChange={e => setC(x => ({ ...x, [k]: e.target.value }))} />
-    </label>
-  )
   return (
-    <Modal title="Project settings" onClose={onClose}>
+    <Modal title="Project settings" onClose={onClose} wide>
       <form
         className="form"
         onSubmit={async e => {
@@ -208,9 +200,12 @@ export function ProjectSettings({ project, onClose, onSave }: { project: Project
         <div className="muted small mono">
           {project.path} · {project.git === false ? 'folder (no git)' : 'git'}
         </div>
-        {project.git !== false && field('setup', 'Setup', 'runs in each new worktree, e.g. npm install')}
-        {field('run', 'Run', 'the dev server, e.g. npm run dev -- --port $PORT')}
-        {field('teardown', 'Teardown', 'runs when a workspace is deleted or archived')}
+        <div className="field">
+          <span>
+            Scripts <span className="muted">· for workspace setup, teardown and the Run button</span>
+          </span>
+          <ScriptsField value={c} file={file} git={project.git !== false} tab={script} onChange={x => setC(c => ({ ...c, ...x }))} />
+        </div>
         <label>
           <span>
             Env <span className="muted">· for every tab, setup and teardown{file.env && Object.keys(file.env).length ? ` · .wb.json has ${Object.keys(file.env).join(', ')}` : ''}</span>
@@ -327,63 +322,5 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
         {!list.length && <div className="muted pad">Nothing matches.</div>}
       </div>
     </Modal>
-  )
-}
-
-type DiffResult = { base: string; from: string; files: { path: string; add: number; del: number; status: string }[]; diff: string }
-
-export function DiffPanel({ ws, onClose }: { ws: string; onClose: () => void }) {
-  const [d, setD] = useState<DiffResult | null>(null)
-  const [err, setErr] = useState('')
-  const box = useRef<HTMLDivElement>(null)
-  const load = () => api.call<DiffResult>('diff', { ws }).then(setD, e => setErr(e.message))
-  useEffect(() => {
-    setD(null)
-    load()
-  }, [ws])
-  const lines = useMemo(() => d?.diff.split('\n') ?? [], [d])
-  const jump = (path: string) => {
-    const el = box.current?.querySelector(`[data-file="${CSS.escape(path)}"]`)
-    el?.scrollIntoView({ block: 'start' })
-  }
-  return (
-    <div className="diff">
-      <div className="diff-head">
-        <b>Changes</b>
-        <span className="muted"> vs {d?.base ?? '…'} (merge-base + uncommitted)</span>
-        <span className="spacer" />
-        <button className="link" onClick={load}>
-          refresh
-        </button>
-        <button className="icon small" onClick={onClose} title="Close (⌘D)">
-          ×
-        </button>
-      </div>
-      {err && <div className="warn pad">{err}</div>}
-      {d && (
-        <div className="diff-files">
-          {d.files.map(f => (
-            <div key={f.path} className="diff-file" onClick={() => jump(f.path)}>
-              <span className={`st st-${f.status}`}>{f.status}</span>
-              <span className="fp">{f.path}</span>
-              <span className="add">+{f.add}</span>
-              <span className="del">−{f.del}</span>
-            </div>
-          ))}
-          {!d.files.length && <div className="muted pad">No changes.</div>}
-        </div>
-      )}
-      <div className="diff-body" ref={box}>
-        {lines.map((l, n) => {
-          const file = l.startsWith('diff --git') ? (l.match(/ b\/(.*)$/)?.[1] ?? '') : undefined
-          const cls = file !== undefined ? 'dl-file' : l.startsWith('@@') ? 'dl-hunk' : l.startsWith('+++') || l.startsWith('---') || /^(index|new file|deleted file|similarity|rename) /.test(l) ? 'dl-meta' : l[0] === '+' ? 'dl-add' : l[0] === '-' ? 'dl-del' : ''
-          return (
-            <div key={n} className={`dl ${cls}`} data-file={file}>
-              {l || ' '}
-            </div>
-          )
-        })}
-      </div>
-    </div>
   )
 }
