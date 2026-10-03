@@ -509,3 +509,12 @@ test('an unknown preset or a custom one without a command is refused before a wo
   assert.deepEqual([v.workspaces.length, v.tabs.length], [1, 0])
   assert.equal(execFileSync('git', ['branch', '--list', 'laki/c'], { cwd: rig.repo, encoding: 'utf8' }), '')
 })
+
+test('a command without a preset runs as the custom preset, for a new workspace too', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, name: 'cmd', cmd: 'echo from-new; sleep 5' })
+  const tab = (await rig.rpc('state')).tabs.find((x: { workspace: string }) => x.workspace === ws.id)
+  assert.equal(tab.preset, 'custom')
+  await until(async () => (await rig.screen(tab.id)).includes('from-new'), 'the command ran')
+})

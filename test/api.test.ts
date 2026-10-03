@@ -31,7 +31,8 @@ test('errors name what is wrong: methods, lookups, the WebSocket', async t => {
   await assert.rejects(c.call('attach', { tab: 'nope' }), /no session nope/)
   const first = c.call('attach', { tab: shell.id })
   const second = c.call('attach', { tab: shell.id, cols: 80, rows: 20 })
-  await assert.rejects(first, /superseded by a newer attach/)
+  // the older one is superseded, unless its snapshot went out before the newer one arrived
+  await first.then(() => {}, e => assert.match(e.message, /superseded by a newer attach/))
   assert.equal((await second).cols, 80)
   assert.equal(await c.call('ping'), 'pong')
   c.close()

@@ -682,7 +682,7 @@ export function App() {
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             renameProjects
-            skill={{ app: 'laki-electron', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => api.call<SkillInfo[]>('skillSet', { agent, on }) }}
+            skill={{ app: 'Laki Electron', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => api.call<SkillInfo[]>('skillSet', { agent, on }) }}
             section={settingsFor && `project:${settingsFor.id}`}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
           />

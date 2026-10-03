@@ -544,7 +544,7 @@ export type NewWs = { project: string; base?: string; preset?: string; cmd?: str
 
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const proj = findProject(o.project)
-  const preset = o.preset || state.settings?.agent || 'claude'
+  const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
   let ws: Workspace
@@ -649,7 +649,7 @@ export async function wsRestore(ref: string) {
 export async function wsFork(ref: string) {
   const src = findWs(ref)
   const agent = tabsOf(src.id).find(t => t.preset === 'claude' && t.resumeId)
-  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (agent.profile ?? 'claude') : 'shell', forkOf: agent?.resumeId })
+  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId })
 }
 
 // restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat.

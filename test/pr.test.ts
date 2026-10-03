@@ -112,6 +112,7 @@ test('autoFix and autoReview: they wait for an agent; CI goes over to you after 
   await idle()
   pr('c4')
   await until(() => c.events.some(e => e.ev === 'turn' && e.kind === 'waiting' && e.text === 'CI still fails after 3 fixes'), 'over to you')
+  await until(async () => (await fix())?.ci === 'c4', 'c4 recorded') // saved after the event goes out
   assert.deepEqual(await fix(), { pr: 9, ci: 'c4', tries: 4, review: 't1:1' })
   assert.equal((await rig.tab(ws.id)).status, 'waiting')
   pr('c4', 'SUCCESS')
