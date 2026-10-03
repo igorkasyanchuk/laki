@@ -78,6 +78,7 @@ export function App() {
 
   const live = useMemo(() => view?.workspaces.filter(w => !w.archived) ?? [], [view])
   const ws = live.find(w => w.id === wsId) ?? live[0] ?? null
+  const previewed = ws && preview?.ws === ws.id ? preview : null // the file preview, when it's this workspace's
   const project = view?.projects.find(p => p.id === ws?.project)
   const git = project?.git !== false
   const tabs = useMemo(() => view?.tabs.filter(t => t.workspace === ws?.id) ?? [], [view, ws])
@@ -375,7 +376,7 @@ export function App() {
       o: openProject,
       f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
       t: () => newTab('shell'),
-      w: () => (preview && preview.ws === ws?.id ? setPreview(null) : tab && closeTabs([tab])), // the file preview first
+      w: () => (previewed ? setPreview(null) : tab && closeTabs([tab])), // the file preview first
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       p: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
       d: () => git && togglePanel('changes'),
@@ -450,16 +451,15 @@ export function App() {
       if (devRunning) a({ label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
-      const previewing = preview?.ws === ws.id
-      if (previewing) a({ label: 'Close the file preview', icon: 'x', hint: '⌘W', run: () => setPreview(null) })
-      if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: previewing ? undefined : '⌘W', run: () => closeTabs([tab]) })
+      if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: '⌘W', run: () => setPreview(null) })
+      if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: previewed ? undefined : '⌘W', run: () => closeTabs([tab]) })
       if (ws.pr) a({ label: `Open PR #${ws.pr.number}`, icon: 'pr', run: () => openExternal(ws.pr!.url) })
       for (const p of ws.ports) a({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
       if (project) a({ label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
     }
     for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${wsName(w)}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
-  }, [view, live, ws, tab, group, sideOpen, apps, preview])
+  }, [view, live, ws, tab, group, sideOpen, apps, previewed])
 
   if (!view)
     return (
@@ -634,13 +634,13 @@ export function App() {
               </div>
             )}
           </div>
-          {preview && ws && preview.ws === ws.id && (
+          {previewed && ws && (
             <FilePreview
-              key={preview.n}
-              path={preview.path}
-              line={preview.line}
-              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: preview.path })}
-              onOpen={() => panelApi(ws).openFile(preview.path)}
+              key={previewed.n}
+              path={previewed.path}
+              line={previewed.line}
+              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path })}
+              onOpen={() => panelApi(ws).openFile(previewed.path)}
               onClose={() => setPreview(null)}
             />
           )}
