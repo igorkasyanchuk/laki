@@ -56,6 +56,7 @@ Read from the workspace, else from the repo root (so it works before it's commit
 
 | | |
 |---|---|
+| ⌘O | open a project folder (native picker), then a new workspace in it |
 | ⌘N | new workspace (project, base branch, agent, prompt; or *local*: the repo itself) |
 | ⌘T / ⌘W | new shell tab / close tab (asks; stops its process) |
 | ⌘1…⌘9 | tabs |
@@ -107,7 +108,7 @@ wbs CLI / hooks (node) ─────── /rpc ──────▶   WBS_DE
 |---|---|---|
 | 1 | daemon: `wbs daemon`, autostart from the app (detached, Electron as node), single instance | done |
 | 2 | attach/reattach with snapshot, resize, multiple clients | done |
-| 3 | projects: add (dialog with folder picker, CLI), list, remove | done |
+| 3 | projects: add with the native folder picker (+ Add project, ⌘O, palette; CLI), list, remove | done |
 | 4 | workspaces: worktree `wb/<id>` from a base (default: current branch) or local; delete keeps the branch | done |
 | 5 | tabs: claude, codex, shell, custom command; close kills; login shell; env | done |
 | 6 | `.wb.json` setup (visible tab, agent waits) / teardown / run | done |

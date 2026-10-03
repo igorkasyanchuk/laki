@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { TabView, View, WorkspaceView } from '../../shared/types'
+import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
 import { AddProject, DiffPanel, Inbox, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
 import { Glyph } from './Glyph'
@@ -35,6 +35,7 @@ export function App() {
   const [wsId, setWsId] = useState<string | null>(() => load('wbs.ws', null))
   const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('wbs.tabs', {}))
   const [dialog, setDialog] = useState<Dialog>(null)
+  const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [diff, setDiff] = useState(false)
   const [error, setError] = useState('')
   const viewRef = useRef<View | null>(null)
@@ -130,6 +131,19 @@ export function App() {
 
   const run = async () => ws && selectTab(await call<TabView>('run', { ws: ws.id }))
 
+  // the native folder picker, then straight to a workspace in that project (the web dev renderer has
+  // no picker: it gets the typed-path dialog)
+  const openProject = async () => {
+    if (!bridge) return setDialog('project')
+    const path = await bridge.pickFolder()
+    if (!path) return
+    const p = await call<Project>('projectAdd', { path }).catch(() => null) // the toast says why
+    if (p) {
+      setNewFor(p.id)
+      setDialog('new')
+    }
+  }
+
   // keys: capture phase, before xterm.js sees them
   const keys = useRef<(e: KeyboardEvent) => void>(() => {})
   keys.current = e => {
@@ -137,6 +151,7 @@ export function App() {
     const k = e.key.toLowerCase()
     const act: Record<string, () => void> = {
       n: () => setDialog('new'),
+      o: openProject,
       t: () => newTab('shell'),
       w: () => closeTab(tab),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
@@ -166,7 +181,7 @@ export function App() {
     }
     const a = (label: string, run: () => void, hint = 'action') => items.push({ label, hint, run })
     a('New workspace', () => setDialog('new'), '⌘N')
-    a('Add project', () => setDialog('project'))
+    a('Open project folder…', openProject, '⌘O')
     a('Inbox', () => setDialog('inbox'), '⌘I')
     if (ws) {
       a('New shell tab', () => newTab('shell'), '⌘T')
@@ -267,7 +282,7 @@ export function App() {
           {!view.projects.length && <div className="empty-side muted">Add a git repository to start.</div>}
         </div>
         <div className="side-foot">
-          <button onClick={() => setDialog('project')}>+ Add project</button>
+          <button title="Open a project folder (⌘O)" onClick={openProject}>+ Add project</button>
           <InboxButton view={view} onClick={() => setDialog('inbox')} />
         </div>
       </aside>
@@ -325,7 +340,7 @@ export function App() {
                 ) : (
                   <>
                     <p>{view.projects.length ? 'No workspaces yet.' : 'No projects yet.'}</p>
-                    <button onClick={() => setDialog(view.projects.length ? 'new' : 'project')}>{view.projects.length ? 'New workspace  ⌘N' : 'Add project'}</button>
+                    <button onClick={() => (view.projects.length ? setDialog('new') : openProject())}>{view.projects.length ? 'New workspace  ⌘N' : 'Open project folder…  ⌘O'}</button>
                   </>
                 )}
               </div>
@@ -353,12 +368,16 @@ export function App() {
       {dialog === 'new' && (
         <NewWorkspace
           view={view}
-          project={ws?.project}
-          onClose={() => setDialog(null)}
+          project={newFor ?? ws?.project}
+          onClose={() => {
+            setDialog(null)
+            setNewFor(undefined)
+          }}
           onCreate={async p => {
             const w = await call<WorkspaceView>('wsNew', p)
             setWsId(w.id)
             setDialog(null)
+            setNewFor(undefined)
           }}
         />
       )}

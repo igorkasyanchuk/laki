@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type { View } from '../../shared/types'
-import { api, bridge } from './api'
+import { api } from './api'
 import { Glyph } from './Glyph'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -145,14 +145,7 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
       >
         <label>
           Git repository
-          <div className="row">
-            <input value={path} autoFocus placeholder="/Users/you/code/app" onChange={e => setPath(e.target.value)} />
-            {bridge && (
-              <button type="button" onClick={async () => setPath((await bridge!.pickFolder()) ?? path)}>
-                Browse…
-              </button>
-            )}
-          </div>
+          <input value={path} autoFocus placeholder="/Users/you/code/app" onChange={e => setPath(e.target.value)} />
         </label>
         <div className="buttons">
           <span className="spacer" />
