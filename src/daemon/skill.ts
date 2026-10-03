@@ -36,8 +36,9 @@ For example \`"${cli}" ls --json\`. Below, \`laki-electron\` stands for it.
 
 ## Where you are
 
-Inside a Laki tab, \`$LAKI_WORKSPACE\` is your workspace's id, \`$LAKI_TAB\` your tab's and \`$PORT\` the
-workspace's port. Outside Laki they're unset.
+Inside a Laki Electron tab, \`$LAKI_ELECTRON_HOME\` is set, \`$LAKI_WORKSPACE\` is your workspace's id,
+\`$LAKI_TAB\` your tab's and \`$PORT\` the workspace's port. Outside Laki they're unset. A tab with
+\`$LAKI_GO_HOME\` instead is Laki Go's: use the laki-go skill there, not this one.
 
 ## Commands
 
