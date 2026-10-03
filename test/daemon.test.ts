@@ -378,6 +378,8 @@ test('PR: failing CI and new review comments go to the agent once; global env; i
   await until(async () => (await rig.rpc('state')).workspaces[0].fix?.ci === 'abc', 'fix recorded')
   let w = (await rig.rpc('state')).workspaces[0]
   assert.equal(w.name, 'Nice name')
+  await rig.rpc('wsSet', { id: ws.id, name: ws.id }) // the id itself: back to it
+  assert.equal((await rig.rpc('state')).workspaces[0].name, undefined)
   assert.equal(w.pr.title, 'Add things')
   assert.equal(w.pr.author, 'ann')
   assert.deepEqual(w.pr.list, [{ name: 'test', state: 'fail', url: 'https://github.com/o/r/actions/runs/1/job/7' }])

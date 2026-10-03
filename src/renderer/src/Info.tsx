@@ -37,6 +37,7 @@ export type WsInfo = {
   agents: { id: string; name: string; glyph: string; last?: string }[]
 }
 export type AutoKey = 'autoFix' | 'autoReview'
+const MAX_CI_FIXES = 3 // the daemon's: failing CI goes to the agent this many times in a row
 
 // CI in a few characters: ✓ 5/5, ✗ 2 failing, … 3 running
 export function ciText(pr: PRInfo) {
@@ -73,7 +74,7 @@ function Toggle({ on, label, tip, onChange }: { on?: boolean; label: string; tip
 export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
   return (
     <>
-      <Toggle on={w.autoFix} label="fix CI" tip="Failing CI goes to the agent, once per commit (3 tries in a row)" onChange={v => onToggle('autoFix', v)} />
+      <Toggle on={w.autoFix} label="fix CI" tip={`Failing CI goes to the agent, once per commit (${MAX_CI_FIXES} tries in a row)`} onChange={v => onToggle('autoFix', v)} />
       <Toggle on={w.autoReview} label="review" tip="New review comments on the PR go to the agent" onChange={v => onToggle('autoReview', v)} />
     </>
   )
@@ -182,7 +183,7 @@ export function InfoPanel(p: {
                   </div>
                   <div className="info-auto">
                     <AutoToggles w={w} onToggle={p.onToggle} />
-                    {w.autoFix && (w.fixTries ?? 0) > 3 && <span className="warn small">gave up after 3 fixes; push to try again</span>}
+                    {w.autoFix && (w.fixTries ?? 0) > MAX_CI_FIXES && <span className="warn small">gave up after {MAX_CI_FIXES} fixes; push to try again</span>}
                   </div>
                   <div className="row">
                     <button onClick={() => p.onFix('ci')} disabled={pr.checks !== 'fail'}>

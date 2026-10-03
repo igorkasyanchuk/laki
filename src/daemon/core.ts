@@ -428,7 +428,10 @@ export function tabSet(o: { id: string; name?: string; color?: string }) {
 export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean }) {
   const w = findWs(o.id)
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
-  if (o.name !== undefined) w.name = o.name.trim().slice(0, 60) || undefined
+  if (o.name !== undefined) {
+    const name = Array.from(o.name.trim()).slice(0, 60).join('') // by character: an emoji stays whole
+    w.name = name && name !== w.id ? name : undefined // the id itself: back to it
+  }
   if (o.autoFix !== undefined) w.autoFix = o.autoFix || undefined
   if (o.autoReview !== undefined) w.autoReview = o.autoReview || undefined
   save()

@@ -381,7 +381,7 @@ export function App() {
       null,
       { head: 'Open in' },
       ...openInItems({ project: p.id }),
-      ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: w.id, icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
+      ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: wsName(w), icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
     ]
   }
 
@@ -411,7 +411,7 @@ export function App() {
       for (const p of ws.ports) a({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
       if (project) a({ label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
     }
-    for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${w.id}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
+    for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${wsName(w)}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
   }, [view, live, ws, tab, group, sideOpen, apps])
 
@@ -698,7 +698,7 @@ export function App() {
       {dialog && typeof dialog === 'object' && 'renameWs' in dialog && live.some(w => w.id === dialog.renameWs) && (
         <Prompt
           title="Rename workspace"
-          hint="Only the name shown here: the folder and branch keep the id."
+          hint="Only the name shown here: the folder and branch keep the id. Enter the id to go back to it."
           initial={wsName(live.find(w => w.id === dialog.renameWs)!)}
           onClose={() => setDialog(null)}
           onSubmit={async name => {

@@ -29,13 +29,16 @@ export function PromptInput(p: {
   dictate?: () => void
   dictationSettings?: () => void
   onSubmit?: () => void // ⌘⏎
+  onBusy?: (busy: boolean) => void // images still saving: their paths aren't in yet
   placeholder?: string
   rows?: number
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const [err, setErr] = useState('')
+  const saving = useRef(0)
   const add = async (files: File[]) => {
     setErr('')
+    p.onBusy?.(++saving.current > 0)
     for (const f of files) {
       const ext = EXT[f.type]
       if (!ext) {
@@ -50,6 +53,7 @@ export function PromptInput(p: {
         setErr(`${f.name || 'image'}: ${(e as Error).message}`)
       }
     }
+    p.onBusy?.(--saving.current > 0)
   }
   const images = (l: DataTransferItemList | FileList) =>
     Array.from(l as ArrayLike<DataTransferItem | File>)

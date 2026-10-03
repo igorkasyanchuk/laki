@@ -29,6 +29,7 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
   const [branches, setBranches] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [images, setImages] = useState<Img[]>([])
+  const [saving, setSaving] = useState(false) // an image isn't saved yet
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
   const plain = view.projects.find(x => x.id === p.project)?.git === false // a folder without git: local only
   useEffect(() => {
@@ -43,7 +44,7 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
   }, [p.project])
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (busy) return
+    if (busy || saving) return
     setBusy(true)
     try {
       const prompt = withImages(p.prompt ?? '', images) || undefined
@@ -127,6 +128,7 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
               dictate={bridge?.dictate}
               dictationSettings={bridge?.dictationSettings}
               onSubmit={submit}
+              onBusy={setSaving}
             />
           </div>
         )}
@@ -136,8 +138,8 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={busy || !p.project}>
-            {busy ? 'Creating…' : 'Create'}
+          <button type="submit" className="primary" disabled={busy || saving || !p.project}>
+            {busy ? 'Creating…' : saving ? 'Saving image…' : 'Create'}
           </button>
         </div>
       </form>
