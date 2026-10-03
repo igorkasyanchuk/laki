@@ -375,7 +375,7 @@ export function App() {
       o: openProject,
       f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
       t: () => newTab('shell'),
-      w: () => tab && closeTabs([tab]),
+      w: () => (preview && preview.ws === ws?.id ? setPreview(null) : tab && closeTabs([tab])), // the file preview first
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       p: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
       d: () => git && togglePanel('changes'),
@@ -427,12 +427,13 @@ export function App() {
 
   const palette: PaletteItem[] = useMemo(() => {
     const items: PaletteItem[] = []
+    const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
+    if (ws) a({ label: 'Find files…', icon: 'search', hint: '⌘P', run: () => setDialog('files') }) // first: it opens a search of its own
     for (const w of live) items.push({ label: wsName(w), hint: `${w.branch || 'folder'} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
       if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
     }
-    const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
     a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
@@ -441,7 +442,6 @@ export function App() {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
       for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
       a({ label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
-      a({ label: 'Find file…', icon: 'file', hint: '⌘P', run: () => setDialog('files') })
       a({ label: 'Files', icon: 'file', hint: '⌥⌘B', run: () => showPanel('files') })
       if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
       if (git) a({ label: 'Review: PR checks and comments', icon: 'review', run: () => showPanel('review') })

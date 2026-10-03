@@ -485,13 +485,14 @@ export function FileFinder(p: { files: () => Promise<FileList>; onPick: (path: s
         />
         <div className="ff-list" ref={list}>
           {err && <div className="warn small pad">{err}</div>}
+          {!all && !err && <div className="muted small pad">Loading the files…</div>}
           {found.map((f, k) => (
             <div key={f.path} className={`ff-item ${k === i ? 'sel' : ''}`} onMouseEnter={() => setI(k)} onClick={() => pick(f.path)}>
               <Icon name="file" />
               {mark(f.path, f.hits)}
             </div>
           ))}
-          {all && q && !found.length && <div className="muted small pad">No file matches.</div>}
+          {all && !found.length && <div className="muted small pad">{q ? 'No file matches.' : 'No files here.'}</div>}
         </div>
       </div>
     </div>

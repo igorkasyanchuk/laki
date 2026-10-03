@@ -132,8 +132,8 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
   review threads (from reviewers with write access and bots: what the agent would get). Click a thread's
   file to preview it at that line.
 
-**Find file** (⌘P, or *Find file…* in ⌘K): type parts of a path (`crt` finds `src/cart.ts`); names match
-before folders. ↑↓ and Enter preview the file.
+**Find files** (*Find files…*, first in ⌘K; or ⌘P): type parts of a path (`crt` finds `src/cart.ts`); names match
+before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 
 **Info panel** (ⓘ or ⌘I): the workspace's name, branch, path and `$PORT`; its PR's title, author, state,
 review decision, size, checks (each links to its run) and description; buttons that send the failing CI or
@@ -175,7 +175,7 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 |---|---|
 | ⌘O | open a project folder (or drop one on the window), then a new workspace in it |
 | ⌘N | new workspace |
-| ⌘T / ⌘W | new shell tab / close tab |
+| ⌘T / ⌘W | new shell tab / close tab (or the file preview, when one is open) |
 | ⌘1…⌘9 | tabs |
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
