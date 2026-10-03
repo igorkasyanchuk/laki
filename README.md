@@ -207,6 +207,10 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
   `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each one is in
   the new-tab menu and the new-workspace dialog. Edit `claude` and `codex` to change how every new one
   starts; a tab started from a preset uses its current settings when it restarts or resumes.
+- *Agent skill*: installs a skill for Claude Code and Codex in your home folder (`~/.claude/skills/wbs`,
+  `~/.codex/skills/wbs`), so every session knows wbs: what it is, and how to drive it with its CLI (list
+  projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
+  It holds the app's path: update it after moving the app. *Remove* takes only its own files.
 - *Projects*: each project's settings (below).
 
 Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle, and so does one

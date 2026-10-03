@@ -3,7 +3,7 @@ import type { Project, ProjectConfig, TabView, View, WorkspaceView } from '../..
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
 import { AddProject, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
-import { type AppInfo, FONT_SIZE, SettingsPage, termLook } from './Settings'
+import { type AppInfo, FONT_SIZE, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
@@ -681,6 +681,7 @@ export function App() {
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             renameProjects
+            skill={{ app: 'wbs', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => call<SkillInfo[]>('skillSet', { agent, on }) }}
             section={settingsFor && `project:${settingsFor.id}`}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
           />

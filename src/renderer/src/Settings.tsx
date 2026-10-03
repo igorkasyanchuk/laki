@@ -241,7 +241,58 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'terminal', label: 'Terminal', icon: 'terminal' },
   { id: 'open', label: 'Open in', icon: 'code' },
   { id: 'presets', label: 'Agent presets', icon: 'agent' },
+  { id: 'skill', label: 'Agent skill', icon: 'import' },
 ]
+
+export type SkillInfo = { agent: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated' }
+// how an app reads and writes its skill; app: its name, for the text
+export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean) => Promise<SkillInfo[]> }
+
+// the skill that teaches Claude Code and Codex about the app, in the user's ~/.claude and ~/.codex
+function SkillSection({ api }: { api: SkillApi }) {
+  const [rows, setRows] = useState<SkillInfo[] | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const fail = (e: any) => setErr(String(e?.message ?? e))
+  useEffect(() => void api.load().then(setRows, fail), [])
+  const set = (agent: string, on: boolean) => {
+    setBusy(true)
+    setErr('')
+    api.set(agent, on).then(setRows, fail).finally(() => setBusy(false))
+  }
+  return (
+    <>
+      <h2>Agent skill</h2>
+      <p className="muted">
+        Teaches Claude Code and Codex about {api.app}: list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all
+        through the {api.app} command line. It goes in your home folder, so every session has it, in {api.app} or not.
+      </p>
+      {err && <div className="warn small">{err}</div>}
+      {!rows && !err && <div className="muted small">Loading…</div>}
+      {rows?.map(r => (
+        <div key={r.agent} className="preset">
+          <div className="row">
+            <b>{r.name}</b>
+            <span className={r.state === 'installed' ? 'small' : 'muted small'}>{r.state === 'installed' ? 'installed' : r.state === 'outdated' ? 'out of date' : 'not installed'}</span>
+            <span className="grow" />
+            {r.state !== 'installed' && (
+              <button className="primary" disabled={busy} onClick={() => set(r.agent, true)}>
+                {r.state === 'missing' ? 'Install' : 'Update'}
+              </button>
+            )}
+            {r.state !== 'missing' && (
+              <button disabled={busy} onClick={() => set(r.agent, false)}>
+                Remove
+              </button>
+            )}
+          </div>
+          <div className="muted small mono">{r.path}</div>
+        </div>
+      ))}
+      <p className="muted small">It holds where {api.app} is installed: after moving the app, update it here.</p>
+    </>
+  )
+}
 
 export function SettingsPage(p: {
   settings: AppSettings
@@ -254,6 +305,7 @@ export function SettingsPage(p: {
   renameProjects?: boolean
   section?: string // where it opens: a section's id, or project:<id>
   script?: keyof Scripts // a project's script tab to show
+  skill?: SkillApi
 }) {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
@@ -325,7 +377,7 @@ export function SettingsPage(p: {
       </div>
       <div className="settings-body">
         <nav className="settings-nav">
-          {SECTIONS.map(x => (
+          {SECTIONS.filter(x => x.id !== 'skill' || p.skill).map(x => (
             <button key={x.id} className={sec === x.id ? 'on' : ''} onClick={() => setSec(x.id)}>
               <Icon name={x.icon} /> {x.label}
             </button>
@@ -505,6 +557,7 @@ export function SettingsPage(p: {
               </label>
             </>
           )}
+          {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'presets' && (
             <>
               <h2>Agent presets</h2>

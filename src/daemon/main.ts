@@ -8,6 +8,7 @@ import { createServer, type IncomingMessage } from 'node:http'
 import { join } from 'node:path'
 import { WebSocketServer } from 'ws'
 import * as core from './core.ts'
+import { skills, skillSet } from './skill.ts'
 
 const { dir } = core
 mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -98,6 +99,8 @@ const api: Record<string, Handler> = {
   files: p => core.files(p.ws),
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
+  skills: () => skills(),
+  skillSet: p => skillSet(p),
   prThreads: p => core.prThreads(p.ws),
   run: p => core.runDev(p.ws),
   ship: p => core.ship(p.ws, p.message),

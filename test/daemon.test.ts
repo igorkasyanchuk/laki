@@ -1,5 +1,6 @@
 // The daemon end to end: real PTYs, git worktrees, hooks via the CLI, fake agents.
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -238,6 +239,29 @@ test('side panel: files with their changes, new files and folders, only inside t
   const big = await rig.rpc('fileRead', { ws: ws.id, path: 'big.log' })
   assert.deepEqual([big.size, big.text.length, big.cut], [600 << 10, 512 << 10, true])
   await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: '../../etc/hosts' }), /inside the workspace/)
+})
+
+test('agent skill: installed in HOME for claude and codex, its launcher drives the daemon, removed again', async t => {
+  const rig = await fresh(t)
+  await rig.rpc('projectAdd', { path: rig.repo })
+  const states = (s: { state: string }[]) => s.map(x => x.state)
+  assert.deepEqual(states(await rig.rpc('skills')), ['missing', 'missing'])
+  assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: true })), ['installed', 'missing'])
+  const at = join(rig.home, '.claude/skills/wbs')
+  assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: wbs\ndescription: /)
+  // the launcher finds this daemon from a bare environment, as an agent's shell would
+  const ls = JSON.parse(execFileSync(join(at, 'wbs'), ['ls', '--json'], { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' }))
+  assert.equal(ls.projects.length, 1)
+  writeFileSync(join(at, 'SKILL.md'), 'edited')
+  assert.deepEqual(states(await rig.rpc('skills')), ['outdated', 'missing'])
+  assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'codex', on: true })), ['outdated', 'installed'])
+  assert.ok(existsSync(join(rig.home, '.codex/skills/wbs/SKILL.md')))
+  writeFileSync(join(at, 'notes.md'), 'the user’s')
+  assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: false })), ['missing', 'installed'])
+  assert.ok(existsSync(join(at, 'notes.md')) && !existsSync(join(at, 'SKILL.md'))) // only its own files go
+  await rig.rpc('skillSet', { agent: 'codex', on: false })
+  assert.ok(!existsSync(join(rig.home, '.codex/skills/wbs'))) // an emptied folder goes too
+  await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
 })
 
 test('ports of the workspace process tree, PR from gh, dev server', async t => {

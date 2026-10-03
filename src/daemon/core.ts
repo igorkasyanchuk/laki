@@ -64,7 +64,7 @@ const here = dirname(fileURLToPath(import.meta.url))
 const cliPath = [join(here, 'cli.js'), join(here, '../cli/main.ts')].find(p => existsSync(p))!
 // node (or Electron as node) + the CLI script
 export const cliArgv = [process.execPath, ...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), cliPath]
-const cliEnv = process.versions.electron ? ['ELECTRON_RUN_AS_NODE=1'] : []
+export const cliEnv = process.versions.electron ? ['ELECTRON_RUN_AS_NODE=1'] : []
 export const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
 const hookCmd = (st: string) => [...cliEnv, ...cliArgv.map(q), 'hook', st].join(' ')
 

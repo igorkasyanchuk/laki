@@ -53,6 +53,7 @@ wbs CLI / hooks (node) ─────── /rpc ──────▶   WBS_DE
 - tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color), `send`, `queueClear`;
 - worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only), `prThreads`, `openIn` with a `file` (paths must stay inside the
   workspace: `inside`);
+- the agent skill (Settings): `skills`, `skillSet` with an `agent` (claude, codex) and `on`;
 - terminals: `screen`, `input`, `resize`, `view`, `detach`.
 
 WebSocket events:
@@ -207,6 +208,7 @@ they work).
 | `src/preload/index.ts` | `bridge`: conn info, notify, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
+| `src/daemon/skill.ts` | the agent skill: SKILL.md and a CLI launcher in `~/.claude/skills/wbs` and `~/.codex/skills/wbs` (`skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
