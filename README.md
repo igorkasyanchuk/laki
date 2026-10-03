@@ -56,7 +56,9 @@ npm link
   - *Settings…* (see Project settings below);
   - *Remove project*;
   - its archived workspaces, which you click to restore.
-- Drag the sidebar's right edge to resize it; double-click the edge to reset.
+- Drag the sidebar's right edge to resize it; double-click the edge to reset. ⌘B (or the sidebar icon) hides
+  and shows it.
+- ⋯ also has *Open in editor* and *Reveal in Finder*.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
 - ＋ in the tab bar opens a new tab: shell (⌘T), claude, codex or a command.
@@ -68,19 +70,23 @@ npm link
 - × on a pane closes that terminal; × on a tab closes all of its terminals. Both stop the process.
 - ⌘1…⌘9 switch tabs.
 - Each workspace remembers its tabs and splits.
+- Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
+  *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange and codex
+  tabs teal unless you pick another color (or none).
 
 **Find:** ⌘F searches the active pane's terminal and its scrollback.
 - ⏎ goes to the next match, ⇧⏎ to the previous.
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
-**Tab bar icons** (right side):
+**Tab bar icons** (right side; hover for a tooltip):
+- editor (⌘E): opens the workspace in your editor (Settings);
 - diff (⌘D): changes against the base branch, including uncommitted and new files;
 - run: the project's dev command, in a *dev* tab;
 - ship: commit, push and open a PR, in a *ship* tab;
 - search: the command palette (⌘K);
 - ⋯: split right/down, fork, archive, delete.
 
-**Status bar** (bottom): branch ← base, `$PORT`, listening ports (click to open), the PR with its CI
+**Status bar** (bottom): branch ← base, `$PORT` and listening ports (click one to open it in the browser), the PR with its CI
 status (click to open), and the workspace's path.
 
 **⌘K palette:** jump to any workspace or tab, or run any action.
@@ -112,6 +118,21 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 | ⌘K | palette |
 | ⌘D | diff |
 | ⌘F | find in the terminal |
+| ⌘E | open in the editor |
+| ⌘B | hide / show the sidebar |
+| ⌘, | settings |
+
+## Settings
+
+⌘, or the gear at the top of the sidebar:
+- *Editor* for ⌘E: Cursor, Zed, VS Code, Windsurf, Sublime Text, or a custom command that gets the folder as
+  `$1` (e.g. `idea "$1"`).
+- The agent new workspaces start with.
+- *Branch prefix* for new worktrees (default `wb/`).
+- Terminal font size.
+- Notifications on or off.
+
+They are kept in `state.json`.
 
 ## Project settings
 

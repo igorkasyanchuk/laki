@@ -1,4 +1,4 @@
 #!/bin/bash
 # test $SHELL: `-lic cmd` / `-l` without anyone's profile
-if [ "$1" = "-lic" ] || [ "$1" = "-lc" ]; then BASH_SILENCE_DEPRECATION_WARNING=1 exec /bin/bash --noprofile --norc -c "$2"; fi
+if [ "$1" = "-lic" ] || [ "$1" = "-lc" ]; then c=$2; shift 2; BASH_SILENCE_DEPRECATION_WARNING=1 exec /bin/bash --noprofile --norc -c "$c" "$@"; fi
 BASH_SILENCE_DEPRECATION_WARNING=1 PS1='$ ' exec /bin/bash --noprofile --norc -i

@@ -1,5 +1,5 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import type { Project, ProjectConfig, View } from '../../shared/types'
+import type { Project, ProjectConfig, Settings, View } from '../../shared/types'
 import { api } from './api'
 import { Glyph } from './Glyph'
 import { Icon, type IconName } from './ui'
@@ -22,8 +22,8 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 
 export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean }
 
-export function NewWorkspace({ view, project, onClose, onCreate }: { view: View; project?: string; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
-  const [p, setP] = useState<NewWsParams>({ project: project ?? view.projects[0]?.id ?? '', preset: 'claude', base: '' })
+export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view: View; project?: string; agent?: string; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
+  const [p, setP] = useState<NewWsParams>({ project: project ?? view.projects[0]?.id ?? '', preset: agent || 'claude', base: '' })
   const [branches, setBranches] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
@@ -217,8 +217,88 @@ export function ProjectSettings({ project, onClose, onSave }: { project: Project
   )
 }
 
-export function Prompt({ title, hint, placeholder, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; onClose: () => void; onSubmit: (v: string) => Promise<void> }) {
-  const [v, setV] = useState('')
+export const EDITORS: [string, string][] = [
+  ['cursor', 'Cursor'],
+  ['zed', 'Zed'],
+  ['vscode', 'VS Code'],
+  ['windsurf', 'Windsurf'],
+  ['sublime', 'Sublime Text'],
+  ['custom', 'Custom command'],
+]
+
+// the app's settings (⌘,), kept by the daemon
+export function AppSettings({ settings, onClose, onSave }: { settings: Settings; onClose: () => void; onSave: (s: Settings) => Promise<void> }) {
+  const [s, setS] = useState<Settings>({ editor: 'cursor', agent: 'claude', branchPrefix: 'wb/', fontSize: 13, notify: true, ...settings })
+  const [busy, setBusy] = useState(false)
+  const set = (k: Partial<Settings>) => setS(x => ({ ...x, ...k }))
+  return (
+    <Modal title="Settings" onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={async e => {
+          e.preventDefault()
+          setBusy(true)
+          await onSave(s).catch(() => setBusy(false))
+        }}
+      >
+        <label>
+          Editor
+          <select value={s.editor} onChange={e => set({ editor: e.target.value })}>
+            {EDITORS.map(([k, name]) => (
+              <option key={k} value={k}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        {s.editor === 'custom' && (
+          <label>
+            <span>
+              Command <span className="muted">· gets the folder as $1</span>
+            </span>
+            <input className="mono" value={s.editorCmd ?? ''} placeholder='idea "$1"' autoFocus onChange={e => set({ editorCmd: e.target.value })} />
+          </label>
+        )}
+        <label>
+          New workspaces start
+          <div className="seg">
+            {['claude', 'codex', 'shell', 'none'].map(x => (
+              <button type="button" key={x} className={s.agent === x ? 'on' : ''} onClick={() => set({ agent: x })}>
+                {x}
+              </button>
+            ))}
+          </div>
+        </label>
+        <label>
+          <span>
+            Branch prefix <span className="muted">· new worktrees' branches</span>
+          </span>
+          <input className="mono" value={s.branchPrefix ?? ''} placeholder="wb/" onChange={e => set({ branchPrefix: e.target.value })} />
+        </label>
+        <label>
+          Terminal font size
+          <input type="number" min={9} max={24} value={s.fontSize} onChange={e => set({ fontSize: Number(e.target.value) || 13 })} />
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={s.notify !== false} onChange={e => set({ notify: e.target.checked })} />
+          Notify when an agent off screen waits or finishes
+        </label>
+        <div className="buttons">
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={busy}>
+            Save
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+export function Prompt({ title, hint, placeholder, initial = '', onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; onClose: () => void; onSubmit: (v: string) => Promise<void> }) {
+  const [v, setV] = useState(initial)
   return (
     <Modal title={title} onClose={onClose}>
       <form
@@ -228,7 +308,7 @@ export function Prompt({ title, hint, placeholder, onClose, onSubmit }: { title:
           if (v.trim()) onSubmit(v.trim()).catch(() => {})
         }}
       >
-        <input value={v} autoFocus placeholder={placeholder} onChange={e => setV(e.target.value)} />
+        <input value={v} autoFocus placeholder={placeholder} onFocus={e => e.target.select()} onChange={e => setV(e.target.value)} />
         {hint && <div className="muted small">{hint}</div>}
         <div className="buttons">
           <span className="spacer" />

@@ -1,7 +1,8 @@
 // A tab's terminal area split into panes (layout.ts), panes and tabs dragged around, and the sidebar's
 // resize handle. Panes are absolutely placed siblings keyed by session, so splitting never remounts a terminal.
-import { useRef, useState, type PointerEvent as PE, type ReactNode } from 'react'
+import { useRef, useState, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 import { type Bar, type Edge, type Layout, place } from './layout'
+import { colorVar } from './ui'
 
 export type Over = { pane: string; edge: Edge } | 'bar'
 export type Drag = { tab: string; whole: boolean; x: number; y: number; over?: Over }
@@ -60,6 +61,8 @@ export function Panes(p: {
   active: string | null
   drag: Drag | null
   label: (tab: string) => ReactNode // pane header
+  color: (tab: string) => string | undefined // its tab color's name
+  onMenu: (e: MouseEvent, tab: string) => void // right click on a pane header
   ghost: ReactNode // what follows the pointer while dragging
   render: (tab: string) => ReactNode
   onFocus: (tab: string) => void
@@ -86,9 +89,9 @@ export function Panes(p: {
           onPointerDownCapture={() => p.onFocus(tab)}
         >
           {panes.length > 1 && (
-            <div className="pane-head" onPointerDown={e => p.startDrag(e, tab)} title="Drag to move this pane; onto the tab bar: a tab of its own">
+            <div className="pane-head" style={colorVar(p.color(tab))} onPointerDown={e => p.startDrag(e, tab)} onContextMenu={e => p.onMenu(e, tab)}>
               {p.label(tab)}
-              <button className="x" title="Close" onPointerDown={e => e.stopPropagation()} onClick={() => p.onClose(tab)}>
+              <button className="x" data-tip="Close" onPointerDown={e => e.stopPropagation()} onClick={() => p.onClose(tab)}>
                 ×
               </button>
             </div>
@@ -125,7 +128,7 @@ export function SideHandle({ width, onWidth, init }: { width: number; onWidth: (
     <div
       className="side-handle"
       style={{ left: width }}
-      title="Drag to resize · double-click to reset"
+      data-tip="Drag to resize · double-click to reset"
       onPointerDown={grab}
       onPointerMove={e => held(e) && onWidth(Math.round(Math.min(480, Math.max(160, e.clientX))))}
       onDoubleClick={() => onWidth(init)}

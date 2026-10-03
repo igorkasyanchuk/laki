@@ -23,6 +23,14 @@
   --find-active: #a87b23;
   --radius: 6px;
   --mono: 'SF Mono', Menlo, Monaco, monospace;
+  --tc-red: #f7768e;
+  --tc-orange: #ff9e64;
+  --tc-yellow: #e0af68;
+  --tc-green: #9ece6a;
+  --tc-teal: #73daca;
+  --tc-blue: #7aa2f7;
+  --tc-purple: #bb9af7;
+  --tc-pink: #f5a3d0;
   color-scheme: dark;
 }
 * { box-sizing: border-box; }
@@ -49,11 +57,11 @@ textarea { resize: vertical; font-family: inherit; }
 .nodrag, .drag button, .drag input { -webkit-app-region: no-drag; }
 
 .splash { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
-.logo { font-weight: 700; letter-spacing: 0.5px; color: var(--accent); font-family: var(--mono); }
 
 .app { display: flex; height: 100%; position: relative; }
 .sidebar { width: 240px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
-.side-head { height: 36px; flex: none; display: flex; align-items: center; padding: 0 6px 0 78px; }
+/* 38px: the traffic lights (trafficLightPosition y 12) sit in its middle; 76px clears them */
+.side-head { height: 38px; flex: none; display: flex; align-items: center; gap: 1px; padding: 0 6px 0 76px; }
 .side-scroll { flex: 1; overflow-y: auto; padding: 2px 0 8px; }
 .project { margin-bottom: 4px; }
 .project-head { display: flex; align-items: center; gap: 1px; height: 26px; padding: 0 6px 0 12px; font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
@@ -86,11 +94,17 @@ textarea { resize: vertical; font-family: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
-.tabbar { height: 36px; flex: none; display: flex; align-items: flex-end; gap: 1px; padding: 0 6px; border-bottom: 1px solid var(--line); background: var(--side); }
+.tabbar { height: 38px; flex: none; display: flex; align-items: flex-end; gap: 1px; padding: 0 6px; border-bottom: 1px solid var(--line); background: var(--side); }
 .tab { display: flex; align-items: center; gap: 6px; height: 29px; padding: 0 4px 0 10px; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; cursor: pointer; color: var(--muted); max-width: 240px; white-space: nowrap; margin-bottom: -1px; font-size: 12.5px; }
 .tab > span:not(.glyph):not(.badge) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tab:hover { color: var(--fg); background: var(--hover); }
 .tab.sel { color: var(--fg); background: var(--term-bg); border-color: var(--line); }
+/* a tab's color (--tab-c, set inline): a line on top and a tint */
+.tab { box-shadow: inset 0 2px 0 var(--tab-c, transparent); }
+.tab:not(.sel) { background: color-mix(in srgb, var(--tab-c, transparent) 9%, transparent); }
+.tab:not(.sel):hover { background: color-mix(in srgb, var(--tab-c, var(--hover)) 16%, var(--hover)); }
+.side-closed .tabbar { padding-left: 76px; }
+.tabbar > .side-show { margin: 0 6px 0 0; }
 .tab .x { background: none; border: none; padding: 0 4px; color: var(--muted); visibility: hidden; }
 .tab:hover .x, .tab.sel .x { visibility: visible; }
 .tabbar > .ib { align-self: center; margin-left: 2px; }
@@ -119,6 +133,13 @@ textarea { resize: vertical; font-family: inherit; }
 .menu-label { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .menu-hint { color: var(--muted); font-size: 11px; }
 .menu-sep { height: 1px; background: var(--line); margin: 4px 2px; }
+.menu-colors { display: flex; gap: 5px; padding: 5px 8px; }
+.swatch { width: 16px; height: 16px; padding: 0; border-radius: 50%; border: 1px solid var(--line); background: var(--tab-c, transparent); }
+.swatch:hover { transform: scale(1.15); }
+.swatch.on { outline: 2px solid var(--fg); outline-offset: 1px; }
+.swatch:first-child { background: linear-gradient(135deg, transparent 45%, var(--muted) 45% 55%, transparent 55%); }
+.tip { position: fixed; z-index: 200; pointer-events: none; margin: 6px 0; padding: 3px 8px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-radius: 5px; font-size: 11.5px; white-space: nowrap; box-shadow: 0 4px 14px rgba(0, 0, 0, 0.4); }
+.status button.listen.port-main { color: var(--muted); }
 .menu-head { padding: 4px 8px 2px; font-size: 10.5px; text-transform: uppercase; letter-spacing: 0.5px; color: var(--muted); font-weight: 600; }
 .drop-overlay { position: fixed; inset: 8px; z-index: 60; pointer-events: none; display: flex; align-items: center; justify-content: center; border: 2px dashed var(--accent); border-radius: 12px; background: color-mix(in srgb, var(--bg) 70%, transparent); color: var(--fg); font-size: 15px; }
 .palette-item .pg { color: var(--muted); display: inline-flex; }
@@ -186,7 +207,8 @@ textarea { resize: vertical; font-family: inherit; }
 .panes { position: absolute; inset: 0; }
 .pane { position: absolute; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
 .pane-head { flex: none; height: 22px; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 10px; font-size: 12px; color: var(--muted); background: var(--side); border-bottom: 1px solid var(--line); cursor: grab; user-select: none; white-space: nowrap; overflow: hidden; }
-.pane.active .pane-head { color: var(--fg); box-shadow: inset 0 2px 0 var(--accent); }
+.pane-head { box-shadow: inset 3px 0 0 var(--tab-c, transparent); background: color-mix(in srgb, var(--tab-c, transparent) 8%, var(--side)); }
+.pane.active .pane-head { color: var(--fg); box-shadow: inset 3px 0 0 var(--tab-c, transparent), inset 0 2px 0 var(--accent); }
 .pane-head .x { background: none; border: none; padding: 0 5px; color: var(--muted); }
 .pane-head .x:hover { color: var(--fg); }
 .pane-body { flex: 1; position: relative; min-height: 0; }

@@ -23,15 +23,15 @@ function theme() {
   }
 }
 
-export function Term({ tab, active = true, findSeq = 0 }: { tab: string; active?: boolean; findSeq?: number }) {
+export function Term({ tab, active = true, findSeq = 0, fontSize = 13 }: { tab: string; active?: boolean; findSeq?: number; fontSize?: number }) {
   const box = useRef<HTMLDivElement>(null)
-  const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon } | null>(null)
+  const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon; fit: FitAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
   const find = findSeq !== closedAt
   useEffect(() => {
     const term = new Terminal({
       fontFamily: '"SF Mono", Menlo, Monaco, monospace',
-      fontSize: 13,
+      fontSize,
       lineHeight: 1.15,
       scrollback: 5000,
       allowProposedApi: true,
@@ -95,7 +95,7 @@ export function Term({ tab, active = true, findSeq = 0 }: { tab: string; active?
     })
     ro.observe(box.current!)
     if (api.connected) attach()
-    setXt({ term, search })
+    setXt({ term, search, fit })
     ;(window as any).__term = term // for inspection in dev tools
     return () => {
       alive = false
@@ -109,6 +109,11 @@ export function Term({ tab, active = true, findSeq = 0 }: { tab: string; active?
   useEffect(() => {
     if (active) xt?.term.focus()
   }, [active, xt])
+  useEffect(() => {
+    if (!xt || xt.term.options.fontSize === fontSize) return
+    xt.term.options.fontSize = fontSize
+    xt.fit.fit()
+  }, [fontSize, xt])
   return (
     <>
       <div className="term" ref={box} />

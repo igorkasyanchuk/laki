@@ -28,13 +28,18 @@ function create() {
     minHeight: 400,
     backgroundColor: '#0e1014',
     titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 14, y: 14 },
+    trafficLightPosition: { x: 14, y: 12 }, // centered in the 38px sidebar header
+    show: false, // shown maximized once ready
     webPreferences: {
       preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
     },
+  })
+  win.once('ready-to-show', () => {
+    win?.maximize()
+    win?.show()
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https?:\/\//.test(url)) shell.openExternal(url)

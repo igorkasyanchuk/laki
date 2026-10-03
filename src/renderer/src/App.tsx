@@ -1,14 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
-import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
+import { AddProject, AppSettings, DiffPanel, EDITORS, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { IconButton, type IconName, type MenuItem, useMenu } from './ui'
+import { colorVar, IconButton, type IconName, type MenuItem, TAB_COLORS, Tips, useMenu } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | { settings: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | 'settings' | { settings: string } | { rename: string }
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -23,6 +23,9 @@ function rollup(tabs: TabView[]) {
   }
   return limit && best !== 'waiting' && best !== 'running' ? 'limit' : best
 }
+
+// a tab's color: its own, else claude's or codex's ('none' turns that off)
+const colorOf = (t?: TabView) => t?.color ?? (t?.preset === 'claude' ? 'orange' : t?.preset === 'codex' ? 'teal' : undefined)
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
 const SIDE = 240 // the sidebar's default width
@@ -46,6 +49,7 @@ export function App() {
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('wbs.groups', {})) // tabs (of panes) per workspace
   const [sideW, setSideW] = useState<number>(() => load('wbs.side', SIDE))
+  const [sideOpen, setSideOpen] = useState<boolean>(() => load('wbs.sideOpen', true))
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [error, setError] = useState('')
   const [menu, openMenu] = useMenu()
@@ -68,6 +72,7 @@ export function App() {
   useEffect(() => void localStorage.setItem('wbs.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('wbs.groups', JSON.stringify(stored)), [stored])
   useEffect(() => void localStorage.setItem('wbs.side', JSON.stringify(sideW)), [sideW])
+  useEffect(() => void localStorage.setItem('wbs.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
 
   const fail = (e: unknown) => {
     setError((e as Error).message)
@@ -95,7 +100,7 @@ export function App() {
       else if (m.ev === 'turn') {
         const t = viewRef.current?.tabs.find(t => t.id === m.tab)
         const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
-        if (!t || shown) return
+        if (!t || shown || viewRef.current?.settings.notify === false) return
         const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
         notify(`${t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id))
       }
@@ -162,10 +167,10 @@ export function App() {
 
   const newTab = async (preset: string, cmd?: string) => ws && selectTab(await call<TabView>('tabNew', { ws: ws.id, preset, cmd }))
   // a new shell next to the focused pane
-  const split = async (edge: 'right' | 'bottom') => {
-    if (!ws || !tab) return
+  const split = async (edge: 'right' | 'bottom', next = tab?.id) => {
+    if (!ws || !next) return
     const t = await call<TabView>('tabNew', { ws: ws.id, preset: 'shell' })
-    setGroups(move([...groups, { tab: t.id }], t.id, false, { pane: tab.id, edge }))
+    setGroups(move([...groups, { tab: t.id }], t.id, false, { pane: next, edge }))
     selectTab(t)
   }
 
@@ -188,6 +193,34 @@ export function App() {
   }
 
   const run = async () => ws && selectTab(await call<TabView>('run', { ws: ws.id }))
+  const editor = view?.settings.editor ?? 'cursor'
+  const editorName = (editor !== 'custom' && EDITORS.find(e => e[0] === editor)?.[1]) || 'editor'
+  const openIn = (app: 'editor' | 'finder', where: { ws?: string; project?: string } = { ws: ws?.id }) => call('openIn', { ...where, app }).catch(() => {})
+  const openPort = (port: number) => openExternal(`http://localhost:${port}`)
+
+  // right click on a tab (or a pane header: one session)
+  const tabMenu = (ids: string[]): MenuItem[] => {
+    const ts = ids.map(byId).filter((t): t is TabView => !!t)
+    const g = groups.find(g => tabsOf(g).includes(ids[0]))
+    const ended = ts.filter(t => t.status === 'exited' && (t.kind === 'agent' || t.kind === 'dev'))
+    const others = groups.filter(x => x !== g).flatMap(x => tabsOf(x).map(byId)).filter((t): t is TabView => !!t)
+    return [
+      { label: 'Rename…', icon: 'pencil', run: () => setDialog({ rename: ts[0].id }) },
+      { colors: TAB_COLORS, value: colorOf(ts[0]), pick: c => ts.forEach(t => call('tabSet', { id: t.id, color: c })) },
+      null,
+      { label: 'Split right', icon: 'splitRight', run: () => (selectTab(ts[0].id), split('right', ts[0].id)) },
+      { label: 'Split down', icon: 'splitDown', run: () => (selectTab(ts[0].id), split('bottom', ts[0].id)) },
+      ...(g && tabsOf(g).length > 1
+        ? ids.length > 1
+          ? [{ label: 'Separate panes', icon: 'unsplit', run: () => setGroups(groups.flatMap(x => (x === g ? tabsOf(x).map(tab => ({ tab })) : [x]))) } as MenuItem]
+          : [{ label: 'Move to its own tab', icon: 'unsplit', run: () => setGroups(move(groups, ids[0], false, 'bar')) } as MenuItem]
+        : []),
+      ...(ended.length ? [{ label: 'Restart', icon: 'restore', run: () => ended.forEach(t => api.send('input', { tab: t.id, data: '\r' })) } as MenuItem] : []),
+      null,
+      { label: ids.length > 1 ? 'Close tab' : 'Close', icon: 'x', hint: '⌘W', run: () => closeTabs(ts) },
+      ...(ids.length > 1 || !g || tabsOf(g).length === 1 ? (others.length ? [{ label: 'Close other tabs', icon: 'x', danger: true, run: () => closeTabs(others) } as MenuItem] : []) : []),
+    ]
+  }
   const fork = async () => ws && setWsId((await call<WorkspaceView>('wsFork', { id: ws.id })).id)
   const restore = (id: string) => call('wsRestore', { id }).then(() => setWsId(id))
   const newWs = (projectId?: string) => {
@@ -212,6 +245,9 @@ export function App() {
     const k = e.key.toLowerCase()
     const act: Record<string, () => void> = {
       n: () => newWs(ws?.project),
+      b: () => setSideOpen(o => !o),
+      ',': () => setDialog('settings'),
+      e: () => ws && openIn('editor'),
       o: openProject,
       f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
       t: () => newTab('shell'),
@@ -255,6 +291,8 @@ export function App() {
     return [
       { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
+      { label: `Open in ${editorName}`, icon: 'code', run: () => openIn('editor', { project: p.id }) },
+      { label: 'Reveal in Finder', icon: 'folder', run: () => openIn('finder', { project: p.id }) },
       { label: 'Remove project', icon: 'trash', danger: true, run: () => confirm(`Remove project ${p.name}? Its files stay.`) && call('projectRm', { id: p.id }) },
       ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: w.id, icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
     ]
@@ -270,8 +308,13 @@ export function App() {
     const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
     a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
+    a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
+    a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: '⌘B', run: () => setSideOpen(o => !o) })
     if (ws) {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
+      a({ label: `Open in ${editorName}`, icon: 'code', hint: '⌘E', run: () => openIn('editor') })
+      a({ label: 'Reveal in Finder', icon: 'folder', run: () => openIn('finder') })
+      a({ label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
       if (git) a({ label: 'Diff', icon: 'diff', hint: '⌘D', run: () => setDiff(true) })
       a({ label: 'Run dev server', icon: 'run', run })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
@@ -283,7 +326,7 @@ export function App() {
     }
     for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${w.id}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
-  }, [view, live, ws, tab, group])
+  }, [view, live, ws, tab, group, sideOpen])
 
   if (!view)
     return (
@@ -293,7 +336,7 @@ export function App() {
       </div>
     )
 
-  const settingsFor = dialog && typeof dialog === 'object' ? view.projects.find(p => p.id === dialog.settings) : undefined
+  const settingsFor = dialog && typeof dialog === 'object' && 'settings' in dialog ? view.projects.find(p => p.id === dialog.settings) : undefined
   const label = (id: string) => {
     const t = byId(id)
     return (
@@ -306,12 +349,14 @@ export function App() {
     )
   }
   return (
-    <div className="app">
+    <div className={`app ${sideOpen ? '' : 'side-closed'}`}>
+      {sideOpen && (
       <aside className="sidebar" style={{ width: sideW }}>
         <div className="side-head drag">
-          <span className="logo">wbs</span>
+          <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
           <span className="spacer" />
           <IconButton icon="folderPlus" title="Open a project folder (⌘O), or drop one on the window" onClick={openProject} />
+          <IconButton icon="gear" title="Settings (⌘,)" onClick={() => setDialog('settings')} />
         </div>
         <div className="side-scroll">
           {view.projects.map(p => (
@@ -342,10 +387,12 @@ export function App() {
           {!view.projects.length && <div className="empty-side muted">Open a folder (⌘O) or drop one here.</div>}
         </div>
       </aside>
-      <SideHandle width={sideW} onWidth={setSideW} init={SIDE} />
+      )}
+      {sideOpen && <SideHandle width={sideW} onWidth={setSideW} init={SIDE} />}
 
       <main className="main">
         <div className="tabbar drag" data-tabbar>
+          {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {groups.map(g => {
             const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
             const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -353,15 +400,17 @@ export function App() {
               <div
                 key={ts[0]?.id}
                 className={`tab nodrag ${g === group ? 'sel' : ''}`}
+                style={colorVar(colorOf(ts[0]))}
                 onClick={() => selectGroup(g)}
+                onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
                 onPointerDown={e => ts[0] && start(e, ts[0].id, true)}
                 onAuxClick={e => e.button === 1 && closeTabs(ts)}
-                title={`${ts.map(t => t.name).join(' · ')} (⌘${groups.indexOf(g) + 1}) · drag onto a pane to split`}
+                data-tip={`⌘${groups.indexOf(g) + 1} · drag onto a pane to split · right click for more`}
               >
                 <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
                 <span>{ts.map(t => t.name).join(' · ')}</span>
                 {queued > 0 && <span className="badge">+{queued}</span>}
-                <button className="x" title="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
+                <button className="x" data-tip="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
                   ×
                 </button>
               </div>
@@ -371,6 +420,7 @@ export function App() {
           <span className="spacer" />
           {ws && (
             <div className="actions nodrag">
+              <IconButton icon="code" title={`Open in ${editorName} (⌘E)`} onClick={() => openIn('editor')} />
               {git && <IconButton icon="diff" title="Diff (⌘D)" on={diff} onClick={() => setDiff(d => !d)} />}
               <IconButton icon="run" title="Run the dev server (project settings: Run)" onClick={run} />
               {ws.kind === 'worktree' && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
@@ -387,8 +437,10 @@ export function App() {
                 active={tab?.id ?? null}
                 drag={drag}
                 label={label}
+                color={id => colorOf(byId(id))}
+                onMenu={(e, id) => openMenu(e, tabMenu([id]))}
                 ghost={drag && (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null).map(id => byId(id)?.name).join(' · ') : label(drag.tab))}
-                render={id => <Term tab={id} active={id === tab?.id && !dialog} findSeq={finds[id] ?? 0} />}
+                render={id => <Term tab={id} active={id === tab?.id && !dialog} findSeq={finds[id] ?? 0} fontSize={view.settings.fontSize ?? 13} />}
                 onFocus={id => id !== tab?.id && selectTab(id)}
                 onClose={id => byId(id) && closeTabs([byId(id)!])}
                 onResize={(path, at) => setGroups(groups.map(g => (g === group ? resize(g, path, at) : g)))}
@@ -427,9 +479,11 @@ export function App() {
                   {ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
                 </span>
               )}
-              <span title="$PORT for this workspace">$PORT {ws.port}</span>
+              <button className="listen port-main" data-tip={`$PORT · open http://localhost:${ws.port}`} onClick={() => openPort(ws.port)}>
+                $PORT {ws.port}
+              </button>
               {ws.ports.map(port => (
-                <button key={port} className="listen" title={`open http://localhost:${port}`} onClick={() => openExternal(`http://localhost:${port}`)}>
+                <button key={port} className="listen" data-tip={`listening · open http://localhost:${port}`} onClick={() => openPort(port)}>
                   ↗{port}
                 </button>
               ))}
@@ -453,12 +507,14 @@ export function App() {
       </main>
 
       {menu}
+      <Tips />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {error && <div className="toast">{error}</div>}
       {dialog === 'new' && (
         <NewWorkspace
           view={view}
           project={newFor ?? ws?.project}
+          agent={view.settings.agent}
           onClose={() => {
             setDialog(null)
             setNewFor(undefined)
@@ -502,6 +558,27 @@ export function App() {
           onSubmit={async cmd => {
             setDialog(null)
             await newTab('custom', cmd)
+          }}
+        />
+      )}
+      {dialog === 'settings' && (
+        <AppSettings
+          settings={view.settings}
+          onClose={() => setDialog(null)}
+          onSave={async s => {
+            await call('settingsSet', s)
+            setDialog(null)
+          }}
+        />
+      )}
+      {dialog && typeof dialog === 'object' && 'rename' in dialog && byId(dialog.rename) && (
+        <Prompt
+          title="Rename"
+          initial={byId(dialog.rename)!.name}
+          onClose={() => setDialog(null)}
+          onSubmit={async name => {
+            await call('tabSet', { id: dialog.rename, name })
+            setDialog(null)
           }}
         />
       )}

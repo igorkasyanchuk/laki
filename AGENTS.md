@@ -48,9 +48,9 @@ wbs CLI / hooks (node) ─────── /rpc ──────▶   WBS_DE
 
 `src/daemon/main.ts` `api`: the same methods over HTTP and WebSocket.
 
-- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`;
+- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (editor, agent, branch prefix, font size, notify), `openIn` (editor or Finder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `projectFile` (the repo's `.wb.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
-- tabs and agents: `tabNew`/`tabClose`, `send`, `queueClear`;
+- tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color), `send`, `queueClear`;
 - worktree actions: `diff`, `run`, `ship`;
 - terminals: `screen`, `input`, `resize`, `view`, `detach`.
 
@@ -125,7 +125,7 @@ the repo's `.wb.json` (`projectConfig`).
     - `wbs.ws`: the selected workspace;
     - `wbs.tabs`: the selected tab per workspace;
     - `wbs.groups`: each workspace's tabs, each a split tree of sessions;
-    - `wbs.side`: the sidebar width.
+    - `wbs.side`: the sidebar width; `wbs.sideOpen`: whether it's shown.
 - **`Term.tsx`**: one xterm per pane. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder.
 - **`layout.ts`**: tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
@@ -138,8 +138,9 @@ the repo's `.wb.json` (`projectConfig`).
     a pane's nearest edge, or the tab bar (`[data-tabbar]`);
   - `SideHandle` resizes the sidebar.
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`).
-- **`ui.tsx`**: line icons (`Icon`, `IconButton`) and popup menus (`useMenu`).
-- **`panels.tsx`**: the new-workspace dialog, palette, project settings, prompt, diff panel and add-project dialog (the last
+- **`ui.tsx`**: line icons (`Icon`, `IconButton`), popup and right-click menus (`useMenu`, color swatches),
+  tooltips (`Tips`: any element with `data-tip`), and tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`).
+- **`panels.tsx`**: the new-workspace dialog, palette, app settings, project settings, prompt, diff panel and add-project dialog (the last
   only for the web dev renderer, which has no folder picker).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
@@ -151,7 +152,7 @@ the repo's `.wb.json` (`projectConfig`).
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (hiddenInset title bar), menu, notifications, `pick-folder` IPC |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header), menu, notifications, `pick-folder` IPC |
 | `src/preload/index.ts` | `bridge`: conn info, notify, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |

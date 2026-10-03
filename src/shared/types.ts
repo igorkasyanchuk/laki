@@ -30,9 +30,13 @@ export type Tab = {
   resumeId?: string // claude session_id / codex thread-id
   forkOf?: string // claude session to fork on first start
   queue?: string[] // follow-ups for when the agent is idle
+  color?: string // a tab color's name (red, blue, …); 'none' turns the agent's default off
 }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[] }
+// the app's settings (⌘,): editor is a preset (cursor, zed, vscode, windsurf, sublime) or 'custom' (editorCmd + the path)
+export type Settings = { editor?: string; editorCmd?: string; agent?: string; branchPrefix?: string; fontSize?: number; notify?: boolean }
+
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -42,4 +46,4 @@ export type TabView = Tab & { status: Status; code?: number; done: boolean; limi
 
 export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; pr?: PR }
 
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: string[] }
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: string[]; settings: Settings }

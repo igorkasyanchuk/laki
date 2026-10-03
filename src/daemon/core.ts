@@ -8,7 +8,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import type { PR, Project, ProjectConfig, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
+import type { PR, Project, ProjectConfig, Settings, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
 
@@ -106,6 +106,7 @@ export function view(): View {
     workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], pr: prs.get(w.id) })),
     tabs,
     presets: PRESETS,
+    settings: state.settings ?? {},
   }
 }
 
@@ -206,7 +207,7 @@ async function uniqueWsId(want: string, proj?: Project) {
     state.workspaces.some(w => w.id === id) ||
     (!!proj &&
       (existsSync(join(dir, 'worktrees', proj.id, id)) ||
-        (await git(proj.path, 'rev-parse', '--verify', '--quiet', `refs/heads/wb/${id}`).then(
+        (await git(proj.path, 'rev-parse', '--verify', '--quiet', `refs/heads/${branchPrefix()}${id}`).then(
           () => true,
           () => false,
         ))))
@@ -387,6 +388,43 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   return tab
 }
 
+// rename a tab, or color it
+export function tabSet(o: { id: string; name?: string; color?: string }) {
+  const t = findTab(o.id)
+  if (o.name?.trim()) t.name = o.name.trim().slice(0, 40)
+  if (o.color !== undefined) t.color = o.color || undefined
+  save()
+  changed()
+  return t
+}
+
+export function settingsSet(o: Settings) {
+  state.settings = { ...state.settings, ...o }
+  save()
+  changed()
+  return state.settings
+}
+
+const branchPrefix = () => state.settings?.branchPrefix?.trim() || 'wb/'
+
+// the editors ⌘E knows, by their macOS app names
+const EDITORS: Record<string, string> = { cursor: 'Cursor', zed: 'Zed', vscode: 'Visual Studio Code', windsurf: 'Windsurf', sublime: 'Sublime Text' }
+
+// open a workspace's (or a project's) folder in the editor from the settings, or in Finder
+export async function openIn(o: { ws?: string; project?: string; app: 'editor' | 'finder' }) {
+  const path = o.ws ? findWs(o.ws).path : findProject(o.project ?? '').path
+  const s = state.settings ?? {}
+  const fail = (e: any) => {
+    throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
+  }
+  if (o.app === 'finder') return void (await run('open', [path]).catch(fail))
+  if (s.editor === 'custom') {
+    if (!s.editorCmd?.trim()) throw new Error('set the editor command in Settings (⌘,)')
+    return void (await run(shell, ['-lc', `${s.editorCmd} "$1"`, 'editor', path], { timeout: 20000 }).catch(fail))
+  }
+  await run('open', ['-a', EDITORS[s.editor ?? 'cursor'] ?? 'Cursor', path]).catch(fail)
+}
+
 export function closeTab(id: string) {
   const t = findTab(id)
   sessions.get(id)?.kill()
@@ -414,7 +452,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     const id = await uniqueWsId(want, proj)
     const path = join(dir, 'worktrees', proj.id, id)
     const base = o.base || current
-    const branch = `wb/${id}`
+    const branch = `${branchPrefix()}${id}`
     mkdirSync(dirname(path), { recursive: true })
     await git(proj.path, 'worktree', 'add', path, '-b', branch, base).catch(e => {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
