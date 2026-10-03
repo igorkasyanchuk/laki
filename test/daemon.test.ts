@@ -286,3 +286,23 @@ test('a folder without git is a project (local workspaces only); project setting
   const dev = await rig.rpc('run', { ws: ws.id })
   await until(async () => (await rig.screen(dev.id)).includes('from-app'), 'the app config wins over .wb.json')
 })
+
+test('a chat that cannot be resumed is dropped: Enter starts a new one', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  await until(async () => (await rig.tab(ws.id, 'claude')).resumeId, 'session id')
+  await rig.stop()
+  // the chat was never saved (no message sent): claude can't resume it
+  const statePath = join(rig.data, 'state.json')
+  writeFileSync(statePath, readFileSync(statePath, 'utf8').replace(/"resumeId": *"[^"]*"/, '"resumeId": "gone-1"'))
+  await rig.start()
+  const tab = await until(async () => {
+    const t = await rig.tab(ws.id, 'claude')
+    return t.status === 'exited' && !t.resumeId && t
+  }, 'the dead id dropped')
+  await until(async () => (await rig.screen(tab.id)).includes('press Enter to start a new one'), 'the hint')
+  await rig.rpc('input', { tab: tab.id, data: '\r' })
+  await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length === 3, 'a new claude')
+  assert.ok(!rig.fakeLog().filter(l => l.bin === 'claude')[2].args.includes('--resume'))
+})

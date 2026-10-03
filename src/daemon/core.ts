@@ -346,13 +346,26 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const r = rtOf(tab.id)
   r.status = o.prompt && !o.resume ? 'running' : 'idle'
   r.done = false
-  s.onExit = () => {
+  s.onExit = code => {
     if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true })
     changed()
+    if (tab.kind !== 'agent' && tab.kind !== 'dev') return
+    s.term.write('', () => {
+      // a chat id claude/codex don't have (e.g. one with no message was never saved): Enter starts a new one
+      if (tab.resumeId && code !== 0 && CHAT_GONE.test(s.screenText(8))) {
+        tab.resumeId = undefined
+        save()
+        s.output('\x1b[2m[that chat can\'t be resumed · press Enter to start a new one]\x1b[0m\r\n')
+      } else s.output('\x1b[2m[press Enter to start it again]\x1b[0m\r\n')
+    })
   }
   changed()
   return s
 }
+
+// what claude --resume / codex resume print for a chat id they don't have.
+// ponytail: matched by message; a reworded message means Enter retries the dead id.
+const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|(conversation|session|thread)\b[^\n]*not found/i
 
 export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string }): Tab {
   const ws = findWs(wsRef)
@@ -625,8 +638,12 @@ export function clearQueue(target: string) {
 export function input(id: string, data: string) {
   const s = sessions.get(id)
   if (!s) return
-  s.write(data)
   const tab = state.tabs.find(t => t.id === id)
+  if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev') && data.includes('\r')) {
+    spawnTab(tab, { resume: true }) // Enter on an ended agent or dev server starts it again
+    return
+  }
+  s.write(data)
   if (tab?.preset === 'codex' && data.includes('\r') && rtOf(id).status === 'idle') {
     rtOf(id).status = 'running' // ponytail: Enter in an idle codex starts a turn; its notify ends it
     changed()
@@ -801,7 +818,7 @@ function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<
 export function runDev(ref: string) {
   const ws = findWs(ref)
   const cmd = projectConfig(ws).run
-  if (!cmd) throw new Error('no "run" command in .wb.json')
+  if (!cmd) throw new Error('no "run" command: set one in the project settings or .wb.json')
   return replaceTab(ws.id, 'dev', cmd)
 }
 

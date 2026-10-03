@@ -49,7 +49,7 @@ export class Session {
     })
   }
 
-  private output(d: string) {
+  output(d: string) {
     this.lastOutput = Date.now()
     this.term.write(d)
     for (const [c, st] of this.clients) {

@@ -10,6 +10,10 @@ const hook = (ev, payload) => {
 }
 const ri = args.indexOf('--resume')
 const session = ri >= 0 && !args.includes('--fork-session') ? args[ri + 1] : 'sess-' + Math.random().toString(36).slice(2, 8)
+if (session.startsWith('gone-')) {
+  process.stdout.write(`No conversation found with session ID: ${session}\r\n`)
+  process.exit(1)
+}
 process.stdout.write('\x1b[?2004h') // bracketed paste on, like the real one
 process.stdout.write(`fake claude ${args.filter(a => !a.includes('/')).join(' ')}\r\n`)
 hook('SessionStart', { session_id: session })
