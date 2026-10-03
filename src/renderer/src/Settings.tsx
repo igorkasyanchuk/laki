@@ -95,13 +95,21 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
   const [s, setS] = useState<AppSettings>(settings)
   const [sec, setSec] = useState('general')
   const set = (k: Partial<AppSettings>) => setS(x => ({ ...x, ...k }))
-  // saved a moment after the last change
+  // saved a moment after the last change, or on closing before that
   const first = useRef(true)
+  const unsaved = useRef<AppSettings | null>(null)
+  const save = useRef(onSave)
+  save.current = onSave
   useEffect(() => {
     if (first.current) return void (first.current = false)
-    const t = setTimeout(() => onSave(s), 300)
+    unsaved.current = s
+    const t = setTimeout(() => {
+      unsaved.current = null
+      onSave(s)
+    }, 300)
     return () => clearTimeout(t)
   }, [s])
+  useEffect(() => () => void (unsaved.current && save.current(unsaved.current)), [])
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', f)

@@ -159,16 +159,17 @@ export function App() {
   // a folder dropped on the window becomes a project (git or not), then a new workspace in it
   useEffect(() => {
     const files = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
+    // a drop target inside (the prompt's images) prevents the default: not a folder for us then
     const over = (e: DragEvent) => {
       if (!files(e)) return
+      setDropping(!e.defaultPrevented)
       e.preventDefault()
-      setDropping(true)
     }
     const leave = (e: DragEvent) => !e.relatedTarget && setDropping(false)
     const drop = async (e: DragEvent) => {
-      if (!files(e)) return
-      e.preventDefault()
       setDropping(false)
+      if (!files(e) || e.defaultPrevented) return
+      e.preventDefault()
       if (!bridge?.pathOf) return fail(new Error('Drop folders on the app window'))
       let last: Project | null = null
       for (const f of e.dataTransfer!.files) last = (await call<Project>('projectAdd', { path: bridge.pathOf(f) }).catch(() => null)) ?? last

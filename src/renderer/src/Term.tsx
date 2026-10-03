@@ -10,7 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, openExternal } from './api'
 import { FindBar } from './Find'
 import { FONT_SIZE, fontStack } from './Settings'
-import { termTheme } from './themes'
+import { termTheme, transparent } from './themes'
 
 export function Term({
   tab,
@@ -42,7 +42,7 @@ export function Term({
       lineHeight: 1.15,
       scrollback: 5000,
       allowProposedApi: true,
-      allowTransparency: true, // gradient themes (themes.ts)
+      allowTransparency: transparent(theme),
       macOptionIsMeta: true,
       cursorBlink: true,
       theme: termTheme(),
@@ -131,7 +131,9 @@ export function Term({
     xt.fit.fit()
   }, [fontSize, fontFamily, xt])
   useEffect(() => {
-    if (xt) xt.term.options.theme = termTheme()
+    if (!xt) return
+    xt.term.options.allowTransparency = transparent(theme)
+    xt.term.options.theme = termTheme()
   }, [theme, xt])
   return (
     <>

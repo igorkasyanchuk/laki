@@ -9,6 +9,9 @@ export type Img = { path: string; url: string } // saved file, and a data: URL f
 // the prompt the agent gets
 export const withImages = (text: string, imgs: Img[]) => [text.trim(), imgs.map(i => i.path).join('\n')].filter(Boolean).join('\n\n')
 
+// what agents read (claude, codex): other images (HEIC, SVG, …) are refused
+const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }
+
 const read = (f: File) =>
   new Promise<string>((res, rej) => {
     const r = new FileReader()
@@ -33,10 +36,14 @@ export function PromptInput(p: {
   const [err, setErr] = useState('')
   const add = async (files: File[]) => {
     setErr('')
-    for (const f of files.filter(f => f.type.startsWith('image/'))) {
+    for (const f of files) {
+      const ext = EXT[f.type]
+      if (!ext) {
+        setErr(`${f.name || 'image'}: PNG, JPEG, GIF or WebP only`)
+        continue
+      }
       try {
         const url = await read(f)
-        const ext = f.type.split('/')[1].replace('jpeg', 'jpg').replace(/\W.*/, '')
         const path = await p.save(url.slice(url.indexOf(',') + 1), ext)
         p.onImages(x => [...x, { path, url }])
       } catch (e) {
@@ -54,15 +61,15 @@ export function PromptInput(p: {
     e.preventDefault()
     add(fs)
   }
+  // handled here: the default prevented tells the window's own drop (folders become projects) to keep out
   const drop = (e: DragEvent) => {
     const fs = images(e.dataTransfer.files)
     if (!fs.length) return
     e.preventDefault()
-    e.stopPropagation() // not a folder for the window's drop
     add(fs)
   }
   return (
-    <div className="prompt-input" onDragOver={e => e.dataTransfer.types.includes('Files') && (e.preventDefault(), e.stopPropagation())} onDrop={drop}>
+    <div className="prompt-input" onDragOver={e => e.dataTransfer.types.includes('Files') && e.preventDefault()} onDrop={drop}>
       <textarea
         ref={box}
         rows={p.rows ?? 4}

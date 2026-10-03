@@ -152,6 +152,9 @@ export const preview = (t: Theme) => {
   return [t.grad ? gradient(t.grad) : bg, ...rest]
 }
 
+// a gradient theme: terminals are see-through (xterm's allowTransparency, which costs some text quality)
+export const transparent = (id?: string) => !!THEMES.find(t => t.id === id)?.grad
+
 // paints <html> with a theme; an unknown id is the default
 export function applyTheme(id?: string) {
   const t = THEMES.find(x => x.id === id) ?? THEMES[0]

@@ -119,13 +119,13 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
               Prompt <span className="muted">(optional)</span>
             </span>
             <PromptInput
-            value={p.prompt ?? ''}
-            onChange={prompt => set({ prompt })}
-            images={images}
-            onImages={setImages}
-            save={(data, ext) => api.call<string>('imageSave', { data, ext })}
-            dictate={bridge?.dictate}
-            dictationSettings={bridge?.dictationSettings}
+              value={p.prompt ?? ''}
+              onChange={prompt => set({ prompt })}
+              images={images}
+              onImages={setImages}
+              save={(data, ext) => api.call<string>('imageSave', { data, ext })}
+              dictate={bridge?.dictate}
+              dictationSettings={bridge?.dictationSettings}
               onSubmit={submit}
             />
           </div>

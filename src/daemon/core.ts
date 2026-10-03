@@ -442,8 +442,11 @@ export function imageSave(o: { data: string; ext?: string }) {
   const ext = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(o.ext ?? '') ? o.ext : 'png'
   const buf = Buffer.from(o.data, 'base64')
   if (!buf.length || buf.length > 20 << 20) throw new Error('an image up to 20 MB')
-  mkdirSync(join(dir, 'images'), { recursive: true })
-  const path = join(dir, 'images', `${Date.now()}-${randomUUID().slice(0, 6)}.${ext}`)
+  const images = join(dir, 'images')
+  mkdirSync(images, { recursive: true })
+  // ones older than a month go: their prompts are long sent
+  for (const f of readdirSync(images)) if (Number(f.split('-')[0]) < Date.now() - 30 * 86400e3) rmSync(join(images, f), { force: true })
+  const path = join(images, `${Date.now()}-${randomUUID().slice(0, 6)}.${ext}`)
   writeFileSync(path, buf)
   return path
 }
@@ -883,13 +886,9 @@ function checkOf(c: any): Check {
   return { name: c.name || c.context || '?', state, url: c.detailsUrl || c.targetUrl || undefined }
 }
 
-export function checksOf(rollup: any[] | undefined): PR['checks'] {
-  if (!rollup?.length) return ''
-  const states = rollup.map(c => String(c.conclusion || c.state || c.status || '').toUpperCase())
-  if (states.some(s => ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(s))) return 'fail'
-  if (rollup.some(c => (c.status && c.status !== 'COMPLETED') || c.state === 'PENDING' || c.state === 'EXPECTED')) return 'pending'
-  return 'pass'
-}
+// all of a PR's checks in one word: fail if any failed, else pending if any runs, else pass
+const checksOf = (list: Check[]): PR['checks'] =>
+  !list.length ? '' : list.some(c => c.state === 'fail') ? 'fail' : list.some(c => c.state === 'pending') ? 'pending' : 'pass'
 
 let prScan: Promise<void> | null = null
 let prAgain = false
@@ -917,12 +916,13 @@ async function scanPR(ws: Workspace) {
   try {
     const { stdout } = await run('gh', ['pr', 'view', ws.branch, '--json', PR_FIELDS], { cwd: ws.path, timeout: 20000 })
     const j = JSON.parse(stdout)
+    const list: Check[] = (j.statusCheckRollup ?? []).map(checkOf)
     pr = {
       number: j.number,
       state: j.state,
       url: j.url,
-      checks: checksOf(j.statusCheckRollup),
-      list: (j.statusCheckRollup ?? []).map(checkOf),
+      checks: checksOf(list),
+      list,
       title: j.title,
       author: j.author?.login,
       draft: j.isDraft,
@@ -959,8 +959,10 @@ async function autoPR(ws: Workspace, pr: PR) {
       const tries = (f.tries ?? 0) + 1
       if (tries > MAX_CI_FIXES) {
         const tab = agentOf(ws)
-        if (tab) rtOf(tab.id).status = 'waiting' // ◆: over to you
-        broadcast({ ev: 'turn', tab: tab?.id, ws: ws.id, kind: 'waiting', text: `CI still fails after ${MAX_CI_FIXES} fixes` })
+        if (tab && tries === MAX_CI_FIXES + 1) {
+          rtOf(tab.id).status = 'waiting' // ◆: over to you, once
+          broadcast({ ev: 'turn', tab: tab.id, ws: ws.id, kind: 'waiting', text: `CI still fails after ${MAX_CI_FIXES} fixes` })
+        }
         Object.assign(f, { ci: pr.head, tries })
       } else if (await prFix({ ws: ws.id, what: 'ci', push: true }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), false)))
         Object.assign(f, { ci: pr.head, tries }) // recorded once sent: no agent yet means the next scan tries again
@@ -1036,13 +1038,18 @@ export async function prFix(o: { ws: string; what: 'ci' | 'review'; push?: boole
   return tellAgent(ws, `CI fails on PR #${pr.number} (${pr.url}). Find the cause and fix it, run what you can locally, then ${pushAsk(!!o.push)}.\n${body}`)
 }
 
-type Thread = { id: string; isResolved: boolean; isOutdated: boolean; path: string; line: number | null; comments: { nodes: { author: { login: string } | null; body: string }[] } }
+type Comment = { author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string }
+type Thread = { id: string; isResolved: boolean; isOutdated: boolean; path: string; line: number | null; comments: { nodes: Comment[] } }
+
+// comments an agent may act on: from people with write access to the repo, or bots (review tools). Anyone
+// can comment on a public PR, and the agent is told to change code and push.
+const trusted = (c: Comment) => c.author?.__typename === 'Bot' || ['OWNER', 'MEMBER', 'COLLABORATOR'].includes(c.authorAssociation ?? '')
 
 const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
   viewer { login }
   repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThreads(first: 100) { nodes {
     id isResolved isOutdated path line
-    comments(first: 30) { nodes { author { login } body } }
+    comments(first: 30) { nodes { author { login __typename } authorAssociation body } }
   } } } }
 }`
 
@@ -1050,7 +1057,9 @@ const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
 async function reviewThreads(cwd: string, pr: number): Promise<{ threads: Thread[]; me: string }> {
   const { stdout } = await run('gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { cwd, timeout: 20000 })
   const d = JSON.parse(stdout).data
-  return { threads: d.repository.pullRequest.reviewThreads.nodes, me: d.viewer.login }
+  const threads: Thread[] | undefined = d?.repository?.pullRequest?.reviewThreads?.nodes
+  if (!threads) throw new Error(`no review threads for PR #${pr} (gh api graphql)`)
+  return { threads: threads.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(trusted) } })), me: d.viewer.login }
 }
 
 // the open threads with how many comments others left on each ("id:n id:n"); your own comments don't
@@ -1087,6 +1096,7 @@ export function sweepRunning(now = Date.now()) {
     if (/esc to interrupt/i.test(s.screenText(15))) continue
     r.status = 'idle'
     changed()
+    if (t.queue?.length) setTimeout(() => deliver(t.id), 800) // what waited for this turn's end (autoPR's too)
   }
 }
 

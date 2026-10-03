@@ -134,7 +134,7 @@ const server = createServer(async (req, res) => {
   }
 })
 
-const wss = new WebSocketServer({ noServer: true, maxPayload: 16 << 20 })
+const wss = new WebSocketServer({ noServer: true, maxPayload: 32 << 20 }) // a pasted 20 MB image, in base64
 let clientSeq = 0
 server.on('upgrade', (req: IncomingMessage, socket, head) => {
   const url = new URL(req.url ?? '', 'http://x')
