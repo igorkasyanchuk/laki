@@ -144,7 +144,7 @@ before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 review decision, size, checks (each links to its run) and description; buttons that send the failing CI or
 the open review comments to the agent now; and what each agent said last.
 
-**PRs.** laki-electron finds the PR of each workspace's branch with `gh` (logged in) every minute.
+**PRs.** Laki Electron finds the PR of each workspace's branch with `gh` (logged in) every minute.
 - *fix CI*: when CI fails on a new commit, the failing checks and the end of their GitHub Actions logs go to
   the workspace's agent (when it's idle), asking it to fix, commit and push. Once per commit; after 3 tries
   in a row it stops and tells you.
@@ -213,7 +213,7 @@ notification; click it to jump there. Follow-ups queued with `laki-electron send
   the new-tab menu and the new-workspace dialog. Edit `claude` and `codex` to change how every new one
   starts; a tab started from a preset uses its current settings when it restarts or resumes.
 - *Agent skill*: installs a skill for Claude Code and Codex in your home folder (`~/.claude/skills/laki-electron`,
-  `~/.codex/skills/laki-electron`), so every session knows laki-electron: what it is, and how to drive it with its CLI (list
+  `~/.codex/skills/laki-electron`), so every session knows Laki Electron: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   It holds the app's path: update it after moving the app. *Remove* takes only its own files.
 - *Projects*: each project's settings (below).
@@ -269,7 +269,7 @@ Data lives in `~/.laki-electron`; set `LAKI_ELECTRON_HOME` to use another folder
 - `claude-settings.json`: the hooks Claude gets through `--settings`;
 - `worktrees/` and `run/`.
 
-`~/.claude` and `~/.codex` are never touched.
+`~/.claude` and `~/.codex` are left alone, except the skill folders *Settings → Agent skill* writes when you click Install.
 
 ## Updating
 
