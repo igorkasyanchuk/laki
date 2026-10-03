@@ -23,7 +23,7 @@ function theme() {
   }
 }
 
-export function Term({ tab, onReady, findSeq = 0 }: { tab: string; onReady?: (t: Terminal) => void; findSeq?: number }) {
+export function Term({ tab, active = true, findSeq = 0 }: { tab: string; active?: boolean; findSeq?: number }) {
   const box = useRef<HTMLDivElement>(null)
   const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
@@ -95,8 +95,6 @@ export function Term({ tab, onReady, findSeq = 0 }: { tab: string; onReady?: (t:
     })
     ro.observe(box.current!)
     if (api.connected) attach()
-    term.focus()
-    onReady?.(term)
     setXt({ term, search })
     ;(window as any).__term = term // for inspection in dev tools
     return () => {
@@ -108,6 +106,9 @@ export function Term({ tab, onReady, findSeq = 0 }: { tab: string; onReady?: (t:
       term.dispose()
     }
   }, [tab])
+  useEffect(() => {
+    if (active) xt?.term.focus()
+  }, [active, xt])
   return (
     <>
       <div className="term" ref={box} />

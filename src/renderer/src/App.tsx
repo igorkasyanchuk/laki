@@ -4,6 +4,8 @@ import { api, bridge, notify, openExternal } from './api'
 import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
+import { drop, keep, type Layout, resize, show, tabsOf } from './layout'
+import { Panes, SideHandle, useTabDrag } from './Panes'
 
 type Dialog = null | 'new' | 'project' | 'palette' | 'ship'
 
@@ -21,6 +23,9 @@ function rollup(tabs: TabView[]) {
   return limit && best !== 'waiting' && best !== 'running' ? 'limit' : best
 }
 
+const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
+const SIDE = 260 // the sidebar's default width
+
 const load = <T,>(k: string, d: T): T => {
   try {
     return JSON.parse(localStorage.getItem(k) ?? '') ?? d
@@ -37,7 +42,9 @@ export function App() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [diff, setDiff] = useState(false)
-  const [findSeq, setFindSeq] = useState(0) // ⌘F presses, for the terminal's find bar
+  const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per tab, for its find bar
+  const [layouts, setLayouts] = useState<Record<string, Layout>>(() => load('wbs.layouts', {})) // panes per workspace
+  const [sideW, setSideW] = useState<number>(() => load('wbs.side', SIDE))
   const [error, setError] = useState('')
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
@@ -45,10 +52,18 @@ export function App() {
   const live = useMemo(() => view?.workspaces.filter(w => !w.archived) ?? [], [view])
   const ws = live.find(w => w.id === wsId) ?? live[0] ?? null
   const tabs = useMemo(() => view?.tabs.filter(t => t.workspace === ws?.id) ?? [], [view, ws])
-  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
+  // panes whose tab still exists; the selected tab is always in one of them
+  const kept = keep(layouts[ws?.id ?? ''] ?? null, id => tabs.some(t => t.id === id))
+  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => tabsOf(kept).includes(t.id)) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
+  const layout = tab ? show(kept, tab.id) : null
+  const visible = tabsOf(layout)
+  const tabByWsRef = useRef(tabByWs)
+  tabByWsRef.current = tabByWs
 
   useEffect(() => void localStorage.setItem('wbs.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
   useEffect(() => void localStorage.setItem('wbs.tabs', JSON.stringify(tabByWs)), [tabByWs])
+  useEffect(() => void localStorage.setItem('wbs.layouts', JSON.stringify(layouts)), [layouts])
+  useEffect(() => void localStorage.setItem('wbs.side', JSON.stringify(sideW)), [sideW])
 
   const fail = (e: unknown) => {
     setError((e as Error).message)
@@ -56,10 +71,13 @@ export function App() {
   }
   const call = useCallback(<T,>(method: string, params: object = {}) => api.call<T>(method, params).catch(e => (fail(e), Promise.reject(e))), [])
 
-  // a tab by id, or one just created (its view may not have arrived yet)
+  // a tab by id, or one just created (its view may not have arrived yet); one not on screen takes the
+  // focused pane's place
   const selectTab = useCallback((ref: string | { id: string; workspace: string }) => {
     const t = typeof ref === 'string' ? viewRef.current?.tabs.find(t => t.id === ref) : ref
     if (!t) return
+    const instead = tabByWsRef.current[t.workspace] ?? current.current ?? undefined
+    setLayouts(m => ({ ...m, [t.workspace]: show(m[t.workspace] ?? null, t.id, instead) }))
     setWsId(t.workspace)
     setTabByWs(m => ({ ...m, [t.workspace]: t.id }))
   }, [])
@@ -73,7 +91,7 @@ export function App() {
       else if (m.ev === 'turn') {
         const v = viewRef.current
         const t = v?.tabs.find(t => t.id === m.tab)
-        const shown = document.hasFocus() && current.current === m.tab
+        const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
         if (!t || shown) return
         const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
         notify(`${t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id))
@@ -87,8 +105,10 @@ export function App() {
   // tell the daemon what's on screen: it clears ● there and doesn't set it
   const current = useRef<string | null>(null)
   current.current = tab?.id ?? null
+  const shownTabs = useRef<string[]>([])
+  shownTabs.current = visible
   useEffect(() => {
-    const report = () => api.send('view', { tab: current.current, focused: document.hasFocus() })
+    const report = () => api.send('view', { tab: current.current, tabs: shownTabs.current, focused: document.hasFocus() })
     report()
     window.addEventListener('focus', report)
     window.addEventListener('blur', report)
@@ -98,7 +118,30 @@ export function App() {
       window.removeEventListener('blur', report)
       off()
     }
-  }, [tab?.id])
+  }, [tab?.id, visible.join()])
+
+  // panes: drop a dragged tab on one, close one (its tab keeps running), move a divider
+  const { drag, start } = useTabDrag((id, pane, edge) => {
+    const next = ws && layout && drop(layout, id, pane, edge)
+    if (!ws || !next) return
+    setLayouts(m => ({ ...m, [ws.id]: next }))
+    selectTab(id)
+  })
+  const closePane = (id: string) => {
+    const rest = keep(layout, x => x !== id)
+    if (!ws || !rest) return
+    setLayouts(m => ({ ...m, [ws.id]: rest }))
+    if (id === tab?.id) selectTab(tabsOf(rest)[0])
+  }
+  const tabLabel = (id: string) => {
+    const t = tabs.find(t => t.id === id)
+    return t && (
+      <>
+        <Glyph s={tabGlyph(t)} />
+        <span>{t.name}</span>
+      </>
+    )
+  }
 
   const newTab = useCallback(
     async (preset: string) => {
@@ -153,7 +196,7 @@ export function App() {
     const act: Record<string, () => void> = {
       n: () => setDialog('new'),
       o: openProject,
-      f: () => dialog || setFindSeq(n => n + 1), // not over a dialog
+      f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
       t: () => newTab('shell'),
       w: () => closeTab(tab),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
@@ -212,7 +255,7 @@ export function App() {
   const archived = view.workspaces.filter(w => w.archived)
   return (
     <div className="app">
-      <aside className="sidebar">
+      <aside className="sidebar" style={{ width: sideW }}>
         <div className="side-head drag">
           <span className="logo">wbs</span>
           <span className="spacer" />
@@ -286,17 +329,19 @@ export function App() {
         </div>
       </aside>
 
+      <SideHandle width={sideW} onWidth={setSideW} init={SIDE} />
       <main className="main">
         <div className="tabbar drag">
           {tabs.map((t, i) => (
             <div
               key={t.id}
-              className={`tab nodrag ${t.id === tab?.id ? 'sel' : ''}`}
+              className={`tab nodrag ${t.id === tab?.id ? 'sel' : visible.includes(t.id) ? 'shown' : ''}`}
               onClick={() => selectTab(t.id)}
+              onPointerDown={e => start(e, t.id)}
               onAuxClick={e => e.button === 1 && closeTab(t)}
               title={`${t.name} (⌘${i + 1})${t.cmd ? `\n${t.cmd}` : ''}`}
             >
-              <Glyph s={t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status} />
+              <Glyph s={tabGlyph(t)} />
               <span>{t.name}</span>
               {!!t.queue?.length && <span className="badge">+{t.queue.length}</span>}
               <button className="x" onClick={e => (e.stopPropagation(), closeTab(t))} title="Close (⌘W)">
@@ -327,8 +372,18 @@ export function App() {
         </div>
         <div className="body">
           <div className="term-wrap">
-            {tab ? (
-              <Term key={tab.id} tab={tab.id} findSeq={findSeq} />
+            {layout ? (
+              <Panes
+                layout={layout}
+                active={tab?.id ?? null}
+                drag={drag}
+                label={tabLabel}
+                render={id => <Term tab={id} active={id === tab?.id} findSeq={finds[id] ?? 0} />}
+                onFocus={id => id !== tab?.id && selectTab(id)}
+                onClosePane={closePane}
+                onResize={(path, at) => ws && setLayouts(m => ({ ...m, [ws.id]: resize(layout, path, at) }))}
+                startDrag={start}
+              />
             ) : (
               <div className="empty">
                 {ws ? (

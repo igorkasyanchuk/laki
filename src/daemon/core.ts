@@ -27,7 +27,7 @@ type Runtime = { status: Status; done: boolean; limit?: number; last?: string; s
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const prs = new Map<string, PR>()
-export type Conn = Client & { view?: { tab: string | null; focused: boolean } }
+export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean } }
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
 
@@ -121,14 +121,19 @@ export function changed() {
 
 const broadcast = (msg: unknown) => clients.forEach(c => c.send(msg))
 
-const viewed = (tab: string) => [...clients].some(c => c.view?.tab === tab && c.view.focused)
+// tabs: every pane on screen; tab: the focused one (older clients send only that)
+const shown = (v: { tab: string | null; tabs?: string[] }) => v.tabs ?? (v.tab ? [v.tab] : [])
+const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(c.view).includes(tab))
 
-export function setView(c: Conn, v: { tab: string | null; focused: boolean }) {
+export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean }) {
   c.view = v
-  const r = v.tab && v.focused ? rt.get(v.tab) : undefined
-  if (r?.done) {
-    r.done = false
-    changed()
+  if (!v.focused) return
+  for (const id of shown(v)) {
+    const r = rt.get(id)
+    if (r?.done) {
+      r.done = false
+      changed()
+    }
   }
 }
 

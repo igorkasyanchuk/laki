@@ -51,7 +51,7 @@ textarea { resize: vertical; font-family: inherit; }
 .splash { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; }
 .logo { font-weight: 700; letter-spacing: 0.5px; color: var(--accent); font-family: var(--mono); }
 
-.app { display: flex; height: 100%; }
+.app { display: flex; height: 100%; position: relative; }
 .sidebar { width: 260px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
 .side-head { height: 42px; display: flex; align-items: center; padding: 0 8px 0 80px; border-bottom: 1px solid var(--line); }
 .side-scroll { flex: 1; overflow-y: auto; padding: 6px 0; }
@@ -163,3 +163,32 @@ textarea { resize: vertical; font-family: inherit; }
 .find button { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 4px; padding: 1px 6px; font: 12px var(--mono); cursor: pointer; }
 .find button:hover { color: var(--fg); background: var(--hover); }
 .find button.on { color: var(--accent); border-color: var(--accent); }
+
+/* sidebar resize handle */
+.side-handle { position: absolute; top: 0; bottom: 0; width: 7px; transform: translateX(-50%); cursor: col-resize; z-index: 10; }
+.side-handle:hover, .side-handle:active { background: linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat; }
+
+/* panes: tabs side by side or stacked */
+.tab.shown { color: var(--fg); }
+.panes { position: absolute; inset: 0; }
+.pane { position: absolute; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+.pane-head { flex: none; height: 26px; display: flex; align-items: center; gap: 6px; padding: 0 4px 0 10px; font-size: 12px; color: var(--muted); background: var(--side); border-bottom: 1px solid var(--line); cursor: grab; user-select: none; white-space: nowrap; overflow: hidden; }
+.pane.active .pane-head { color: var(--fg); box-shadow: inset 0 2px 0 var(--accent); }
+.pane-head .x { background: none; border: none; padding: 0 5px; color: var(--muted); }
+.pane-head .x:hover { color: var(--fg); }
+.pane-body { flex: 1; position: relative; min-height: 0; }
+.bar { position: absolute; z-index: 4; }
+.bar.row { width: 7px; transform: translateX(-50%); cursor: col-resize; }
+.bar.col { height: 7px; transform: translateY(-50%); cursor: row-resize; }
+.bar::after { content: ''; position: absolute; background: var(--line); }
+.bar.row::after { left: 3px; top: 0; bottom: 0; width: 1px; }
+.bar.col::after { top: 3px; left: 0; right: 0; height: 1px; }
+.bar:hover::after, .bar:active::after { background: var(--accent); }
+.panes.dragging, .panes.dragging * { cursor: grabbing !important; }
+.drop-zone { position: absolute; z-index: 6; pointer-events: none; background: color-mix(in srgb, var(--accent) 20%, transparent); border: 2px solid var(--accent); border-radius: 4px; }
+.drop-zone.center { inset: 0; }
+.drop-zone.left { left: 0; top: 0; bottom: 0; width: 50%; }
+.drop-zone.right { right: 0; top: 0; bottom: 0; width: 50%; }
+.drop-zone.top { left: 0; right: 0; top: 0; height: 50%; }
+.drop-zone.bottom { left: 0; right: 0; bottom: 0; height: 50%; }
+.drag-ghost { position: fixed; z-index: 100; pointer-events: none; display: flex; align-items: center; gap: 6px; padding: 3px 10px; background: var(--panel); color: var(--fg); border: 1px solid var(--accent); border-radius: var(--radius); font-size: 12px; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
