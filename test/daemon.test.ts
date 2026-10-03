@@ -241,16 +241,20 @@ test('side panel: files with their changes, new files and folders, only inside t
   await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: '../../etc/hosts' }), /inside the workspace/)
 })
 
-test('a tab whose program ends cleanly closes; a failed one stays, to read', async t => {
+test('a tab whose program ends cleanly closes, and a shell on any exit; a failed program stays, to read', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const ok = await rig.rpc('tabNew', { ws: ws.id, cmd: 'true' })
   const bad = await rig.rpc('tabNew', { ws: ws.id, cmd: 'exit 3' })
+  const sh = await rig.rpc('tabNew', { ws: ws.id })
+  await until(async () => (await rig.rpc('state')).tabs.find((x: { id: string }) => x.id === sh.id)?.status !== 'exited', 'shell up')
+  await rig.rpc('send', { target: sh.id, text: 'exit 3' })
   await until(async () => {
     const v = await rig.rpc('state')
-    return !v.tabs.some((x: { id: string }) => x.id === ok.id) && v.tabs.find((x: { id: string }) => x.id === bad.id)?.status === 'exited'
-  }, 'the clean one closed, the failed one exited')
+    const has = (id: string) => v.tabs.some((x: { id: string }) => x.id === id)
+    return !has(ok.id) && !has(sh.id) && v.tabs.find((x: { id: string }) => x.id === bad.id)?.status === 'exited'
+  }, 'the clean one and the shell closed, the failed one exited')
 })
 
 test('agent skill: installed in HOME for claude and codex, its launcher drives the daemon, removed again', async t => {

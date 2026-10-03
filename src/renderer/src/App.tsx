@@ -559,7 +559,7 @@ export function App() {
                 <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
                 <span>{ts.map(t => t.name).join(' · ')}</span>
                 {queued > 0 && <span className="badge">+{queued}</span>}
-                <button className="x" data-tip="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
+                <button className="x" data-tip="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
                   ×
                 </button>
               </div>
