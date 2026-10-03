@@ -366,7 +366,6 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
     load.current().then(x => alive && setF(x), e => alive && (setF(null), setErr(String(e?.message ?? e))))
     return () => void (alive = false)
   }, [p.path, n])
-  useEffect(() => setF(null), [p.path])
   useLayoutEffect(() => {
     if (p.line) body.current?.querySelector('.pv-line.at')?.scrollIntoView({ block: 'center' })
     else body.current?.scrollTo(0, 0)
@@ -401,8 +400,8 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
               {l || ' '}
             </div>
           ))}
-        {f?.cut && <div className="muted small pad">Showing the first {sizeText(f.text?.length ?? 0)}. Open it in the editor for the rest.</div>}
-        {f && f.text === undefined && !f.image && <div className="muted small pad">A binary file ({sizeText(f.size)}): open it in the editor or Finder.</div>}
+        {f?.cut && <div className="muted small pad">Showing the start of the file. Open it in the editor for the rest.</div>}
+        {f && f.text === undefined && !f.image && <div className="muted small pad">Not shown here ({sizeText(f.size)}): open it in the editor or Finder.</div>}
       </div>
     </div>
   )

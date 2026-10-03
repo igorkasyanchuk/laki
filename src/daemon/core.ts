@@ -1246,10 +1246,10 @@ export function fileRead(o: { ws: string; path: string }) {
   if (!st.isFile()) throw new Error(`${o.path} isn't a file`)
   const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
   if (mime) return st.size > 10 << 20 ? { size: st.size } : { size: st.size, image: `data:${mime};base64,${readFileSync(abs).toString('base64')}` }
-  const buf = Buffer.alloc(Math.min(st.size, MAX_TEXT))
+  let buf = Buffer.alloc(Math.min(st.size, MAX_TEXT))
   const fd = openSync(abs, 'r')
   try {
-    readSync(fd, buf, 0, buf.length, 0)
+    buf = buf.subarray(0, readSync(fd, buf, 0, buf.length, 0)) // less when it shrank since statSync
   } finally {
     closeSync(fd)
   }

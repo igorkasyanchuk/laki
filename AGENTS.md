@@ -154,7 +154,8 @@ they work).
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS.
   - The project and workspace order is the daemon's (`reorder`).
 - **`Term.tsx`**: one xterm per pane. It attaches on mount and detaches on unmount, and swallows terminal
-  queries unless it is the responder.
+  queries unless it is the responder. A keypress whose keydown it didn't see is dropped: Enter that closed a
+  dialog (and so focused the terminal) would type a stray ⏎.
 - **`layout.ts`**: tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
   session is in exactly one tab and nothing nests. Pure functions: `groupsOf` (stored tabs minus ended
   sessions, plus one tab per unplaced session), `move` (a pane or a whole tab next to a pane, or out to the

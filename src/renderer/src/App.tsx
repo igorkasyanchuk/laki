@@ -37,6 +37,7 @@ const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_I
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
 const SIDE = 240 // the sidebar's default width
+let requests = 0
 const wsName = (w: { id: string; name?: string }) => w.name || w.id
 
 const load = <T,>(k: string, d: T): T => {
@@ -56,11 +57,12 @@ export function App() {
   const [wsId, setWsId] = useState<string | null>(() => load('wbs.ws', null))
   const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('wbs.tabs', {})) // the focused pane's session
   const [dialog, setDialog] = useState<Dialog>(null)
+  const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('wbs.panel', false)) // the right panel: files, changes, review
   const [panelTab, setPanelTab] = useState<PanelTab>(() => load('wbs.panelTab', 'files'))
   const [panelW, setPanelW] = useState<number>(() => load('wbs.panelW', PANEL_WIDTH))
-  const [preview, setPreview] = useState<{ ws: string; path: string; line?: number } | null>(null) // a file shown in the app
+  const [preview, setPreview] = useState<{ ws: string; path: string; line?: number; n: number } | null>(null) // a file shown in the app; n: each request reloads it
   const [info, setInfo] = useState<boolean>(() => load('wbs.info', false)) // the workspace info panel
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('wbs.groups', {})) // tabs (of panes) per workspace
@@ -254,7 +256,7 @@ export function App() {
     files: () => api.call<FileList>('files', { ws: w.id }),
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
     openFile: file => void call('openIn', { ws: w.id, app: 'editor', file }).catch(() => {}),
-    preview: (path, line) => setPreview({ ws: w.id, path, line }),
+    preview: (path, line) => setPreview({ ws: w.id, path, line, n: ++requests }),
     changes: () => api.call<Changes>('diff', { ws: w.id }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
   })
@@ -364,7 +366,7 @@ export function App() {
     const act: Record<string, () => void> = {
       n: () => newWs(ws?.project),
       b: () => setSideOpen(o => !o),
-      ',': () => setDialog(d => (d === 'settings' ? null : 'settings')),
+      ',': () => setDialog(d => (d === 'settings' || (typeof d === 'object' && d && 'settings' in d) ? null : 'settings')),
       e: () => ws && openIn(editor),
       '=': () => zoom(1),
       '+': () => zoom(1),
@@ -632,6 +634,7 @@ export function App() {
           </div>
           {preview && ws && preview.ws === ws.id && (
             <FilePreview
+              key={preview.n}
               path={preview.path}
               line={preview.line}
               load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: preview.path })}
@@ -668,7 +671,7 @@ export function App() {
         </div>
         {(dialog === 'settings' || settingsFor) && (
           <SettingsPage
-            key={settingsFor?.id ?? ''}
+            key={settingsKey}
             settings={view.settings}
             apps={apps}
             onClose={() => setDialog(null)}

@@ -234,6 +234,9 @@ test('side panel: files with their changes, new files and folders, only inside t
   assert.equal((await rig.rpc('fileRead', { ws: ws.id, path: 'dot.png' })).image, 'data:image/png;base64,iVBORw==')
   writeFileSync(join(ws.path, 'blob.bin'), Buffer.from([1, 0, 2]))
   assert.deepEqual(await rig.rpc('fileRead', { ws: ws.id, path: 'blob.bin' }), { size: 3 })
+  writeFileSync(join(ws.path, 'big.log'), 'x'.repeat(600 << 10))
+  const big = await rig.rpc('fileRead', { ws: ws.id, path: 'big.log' })
+  assert.deepEqual([big.size, big.text.length, big.cut], [600 << 10, 512 << 10, true])
   await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: '../../etc/hosts' }), /inside the workspace/)
 })
 

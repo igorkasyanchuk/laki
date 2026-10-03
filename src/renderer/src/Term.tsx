@@ -94,6 +94,9 @@ export function Term({
       else if (m.tab === tab && m.ev === 'responder') responder = m.on
       else if (m.ev === 'open') attach()
     })
+    // a keypress whose keydown went elsewhere isn't ours: Enter that closed a dialog and so focused this
+    let down = false
+    term.attachCustomKeyEventHandler(e => (e.type === 'keydown' ? (down = true) : e.type === 'keyup' ? !(down = false) : down))
     term.onData(d => api.send('input', { tab, data: d }))
     term.onBinary(d => api.send('input', { tab, data: d }))
     term.onResize(({ cols, rows }) => api.send('resize', { tab, cols, rows }))
