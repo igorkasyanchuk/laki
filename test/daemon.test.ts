@@ -241,6 +241,18 @@ test('side panel: files with their changes, new files and folders, only inside t
   await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: '../../etc/hosts' }), /inside the workspace/)
 })
 
+test('a tab whose program ends cleanly closes; a failed one stays, to read', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const ok = await rig.rpc('tabNew', { ws: ws.id, cmd: 'true' })
+  const bad = await rig.rpc('tabNew', { ws: ws.id, cmd: 'exit 3' })
+  await until(async () => {
+    const v = await rig.rpc('state')
+    return !v.tabs.some((x: { id: string }) => x.id === ok.id) && v.tabs.find((x: { id: string }) => x.id === bad.id)?.status === 'exited'
+  }, 'the clean one closed, the failed one exited')
+})
+
 test('agent skill: installed in HOME for claude and codex, its launcher drives the daemon, removed again', async t => {
   const rig = await fresh(t)
   await rig.rpc('projectAdd', { path: rig.repo })

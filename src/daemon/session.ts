@@ -40,7 +40,8 @@ export class Session {
     })
     this.pty = pty.spawn(file, args, { name: 'xterm-256color', cols, rows, cwd: opts.cwd, env: opts.env })
     this.pty.onData(d => this.output(d))
-    this.pty.onExit(({ exitCode }) => {
+    this.pty.onExit(({ exitCode: code, signal }) => {
+      const exitCode = signal ? 128 + signal : code // killed: not a clean exit
       this.exited = true
       this.exitCode = exitCode
       this.output(`\r\n\x1b[2m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`)

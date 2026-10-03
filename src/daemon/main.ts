@@ -211,6 +211,7 @@ server.listen(Number(process.env.WBS_PORT || 0), '127.0.0.1', () => {
 function shutdown() {
   log('shutting down')
   timers.forEach(clearInterval)
+  core.stop()
   for (const s of core.sessions.values()) s.kill()
   rmSync(join(dir, 'daemon.json'), { force: true })
   rmSync(lockPath, { force: true })

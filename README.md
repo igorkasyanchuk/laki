@@ -92,7 +92,9 @@ npm link
 - Drag a pane's header to move the pane within its tab, or onto the tab bar to give it a tab of its own.
 - Drag the dividers to resize.
 - × on a pane closes that terminal; × on a tab closes all of its terminals. Both stop the process.
-- ⌘1…⌘9 switch tabs.
+- ⌘1…⌘9 switch tabs. Double click a tab to rename it.
+- A tab closes by itself when its shell exits, or its agent ends cleanly (exit code 0). An agent that failed
+  stays open to read, and ⏎ starts it again.
 - Each workspace remembers its tabs and splits.
 - Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
   *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange and codex

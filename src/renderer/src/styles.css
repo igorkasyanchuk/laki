@@ -123,11 +123,12 @@ textarea { resize: vertical; font-family: inherit; }
 .tab { display: flex; align-items: center; gap: 6px; height: 29px; padding: 0 4px 0 10px; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; cursor: pointer; color: var(--muted); max-width: 240px; white-space: nowrap; margin-bottom: -1px; font-size: 12.5px; }
 .tab > span:not(.glyph):not(.badge) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .tab:hover { color: var(--fg); background: var(--hover); }
-.tab.sel { color: var(--fg); background: var(--term-bg); border-color: var(--line); }
-/* a tab's color (--tab-c, set inline): a line on top and a tint */
-.tab { box-shadow: inset 0 2px 0 var(--tab-c, transparent); }
-.tab:not(.sel) { background: color-mix(in srgb, var(--tab-c, transparent) 9%, transparent); }
-.tab:not(.sel):hover { background: color-mix(in srgb, var(--tab-c, var(--hover)) 16%, var(--hover)); }
+.tab.sel { color: var(--fg); background: var(--tab-sel, var(--term-bg)); border-color: var(--line); }
+/* the selected tab: joined to the terminal (--tab-sel: its background, or a lift over a gradient), a bar on
+   top in its color or the accent; the others only a faint line in theirs (--tab-c, set inline) */
+.tab { box-shadow: inset 0 2px 0 color-mix(in srgb, var(--tab-c, transparent) 45%, transparent); }
+.tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)); }
+.tab:not(.sel):hover { background: color-mix(in srgb, var(--tab-c, var(--hover)) 14%, var(--hover)); }
 .side-closed .tabbar { padding-left: 76px; }
 .tabbar > .side-show { margin: 0 6px 0 0; }
 .tab .x { background: none; border: none; padding: 0 4px; color: var(--muted); visibility: hidden; }

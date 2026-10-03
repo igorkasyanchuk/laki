@@ -550,10 +550,11 @@ export function App() {
                 className={`tab nodrag ${g === group ? 'sel' : ''}`}
                 style={colorVar(colorOf(ts[0]))}
                 onClick={() => selectGroup(g)}
+                onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
                 onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
                 onPointerDown={e => ts[0] && start(e, ts[0].id, true)}
                 onAuxClick={e => e.button === 1 && closeTabs(ts)}
-                data-tip={`⌘${groups.indexOf(g) + 1} · drag onto a pane to split · right click for more`}
+                data-tip={`⌘${groups.indexOf(g) + 1} · double click to rename · drag onto a pane to split · right click for more`}
               >
                 <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
                 <span>{ts.map(t => t.name).join(' · ')}</span>

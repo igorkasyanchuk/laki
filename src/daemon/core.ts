@@ -374,6 +374,8 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   r.done = false
   s.onExit = code => {
     if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true })
+    // `exit` closes a shell's tab, a clean exit an agent's; one we caused (closing, restarting, stopping) isn't that
+    if ((tab.kind === 'shell' || (tab.kind === 'agent' && code === 0)) && !stopping && sessions.get(tab.id) === s && state.tabs.includes(tab)) return closeTab(tab.id)
     changed()
     if (tab.kind !== 'agent' && tab.kind !== 'dev') return
     s.term.write('', () => {
@@ -388,6 +390,10 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   changed()
   return s
 }
+
+let stopping = false
+// the daemon is shutting down: the sessions it ends aren't exits to act on
+export const stop = () => void (stopping = true)
 
 // what claude --resume / codex resume print for a chat id they don't have.
 // ponytail: matched by message; a reworded message means Enter retries the dead id.

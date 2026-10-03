@@ -73,6 +73,9 @@ on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
   cursor visibility and style, mouse encoding, scroll region.
 - The live stream follows on the same socket, in order.
 - Any number of clients can attach.
+- **Exit**: a signal reports code 128+signal. A shell's exit, or an agent's with code 0, closes its tab (`core.ts` `onExit`), unless
+  wb ended it: closing, restarting or archiving replace the session first, and `core.stop()` (shutdown)
+  sets `stopping`.
 
 ### Terminal queries
 
