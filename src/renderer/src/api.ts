@@ -11,7 +11,7 @@ type Bridge = {
   dictate?(): void
   dictationSettings?(): void
 }
-export const bridge: Bridge | undefined = (window as any).wbs
+export const bridge: Bridge | undefined = (window as any).laki
 
 export type Msg = { ev: string; [k: string]: any }
 

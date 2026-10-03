@@ -1,5 +1,5 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The same file is in both apps
-// (wb-superset, wb-spike); each app's daemon keeps the settings and its CSS styles the page.
+// (laki-electron, laki-go); each app's daemon keeps the settings and its CSS styles the page.
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -105,7 +105,7 @@ function TermPreview({ s }: { s: AppSettings }) {
 }
 
 const SCRIPTS = [
-  { k: 'setup', label: 'Setup', hint: 'Runs in each new worktree, in a setup tab; agents and Run wait for it. $WB_PROJECT_PATH is the repo itself.', eg: 'npm install\ncp "$WB_PROJECT_PATH/.env" .env' },
+  { k: 'setup', label: 'Setup', hint: 'Runs in each new worktree, in a setup tab; agents and Run wait for it. $LAKI_PROJECT_PATH is the repo itself.', eg: 'npm install\ncp "$LAKI_PROJECT_PATH/.env" .env' },
   { k: 'teardown', label: 'Teardown', hint: 'Runs when a workspace is deleted or archived, for a minute at most.', eg: 'docker compose down' },
   { k: 'run', label: 'Run', hint: 'The Run button: starts it in a run tab, e.g. a dev server on $PORT.', eg: 'npm run dev -- --port $PORT' },
 ] as const
@@ -132,7 +132,7 @@ export function ScriptsField({ value, file = {}, git = true, tab, onChange }: { 
           rows={7}
           spellCheck={false}
           value={value[t.k] ?? ''}
-          placeholder={file[t.k] ? `${file[t.k]}\n\n(the repo's .wb.json)` : t.eg}
+          placeholder={file[t.k] ? `${file[t.k]}\n\n(the repo's .laki.json)` : t.eg}
           onChange={e => onChange({ ...value, [t.k]: e.target.value })}
         />
         <label className="scripts-import" data-tip="Fill it from a script file">
@@ -218,13 +218,13 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
       )}
       <div className="field">
         <span>
-          Scripts <span className="muted">· for workspace setup, teardown and the Run button; empty: the repo's .wb.json</span>
+          Scripts <span className="muted">· for workspace setup, teardown and the Run button; empty: the repo's .laki.json</span>
         </span>
         <ScriptsField value={c} file={file} git={p.project.git} tab={p.script} onChange={x => setC(y => ({ ...y, ...x }))} />
       </div>
       <label>
         <span>
-          Env <span className="muted">· for every tab, setup and teardown{file.env && Object.keys(file.env).length ? ` · .wb.json has ${Object.keys(file.env).join(', ')}` : ''}</span>
+          Env <span className="muted">· for every tab, setup and teardown{file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}</span>
         </span>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
       </label>
@@ -300,7 +300,7 @@ export function SettingsPage(p: {
   onSave: (s: AppSettings) => void
   onClose: () => void
   projects?: ProjectInfo[]
-  projectFile?: (id: string) => Promise<ProjectConfig> // its .wb.json
+  projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
   onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig }) => unknown
   renameProjects?: boolean
   section?: string // where it opens: a section's id, or project:<id>
@@ -417,7 +417,7 @@ export function SettingsPage(p: {
                 <span>
                   Branch prefix <span className="muted">· for new worktrees' branches</span>
                 </span>
-                <input className="mono" value={s.branchPrefix ?? ''} placeholder="wb/" onChange={e => set({ branchPrefix: e.target.value })} />
+                <input className="mono" value={s.branchPrefix ?? ''} placeholder="laki/" onChange={e => set({ branchPrefix: e.target.value })} />
               </label>
               <label className="check">
                 <input type="checkbox" checked={s.notify !== false} onChange={e => set({ notify: e.target.checked })} />
@@ -527,7 +527,7 @@ export function SettingsPage(p: {
               <div style={{ zoom: 1 / scale }}>
                 <TermPreview s={s} />
               </div>
-              <p className="muted small">Ligatures (=&gt; as one glyph) aren't drawn: xterm needs an add-on for them that wb doesn't ship.</p>
+              <p className="muted small">Ligatures (=&gt; as one glyph) aren't drawn: xterm needs an add-on for them that Laki doesn't ship.</p>
             </>
           )}
           {sec === 'open' && (

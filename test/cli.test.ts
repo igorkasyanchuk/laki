@@ -1,4 +1,4 @@
-// The wbs CLI against a daemon in a temp home.
+// The laki-electron CLI against a daemon in a temp home.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -11,12 +11,12 @@ test('cli: project add, new, ls, send, screen, rm (--json)', async t => {
   r = await rig.cli('new', proj.id, '--preset', 'shell', '--name', 'cli-ws', '--json')
   assert.equal(r.code, 0, r.err)
   const ws = JSON.parse(r.out)
-  assert.equal(ws.branch, 'wb/cli-ws')
+  assert.equal(ws.branch, 'laki/cli-ws')
   r = await rig.cli('ls', '--json')
   const v = JSON.parse(r.out)
   assert.deepEqual(v.workspaces.map((w: any) => w.id), ['cli-ws'])
   r = await rig.cli('ls')
-  assert.match(r.out, /cli-ws {2}wb\/cli-ws {2}:3100/)
+  assert.match(r.out, /cli-ws {2}laki\/cli-ws {2}:3100/)
   r = await rig.cli('send', 'cli-ws/shell', 'echo', 'from-the-cli')
   assert.match(r.out, /sent/)
   await until(async () => (await rig.cli('screen', 'cli-ws/shell')).out.includes('from-the-cli\n'), 'echoed')
@@ -36,7 +36,7 @@ test('cli: hook never fails, even without a daemon', async t => {
   const rig = await fresh(t)
   await rig.stop()
   const started = Date.now()
-  rig.env.WB_TAB = 'nope'
+  rig.env.LAKI_TAB = 'nope'
   const r = await rig.cli('hook', 'idle')
   assert.equal(r.code, 0)
   assert.ok(Date.now() - started < 1500)

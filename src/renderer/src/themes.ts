@@ -1,4 +1,4 @@
-// Color themes (Settings → Appearance). A theme sets the CSS variables of both apps (wb-superset, wb-spike) on
+// Color themes (Settings → Appearance). A theme sets the CSS variables of both apps (laki-electron, laki-go) on
 // <html>; 'default' keeps the app's own (:root in its stylesheet). The terminal's 16 colors are --ansi-0…15
 // and termTheme() reads them. The same file is in both apps.
 
@@ -164,7 +164,7 @@ export function applyTheme(id?: string) {
   st.colorScheme = ''
   if (!t.c || !t.ansi) return
   const { c, ansi: a } = t
-  // each color under both apps' names (superset's first, then spike's)
+  // each color under both apps' names (Laki Electron's first, then Laki Go's)
   const vars: Record<string, string> = {
     '--bg': c.bg, '--app-bg': t.grad ? gradient(t.grad) : c.bg, '--term-bg': t.grad ? '#00000000' : c.bg, '--tab-sel': t.grad ? c.fg + '1f' : c.bg, '--side': c.side, '--panel': c.panel, '--raised': c.raised, '--hover': c.raised,
     '--line': c.line, '--fg': c.fg, '--muted': c.muted, '--dim': c.muted, '--accent': c.accent, '--accent-fg': c.accentFg, '--sel': c.sel,

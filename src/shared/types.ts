@@ -1,7 +1,7 @@
 // Shapes shared by the daemon, the CLI and the renderer.
 
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
-// each field overrides .wb.json's (env key by key)
+// each field overrides .laki.json's (env key by key)
 export type ProjectConfig = { setup?: string; teardown?: string; run?: string; env?: Record<string, string> }
 
 // git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)

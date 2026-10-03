@@ -1,7 +1,7 @@
 // The renderer's only door to native code.
 import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
-contextBridge.exposeInMainWorld('wbs', {
+contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
   notify: (title: string, body: string, tab: string) => ipcRenderer.send('notify', title, body, tab),
   onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),

@@ -1,4 +1,4 @@
-// wbs: the command line for the daemon. `wbs hook <state>` is what agents' hooks run: it never fails or
+// laki-electron: the command line for the daemon. `laki-electron hook <state>` is what agents' hooks run: it never fails or
 // blocks the agent for more than a second.
 import { execFileSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
@@ -28,7 +28,7 @@ const out = (v: unknown, text?: string) => console.log(json || text === undefine
 
 async function hook(state: string, extra?: string) {
   setTimeout(() => process.exit(0), 1000) // never hold the agent up
-  const tab = process.env.WB_TAB
+  const tab = process.env.LAKI_TAB
   if (!tab) process.exit(0)
   let payload: unknown = {}
   try {
@@ -59,13 +59,13 @@ async function main() {
     case 'help':
       return console.log(USAGE)
     case 'open': {
-      // the app this CLI ships in, else this checkout's build, else whatever LaunchServices knows as wbs
+      // the app this CLI ships in, else this checkout's build, else whatever LaunchServices knows as laki-electron
       const here = dirname(fileURLToPath(import.meta.url))
-      const app = [process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, ''), resolve(here, '../../dist/mac-arm64/wbs.app'), resolve(here, '../../../dist/mac-arm64/wbs.app')].find(p => p.endsWith('.app') && existsSync(p))
+      const app = [process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, ''), resolve(here, '../../dist/mac-arm64/Laki Electron.app'), resolve(here, '../../../dist/mac-arm64/Laki Electron.app')].find(p => p.endsWith('.app') && existsSync(p))
       try {
-        execFileSync('open', app ? [app] : ['-b', 'dev.wbs.app'], { stdio: 'ignore' })
+        execFileSync('open', app ? [app] : ['-b', 'dev.laki.electron'], { stdio: 'ignore' })
       } catch {
-        throw new Error('wbs.app not found: build it with `npm run pack` (dist/mac-arm64/wbs.app), or copy it to /Applications')
+        throw new Error('Laki Electron.app not found: build it with `npm run pack` (dist/mac-arm64/Laki Electron.app), or copy it to /Applications')
       }
       return
     }
@@ -96,7 +96,7 @@ async function main() {
       return out(v.projects, v.projects.map(p => `${p.id}  ${p.path}`).join('\n'))
     }
     case 'new': {
-      if (!rest[0]) throw new Error('usage: wbs new <project> [--base b] [--preset p] [--prompt text]')
+      if (!rest[0]) throw new Error('usage: laki-electron new <project> [--base b] [--preset p] [--prompt text]')
       const ws = await rpc('wsNew', {
         project: rest[0],
         base: flags.base,
@@ -147,6 +147,6 @@ async function main() {
 }
 
 main().catch(e => {
-  console.error(`wbs: ${e.message}`)
+  console.error(`laki-electron: ${e.message}`)
   process.exit(1)
 })

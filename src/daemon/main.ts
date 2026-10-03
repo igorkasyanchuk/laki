@@ -18,7 +18,7 @@ chmodSync(dir, 0o700) // state, queued messages and agents' answers live here
 // pid, so no one ever reads it empty and takes a starting daemon's lock for a stale one.
 // ponytail: two starters that both find the same stale lock can still both remove it; flock if that matters.
 const lockPath = join(dir, 'daemon.lock')
-// a live process running the daemon (node …/daemon/main.ts, Electron-as-node …/daemon.js, or `wbs daemon`)
+// a live process running the daemon (node …/daemon/main.ts, Electron-as-node …/daemon.js, or `laki-electron daemon`)
 function isDaemon(pid: number) {
   try {
     return /daemon(\.js|\/main\.ts)|\sdaemon\s*$/m.test(execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }))
@@ -49,20 +49,20 @@ function takeLock(): boolean {
   }
 }
 if (!takeLock()) {
-  console.log('wbs daemon already running')
+  console.log('laki-electron daemon already running')
   process.exit(0)
 }
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
-if (process.env.WBS_FROM_APP) core.adoptLoginPath()
+if (process.env.LAKI_ELECTRON_FROM_APP) core.adoptLoginPath()
 core.load()
 core.writeClaudeSettings()
 core.restoreAll()
 
 const token = randomBytes(32).toString('hex')
 // Browsers always send Origin on a WebSocket; node clients (CLI, hooks, Electron main) send none.
-const origins = new Set(['file://', ...(process.env.WBS_DEV_ORIGIN ? process.env.WBS_DEV_ORIGIN.split(',') : [])])
+const origins = new Set(['file://', ...(process.env.LAKI_ELECTRON_DEV_ORIGIN ? process.env.LAKI_ELECTRON_DEV_ORIGIN.split(',') : [])])
 const originOk = (o: string | undefined) => o === undefined || origins.has(o)
 const tokenOk = (t: string | null | undefined) => !!t && t.length === token.length && timingSafeEqual(Buffer.from(t), Buffer.from(token))
 
@@ -193,16 +193,16 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 })
 
 const timers: NodeJS.Timeout[] = []
-server.listen(Number(process.env.WBS_PORT || 0), '127.0.0.1', () => {
+server.listen(Number(process.env.LAKI_ELECTRON_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
   const port = typeof addr === 'object' && addr ? addr.port : 0
   const info = join(dir, 'daemon.json')
   writeFileSync(info, JSON.stringify({ port, token, pid: process.pid }), { mode: 0o600 })
   chmodSync(info, 0o600)
-  log(`wbs daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
+  log(`laki-electron daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
-  every(Number(process.env.WBS_PORT_SCAN_MS || 5000), core.scanPorts)
-  every(Number(process.env.WBS_PR_SCAN_MS || 60000), core.scanPRs)
+  every(Number(process.env.LAKI_ELECTRON_PORT_SCAN_MS || 5000), core.scanPorts)
+  every(Number(process.env.LAKI_ELECTRON_PR_SCAN_MS || 60000), core.scanPRs)
   every(2000, core.sweepRunning)
   every(30000, () => core.watchLimits())
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)

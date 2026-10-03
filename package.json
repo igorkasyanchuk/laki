@@ -1,12 +1,12 @@
 {
-  "name": "wb-superset",
-  "productName": "wbs",
+  "name": "laki-electron",
+  "productName": "Laki Electron",
   "version": "0.1.0",
   "description": "Workbench for coding agents in parallel git worktrees",
   "type": "module",
   "main": "out/main/index.js",
   "bin": {
-    "wbs": "bin/wbs.js"
+    "laki-electron": "bin/laki-electron.js"
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -44,8 +44,8 @@
     "vite": "^7.3.6"
   },
   "build": {
-    "appId": "dev.wbs.app",
-    "productName": "wbs",
+    "appId": "dev.laki.electron",
+    "productName": "Laki Electron",
     "files": [
       "out/**/*",
       "package.json"

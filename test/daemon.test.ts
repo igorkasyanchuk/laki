@@ -31,11 +31,11 @@ test('single instance: a second daemon exits', async t => {
 })
 
 test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch', async t => {
-  const rig = await fresh(t, { config: { setup: 'echo setting-up; sleep 1; echo setup-ok > .setup-ran', teardown: 'echo bye > "$WBS_TEARDOWN_MARK"' } })
+  const rig = await fresh(t, { config: { setup: 'echo setting-up; sleep 1; echo setup-ok > .setup-ran', teardown: 'echo bye > "$LAKI_ELECTRON_TEARDOWN_MARK"' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'build the thing', name: 'feat one' })
   assert.equal(ws.id, 'feat-one')
-  assert.equal(ws.branch, 'wb/feat-one')
+  assert.equal(ws.branch, 'laki/feat-one')
   assert.equal(ws.port, 3100)
   assert.ok(existsSync(join(ws.path, 'README.md')))
   // the agent waits for setup: claude hasn't started while the marker exists
@@ -58,16 +58,16 @@ test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch
   await rig.rpc('wsRm', { id: ws.id })
   assert.ok(!existsSync(ws.path))
   const { execFileSync } = await import('node:child_process')
-  assert.match(execFileSync('git', ['branch'], { cwd: rig.repo, encoding: 'utf8' }), /wb\/feat-one/)
+  assert.match(execFileSync('git', ['branch'], { cwd: rig.repo, encoding: 'utf8' }), /laki\/feat-one/)
   v = await rig.rpc('state')
   assert.deepEqual(v.workspaces.map((w: any) => w.id), [ws2.id])
   // the freed port is reused
   const ws3 = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'three' })
   assert.equal(ws3.port, 3100)
-  // the same name again: wb/feat-one is kept, so the new one gets its own id and branch
+  // the same name again: laki/feat-one is kept, so the new one gets its own id and branch
   const again = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'feat one' })
   assert.equal(again.id, 'feat-one-2')
-  assert.equal(again.branch, 'wb/feat-one-2')
+  assert.equal(again.branch, 'laki/feat-one-2')
   // a local workspace is the repo root itself
   const local = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'shell' })
   assert.equal(local.path, p.path)
@@ -262,20 +262,20 @@ test('agent skill: installed in HOME for claude and codex, its launcher drives t
   const states = (s: { state: string }[]) => s.map(x => x.state)
   assert.deepEqual(states(await rig.rpc('skills')), ['missing', 'missing'])
   assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: true })), ['installed', 'missing'])
-  const at = join(rig.home, '.claude/skills/wbs')
-  assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: wbs\ndescription: /)
+  const at = join(rig.home, '.claude/skills/laki-electron')
+  assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki-electron\ndescription: /)
   // the launcher finds this daemon from a bare environment, as an agent's shell would
-  const ls = JSON.parse(execFileSync(join(at, 'wbs'), ['ls', '--json'], { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' }))
+  const ls = JSON.parse(execFileSync(join(at, 'laki-electron'), ['ls', '--json'], { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' }))
   assert.equal(ls.projects.length, 1)
   writeFileSync(join(at, 'SKILL.md'), 'edited')
   assert.deepEqual(states(await rig.rpc('skills')), ['outdated', 'missing'])
   assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'codex', on: true })), ['outdated', 'installed'])
-  assert.ok(existsSync(join(rig.home, '.codex/skills/wbs/SKILL.md')))
+  assert.ok(existsSync(join(rig.home, '.codex/skills/laki-electron/SKILL.md')))
   writeFileSync(join(at, 'notes.md'), 'the user’s')
   assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: false })), ['missing', 'installed'])
   assert.ok(existsSync(join(at, 'notes.md')) && !existsSync(join(at, 'SKILL.md'))) // only its own files go
   await rig.rpc('skillSet', { agent: 'codex', on: false })
-  assert.ok(!existsSync(join(rig.home, '.codex/skills/wbs'))) // an emptied folder goes too
+  assert.ok(!existsSync(join(rig.home, '.codex/skills/laki-electron'))) // an emptied folder goes too
   await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key
 })
@@ -311,7 +311,7 @@ test('archive keeps the branch and resume ids; restore brings them back', async 
   assert.ok(existsSync(join(ws.path, 'README.md')))
   // fork: a new worktree from this branch, the chat forked
   const fork = await rig.rpc('wsFork', { id: ws.id })
-  assert.equal(fork.base, 'wb/keep')
+  assert.equal(fork.base, 'laki/keep')
   await until(() => rig.fakeLog().some(l => l.bin === 'claude' && l.args.includes('--fork-session')), 'forked claude')
   assert.deepEqual(rig.fakeLog().find(l => l.args.includes('--fork-session')).args.slice(2), ['--resume', id, '--fork-session'])
 })
@@ -339,7 +339,7 @@ test('usage limit from codex screen: ◷ until reset, then "continue"', async t 
   assert.match(await rig.screen(ws.id), /answer: continue[\s\S]*answer: later/)
 })
 
-test('a folder without git is a project (local workspaces only); project settings override .wb.json', async t => {
+test('a folder without git is a project (local workspaces only); project settings override .laki.json', async t => {
   const rig = await fresh(t, { config: { run: 'echo from-file', teardown: 'echo bye' } })
   const plain = join(rig.home, 'notes')
   mkdirSync(plain)
@@ -360,7 +360,7 @@ test('a folder without git is a project (local workspaces only); project setting
   assert.deepEqual(saved.config, { run: 'echo from-app' }) // blanks dropped
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })
   const dev = await rig.rpc('run', { ws: ws.id })
-  await until(async () => (await rig.screen(dev.id)).includes('from-app'), 'the app config wins over .wb.json')
+  await until(async () => (await rig.screen(dev.id)).includes('from-app'), 'the app config wins over .laki.json')
 })
 
 test('a chat that cannot be resumed is dropped: Enter starts a new one', async t => {

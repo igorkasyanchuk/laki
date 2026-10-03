@@ -5,7 +5,7 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const dataDir = () => process.env.WBS_HOME || join(homedir(), '.wb-superset')
+export const dataDir = () => process.env.LAKI_ELECTRON_HOME || join(homedir(), '.laki-electron')
 
 export type DaemonInfo = { port: number; token: string; pid: number }
 

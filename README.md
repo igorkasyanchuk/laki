@@ -1,4 +1,4 @@
-# wbs (wb-superset)
+# Laki Electron
 
 A macOS app for running coding agents (Claude Code, Codex, or any command) side by side, each in its own
 git worktree. You get a sidebar of projects and workspaces, tabs per workspace, real terminals you can split
@@ -6,6 +6,9 @@ into panes, and live agent status (running, waiting for you, finished). It also 
 side panel (files, changes, review), a Run button, dev servers, listening ports, PRs and ship. Agents keep running when you quit the app.
 
 Electron + a terminal-host daemon (node-pty + @xterm/headless) + React + xterm.js, the same shape as Superset.
+
+Laki Electron is one of two builds of **Laki**; [Laki Go](../go) is the other (Go + Wails), with the same
+features and UI. What Laki is and where it's going: [requirements](../requirements/README.md).
 
 ## Features
 
@@ -39,18 +42,18 @@ You need:
 Optional: `gh` (logged in, for PRs and ship), `claude` and/or `codex` on your PATH.
 
 ```bash
-cd ~/projects/wb-superset
+cd ~/projects/laki/electron
 npm install            # if node_modules/electron/dist is missing: node node_modules/electron/install.js
 npm run pack
 ```
 
-The build produces `dist/mac-arm64/wbs.app` (unsigned). Open it from there, or copy it to /Applications:
+The build produces `dist/mac-arm64/Laki Electron.app` (unsigned). Open it from there, or copy it to /Applications:
 
 ```bash
-open dist/mac-arm64/wbs.app
+open "dist/mac-arm64/Laki Electron.app"
 ```
 
-To put the CLI on your PATH as `wbs`:
+To put the CLI on your PATH as `laki-electron`:
 
 ```bash
 npm link
@@ -64,7 +67,7 @@ npm link
 3. The new-workspace dialog opens. Pick an agent (claude, codex, shell, or a custom command) and,
    optionally, a first prompt.
    - For a git repository, also pick a base branch. The workspace gets a worktree in
-     `~/.wb-superset/worktrees/<project>/<id>` on branch `wb/<id>`, its setup command runs, then the
+     `~/.laki-electron/worktrees/<project>/<id>` on branch `laki/<id>`, its setup command runs, then the
      agent starts. *Local* works in the repo itself instead.
    - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
 
@@ -141,7 +144,7 @@ before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 review decision, size, checks (each links to its run) and description; buttons that send the failing CI or
 the open review comments to the agent now; and what each agent said last.
 
-**PRs.** wbs finds the PR of each workspace's branch with `gh` (logged in) every minute.
+**PRs.** laki-electron finds the PR of each workspace's branch with `gh` (logged in) every minute.
 - *fix CI*: when CI fails on a new commit, the failing checks and the end of their GitHub Actions logs go to
   the workspace's agent (when it's idle), asking it to fix, commit and push. Once per commit; after 3 tries
   in a row it stops and tells you.
@@ -169,7 +172,7 @@ the open review comments to the agent now; and what each agent said last.
 | ✓ / ✖ | process ended (ok / failed) |
 
 A workspace shows its most urgent tab. A terminal that waits or finishes while off screen sends a macOS
-notification; click it to jump there. Follow-ups queued with `wbs send --when-idle` show as `+n`.
+notification; click it to jump there. Follow-ups queued with `laki-electron send --when-idle` show as `+n`.
 
 ### Keys
 
@@ -196,7 +199,7 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 
 ⌘, or the gear at the top of the sidebar opens the settings page. Changes save as you make them, into
 `state.json`. The page grows and shrinks with the terminal font size.
-- *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `wb/`),
+- *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `laki/`),
   notifications, and environment variables for every session (a project's or preset's env wins over them).
 - *Appearance*: the theme: Midnight (default), Dawn (light), Synthwave, Forest, Ember, and the Warp-style
   gradients Cyber Wave, Koi, Pink City, Leafy and Snowy (light). Terminals take its 16 colors.
@@ -209,8 +212,8 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
   `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each one is in
   the new-tab menu and the new-workspace dialog. Edit `claude` and `codex` to change how every new one
   starts; a tab started from a preset uses its current settings when it restarts or resumes.
-- *Agent skill*: installs a skill for Claude Code and Codex in your home folder (`~/.claude/skills/wbs`,
-  `~/.codex/skills/wbs`), so every session knows wbs: what it is, and how to drive it with its CLI (list
+- *Agent skill*: installs a skill for Claude Code and Codex in your home folder (`~/.claude/skills/laki-electron`,
+  `~/.codex/skills/laki-electron`), so every session knows laki-electron: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   It holds the app's path: update it after moving the app. *Remove* takes only its own files.
 - *Projects*: each project's settings (below).
@@ -225,41 +228,41 @@ tab). Saved as you type:
 - Name.
 - *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:
   - *Setup*: runs in each new worktree, e.g. `npm install`; agent and dev tabs wait for it.
-    `$WB_PROJECT_PATH` is the repo itself, e.g. `cp "$WB_PROJECT_PATH/.env" .env`.
+    `$LAKI_PROJECT_PATH` is the repo itself, e.g. `cp "$LAKI_PROJECT_PATH/.env" .env`.
   - *Teardown*: runs when a workspace is deleted or archived.
   - *Run*: what ▷ Run starts, e.g. `npm run dev -- --port $PORT`.
 - *Env*: `KEY=value` lines for every tab of the project's workspaces, and its setup and teardown.
 
-These are saved in the app. A field left empty falls back to a `.wb.json` in the repo, which a team can
+These are saved in the app. A field left empty falls back to a `.laki.json` in the repo, which a team can
 commit. The page shows that file's values as placeholders:
 
 ```json
 { "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT", "env": { "NODE_ENV": "development" } }
 ```
 
-Env from the app and from `.wb.json` merge, key by key (the app's wins), then a preset's env goes on top.
+Env from the app and from `.laki.json` merge, key by key (the app's wins), then a preset's env goes on top.
 
 Every workspace gets its own `$PORT` (3100, 3110, …).
 
 ## CLI
 
 ```bash
-wbs project add ~/code/app
-wbs new app --prompt "fix the login redirect"          # worktree + claude with that prompt
-wbs new app --preset codex --base develop --name dark
-wbs ls [--json]
-wbs send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
-wbs screen fix-the-login/claude
-wbs diff fix-the-login | run fix-the-login | ship fix-the-login -m "Fix redirect"
-wbs archive fix-the-login | restore … | fork … | rm …
-wbs open                                               # the app
-wbs stop                                               # stop the daemon (agents resume when it starts again)
-wbs daemon                                             # run the daemon in the foreground
+laki-electron project add ~/code/app
+laki-electron new app --prompt "fix the login redirect"          # worktree + claude with that prompt
+laki-electron new app --preset codex --base develop --name dark
+laki-electron ls [--json]
+laki-electron send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
+laki-electron screen fix-the-login/claude
+laki-electron diff fix-the-login | run fix-the-login | ship fix-the-login -m "Fix redirect"
+laki-electron archive fix-the-login | restore … | fork … | rm …
+laki-electron open                                               # the app
+laki-electron stop                                               # stop the daemon (agents resume when it starts again)
+laki-electron daemon                                             # run the daemon in the foreground
 ```
 
 ## Data
 
-Data lives in `~/.wb-superset`; set `WBS_HOME` to use another folder. It holds:
+Data lives in `~/.laki-electron`; set `LAKI_ELECTRON_HOME` to use another folder. It holds:
 - `state.json`: projects, workspaces, tabs and chat ids;
 - `daemon.json`: the daemon's port and token (0600);
 - `daemon.log`;
@@ -271,12 +274,12 @@ Data lives in `~/.wb-superset`; set `WBS_HOME` to use another folder. It holds:
 ## Updating
 
 After pulling or changing the code, run `npm run pack` and reopen the app. The running daemon stays the
-old build until it restarts: run `wbs stop`, then open the app. Agents come back resumed
+old build until it restarts: run `laki-electron stop`, then open the app. Agents come back resumed
 (`claude --resume`, `codex resume`); shells and dev servers start fresh.
 
 ## Troubleshooting
 
-- **The app shows "connecting to the daemon…"**: check `~/.wb-superset/daemon.log`. To restart the daemon, run `wbs stop`, then reopen the app.
+- **The app shows "connecting to the daemon…"**: check `~/.laki-electron/daemon.log`. To restart the daemon, run `laki-electron stop`, then reopen the app.
 - **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude` and `codex` must be on the PATH your `~/.zshrc` sets.
 - **No PR badge**: run `gh auth status`. PRs are checked once a minute.
 

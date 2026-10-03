@@ -49,25 +49,25 @@ const load = <T,>(k: string, d: T): T => {
 }
 
 // the last theme, until the daemon's settings arrive
-applyTheme(load<string>('wbs.theme', ''))
+applyTheme(load<string>('laki.theme', ''))
 
 export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
-  const [wsId, setWsId] = useState<string | null>(() => load('wbs.ws', null))
-  const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('wbs.tabs', {})) // the focused pane's session
+  const [wsId, setWsId] = useState<string | null>(() => load('laki.ws', null))
+  const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('laki.tabs', {})) // the focused pane's session
   const [dialog, setDialog] = useState<Dialog>(null)
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
-  const [panelOpen, setPanelOpen] = useState<boolean>(() => load('wbs.panel', false)) // the right panel: files, changes, review
-  const [panelTab, setPanelTab] = useState<PanelTab>(() => load('wbs.panelTab', 'files'))
-  const [panelW, setPanelW] = useState<number>(() => load('wbs.panelW', PANEL_WIDTH))
+  const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review
+  const [panelTab, setPanelTab] = useState<PanelTab>(() => load('laki.panelTab', 'files'))
+  const [panelW, setPanelW] = useState<number>(() => load('laki.panelW', PANEL_WIDTH))
   const [preview, setPreview] = useState<{ ws: string; path: string; line?: number; n: number } | null>(null) // a file shown in the app; n: each request reloads it
-  const [info, setInfo] = useState<boolean>(() => load('wbs.info', false)) // the workspace info panel
+  const [info, setInfo] = useState<boolean>(() => load('laki.info', false)) // the workspace info panel
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
-  const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('wbs.groups', {})) // tabs (of panes) per workspace
-  const [sideW, setSideW] = useState<number>(() => load('wbs.side', SIDE))
-  const [sideOpen, setSideOpen] = useState<boolean>(() => load('wbs.sideOpen', true))
+  const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
+  const [sideW, setSideW] = useState<number>(() => load('laki.side', SIDE))
+  const [sideOpen, setSideOpen] = useState<boolean>(() => load('laki.sideOpen', true))
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [error, setError] = useState('')
   const [menu, openMenu] = useMenu()
@@ -88,16 +88,16 @@ export function App() {
   const group = groups.find(g => tabsOf(g).includes(tab?.id ?? '')) ?? null
   const visible = tabsOf(group)
 
-  useEffect(() => void localStorage.setItem('wbs.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
-  useEffect(() => void localStorage.setItem('wbs.tabs', JSON.stringify(tabByWs)), [tabByWs])
-  useEffect(() => void localStorage.setItem('wbs.groups', JSON.stringify(stored)), [stored])
-  useEffect(() => void localStorage.setItem('wbs.side', JSON.stringify(sideW)), [sideW])
-  useEffect(() => void localStorage.setItem('wbs.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
-  useEffect(() => void localStorage.setItem('wbs.info', JSON.stringify(info)), [info])
+  useEffect(() => void localStorage.setItem('laki.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
+  useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
+  useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
+  useEffect(() => void localStorage.setItem('laki.side', JSON.stringify(sideW)), [sideW])
+  useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
+  useEffect(() => void localStorage.setItem('laki.info', JSON.stringify(info)), [info])
   useEffect(() => {
-    localStorage.setItem('wbs.panel', JSON.stringify(panelOpen))
-    localStorage.setItem('wbs.panelTab', JSON.stringify(panelTab))
-    localStorage.setItem('wbs.panelW', JSON.stringify(panelW))
+    localStorage.setItem('laki.panel', JSON.stringify(panelOpen))
+    localStorage.setItem('laki.panelTab', JSON.stringify(panelTab))
+    localStorage.setItem('laki.panelW', JSON.stringify(panelW))
   }, [panelOpen, panelTab, panelW])
 
   // the theme, painted before the terminals read it (their effects run before ours)
@@ -106,7 +106,7 @@ export function App() {
   if (view && painted.current !== theme) {
     painted.current = theme
     applyTheme(theme)
-    localStorage.setItem('wbs.theme', JSON.stringify(theme))
+    localStorage.setItem('laki.theme', JSON.stringify(theme))
   }
 
   const toast = (m: string) => {
@@ -464,7 +464,7 @@ export function App() {
   if (!view)
     return (
       <div className="splash">
-        <div className="logo">wbs</div>
+        <div className="logo">Laki</div>
         <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>
       </div>
     )
@@ -682,7 +682,7 @@ export function App() {
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             renameProjects
-            skill={{ app: 'wbs', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => api.call<SkillInfo[]>('skillSet', { agent, on }) }}
+            skill={{ app: 'laki-electron', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => api.call<SkillInfo[]>('skillSet', { agent, on }) }}
             section={settingsFor && `project:${settingsFor.id}`}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
           />

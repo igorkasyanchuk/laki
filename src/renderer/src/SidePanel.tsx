@@ -1,6 +1,6 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
 // checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. The
-// same file is in both apps (wb-superset, wb-spike); each passes in how its daemon lists, reads and makes
+// same file is in both apps (laki-electron, laki-go); each passes in how its daemon lists, reads and makes
 // files, opens one in the editor, diffs and reads reviews.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { type AutoKey, PRSection, type WsInfo } from './Info'

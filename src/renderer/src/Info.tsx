@@ -1,6 +1,6 @@
 // A workspace's info panel (the ⓘ in the tab bar) and its PR in the status bar: CI, review, and the
 // switches that send failing CI or new review comments to the agent. The same file is in both apps
-// (wb-superset, wb-spike); each maps its own workspace to WsInfo.
+// (laki-electron, laki-go); each maps its own workspace to WsInfo.
 import { type ReactNode } from 'react'
 import { Glyph } from './Glyph'
 import { Icon, IconButton } from './ui'

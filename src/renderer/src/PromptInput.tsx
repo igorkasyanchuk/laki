@@ -1,6 +1,6 @@
 // A prompt for an agent: text, screenshots pasted or dropped in (the daemon saves them; their paths go
 // after the text, and the agent opens them), and macOS dictation. The same file is in both apps
-// (wb-superset, wb-spike); each passes in how its daemon saves an image and how dictation starts.
+// (laki-electron, laki-go); each passes in how its daemon saves an image and how dictation starts.
 import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
 import { Icon } from './ui'
 

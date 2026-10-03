@@ -88,8 +88,8 @@ export function writeClaudeSettings() {
 // A Finder-launched app has a bare PATH: take the login shell's, so git/gh/claude are found.
 export function adoptLoginPath() {
   try {
-    const out = execFileSync(shell, ['-lic', 'printf "__WBS__%s__WBS__" "$PATH"'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
-    const m = out.match(/__WBS__(.*)__WBS__/)
+    const out = execFileSync(shell, ['-lic', 'printf "__LAKI__%s__LAKI__" "$PATH"'], { encoding: 'utf8', timeout: 5000, stdio: ['ignore', 'pipe', 'ignore'] })
+    const m = out.match(/__LAKI__(.*)__LAKI__/)
     if (m?.[1]) process.env.PATH = m[1]
   } catch {}
 }
@@ -113,7 +113,7 @@ export function view(): View {
   })
   return {
     projects: state.projects,
-    // ponytail: run reads .wb.json per workspace on every view; cache by mtime if many workspaces
+    // ponytail: run reads .laki.json per workspace on every view; cache by mtime if many workspaces
     workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], pr: prs.get(w.id), run: !!projectConfig(w).run })),
     tabs,
     presets: presets(),
@@ -211,7 +211,7 @@ const slug = (s: string) =>
     .slice(0, 32)
     .replace(/-+$/, '')
 
-// uniqueWsId: an id no workspace, worktree dir or kept wb/<id> branch (wsRm keeps branches) uses yet
+// uniqueWsId: an id no workspace, worktree dir or kept laki/<id> branch (wsRm keeps branches) uses yet
 async function uniqueWsId(want: string, proj?: Project) {
   const base = want || `ws-${randomUUID().slice(0, 4)}`
   const taken = async (id: string) =>
@@ -235,7 +235,7 @@ export function allocPort() {
   return port
 }
 
-// .wb.json from the workspace (as checked out), else from the project root (works before it's committed);
+// .laki.json from the workspace (as checked out), else from the project root (works before it's committed);
 // the project's own config (set in the app) wins field by field
 export function projectConfig(ws: Workspace): ProjectConfig {
   const proj = state.projects.find(p => p.id === ws.project)
@@ -243,7 +243,7 @@ export function projectConfig(ws: Workspace): ProjectConfig {
   for (const d of [ws.path, proj?.path]) {
     if (!d) continue
     try {
-      file = JSON.parse(readFileSync(join(d, '.wb.json'), 'utf8'))
+      file = JSON.parse(readFileSync(join(d, '.laki.json'), 'utf8'))
       break
     } catch {}
   }
@@ -252,10 +252,10 @@ export function projectConfig(ws: Workspace): ProjectConfig {
   return { ...file, ...own, env: { ...file.env, ...env } }
 }
 
-// the .wb.json a project's root has, for the settings dialog's placeholders
+// the .laki.json a project's root has, for the settings dialog's placeholders
 export function projectFileConfig(ref: string): ProjectConfig {
   try {
-    return JSON.parse(readFileSync(join(findProject(ref).path, '.wb.json'), 'utf8'))
+    return JSON.parse(readFileSync(join(findProject(ref).path, '.laki.json'), 'utf8'))
   } catch {
     return {}
   }
@@ -314,7 +314,7 @@ export function projectRm(ref: string) {
 function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
   const env: Record<string, string> = {}
   for (const [k, v] of Object.entries(process.env)) {
-    if (v === undefined || k.startsWith('ELECTRON_') || k.startsWith('WBS_') || k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_')) continue
+    if (v === undefined || k.startsWith('ELECTRON_') || k.startsWith('LAKI_') || k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_')) continue
     env[k] = v
   }
   return {
@@ -324,12 +324,12 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
     ...presetOf(tab)?.env,
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
-    TERM_PROGRAM: 'wbs',
-    WB_WORKSPACE: ws.id,
-    WB_TAB: tab.id,
+    TERM_PROGRAM: 'laki',
+    LAKI_WORKSPACE: ws.id,
+    LAKI_TAB: tab.id,
     PORT: String(ws.port),
-    WBS_HOME: dir,
-    WB_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
+    LAKI_ELECTRON_HOME: dir,
+    LAKI_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
     ...extra,
   }
 }
@@ -477,7 +477,7 @@ export function settingsSet(o: Settings) {
   return state.settings
 }
 
-const branchPrefix = () => state.settings?.branchPrefix?.trim() || 'wb/'
+const branchPrefix = () => state.settings?.branchPrefix?.trim() || 'laki/'
 
 // what a folder can open in, by macOS app name (open -a <app> <folder>)
 export const APPS: Record<string, string> = {
@@ -1158,7 +1158,7 @@ function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<
 export function runDev(ref: string) {
   const ws = findWs(ref)
   const cmd = projectConfig(ws).run
-  if (!cmd) throw new Error('no "run" command: set one in the project settings or .wb.json')
+  if (!cmd) throw new Error('no "run" command: set one in the project settings or .laki.json')
   return replaceTab(ws.id, 'dev', cmd)
 }
 
@@ -1169,11 +1169,11 @@ export function ship(ref: string, message: string) {
   const script = [
     'set -e',
     'git add -A',
-    'git diff --cached --quiet || git commit -m "$WB_MSG"',
-    'git push -u origin "$WB_BRANCH"',
-    'gh pr view "$WB_BRANCH" --json url -q .url 2>/dev/null || gh pr create --fill',
+    'git diff --cached --quiet || git commit -m "$LAKI_MSG"',
+    'git push -u origin "$LAKI_BRANCH"',
+    'gh pr view "$LAKI_BRANCH" --json url -q .url 2>/dev/null || gh pr create --fill',
   ].join('\n')
-  const tab = replaceTab(ws.id, 'ship', script, { WB_MSG: message, WB_BRANCH: ws.branch })
+  const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch })
   sessions.get(tab.id)!.onExit = () => {
     changed()
     scanPRs()

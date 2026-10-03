@@ -1,4 +1,4 @@
-// Test rig: a temp WBS_HOME (and HOME), fake claude/codex/gh first on PATH, a test $SHELL without
+// Test rig: a temp LAKI_ELECTRON_HOME (and HOME), fake claude/codex/gh first on PATH, a test $SHELL without
 // profiles, a temp git repo, and a daemon started from source. Nothing touches real data or the network.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
@@ -31,18 +31,18 @@ export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms =
 export type Rig = Awaited<ReturnType<typeof fresh>>
 
 export async function fresh(t: TestContext, o: { setup?: string; config?: object } = {}) {
-  const home = mkdtempSync('/tmp/wbs-')
+  const home = mkdtempSync('/tmp/laki-electron-')
   const repo = join(home, 'repo')
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     HOME: home,
-    WBS_HOME: join(home, 'data'),
+    LAKI_ELECTRON_HOME: join(home, 'data'),
     PATH: `${fakes}:${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`, // node for the fakes
     SHELL: join(fakes, 'tsh'),
     FAKE_LOG: join(home, 'fake.log'),
     FAKE_GH: join(home, 'gh'), // the fake gh's answers, when there (fakes/gh)
-    WBS_PORT_SCAN_MS: '300',
-    WBS_PR_SCAN_MS: '500',
+    LAKI_ELECTRON_PORT_SCAN_MS: '300',
+    LAKI_ELECTRON_PR_SCAN_MS: '500',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 't',
     GIT_AUTHOR_EMAIL: 't@t',
@@ -52,7 +52,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
   for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX') delete env[k]
   execFileSync('git', ['init', '-q', '-b', 'main', repo], { env })
   writeFileSync(join(repo, 'README.md'), 'hello\n')
-  if (o.config) writeFileSync(join(repo, '.wb.json'), JSON.stringify(o.config))
+  if (o.config) writeFileSync(join(repo, '.laki.json'), JSON.stringify(o.config))
   execFileSync('git', ['add', '-A'], { cwd: repo, env })
   execFileSync('git', ['commit', '-qm', 'init'], { cwd: repo, env })
 
@@ -61,7 +61,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     home,
     repo,
     env,
-    data: env.WBS_HOME,
+    data: env.LAKI_ELECTRON_HOME,
     async start() {
       daemon = spawn(node[0], [...node.slice(1), join(root, 'src/daemon/main.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] })
       let log = ''
@@ -77,7 +77,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       d.kill('SIGTERM')
       await gone
     },
-    info: () => JSON.parse(readFileSync(join(env.WBS_HOME, 'daemon.json'), 'utf8')) as { port: number; token: string },
+    info: () => JSON.parse(readFileSync(join(env.LAKI_ELECTRON_HOME, 'daemon.json'), 'utf8')) as { port: number; token: string },
     async rpc(method: string, params: object = {}): Promise<any> {
       const { port, token } = rig.info()
       const res = await fetch(`http://127.0.0.1:${port}/rpc`, {

@@ -16,8 +16,8 @@ app.on('second-instance', () => show())
 const daemon = () =>
   ensureDaemon({
     ELECTRON_RUN_AS_NODE: '1',
-    WBS_FROM_APP: '1',
-    ...(dev ? { WBS_DEV_ORIGIN: new URL(process.env.ELECTRON_RENDERER_URL!).origin } : {}),
+    LAKI_ELECTRON_FROM_APP: '1',
+    ...(dev ? { LAKI_ELECTRON_DEV_ORIGIN: new URL(process.env.ELECTRON_RENDERER_URL!).origin } : {}),
   })
 
 function create() {
@@ -56,8 +56,8 @@ function create() {
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
     pendingTab = null
-    // WBS_CAPTURE=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
-    const out = process.env.WBS_CAPTURE
+    // LAKI_ELECTRON_CAPTURE=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
+    const out = process.env.LAKI_ELECTRON_CAPTURE
     if (out) setTimeout(async () => win && writeFileSync(out, (await win.webContents.capturePage()).toPNG()), 3000)
   })
   if (dev) win.loadURL(process.env.ELECTRON_RENDERER_URL!)
@@ -81,7 +81,7 @@ ipcMain.handle('conn', async () => {
   return { port, token }
 })
 ipcMain.on('notify', (_e, title: string, body: string, tab: string) => {
-  if (process.env.WBS_NOTIFY_LOG) appendFileSync(process.env.WBS_NOTIFY_LOG, JSON.stringify({ title, body, tab }) + '\n') // smoke tests
+  if (process.env.LAKI_ELECTRON_NOTIFY_LOG) appendFileSync(process.env.LAKI_ELECTRON_NOTIFY_LOG, JSON.stringify({ title, body, tab }) + '\n') // smoke tests
   const n = new Notification({ title, body, silent: false })
   n.on('click', () => show(tab))
   n.show()
@@ -108,7 +108,7 @@ Menu.setApplicationMenu(
 )
 
 app.whenReady().then(async () => {
-  await daemon().catch(e => dialog.showErrorBox('wbs', `The daemon didn't start: ${e.message}`))
+  await daemon().catch(e => dialog.showErrorBox('Laki Electron', `The daemon didn't start: ${e.message}`))
   create()
 })
 app.on('before-quit', () => (quitting = true))
