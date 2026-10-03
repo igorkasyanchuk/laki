@@ -38,56 +38,52 @@ npm link
 ## First run
 
 1. Open the app. It starts its background daemon if one isn't running.
-2. **⌘O** (or *+ Add project* at the bottom of the sidebar) opens a project: pick a git repository.
-3. The new-workspace dialog opens. Pick:
-   - an agent (claude, codex, shell, or a custom command);
-   - a base branch;
-   - optionally, a first prompt.
-
-   *Local* runs in the repo itself instead of a new worktree.
-4. The workspace gets a worktree in `~/.wb-superset/worktrees/<project>/<id>`, on branch `wb/<id>`. Its
-   setup script runs, then the agent starts.
+2. Add a project: **⌘O**, the folder icon at the top of the sidebar, or drag a folder from Finder onto the
+   window. It can be a git repository or any other folder.
+3. The new-workspace dialog opens. Pick an agent (claude, codex, shell, or a custom command) and,
+   optionally, a first prompt.
+   - For a git repository, also pick a base branch. The workspace gets a worktree in
+     `~/.wb-superset/worktrees/<project>/<id>` on branch `wb/<id>`, its setup command runs, then the
+     agent starts. *Local* works in the repo itself instead.
+   - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
 
 ## Using it
 
-**Sidebar**
-- Shows projects, each with its workspaces.
-- Each workspace row shows its status, branch, `$PORT`, listening ports (click one to open it in the browser) and its PR with CI status.
-- Archived workspaces are listed at the bottom with *restore*.
+**Sidebar:** projects and their workspaces, one line each (status, name, PR number).
+- ＋ on a project creates a new workspace in it.
+- ⋯ on a project opens its menu:
+  - *New workspace*;
+  - *Settings…* (see Project settings below);
+  - *Remove project*;
+  - its archived workspaces, which you click to restore.
 - Drag the sidebar's right edge to resize it; double-click the edge to reset.
 
-**Tabs**
-- \+ in the tab bar (or ⌘T) opens a shell. New claude/codex tabs are in the ⌘K palette.
-- ⌘W closes a tab (this stops its process), and middle-click does too. ⌘1…⌘9 switch tabs.
+**Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
+- ＋ in the tab bar opens a new tab: shell (⌘T), claude, codex or a command.
+- Splitting:
+  - Drag a tab onto a pane's edge: it moves into that tab, on that side.
+  - *Split right* / *Split down* (⋯ menu or ⌘K) open a new shell next to the active pane.
+- Drag a pane's header to move the pane within its tab, or onto the tab bar to give it a tab of its own.
+- Drag the dividers to resize.
+- × on a pane closes that terminal; × on a tab closes all of its terminals. Both stop the process.
+- ⌘1…⌘9 switch tabs.
+- Each workspace remembers its tabs and splits.
 
-**Panes**
-- Drag a tab from the tab bar onto the terminal.
-  - Dropping near an edge splits that pane: side by side, or stacked top and bottom.
-  - Dropping in the middle replaces what that pane shows.
-- Drag a pane's header to move the pane, and drag the dividers to resize.
-- × on a pane header closes the pane; the tab keeps running.
-- Clicking a tab that isn't on screen shows it in the active pane.
-- Each workspace remembers its layout.
-
-**Find**
-- ⌘F searches the active pane's terminal and its scrollback.
+**Find:** ⌘F searches the active pane's terminal and its scrollback.
 - ⏎ goes to the next match, ⇧⏎ to the previous.
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
-**Send bar** (under an agent tab)
-- Type a follow-up and press ⏎ to send it; ⇧⏎ adds a newline.
-- With *when idle* checked, the message is queued and typed in when the agent's turn ends.
-- *n queued · clear* drops the queue.
+**Tab bar icons** (right side):
+- diff (⌘D): changes against the base branch, including uncommitted and new files;
+- run: the project's dev command, in a *dev* tab;
+- ship: commit, push and open a PR, in a *ship* tab;
+- search: the command palette (⌘K);
+- ⋯: split right/down, fork, archive, delete.
 
-**Toolbar**
-- *Diff* (⌘D) shows changes against the base branch, including uncommitted and new files.
-- *Run* starts the project's dev command in a *dev* tab.
-- *Ship* commits, pushes and opens a PR, in a *ship* tab.
-- *⌘K* opens the palette.
+**Status bar** (bottom): branch ← base, `$PORT`, listening ports (click to open), the PR with its CI
+status (click to open), and the workspace's path.
 
-**⌘K palette**
-- Jump to any workspace or tab.
-- Run any action: new claude/codex/shell tab, diff, run, ship, fork, archive, delete, restore, open the PR or a port.
+**⌘K palette:** jump to any workspace or tab, or run any action.
 
 **Status**
 
@@ -100,33 +96,37 @@ npm link
 | ◷ | usage limit (it types `continue` after the reset) |
 | ✓ / ✖ | process ended (ok / failed) |
 
-A workspace shows its most urgent tab. A tab that waits or finishes while off screen sends a macOS
-notification; click it to jump to the tab.
+A workspace shows its most urgent tab. A terminal that waits or finishes while off screen sends a macOS
+notification; click it to jump there. Follow-ups queued with `wbs send --when-idle` show as `+n`.
 
 ### Keys
 
 | key | |
 |---|---|
-| ⌘O | open a project folder, then a new workspace in it |
+| ⌘O | open a project folder (or drop one on the window), then a new workspace in it |
 | ⌘N | new workspace |
 | ⌘T / ⌘W | new shell tab / close tab |
 | ⌘1…⌘9 | tabs |
+| Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘K | palette |
 | ⌘D | diff |
 | ⌘F | find in the terminal |
 
-## Project config: `.wb.json`
+## Project settings
 
-Put this in the repo root (it's read from the workspace first, then the repo, so it works before you commit it):
+⋯ on a project, then *Settings…*:
+- Name.
+- *Setup*: runs in each new worktree, e.g. `npm install`; agent and dev tabs wait for it.
+- *Run*: the dev server, e.g. `npm run dev -- --port $PORT`.
+- *Teardown*: runs when a workspace is deleted or archived.
+
+These are saved in the app. A field left empty falls back to a `.wb.json` in the repo, which a team can
+commit. The dialog shows that file's values as placeholders:
 
 ```json
 { "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT" }
 ```
-
-- `setup` runs in a visible *setup* tab when a worktree workspace is created; the agent tab waits for it.
-- `teardown` runs when a workspace is deleted or archived.
-- `run` is the *Run* button.
 
 Every workspace gets its own `$PORT` (3100, 3110, …).
 

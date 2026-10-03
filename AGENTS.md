@@ -49,7 +49,7 @@ wbs CLI / hooks (node) ─────── /rpc ──────▶   WBS_DE
 `src/daemon/main.ts` `api`: the same methods over HTTP and WebSocket.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`;
-- projects and workspaces: `projectAdd`/`projectRm`, `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `projectFile` (the repo's `.wb.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - tabs and agents: `tabNew`/`tabClose`, `send`, `queueClear`;
 - worktree actions: `diff`, `run`, `ship`;
 - terminals: `screen`, `input`, `resize`, `view`, `detach`.
@@ -99,6 +99,12 @@ node/Electron path and the CLI's path, and map to states:
 
 Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.
 
+### Projects
+
+A project is a git repository (its top level) or any other folder (`git: false`: local workspaces only,
+no branches, diff, PRs or ship). `config` (setup, run, teardown), set in the app, wins field by field over
+the repo's `.wb.json` (`projectConfig`).
+
 ### Resume
 
 `state.json` keeps projects, workspaces, tabs and resume ids. Starting the daemon brings every tab back:
@@ -118,23 +124,27 @@ Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the 
   - Per-viewer UI state is in `localStorage`:
     - `wbs.ws`: the selected workspace;
     - `wbs.tabs`: the selected tab per workspace;
-    - `wbs.layouts`: panes per workspace;
+    - `wbs.groups`: each workspace's tabs, each a split tree of sessions;
     - `wbs.side`: the sidebar width.
 - **`Term.tsx`**: one xterm per pane. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder.
-- **`layout.ts`**: pure split-tree functions (`drop`, `keep`, `show`, `resize`, `place`). Tested in
-  `test/layout.test.ts`.
+- **`layout.ts`**: tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
+  session is in exactly one tab and nothing nests. Pure functions: `groupsOf` (stored tabs minus ended
+  sessions, plus one tab per unplaced session), `move` (a pane or a whole tab next to a pane, or out to the
+  tab bar), `insert`, `keep`, `resize`, `place`. Tested in `test/layout.test.ts`.
 - **`Panes.tsx`**:
   - panes are absolutely placed siblings keyed by tab, so splitting never remounts a terminal;
-  - `useTabDrag` is pointer-based (not HTML5 DnD) and finds the drop target with `elementFromPoint`;
+  - `useTabDrag` is pointer-based (not HTML5 DnD) and finds the drop target with `elementFromPoint`:
+    a pane's nearest edge, or the tab bar (`[data-tabbar]`);
   - `SideHandle` resizes the sidebar.
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`).
-- **`panels.tsx`**: the new-workspace dialog, palette, prompt, diff panel and add-project dialog (the last
+- **`ui.tsx`**: line icons (`Icon`, `IconButton`) and popup menus (`useMenu`).
+- **`panels.tsx`**: the new-workspace dialog, palette, project settings, prompt, diff panel and add-project dialog (the last
   only for the web dev renderer, which has no folder picker).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
 
-**Shared files:** `layout.ts`, `Panes.tsx` and `Find.tsx` are identical copies of the files in
+**Shared files:** `layout.ts`, `Panes.tsx`, `Find.tsx` and `ui.tsx` are identical copies of the files in
 `~/projects/wb-spike/frontend/src/`. Change both copies.
 
 ## Files
@@ -142,7 +152,7 @@ Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the 
 | file | what |
 |---|---|
 | `src/main/index.ts` | Electron main: single instance, starts the daemon, window (hiddenInset title bar), menu, notifications, `pick-folder` IPC |
-| `src/preload/index.ts` | `bridge`: conn info, notify, pickFolder, openExternal, onFocusTab |
+| `src/preload/index.ts` | `bridge`: conn info, notify, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |

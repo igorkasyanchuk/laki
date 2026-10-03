@@ -1,7 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import type { View } from '../../shared/types'
+import type { Project, ProjectConfig, View } from '../../shared/types'
 import { api } from './api'
 import { Glyph } from './Glyph'
+import { Icon, type IconName } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
@@ -26,6 +27,7 @@ export function NewWorkspace({ view, project, onClose, onCreate }: { view: View;
   const [branches, setBranches] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
+  const plain = view.projects.find(x => x.id === p.project)?.git === false // a folder without git: local only
   useEffect(() => {
     if (!p.project) return
     api.call('branches', { project: p.project }).then(
@@ -40,7 +42,7 @@ export function NewWorkspace({ view, project, onClose, onCreate }: { view: View;
     e.preventDefault()
     setBusy(true)
     try {
-      await onCreate({ ...p, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined })
+      await onCreate({ ...p, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined })
     } catch {
       setBusy(false)
     }
@@ -48,7 +50,7 @@ export function NewWorkspace({ view, project, onClose, onCreate }: { view: View;
   if (!view.projects.length)
     return (
       <Modal title="New workspace" onClose={onClose}>
-        <p className="muted">Add a project first (a local git repository).</p>
+        <p className="muted">Open a folder first (⌘O), or drop one on the window.</p>
       </Modal>
     )
   return (
@@ -64,10 +66,14 @@ export function NewWorkspace({ view, project, onClose, onCreate }: { view: View;
             ))}
           </select>
         </label>
-        <label className="check">
-          <input type="checkbox" checked={!!p.local} onChange={e => set({ local: e.target.checked })} /> Local: work in the repo itself (no worktree)
-        </label>
-        {!p.local && (
+        {plain ? (
+          <div className="muted small">A folder without git: the workspace runs in the folder itself.</div>
+        ) : (
+          <label className="check">
+            <input type="checkbox" checked={!!p.local} onChange={e => set({ local: e.target.checked })} /> Local: work in the repo itself (no worktree)
+          </label>
+        )}
+        {!p.local && !plain && (
           <div className="row">
             <label>
               Base branch
@@ -144,7 +150,7 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
         }}
       >
         <label>
-          Git repository
+          Folder
           <input value={path} autoFocus placeholder="/Users/you/code/app" onChange={e => setPath(e.target.value)} />
         </label>
         <div className="buttons">
@@ -154,6 +160,56 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
           </button>
           <button type="submit" className="primary" disabled={!path.trim()}>
             Add
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// a project's name and commands; empty fields fall back to the repo's .wb.json (shown as placeholders)
+export function ProjectSettings({ project, onClose, onSave }: { project: Project; onClose: () => void; onSave: (p: { name: string; config: ProjectConfig }) => Promise<void> }) {
+  const [name, setName] = useState(project.name)
+  const [c, setC] = useState<ProjectConfig>(project.config ?? {})
+  const [file, setFile] = useState<ProjectConfig>({})
+  const [busy, setBusy] = useState(false)
+  useEffect(() => void api.call<ProjectConfig>('projectFile', { id: project.id }).then(setFile, () => {}), [project.id])
+  const field = (k: keyof ProjectConfig, title: string, hint: string) => (
+    <label>
+      <span>
+        {title} <span className="muted">· {hint}</span>
+      </span>
+      <input className="mono" value={c[k] ?? ''} placeholder={file[k] ? `${file[k]}   (.wb.json)` : ''} onChange={e => setC(x => ({ ...x, [k]: e.target.value }))} />
+    </label>
+  )
+  return (
+    <Modal title="Project settings" onClose={onClose}>
+      <form
+        className="form"
+        onSubmit={async e => {
+          e.preventDefault()
+          setBusy(true)
+          await onSave({ name, config: c }).catch(() => setBusy(false))
+        }}
+      >
+        <label>
+          Name
+          <input value={name} autoFocus onChange={e => setName(e.target.value)} />
+        </label>
+        <div className="muted small mono">
+          {project.path} · {project.git === false ? 'folder (no git)' : 'git'}
+        </div>
+        {project.git !== false && field('setup', 'Setup', 'runs in each new worktree, e.g. npm install')}
+        {field('run', 'Run', 'the dev server, e.g. npm run dev -- --port $PORT')}
+        {field('teardown', 'Teardown', 'runs when a workspace is deleted or archived')}
+        <div className="buttons">
+          <span className="muted small">Empty: the repo's .wb.json</span>
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={busy || !name.trim()}>
+            Save
           </button>
         </div>
       </form>
@@ -188,7 +244,7 @@ export function Prompt({ title, hint, placeholder, onClose, onSubmit }: { title:
   )
 }
 
-export type PaletteItem = { label: string; hint?: string; glyph?: string; run: () => void }
+export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; run: () => void }
 
 // fuzzy: the query's characters in order; contiguous runs and word starts score higher
 export function fuzzy(q: string, s: string): number {
@@ -248,7 +304,7 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
       <div className="palette-list" ref={ref}>
         {list.map((x, n) => (
           <div key={x.label + n} className={`palette-item ${n === i ? 'sel' : ''}`} onMouseMove={() => setI(n)} onClick={() => pick(x)}>
-            <span className="pg">{x.glyph && <Glyph s={x.glyph} />}</span>
+            <span className="pg">{x.icon ? <Icon name={x.icon} /> : x.glyph && <Glyph s={x.glyph} />}</span>
             <span className="pl">{x.label}</span>
             <span className="ph muted">{x.hint}</span>
           </div>

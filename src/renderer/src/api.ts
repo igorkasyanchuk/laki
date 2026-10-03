@@ -6,6 +6,7 @@ type Bridge = {
   notify(title: string, body: string, tab: string): void
   onFocusTab(cb: (tab: string) => void): void
   pickFolder(): Promise<string | null>
+  pathOf?(f: File): string
   openExternal(url: string): void
 }
 export const bridge: Bridge | undefined = (window as any).wbs

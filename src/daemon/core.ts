@@ -2,13 +2,13 @@
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { userInfo } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import type { PR, Project, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
+import type { PR, Project, ProjectConfig, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
 
@@ -186,6 +186,7 @@ async function git(cwd: string, ...args: string[]): Promise<string> {
 
 export async function branches(projectRef: string) {
   const p = findProject(projectRef)
+  if (p.git === false) return { current: '', branches: [] }
   const [current, list] = await Promise.all([git(p.path, 'rev-parse', '--abbrev-ref', 'HEAD'), git(p.path, 'branch', '--format=%(refname:short)')])
   return { current, branches: list.split('\n').filter(Boolean) }
 }
@@ -222,33 +223,55 @@ export function allocPort() {
   return port
 }
 
-type ProjectConfig = { setup?: string; teardown?: string; run?: string }
-
-// .wb.json from the workspace (as checked out), else from the project root (works before it's committed)
+// .wb.json from the workspace (as checked out), else from the project root (works before it's committed);
+// the project's own config (set in the app) wins field by field
 export function projectConfig(ws: Workspace): ProjectConfig {
   const proj = state.projects.find(p => p.id === ws.project)
+  let file: ProjectConfig = {}
   for (const d of [ws.path, proj?.path]) {
     if (!d) continue
     try {
-      return JSON.parse(readFileSync(join(d, '.wb.json'), 'utf8'))
+      file = JSON.parse(readFileSync(join(d, '.wb.json'), 'utf8'))
+      break
     } catch {}
   }
-  return {}
+  const own = Object.fromEntries(Object.entries(proj?.config ?? {}).filter(([, v]) => v?.trim()))
+  return { ...file, ...own }
+}
+
+// the .wb.json a project's root has, for the settings dialog's placeholders
+export function projectFileConfig(ref: string): ProjectConfig {
+  try {
+    return JSON.parse(readFileSync(join(findProject(ref).path, '.wb.json'), 'utf8'))
+  } catch {
+    return {}
+  }
+}
+
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig }) {
+  const p = findProject(ref)
+  if (o.name?.trim()) p.name = o.name.trim()
+  if (o.config) p.config = { setup: o.config.setup?.trim() || undefined, teardown: o.config.teardown?.trim() || undefined, run: o.config.run?.trim() || undefined }
+  save()
+  changed()
+  return p
 }
 
 const setupMarker = (ws: Workspace) => join(runDir, `${ws.id}.setup`)
 
 // ---------- projects
 
+// a git repository (its top level), or any other folder (git: false)
 export async function projectAdd(path: string): Promise<Project> {
-  const root = await git(resolve(path), 'rev-parse', '--show-toplevel').catch(() => {
-    throw new Error(`${path} is not a git repository`)
-  })
+  const abs = resolve(path)
+  if (!statSync(abs, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${path} is not a folder`)
+  const top = await git(abs, 'rev-parse', '--show-toplevel').catch(() => '')
+  const root = top || realpathSync(abs)
   const existing = state.projects.find(p => p.path === root)
   if (existing) return existing
   let id = slug(basename(root)) || 'project'
   for (let n = 2; state.projects.some(p => p.id === id); n++) id = `${slug(basename(root))}-${n}`
-  const p = { id, name: basename(root), path: root }
+  const p: Project = { id, name: basename(root), path: root, git: !!top }
   state.projects.push(p)
   save()
   changed()
@@ -367,9 +390,9 @@ export type NewWs = { project: string; base?: string; preset?: string; cmd?: str
 
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const proj = findProject(o.project)
-  const current = await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
+  const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
   let ws: Workspace
-  if (o.local) {
+  if (o.local || proj.git === false) {
     const have = state.workspaces.find(w => w.project === proj.id && w.kind === 'local')
     if (have) return have
     ws = { id: await uniqueWsId(proj.id), project: proj.id, path: proj.path, branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }

@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
-import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
+import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
-import { drop, keep, type Layout, resize, show, tabsOf } from './layout'
+import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
+import { IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'ship'
+type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | { settings: string }
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -24,7 +25,7 @@ function rollup(tabs: TabView[]) {
 }
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
-const SIDE = 260 // the sidebar's default width
+const SIDE = 240 // the sidebar's default width
 
 const load = <T,>(k: string, d: T): T => {
   try {
@@ -38,31 +39,34 @@ export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
   const [wsId, setWsId] = useState<string | null>(() => load('wbs.ws', null))
-  const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('wbs.tabs', {}))
+  const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('wbs.tabs', {})) // the focused pane's session
   const [dialog, setDialog] = useState<Dialog>(null)
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [diff, setDiff] = useState(false)
-  const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per tab, for its find bar
-  const [layouts, setLayouts] = useState<Record<string, Layout>>(() => load('wbs.layouts', {})) // panes per workspace
+  const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
+  const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('wbs.groups', {})) // tabs (of panes) per workspace
   const [sideW, setSideW] = useState<number>(() => load('wbs.side', SIDE))
+  const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [error, setError] = useState('')
+  const [menu, openMenu] = useMenu()
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
+  const mru = useRef<string[]>([]) // sessions, most recently focused first: which pane a tab focuses
 
   const live = useMemo(() => view?.workspaces.filter(w => !w.archived) ?? [], [view])
   const ws = live.find(w => w.id === wsId) ?? live[0] ?? null
+  const project = view?.projects.find(p => p.id === ws?.project)
+  const git = project?.git !== false
   const tabs = useMemo(() => view?.tabs.filter(t => t.workspace === ws?.id) ?? [], [view, ws])
-  // panes whose tab still exists; the selected tab is always in one of them
-  const kept = keep(layouts[ws?.id ?? ''] ?? null, id => tabs.some(t => t.id === id))
-  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => tabsOf(kept).includes(t.id)) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
-  const layout = tab ? show(kept, tab.id) : null
-  const visible = tabsOf(layout)
-  const tabByWsRef = useRef(tabByWs)
-  tabByWsRef.current = tabByWs
+  const byId = (id: string) => tabs.find(t => t.id === id)
+  const groups = groupsOf(stored[ws?.id ?? ''], tabs.map(t => t.id))
+  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
+  const group = groups.find(g => tabsOf(g).includes(tab?.id ?? '')) ?? null
+  const visible = tabsOf(group)
 
   useEffect(() => void localStorage.setItem('wbs.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
   useEffect(() => void localStorage.setItem('wbs.tabs', JSON.stringify(tabByWs)), [tabByWs])
-  useEffect(() => void localStorage.setItem('wbs.layouts', JSON.stringify(layouts)), [layouts])
+  useEffect(() => void localStorage.setItem('wbs.groups', JSON.stringify(stored)), [stored])
   useEffect(() => void localStorage.setItem('wbs.side', JSON.stringify(sideW)), [sideW])
 
   const fail = (e: unknown) => {
@@ -71,16 +75,16 @@ export function App() {
   }
   const call = useCallback(<T,>(method: string, params: object = {}) => api.call<T>(method, params).catch(e => (fail(e), Promise.reject(e))), [])
 
-  // a tab by id, or one just created (its view may not have arrived yet); one not on screen takes the
-  // focused pane's place
+  // a session by id, or one just created (its view may not have arrived yet)
   const selectTab = useCallback((ref: string | { id: string; workspace: string }) => {
     const t = typeof ref === 'string' ? viewRef.current?.tabs.find(t => t.id === ref) : ref
     if (!t) return
-    const instead = tabByWsRef.current[t.workspace] ?? current.current ?? undefined
-    setLayouts(m => ({ ...m, [t.workspace]: show(m[t.workspace] ?? null, t.id, instead) }))
+    mru.current = [t.id, ...mru.current.filter(x => x !== t.id)].slice(0, 200)
     setWsId(t.workspace)
     setTabByWs(m => ({ ...m, [t.workspace]: t.id }))
   }, [])
+  const selectGroup = (g: Layout) => selectTab(mru.current.find(id => tabsOf(g).includes(id)) ?? tabsOf(g)[0])
+  const setGroups = (next: Layout[]) => ws && setStored(m => ({ ...m, [ws.id]: next }))
 
   // the daemon connection
   useEffect(() => {
@@ -89,8 +93,7 @@ export function App() {
       else if (m.ev === 'open') setConnected(true)
       else if (m.ev === 'close') setConnected(false)
       else if (m.ev === 'turn') {
-        const v = viewRef.current
-        const t = v?.tabs.find(t => t.id === m.tab)
+        const t = viewRef.current?.tabs.find(t => t.id === m.tab)
         const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
         if (!t || shown) return
         const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
@@ -120,46 +123,57 @@ export function App() {
     }
   }, [tab?.id, visible.join()])
 
-  // panes: drop a dragged tab on one, close one (its tab keeps running), move a divider
-  const { drag, start } = useTabDrag((id, pane, edge) => {
-    const next = ws && layout && drop(layout, id, pane, edge)
-    if (!ws || !next) return
-    setLayouts(m => ({ ...m, [ws.id]: next }))
+  // a folder dropped on the window becomes a project (git or not), then a new workspace in it
+  useEffect(() => {
+    const files = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files')
+    const over = (e: DragEvent) => {
+      if (!files(e)) return
+      e.preventDefault()
+      setDropping(true)
+    }
+    const leave = (e: DragEvent) => !e.relatedTarget && setDropping(false)
+    const drop = async (e: DragEvent) => {
+      if (!files(e)) return
+      e.preventDefault()
+      setDropping(false)
+      if (!bridge?.pathOf) return fail(new Error('Drop folders on the app window'))
+      let last: Project | null = null
+      for (const f of e.dataTransfer!.files) last = (await call<Project>('projectAdd', { path: bridge.pathOf(f) }).catch(() => null)) ?? last
+      if (last) {
+        setNewFor(last.id)
+        setDialog('new')
+      }
+    }
+    window.addEventListener('dragover', over)
+    window.addEventListener('dragleave', leave)
+    window.addEventListener('drop', drop)
+    return () => {
+      window.removeEventListener('dragover', over)
+      window.removeEventListener('dragleave', leave)
+      window.removeEventListener('drop', drop)
+    }
+  }, [call])
+
+  // panes: a pane (or a whole tab) dropped next to another pane, or onto the tab bar: a tab of its own
+  const { drag, start } = useTabDrag((id, whole, over) => {
+    setGroups(move(groups, id, whole, over))
     selectTab(id)
   })
-  const closePane = (id: string) => {
-    const rest = keep(layout, x => x !== id)
-    if (!ws || !rest) return
-    setLayouts(m => ({ ...m, [ws.id]: rest }))
-    if (id === tab?.id) selectTab(tabsOf(rest)[0])
-  }
-  const tabLabel = (id: string) => {
-    const t = tabs.find(t => t.id === id)
-    return t && (
-      <>
-        <Glyph s={tabGlyph(t)} />
-        <span>{t.name}</span>
-      </>
-    )
+
+  const newTab = async (preset: string, cmd?: string) => ws && selectTab(await call<TabView>('tabNew', { ws: ws.id, preset, cmd }))
+  // a new shell next to the focused pane
+  const split = async (edge: 'right' | 'bottom') => {
+    if (!ws || !tab) return
+    const t = await call<TabView>('tabNew', { ws: ws.id, preset: 'shell' })
+    setGroups(move([...groups, { tab: t.id }], t.id, false, { pane: tab.id, edge }))
+    selectTab(t)
   }
 
-  const newTab = useCallback(
-    async (preset: string) => {
-      if (!ws) return
-      selectTab(await call<TabView>('tabNew', { ws: ws.id, preset }))
-    },
-    [ws, call, selectTab],
-  )
-
-  const closeTab = useCallback(
-    async (t: TabView | null) => {
-      if (!t) return
-      const running = t.status !== 'exited'
-      if (running && !confirm(`Close ${t.name}? Its process will be stopped.`)) return
-      await call('tabClose', { id: t.id })
-    },
-    [call],
-  )
+  const closeTabs = async (ts: TabView[]) => {
+    const running = ts.filter(t => t.status !== 'exited')
+    if (running.length && !confirm(`Close ${ts.map(t => t.name).join(', ')}? ${running.length > 1 ? 'Their processes' : 'Its process'} will be stopped.`)) return
+    for (const t of ts) await call('tabClose', { id: t.id })
+  }
 
   const moveWs = (d: number) => {
     if (!live.length) return
@@ -174,6 +188,12 @@ export function App() {
   }
 
   const run = async () => ws && selectTab(await call<TabView>('run', { ws: ws.id }))
+  const fork = async () => ws && setWsId((await call<WorkspaceView>('wsFork', { id: ws.id })).id)
+  const restore = (id: string) => call('wsRestore', { id }).then(() => setWsId(id))
+  const newWs = (projectId?: string) => {
+    setNewFor(projectId)
+    setDialog('new')
+  }
 
   // the native folder picker, then straight to a workspace in that project (the web dev renderer has
   // no picker: it gets the typed-path dialog)
@@ -182,10 +202,7 @@ export function App() {
     const path = await bridge.pickFolder()
     if (!path) return
     const p = await call<Project>('projectAdd', { path }).catch(() => null) // the toast says why
-    if (p) {
-      setNewFor(p.id)
-      setDialog('new')
-    }
+    if (p) newWs(p.id)
   }
 
   // keys: capture phase, before xterm.js sees them
@@ -194,17 +211,17 @@ export function App() {
     if (!e.metaKey || e.altKey || e.ctrlKey) return
     const k = e.key.toLowerCase()
     const act: Record<string, () => void> = {
-      n: () => setDialog('new'),
+      n: () => newWs(ws?.project),
       o: openProject,
       f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
       t: () => newTab('shell'),
-      w: () => closeTab(tab),
+      w: () => tab && closeTabs([tab]),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
-      d: () => setDiff(d => !d),
+      d: () => git && setDiff(d => !d),
       arrowup: () => moveWs(-1),
       arrowdown: () => moveWs(1),
     }
-    if (/^[1-9]$/.test(k)) act[k] = () => tabs[Number(k) - 1] && selectTab(tabs[Number(k) - 1].id)
+    if (/^[1-9]$/.test(k)) act[k] = () => groups[Number(k) - 1] && selectGroup(groups[Number(k) - 1])
     if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown')) return
     e.preventDefault()
     e.stopPropagation()
@@ -216,33 +233,57 @@ export function App() {
     return () => window.removeEventListener('keydown', f, true)
   }, [])
 
+  // the actions, once: the ⋯ menus and the palette show the same ones
+  type Action = { label: string; icon: IconName; hint?: string; danger?: boolean; run: () => void }
+  const newTabActions: Action[] = [
+    { label: 'Shell', icon: 'terminal', hint: '⌘T', run: () => newTab('shell') },
+    { label: 'Claude', icon: 'agent', run: () => newTab('claude') },
+    { label: 'Codex', icon: 'agent', run: () => newTab('codex') },
+    { label: 'Command…', icon: 'terminal', run: () => setDialog('custom') },
+  ]
+  const wsActions: Action[] = !ws
+    ? []
+    : [
+        ...(tab ? [{ label: 'Split right', icon: 'splitRight', run: () => split('right') } as Action, { label: 'Split down', icon: 'splitDown', run: () => split('bottom') } as Action] : []),
+        ...(ws.kind === 'worktree'
+          ? [{ label: 'Fork workspace', icon: 'fork', run: fork } as Action, { label: 'Archive workspace', icon: 'archive', run: () => rmWs(ws, true) } as Action]
+          : []),
+        { label: 'Delete workspace', icon: 'trash', danger: true, run: () => rmWs(ws, false) },
+      ]
+  const projectActions = (p: Project): MenuItem[] => {
+    const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
+    return [
+      { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
+      { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
+      { label: 'Remove project', icon: 'trash', danger: true, run: () => confirm(`Remove project ${p.name}? Its files stay.`) && call('projectRm', { id: p.id }) },
+      ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: w.id, icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
+    ]
+  }
+
   const palette: PaletteItem[] = useMemo(() => {
     const items: PaletteItem[] = []
-    for (const w of live) items.push({ label: w.id, hint: `${w.branch} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
+    for (const w of live) items.push({ label: w.id, hint: `${w.branch || 'folder'} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
-      if (w) items.push({ label: `${t.workspace} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: t.done && t.status === 'idle' ? 'done' : t.status, run: () => selectTab(t.id) })
+      if (w) items.push({ label: `${t.workspace} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
     }
-    const a = (label: string, run: () => void, hint = 'action') => items.push({ label, hint, run })
-    a('New workspace', () => setDialog('new'), '⌘N')
-    a('Open project folder…', openProject, '⌘O')
+    const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
+    a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
+    a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     if (ws) {
-      a('New shell tab', () => newTab('shell'), '⌘T')
-      a('New claude tab', () => newTab('claude'))
-      a('New codex tab', () => newTab('codex'))
-      a('Diff', () => setDiff(true), '⌘D')
-      a('Run dev server', run)
-      if (ws.kind === 'worktree') a('Ship: commit, push, open PR', () => setDialog('ship'))
-      if (ws.kind === 'worktree') a('Fork workspace', async () => setWsId((await call<WorkspaceView>('wsFork', { id: ws.id })).id))
-      if (ws.kind === 'worktree') a('Archive workspace', () => rmWs(ws, true))
-      a('Delete workspace', () => rmWs(ws, false))
-      if (tab) a('Close tab', () => closeTab(tab), '⌘W')
-      if (ws.pr) a(`Open PR #${ws.pr.number}`, () => openExternal(ws.pr!.url))
-      for (const p of ws.ports) a(`Open localhost:${p}`, () => openExternal(`http://localhost:${p}`))
+      newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
+      if (git) a({ label: 'Diff', icon: 'diff', hint: '⌘D', run: () => setDiff(true) })
+      a({ label: 'Run dev server', icon: 'run', run })
+      if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
+      wsActions.forEach(a)
+      if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: '⌘W', run: () => closeTabs([tab]) })
+      if (ws.pr) a({ label: `Open PR #${ws.pr.number}`, icon: 'pr', run: () => openExternal(ws.pr!.url) })
+      for (const p of ws.ports) a({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
+      if (project) a({ label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
     }
-    for (const w of view?.workspaces.filter(w => w.archived) ?? []) a(`Restore ${w.id}`, () => call('wsRestore', { id: w.id }).then(() => setWsId(w.id)), 'archived')
+    for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${w.id}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
-  }, [view, live, ws, tab])
+  }, [view, live, ws, tab, group])
 
   if (!view)
     return (
@@ -252,26 +293,34 @@ export function App() {
       </div>
     )
 
-  const archived = view.workspaces.filter(w => w.archived)
+  const settingsFor = dialog && typeof dialog === 'object' ? view.projects.find(p => p.id === dialog.settings) : undefined
+  const label = (id: string) => {
+    const t = byId(id)
+    return (
+      t && (
+        <>
+          <Glyph s={tabGlyph(t)} />
+          <span>{t.name}</span>
+        </>
+      )
+    )
+  }
   return (
     <div className="app">
       <aside className="sidebar" style={{ width: sideW }}>
         <div className="side-head drag">
           <span className="logo">wbs</span>
           <span className="spacer" />
-          <button className="icon nodrag" title="New workspace (⌘N)" onClick={() => setDialog('new')}>
-            +
-          </button>
+          <IconButton icon="folderPlus" title="Open a project folder (⌘O), or drop one on the window" onClick={openProject} />
         </div>
         <div className="side-scroll">
           {view.projects.map(p => (
             <div key={p.id} className="project">
-              <div className="project-head">
-                <span title={p.path}>{p.name}</span>
+              <div className="project-head" title={p.path}>
+                <span className="project-name">{p.name}</span>
                 <span className="spacer" />
-                <button className="icon small" title={`Remove project ${p.name}`} onClick={() => confirm(`Remove project ${p.name}? Files stay.`) && call('projectRm', { id: p.id })}>
-                  ×
-                </button>
+                <IconButton icon="plus" title="New workspace" onClick={() => newWs(p.id)} />
+                <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               {live
                 .filter(w => w.project === p.id)
@@ -279,145 +328,132 @@ export function App() {
                   const wt = view.tabs.filter(t => t.workspace === w.id)
                   const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
                   return (
-                    <div key={w.id} className={`ws ${w.id === ws?.id ? 'sel' : ''}`} onClick={() => setWsId(w.id)}>
-                      <div className="ws-line">
-                        <Glyph s={w.setup ? 'running' : rollup(wt)} />
-                        <span className="ws-name">{w.id}</span>
-                        {queued > 0 && <span className="badge">+{queued}</span>}
-                        <span className="spacer" />
-                        {w.pr && (
-                          <button className={`pr pr-${w.pr.checks || 'none'} pr-${w.pr.state.toLowerCase()}`} title={`PR #${w.pr.number} ${w.pr.state} ${w.pr.checks}`} onClick={e => (e.stopPropagation(), openExternal(w.pr!.url))}>
-                            #{w.pr.number}
-                            {{ pass: ' ✓', fail: ' ✗', pending: ' …', '': '' }[w.pr.checks]}
-                          </button>
-                        )}
-                      </div>
-                      <div className="ws-meta">
-                        <span className="branch">{w.kind === 'local' ? `⌂ ${w.branch}` : `⎇ ${w.branch}`}</span>
-                        <span className="port" title="$PORT">:{w.port}</span>
-                        {w.ports.map(port => (
-                          <button key={port} className="listen" title={`open http://localhost:${port}`} onClick={e => (e.stopPropagation(), openExternal(`http://localhost:${port}`))}>
-                            ↗{port}
-                          </button>
-                        ))}
-                      </div>
+                    <div key={w.id} className={`ws ${w.id === ws?.id ? 'sel' : ''}`} onClick={() => setWsId(w.id)} title={`${w.branch || w.path} · $PORT ${w.port}`}>
+                      <Glyph s={w.setup ? 'running' : rollup(wt)} />
+                      <span className="ws-name">{w.id}</span>
+                      {queued > 0 && <span className="badge">+{queued}</span>}
+                      <span className="spacer" />
+                      {w.pr && <span className={`pr pr-${w.pr.checks || 'none'} pr-${w.pr.state.toLowerCase()}`}>#{w.pr.number}</span>}
                     </div>
                   )
                 })}
             </div>
           ))}
-          {archived.length > 0 && (
-            <div className="project archived">
-              <div className="project-head">archived</div>
-              {archived.map(w => (
-                <div key={w.id} className="ws">
-                  <div className="ws-line">
-                    <span className="ws-name muted">{w.id}</span>
-                    <span className="spacer" />
-                    <button className="link" onClick={() => call('wsRestore', { id: w.id }).then(() => setWsId(w.id))}>
-                      restore
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-          {!view.projects.length && <div className="empty-side muted">Add a git repository to start.</div>}
-        </div>
-        <div className="side-foot">
-          <button title="Open a project folder (⌘O)" onClick={openProject}>+ Add project</button>
+          {!view.projects.length && <div className="empty-side muted">Open a folder (⌘O) or drop one here.</div>}
         </div>
       </aside>
-
       <SideHandle width={sideW} onWidth={setSideW} init={SIDE} />
+
       <main className="main">
-        <div className="tabbar drag">
-          {tabs.map((t, i) => (
-            <div
-              key={t.id}
-              className={`tab nodrag ${t.id === tab?.id ? 'sel' : visible.includes(t.id) ? 'shown' : ''}`}
-              onClick={() => selectTab(t.id)}
-              onPointerDown={e => start(e, t.id)}
-              onAuxClick={e => e.button === 1 && closeTab(t)}
-              title={`${t.name} (⌘${i + 1})${t.cmd ? `\n${t.cmd}` : ''}`}
-            >
-              <Glyph s={tabGlyph(t)} />
-              <span>{t.name}</span>
-              {!!t.queue?.length && <span className="badge">+{t.queue.length}</span>}
-              <button className="x" onClick={e => (e.stopPropagation(), closeTab(t))} title="Close (⌘W)">
-                ×
-              </button>
-            </div>
-          ))}
-          {ws && (
-            <button className="icon nodrag" title="New shell tab (⌘T)" onClick={() => newTab('shell')}>
-              +
-            </button>
-          )}
+        <div className="tabbar drag" data-tabbar>
+          {groups.map(g => {
+            const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
+            const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
+            return (
+              <div
+                key={ts[0]?.id}
+                className={`tab nodrag ${g === group ? 'sel' : ''}`}
+                onClick={() => selectGroup(g)}
+                onPointerDown={e => ts[0] && start(e, ts[0].id, true)}
+                onAuxClick={e => e.button === 1 && closeTabs(ts)}
+                title={`${ts.map(t => t.name).join(' · ')} (⌘${groups.indexOf(g) + 1}) · drag onto a pane to split`}
+              >
+                <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
+                <span>{ts.map(t => t.name).join(' · ')}</span>
+                {queued > 0 && <span className="badge">+{queued}</span>}
+                <button className="x" title="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
+                  ×
+                </button>
+              </div>
+            )
+          })}
+          {ws && <IconButton icon="plus" title="New tab" className="nodrag" onClick={e => openMenu(e, newTabActions)} />}
           <span className="spacer" />
           {ws && (
             <div className="actions nodrag">
-              <button onClick={() => setDiff(d => !d)} className={diff ? 'on' : ''} title="⌘D">
-                Diff
-              </button>
-              <button onClick={run} title="Run the project's dev command (.wb.json run) in a dev tab">
-                Run
-              </button>
-              {ws.kind === 'worktree' && <button onClick={() => setDialog('ship')}>Ship</button>}
-              <button onClick={() => setDialog('palette')} title="⌘K">
-                ⌘K
-              </button>
+              {git && <IconButton icon="diff" title="Diff (⌘D)" on={diff} onClick={() => setDiff(d => !d)} />}
+              <IconButton icon="run" title="Run the dev server (project settings: Run)" onClick={run} />
+              {ws.kind === 'worktree' && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
+              <IconButton icon="search" title="Commands (⌘K)" onClick={() => setDialog('palette')} />
+              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
             </div>
           )}
         </div>
         <div className="body">
           <div className="term-wrap">
-            {layout ? (
+            {group ? (
               <Panes
-                layout={layout}
+                layout={group}
                 active={tab?.id ?? null}
                 drag={drag}
-                label={tabLabel}
-                render={id => <Term tab={id} active={id === tab?.id} findSeq={finds[id] ?? 0} />}
+                label={label}
+                ghost={drag && (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null).map(id => byId(id)?.name).join(' · ') : label(drag.tab))}
+                render={id => <Term tab={id} active={id === tab?.id && !dialog} findSeq={finds[id] ?? 0} />}
                 onFocus={id => id !== tab?.id && selectTab(id)}
-                onClosePane={closePane}
-                onResize={(path, at) => ws && setLayouts(m => ({ ...m, [ws.id]: resize(layout, path, at) }))}
-                startDrag={start}
+                onClose={id => byId(id) && closeTabs([byId(id)!])}
+                onResize={(path, at) => setGroups(groups.map(g => (g === group ? resize(g, path, at) : g)))}
+                startDrag={(e, id) => start(e, id, false)}
               />
             ) : (
               <div className="empty">
                 {ws ? (
                   <>
                     <p>No tabs in {ws.id}.</p>
-                    <button onClick={() => newTab('claude')}>claude</button> <button onClick={() => newTab('codex')}>codex</button> <button onClick={() => newTab('shell')}>shell</button>
+                    <div className="row">
+                      {newTabActions.slice(0, 3).map(x => (
+                        <button key={x.label} onClick={x.run}>
+                          {x.label}
+                        </button>
+                      ))}
+                    </div>
                   </>
                 ) : (
                   <>
-                    <p>{view.projects.length ? 'No workspaces yet.' : 'No projects yet.'}</p>
-                    <button onClick={() => (view.projects.length ? setDialog('new') : openProject())}>{view.projects.length ? 'New workspace  ⌘N' : 'Open project folder…  ⌘O'}</button>
+                    <p>{view.projects.length ? 'No workspaces yet.' : 'Open a folder, or drop one here.'}</p>
+                    <button onClick={() => (view.projects.length ? newWs() : openProject())}>{view.projects.length ? 'New workspace  ⌘N' : 'Open folder…  ⌘O'}</button>
                   </>
                 )}
               </div>
             )}
           </div>
-          {diff && ws && <DiffPanel ws={ws.id} onClose={() => setDiff(false)} />}
+          {diff && ws && git && <DiffPanel ws={ws.id} onClose={() => setDiff(false)} />}
         </div>
-        {tab?.kind === 'agent' && <SendBar tab={tab} call={call} />}
         <div className="status">
-          {ws ? (
+          {ws && (
             <>
-              <span>{ws.path}</span>
-              <span className="spacer" />
-              {ws.setup && <span className="muted">setup running… </span>}
-              <span>PORT {ws.port}</span>
+              {git && (
+                <span title={ws.kind === 'worktree' ? `branch ${ws.branch}, from ${ws.base}` : 'the repo itself'}>
+                  ⎇ {ws.branch}
+                  {ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
+                </span>
+              )}
+              <span title="$PORT for this workspace">$PORT {ws.port}</span>
+              {ws.ports.map(port => (
+                <button key={port} className="listen" title={`open http://localhost:${port}`} onClick={() => openExternal(`http://localhost:${port}`)}>
+                  ↗{port}
+                </button>
+              ))}
+              {ws.pr && (
+                <button className={`pr pr-${ws.pr.checks || 'none'} pr-${ws.pr.state.toLowerCase()}`} title={`PR #${ws.pr.number} ${ws.pr.state} ${ws.pr.checks}`} onClick={() => openExternal(ws.pr!.url)}>
+                  #{ws.pr.number}
+                  {{ pass: ' ✓', fail: ' ✗', pending: ' …', '': '' }[ws.pr.checks]}
+                </button>
+              )}
+              {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
-          ) : (
-            <span className="spacer" />
           )}
-          {!connected && <span className="warn"> · reconnecting…</span>}
+          <span className="spacer" />
+          {ws && (
+            <span className="path" title={ws.path}>
+              {'\u200e' + ws.path /* keeps the leading / in the right-to-left truncation */}
+            </span>
+          )}
+          {!connected && <span className="warn">reconnecting…</span>}
         </div>
       </main>
 
+      {menu}
+      {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {error && <div className="toast">{error}</div>}
       {dialog === 'new' && (
         <NewWorkspace
@@ -457,40 +493,27 @@ export function App() {
           }}
         />
       )}
-    </div>
-  )
-}
-
-function SendBar({ tab, call }: { tab: TabView; call: <T>(m: string, p?: object) => Promise<T> }) {
-  const [text, setText] = useState('')
-  const [whenIdle, setWhenIdle] = useState(true)
-  const submit = async () => {
-    if (!text.trim()) return
-    setText('') // now, so text typed while the request runs isn't sent along with it
-    await call('send', { target: tab.id, text, whenIdle }).catch(() => setText(text))
-  }
-  return (
-    <div className="sendbar">
-      <textarea
-        rows={1}
-        value={text}
-        placeholder={`Message ${tab.name}… (⏎ send, ⇧⏎ newline)`}
-        onChange={e => setText(e.target.value)}
-        onKeyDown={e => {
-          if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault()
-            submit()
-          }
-        }}
-      />
-      <label title="Queue it: typed in when the agent finishes its turn">
-        <input type="checkbox" checked={whenIdle} onChange={e => setWhenIdle(e.target.checked)} /> when idle
-      </label>
-      <button onClick={submit}>Send</button>
-      {!!tab.queue?.length && (
-        <button className="link" title={tab.queue.join('\n')} onClick={() => call('queueClear', { target: tab.id })}>
-          {tab.queue.length} queued · clear
-        </button>
+      {dialog === 'custom' && ws && (
+        <Prompt
+          title="New tab: command"
+          placeholder="aider --model sonnet"
+          hint="Runs through your login shell, in the workspace."
+          onClose={() => setDialog(null)}
+          onSubmit={async cmd => {
+            setDialog(null)
+            await newTab('custom', cmd)
+          }}
+        />
+      )}
+      {settingsFor && (
+        <ProjectSettings
+          project={settingsFor}
+          onClose={() => setDialog(null)}
+          onSave={async p => {
+            await call('projectSet', { id: settingsFor.id, ...p })
+            setDialog(null)
+          }}
+        />
       )}
     </div>
   )

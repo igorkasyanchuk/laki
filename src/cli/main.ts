@@ -94,7 +94,7 @@ async function main() {
         for (const w of v.workspaces.filter(w => w.project === p.id)) {
           const tabs = v.tabs.filter(t => t.workspace === w.id)
           const extra = [w.archived ? 'archived' : `:${w.port}`, w.pr ? `PR #${w.pr.number} ${w.pr.state}` : '', w.ports.length ? `listening ${w.ports.join(',')}` : '']
-          console.log(`  ${w.id}  ${w.branch}  ${extra.filter(Boolean).join('  ')}`)
+          console.log(`  ${w.id}  ${w.branch || 'folder'}  ${extra.filter(Boolean).join('  ')}`)
           for (const t of tabs) console.log(`    ${t.status === 'exited' && t.code === 0 ? '✓' : (glyph[t.status] ?? ' ')}${t.done ? '●' : ' '} ${t.name} (${t.id})${t.queue?.length ? ` +${t.queue.length} queued` : ''}`)
         }
       }
@@ -118,7 +118,7 @@ async function main() {
         name: flags.name,
         local: !!flags.local,
       })
-      return out(ws, `${ws.id}  ${ws.path}  (branch ${ws.branch}, PORT ${ws.port})`)
+      return out(ws, `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : "folder"}, PORT ${ws.port})`)
     }
     case 'rm':
     case 'archive':

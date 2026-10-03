@@ -1,11 +1,12 @@
-// Panes: a workspace's terminal area as a tree of splits, each leaf one tab. Pure functions, no React.
+// A workspace's tabs, tmux style: each tab is a tree of splits whose leaves are terminals (the daemon's
+// tabs, called sessions here). Pure functions, no React.
 export type Layout = { tab: string } | { dir: 'row' | 'col'; a: Layout; b: Layout; at: number }
-export type Edge = 'left' | 'right' | 'top' | 'bottom' | 'center'
+export type Edge = 'left' | 'right' | 'top' | 'bottom'
 export type Box = { x: number; y: number; w: number; h: number } // fractions of the area
 
 export const tabsOf = (l: Layout | null): string[] => (!l ? [] : 'tab' in l ? [l.tab] : [...tabsOf(l.a), ...tabsOf(l.b)])
 
-// keep the panes whose tab passes; a split that loses a side becomes the other side
+// keep the panes whose session passes; a split that loses a side becomes the other side
 export function keep(l: Layout | null, ok: (tab: string) => boolean): Layout | null {
   if (!l) return null
   if ('tab' in l) return ok(l.tab) ? l : null
@@ -14,25 +15,42 @@ export function keep(l: Layout | null, ok: (tab: string) => boolean): Layout | n
   return !a ? b : !b ? a : { ...l, a, b }
 }
 
+// the tabs to show: the stored ones minus ended sessions, then a tab for each session in none
+export function groupsOf(stored: Layout[] | undefined, ids: string[]): Layout[] {
+  const seen = new Set<string>()
+  const out: Layout[] = []
+  for (const g of stored ?? []) {
+    const k = keep(g, id => ids.includes(id) && !seen.has(id))
+    if (!k) continue
+    tabsOf(k).forEach(id => seen.add(id))
+    out.push(k)
+  }
+  return [...out, ...ids.filter(id => !seen.has(id)).map(tab => ({ tab }))]
+}
+
 const swap = (l: Layout, from: string, to: Layout): Layout =>
   'tab' in l ? (l.tab === from ? to : l) : { ...l, a: swap(l.a, from, to), b: swap(l.b, from, to) }
 
-// make sure tab is on screen: in the pane of `instead` (or the first pane) when it isn't already
-export function show(l: Layout | null, tab: string, instead?: string): Layout {
-  const on = tabsOf(l)
-  if (!l || on.includes(tab)) return l ?? { tab }
-  return swap(l, instead && on.includes(instead) ? instead : on[0], { tab })
-}
-
-// drop tab on target's pane: an edge splits that pane, the center takes it over
-export function drop(l: Layout | null, tab: string, target: string, edge: Edge): Layout | null {
-  if (tab === target) return l
-  const rest = keep(l, t => t !== tab)
-  if (!rest || !tabsOf(rest).includes(target)) return l
-  if (edge === 'center') return swap(rest, target, { tab })
+// split target's pane: node goes on the edge's side
+export function insert(l: Layout, node: Layout, target: string, edge: Edge): Layout {
   const dir = edge === 'left' || edge === 'right' ? 'row' : 'col'
   const first = edge === 'left' || edge === 'top'
-  return swap(rest, target, { dir, a: first ? { tab } : { tab: target }, b: first ? { tab: target } : { tab }, at: 0.5 })
+  return swap(l, target, { dir, a: first ? node : { tab: target }, b: first ? { tab: target } : node, at: 0.5 })
+}
+
+// move a pane (whole: its entire tab) next to another pane, or ('bar') out into a tab of its own
+export function move(groups: Layout[], tab: string, whole: boolean, to: { pane: string; edge: Edge } | 'bar'): Layout[] {
+  const gi = groups.findIndex(g => tabsOf(g).includes(tab))
+  if (gi < 0) return groups
+  if (to === 'bar') {
+    const rest = keep(groups[gi], t => t !== tab)
+    if (whole || !rest) return groups // ponytail: tabs aren't reordered by dragging
+    return [...groups.slice(0, gi), rest, { tab }, ...groups.slice(gi + 1)]
+  }
+  const node: Layout = whole ? groups[gi] : { tab }
+  if (tabsOf(node).includes(to.pane)) return groups
+  const out = whole ? groups.filter((_, i) => i !== gi) : groups.map(g => keep(g, t => t !== tab)).filter((g): g is Layout => !!g)
+  return out.map(g => (tabsOf(g).includes(to.pane) ? insert(g, node, to.pane, to.edge) : g))
 }
 
 // path: 'a'/'b' steps from the root to a split

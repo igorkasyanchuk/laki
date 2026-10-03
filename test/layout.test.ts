@@ -1,22 +1,26 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { drop, keep, place, resize, show, tabsOf } from '../src/renderer/src/layout.ts'
+import { groupsOf, keep, move, place, resize, tabsOf } from '../src/renderer/src/layout.ts'
 
-test('panes: drop splits or replaces, close collapses, show swaps the focused pane', () => {
-  let l = drop({ tab: 'a' }, 'b', 'a', 'right')!
-  assert.deepEqual(l, { dir: 'row', a: { tab: 'a' }, b: { tab: 'b' }, at: 0.5 })
-  l = drop(l, 'c', 'a', 'bottom')! // c under a
-  assert.deepEqual(tabsOf(l), ['a', 'c', 'b'])
-  assert.deepEqual(drop(l, 'b', 'c', 'top'), { dir: 'col', a: { tab: 'a' }, b: { dir: 'col', a: { tab: 'b' }, b: { tab: 'c' }, at: 0.5 }, at: 0.5 }) // moved, not copied
-  assert.deepEqual(tabsOf(drop(l, 'd', 'b', 'center')), ['a', 'c', 'd'])
-  assert.equal(drop(l, 'a', 'a', 'left'), l) // onto itself: nothing
-  assert.deepEqual(keep(l, t => t !== 'a'), { dir: 'row', a: { tab: 'c' }, b: { tab: 'b' }, at: 0.5 })
-  assert.equal(keep(l, () => false), null)
-  assert.deepEqual(tabsOf(show(l, 'x', 'c')), ['a', 'x', 'b'])
-  assert.equal(show(l, 'b', 'c'), l) // already on screen
-  assert.deepEqual(show(null, 'x'), { tab: 'x' })
-  assert.equal((resize(l, '', 2) as { at: number }).at, 0.9) // clamped
-  const { panes, bars } = place(resize(l, 'a', 0.25))
+test('tabs of panes: sessions in no tab get one, moving splits and merges, nothing nests', () => {
+  let g = groupsOf(undefined, ['a', 'b', 'c'])
+  assert.deepEqual(g, [{ tab: 'a' }, { tab: 'b' }, { tab: 'c' }])
+  g = move(g, 'b', true, { pane: 'a', edge: 'right' }) // tab b into tab a, on the right
+  assert.deepEqual(g, [{ dir: 'row', a: { tab: 'a' }, b: { tab: 'b' }, at: 0.5 }, { tab: 'c' }])
+  g = move(g, 'c', true, { pane: 'a', edge: 'bottom' })
+  assert.equal(g.length, 1)
+  assert.deepEqual(tabsOf(g[0]), ['a', 'c', 'b'])
+  assert.equal(move(g, 'a', true, { pane: 'b', edge: 'left' }), g) // a tab onto its own pane: nothing
+  const moved = move(g, 'b', false, { pane: 'c', edge: 'top' }) // one pane within its tab
+  assert.deepEqual(tabsOf(moved[0]), ['a', 'b', 'c'])
+  const out = move(g, 'c', false, 'bar') // a pane out into its own tab, right after
+  assert.deepEqual(out.map(tabsOf), [['a', 'b'], ['c']])
+  assert.equal(move(out, 'c', false, 'bar'), out) // already alone
+  // ended sessions drop out; new ones get their own tab; a session is never in two tabs
+  assert.deepEqual(groupsOf([g[0], { tab: 'a' }], ['a', 'c', 'd']).map(tabsOf), [['a', 'c'], ['d']])
+  assert.equal(keep(g[0], () => false), null)
+  assert.equal((resize(g[0], '', 2) as { at: number }).at, 0.9) // clamped
+  const { panes, bars } = place(resize(g[0], 'a', 0.25))
   assert.deepEqual(panes.find(p => p.tab === 'c')!.box, { x: 0, y: 0.25, w: 0.5, h: 0.75 })
   assert.equal(bars.length, 2)
 })

@@ -1,6 +1,6 @@
 // The daemon end to end: real PTYs, git worktrees, hooks via the CLI, fake agents.
 import assert from 'node:assert/strict'
-import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, sleep, until } from './helpers.ts'
@@ -261,4 +261,28 @@ test('usage limit from codex screen: ◷ until reset, then "continue"', async t 
   await rig.rpc('watchLimits', { now: tv.limit + 61_000 })
   await until(async () => (await rig.tab(ws.id)).last === 'answer: later', 'continued, then the queue')
   assert.match(await rig.screen(ws.id), /answer: continue[\s\S]*answer: later/)
+})
+
+test('a folder without git is a project (local workspaces only); project settings override .wb.json', async t => {
+  const rig = await fresh(t, { config: { run: 'echo from-file', teardown: 'echo bye' } })
+  const plain = join(rig.home, 'notes')
+  mkdirSync(plain)
+  const np = await rig.rpc('projectAdd', { path: plain })
+  assert.equal(np.git, false)
+  assert.deepEqual(await rig.rpc('branches', { project: np.id }), { current: '', branches: [] })
+  const nw = await rig.rpc('wsNew', { project: np.id, preset: 'shell' }) // no local flag: forced
+  assert.equal(nw.kind, 'local')
+  assert.equal(nw.path, realpathSync(plain))
+  await assert.rejects(rig.rpc('projectAdd', { path: join(plain, 'missing') }), /not a folder/)
+
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  assert.equal(p.git, true)
+  assert.deepEqual(await rig.rpc('projectFile', { id: p.id }), { run: 'echo from-file', teardown: 'echo bye' })
+  await rig.rpc('projectSet', { id: p.id, name: 'Shop', config: { run: 'echo from-app', setup: '  ' } })
+  const saved = (await rig.rpc('state')).projects.find((x: any) => x.id === p.id)
+  assert.equal(saved.name, 'Shop')
+  assert.deepEqual(saved.config, { run: 'echo from-app' }) // blanks dropped
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })
+  const dev = await rig.rpc('run', { ws: ws.id })
+  await until(async () => (await rig.screen(dev.id)).includes('from-app'), 'the app config wins over .wb.json')
 })

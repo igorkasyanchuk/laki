@@ -1,6 +1,10 @@
 // Shapes shared by the daemon, the CLI and the renderer.
 
-export type Project = { id: string; name: string; path: string }
+// setup runs in a new worktree, teardown when one goes, run is the dev server; each field overrides .wb.json's
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string }
+
+// git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)
+export type Project = { id: string; name: string; path: string; git?: boolean; config?: ProjectConfig }
 
 export type Workspace = {
   id: string
