@@ -18,7 +18,14 @@ export type Workspace = {
   created: number
   archived?: boolean
   color?: string // its sidebar color's name
+  name?: string // shown instead of the id (which names the worktree and branch)
+  autoFix?: boolean // failing CI goes to the agent
+  autoReview?: boolean // new PR review comments go to the agent
+  fix?: PRFix // what autoFix/autoReview sent already
 }
+
+// for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent
+export type PRFix = { pr: number; ci?: string; tries?: number; review?: string }
 
 export type TabKind = 'agent' | 'shell' | 'setup' | 'dev' | 'ship'
 
@@ -50,13 +57,33 @@ export type Settings = {
   copyOnSelect?: boolean
   notify?: boolean
   presets?: Preset[]
+  theme?: string
+  env?: Record<string, string> // every session's, under the project's and the preset's
 }
 
 export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
-export type PR = { number: number; state: string; url: string; checks: '' | 'pass' | 'fail' | 'pending' }
+export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string }
+
+// checks: all of them in one word; list: each one. head: the commit the checks ran on.
+export type PR = {
+  number: number
+  state: string
+  url: string
+  checks: '' | 'pass' | 'fail' | 'pending'
+  list?: Check[]
+  title?: string
+  author?: string
+  draft?: boolean
+  head?: string
+  review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
+  additions?: number
+  deletions?: number
+  body?: string
+  updated?: string
+}
 
 export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string }
 

@@ -215,7 +215,7 @@ test('ports of the workspace process tree, PR from gh, dev server', async t => {
   assert.equal(Number(m[2]), ws.port)
   await until(async () => (await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'port scanned')
   const pr = await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
-  assert.deepEqual(pr, { number: 42, state: 'OPEN', url: 'https://example.invalid/pr/42', checks: 'pending' })
+  assert.deepEqual({ ...pr, list: undefined }, { number: 42, state: 'OPEN', url: 'https://example.invalid/pr/42', checks: 'pending', list: undefined })
 })
 
 test('archive keeps the branch and resume ids; restore brings them back', async t => {
@@ -352,4 +352,65 @@ test('presets: args and env on top of the project env; Esc ends a turn; reorder;
   assert.deepEqual(v.workspaces.map((w: any) => w.id), [ws2.id, ws.id])
   assert.equal(v.workspaces[0].color, 'pink')
   assert.equal(v.workspaces[0].run, false)
+})
+
+test('PR: failing CI and new review comments go to the agent once; global env; images; workspace name; a silent turn ends', async t => {
+  const rig = await fresh(t, { config: { env: { TEST_SHARED: 'file' } } })
+  await rig.rpc('settingsSet', { env: { TEST_GLOBAL: 'g', TEST_SHARED: 'global', 'bad key': 'x' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await rig.tab(ws.id)
+  await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().some(l => l.bin === 'claude'), 'claude')
+  assert.deepEqual(rig.fakeLog().find(l => l.bin === 'claude').env, { TEST_GLOBAL: 'g', TEST_SHARED: 'file' })
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'prompt')
+
+  // CI fails on commit abc: its failing job's log goes to the agent, once
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const pr = (head: string) =>
+    writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 42, state: 'OPEN', url: 'https://example.invalid/pr/42', title: 'Add things', author: { login: 'ann' }, headRefOid: head,
+      statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: 'https://github.com/o/r/actions/runs/1/job/7' }] }))
+  pr('abc')
+  writeFileSync(join(gh, 'checks.json'), JSON.stringify([{ name: 'test', bucket: 'fail', link: 'https://github.com/o/r/actions/runs/1/job/7' }]))
+  writeFileSync(join(gh, 'run.log'), 'test\tRun tests\t2026-10-03T10:00:00Z expected 2, got 3\n')
+  await rig.rpc('wsSet', { id: ws.id, autoFix: true, name: '  Nice name  ' })
+  await until(async () => (await rig.screen(tab.id)).includes('answer: CI fails on PR #42'), 'CI sent')
+  await until(async () => (await rig.rpc('state')).workspaces[0].fix?.ci === 'abc', 'fix recorded')
+  let w = (await rig.rpc('state')).workspaces[0]
+  assert.equal(w.name, 'Nice name')
+  assert.equal(w.pr.title, 'Add things')
+  assert.equal(w.pr.author, 'ann')
+  assert.deepEqual(w.pr.list, [{ name: 'test', state: 'fail', url: 'https://github.com/o/r/actions/runs/1/job/7' }])
+  assert.equal(w.fix.tries, 1)
+  assert.match(await rig.screen(tab.id), /expected 2, got 3/)
+  await sleep(1500) // scans go on: the same commit isn't sent again
+  assert.equal((await rig.screen(tab.id)).split('answer: CI fails').length, 2)
+  // a new commit still failing: sent again
+  pr('def')
+  await until(async () => (await rig.rpc('state')).workspaces[0].fix?.tries === 2, 'second try')
+
+  // review: another person's open thread goes once; your own comments don't count
+  const thread = (n: number) => ({ id: 't1', isResolved: false, isOutdated: false, path: 'a.go', line: 3, comments: { nodes: [{ author: { login: 'bob' }, body: 'rename this' }, ...Array(n).fill({ author: { login: 'me' }, body: 'done' })] } })
+  const review = (n: number) => writeFileSync(join(gh, 'graphql.json'), JSON.stringify({ data: { viewer: { login: 'me' }, repository: { pullRequest: { reviewThreads: { nodes: [thread(n)] } } } } }))
+  review(0)
+  await rig.rpc('wsSet', { id: ws.id, autoReview: true })
+  await until(async () => (await rig.screen(tab.id)).includes('@bob: rename this'), 'review sent')
+  await until(async () => (await rig.rpc('state')).workspaces[0].fix?.review === 't1:1', 'review recorded')
+  review(1) // the agent replied as you
+  await sleep(1500)
+  assert.equal((await rig.screen(tab.id)).split('answer: Address the open review comments').length, 2) // the fake echoes it, then answers
+
+  // a pasted image is kept by the daemon; its path goes in the prompt
+  const path = await rig.rpc('imageSave', { data: Buffer.from('png!').toString('base64'), ext: 'exe' })
+  assert.ok(path.startsWith(join(rig.data, 'images')) && path.endsWith('.png'))
+  assert.equal(readFileSync(path, 'utf8'), 'png!')
+
+  // a turn that ends with no hook and no "esc to interrupt" on screen: idle after a few quiet seconds
+  await rig.rpc('input', { tab: tab.id, data: 'mute\r' })
+  await until(async () => (await rig.tab(ws.id)).status === 'running', 'running')
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle after a quiet while', 15000)
+  // while it says "esc to interrupt", it's still running
+  await rig.rpc('input', { tab: tab.id, data: 'slow\r' })
+  await sleep(7000)
+  assert.equal((await rig.tab(ws.id)).status, 'running')
 })

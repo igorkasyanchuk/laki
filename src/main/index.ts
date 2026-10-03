@@ -90,6 +90,9 @@ ipcMain.handle('pick-folder', async () => {
   const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] })
   return r.canceled ? null : r.filePaths[0]
 })
+// macOS dictation, as Edit › Start Dictation does; its language and microphone are in System Settings
+ipcMain.on('dictate', () => Menu.sendActionToFirstResponder('startDictation:'))
+ipcMain.on('dictation-settings', () => shell.openExternal('x-apple.systempreferences:com.apple.Keyboard-Settings.extension'))
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url)
 })

@@ -22,7 +22,8 @@ const turn = text => {
   hook('UserPromptSubmit', { prompt: text })
   if (text.startsWith('ask')) { process.stdout.write('allow? (y/n)\r\n'); hook('Notification', { message: 'needs permission' }); return }
   busy = true
-  if (text.startsWith('slow')) return
+  if (text.startsWith('slow')) return void process.stdout.write('✻ Working… (esc to interrupt)\r\n') // until Esc
+  if (text.startsWith('mute')) return // a turn that ends without a hook or a word (a resumed chat's recap)
   setTimeout(() => {
     if (!busy) return
     busy = false

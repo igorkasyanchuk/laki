@@ -1,15 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
+import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
 import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
 import { type AppInfo, FONT_SIZE, SettingsPage } from './Settings'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
+import { applyTheme } from './themes'
 import { colorVar, IconButton, type IconName, type MenuItem, moveId, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | 'settings' | { settings: string } | { rename: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | 'settings' | { settings: string } | { rename: string } | { renameWs: string }
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -34,6 +36,7 @@ const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_I
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
 const SIDE = 240 // the sidebar's default width
+const wsName = (w: { id: string; name?: string }) => w.name || w.id
 
 const load = <T,>(k: string, d: T): T => {
   try {
@@ -43,6 +46,9 @@ const load = <T,>(k: string, d: T): T => {
   }
 }
 
+// the last theme, until the daemon's settings arrive
+applyTheme(load<string>('wbs.theme', ''))
+
 export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
@@ -51,6 +57,7 @@ export function App() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [diff, setDiff] = useState(false)
+  const [info, setInfo] = useState<boolean>(() => load('wbs.info', false)) // the workspace info panel
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('wbs.groups', {})) // tabs (of panes) per workspace
   const [sideW, setSideW] = useState<number>(() => load('wbs.side', SIDE))
@@ -79,11 +86,22 @@ export function App() {
   useEffect(() => void localStorage.setItem('wbs.groups', JSON.stringify(stored)), [stored])
   useEffect(() => void localStorage.setItem('wbs.side', JSON.stringify(sideW)), [sideW])
   useEffect(() => void localStorage.setItem('wbs.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
+  useEffect(() => void localStorage.setItem('wbs.info', JSON.stringify(info)), [info])
 
-  const fail = (e: unknown) => {
-    setError((e as Error).message)
+  // the theme, painted before the terminals read it (their effects run before ours)
+  const theme = view?.settings.theme ?? ''
+  const painted = useRef<string | null>(null)
+  if (view && painted.current !== theme) {
+    painted.current = theme
+    applyTheme(theme)
+    localStorage.setItem('wbs.theme', JSON.stringify(theme))
+  }
+
+  const toast = (m: string) => {
+    setError(m)
     setTimeout(() => setError(''), 6000)
   }
+  const fail = (e: unknown) => toast((e as Error).message)
   const call = useCallback(<T,>(method: string, params: object = {}) => api.call<T>(method, params).catch(e => (fail(e), Promise.reject(e))), [])
 
   // a session by id, or one just created (its view may not have arrived yet)
@@ -111,7 +129,8 @@ export function App() {
         const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
         if (!t || shown || viewRef.current?.settings.notify === false) return
         const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
-        notify(`${t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id))
+        const w = viewRef.current?.workspaces.find(w => w.id === t.workspace)
+        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id))
       }
     })
     api.connect()
@@ -197,7 +216,7 @@ export function App() {
 
   const rmWs = async (w: WorkspaceView, archive: boolean) => {
     const what = archive ? 'Archive' : 'Delete'
-    if (!confirm(`${what} ${w.id}? Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`)) return
+    if (!confirm(`${what} ${wsName(w)}? Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`)) return
     await call(archive ? 'wsArchive' : 'wsRm', { id: w.id })
   }
 
@@ -235,18 +254,29 @@ export function App() {
   // right click on a workspace in the sidebar
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
+    { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
+    { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), setInfo(true)) },
     null,
     { head: 'Open in' },
     ...openInItems({ ws: w.id }),
     null,
     ...(w.kind === 'worktree'
       ? [
-          { label: 'Fork workspace', icon: 'fork', run: () => call<WorkspaceView>('wsFork', { id: w.id }).then(x => setWsId(x.id)) } as MenuItem,
-          { label: 'Archive workspace', icon: 'archive', run: () => rmWs(w, true) } as MenuItem,
+          { label: 'Fork workspace', icon: 'fork', key: 'f', run: () => call<WorkspaceView>('wsFork', { id: w.id }).then(x => setWsId(x.id)) } as MenuItem,
+          { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => rmWs(w, true) } as MenuItem,
         ]
       : []),
-    { label: 'Delete workspace', icon: 'trash', danger: true, run: () => rmWs(w, false) },
+    { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w, false) },
   ]
+
+  // a workspace for the info panel and the status bar's PR
+  const infoOf = (w: WorkspaceView): WsInfo => ({
+    ...w,
+    fixTries: w.fix?.pr === w.pr?.number ? w.fix?.tries : 0,
+    agents: (view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent').map(t => ({ id: t.id, name: t.name, glyph: tabGlyph(t), last: t.last })),
+  })
+  const setAuto = (w: WorkspaceView, k: AutoKey, v: boolean) => call('wsSet', { id: w.id, [k]: v }).catch(() => {})
+  const prFix = (w: WorkspaceView, what: 'ci' | 'review') => call('prFix', { ws: w.id, what }).then(() => toast('Sent to the agent'), () => {})
 
   // right click on a tab (or a pane header: one session)
   const tabMenu = (ids: string[]): MenuItem[] => {
@@ -255,7 +285,7 @@ export function App() {
     const ended = ts.filter(t => t.status === 'exited' && (t.kind === 'agent' || t.kind === 'dev'))
     const others = groups.filter(x => x !== g).flatMap(x => tabsOf(x).map(byId)).filter((t): t is TabView => !!t)
     return [
-      { label: 'Rename…', icon: 'pencil', run: () => setDialog({ rename: ts[0].id }) },
+      { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ rename: ts[0].id }) },
       { colors: TAB_COLORS, value: colorOf(ts[0]), pick: c => ts.forEach(t => call('tabSet', { id: t.id, color: c })) },
       null,
       { label: 'Split right', icon: 'splitRight', run: () => (selectTab(ts[0].id), split('right', ts[0].id)) },
@@ -308,6 +338,7 @@ export function App() {
       w: () => tab && closeTabs([tab]),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       d: () => git && setDiff(d => !d),
+      i: () => setInfo(i => !i),
       arrowup: () => moveWs(-1),
       arrowdown: () => moveWs(1),
     }
@@ -324,7 +355,7 @@ export function App() {
   }, [])
 
   // the actions, once: the ⋯ menus and the palette show the same ones
-  type Action = { label: string; icon: IconName; hint?: string; danger?: boolean; run: () => void }
+  type Action = { label: string; icon: IconName; hint?: string; key?: string; danger?: boolean; run: () => void }
   const newTabActions: Action[] = [
     { label: 'Shell', icon: 'terminal', hint: '⌘T', run: () => newTab('shell') },
     ...(view?.presets ?? []).map(p => ({ label: p.name, icon: 'agent', run: () => newTab(p.name) }) as Action),
@@ -335,16 +366,17 @@ export function App() {
     : [
         ...(tab ? [{ label: 'Split right', icon: 'splitRight', run: () => split('right') } as Action, { label: 'Split down', icon: 'splitDown', run: () => split('bottom') } as Action] : []),
         ...(ws.kind === 'worktree'
-          ? [{ label: 'Fork workspace', icon: 'fork', run: fork } as Action, { label: 'Archive workspace', icon: 'archive', run: () => rmWs(ws, true) } as Action]
+          ? [{ label: 'Fork workspace', icon: 'fork', key: 'f', run: fork } as Action, { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => rmWs(ws, true) } as Action]
           : []),
-        { label: 'Delete workspace', icon: 'trash', danger: true, run: () => rmWs(ws, false) },
+        { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
+        { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(ws, false) },
       ]
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
-      { label: 'Remove project', icon: 'trash', danger: true, run: () => confirm(`Remove project ${p.name}? Its files stay.`) && call('projectRm', { id: p.id }) },
+      { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => confirm(`Remove project ${p.name}? Its files stay.`) && call('projectRm', { id: p.id }) },
       null,
       { head: 'Open in' },
       ...openInItems({ project: p.id }),
@@ -354,10 +386,10 @@ export function App() {
 
   const palette: PaletteItem[] = useMemo(() => {
     const items: PaletteItem[] = []
-    for (const w of live) items.push({ label: w.id, hint: `${w.branch || 'folder'} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
+    for (const w of live) items.push({ label: wsName(w), hint: `${w.branch || 'folder'} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
-      if (w) items.push({ label: `${t.workspace} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
+      if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
     }
     const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
     a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
@@ -369,6 +401,7 @@ export function App() {
       for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
       a({ label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
       if (git) a({ label: 'Diff', icon: 'diff', hint: '⌘D', run: () => setDiff(true) })
+      a({ label: 'Workspace info', icon: 'info', hint: '⌘I', run: () => setInfo(true) })
       if (ws.run) a({ label: 'Run dev server', icon: 'run', run })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
@@ -444,7 +477,7 @@ export function App() {
                       title={`${w.branch || w.path} · $PORT ${w.port}`}
                     >
                       <Glyph s={w.setup ? 'running' : rollup(wt)} />
-                      <span className="ws-name">{w.id}</span>
+                      <span className="ws-name">{wsName(w)}</span>
                       {queued > 0 && <span className="badge">+{queued}</span>}
                       <span className="spacer" />
                       {w.pr && <span className={`pr pr-${w.pr.checks || 'none'} pr-${w.pr.state.toLowerCase()}`}>#{w.pr.number}</span>}
@@ -490,6 +523,7 @@ export function App() {
           {ws && (
             <div className="actions nodrag">
               <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
+              <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => setInfo(i => !i)} />
               {git && <IconButton icon="diff" title="Diff (⌘D)" on={diff} onClick={() => setDiff(d => !d)} />}
               {ws.run && <IconButton icon="run" title="Run the dev server" onClick={run} />}
               {ws.kind === 'worktree' && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
@@ -517,6 +551,7 @@ export function App() {
                     fontSize={fontSize}
                     fontFamily={settings.fontFamily}
                     copyOnSelect={settings.copyOnSelect !== false}
+                    theme={theme}
                   />
                 )}
                 onFocus={id => id !== tab?.id && selectTab(id)}
@@ -528,7 +563,7 @@ export function App() {
               <div className="empty">
                 {ws ? (
                   <>
-                    <p>No tabs in {ws.id}.</p>
+                    <p>No tabs in {wsName(ws)}.</p>
                     <div className="row">
                       {newTabActions.slice(0, 3).map(x => (
                         <button key={x.label} onClick={x.run}>
@@ -547,6 +582,17 @@ export function App() {
             )}
           </div>
           {diff && ws && git && <DiffPanel ws={ws.id} onClose={() => setDiff(false)} />}
+          {info && ws && (
+            <InfoPanel
+              w={infoOf(ws)}
+              onClose={() => setInfo(false)}
+              onOpen={openExternal}
+              onToggle={(k, v) => setAuto(ws, k, v)}
+              onFix={what => prFix(ws, what)}
+              onRename={() => setDialog({ renameWs: ws.id })}
+              onAgent={selectTab}
+            />
+          )}
         </div>
         {dialog === 'settings' && (
           <SettingsPage settings={view.settings} apps={apps} onClose={() => setDialog(null)} onSave={s => call('settingsSet', s).catch(() => {})} />
@@ -568,12 +614,7 @@ export function App() {
                   ↗{port}
                 </button>
               ))}
-              {ws.pr && (
-                <button className={`pr pr-${ws.pr.checks || 'none'} pr-${ws.pr.state.toLowerCase()}`} title={`PR #${ws.pr.number} ${ws.pr.state} ${ws.pr.checks}`} onClick={() => openExternal(ws.pr!.url)}>
-                  #{ws.pr.number}
-                  {{ pass: ' ✓', fail: ' ✗', pending: ' …', '': '' }[ws.pr.checks]}
-                </button>
-              )}
+              <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} />
               {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
           )}
@@ -649,6 +690,18 @@ export function App() {
           onClose={() => setDialog(null)}
           onSubmit={async name => {
             await call('tabSet', { id: dialog.rename, name })
+            setDialog(null)
+          }}
+        />
+      )}
+      {dialog && typeof dialog === 'object' && 'renameWs' in dialog && live.some(w => w.id === dialog.renameWs) && (
+        <Prompt
+          title="Rename workspace"
+          hint="Only the name shown here: the folder and branch keep the id."
+          initial={wsName(live.find(w => w.id === dialog.renameWs)!)}
+          onClose={() => setDialog(null)}
+          onSubmit={async name => {
+            await call('wsSet', { id: dialog.renameWs, name })
             setDialog(null)
           }}
         />

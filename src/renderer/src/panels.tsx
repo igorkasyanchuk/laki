@@ -1,7 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project, ProjectConfig, View } from '../../shared/types'
-import { api } from './api'
+import { api, bridge } from './api'
 import { Glyph } from './Glyph'
+import { type Img, PromptInput, withImages } from './PromptInput'
 import { EnvField } from './Settings'
 import { Icon, type IconName } from './ui'
 
@@ -27,6 +28,7 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
   const [p, setP] = useState<NewWsParams>({ project: project ?? view.projects[0]?.id ?? '', preset: agent || 'claude', base: '' })
   const [branches, setBranches] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
+  const [images, setImages] = useState<Img[]>([])
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
   const plain = view.projects.find(x => x.id === p.project)?.git === false // a folder without git: local only
   useEffect(() => {
@@ -39,11 +41,13 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
       () => setBranches([]),
     )
   }, [p.project])
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const submit = async (e?: React.FormEvent) => {
+    e?.preventDefault()
+    if (busy) return
     setBusy(true)
     try {
-      await onCreate({ ...p, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined })
+      const prompt = withImages(p.prompt ?? '', images) || undefined
+      await onCreate({ ...p, prompt, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined })
     } catch {
       setBusy(false)
     }
@@ -110,19 +114,21 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
           </label>
         )}
         {view.presets.some(x => x.name === p.preset && x.agent !== 'command') && (
-          <label>
+          <div className="field">
             <span>
               Prompt <span className="muted">(optional)</span>
             </span>
-            <textarea
-              rows={4}
-              value={p.prompt ?? ''}
-              autoFocus
-              placeholder="What should the agent do?"
-              onChange={e => set({ prompt: e.target.value })}
-              onKeyDown={e => e.key === 'Enter' && e.metaKey && submit(e)}
+            <PromptInput
+            value={p.prompt ?? ''}
+            onChange={prompt => set({ prompt })}
+            images={images}
+            onImages={setImages}
+            save={(data, ext) => api.call<string>('imageSave', { data, ext })}
+            dictate={bridge?.dictate}
+            dictationSettings={bridge?.dictationSettings}
+              onSubmit={submit}
             />
-          </label>
+          </div>
         )}
         <div className="buttons">
           <span className="muted">⌘⏎ create · esc cancel</span>

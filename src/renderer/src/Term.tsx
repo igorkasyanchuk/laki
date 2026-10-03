@@ -10,19 +10,7 @@ import { useEffect, useRef, useState } from 'react'
 import { api, openExternal } from './api'
 import { FindBar } from './Find'
 import { FONT_SIZE, fontStack } from './Settings'
-
-const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
-
-function theme() {
-  return {
-    background: css('--term-bg'),
-    foreground: css('--fg'),
-    cursor: css('--accent'),
-    selectionBackground: css('--sel'),
-    black: '#1b1e25', red: '#f7768e', green: '#9ece6a', yellow: '#e0af68', blue: '#7aa2f7', magenta: '#bb9af7', cyan: '#7dcfff', white: '#c0caf5',
-    brightBlack: '#565f89', brightRed: '#ff899d', brightGreen: '#b9f27c', brightYellow: '#ffc777', brightBlue: '#8db0ff', brightMagenta: '#c7a9ff', brightCyan: '#a4daff', brightWhite: '#e6e9f5',
-  }
-}
+import { termTheme } from './themes'
 
 export function Term({
   tab,
@@ -31,6 +19,7 @@ export function Term({
   fontSize = FONT_SIZE,
   fontFamily,
   copyOnSelect = true,
+  theme = '',
 }: {
   tab: string
   active?: boolean
@@ -38,6 +27,7 @@ export function Term({
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  theme?: string // the app's (themes.ts): the colors come from its CSS
 }) {
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
@@ -52,9 +42,10 @@ export function Term({
       lineHeight: 1.15,
       scrollback: 5000,
       allowProposedApi: true,
+      allowTransparency: true, // gradient themes (themes.ts)
       macOptionIsMeta: true,
       cursorBlink: true,
-      theme: theme(),
+      theme: termTheme(),
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
@@ -139,6 +130,9 @@ export function Term({
     xt.term.options.fontFamily = family
     xt.fit.fit()
   }, [fontSize, fontFamily, xt])
+  useEffect(() => {
+    if (xt) xt.term.options.theme = termTheme()
+  }, [theme, xt])
   return (
     <>
       <div className="term" ref={box} />

@@ -27,6 +27,10 @@ const paths = {
   gear: 'M12.92 7.13L14.65 7.18 14.65 8.82 12.92 8.87 12.1 10.87 13.28 12.12 12.12 13.28 10.87 12.1 8.87 12.92 8.82 14.65 7.18 14.65 7.13 12.92 5.13 12.1 3.88 13.28 2.72 12.12 3.9 10.87 3.08 8.87 1.35 8.82 1.35 7.18 3.08 7.13 3.9 5.13 2.72 3.88 3.88 2.72 5.13 3.9 7.13 3.08 7.18 1.35 8.82 1.35 8.87 3.08 10.87 3.9 12.12 2.72 13.28 3.88 12.1 5.13zM10.2 8a2.2 2.2 0 11-4.4 0 2.2 2.2 0 014.4 0z',
   pencil: 'M10.5 2.5l3 3L6 13H3v-3z',
   unsplit: 'M2.5 2.5h4.5v11H2.5zM9 2.5h4.5v11H9z',
+  info: 'M8 14a6 6 0 100-12 6 6 0 000 12zM8 7.2v4M8 4.9v.01',
+  mic: 'M8 1.8a2 2 0 012 2v4a2 2 0 11-4 0v-4a2 2 0 012-2zM4 7.5a4 4 0 008 0M8 11.5v2.7M5.8 14.2h4.4',
+  image: 'M2.5 3h11v10h-11zM2.5 11l3.2-3.2 2.6 2.6 1.7-1.7 3.5 3.5M10.5 6.2v.01',
+  palette: 'M8 14a6 6 0 116-6c0 1.5-1.2 2.2-2.5 2.2H10a1.3 1.3 0 00-.9 2.2c.5.6.1 1.6-1.1 1.6zM5 7.5v.01M7 5v.01M10 5v.01',
   pr: 'M5.8 3a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM5.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM12.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM4.5 4.3v7.4M11.5 11.7V7.5a2 2 0 00-2-2H7M8.5 4L7 5.5 8.5 7',
 }
 export type IconName = keyof typeof paths
@@ -96,20 +100,59 @@ export const moveId = (ids: string[], d: RowDrop) => {
   return rest
 }
 
-// null is a separator, { head } a section title, { colors } a row of swatches
+// null is a separator, { head } a section title, { colors } a row of swatches (keys 0-8). An item's key
+// runs it while the menu is open; without one it gets the first free initial of its label's words.
 export type MenuItem =
-  | { label: string; icon?: IconName; hint?: string; danger?: boolean; run: () => void }
+  | { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; run: () => void }
   | { head: string }
   | { colors: string[]; value?: string; pick: (c: string) => void }
   | null
+type Act = Extract<MenuItem, { run: () => void }>
+const isAct = (it: MenuItem): it is Act => !!it && 'run' in it
+
+// a key per item: its own, else a free initial of its words, else any free letter of its label
+function menuKeys(acts: Act[]) {
+  const used = new Set(acts.map(a => a.key?.toLowerCase()))
+  return acts.map(a => {
+    if (a.key) return a.key.toLowerCase()
+    const l = a.label.toLowerCase()
+    const k = [...l.split(/[^a-z0-9]+/).map(w => w[0]), ...l].find(c => c && /[a-z0-9]/.test(c) && !used.has(c))
+    if (k) used.add(k)
+    return k
+  })
+}
 
 function Menu({ anchor, items, align, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
+  const acts = items.filter(isAct)
+  const keys = menuKeys(acts)
+  const [sel, setSel] = useState(-1) // ↑↓ moves it, ⏎ runs it
+  const pick = (a: Act) => {
+    onClose()
+    a.run()
+  }
+  const colors = items.find(it => !!it && 'colors' in it) as Extract<MenuItem, { colors: string[] }> | undefined
+  // keys go to the menu while it's open (not to the terminal under it); ⌘ shortcuts still work
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
+  onKey.current = e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return
+    e.preventDefault()
+    e.stopPropagation()
+    const k = e.key.toLowerCase()
+    if (e.key === 'Escape') onClose()
+    else if (e.key === 'ArrowDown') setSel(i => (i + 1) % acts.length)
+    else if (e.key === 'ArrowUp') setSel(i => (i <= 0 ? acts.length : i) - 1)
+    else if (e.key === 'Enter' && acts[sel]) pick(acts[sel])
+    else if (colors && /^[0-9]$/.test(k) && +k <= colors.colors.length) {
+      onClose()
+      colors.pick(['none', ...colors.colors][+k])
+    } else if (keys.includes(k)) pick(acts[keys.indexOf(k)])
+  }
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const f = (e: KeyboardEvent) => onKey.current(e)
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
-  }, [onClose])
+  }, [])
   // kept inside the window: flipped up or left when there's no room
   useLayoutEffect(() => {
     const el = box.current!
@@ -130,12 +173,12 @@ function Menu({ anchor, items, align, onClose }: { anchor: DOMRect; items: MenuI
             </div>
           ) : 'colors' in it ? (
             <div key={i} className="menu-colors">
-              {['none', ...it.colors].map(c => (
+              {['none', ...it.colors].map((c, n) => (
                 <button
                   key={c}
                   className={`swatch ${c === (it.value ?? 'none') ? 'on' : ''}`}
                   style={colorVar(c)}
-                  data-tip={c === 'none' ? 'No color' : c}
+                  data-tip={`${c === 'none' ? 'No color' : c} · ${n}`}
                   onClick={() => {
                     onClose()
                     it.pick(c)
@@ -147,15 +190,14 @@ function Menu({ anchor, items, align, onClose }: { anchor: DOMRect; items: MenuI
             <button
               key={i}
               role="menuitem"
-              className={`menu-item ${it.danger ? 'danger' : ''}`}
-              onClick={() => {
-                onClose()
-                it.run()
-              }}
+              className={`menu-item ${it.danger ? 'danger' : ''} ${acts[sel] === it ? 'sel' : ''}`}
+              onClick={() => pick(it)}
+              onPointerMove={() => setSel(-1)}
             >
               <span className="menu-icon">{it.icon && <Icon name={it.icon} />}</span>
               <span className="menu-label">{it.label}</span>
               {it.hint && <span className="menu-hint">{it.hint}</span>}
+              {keys[acts.indexOf(it)] && <kbd className="menu-key">{keys[acts.indexOf(it)]!.toUpperCase()}</kbd>}
             </button>
           ),
         )}

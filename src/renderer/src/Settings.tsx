@@ -1,6 +1,7 @@
 // The app's settings, a page of its own (⌘,): saved as you change them. The same file is in both apps
 // (wb-superset, wb-spike); each app's daemon keeps the settings and its CSS styles the page.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { applyTheme, preview, THEMES } from './themes'
 import { Icon, IconButton, type IconName } from './ui'
 
 // how an agent starts: claude or codex with extra args, or any command; env on top of the project's
@@ -14,6 +15,8 @@ export type AppSettings = {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  theme?: string // themes.ts
+  env?: Record<string, string> // every session's
   notify?: boolean
   presets?: Preset[]
 }
@@ -27,7 +30,24 @@ export const DEFAULT_PRESETS: Preset[] = [
 export const presetsOf = (s: AppSettings) => s.presets ?? DEFAULT_PRESETS
 
 export const FONT_SIZE = 13
-export const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'JetBrains Mono', 'Fira Code', 'Cascadia Code', 'Source Code Pro', 'IBM Plex Mono', 'Hack']
+export const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'JetBrains Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', 'Cascadia Mono',
+  'Source Code Pro', 'IBM Plex Mono', 'Hack', 'Iosevka', 'Victor Mono', 'Roboto Mono', 'Ubuntu Mono', 'Inconsolata', 'Geist Mono', 'Commit Mono',
+  'Monaspace Neon', 'Berkeley Mono', 'Input Mono', 'Hasklig', 'Anonymous Pro', 'DejaVu Sans Mono', 'Meslo LG S', 'MesloLGS NF', 'MesloLGS Nerd Font',
+  'JetBrainsMono Nerd Font', 'FiraCode Nerd Font', 'Hack Nerd Font', 'Operator Mono', 'Dank Mono', 'PT Mono', 'Andale Mono']
+export const FONT_SIZES = [10, 11, 12, 13, 14, 15, 16, 17, 18, 20, 22, 24, 28, 32]
+
+// the FONTS this Mac has: an installed font draws text at another width than at least one fallback
+export function installedFonts() {
+  const c = document.createElement('canvas').getContext('2d')
+  if (!c) return FONTS
+  const width = (f: string) => {
+    c.font = `20px ${f}`
+    return c.measureText('mmmmmmmmmmlli1WQ@#').width
+  }
+  const fallbacks = ['monospace', 'serif']
+  const base = fallbacks.map(width)
+  return FONTS.filter(f => fallbacks.some((b, i) => width(`"${f}", ${b}`) !== base[i]))
+}
 // a font name for xterm, with fallbacks
 export const fontStack = (f?: string) => [f?.trim() && JSON.stringify(f.trim()), '"SF Mono"', 'Menlo', 'Monaco', 'monospace'].filter(Boolean).join(', ')
 
@@ -65,6 +85,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
 
 const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
+  { id: 'appearance', label: 'Appearance', icon: 'palette' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal' },
   { id: 'open', label: 'Open in', icon: 'code' },
   { id: 'presets', label: 'Agent presets', icon: 'agent' },
@@ -98,6 +119,9 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
     set({ presets: next })
   }
   const editor = s.editor || 'cursor'
+  const fonts = useMemo(installedFonts, [])
+  const font = s.fontFamily?.trim() ?? ''
+  const [otherFont, setOtherFont] = useState(() => !!font && !FONTS.includes(font))
   return (
     <div className="settings-page">
       <div className="settings-head">
@@ -137,6 +161,44 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
                 <input type="checkbox" checked={s.notify !== false} onChange={e => set({ notify: e.target.checked })} />
                 Notify when an agent off screen waits or finishes
               </label>
+              <label>
+                <span>
+                  Environment <span className="muted">· every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.</span>
+                </span>
+                <EnvField value={s.env} onChange={env => set({ env })} />
+              </label>
+            </>
+          )}
+          {sec === 'appearance' && (
+            <>
+              <h2>Appearance</h2>
+              <div className="themes">
+                {THEMES.map(t => {
+                  const [bg, panel, fg, accent, ...ansi] = preview(t)
+                  const on = (s.theme || 'default') === t.id
+                  return (
+                    <button
+                      key={t.id}
+                      className={`theme ${on ? 'on' : ''}`}
+                      style={{ background: bg, color: fg }}
+                      onClick={() => {
+                        applyTheme(t.id) // now; the app applies it again once saved
+                        set({ theme: t.id })
+                      }}
+                    >
+                      <span className="theme-bar" style={{ background: panel }}>
+                        <span style={{ background: accent }} />
+                      </span>
+                      <span className="theme-dots">
+                        {ansi.map((c, i) => (
+                          <span key={i} style={{ background: c }} />
+                        ))}
+                      </span>
+                      <span className="theme-name">{t.name}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </>
           )}
           {sec === 'terminal' && (
@@ -144,18 +206,38 @@ export function SettingsPage({ settings, apps, onSave, onClose }: { settings: Ap
               <h2>Terminal</h2>
               <label>
                 Font
-                <input list="settings-fonts" value={s.fontFamily ?? ''} placeholder="SF Mono" onChange={e => set({ fontFamily: e.target.value })} />
-                <datalist id="settings-fonts">
-                  {FONTS.map(f => (
-                    <option key={f} value={f} />
+                <select
+                  value={otherFont ? 'other' : font}
+                  onChange={e => {
+                    setOtherFont(e.target.value === 'other')
+                    if (e.target.value !== 'other') set({ fontFamily: e.target.value || undefined })
+                  }}
+                >
+                  <option value="">Default (SF Mono)</option>
+                  {font && !otherFont && !fonts.includes(font) && <option value={font}>{font} (not found)</option>}
+                  {fonts.map(f => (
+                    <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>
+                      {f}
+                    </option>
                   ))}
-                </datalist>
+                  <option value="other">Other…</option>
+                </select>
               </label>
+              {otherFont && <input value={s.fontFamily ?? ''} placeholder="a font's name, as in Font Book" onChange={e => set({ fontFamily: e.target.value })} autoFocus />}
               <label>
                 <span>
                   Font size <span className="muted">· ⌘+ / ⌘− / ⌘0 anywhere</span>
                 </span>
-                <input type="number" min={8} max={32} value={s.fontSize ?? FONT_SIZE} onChange={e => set({ fontSize: Number(e.target.value) || FONT_SIZE })} />
+                <select value={s.fontSize ?? FONT_SIZE} onChange={e => set({ fontSize: Number(e.target.value) })}>
+                  {[...new Set([...FONT_SIZES, s.fontSize ?? FONT_SIZE])]
+                    .sort((a, b) => a - b)
+                    .map(n => (
+                      <option key={n} value={n}>
+                        {n}
+                        {n === FONT_SIZE ? ' (default)' : ''}
+                      </option>
+                    ))}
+                </select>
               </label>
               <label className="check">
                 <input type="checkbox" checked={s.copyOnSelect !== false} onChange={e => set({ copyOnSelect: e.target.checked })} />

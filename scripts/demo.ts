@@ -17,6 +17,7 @@ Object.assign(process.env, {
   SHELL: join(root, 'test/fakes/tsh'),
   FAKE_LOG: join(home, 'fake.log'),
   FAKE_TURN_MS: '4000',
+  FAKE_GH: join(home, 'gh'),
   WBS_DEV_ORIGIN: 'http://127.0.0.1:5199,http://localhost:5199',
   GIT_AUTHOR_NAME: 'demo',
   GIT_AUTHOR_EMAIL: 'demo@example.invalid',
@@ -27,6 +28,18 @@ for (const k of Object.keys(process.env)) if (k.startsWith('CLAUDE') || k.starts
 const { ensureDaemon, rpc } = await import('../src/shared/conn.ts')
 
 const git = (...a: string[]) => execFileSync('git', a, { cwd: repo })
+// a PR with a failing check, for the status bar and the info panel
+mkdirSync(join(home, 'gh'), { recursive: true })
+const check = (name: string, conclusion: string, status = 'COMPLETED') => ({ __typename: 'CheckRun', name, status, conclusion, detailsUrl: `https://github.com/acme/shop/actions/runs/1/job/${name.length}` })
+writeFileSync(
+  join(home, 'gh/pr.json'),
+  JSON.stringify({
+    number: 42, state: 'OPEN', url: 'https://github.com/acme/shop/pull/42', title: 'Cart: totals with discounts', author: { login: 'ann' }, isDraft: false,
+    headRefOid: 'abc123', reviewDecision: 'CHANGES_REQUESTED', additions: 120, deletions: 14, updatedAt: new Date(Date.now() - 3600e3).toISOString(),
+    body: 'Adds discount codes to the cart.\n\n- percent and fixed discounts\n- tests for both',
+    statusCheckRollup: [check('lint', 'SUCCESS'), check('test (node 22)', 'FAILURE'), check('build', 'SUCCESS'), check('e2e', '', 'IN_PROGRESS')],
+  }),
+)
 mkdirSync(join(repo, 'src'), { recursive: true })
 git('init', '-q', '-b', 'main')
 writeFileSync(join(repo, 'README.md'), '# shop\n\nA tiny shop.\n')

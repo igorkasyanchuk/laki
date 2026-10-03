@@ -7,6 +7,23 @@ diff panel, dev servers, listening ports, PRs and ship. Agents keep running when
 
 Electron + a terminal-host daemon (node-pty + @xterm/headless) + React + xterm.js, the same shape as Superset.
 
+## Features
+
+- **Workspaces**: one git worktree and branch per task (or the repo or a plain folder itself), with setup and
+  teardown scripts, env, a `$PORT` of its own, and a name you can change.
+- **Agents**: Claude Code, Codex or any command, started from presets (args, env). Live status per tab and
+  workspace; notifications; a follow-up queue; resume after a restart; usage limits wait and continue.
+- **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
+  closed. ⌘F finds with every match in yellow; copy on select; font, size and zoom.
+- **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots; the agent gets the text
+  and the images' paths.
+- **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI or new review
+  comments to the agent on their own; an info panel with the PR, its checks and what the agents said last.
+- **Git**: diff panel, ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
+- **Dev servers and ports**: a dev tab per workspace, listening ports you click to open.
+- **Look**: 9 themes, including Warp-style gradients; tab and workspace colors.
+- **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
+
 ## Install
 
 You need:
@@ -59,7 +76,8 @@ npm link
 - Drag the sidebar's right edge to resize it; double-click the edge to reset. ⌘B (or the sidebar icon) hides
   and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
-- Right click a workspace for a color, *Open in*, fork, archive and delete.
+- Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
+  *Info*, *Open in*, fork, archive and delete.
 - Drag projects, and workspaces within a project, to reorder them.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
@@ -76,11 +94,15 @@ npm link
   *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange and codex
   tabs teal unless you pick another color (or none).
 
-**Find:** ⌘F searches the active pane's terminal and its scrollback.
+**Menus:** every item has a key, shown on its right: press it while the menu is open (e.g. right click a
+workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 pick a color.
+
+**Find:** ⌘F searches the active pane's terminal and its scrollback; every match is yellow.
 - ⏎ goes to the next match, ⇧⏎ to the previous.
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
+- info (⌘I): the workspace info panel (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
 - diff (⌘D): changes against the base branch, including uncommitted and new files;
@@ -89,8 +111,27 @@ npm link
 - search: the command palette (⌘K);
 - ⋯: split right/down, fork, archive, delete.
 
-**Status bar** (bottom): branch ← base, `$PORT` and listening ports (click one to open it in the browser), the PR with its CI
-status (click to open), and the workspace's path.
+**Status bar** (bottom): branch ← base, `$PORT` and listening ports (click one to open it in the browser), the PR
+(click to open it), its CI (`✓ 4/4`, `✗ 1 failing`, `… 2 running`; click for the checks), the *fix CI* and
+*review* switches (see PRs below), and the workspace's path.
+
+**Info panel** (ⓘ or ⌘I): the workspace's name, branch, path and `$PORT`; its PR's title, author, state,
+review decision, size, checks (each links to its run) and description; buttons that send the failing CI or
+the open review comments to the agent now; and what each agent said last.
+
+**PRs.** wbs finds the PR of each workspace's branch with `gh` (logged in) every minute.
+- *fix CI*: when CI fails on a new commit, the failing checks and the end of their GitHub Actions logs go to
+  the workspace's agent (when it's idle), asking it to fix, commit and push. Once per commit; after 3 tries
+  in a row it stops and tells you.
+- *review*: new review comments from others (unresolved inline threads) go to the agent, asking it to
+  address them and push. Its own replies don't start another round.
+
+**New workspace:** pick the project, base branch, name and agent, then the prompt:
+- paste a screenshot (⌘V), drop image files on it, or pick them with the image icon; each shows as a
+  thumbnail, and its path goes after your text;
+- the mic starts macOS dictation (or press Fn twice). *mic & language…* opens System Settings → Keyboard →
+  Dictation, where you pick the microphone and the languages;
+- ⌘⏎ creates it.
 
 **⌘K palette:** jump to any workspace or tab, or run any action.
 
@@ -120,6 +161,7 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘K | palette |
 | ⌘D | diff |
+| ⌘I | workspace info |
 | ⌘F | find in the terminal |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
@@ -131,15 +173,19 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 ⌘, or the gear at the top of the sidebar opens the settings page. Changes save as you make them, into
 `state.json`.
 - *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `wb/`),
-  notifications.
-- *Terminal*: font, font size (also ⌘+ / ⌘− / ⌘0), copy selected text to the clipboard (on by default).
+  notifications, and environment variables for every session (a project's or preset's env wins over them).
+- *Appearance*: the theme: Midnight (default), Dawn (light), Synthwave, Forest, Ember, and the Warp-style
+  gradients Cyber Wave, Koi, Pink City, Leafy and Snowy (light). Terminals take its 16 colors.
+- *Terminal*: font (the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
+  copy selected text to the clipboard (on by default).
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
 - *Agent presets*: how agents start. A preset is Claude Code or Codex with extra arguments (e.g.
   `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each one is in
   the new-tab menu and the new-workspace dialog. Edit `claude` and `codex` to change how every new one
   starts; a tab started from a preset uses its current settings when it restarts or resumes.
 
-Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle.
+Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle, and so does one
+whose turn ends without a word (a resumed chat's recap): quiet for a few seconds, no "esc to interrupt".
 
 ## Project settings
 

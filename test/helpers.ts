@@ -40,6 +40,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     PATH: `${fakes}:${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`, // node for the fakes
     SHELL: join(fakes, 'tsh'),
     FAKE_LOG: join(home, 'fake.log'),
+    FAKE_GH: join(home, 'gh'), // the fake gh's answers, when there (fakes/gh)
     WBS_PORT_SCAN_MS: '300',
     WBS_PR_SCAN_MS: '500',
     GIT_CONFIG_NOSYSTEM: '1',

@@ -8,6 +8,8 @@ type Bridge = {
   pickFolder(): Promise<string | null>
   pathOf?(f: File): string
   openExternal(url: string): void
+  dictate?(): void
+  dictationSettings?(): void
 }
 export const bridge: Bridge | undefined = (window as any).wbs
 

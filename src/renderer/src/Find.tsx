@@ -19,6 +19,12 @@ export function FindBar({ term, search, seq, onClose }: { term: Terminal; search
     return () => d.dispose()
   }, [search])
   useLayoutEffect(() => { inp.current?.focus(); inp.current?.select() }, [seq]) // before the next key arrives
+  // matches are bright (--find): while the bar is open, text darkens or lightens to stay readable on them
+  useEffect(() => {
+    const was = term.options.minimumContrastRatio
+    term.options.minimumContrastRatio = 4.5
+    return () => { term.options.minimumContrastRatio = was }
+  }, [term])
 
   const find = (dir: 1 | -1, incremental = false) => {
     if (!q) { search.clearDecorations(); setRes(null); return }

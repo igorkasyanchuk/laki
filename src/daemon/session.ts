@@ -24,7 +24,7 @@ export class Session {
   responder: Client | null = null
   exited = false
   exitCode = 0
-  lastOutput = 0
+  lastOutput = Date.now() // when the program last printed
   onExit: (code: number) => void = () => {}
   onOutput: (data: string) => void = () => {}
 

@@ -89,6 +89,8 @@ const api: Record<string, Handler> = {
   apps: () => core.apps(),
   wsSet: p => core.wsSet(p),
   reorder: p => core.reorder(p),
+  imageSave: p => core.imageSave(p),
+  prFix: p => core.prFix(p),
   send: p => core.send(p),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),
@@ -194,6 +196,7 @@ server.listen(Number(process.env.WBS_PORT || 0), '127.0.0.1', () => {
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
   every(Number(process.env.WBS_PORT_SCAN_MS || 5000), core.scanPorts)
   every(Number(process.env.WBS_PR_SCAN_MS || 60000), core.scanPRs)
+  every(2000, core.sweepRunning)
   every(30000, () => core.watchLimits())
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)
 })

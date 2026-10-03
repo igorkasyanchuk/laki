@@ -8,7 +8,7 @@ import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import type { PR, Preset, Project, ProjectConfig, Settings, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
+import type { Check, PR, PRFix, Preset, Project, ProjectConfig, Settings, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
 
@@ -19,6 +19,8 @@ const statePath = join(dir, 'state.json')
 const runDir = join(dir, 'run')
 export const settingsPath = join(dir, 'claude-settings.json')
 export const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'
+
+const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
 // the agents to start: Settings' presets, or claude and codex as they are
 const DEFAULT_PRESETS: Preset[] = [
@@ -317,6 +319,7 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
   }
   return {
     ...env,
+    ...state.settings?.env, // Settings → General: every session's
     ...projectConfig(ws).env,
     ...presetOf(tab)?.env,
     TERM: 'xterm-256color',
@@ -421,13 +424,28 @@ export function tabSet(o: { id: string; name?: string; color?: string }) {
   return t
 }
 
-// a workspace's sidebar color
-export function wsSet(o: { id: string; color?: string }) {
+// a workspace's sidebar color, name, and whether CI failures and review comments go to its agent
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean }) {
   const w = findWs(o.id)
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
+  if (o.name !== undefined) w.name = o.name.trim().slice(0, 60) || undefined
+  if (o.autoFix !== undefined) w.autoFix = o.autoFix || undefined
+  if (o.autoReview !== undefined) w.autoReview = o.autoReview || undefined
   save()
   changed()
+  if (o.autoFix || o.autoReview) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
   return w
+}
+
+// a pasted image, kept for an agent's prompt (by its path)
+export function imageSave(o: { data: string; ext?: string }) {
+  const ext = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(o.ext ?? '') ? o.ext : 'png'
+  const buf = Buffer.from(o.data, 'base64')
+  if (!buf.length || buf.length > 20 << 20) throw new Error('an image up to 20 MB')
+  mkdirSync(join(dir, 'images'), { recursive: true })
+  const path = join(dir, 'images', `${Date.now()}-${randomUUID().slice(0, 6)}.${ext}`)
+  writeFileSync(path, buf)
+  return path
 }
 
 // the sidebar's order: projects, or workspaces (by id; others keep their place after them)
@@ -443,6 +461,7 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 }
 
 export function settingsSet(o: Settings) {
+  if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k))) }
   state.settings = { ...state.settings, ...o }
   save()
   changed()
@@ -851,6 +870,19 @@ export async function scanPorts() {
   }
 }
 
+// one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)
+function checkOf(c: any): Check {
+  const s = String(c.conclusion || c.state || '').toUpperCase()
+  const state: Check['state'] = ['FAILURE', 'ERROR', 'TIMED_OUT', 'CANCELLED', 'ACTION_REQUIRED', 'STARTUP_FAILURE'].includes(s)
+    ? 'fail'
+    : (c.status && c.status !== 'COMPLETED') || s === 'PENDING' || s === 'EXPECTED'
+      ? 'pending'
+      : ['SKIPPED', 'NEUTRAL', 'STALE'].includes(s)
+        ? 'skip'
+        : 'pass'
+  return { name: c.name || c.context || '?', state, url: c.detailsUrl || c.targetUrl || undefined }
+}
+
 export function checksOf(rollup: any[] | undefined): PR['checks'] {
   if (!rollup?.length) return ''
   const states = rollup.map(c => String(c.conclusion || c.state || c.status || '').toUpperCase())
@@ -878,17 +910,183 @@ export function scanPRs(): Promise<void> {
   return prScan
 }
 
+const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,reviewDecision,additions,deletions,body,updatedAt,statusCheckRollup'
+
 async function scanPR(ws: Workspace) {
+  let pr: PR
   try {
-    const { stdout } = await run('gh', ['pr', 'view', ws.branch, '--json', 'number,state,url,statusCheckRollup'], { cwd: ws.path, timeout: 20000 })
+    const { stdout } = await run('gh', ['pr', 'view', ws.branch, '--json', PR_FIELDS], { cwd: ws.path, timeout: 20000 })
     const j = JSON.parse(stdout)
-    const pr: PR = { number: j.number, state: j.state, url: j.url, checks: checksOf(j.statusCheckRollup) }
-    if (JSON.stringify(prs.get(ws.id)) !== JSON.stringify(pr)) {
-      prs.set(ws.id, pr)
-      changed()
+    pr = {
+      number: j.number,
+      state: j.state,
+      url: j.url,
+      checks: checksOf(j.statusCheckRollup),
+      list: (j.statusCheckRollup ?? []).map(checkOf),
+      title: j.title,
+      author: j.author?.login,
+      draft: j.isDraft,
+      head: j.headRefOid,
+      review: j.reviewDecision || undefined,
+      additions: j.additions,
+      deletions: j.deletions,
+      body: typeof j.body === 'string' ? j.body.slice(0, 4000) : undefined,
+      updated: j.updatedAt,
     }
   } catch {
     if (prs.delete(ws.id)) changed()
+    return
+  }
+  if (JSON.stringify(prs.get(ws.id)) !== JSON.stringify(pr)) {
+    prs.set(ws.id, pr)
+    changed()
+  }
+  await autoPR(ws, pr).catch(e => log(`autoPR ${ws.id}: ${e.message}`))
+}
+
+// ---------- PR feedback to the agent: failing CI, review comments (from wb's fix-ci / fix-review)
+
+const MAX_CI_FIXES = 3 // in a row, one per pushed commit; then it's over to you
+
+// autoPR, after each scan of an open PR: with autoFix, failing CI goes to the agent once per commit (3
+// times in a row at most); with autoReview, new review comments do. Either way it's asked to push.
+async function autoPR(ws: Workspace, pr: PR) {
+  if (pr.state !== 'OPEN' || !(ws.autoFix || ws.autoReview)) return
+  const f: PRFix = ws.fix?.pr === pr.number ? { ...ws.fix } : { pr: pr.number }
+  if (ws.autoFix) {
+    if (pr.checks === 'pass') f.tries = 0
+    else if (pr.checks === 'fail' && pr.head && pr.head !== f.ci) {
+      const tries = (f.tries ?? 0) + 1
+      if (tries > MAX_CI_FIXES) {
+        const tab = agentOf(ws)
+        if (tab) rtOf(tab.id).status = 'waiting' // ◆: over to you
+        broadcast({ ev: 'turn', tab: tab?.id, ws: ws.id, kind: 'waiting', text: `CI still fails after ${MAX_CI_FIXES} fixes` })
+        Object.assign(f, { ci: pr.head, tries })
+      } else if (await prFix({ ws: ws.id, what: 'ci', push: true }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), false)))
+        Object.assign(f, { ci: pr.head, tries }) // recorded once sent: no agent yet means the next scan tries again
+    }
+  }
+  if (ws.autoReview) {
+    const t = await reviewThreads(ws.path, pr.number).catch(() => null)
+    const k = t && reviewKey(t.threads, t.me)
+    if (t && k !== null && newReview(k, f.review))
+      try {
+        tellAgent(ws, reviewMessage(pr, t.threads, true))
+        f.review = k
+      } catch (e) {
+        log(`fix review ${ws.id}: ${(e as Error).message}`)
+      }
+    else if (k !== null) f.review = k // resolved threads drop out of the key
+  }
+  if (JSON.stringify(f) !== JSON.stringify(ws.fix)) {
+    ws.fix = f
+    save()
+    changed()
+  }
+}
+
+// the workspace's agent: the first claude or codex tab
+const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => hasHooks(t) && sessions.get(t.id) && !sessions.get(t.id)!.exited)
+
+// tellAgent types text into the workspace's agent, now or when its turn ends
+function tellAgent(ws: Workspace, text: string) {
+  const tab = agentOf(ws)
+  if (!tab) throw new Error(`${ws.id} has no running agent (claude or codex)`)
+  return send({ target: tab.id, text, whenIdle: true })
+}
+
+const pushAsk = (push: boolean) => (push ? 'commit and push the fix, then say what you changed' : 'say what you changed')
+
+// prFix sends the PR's failing CI (with the end of the failed GitHub Actions logs) or its open review
+// comments to the workspace's agent
+export async function prFix(o: { ws: string; what: 'ci' | 'review'; push?: boolean }) {
+  const ws = findWs(o.ws)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  if (o.what === 'review') {
+    const { threads } = await reviewThreads(ws.path, pr.number)
+    const msg = reviewMessage(pr, threads, !!o.push)
+    if (!msg) throw new Error(`no open review comments on PR #${pr.number}`)
+    return tellAgent(ws, msg)
+  }
+  // gh exits non-zero while checks fail
+  const { stdout } = await run('gh', ['pr', 'checks', String(pr.number), '--json', 'name,bucket,link'], { cwd: ws.path, timeout: 20000 }).catch(e => ({ stdout: String(e.stdout ?? '') }))
+  const failing = (JSON.parse(stdout.trim() || '[]') as { name: string; bucket: string; link: string }[]).filter(c => c.bucket === 'fail')
+  if (!failing.length) throw new Error(`no failing checks on PR #${pr.number}`)
+  let body = ''
+  let logs = 0
+  for (const c of failing) {
+    body += `\n## ${c.name}\n${c.link}\n`
+    const job = c.link?.match(/\/actions\/runs\/\d+\/job\/(\d+)/)?.[1]
+    if (job && logs < 3) {
+      const out = await run('gh', ['run', 'view', '--job', job, '--log-failed'], { cwd: ws.path, timeout: 30000, maxBuffer: 32 << 20 }).then(r => r.stdout, () => '')
+      const tail = out
+        .trimEnd()
+        .split('\n')
+        .slice(-80)
+        .map(l => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/^[^\t]*\t[^\t]*\t\S+ ?/, ''))
+        .join('\n')
+        .trim()
+      if (tail) {
+        logs++
+        body += `End of the failed steps' log (all of it: gh run view --job ${job} --log-failed):\n${tail}\n`
+      }
+    }
+  }
+  return tellAgent(ws, `CI fails on PR #${pr.number} (${pr.url}). Find the cause and fix it, run what you can locally, then ${pushAsk(!!o.push)}.\n${body}`)
+}
+
+type Thread = { id: string; isResolved: boolean; isOutdated: boolean; path: string; line: number | null; comments: { nodes: { author: { login: string } | null; body: string }[] } }
+
+const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
+  viewer { login }
+  repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThreads(first: 100) { nodes {
+    id isResolved isOutdated path line
+    comments(first: 30) { nodes { author { login } body } }
+  } } } }
+}`
+
+// a PR's review threads, and who you are on GitHub
+async function reviewThreads(cwd: string, pr: number): Promise<{ threads: Thread[]; me: string }> {
+  const { stdout } = await run('gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { cwd, timeout: 20000 })
+  const d = JSON.parse(stdout).data
+  return { threads: d.repository.pullRequest.reviewThreads.nodes, me: d.viewer.login }
+}
+
+// the open threads with how many comments others left on each ("id:n id:n"); your own comments don't
+// count: the agent comments as you, and its replies must not start another round
+export const reviewKey = (threads: Thread[], me: string) =>
+  threads
+    .map(t => [t, t.comments.nodes.filter(c => c.author?.login !== me).length] as const)
+    .filter(([t, n]) => !t.isResolved && n > 0)
+    .map(([t, n]) => `${t.id}:${n}`)
+    .join(' ')
+
+// a thread or reply in key that wasn't there when the last one was sent
+export const newReview = (key: string, sent = '') => key.split(' ').some(t => t && !sent.split(' ').includes(t))
+
+// ponytail: inline threads only, not review summaries or plain PR comments
+function reviewMessage(pr: PR, threads: Thread[], push: boolean) {
+  const open = threads.filter(t => !t.isResolved && t.comments.nodes.length)
+  if (!open.length) return ''
+  const items = open.map((t, i) => {
+    const where = `${t.path}${t.line ? `:${t.line}` : ''}${t.isOutdated ? ' (outdated: the code moved since)' : ''}`
+    const said = t.comments.nodes.map(c => `   @${c.author?.login ?? '?'}: ${c.body.trim().replace(/\n/g, '\n   ')}`).join('\n')
+    return `\n${i + 1}. ${where}\n${said}`
+  })
+  return `Address the open review comments on PR #${pr.number} (${pr.url}). Fix what you agree with; then ${pushAsk(push)}, and what you didn't and why.\n${items.join('\n')}`
+}
+
+// a turn that ended without a hook (an interrupt, a resumed chat's recap): running, no output for a
+// while and no "esc to interrupt" on screen (claude and codex show it while they work) means idle
+export function sweepRunning(now = Date.now()) {
+  for (const t of state.tabs) {
+    const s = sessions.get(t.id)
+    const r = rt.get(t.id)
+    if (!s || s.exited || r?.status !== 'running' || !hasHooks(t) || now - s.lastOutput < 4000) continue
+    if (/esc to interrupt/i.test(s.screenText(15))) continue
+    r.status = 'idle'
+    changed()
   }
 }
 

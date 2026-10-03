@@ -110,12 +110,16 @@ the repo's `.wb.json` (`projectConfig`).
 `settings.presets` (default: plain `claude` and `codex`) say how agents start: `agent` (claude, codex,
 command), `args` (appended raw before the prompt), `cmd`, `env`. A tab keeps `preset` = what the agent is
 (hooks, resume, colors) and `profile` = the preset's name, looked up at every start (`presetOf`), so edits
-apply on restart. Env order: process < project (`.wb.json`, then the app's) < preset < wb's own vars.
+apply on restart. Env order: process < `settings.env` (global) < project (`.wb.json`, then the app's) <
+preset < wb's own vars.
 
 ### Interrupts
 
 Esc or ⌃C ends a Claude/Codex turn without any hook. `input` sees the key and `interrupted` checks the
-screen for "Interrupted" a few times over 2.5s; a `running` hook in between cancels it.
+screen for "Interrupted" a few times over 2.5s; a `running` hook in between cancels it. A turn can also end
+with no hook and no key (a resumed chat's recap): `sweepRunning` (every 2s) sets a running tab idle after 4s
+without output when its last 15 lines lack "esc to interrupt" (claude and codex show it, and redraw, while
+they work).
 
 ### Resume
 
@@ -125,7 +129,14 @@ screen for "Interrupted" a few times over 2.5s; a `running` hook in between canc
 ### Scans
 
 - Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN`, every 5s.
-- PRs: `gh pr view <branch> --json number,state,url,statusCheckRollup`, every 60s.
+- PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, review
+  decision, size, body), every 60s; one scan at a time (`scanPRs`), so `autoPR` never sends twice.
+- `autoPR` (workspace `autoFix` / `autoReview`, ported from wb's `review.go`): failing CI on a new head
+  commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`), at most 3 in a row
+  (`MAX_CI_FIXES`), then status waiting and a notification; new review threads → `reviewMessage`
+  (GraphQL `reviewThreads`; `reviewKey` counts only others' comments). What was sent is `workspace.fix`.
+  Messages go to the first live claude/codex tab with `send({ whenIdle })`.
+- Images pasted into a prompt: `imageSave` writes them to `<data>/images/`; the prompt gets their paths.
 
 ### Renderer
 
@@ -137,7 +148,9 @@ screen for "Interrupted" a few times over 2.5s; a `running` hook in between canc
     - `wbs.ws`: the selected workspace;
     - `wbs.tabs`: the selected tab per workspace;
     - `wbs.groups`: each workspace's tabs, each a split tree of sessions;
-    - `wbs.side`: the sidebar width; `wbs.sideOpen`: whether it's shown.
+    - `wbs.side`: the sidebar width; `wbs.sideOpen`: whether it's shown; `wbs.info`: the info panel;
+    - `wbs.theme`: the last theme, painted before the daemon's settings arrive.
+  - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS.
   - The project and workspace order is the daemon's (`reorder`).
 - **`Term.tsx`**: one xterm per pane. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder.
@@ -150,8 +163,17 @@ screen for "Interrupted" a few times over 2.5s; a `running` hook in between canc
   - `useTabDrag` is pointer-based (not HTML5 DnD) and finds the drop target with `elementFromPoint`:
     a pane's nearest edge, or the tab bar (`[data-tabbar]`);
   - `SideHandle` resizes the sidebar.
-- **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`).
-- **`ui.tsx`**: line icons (`Icon`, `IconButton`), popup and right-click menus (`useMenu`, color swatches),
+- **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
+  terminal's `minimumContrastRatio` keeps their text readable.
+- **`themes.ts`**: `THEMES`, `applyTheme` (sets both apps' CSS variables on `<html>`; `default` leaves the
+  stylesheet's), `termTheme` (xterm colors from `--ansi-0…15`). Gradient themes set `--app-bg` and a
+  transparent `--term-bg` (xterm runs with `allowTransparency`).
+- **`PromptInput.tsx`**: a prompt with pasted/dropped images (saved by the daemon) and dictation;
+  `withImages` appends their paths.
+- **`Info.tsx`**: the workspace info panel and the status bar's PR (`PRStatus`, `AutoToggles`, `ciText`);
+  each app maps its workspace to `WsInfo`.
+- **`ui.tsx`**: line icons (`Icon`, `IconButton`), popup and right-click menus (`useMenu`, color swatches;
+  each item has a key: its own `key` or a free initial, `menuKeys`),
   tooltips (`Tips`: any element with `data-tip`), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
   and sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`).
 - **`Settings.tsx`**: the settings page (⌘,), autosaved; presets, `EnvField` (KEY=value lines), fonts.
@@ -160,7 +182,8 @@ screen for "Interrupted" a few times over 2.5s; a `running` hook in between canc
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
 
-**Shared files:** `layout.ts`, `Panes.tsx`, `Find.tsx`, `ui.tsx` and `Settings.tsx` are identical copies of the files in
+**Shared files:** `layout.ts`, `Panes.tsx`, `Find.tsx`, `ui.tsx`, `Settings.tsx`, `themes.ts`, `PromptInput.tsx`,
+`Info.tsx` and `Glyph.tsx` are identical copies of the files in
 `~/projects/wb-spike/frontend/src/`. Change both copies.
 
 ## Files
@@ -168,7 +191,7 @@ screen for "Interrupted" a few times over 2.5s; a `running` hook in between canc
 | file | what |
 |---|---|
 | `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header), menu, notifications, `pick-folder` IPC |
-| `src/preload/index.ts` | `bridge`: conn info, notify, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab |
+| `src/preload/index.ts` | `bridge`: conn info, notify, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |

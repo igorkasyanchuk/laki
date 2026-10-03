@@ -8,4 +8,6 @@ contextBridge.exposeInMainWorld('wbs', {
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
+  dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
+  dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
 })
