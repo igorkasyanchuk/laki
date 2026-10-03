@@ -527,7 +527,6 @@ export function App() {
                       <span className="ws-name">{wsName(w)}</span>
                       {queued > 0 && <span className="badge">+{queued}</span>}
                       <span className="spacer" />
-                      {w.pr && <span className={`pr pr-${w.pr.checks || 'none'} pr-${w.pr.state.toLowerCase()}`}>#{w.pr.number}</span>}
                     </div>
                   )
                 })}

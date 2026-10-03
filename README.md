@@ -70,7 +70,7 @@ npm link
 
 ## Using it
 
-**Sidebar:** projects and their workspaces, one line each (status, name, PR number).
+**Sidebar:** projects and their workspaces, one line each (status, name). The selected workspace's PR is in the status bar.
 - ＋ on a project creates a new workspace in it.
 - ⋯ on a project opens its menu:
   - *New workspace*;
