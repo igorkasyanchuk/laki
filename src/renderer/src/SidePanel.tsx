@@ -173,7 +173,7 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
                 key={n.path}
                 className={`sp-row ${sel === n.path ? 'sel' : ''} ${n.dir ? '' : `ch-${changed[n.path] ?? ''}`}`}
                 style={{ paddingLeft: 8 + depth * 14 }}
-                onClick={() => (setSel(n.path), n.dir ? toggle(n.path) : api.preview(n.path))}
+                onClick={e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && api.preview(n.path))} // a double-click's second opens the editor
                 onDoubleClick={() => !n.dir && api.openFile(n.path)}
               >
                 <span className="sp-chev">{n.dir && <Icon name={open.has(n.path) ? 'chevron' : 'chevronRight'} />}</span>
@@ -239,14 +239,16 @@ function ChangesTab({ api, ws }: { api: PanelApi; ws: string }) {
                     {l || ' '}
                   </div>
                 ))}
-                <span className="row">
-                  <button className="link small" onClick={() => api.preview(f.path)}>
-                    show the file
-                  </button>
-                  <button className="link small" onClick={() => api.openFile(f.path)}>
-                    open in the editor
-                  </button>
-                </span>
+                {f.status[0] !== 'D' && (
+                  <span className="row">
+                    <button className="link small" onClick={() => api.preview(f.path)}>
+                      show the file
+                    </button>
+                    <button className="link small" onClick={() => api.openFile(f.path)}>
+                      open in the editor
+                    </button>
+                  </span>
+                )}
               </div>
             )}
           </div>
