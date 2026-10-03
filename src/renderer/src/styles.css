@@ -48,7 +48,7 @@ button.link { background: none; border: none; color: var(--accent); padding: 0 4
 input, select, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; outline: none; width: 100%; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 textarea { resize: vertical; font-family: inherit; }
-.spacer { flex: 1; }
+.spacer, .grow { flex: 1; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
 .warn { color: var(--error); }
@@ -69,8 +69,14 @@ textarea { resize: vertical; font-family: inherit; }
 .project-head .ib { opacity: 0; }
 .project-head:hover .ib, .project-head .ib:focus-visible { opacity: 1; }
 .ws { display: flex; align-items: center; gap: 6px; height: 26px; padding: 0 10px 0 12px; cursor: pointer; border-left: 2px solid transparent; min-width: 0; }
-.ws:hover { background: var(--hover); }
-.ws.sel { background: var(--sel); border-left-color: var(--accent); }
+.ws:hover { background-color: var(--hover); }
+.ws.sel { background-color: var(--sel); border-left-color: var(--accent); }
+/* a workspace's color (--tab-c, set inline): its left edge and a tint */
+.ws { border-left-color: var(--tab-c, transparent); background-image: linear-gradient(90deg, color-mix(in srgb, var(--tab-c, transparent) 20%, transparent), color-mix(in srgb, var(--tab-c, transparent) 5%, transparent)); }
+.ws.sel { border-left-color: var(--tab-c, var(--accent)); }
+/* where a dragged project or workspace would land */
+.drop-before { box-shadow: inset 0 2px 0 var(--accent); }
+.drop-after { box-shadow: inset 0 -2px 0 var(--accent); }
 .ws-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .listen { background: none; border: none; padding: 0; color: var(--done); font-family: var(--mono); font-size: 11.5px; }
 .listen:hover { text-decoration: underline; background: none; }
@@ -93,7 +99,23 @@ textarea { resize: vertical; font-family: inherit; }
 .glyph.spin { width: 10px; height: 10px; margin: 0 2px; border: 2px solid color-mix(in srgb, var(--running) 25%, transparent); border-top-color: var(--running); border-radius: 50%; animation: spin 0.8s linear infinite; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
-.main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+/* Settings: a page over the main column */
+.settings-page { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; background: var(--bg); }
+.settings-head { height: 38px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); background: var(--side); -webkit-app-region: drag; }
+.settings-head button { -webkit-app-region: no-drag; }
+.side-closed .settings-head { padding-left: 76px; }
+.settings-body { flex: 1; display: flex; min-height: 0; }
+.settings-nav { width: 180px; flex: none; padding: 12px 8px; display: flex; flex-direction: column; gap: 2px; border-right: 1px solid var(--line); background: var(--side); }
+.settings-nav button { display: flex; align-items: center; gap: 8px; background: none; border: none; text-align: left; padding: 6px 10px; color: var(--muted); }
+.settings-nav button:hover { background: var(--hover); color: var(--fg); }
+.settings-nav button.on { background: var(--sel); color: var(--fg); }
+.settings-main { flex: 1; overflow-y: auto; padding: 20px 28px 40px; max-width: 700px; gap: 14px; }
+.settings-main h2 { margin: 0; font-size: 15px; color: var(--fg); }
+.settings-main p { margin: 0; }
+.preset { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); }
+.preset .row select { flex: none; width: 140px; }
+.sample { padding: 10px 12px; background: var(--term-bg); border: 1px solid var(--line); border-radius: var(--radius); color: var(--fg); white-space: nowrap; overflow: hidden; }
 .tabbar { height: 38px; flex: none; display: flex; align-items: flex-end; gap: 1px; padding: 0 6px; border-bottom: 1px solid var(--line); background: var(--side); }
 .tab { display: flex; align-items: center; gap: 6px; height: 29px; padding: 0 4px 0 10px; border: 1px solid transparent; border-bottom: none; border-radius: var(--radius) var(--radius) 0 0; cursor: pointer; color: var(--muted); max-width: 240px; white-space: nowrap; margin-bottom: -1px; font-size: 12.5px; }
 .tab > span:not(.glyph):not(.badge) { overflow: hidden; text-overflow: ellipsis; min-width: 0; }

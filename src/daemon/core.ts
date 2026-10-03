@@ -3,12 +3,12 @@
 import { execFile, execFileSync } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { userInfo } from 'node:os'
+import { homedir, userInfo } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import type { PR, Project, ProjectConfig, Settings, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
+import type { PR, Preset, Project, ProjectConfig, Settings, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
 
@@ -19,11 +19,19 @@ const statePath = join(dir, 'state.json')
 const runDir = join(dir, 'run')
 export const settingsPath = join(dir, 'claude-settings.json')
 export const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'
-export const PRESETS = ['claude', 'codex', 'shell']
+
+// the agents to start: Settings' presets, or claude and codex as they are
+const DEFAULT_PRESETS: Preset[] = [
+  { name: 'claude', agent: 'claude' },
+  { name: 'codex', agent: 'codex' },
+]
+export const presets = () => state.settings?.presets ?? DEFAULT_PRESETS
+const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
+const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number }
+type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number }
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const prs = new Map<string, PR>()
@@ -103,9 +111,10 @@ export function view(): View {
   })
   return {
     projects: state.projects,
-    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], pr: prs.get(w.id) })),
+    // ponytail: run reads .wb.json per workspace on every view; cache by mtime if many workspaces
+    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], pr: prs.get(w.id), run: !!projectConfig(w).run })),
     tabs,
-    presets: PRESETS,
+    presets: presets(),
     settings: state.settings ?? {},
   }
 }
@@ -236,8 +245,9 @@ export function projectConfig(ws: Workspace): ProjectConfig {
       break
     } catch {}
   }
-  const own = Object.fromEntries(Object.entries(proj?.config ?? {}).filter(([, v]) => v?.trim()))
-  return { ...file, ...own }
+  const { env, ...cmds } = proj?.config ?? {}
+  const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => v?.trim()))
+  return { ...file, ...own, env: { ...file.env, ...env } }
 }
 
 // the .wb.json a project's root has, for the settings dialog's placeholders
@@ -252,7 +262,15 @@ export function projectFileConfig(ref: string): ProjectConfig {
 export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig }) {
   const p = findProject(ref)
   if (o.name?.trim()) p.name = o.name.trim()
-  if (o.config) p.config = { setup: o.config.setup?.trim() || undefined, teardown: o.config.teardown?.trim() || undefined, run: o.config.run?.trim() || undefined }
+  if (o.config) {
+    const env = Object.fromEntries(Object.entries(o.config.env ?? {}).filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k)))
+    p.config = {
+      setup: o.config.setup?.trim() || undefined,
+      teardown: o.config.teardown?.trim() || undefined,
+      run: o.config.run?.trim() || undefined,
+      env: Object.keys(env).length ? env : undefined,
+    }
+  }
   save()
   changed()
   return p
@@ -299,6 +317,8 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
   }
   return {
     ...env,
+    ...projectConfig(ws).env,
+    ...presetOf(tab)?.env,
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
     TERM_PROGRAM: 'wbs',
@@ -311,6 +331,7 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
 }
 
 function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean): string {
+  const pr = presetOf(tab)
   let argv: string[]
   if (tab.preset === 'claude') {
     argv = ['claude', '--settings', settingsPath]
@@ -321,10 +342,10 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean): string
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
     argv.push('-c', 'notify=' + JSON.stringify(['/usr/bin/env', ...cliEnv, ...cliArgv, 'hook', 'done']))
   } else {
-    return tab.cmd || 'true'
+    return (pr?.agent === 'command' && pr.cmd?.trim()) || tab.cmd || 'true'
   }
-  if (prompt && !resume) argv.push(prompt)
-  return argv.map(q).join(' ')
+  // a preset's args go in as written (a shell runs the line), before the prompt
+  return [argv.map(q).join(' '), pr?.args?.trim(), prompt && !resume ? q(prompt) : ''].filter(Boolean).join(' ')
 }
 
 type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string> }
@@ -370,12 +391,14 @@ const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|
 
 export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string }): Tab {
   const ws = findWs(wsRef)
-  const preset = o.preset || (o.cmd ? 'custom' : 'shell')
+  const pr = o.kind ? undefined : presetNamed(o.preset)
+  if (pr?.agent === 'command') o = { ...o, cmd: pr.cmd || 'true' }
+  const preset = pr ? (pr.agent === 'command' ? 'custom' : pr.agent) : o.preset || (o.cmd ? 'custom' : 'shell')
   const kind = o.kind ?? (preset === 'shell' && !o.cmd ? 'shell' : 'agent')
-  let name = o.name || (kind === 'agent' ? (preset === 'custom' ? basename(o.cmd!.split(/\s/)[0]) : preset) : kind)
+  let name = o.name || pr?.name || (kind === 'agent' ? (preset === 'custom' ? basename(o.cmd!.split(/\s/)[0]) : preset) : kind)
   const base = name
   for (let n = 2; tabsOf(ws.id).some(t => t.name === name); n++) name = `${base} ${n}`
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}) }
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}) }
   state.tabs.push(tab)
   save()
   try {
@@ -398,6 +421,27 @@ export function tabSet(o: { id: string; name?: string; color?: string }) {
   return t
 }
 
+// a workspace's sidebar color
+export function wsSet(o: { id: string; color?: string }) {
+  const w = findWs(o.id)
+  if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
+  save()
+  changed()
+  return w
+}
+
+// the sidebar's order: projects, or workspaces (by id; others keep their place after them)
+export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
+  const by = <T extends { id: string }>(list: T[], ids: string[]) => {
+    const at = (x: T) => (ids.includes(x.id) ? ids.indexOf(x.id) : ids.length)
+    return [...list].sort((a, b) => at(a) - at(b)) // stable: the rest keep their order
+  }
+  if (o.projects) state.projects = by(state.projects, o.projects)
+  if (o.workspaces) state.workspaces = by(state.workspaces, o.workspaces)
+  save()
+  changed()
+}
+
 export function settingsSet(o: Settings) {
   state.settings = { ...state.settings, ...o }
   save()
@@ -407,22 +451,45 @@ export function settingsSet(o: Settings) {
 
 const branchPrefix = () => state.settings?.branchPrefix?.trim() || 'wb/'
 
-// the editors ⌘E knows, by their macOS app names
-const EDITORS: Record<string, string> = { cursor: 'Cursor', zed: 'Zed', vscode: 'Visual Studio Code', windsurf: 'Windsurf', sublime: 'Sublime Text' }
+// what a folder can open in, by macOS app name (open -a <app> <folder>)
+export const APPS: Record<string, string> = {
+  cursor: 'Cursor',
+  zed: 'Zed',
+  vscode: 'Visual Studio Code',
+  windsurf: 'Windsurf',
+  sublime: 'Sublime Text',
+  webstorm: 'WebStorm',
+  intellij: 'IntelliJ IDEA',
+  xcode: 'Xcode',
+  finder: 'Finder',
+  terminal: 'Terminal',
+  iterm: 'iTerm',
+  warp: 'Warp',
+  ghostty: 'Ghostty',
+}
 
-// open a workspace's (or a project's) folder in the editor from the settings, or in Finder
-export async function openIn(o: { ws?: string; project?: string; app: 'editor' | 'finder' }) {
+// the apps installed (Finder and Terminal always are)
+export function apps() {
+  const dirs = ['/Applications', '/System/Applications/Utilities', join(homedir(), 'Applications')]
+  return Object.entries(APPS)
+    .filter(([id, name]) => id === 'finder' || dirs.some(d => existsSync(join(d, `${name}.app`))))
+    .map(([id, name]) => ({ id, name }))
+}
+
+// open a workspace's (or a project's) folder in an app; 'editor' is the one in Settings
+export async function openIn(o: { ws?: string; project?: string; app: string }) {
   const path = o.ws ? findWs(o.ws).path : findProject(o.project ?? '').path
   const s = state.settings ?? {}
+  const app = o.app === 'editor' ? s.editor || 'cursor' : o.app
   const fail = (e: any) => {
     throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
   }
-  if (o.app === 'finder') return void (await run('open', [path]).catch(fail))
-  if (s.editor === 'custom') {
+  if (app === 'custom') {
     if (!s.editorCmd?.trim()) throw new Error('set the editor command in Settings (⌘,)')
     return void (await run(shell, ['-lc', `${s.editorCmd} "$1"`, 'editor', path], { timeout: 20000 }).catch(fail))
   }
-  await run('open', ['-a', EDITORS[s.editor ?? 'cursor'] ?? 'Cursor', path]).catch(fail)
+  if (!APPS[app]) throw new Error(`no app ${app}`)
+  await run('open', app === 'finder' ? [path] : ['-a', APPS[app], path]).catch(fail)
 }
 
 export function closeTab(id: string) {
@@ -466,7 +533,8 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     writeFileSync(setupMarker(ws), String(Date.now()))
     addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
   }
-  if (o.preset !== 'none') addTab(ws.id, { preset: o.preset || 'claude', cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf })
+  const preset = o.preset || state.settings?.agent || 'claude'
+  if (preset !== 'none') addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf })
   changed()
   return ws
 }
@@ -541,7 +609,7 @@ export async function wsRestore(ref: string) {
 export async function wsFork(ref: string) {
   const src = findWs(ref)
   const agent = tabsOf(src.id).find(t => t.preset === 'claude' && t.resumeId)
-  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? 'claude' : 'shell', forkOf: agent?.resumeId })
+  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (agent.profile ?? 'claude') : 'shell', forkOf: agent?.resumeId })
 }
 
 // restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat.
@@ -577,7 +645,7 @@ export function hook(p: { tab: string; state: string; payload?: any }) {
       return changed()
     case 'running':
       r.status = 'running'
-      r.limit = undefined
+      r.limit = r.escAt = undefined
       break
     case 'waiting':
       r.status = 'waiting'
@@ -686,6 +754,24 @@ export function input(id: string, data: string) {
     rtOf(id).status = 'running' // ponytail: Enter in an idle codex starts a turn; its notify ends it
     changed()
   }
+  if (tab && hasHooks(tab) && (data === '\x1b' || data === '\x03')) interrupted(tab.id, s)
+}
+
+// Esc or ⌃C stops a turn, and no hook says so: idle once the screen shows "Interrupted" (claude's
+// "Interrupted · What should Claude do instead?", codex's "Conversation interrupted").
+// ponytail: matched by message, like CHAT_GONE.
+function interrupted(id: string, s: Session) {
+  const r = rtOf(id)
+  if (r.status !== 'running' && r.status !== 'waiting') return
+  const at = (r.escAt = Date.now())
+  for (const ms of [300, 1000, 2500])
+    setTimeout(() => {
+      if (r.escAt !== at || (r.status !== 'running' && r.status !== 'waiting')) return // a new turn since
+      if (!/interrupted/i.test(s.screenText(6))) return
+      r.status = 'idle'
+      r.escAt = undefined
+      changed()
+    }, ms)
 }
 
 export function resize(id: string, cols: number, rows: number) {

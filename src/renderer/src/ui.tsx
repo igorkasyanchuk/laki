@@ -1,5 +1,6 @@
-// Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus.
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+// Small shared UI: line icons (16px, currentColor), icon buttons, tooltips, popup and context menus,
+// rows dragged into a new order.
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 
 const paths = {
   plus: 'M8 3v10M3 8h10',
@@ -23,7 +24,7 @@ const paths = {
   link: 'M9.5 2.5h4v4M13.5 2.5L7.5 8.5M11.5 9.5v4h-9v-9h4',
   sidebar: 'M2.5 3h11v10h-11zM6.5 3v10',
   code: 'M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5',
-  gear: 'M8 10a2 2 0 100-4 2 2 0 000 4zM8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4',
+  gear: 'M12.92 7.13L14.65 7.18 14.65 8.82 12.92 8.87 12.1 10.87 13.28 12.12 12.12 13.28 10.87 12.1 8.87 12.92 8.82 14.65 7.18 14.65 7.13 12.92 5.13 12.1 3.88 13.28 2.72 12.12 3.9 10.87 3.08 8.87 1.35 8.82 1.35 7.18 3.08 7.13 3.9 5.13 2.72 3.88 3.88 2.72 5.13 3.9 7.13 3.08 7.18 1.35 8.82 1.35 8.87 3.08 10.87 3.9 12.12 2.72 13.28 3.88 12.1 5.13zM10.2 8a2.2 2.2 0 11-4.4 0 2.2 2.2 0 014.4 0z',
   pencil: 'M10.5 2.5l3 3L6 13H3v-3z',
   unsplit: 'M2.5 2.5h4.5v11H2.5zM9 2.5h4.5v11H9z',
   pr: 'M5.8 3a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM5.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM12.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM4.5 4.3v7.4M11.5 11.7V7.5a2 2 0 00-2-2H7M8.5 4L7 5.5 8.5 7',
@@ -49,6 +50,51 @@ export function IconButton({ icon, title, onClick, on, className = '' }: { icon:
 // tab colors, by name: CSS --tc-<name> in each app's theme
 export const TAB_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink']
 export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(--tc-${c})` } as CSSProperties) : undefined)
+
+// a row dropped before or after another of its kind (and group: workspaces stay in their project)
+export type RowDrop = { kind: string; id: string; target: string; after: boolean }
+
+// rows ([data-row="<kind>:<id>"], optional data-group) dragged into a new order; `over` is where the
+// pointer would drop, for an insertion line
+export function useRowDrag(onDrop: (d: RowDrop) => void) {
+  const [over, setOver] = useState<RowDrop | null>(null)
+  const done = useRef(onDrop)
+  done.current = onDrop
+  const start = (e: PE, kind: string, id: string, group = '') => {
+    if (e.button !== 0) return
+    const y0 = e.clientY
+    let cur: RowDrop | null = null
+    let moved = false
+    const move = (ev: PointerEvent) => {
+      if (!moved && Math.abs(ev.clientY - y0) < 5) return
+      moved = true
+      document.getSelection()?.removeAllRanges()
+      const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>(`[data-row^="${kind}:"]`)
+      const target = el && (el.dataset.group ?? '') === group ? el.dataset.row!.slice(kind.length + 1) : ''
+      const r = el?.getBoundingClientRect()
+      cur = target && target !== id && r ? { kind, id, target, after: ev.clientY > r.top + r.height / 2 } : null
+      setOver(cur)
+    }
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      setOver(null)
+      if (cur) done.current(cur)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+  }
+  // the class a row gets while something would drop next to it
+  const at = (kind: string, id: string) => (over?.kind === kind && over.target === id ? (over.after ? 'drop-after' : 'drop-before') : '')
+  return { start, at }
+}
+
+// ids with d.id moved next to d.target
+export const moveId = (ids: string[], d: RowDrop) => {
+  const rest = ids.filter(x => x !== d.id)
+  rest.splice(rest.indexOf(d.target) + (d.after ? 1 : 0), 0, d.id)
+  return rest
+}
 
 // null is a separator, { head } a section title, { colors } a row of swatches
 export type MenuItem =

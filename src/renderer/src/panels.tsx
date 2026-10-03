@@ -1,7 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import type { Project, ProjectConfig, Settings, View } from '../../shared/types'
+import type { Project, ProjectConfig, View } from '../../shared/types'
 import { api } from './api'
 import { Glyph } from './Glyph'
+import { EnvField } from './Settings'
 import { Icon, type IconName } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -95,7 +96,7 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
         <label>
           Agent
           <div className="seg">
-            {['claude', 'codex', 'shell', 'custom', 'none'].map(x => (
+            {[...view.presets.map(x => x.name), 'shell', 'custom', 'none'].map(x => (
               <button type="button" key={x} className={p.preset === x ? 'on' : ''} onClick={() => set({ preset: x })}>
                 {x}
               </button>
@@ -108,7 +109,7 @@ export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view
             <input value={p.cmd ?? ''} placeholder="aider --model …" onChange={e => set({ cmd: e.target.value })} autoFocus />
           </label>
         )}
-        {(p.preset === 'claude' || p.preset === 'codex') && (
+        {view.presets.some(x => x.name === p.preset && x.agent !== 'command') && (
           <label>
             <span>
               Prompt <span className="muted">(optional)</span>
@@ -174,7 +175,7 @@ export function ProjectSettings({ project, onClose, onSave }: { project: Project
   const [file, setFile] = useState<ProjectConfig>({})
   const [busy, setBusy] = useState(false)
   useEffect(() => void api.call<ProjectConfig>('projectFile', { id: project.id }).then(setFile, () => {}), [project.id])
-  const field = (k: keyof ProjectConfig, title: string, hint: string) => (
+  const field = (k: 'setup' | 'run' | 'teardown', title: string, hint: string) => (
     <label>
       <span>
         {title} <span className="muted">· {hint}</span>
@@ -202,6 +203,12 @@ export function ProjectSettings({ project, onClose, onSave }: { project: Project
         {project.git !== false && field('setup', 'Setup', 'runs in each new worktree, e.g. npm install')}
         {field('run', 'Run', 'the dev server, e.g. npm run dev -- --port $PORT')}
         {field('teardown', 'Teardown', 'runs when a workspace is deleted or archived')}
+        <label>
+          <span>
+            Env <span className="muted">· for every tab, setup and teardown{file.env && Object.keys(file.env).length ? ` · .wb.json has ${Object.keys(file.env).join(', ')}` : ''}</span>
+          </span>
+          <EnvField value={c.env} onChange={env => setC(x => ({ ...x, env }))} />
+        </label>
         <div className="buttons">
           <span className="muted small">Empty: the repo's .wb.json</span>
           <span className="spacer" />
@@ -209,86 +216,6 @@ export function ProjectSettings({ project, onClose, onSave }: { project: Project
             Cancel
           </button>
           <button type="submit" className="primary" disabled={busy || !name.trim()}>
-            Save
-          </button>
-        </div>
-      </form>
-    </Modal>
-  )
-}
-
-export const EDITORS: [string, string][] = [
-  ['cursor', 'Cursor'],
-  ['zed', 'Zed'],
-  ['vscode', 'VS Code'],
-  ['windsurf', 'Windsurf'],
-  ['sublime', 'Sublime Text'],
-  ['custom', 'Custom command'],
-]
-
-// the app's settings (⌘,), kept by the daemon
-export function AppSettings({ settings, onClose, onSave }: { settings: Settings; onClose: () => void; onSave: (s: Settings) => Promise<void> }) {
-  const [s, setS] = useState<Settings>({ editor: 'cursor', agent: 'claude', branchPrefix: 'wb/', fontSize: 13, notify: true, ...settings })
-  const [busy, setBusy] = useState(false)
-  const set = (k: Partial<Settings>) => setS(x => ({ ...x, ...k }))
-  return (
-    <Modal title="Settings" onClose={onClose}>
-      <form
-        className="form"
-        onSubmit={async e => {
-          e.preventDefault()
-          setBusy(true)
-          await onSave(s).catch(() => setBusy(false))
-        }}
-      >
-        <label>
-          Editor
-          <select value={s.editor} onChange={e => set({ editor: e.target.value })}>
-            {EDITORS.map(([k, name]) => (
-              <option key={k} value={k}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {s.editor === 'custom' && (
-          <label>
-            <span>
-              Command <span className="muted">· gets the folder as $1</span>
-            </span>
-            <input className="mono" value={s.editorCmd ?? ''} placeholder='idea "$1"' autoFocus onChange={e => set({ editorCmd: e.target.value })} />
-          </label>
-        )}
-        <label>
-          New workspaces start
-          <div className="seg">
-            {['claude', 'codex', 'shell', 'none'].map(x => (
-              <button type="button" key={x} className={s.agent === x ? 'on' : ''} onClick={() => set({ agent: x })}>
-                {x}
-              </button>
-            ))}
-          </div>
-        </label>
-        <label>
-          <span>
-            Branch prefix <span className="muted">· new worktrees' branches</span>
-          </span>
-          <input className="mono" value={s.branchPrefix ?? ''} placeholder="wb/" onChange={e => set({ branchPrefix: e.target.value })} />
-        </label>
-        <label>
-          Terminal font size
-          <input type="number" min={9} max={24} value={s.fontSize} onChange={e => set({ fontSize: Number(e.target.value) || 13 })} />
-        </label>
-        <label className="check">
-          <input type="checkbox" checked={s.notify !== false} onChange={e => set({ notify: e.target.checked })} />
-          Notify when an agent off screen waits or finishes
-        </label>
-        <div className="buttons">
-          <span className="spacer" />
-          <button type="button" onClick={onClose}>
-            Cancel
-          </button>
-          <button type="submit" className="primary" disabled={busy}>
             Save
           </button>
         </div>

@@ -58,10 +58,12 @@ npm link
   - its archived workspaces, which you click to restore.
 - Drag the sidebar's right edge to resize it; double-click the edge to reset. ⌘B (or the sidebar icon) hides
   and shows it.
-- ⋯ also has *Open in editor* and *Reveal in Finder*.
+- ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
+- Right click a workspace for a color, *Open in*, fork, archive and delete.
+- Drag projects, and workspaces within a project, to reorder them.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
-- ＋ in the tab bar opens a new tab: shell (⌘T), claude, codex or a command.
+- ＋ in the tab bar opens a new tab: shell (⌘T), one of your agent presets (claude, codex, …) or a command.
 - Splitting:
   - Drag a tab onto a pane's edge: it moves into that tab, on that side.
   - *Split right* / *Split down* (⋯ menu or ⌘K) open a new shell next to the active pane.
@@ -79,9 +81,10 @@ npm link
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
-- editor (⌘E): opens the workspace in your editor (Settings);
+- editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Sublime Text, JetBrains IDEs, Xcode, Finder,
+  Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
 - diff (⌘D): changes against the base branch, including uncommitted and new files;
-- run: the project's dev command, in a *dev* tab;
+- run: the project's dev command, in a *dev* tab (shown when the project has one);
 - ship: commit, push and open a PR, in a *ship* tab;
 - search: the command palette (⌘K);
 - ⋯: split right/down, fork, archive, delete.
@@ -121,18 +124,22 @@ notification; click it to jump there. Follow-ups queued with `wbs send --when-id
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
 | ⌘, | settings |
+| ⌘+ / ⌘− / ⌘0 | terminal font bigger / smaller / default |
 
 ## Settings
 
-⌘, or the gear at the top of the sidebar:
-- *Editor* for ⌘E: Cursor, Zed, VS Code, Windsurf, Sublime Text, or a custom command that gets the folder as
-  `$1` (e.g. `idea "$1"`).
-- The agent new workspaces start with.
-- *Branch prefix* for new worktrees (default `wb/`).
-- Terminal font size.
-- Notifications on or off.
+⌘, or the gear at the top of the sidebar opens the settings page. Changes save as you make them, into
+`state.json`.
+- *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `wb/`),
+  notifications.
+- *Terminal*: font, font size (also ⌘+ / ⌘− / ⌘0), copy selected text to the clipboard (on by default).
+- *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
+- *Agent presets*: how agents start. A preset is Claude Code or Codex with extra arguments (e.g.
+  `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each one is in
+  the new-tab menu and the new-workspace dialog. Edit `claude` and `codex` to change how every new one
+  starts; a tab started from a preset uses its current settings when it restarts or resumes.
 
-They are kept in `state.json`.
+Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle.
 
 ## Project settings
 
@@ -141,13 +148,16 @@ They are kept in `state.json`.
 - *Setup*: runs in each new worktree, e.g. `npm install`; agent and dev tabs wait for it.
 - *Run*: the dev server, e.g. `npm run dev -- --port $PORT`.
 - *Teardown*: runs when a workspace is deleted or archived.
+- *Env*: `KEY=value` lines for every tab of the project's workspaces, and its setup and teardown.
 
 These are saved in the app. A field left empty falls back to a `.wb.json` in the repo, which a team can
 commit. The dialog shows that file's values as placeholders:
 
 ```json
-{ "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT" }
+{ "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT", "env": { "NODE_ENV": "development" } }
 ```
+
+Env from the app and from `.wb.json` merge, key by key (the app's wins), then a preset's env goes on top.
 
 Every workspace gets its own `$PORT` (3100, 3110, …).
 

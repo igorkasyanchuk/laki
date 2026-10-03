@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { Project, TabView, View, WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
-import { AddProject, AppSettings, DiffPanel, EDITORS, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
+import { AddProject, DiffPanel, NewWorkspace, Palette, type PaletteItem, ProjectSettings, Prompt } from './panels'
+import { type AppInfo, FONT_SIZE, SettingsPage } from './Settings'
 import { Glyph } from './Glyph'
 import { Term } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { colorVar, IconButton, type IconName, type MenuItem, TAB_COLORS, Tips, useMenu } from './ui'
+import { colorVar, IconButton, type IconName, type MenuItem, moveId, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
 type Dialog = null | 'new' | 'project' | 'palette' | 'ship' | 'custom' | 'settings' | { settings: string } | { rename: string }
 
@@ -26,6 +27,10 @@ function rollup(tabs: TabView[]) {
 
 // a tab's color: its own, else claude's or codex's ('none' turns that off)
 const colorOf = (t?: TabView) => t?.color ?? (t?.preset === 'claude' ? 'orange' : t?.preset === 'codex' ? 'teal' : undefined)
+
+// where a folder opens: editors (one of them is ⌘E's), Finder, terminals
+const EDITOR_IDS = ['cursor', 'zed', 'vscode', 'windsurf', 'sublime', 'webstorm', 'intellij', 'xcode', 'custom']
+const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_IDS.includes(id) ? 'code' : 'terminal')
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
 const SIDE = 240 // the sidebar's default width
@@ -53,6 +58,7 @@ export function App() {
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [error, setError] = useState('')
   const [menu, openMenu] = useMenu()
+  const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
   const mru = useRef<string[]>([]) // sessions, most recently focused first: which pane a tab focuses
@@ -95,7 +101,10 @@ export function App() {
   useEffect(() => {
     const off = api.on(m => {
       if (m.ev === 'state') setView(m.view)
-      else if (m.ev === 'open') setConnected(true)
+      else if (m.ev === 'open') {
+        setConnected(true)
+        api.call<AppInfo[]>('apps').then(setApps, () => {})
+      }
       else if (m.ev === 'close') setConnected(false)
       else if (m.ev === 'turn') {
         const t = viewRef.current?.tabs.find(t => t.id === m.tab)
@@ -193,10 +202,51 @@ export function App() {
   }
 
   const run = async () => ws && selectTab(await call<TabView>('run', { ws: ws.id }))
-  const editor = view?.settings.editor ?? 'cursor'
-  const editorName = (editor !== 'custom' && EDITORS.find(e => e[0] === editor)?.[1]) || 'editor'
-  const openIn = (app: 'editor' | 'finder', where: { ws?: string; project?: string } = { ws: ws?.id }) => call('openIn', { ...where, app }).catch(() => {})
+  const settings = view?.settings ?? {}
+  const editor = settings.editor || 'cursor'
+  const targets: AppInfo[] = [...apps, ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
+  const editorName = targets.find(a => a.id === editor && a.id !== 'custom')?.name ?? 'editor'
+  const openIn = (app: string, where: { ws?: string; project?: string } = { ws: ws?.id }) => {
+    call('openIn', { ...where, app }).catch(() => {})
+    // an editor picked from the list is ⌘E's from now on
+    if (EDITOR_IDS.includes(app) && app !== editor) call('settingsSet', { editor: app }).catch(() => {})
+  }
+  // Open in: every app, ⌘E's first
+  const openInItems = (where: { ws?: string; project?: string } = { ws: ws?.id }): MenuItem[] =>
+    [...targets]
+      .sort((a, b) => Number(b.id === editor) - Number(a.id === editor))
+      .map(a => ({ label: a.name, icon: appIcon(a.id), hint: a.id === editor ? '⌘E' : undefined, run: () => openIn(a.id, where) }))
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)
+  const fontSize = settings.fontSize ?? FONT_SIZE
+  const zoomed = useRef(fontSize) // the size asked for last: quick presses add up before the view comes back
+  const zoom = (d: number) => {
+    zoomed.current = d ? Math.min(32, Math.max(8, zoomed.current + d)) : FONT_SIZE
+    call('settingsSet', { fontSize: zoomed.current }).catch(() => {})
+  }
+  useEffect(() => void (zoomed.current = fontSize), [fontSize])
+
+  // the sidebar's order: projects, and workspaces within their project, dragged
+  const rows = useRowDrag(d =>
+    d.kind === 'project'
+      ? call('reorder', { projects: moveId(view!.projects.map(p => p.id), d) })
+      : call('reorder', { workspaces: moveId(live.filter(w => w.project === live.find(x => x.id === d.id)?.project).map(w => w.id), d) }),
+  )
+
+  // right click on a workspace in the sidebar
+  const wsMenu = (w: WorkspaceView): MenuItem[] => [
+    { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
+    null,
+    { head: 'Open in' },
+    ...openInItems({ ws: w.id }),
+    null,
+    ...(w.kind === 'worktree'
+      ? [
+          { label: 'Fork workspace', icon: 'fork', run: () => call<WorkspaceView>('wsFork', { id: w.id }).then(x => setWsId(x.id)) } as MenuItem,
+          { label: 'Archive workspace', icon: 'archive', run: () => rmWs(w, true) } as MenuItem,
+        ]
+      : []),
+    { label: 'Delete workspace', icon: 'trash', danger: true, run: () => rmWs(w, false) },
+  ]
 
   // right click on a tab (or a pane header: one session)
   const tabMenu = (ids: string[]): MenuItem[] => {
@@ -246,8 +296,12 @@ export function App() {
     const act: Record<string, () => void> = {
       n: () => newWs(ws?.project),
       b: () => setSideOpen(o => !o),
-      ',': () => setDialog('settings'),
-      e: () => ws && openIn('editor'),
+      ',': () => setDialog(d => (d === 'settings' ? null : 'settings')),
+      e: () => ws && openIn(editor),
+      '=': () => zoom(1),
+      '+': () => zoom(1),
+      '-': () => zoom(-1),
+      '0': () => zoom(0),
       o: openProject,
       f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
       t: () => newTab('shell'),
@@ -258,7 +312,7 @@ export function App() {
       arrowdown: () => moveWs(1),
     }
     if (/^[1-9]$/.test(k)) act[k] = () => groups[Number(k) - 1] && selectGroup(groups[Number(k) - 1])
-    if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown')) return
+    if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown' && k !== '+')) return
     e.preventDefault()
     e.stopPropagation()
     act[k]()
@@ -273,8 +327,7 @@ export function App() {
   type Action = { label: string; icon: IconName; hint?: string; danger?: boolean; run: () => void }
   const newTabActions: Action[] = [
     { label: 'Shell', icon: 'terminal', hint: '⌘T', run: () => newTab('shell') },
-    { label: 'Claude', icon: 'agent', run: () => newTab('claude') },
-    { label: 'Codex', icon: 'agent', run: () => newTab('codex') },
+    ...(view?.presets ?? []).map(p => ({ label: p.name, icon: 'agent', run: () => newTab(p.name) }) as Action),
     { label: 'Command…', icon: 'terminal', run: () => setDialog('custom') },
   ]
   const wsActions: Action[] = !ws
@@ -291,9 +344,10 @@ export function App() {
     return [
       { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
-      { label: `Open in ${editorName}`, icon: 'code', run: () => openIn('editor', { project: p.id }) },
-      { label: 'Reveal in Finder', icon: 'folder', run: () => openIn('finder', { project: p.id }) },
       { label: 'Remove project', icon: 'trash', danger: true, run: () => confirm(`Remove project ${p.name}? Its files stay.`) && call('projectRm', { id: p.id }) },
+      null,
+      { head: 'Open in' },
+      ...openInItems({ project: p.id }),
       ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: w.id, icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
     ]
   }
@@ -312,11 +366,10 @@ export function App() {
     a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: '⌘B', run: () => setSideOpen(o => !o) })
     if (ws) {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
-      a({ label: `Open in ${editorName}`, icon: 'code', hint: '⌘E', run: () => openIn('editor') })
-      a({ label: 'Reveal in Finder', icon: 'folder', run: () => openIn('finder') })
+      for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
       a({ label: `Open localhost:${ws.port} ($PORT)`, icon: 'link', run: () => openPort(ws.port) })
       if (git) a({ label: 'Diff', icon: 'diff', hint: '⌘D', run: () => setDiff(true) })
-      a({ label: 'Run dev server', icon: 'run', run })
+      if (ws.run) a({ label: 'Run dev server', icon: 'run', run })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
       if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: '⌘W', run: () => closeTabs([tab]) })
@@ -326,7 +379,7 @@ export function App() {
     }
     for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${w.id}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
-  }, [view, live, ws, tab, group, sideOpen])
+  }, [view, live, ws, tab, group, sideOpen, apps])
 
   if (!view)
     return (
@@ -356,12 +409,18 @@ export function App() {
           <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
           <span className="spacer" />
           <IconButton icon="folderPlus" title="Open a project folder (⌘O), or drop one on the window" onClick={openProject} />
-          <IconButton icon="gear" title="Settings (⌘,)" onClick={() => setDialog('settings')} />
+          <IconButton icon="gear" title="Settings (⌘,)" on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
         <div className="side-scroll">
           {view.projects.map(p => (
             <div key={p.id} className="project">
-              <div className="project-head" title={p.path}>
+              <div
+                className={`project-head ${rows.at('project', p.id)}`}
+                title={p.path}
+                data-row={`project:${p.id}`}
+                onPointerDown={e => rows.start(e, 'project', p.id)}
+                onContextMenu={e => openMenu(e, projectActions(p))}
+              >
                 <span className="project-name">{p.name}</span>
                 <span className="spacer" />
                 <IconButton icon="plus" title="New workspace" onClick={() => newWs(p.id)} />
@@ -373,7 +432,17 @@ export function App() {
                   const wt = view.tabs.filter(t => t.workspace === w.id)
                   const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
                   return (
-                    <div key={w.id} className={`ws ${w.id === ws?.id ? 'sel' : ''}`} onClick={() => setWsId(w.id)} title={`${w.branch || w.path} · $PORT ${w.port}`}>
+                    <div
+                      key={w.id}
+                      className={`ws ${w.id === ws?.id ? 'sel' : ''} ${rows.at('ws', w.id)}`}
+                      style={colorVar(w.color)}
+                      data-row={`ws:${w.id}`}
+                      data-group={p.id}
+                      onPointerDown={e => rows.start(e, 'ws', w.id, p.id)}
+                      onClick={() => setWsId(w.id)}
+                      onContextMenu={e => openMenu(e, wsMenu(w))}
+                      title={`${w.branch || w.path} · $PORT ${w.port}`}
+                    >
                       <Glyph s={w.setup ? 'running' : rollup(wt)} />
                       <span className="ws-name">{w.id}</span>
                       {queued > 0 && <span className="badge">+{queued}</span>}
@@ -420,9 +489,9 @@ export function App() {
           <span className="spacer" />
           {ws && (
             <div className="actions nodrag">
-              <IconButton icon="code" title={`Open in ${editorName} (⌘E)`} onClick={() => openIn('editor')} />
+              <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
               {git && <IconButton icon="diff" title="Diff (⌘D)" on={diff} onClick={() => setDiff(d => !d)} />}
-              <IconButton icon="run" title="Run the dev server (project settings: Run)" onClick={run} />
+              {ws.run && <IconButton icon="run" title="Run the dev server" onClick={run} />}
               {ws.kind === 'worktree' && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
               <IconButton icon="search" title="Commands (⌘K)" onClick={() => setDialog('palette')} />
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
@@ -440,7 +509,16 @@ export function App() {
                 color={id => colorOf(byId(id))}
                 onMenu={(e, id) => openMenu(e, tabMenu([id]))}
                 ghost={drag && (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null).map(id => byId(id)?.name).join(' · ') : label(drag.tab))}
-                render={id => <Term tab={id} active={id === tab?.id && !dialog} findSeq={finds[id] ?? 0} fontSize={view.settings.fontSize ?? 13} />}
+                render={id => (
+                  <Term
+                    tab={id}
+                    active={id === tab?.id && !dialog}
+                    findSeq={finds[id] ?? 0}
+                    fontSize={fontSize}
+                    fontFamily={settings.fontFamily}
+                    copyOnSelect={settings.copyOnSelect !== false}
+                  />
+                )}
                 onFocus={id => id !== tab?.id && selectTab(id)}
                 onClose={id => byId(id) && closeTabs([byId(id)!])}
                 onResize={(path, at) => setGroups(groups.map(g => (g === group ? resize(g, path, at) : g)))}
@@ -470,6 +548,9 @@ export function App() {
           </div>
           {diff && ws && git && <DiffPanel ws={ws.id} onClose={() => setDiff(false)} />}
         </div>
+        {dialog === 'settings' && (
+          <SettingsPage settings={view.settings} apps={apps} onClose={() => setDialog(null)} onSave={s => call('settingsSet', s).catch(() => {})} />
+        )}
         <div className="status">
           {ws && (
             <>
@@ -514,7 +595,7 @@ export function App() {
         <NewWorkspace
           view={view}
           project={newFor ?? ws?.project}
-          agent={view.settings.agent}
+          agent={settings.agent}
           onClose={() => {
             setDialog(null)
             setNewFor(undefined)
@@ -558,16 +639,6 @@ export function App() {
           onSubmit={async cmd => {
             setDialog(null)
             await newTab('custom', cmd)
-          }}
-        />
-      )}
-      {dialog === 'settings' && (
-        <AppSettings
-          settings={view.settings}
-          onClose={() => setDialog(null)}
-          onSave={async s => {
-            await call('settingsSet', s)
-            setDialog(null)
           }}
         />
       )}

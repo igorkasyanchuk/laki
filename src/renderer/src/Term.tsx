@@ -9,6 +9,7 @@ import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
 import { api, openExternal } from './api'
 import { FindBar } from './Find'
+import { FONT_SIZE, fontStack } from './Settings'
 
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
 
@@ -23,14 +24,30 @@ function theme() {
   }
 }
 
-export function Term({ tab, active = true, findSeq = 0, fontSize = 13 }: { tab: string; active?: boolean; findSeq?: number; fontSize?: number }) {
+export function Term({
+  tab,
+  active = true,
+  findSeq = 0,
+  fontSize = FONT_SIZE,
+  fontFamily,
+  copyOnSelect = true,
+}: {
+  tab: string
+  active?: boolean
+  findSeq?: number
+  fontSize?: number
+  fontFamily?: string
+  copyOnSelect?: boolean
+}) {
+  const copy = useRef(copyOnSelect)
+  copy.current = copyOnSelect
   const box = useRef<HTMLDivElement>(null)
   const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon; fit: FitAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
   const find = findSeq !== closedAt
   useEffect(() => {
     const term = new Terminal({
-      fontFamily: '"SF Mono", Menlo, Monaco, monospace',
+      fontFamily: fontStack(fontFamily),
       fontSize,
       lineHeight: 1.15,
       scrollback: 5000,
@@ -88,6 +105,11 @@ export function Term({ tab, active = true, findSeq = 0, fontSize = 13 }: { tab: 
     term.onData(d => api.send('input', { tab, data: d }))
     term.onBinary(d => api.send('input', { tab, data: d }))
     term.onResize(({ cols, rows }) => api.send('resize', { tab, cols, rows }))
+    // a selection goes to the clipboard as you make it (Settings: Copy selected text)
+    term.onSelectionChange(() => {
+      const text = term.getSelection()
+      if (copy.current && text) navigator.clipboard.writeText(text).catch(() => {})
+    })
     let raf = 0
     const ro = new ResizeObserver(() => {
       cancelAnimationFrame(raf)
@@ -110,10 +132,13 @@ export function Term({ tab, active = true, findSeq = 0, fontSize = 13 }: { tab: 
     if (active) xt?.term.focus()
   }, [active, xt])
   useEffect(() => {
-    if (!xt || xt.term.options.fontSize === fontSize) return
+    if (!xt) return
+    const family = fontStack(fontFamily)
+    if (xt.term.options.fontSize === fontSize && xt.term.options.fontFamily === family) return
     xt.term.options.fontSize = fontSize
+    xt.term.options.fontFamily = family
     xt.fit.fit()
-  }, [fontSize, xt])
+  }, [fontSize, fontFamily, xt])
   return (
     <>
       <div className="term" ref={box} />
