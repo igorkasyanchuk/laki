@@ -497,3 +497,15 @@ test('PR: failing CI and new review comments go to the agent once; global env; i
   await sleep(7000)
   assert.equal((await rig.tab(ws.id)).status, 'running')
 })
+
+test('an unknown preset or a custom one without a command is refused before a worktree is made', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'c', preset: 'aider' }), /unknown preset aider/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'c', preset: 'custom' }), /command missing/)
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await assert.rejects(rig.rpc('tabNew', { ws: ws.id, preset: 'aider' }), /unknown preset aider/)
+  const v = await rig.rpc('state')
+  assert.deepEqual([v.workspaces.length, v.tabs.length], [1, 0])
+  assert.equal(execFileSync('git', ['branch', '--list', 'laki/c'], { cwd: rig.repo, encoding: 'utf8' }), '')
+})

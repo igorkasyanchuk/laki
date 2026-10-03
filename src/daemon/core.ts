@@ -395,8 +395,16 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
 // ponytail: matched by message; a reworded message means Enter retries the dead id.
 const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|(conversation|session|thread)\b[^\n]*not found/i
 
+// why addTab would refuse an agent: checked before wsNew makes a worktree for it
+function presetCheck(preset?: string, cmd?: string) {
+  if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
+  if (preset && !['claude', 'codex', 'shell', 'custom'].includes(preset) && !presetNamed(preset))
+    throw new Error(`unknown preset ${preset} (see Settings: Agent presets)`)
+}
+
 export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string }): Tab {
   const ws = findWs(wsRef)
+  if (!o.kind) presetCheck(o.preset, o.cmd)
   const pr = o.kind ? undefined : presetNamed(o.preset)
   if (pr?.agent === 'command') o = { ...o, cmd: pr.cmd || 'true' }
   const preset = pr ? (pr.agent === 'command' ? 'custom' : pr.agent) : o.preset || (o.cmd ? 'custom' : 'shell')
@@ -536,6 +544,8 @@ export type NewWs = { project: string; base?: string; preset?: string; cmd?: str
 
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const proj = findProject(o.project)
+  const preset = o.preset || state.settings?.agent || 'claude'
+  if (preset !== 'none') presetCheck(preset, o.cmd)
   const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
   let ws: Workspace
   if (o.local || proj.git === false) {
@@ -561,9 +571,11 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     writeFileSync(setupMarker(ws), String(Date.now()))
     addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
   }
-  const preset = o.preset || state.settings?.agent || 'claude'
-  if (preset !== 'none') addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf })
-  changed()
+  try {
+    if (preset !== 'none') addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf })
+  } finally {
+    changed() // the workspace is made, even when its agent didn't start
+  }
   return ws
 }
 
