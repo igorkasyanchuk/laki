@@ -1,7 +1,7 @@
-// Test rig: a temp LAKI_ELECTRON_HOME (and HOME), fake claude/codex/gh first on PATH, a test $SHELL without
+// Test rig: a temp LAKI_ELECTRON_HOME (and HOME), fake claude/codex/gh/open first on PATH, a test $SHELL without
 // profiles, a temp git repo, and a daemon started from source. Nothing touches real data or the network.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -12,6 +12,16 @@ const fakes = join(root, 'test/fakes')
 const node = [process.execPath, '--experimental-strip-types', '--no-warnings']
 
 export const sleep = (ms: number) => new Promise(r => setTimeout(r, ms))
+
+// whether a process exists (signal 0 only checks)
+export function running(pid: number) {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
 
 export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms = 8000): Promise<T> {
   const end = Date.now() + ms
@@ -77,7 +87,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       d.kill('SIGTERM')
       await gone
     },
-    info: () => JSON.parse(readFileSync(join(env.LAKI_ELECTRON_HOME, 'daemon.json'), 'utf8')) as { port: number; token: string },
+    info: () => JSON.parse(readFileSync(join(env.LAKI_ELECTRON_HOME, 'daemon.json'), 'utf8')) as { port: number; token: string; pid: number },
     async rpc(method: string, params: object = {}): Promise<any> {
       const { port, token } = rig.info()
       const res = await fetch(`http://127.0.0.1:${port}/rpc`, {
@@ -114,6 +124,11 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
   }
   t.after(async () => {
     await rig.stop()
+    // a daemon the CLI started in this home (autostart): shut down through its own daemon.json
+    if (existsSync(join(env.LAKI_ELECTRON_HOME, 'daemon.json'))) {
+      const { pid } = rig.info()
+      if (await rig.rpc('shutdown').then(() => true, () => false)) await until(() => !running(pid), 'autostarted daemon gone').catch(() => {})
+    }
     rmSync(home, { recursive: true, force: true })
   })
   await rig.start()

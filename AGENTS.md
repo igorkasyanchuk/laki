@@ -17,8 +17,8 @@ npm run dev                       # Electron + renderer dev server on :5199
 
 - **Tests** are `node --test` with type stripping (`test/*.test.ts`), no framework.
   - `test/helpers.ts` `fresh()` gives each test a temp `LAKI_ELECTRON_HOME` and `HOME`, its own daemon, and the
-    fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, a shell `tsh`, and `da-probe` (counts
-    terminal query replies). No network.
+    fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), a shell `tsh`, and
+    `da-probe` (counts terminal query replies). No network.
   - Never let a test touch the real `~/.laki-electron`, `~/.claude` or `~/.codex`.
 - **Trying the UI in a browser**:
   1. `npm run demo -- /tmp/laki-electron-x` builds a temp world (a repo, 3 workspaces, fake agents) and a daemon
@@ -218,7 +218,7 @@ they work).
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/cli/main.ts` | the `laki-electron` CLI and `laki-electron hook` |
 | `bin/laki-electron.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
-| `test/` | `daemon`, `cli`, `e2e`, `snapshot`, `limits`, `layout` tests; `helpers.ts`; `fakes/` |
+| `test/` | `daemon`, `api` (errors, edge cases, daemon start), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout` tests; `helpers.ts`; `fakes/` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh` |
 
 ## Conventions

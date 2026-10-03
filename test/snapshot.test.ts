@@ -93,3 +93,38 @@ test('queries are answered once: by the headless terminal only while no client i
   assert.equal(s.responder, null)
   await ask(/got:/g, 3) // detached: the headless terminal answers again
 })
+
+test('snapshot: pixel mouse reports and every cursor style come back', async t => {
+  const s = new Session('m', '/bin/sh', ['-c', 'sleep 30'], { cwd: '/tmp', env: process.env as any })
+  t.after(() => s.kill())
+  assert.deepEqual([s.term.cols, s.term.rows], [120, 32]) // the default size
+  s.term.write('\x1b[?1000h\x1b[?1016h')
+  await s.flushed()
+  assert.equal(state(await replay(s)).encoding, 'SGR_PIXELS')
+  for (const seq of ['\x1b[2 q', '\x1b[3 q', '\x1b[4 q', '\x1b[6 q']) {
+    s.term.write(seq)
+    await s.flushed()
+    assert.deepEqual(state(await replay(s)).style, state(s.term).style, JSON.stringify(seq))
+  }
+})
+
+test('attach: a newer attach of the same client wins; attached clients hear the exit, a signal as 128+n', async t => {
+  const s = new Session('a', '/bin/sh', ['-c', 'sleep 30'], { cwd: '/tmp', env: process.env as any })
+  t.after(() => s.kill())
+  const sent: any[] = []
+  const c = { id: 1, send: (m: any) => sent.push(m) }
+  const replies: any[] = []
+  s.attach(c, undefined, undefined, r => replies.push(r))
+  s.attach(c, 80, 24, r => replies.push(r))
+  await until(() => replies.length === 2, 'both replies')
+  assert.equal(replies[0], null)
+  assert.deepEqual([replies[1].cols, replies[1].rows], [80, 24])
+  assert.deepEqual(s.attachedClients(), [c])
+  s.detach({ id: 2, send() {} }) // never attached: nothing changes
+  assert.equal(s.responder, c)
+  process.kill(s.pty.pid, 'SIGTERM') // this test's own child
+  await until(() => s.exited, 'exit')
+  assert.equal(s.exitCode, 128 + 15)
+  assert.ok(sent.some(m => m.ev === 'exit' && m.code === 143))
+  assert.match(s.screenText(2), /process exited with code 143/)
+})
