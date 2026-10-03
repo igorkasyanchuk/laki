@@ -112,8 +112,9 @@ bar, Linux/Windows) are easiest there. Laki Go wins on memory, size and Go reuse
   sidebar (⌘B).
 
 **CLI**
-- `ls [--json]`, `project add|ls|rm`, `new`, `tab`, `send [--when-idle]`, `screen`, `diff`, `run`, `ship`,
-  `rm`, `archive`, `restore`, `fork`, `open`, `daemon`, `stop`. Agents' hooks call the same CLI.
+- `ls [--json]`, `project add|ls|rm`, `new`, `tab`, `send [--when-idle]`, `screen`, `diff`, `run`, `rm`,
+  `archive`, `restore`, `fork`, `open`, `daemon`, `stop`; Laki Electron's also has `ship`. Agents' hooks call
+  the same CLI.
 
 ## Quality bar
 
