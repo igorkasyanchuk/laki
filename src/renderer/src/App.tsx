@@ -37,6 +37,7 @@ export function App() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [diff, setDiff] = useState(false)
+  const [findSeq, setFindSeq] = useState(0) // ⌘F presses, for the terminal's find bar
   const [error, setError] = useState('')
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
@@ -152,6 +153,7 @@ export function App() {
     const act: Record<string, () => void> = {
       n: () => setDialog('new'),
       o: openProject,
+      f: () => dialog || setFindSeq(n => n + 1), // not over a dialog
       t: () => newTab('shell'),
       w: () => closeTab(tab),
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
@@ -326,7 +328,7 @@ export function App() {
         <div className="body">
           <div className="term-wrap">
             {tab ? (
-              <Term key={tab.id} tab={tab.id} />
+              <Term key={tab.id} tab={tab.id} findSeq={findSeq} />
             ) : (
               <div className="empty">
                 {ws ? (

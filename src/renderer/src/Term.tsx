@@ -1,12 +1,14 @@
 // One xterm.js per visible tab. It attaches to the daemon's session (snapshot, then the live stream)
 // and detaches on unmount; switching tabs re-attaches. WebGL renders only this visible terminal.
 import { FitAddon } from '@xterm/addon-fit'
+import { SearchAddon } from '@xterm/addon-search'
 import { WebLinksAddon } from '@xterm/addon-web-links'
 import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { api, openExternal } from './api'
+import { FindBar } from './Find'
 
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
 
@@ -21,8 +23,11 @@ function theme() {
   }
 }
 
-export function Term({ tab, onReady }: { tab: string; onReady?: (t: Terminal) => void }) {
+export function Term({ tab, onReady, findSeq = 0 }: { tab: string; onReady?: (t: Terminal) => void; findSeq?: number }) {
   const box = useRef<HTMLDivElement>(null)
+  const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon } | null>(null)
+  const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
+  const find = findSeq !== closedAt
   useEffect(() => {
     const term = new Terminal({
       fontFamily: '"SF Mono", Menlo, Monaco, monospace',
@@ -37,6 +42,8 @@ export function Term({ tab, onReady }: { tab: string; onReady?: (t: Terminal) =>
     const fit = new FitAddon()
     term.loadAddon(fit)
     term.loadAddon(new WebLinksAddon((_e, uri) => openExternal(uri)))
+    const search = new SearchAddon()
+    term.loadAddon(search)
     term.open(box.current!)
     try {
       const gl = new WebglAddon()
@@ -90,6 +97,7 @@ export function Term({ tab, onReady }: { tab: string; onReady?: (t: Terminal) =>
     if (api.connected) attach()
     term.focus()
     onReady?.(term)
+    setXt({ term, search })
     ;(window as any).__term = term // for inspection in dev tools
     return () => {
       alive = false
@@ -100,5 +108,10 @@ export function Term({ tab, onReady }: { tab: string; onReady?: (t: Terminal) =>
       term.dispose()
     }
   }, [tab])
-  return <div className="term" ref={box} />
+  return (
+    <>
+      <div className="term" ref={box} />
+      {find && xt && <FindBar term={xt.term} search={xt.search} seq={findSeq} onClose={() => setClosedAt(findSeq)} />}
+    </>
+  )
 }

@@ -19,6 +19,8 @@
   --hunk: #bb9af7;
   --add-bg: rgba(158, 206, 106, 0.08);
   --del-bg: rgba(247, 118, 142, 0.08);
+  --find: #4a3c17;
+  --find-active: #a87b23;
   --radius: 6px;
   --mono: 'SF Mono', Menlo, Monaco, monospace;
   color-scheme: dark;
@@ -153,3 +155,11 @@ textarea { resize: vertical; font-family: inherit; }
 .palette-item .ph { flex: 1; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
 .toast { position: fixed; bottom: 36px; right: 16px; background: var(--panel); border: 1px solid var(--error); color: var(--fg); padding: 8px 12px; border-radius: var(--radius); max-width: 480px; z-index: 20; white-space: pre-wrap; }
 .xterm .xterm-viewport { background: var(--term-bg) !important; }
+
+.find { position: absolute; top: 8px; right: 16px; z-index: 5; display: flex; align-items: center; gap: 2px; padding: 4px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: 0 6px 18px rgba(0, 0, 0, 0.35); }
+.find input { width: 210px; background: var(--bg); color: var(--fg); border: 1px solid var(--line); border-radius: 4px; padding: 3px 7px; font: 12px var(--mono); outline: none; }
+.find input:focus { border-color: var(--accent); }
+.find-count { min-width: 64px; text-align: center; font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.find button { background: none; border: 1px solid transparent; color: var(--muted); border-radius: 4px; padding: 1px 6px; font: 12px var(--mono); cursor: pointer; }
+.find button:hover { color: var(--fg); background: var(--hover); }
+.find button.on { color: var(--accent); border-color: var(--accent); }
