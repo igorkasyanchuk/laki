@@ -24,6 +24,7 @@ export type PanelApi = {
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
   toAgent: (text: string) => Promise<unknown> // to the workspace's agent, when its turn ends
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
+  menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
 }
 
 export const PANEL_WIDTH = 340
@@ -166,7 +167,7 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
         {!d && !err && <div className="muted small pad">Loading…</div>}
         {query
           ? found.map(f => (
-              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} onClick={() => (setSel(f), api.preview(f))}>
+              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} onClick={() => (setSel(f), api.preview(f))} onContextMenu={e => (setSel(f), api.menu(e, f, false))}>
                 <Icon name="file" />
                 <span className="sp-name">
                   {f.slice(f.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f)}</span>
@@ -181,6 +182,7 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
                 style={{ paddingLeft: 8 + depth * 14 }}
                 onClick={e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && api.preview(n.path))} // a double-click's second opens the editor
                 onDoubleClick={() => !n.dir && api.openFile(n.path)}
+                onContextMenu={e => (setSel(n.path), api.menu(e, n.path, n.dir))}
               >
                 <span className="sp-chev">{n.dir && <Icon name={open.has(n.path) ? 'chevron' : 'chevronRight'} />}</span>
                 <span className="sp-name">{n.name}</span>
@@ -430,7 +432,7 @@ const canFrame = !bridge && ['localhost', '127.0.0.1'].includes(location.hostnam
 // localhost), with back, forward and a screenshot for the agent; in a browser on this Mac an iframe.
 // ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them)
 function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void }) {
-  const ports = [...new Set([...(w.ports ?? []), w.port])]
+  const ports = [...new Set([w.port, ...(w.ports ?? [])])] // $PORT first
   const [port, setPort] = useState(ports[0])
   const [addr, setAddr] = useState('/') // the address bar: a path on the port, or a whole URL
   const [url, setUrl] = useState(`http://localhost:${ports[0]}/`) // what's shown

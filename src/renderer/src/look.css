@@ -97,12 +97,12 @@
 /* glass: the window behind shows through, blurred (themes.ts makes the backgrounds see-through, as the sliders
    say, and lights them with the theme's glow). Floating things are frosted panes with a lit top edge. */
 html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --glass-hi: rgba(255, 255, 255, 0.08); }
+/* no backdrop-filter in glass: over the see-through (vibrancy) window Electron repaints it badly: flicker on hover,
+   stale tooltips, hard-edged rectangles around menus. The window's own blur is native; floats are nearly opaque. */
 :where(html.glass) :is(.menu, .modal, .tunnel-pop, .toast, .tip) {
-  background: color-mix(in srgb, var(--panel) 60%, transparent); border-color: var(--glass-edge);
-  backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  background: color-mix(in srgb, var(--panel) 90%, transparent); border-color: var(--glass-edge);
   box-shadow: inset 0 1px 0 var(--glass-hi), 0 24px 70px rgba(0, 0, 0, 0.42); }
-:where(html.glass) :is(.info, .side-panel) { background: color-mix(in srgb, var(--panel) 45%, transparent); border-left-color: var(--glass-edge);
-  backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); }
+:where(html.glass) :is(.info, .side-panel) { background: color-mix(in srgb, var(--panel) 75%, transparent); border-left-color: var(--glass-edge); }
 :where(html.glass) .sidebar { border-right-color: var(--glass-edge); box-shadow: inset -1px 0 0 var(--glass-hi); }
 :where(html.glass) :is(.tabbar, .settings-head) { border-bottom-color: var(--glass-edge); }
 :where(html.glass) .status { background: color-mix(in srgb, var(--side) 55%, transparent); border-top-color: var(--glass-edge); }
@@ -111,7 +111,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 :where(html.glass) :is(.buttons button:not(.primary), .seg button, .run-btn) { background-color: color-mix(in srgb, var(--panel) 50%, transparent); border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi); }
 :where(html.glass) :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { background-color: color-mix(in srgb, var(--bg) 40%, transparent); border-color: var(--glass-edge); }
 :where(html.glass) button.primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 18px color-mix(in srgb, var(--accent) 35%, transparent); }
-:where(html.glass) .settings-page { background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(36px) saturate(1.4); -webkit-backdrop-filter: blur(36px) saturate(1.4); }
+:where(html.glass) .settings-page { background: color-mix(in srgb, var(--bg) 88%, transparent); }
 :where(html.glass) :is(.settings-head, .settings-nav) { background: transparent; }
 :where(html.glass) .settings-nav { border-right-color: var(--glass-edge); }
 
@@ -282,7 +282,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
   background: linear-gradient(90deg, #3a82e0, #a9d4ff 35%, #64b0f8 60%, #2f78d8); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
 
 /* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
-:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
 
 /* Clay: soft UI. One color everywhere, shapes raised out of it or pressed into it by light from the top left */
 [data-look='clay'] { --radius: 12px;
@@ -933,3 +933,458 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='bricks'] .toggle.on .toggle-track { background: #00852b; }
 [data-look='bricks'] .toggle-knob { border-radius: 2px; }
 [data-look='bricks'] .theme { border-radius: 4px; box-shadow: var(--brick); }
+
+/* Zero Day: a hacker's terminal. Green on black in a monospace, a root prompt and a blinking block on the headings,
+   [ bracketed ] buttons, a > on the selection, and digital rain falling faintly behind the terminals */
+[data-look='zeroday'] { --radius: 0px; --ui-font: 'Andale Mono', Menlo, monospace; --matrix: 0 0 6px rgba(0, 255, 102, 0.55);
+  --drop: transparent 55%, rgba(0, 255, 102, 0.1) 90%, rgba(190, 255, 210, 0.28); }
+[data-look='zeroday'] :is(.settings-main h2, .tunnel-head b) { color: var(--accent); font-size: 14px; text-shadow: var(--matrix); }
+[data-look='zeroday'] .settings-main h2::before { content: 'root@laki:~# '; color: var(--muted); text-shadow: none; }
+[data-look='zeroday'] .settings-main h2::after { content: '\2588'; margin-left: 4px; animation: zd-blink 1s steps(1) infinite; }
+@keyframes zd-blink { 50% { opacity: 0; } }
+[data-look='zeroday'] .project-head { color: var(--accent); letter-spacing: 1px; }
+[data-look='zeroday'] .project-head::before { content: '//'; margin-right: 5px; color: var(--muted); }
+[data-look='zeroday'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); border-radius: 0; background: transparent; color: var(--accent); }
+[data-look='zeroday'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='zeroday'] .seg button.on { background: var(--accent); color: #000; }
+[data-look='zeroday'] :is(.buttons button, button.primary)::before { content: '['; margin-right: 6px; opacity: 0.6; }
+[data-look='zeroday'] :is(.buttons button, button.primary)::after { content: ']'; margin-left: 6px; opacity: 0.6; }
+[data-look='zeroday'] button.primary { border: 1px solid var(--accent); border-radius: 0; background: rgba(0, 255, 102, 0.12); color: var(--accent); text-shadow: var(--matrix); }
+[data-look='zeroday'] button.primary:hover { background: var(--accent); color: #000; text-shadow: none; }
+[data-look='zeroday'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-color: var(--line); background: #000; caret-color: var(--accent); }
+[data-look='zeroday'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--accent); border-radius: 0; background: #000; box-shadow: 0 0 18px rgba(0, 255, 102, 0.18), 0 16px 40px rgba(0, 0, 0, 0.7); }
+[data-look='zeroday'] .menu-item { border-radius: 0; }
+[data-look='zeroday'] .menu-item:hover { background: var(--accent); color: #000; }
+[data-look='zeroday'] .tab { border-radius: 0; }
+[data-look='zeroday'] .tab.sel { background: #000; color: var(--accent); }
+[data-look='zeroday'] .ws.sel { background: transparent; border-left-color: transparent; color: var(--accent); text-shadow: var(--matrix); }
+[data-look='zeroday'] .ws.sel::before { content: '>'; margin-left: -10px; color: var(--accent); }
+[data-look='zeroday'] .settings-nav button.on { background: transparent; color: var(--accent); }
+[data-look='zeroday'] .settings-nav button.on::before { content: '>'; margin-left: -8px; margin-right: 2px; }
+[data-look='zeroday'] .term-wrap { overflow: hidden; }
+[data-look='zeroday'] .term-wrap::before, [data-look='zeroday'] .term-wrap::after { content: ''; position: absolute; left: 0; right: 0; top: -360px; bottom: 0; z-index: 2; pointer-events: none; }
+/* columns of rain: each a falling streak with a bright head, repeating down; 360px (the loop) is a multiple of each
+   one's height, so the loop is seamless */
+[data-look='zeroday'] .term-wrap::before { animation: zd-rain 9s linear infinite;
+  background: linear-gradient(var(--drop)) 4% 30px / 2px 120px repeat-y, linear-gradient(var(--drop)) 17% 0 / 2px 180px repeat-y,
+    linear-gradient(var(--drop)) 29% 70px / 2px 90px repeat-y, linear-gradient(var(--drop)) 43% 10px / 2px 360px repeat-y,
+    linear-gradient(var(--drop)) 58% 50px / 2px 120px repeat-y, linear-gradient(var(--drop)) 71% 140px / 2px 180px repeat-y,
+    linear-gradient(var(--drop)) 86% 20px / 2px 72px repeat-y, linear-gradient(var(--drop)) 97% 100px / 2px 120px repeat-y; }
+[data-look='zeroday'] .term-wrap::after { animation: zd-rain 14s linear infinite; opacity: 0.7;
+  background: linear-gradient(var(--drop)) 10% 60px / 2px 180px repeat-y, linear-gradient(var(--drop)) 23% 20px / 2px 120px repeat-y,
+    linear-gradient(var(--drop)) 36% 200px / 2px 360px repeat-y, linear-gradient(var(--drop)) 51% 0 / 2px 90px repeat-y,
+    linear-gradient(var(--drop)) 64% 80px / 2px 120px repeat-y, linear-gradient(var(--drop)) 79% 40px / 2px 360px repeat-y,
+    linear-gradient(var(--drop)) 92% 10px / 2px 180px repeat-y; }
+@keyframes zd-rain { to { translate: 0 360px; } }
+[data-look='zeroday'] .toggle-track, [data-look='zeroday'] .toggle-knob { border-radius: 0; }
+[data-look='zeroday'] .theme { border-radius: 0; }
+@media (prefers-reduced-motion: reduce) { [data-look='zeroday'] .term-wrap::before, [data-look='zeroday'] .term-wrap::after, [data-look='zeroday'] .settings-main h2::after { animation: none; } }
+
+/* Glitch: a corrupted signal. Condensed caps with red and cyan split edges that tear now and then, controls that
+   jump when hovered, misregistered shadows, and a tear rolling down the terminals */
+[data-look='glitch'] { --radius: 0px; --ui-font: 'Avenir Next Condensed', 'Arial Narrow', sans-serif;
+  --split: -1.5px 0 0 rgba(255, 42, 109, 0.85), 1.5px 0 0 rgba(0, 240, 255, 0.85); --split-sm: -1px 0 0 rgba(255, 42, 109, 0.8), 1px 0 0 rgba(0, 240, 255, 0.8); }
+[data-look='glitch'] :is(.settings-main h2, .tunnel-head b) { font-family: 'DIN Condensed', Impact, var(--ui-font); font-size: 22px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; text-shadow: var(--split); }
+[data-look='glitch'] .settings-main h2 { animation: gl-tear 5s steps(1) infinite; }
+@keyframes gl-tear {
+  93% { text-shadow: -4px 0 0 rgba(255, 42, 109, 0.9), 3px 0 0 rgba(0, 240, 255, 0.9); translate: 2px 0; }
+  95% { text-shadow: 3px 0 0 rgba(255, 42, 109, 0.9), -3px 0 0 rgba(0, 240, 255, 0.9); translate: -2px 0; clip-path: inset(15% 0 35% 0); }
+  97% { text-shadow: var(--split); translate: 0; clip-path: none; } }
+[data-look='glitch'] .project-head { color: var(--pink); letter-spacing: 2px; }
+[data-look='glitch'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); border-radius: 0; background: #0b0912; text-transform: uppercase; letter-spacing: 0.5px;
+  box-shadow: 2px 2px 0 rgba(255, 42, 109, 0.55), -2px -2px 0 rgba(0, 240, 255, 0.4); }
+[data-look='glitch'] .seg button.on { background: #1e1838; color: var(--accent); text-shadow: var(--split-sm); }
+[data-look='glitch'] button.primary { border: none; border-radius: 0; background: var(--accent); color: #07060b; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; box-shadow: 3px 0 0 #ff2a6d, -3px 0 0 #2a7bff; }
+[data-look='glitch'] :is(.buttons button, .seg button, .scripts-tabs button, button.primary):hover { animation: gl-jump 0.3s steps(1); }
+@keyframes gl-jump { 0% { translate: -2px 1px; clip-path: inset(0 0 50% 0); } 33% { translate: 2px -1px; clip-path: inset(45% 0 0 0); } 66% { translate: -1px 0; clip-path: none; } 100% { translate: 0; } }
+[data-look='glitch'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-color: var(--line); background: #07060b; }
+[data-look='glitch'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { box-shadow: -2px 0 0 #ff2a6d, 2px 0 0 var(--accent); }
+[data-look='glitch'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--line); border-radius: 0; box-shadow: -3px 0 0 rgba(255, 42, 109, 0.7), 3px 0 0 rgba(0, 240, 255, 0.7), 0 16px 40px rgba(0, 0, 0, 0.6); }
+[data-look='glitch'] .menu-item { border-radius: 0; }
+[data-look='glitch'] .menu-item:hover { background: linear-gradient(90deg, rgba(255, 42, 109, 0.35), rgba(0, 240, 255, 0.22)); color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .sidebar { border-right: 2px solid transparent; border-image: linear-gradient(180deg, #ff2a6d, var(--accent) 50%, #ff2a6d) 1; }
+[data-look='glitch'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='glitch'] .tab.sel { background: var(--bg); color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .ws.sel { background: linear-gradient(90deg, rgba(0, 240, 255, 0.16), transparent); border-left-color: #ff2a6d; color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .settings-nav button.on { background: linear-gradient(90deg, rgba(0, 240, 255, 0.16), transparent); color: #fff; text-shadow: var(--split-sm); }
+[data-look='glitch'] .term-wrap { overflow: hidden; }
+[data-look='glitch'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px); }
+[data-look='glitch'] .term-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 16px; z-index: 2; pointer-events: none; translate: 0 -30px;
+  background: linear-gradient(90deg, rgba(255, 42, 109, 0.13), rgba(0, 240, 255, 0.12) 35%, transparent 55%, rgba(255, 42, 109, 0.1) 80%, transparent); animation: gl-roll 8s steps(48) infinite; }
+@keyframes gl-roll { 0%, 75% { translate: 0 -30px; } 100% { translate: 0 100vh; } }
+[data-look='glitch'] .toggle-track, [data-look='glitch'] .toggle-knob { border-radius: 0; }
+[data-look='glitch'] .toggle.on .toggle-track { box-shadow: -2px 0 0 #ff2a6d; }
+[data-look='glitch'] .theme { border-radius: 0; }
+@media (prefers-reduced-motion: reduce) {
+  [data-look='glitch'] :is(.settings-main h2, .buttons button, .seg button, .scripts-tabs button, button.primary), [data-look='glitch'] .term-wrap::before { animation: none !important; } }
+
+/* Greenbar: line-printer paper. Pale green bands across the terminals and menus, tractor-feed holes down the sidebar,
+   perforations, a typewriter mono, and *** banner *** headings */
+[data-look='greenbar'] { --radius: 0px; --ui-font: 'PT Mono', 'Courier New', monospace; --band: rgba(120, 180, 90, 0.13); --perf: 1px dashed #9db487; }
+[data-look='greenbar'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Courier New', Courier, monospace; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; }
+[data-look='greenbar'] .settings-main h2::before { content: '*** '; color: var(--accent); }
+[data-look='greenbar'] .settings-main h2::after { content: ' ***'; color: var(--accent); }
+[data-look='greenbar'] .project-head { color: var(--accent); }
+[data-look='greenbar'] .sidebar { border-right: 2px dashed #b9cba3;
+  background: radial-gradient(circle, #d5ddca 0 3.5px, rgba(0, 0, 0, 0.1) 4px, transparent 4.5px) 0 4px / 12px 18px repeat-y, var(--side); }
+[data-look='greenbar'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: var(--perf); border-radius: 0; background: #fff; }
+[data-look='greenbar'] .seg button.on { border-style: solid; border-color: var(--accent); background: var(--sel); }
+[data-look='greenbar'] button.primary { border: 2px solid var(--fg); border-radius: 0; background: var(--fg); color: var(--bg); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='greenbar'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border: var(--perf); background: #fff; }
+[data-look='greenbar'] :is(.menu, .modal, .tunnel-pop) { border-radius: 0; border: 1px solid #b9cba3; border-block: 2px dashed #9db487; box-shadow: 0 8px 24px rgba(40, 60, 30, 0.18); }
+[data-look='greenbar'] .menu-item { border-radius: 0; }
+[data-look='greenbar'] .menu-item:nth-child(even) { background-color: var(--band); }
+[data-look='greenbar'] .menu-item:hover { background-color: var(--sel); }
+[data-look='greenbar'] .tab { border-radius: 0; }
+[data-look='greenbar'] .tab.sel { background: #fff; }
+[data-look='greenbar'] .ws.sel { font-weight: 700; }
+[data-look='greenbar'] :is(.tabbar, .settings-head) { border-bottom: var(--perf); }
+[data-look='greenbar'] .status { border-top: var(--perf); }
+[data-look='greenbar'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: repeating-linear-gradient(180deg, var(--band) 0 48px, transparent 48px 96px); }
+[data-look='greenbar'] .toggle-track, [data-look='greenbar'] .toggle-knob { border-radius: 0; }
+[data-look='greenbar'] .theme { border-radius: 0; border-style: dashed; }
+
+/* Noir: a black-and-white detective film. Light through venetian blinds across the terminals, grain and a vignette,
+   letterspaced Didot italics for the headings, title-card menus, and red kept for trouble */
+[data-look='noir'] { --radius: 0px; --ui-font: Optima, 'Gill Sans', sans-serif; --head: Didot, 'Bodoni 72', 'Times New Roman', serif;
+  --grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 1 0 0 0 0 1 0 0 0 0.6 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); }
+[data-look='noir'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); font-style: italic; font-weight: 400; font-size: 21px; letter-spacing: 3px; text-transform: uppercase; }
+[data-look='noir'] .project-head { letter-spacing: 3px; color: #b8b6b0; }
+[data-look='noir'] .sidebar { background: radial-gradient(ellipse at 0 0, rgba(255, 255, 255, 0.07), transparent 60%), var(--side); }
+[data-look='noir'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a4a4a; border-radius: 0; background: transparent; text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='noir'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='noir'] .seg button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='noir'] button.primary { border: none; border-radius: 0; background: var(--accent); color: var(--accent-fg); text-transform: uppercase; letter-spacing: 2px; }
+[data-look='noir'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border: none; border-bottom: 1px solid #4a4a4a; background: transparent; }
+[data-look='noir'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #3a3a3a; border-radius: 0; background: var(--grain), var(--panel); box-shadow: 0 30px 60px rgba(0, 0, 0, 0.8); }
+[data-look='noir'] .menu-item { border-radius: 0; letter-spacing: 0.5px; }
+[data-look='noir'] .menu-item:hover { background: var(--accent); color: var(--accent-fg); }
+[data-look='noir'] .tab { border-radius: 0; letter-spacing: 0.5px; }
+[data-look='noir'] .tab.sel { background: var(--bg); }
+[data-look='noir'] .ws.sel { background: linear-gradient(90deg, #2c2c2c, transparent); border-left-color: var(--accent); color: #fff; }
+[data-look='noir'] .settings-nav button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='noir'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(ellipse at 60% 35%, transparent 50%, rgba(0, 0, 0, 0.32)), repeating-linear-gradient(-28deg, transparent 0 34px, rgba(255, 255, 255, 0.035) 34px 52px); }
+[data-look='noir'] .term-wrap::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--grain); opacity: 0.05; }
+[data-look='noir'] .toggle-track, [data-look='noir'] .toggle-knob { border-radius: 0; }
+[data-look='noir'] .theme { border-radius: 0; }
+
+/* Big Top: a circus. A red and cream valance over the tab bar, marquee bulbs around the popups, a ticket for the main
+   button, ★ Copperplate ★ headings, a slab serif, and a spotlight on the terminals */
+[data-look='circus'] { --radius: 6px; --ui-font: Superclarendon, Rockwell, Georgia, serif; --head: Copperplate, 'Copperplate Gothic Light', serif;
+  --bulbs: radial-gradient(circle at 6px 6px, #fff6c8 0 2px, rgba(255, 214, 102, 0.6) 3px, transparent 4px) 0 0 / 12px 12px round; }
+[data-look='circus'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); color: var(--accent); font-size: 18px; letter-spacing: 2px; text-transform: uppercase; }
+[data-look='circus'] .settings-main h2::before { content: '\2605  '; color: #e09a00; }
+[data-look='circus'] .settings-main h2::after { content: '  \2605'; color: #e09a00; }
+[data-look='circus'] .project-head { font-family: var(--head); color: var(--error); letter-spacing: 1.5px; }
+[data-look='circus'] .sidebar { background: repeating-linear-gradient(90deg, rgba(214, 40, 40, 0.05) 0 18px, transparent 18px 36px), var(--side); }
+[data-look='circus'] .tabbar { background: radial-gradient(circle at 9px 0, #d62828 0 8.5px, transparent 9px) 0 6px / 36px 9px repeat-x,
+  radial-gradient(circle at 9px 0, #ecd4a2 0 8.5px, transparent 9px) 18px 6px / 36px 9px repeat-x,
+  repeating-linear-gradient(90deg, #d62828 0 18px, #ecd4a2 18px 36px) top / 100% 6px no-repeat, var(--side); }
+[data-look='circus'] .tab { background: color-mix(in srgb, var(--panel) 80%, transparent); }
+[data-look='circus'] .tab.sel { background: var(--bg); box-shadow: inset 0 3px 0 var(--tab-c, var(--accent)); }
+[data-look='circus'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid var(--accent); border-radius: 999px; background: var(--panel); color: var(--error); font-weight: 700; }
+[data-look='circus'] .seg button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='circus'] button.primary { border: none; border-radius: 3px; padding-inline: 18px; color: var(--accent-fg); font-family: var(--head); letter-spacing: 1px; text-transform: uppercase;
+  background: radial-gradient(circle at 0 50%, var(--bg) 0 5px, transparent 5.5px), radial-gradient(circle at 100% 50%, var(--bg) 0 5px, transparent 5.5px), linear-gradient(#e63946, #c1121f);
+  box-shadow: inset 0 0 0 3px #c1121f, inset 0 0 0 4px rgba(255, 250, 240, 0.6); }
+[data-look='circus'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid var(--line); border-radius: 8px; }
+[data-look='circus'] :is(.menu, .modal, .tunnel-pop) { border: 8px solid transparent; border-radius: 12px;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box, var(--bulbs) border-box, #b31b1b border-box; box-shadow: 0 16px 40px rgba(90, 20, 10, 0.3); }
+[data-look='circus'] .menu-item:hover { background: var(--sel); }
+[data-look='circus'] .ws.sel { background: linear-gradient(90deg, var(--sel), transparent); border-left-color: var(--accent); font-weight: 700; }
+[data-look='circus'] .settings-nav button.on { background: var(--accent); color: var(--accent-fg); }
+[data-look='circus'] .status { border-top: 3px solid var(--accent); }
+[data-look='circus'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% -10%, rgba(255, 200, 80, 0.16), transparent 55%); }
+[data-look='circus'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='circus'] .theme { border-radius: 10px; }
+
+/* Darkroom: a photo lab under the safelight. Everything in reds, a film strip down the sidebar's edge with frame
+   numbers by the workspaces, sprocket holes along the tab bar, Futura caps, and the safelight's glow over the terminals */
+[data-look='darkroom'] { --radius: 2px; --ui-font: Futura, 'Avenir Next', 'Century Gothic', sans-serif; --glow: 0 0 12px rgba(255, 68, 51, 0.4); }
+[data-look='darkroom'] :is(.settings-main h2, .tunnel-head b) { color: var(--accent); font-size: 14px; font-weight: 500; letter-spacing: 3px; text-transform: uppercase; }
+[data-look='darkroom'] .settings-main h2::after { content: '  \25B8 400'; font-size: 10px; letter-spacing: 1px; color: var(--muted); }
+[data-look='darkroom'] .project-head { letter-spacing: 2px; }
+[data-look='darkroom'] .sidebar { padding-right: 12px; counter-reset: frame; }
+[data-look='darkroom'] .app:not(.narrow) .sidebar { position: relative; } /* a phone's drawer is fixed already */
+[data-look='darkroom'] .sidebar::after { content: ''; position: absolute; top: 0; right: 0; bottom: 0; width: 12px; pointer-events: none;
+  background: linear-gradient(rgba(255, 120, 100, 0.22) 0 8px, transparent 8px) 3px 4px / 6px 14px repeat-y, #050101; }
+[data-look='darkroom'] .ws { counter-increment: frame; }
+[data-look='darkroom'] .ws::after { content: counter(frame) 'A'; flex: none; font: 9px var(--mono); color: var(--muted); opacity: 0.7; }
+[data-look='darkroom'] .tabbar { background: linear-gradient(90deg, rgba(255, 120, 100, 0.2) 0 8px, transparent 8px) 6px 2px / 16px 5px repeat-x, var(--side); }
+[data-look='darkroom'] .tab { border-radius: 2px 2px 0 0; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+[data-look='darkroom'] .tab.sel { background: var(--bg); }
+[data-look='darkroom'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #5a1a14; border-radius: 2px; background: var(--panel); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='darkroom'] :is(.buttons button, .seg button, .scripts-tabs button):hover { border-color: var(--accent); box-shadow: var(--glow); }
+[data-look='darkroom'] .seg button.on { background: var(--sel); border-color: var(--accent); color: #fff0ea; }
+[data-look='darkroom'] button.primary { border: none; border-radius: 2px; background: var(--accent); color: var(--accent-fg); text-transform: uppercase; letter-spacing: 2px; box-shadow: var(--glow); }
+[data-look='darkroom'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a1612; border-radius: 2px; background: #0d0404; }
+[data-look='darkroom'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #4a1612; border-radius: 3px; box-shadow: 0 0 0 1px #000, 0 0 40px rgba(255, 40, 20, 0.14), 0 20px 50px rgba(0, 0, 0, 0.7); }
+[data-look='darkroom'] .menu-item:hover { background: var(--sel); color: #fff0ea; }
+[data-look='darkroom'] .ws.sel { background: linear-gradient(90deg, var(--sel), transparent); border-left-color: var(--accent); color: #fff0ea; }
+[data-look='darkroom'] .settings-nav button.on { background: var(--sel); color: #fff0ea; }
+[data-look='darkroom'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(ellipse at 88% -8%, rgba(255, 40, 20, 0.16), transparent 55%), radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(0, 0, 0, 0.35)); }
+[data-look='darkroom'] .toggle.on .toggle-track { background: var(--accent); box-shadow: var(--glow); }
+[data-look='darkroom'] .theme { border-radius: 2px; }
+
+/* Transit: a subway map. Helvetica on black signage (the menus, the status bar), each workspace a station on its
+   project's line, round line bullets by the headings, a pill for the main button */
+[data-look='transit'] { --radius: 4px; --ui-font: 'Helvetica Neue', Helvetica, Arial, sans-serif; --route: var(--accent); --sign: #111; }
+[data-look='transit'] :is(.settings-main h2, .tunnel-head b) { font-weight: 700; font-size: 18px; letter-spacing: -0.2px; }
+[data-look='transit'] .settings-main h2::before { content: ''; display: inline-block; width: 16px; height: 16px; margin-right: 50px; vertical-align: -2px; border-radius: 50%;
+  background: var(--accent); box-shadow: 21px 0 0 #ee352e, 42px 0 0 #00933c; }
+[data-look='transit'] .project-head { color: var(--fg); font-weight: 700; letter-spacing: 0.3px; }
+[data-look='transit'] .ws { position: relative; padding-left: 26px; border-left-color: transparent; background-image: linear-gradient(var(--route), var(--route)); background-size: 4px 100%; background-position: 10px 0; background-repeat: no-repeat; }
+[data-look='transit'] .ws::before { content: ''; position: absolute; left: 6px; top: 50%; width: 12px; height: 12px; margin-top: -6px; border-radius: 50%; background: #fff; border: 3px solid var(--tab-c, var(--route)); }
+[data-look='transit'] .ws.sel::before { background: var(--fg); border-color: var(--fg); } /* you are here */
+[data-look='transit'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: none; border-radius: 3px; background: var(--sign); color: #fff; font-weight: 700; }
+[data-look='transit'] :is(.buttons button, .seg button, .scripts-tabs button):hover { background: #333; }
+[data-look='transit'] .seg button.on { background: var(--sel); color: var(--sign); }
+[data-look='transit'] button.primary { border: none; border-radius: 999px; padding-inline: 14px; background: var(--accent); color: #fff; font-weight: 700; }
+[data-look='transit'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid var(--line); border-radius: 3px; }
+[data-look='transit'] .menu { --fg: #fff; --muted: #a8a8a0; --sel: #2c2c2c; --line: #3a3a3a; border: none; border-radius: 4px; background: var(--sign); color: #fff; box-shadow: inset 0 3px 0 #fff, 0 14px 34px rgba(0, 0, 0, 0.35); }
+[data-look='transit'] :is(.modal, .tunnel-pop) { border: none; border-top: 6px solid var(--sign); border-radius: 4px; }
+[data-look='transit'] .status { --fg: #fff; --muted: #a8a8a0; border-top: none; background: var(--sign); color: #d8d8d0; }
+[data-look='transit'] .tab { font-weight: 600; }
+[data-look='transit'] .settings-nav button.on { background: var(--sel); color: var(--sign); font-weight: 700; }
+[data-look='transit'] .toggle.on .toggle-track { background: var(--done); }
+
+/* Modular: a synth rack. Brushed aluminium panels with screws in the corners, a patch jack by the headings, rubber
+   keys, LEDs for switches, DIN type, and an oscilloscope's trace drifting across the terminals */
+[data-look='modular'] { --radius: 3px; --ui-font: 'DIN Alternate', 'Helvetica Neue', sans-serif;
+  --brushed: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px), linear-gradient(180deg, #2e3034, #24262a);
+  --screw: radial-gradient(circle, #b4b8be 0 1.5px, #5a5e64 2px 3px, transparent 3.5px); }
+[data-look='modular'] :is(.sidebar, .settings-nav, .status) { background: var(--brushed); }
+[data-look='modular'] :is(.settings-main h2, .tunnel-head b) { font-family: 'DIN Condensed', var(--ui-font); font-size: 18px; letter-spacing: 3px; text-transform: uppercase; color: #fff; }
+[data-look='modular'] .settings-main h2::before { content: ''; display: inline-block; width: 14px; height: 14px; margin-right: 10px; vertical-align: -1px; border-radius: 50%;
+  background: radial-gradient(circle, #0b0c0d 0 3px, #9aa0a8 3.5px 5px, #4a4e54 5.5px); }
+[data-look='modular'] .project-head { color: #d5d9de; letter-spacing: 2px; }
+[data-look='modular'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #0b0c0d; border-radius: 3px; background: linear-gradient(#3a3d42, #2a2c30);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 0 #000; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='modular'] .seg button.on { color: var(--accent); }
+[data-look='modular'] button.primary { border: none; border-radius: 999px; background: var(--accent); color: #141517; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='modular'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #0b0c0d; background: #101113; }
+[data-look='modular'] :is(.menu, .modal, .tunnel-pop) { border: 1px solid #0b0c0d; border-radius: 3px;
+  background: var(--screw) left 3px top 3px / 8px 8px no-repeat, var(--screw) right 3px top 3px / 8px 8px no-repeat, var(--screw) left 3px bottom 3px / 8px 8px no-repeat,
+    var(--screw) right 3px bottom 3px / 8px 8px no-repeat, var(--brushed);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06), 0 18px 40px rgba(0, 0, 0, 0.6); }
+[data-look='modular'] .menu { padding: 12px 6px; }
+[data-look='modular'] .menu-item:hover { background: rgba(255, 77, 46, 0.18); }
+[data-look='modular'] .tab.sel { background: var(--bg); }
+[data-look='modular'] .ws.sel { background: linear-gradient(90deg, rgba(255, 77, 46, 0.18), transparent); border-left-color: var(--accent); }
+[data-look='modular'] .settings-nav button.on { background: rgba(255, 77, 46, 0.18); }
+[data-look='modular'] .toggle-track { background: #0b0c0d; box-shadow: inset 0 1px 2px #000; }
+[data-look='modular'] .toggle.on .toggle-track { background: #2a0d08; }
+[data-look='modular'] .toggle.on .toggle-knob { background: var(--accent); box-shadow: 0 0 6px 2px rgba(255, 77, 46, 0.7); }
+[data-look='modular'] .term-wrap { overflow: hidden; }
+[data-look='modular'] .term-wrap::after { content: ''; position: absolute; left: -240px; right: 0; bottom: 18%; height: 60px; z-index: 2; pointer-events: none; opacity: 0.14; animation: mod-scope 5s linear infinite;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='60'%3E%3Cpath d='M0 30 Q30 2 60 30 T120 30 T180 30 T240 30' fill='none' stroke='%233fe0d0' stroke-width='2'/%3E%3C/svg%3E") 0 0 / 240px 60px repeat-x; }
+@keyframes mod-scope { to { translate: 240px 0; } }
+[data-look='modular'] .theme { border-radius: 3px; }
+
+/* Topo: a topographic map. Contour lines on the sidebar and faintly over the terminals, a ▲ summit by the headings, a
+   legend box with a scale bar for menus, a trail blaze for the main button, ◉ where you are */
+[data-look='topo'] { --radius: 3px; --ui-font: 'Avenir Next Condensed', 'Avenir Next', sans-serif;
+  --contours: repeating-radial-gradient(ellipse 140% 90% at 20% 30%, transparent 0 15px, rgba(140, 105, 50, 0.16) 15px 16px), repeating-radial-gradient(ellipse 120% 100% at 85% 80%, transparent 0 19px, rgba(140, 105, 50, 0.12) 19px 20px); }
+[data-look='topo'] :is(.sidebar, .settings-nav) { background: var(--contours), var(--side); }
+[data-look='topo'] :is(.settings-main h2, .tunnel-head b) { font-weight: 700; text-transform: uppercase; letter-spacing: 2.5px; color: #3a5a2a; }
+[data-look='topo'] .settings-main h2::before { content: '\25B2  '; color: var(--accent); }
+[data-look='topo'] .project-head { color: #4f7f3a; letter-spacing: 1.5px; }
+[data-look='topo'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1.5px solid #8a6a3a; border-radius: 3px; background: var(--panel); font-weight: 600; }
+[data-look='topo'] :is(.buttons button, .seg button, .scripts-tabs button):hover { background: #efe6cc; }
+[data-look='topo'] .seg button.on { background: #4f7f3a; border-color: #4f7f3a; color: #fff; }
+[data-look='topo'] button.primary { border: none; border-radius: 3px; background: var(--accent); color: #fff; font-weight: 700; box-shadow: 0 0 0 2px var(--panel), 0 0 0 3.5px var(--accent); }
+[data-look='topo'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #b8a67e; background: #fffdf6; }
+[data-look='topo'] :is(.menu, .modal, .tunnel-pop) { border: 1px solid var(--fg); border-radius: 0; box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 4px var(--fg), 0 10px 30px rgba(60, 45, 20, 0.25); }
+[data-look='topo'] .menu { padding: 8px 8px 18px; }
+[data-look='topo'] .menu::after { content: ''; position: absolute; right: 10px; bottom: 7px; width: 60px; height: 4px; border: 1px solid var(--fg); background: repeating-linear-gradient(90deg, var(--fg) 0 15px, transparent 15px 30px); }
+[data-look='topo'] .menu-item:hover { background: var(--sel); }
+[data-look='topo'] :is(.tabbar, .settings-head) { border-bottom: 1.5px dashed var(--accent); }
+[data-look='topo'] .ws.sel { border-left-color: var(--accent); }
+[data-look='topo'] .ws.sel::after { content: '\25C9'; margin-left: 4px; color: var(--accent); font-size: 11px; }
+[data-look='topo'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--contours); opacity: 0.6; }
+[data-look='topo'] .toggle.on .toggle-track { background: #4f7f3a; }
+[data-look='topo'] .theme { border-radius: 3px; }
+
+/* Abyss: the deep sea. Bioluminescent cyan and magenta glows, thin letterspaced Gill Sans, soft round shapes, light
+   coming down from the surface and bubbles rising through the terminals */
+[data-look='abyss'] { --radius: 14px; --ui-font: 'Gill Sans', 'Avenir Next', sans-serif; --glow: 0 0 10px rgba(63, 240, 255, 0.55);
+  --bubble: radial-gradient(circle, transparent 0 3px, rgba(160, 240, 255, 0.35) 3.5px 4.5px, transparent 5px); --fizz: radial-gradient(circle, rgba(160, 240, 255, 0.4) 0 1.5px, transparent 2px); }
+[data-look='abyss'] :is(.sidebar, .settings-nav) { background: linear-gradient(180deg, #031024, #010610); }
+[data-look='abyss'] :is(.settings-main h2, .tunnel-head b) { font-weight: 300; font-size: 20px; letter-spacing: 4px; text-transform: uppercase; color: var(--accent); text-shadow: var(--glow); }
+[data-look='abyss'] .project-head { color: var(--pink); letter-spacing: 2px; text-shadow: 0 0 8px rgba(255, 79, 216, 0.5); }
+[data-look='abyss'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(63, 240, 255, 0.35); border-radius: 14px; background: rgba(63, 240, 255, 0.06); }
+[data-look='abyss'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='abyss'] .seg button.on { border-color: var(--accent); box-shadow: var(--glow); }
+[data-look='abyss'] button.primary { border: none; border-radius: 16px; background: radial-gradient(circle at 50% 30%, #8af8ff, #1fb8d0); color: #020b18; box-shadow: 0 0 16px rgba(63, 240, 255, 0.5); }
+[data-look='abyss'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: rgba(63, 240, 255, 0.3); border-radius: 12px; background: #010812; }
+[data-look='abyss'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(63, 240, 255, 0.3); border-radius: 18px; box-shadow: 0 0 30px rgba(63, 240, 255, 0.12), 0 20px 50px rgba(0, 0, 0, 0.7); }
+[data-look='abyss'] .menu-item:hover { background: rgba(63, 240, 255, 0.12); border-radius: 10px; }
+[data-look='abyss'] .ws.sel { background: radial-gradient(ellipse at 20% 50%, rgba(255, 79, 216, 0.28), transparent 70%); border-left-color: var(--pink); color: #fff; }
+[data-look='abyss'] .settings-nav button.on { background: rgba(63, 240, 255, 0.12); color: var(--accent); }
+[data-look='abyss'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)), 0 -4px 12px -6px rgba(63, 240, 255, 0.6); }
+[data-look='abyss'] .term-wrap { overflow: hidden; }
+[data-look='abyss'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(100deg, transparent 20%, rgba(63, 240, 255, 0.05) 25%, transparent 32%), linear-gradient(80deg, transparent 55%, rgba(63, 240, 255, 0.04) 60%, transparent 68%),
+    radial-gradient(ellipse at 50% -20%, rgba(63, 240, 255, 0.1), transparent 60%); }
+/* bubbles: each column repeats every 120-480px, so a 480px rise loops without a jump */
+[data-look='abyss'] .term-wrap::before { content: ''; position: absolute; left: 0; right: 0; top: 0; bottom: -480px; z-index: 2; pointer-events: none; animation: abyss-rise 18s linear infinite;
+  background: var(--bubble) 8% 40px / 10px 240px repeat-y, var(--fizz) 21% 0 / 6px 160px repeat-y, var(--bubble) 37% 120px / 10px 480px repeat-y, var(--fizz) 52% 60px / 6px 120px repeat-y,
+    var(--bubble) 66% 10px / 10px 160px repeat-y, var(--fizz) 79% 90px / 6px 240px repeat-y, var(--bubble) 91% 200px / 10px 480px repeat-y; }
+@keyframes abyss-rise { to { translate: 0 -480px; } }
+[data-look='abyss'] .toggle.on .toggle-track { background: var(--accent); box-shadow: var(--glow); }
+[data-look='abyss'] .theme { border-radius: 14px; }
+
+/* Manuscript: an illuminated manuscript. Parchment with a darkened edge, Luminari headings with a red and gold capital
+   and a ❧, Hoefler Text, rubricated selections marked ¶, double gold rules on the popups, a wax seal for the main button */
+[data-look='manuscript'] { --radius: 2px; --ui-font: 'Hoefler Text', Baskerville, Georgia, serif; --head: Luminari, 'Apple Chancery', serif; --gold: #c9a227; --rubric: #a8201a; }
+[data-look='manuscript'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); font-weight: 400; font-size: 22px; color: var(--fg); }
+[data-look='manuscript'] .settings-main h2::first-letter { color: var(--rubric); font-size: 1.5em; text-shadow: 1px 1px 0 var(--gold); }
+[data-look='manuscript'] .settings-main h2::after { content: '  \2767'; color: var(--rubric); font-size: 0.8em; }
+[data-look='manuscript'] .project-head { font-family: var(--head); font-size: 13px; text-transform: none; letter-spacing: 1px; color: var(--rubric); }
+[data-look='manuscript'] .sidebar { background: radial-gradient(ellipse at 30% 20%, rgba(255, 250, 235, 0.6), transparent 60%), var(--side); box-shadow: inset -12px 0 18px -10px rgba(110, 70, 20, 0.35); }
+[data-look='manuscript'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #a88a54; border-radius: 2px; background: var(--panel); font-variant: small-caps; letter-spacing: 0.5px; }
+[data-look='manuscript'] .seg button.on { background: var(--sel); color: var(--rubric); }
+[data-look='manuscript'] button.primary { border: none; border-radius: 40% 60% 55% 45% / 50% 45% 55% 50%; padding-inline: 16px; font-family: var(--head); color: #f8e6c8;
+  background: radial-gradient(circle at 40% 35%, #d0453a, #8a1610 70%); box-shadow: 0 2px 4px rgba(80, 10, 5, 0.4), inset 0 -2px 4px rgba(0, 0, 0, 0.3); }
+[data-look='manuscript'] input:not([type='radio'], [type='checkbox'], [type='range']) { border: none; border-bottom: 1px solid #a88a54; border-radius: 0; background: transparent; }
+[data-look='manuscript'] :is(select, textarea) { border-color: var(--line); background: #fbf4e2; }
+[data-look='manuscript'] :is(.menu, .modal, .tunnel-pop) { border: 1px solid #8a6a3a; border-radius: 2px; box-shadow: inset 0 0 0 3px var(--panel), inset 0 0 0 4px var(--gold), 0 12px 30px rgba(80, 50, 15, 0.3); }
+[data-look='manuscript'] .menu { padding: 8px; }
+[data-look='manuscript'] .menu-item:hover { background: #ecdcb0; color: var(--rubric); }
+[data-look='manuscript'] .ws.sel { background: transparent; border-left-color: transparent; color: var(--rubric); font-style: italic; }
+[data-look='manuscript'] .ws.sel::before { content: '\00B6'; margin-left: -9px; color: var(--rubric); }
+[data-look='manuscript'] .tab.sel { background: var(--bg); box-shadow: inset 0 2px 0 var(--tab-c, var(--rubric)); }
+[data-look='manuscript'] .settings-nav button.on { background: transparent; color: var(--rubric); font-style: italic; }
+[data-look='manuscript'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(ellipse at 85% 15%, rgba(150, 100, 30, 0.08), transparent 40%), radial-gradient(ellipse at 10% 90%, rgba(150, 100, 30, 0.07), transparent 45%), radial-gradient(ellipse at 50% 50%, transparent 60%, rgba(120, 80, 20, 0.12)); }
+[data-look='manuscript'] .toggle.on .toggle-track { background: var(--rubric); }
+[data-look='manuscript'] .theme { border-radius: 2px; }
+
+/* Mixtape: cassettes. Menus are label stickers (striped band, ruled lines, Marker Felt), tabs are spines, buttons are a
+   tape deck's chunky keys, ◎ ◎ reels by the headings */
+[data-look='cassette'] { --radius: 4px; --ui-font: 'Helvetica Neue', Helvetica, sans-serif; --hand: 'Marker Felt', Noteworthy, 'Comic Sans MS', sans-serif; --label: #f3ead6;
+  --stripes: linear-gradient(180deg, #ff6b35 0 4px, #ffcf4a 4px 8px, #4fc3d9 8px 12px); --key: linear-gradient(180deg, #d9d9dd, #a9a9b0); }
+[data-look='cassette'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--hand); font-size: 22px; font-weight: 400; }
+[data-look='cassette'] .settings-main h2::before { content: '\25CE\2009\25CE'; margin-right: 10px; font-family: var(--ui-font); color: var(--accent); }
+[data-look='cassette'] .project-head { font-family: var(--hand); font-size: 13px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--waiting); }
+[data-look='cassette'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #55555c; border-radius: 3px 3px 5px 5px; background: var(--key); color: #1b1a1e; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.5px; box-shadow: inset 0 1px 0 #fff, 0 3px 0 #55555c; }
+[data-look='cassette'] :is(.buttons button, .seg button, .scripts-tabs button):active { translate: 0 2px; box-shadow: inset 0 1px 0 #fff, 0 1px 0 #55555c; }
+[data-look='cassette'] .seg button.on { background: linear-gradient(180deg, #ff8a5a, #ff6b35); }
+[data-look='cassette'] button.primary { border: 1px solid #a83a10; border-radius: 3px 3px 5px 5px; background: linear-gradient(180deg, #ff8a5a, #e0501f); color: #fff; font-weight: 700;
+  text-transform: uppercase; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4), 0 3px 0 #a83a10; }
+[data-look='cassette'] .menu { --fg: #2a2218; --muted: #7a6a54; --sel: #ffe0a8; --line: #d8c8a8; border: none; border-radius: 6px; padding-top: 16px; color: var(--fg);
+  background: var(--stripes) top / 100% 12px no-repeat, repeating-linear-gradient(180deg, transparent 0 25px, rgba(60, 40, 20, 0.12) 25px 26px), var(--label);
+  box-shadow: 0 0 0 4px #2e2c33, 0 16px 40px rgba(0, 0, 0, 0.6); }
+[data-look='cassette'] .menu-item { font-family: var(--hand); font-size: 13.5px; }
+[data-look='cassette'] :is(.modal, .tunnel-pop) { padding-top: 22px; background: var(--stripes) top / 100% 12px no-repeat, var(--panel); }
+[data-look='cassette'] .tab { margin-right: 2px; background: #2e2c33; }
+[data-look='cassette'] .tab.sel { --fg: #2a2218; --muted: #7a6a54; background: var(--label); color: var(--fg); box-shadow: inset 0 3px 0 var(--tab-c, var(--accent)); }
+[data-look='cassette'] .ws.sel { --fg: #2a2218; --muted: #7a6a54; background: var(--label); color: var(--fg); border-left-color: var(--accent); font-family: var(--hand); }
+[data-look='cassette'] .settings-nav button.on { background: var(--label); color: #2a2218; }
+[data-look='cassette'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='cassette'] .theme { border-radius: 4px; }
+
+/* Workshop: a woodshop. Wood grain on the sidebar and popups, a pegboard tab bar, a tape measure for the status bar,
+   riveted steel buttons, a safety-orange main one, Phosphate headings */
+[data-look='workshop'] { --radius: 3px; --ui-font: 'DIN Alternate', 'Avenir Next Condensed', sans-serif; --head: Phosphate, Impact, sans-serif;
+  --grain: repeating-linear-gradient(92deg, transparent 0 7px, rgba(0, 0, 0, 0.12) 7px 8px, transparent 8px 19px, rgba(255, 220, 170, 0.05) 19px 21px), linear-gradient(90deg, #3a2716, #2c1d11 40%, #3a2716 70%, #2a1b10);
+  --rivet: radial-gradient(circle, #6a6e74 0 1.5px, transparent 2px); --steel: linear-gradient(180deg, #c8ccd2, #8e939a); }
+[data-look='workshop'] :is(.sidebar, .settings-nav) { background: var(--grain); }
+[data-look='workshop'] .tabbar { background: radial-gradient(circle, #1a1008 0 2.5px, transparent 3px) 0 0 / 16px 16px, #6a4f32; }
+[data-look='workshop'] .tab { background: #2a1d14; }
+[data-look='workshop'] .tab.sel { background: var(--bg); }
+[data-look='workshop'] .status { --fg: #1a1008; --muted: #4a3520; --waiting: #8a5a00; --done: #2f6a1a; --error: #a8200a; --running: #1a4f8a; --accent: #a8200a; border-top: none; color: var(--fg);
+  background: repeating-linear-gradient(90deg, #1a1008 0 1px, transparent 1px 8px) top / 100% 3px no-repeat, repeating-linear-gradient(90deg, #1a1008 0 1px, transparent 1px 40px) top / 100% 6px no-repeat, linear-gradient(#e8c66a, #d8b04a); }
+[data-look='workshop'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--head); font-size: 22px; font-weight: 400; letter-spacing: 1px; text-transform: uppercase; color: var(--accent); }
+[data-look='workshop'] .project-head { font-family: var(--head); font-size: 12px; font-weight: 400; letter-spacing: 1.5px; color: #e8c66a; }
+[data-look='workshop'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a4e54; border-radius: 3px; padding-inline: 14px; color: #1a1410; font-weight: 700;
+  background: var(--rivet) left 4px center / 4px 4px no-repeat, var(--rivet) right 4px center / 4px 4px no-repeat, var(--steel); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+[data-look='workshop'] .seg button.on { background: var(--rivet) left 4px center / 4px 4px no-repeat, var(--rivet) right 4px center / 4px 4px no-repeat, linear-gradient(#ffb36a, #ff7a1a); }
+[data-look='workshop'] button.primary { border: none; border-radius: 3px; background: var(--accent); color: #1a1410; font-family: var(--head); font-weight: 400; letter-spacing: 1px; text-transform: uppercase; box-shadow: inset 0 -3px 0 rgba(0, 0, 0, 0.25); }
+[data-look='workshop'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #5a4430; background: #120d09; }
+[data-look='workshop'] :is(.menu, .modal, .tunnel-pop) { border: 2px solid #1a1008; border-radius: 3px; background: var(--grain); box-shadow: inset 0 0 0 1px rgba(255, 220, 170, 0.15), 0 16px 40px rgba(0, 0, 0, 0.6); }
+[data-look='workshop'] .menu-item:hover { background: rgba(255, 122, 26, 0.25); }
+[data-look='workshop'] .ws.sel { background: rgba(255, 122, 26, 0.2); border-left-color: var(--accent); color: #fff; }
+[data-look='workshop'] .settings-nav button.on { background: rgba(255, 122, 26, 0.2); }
+[data-look='workshop'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% -15%, rgba(255, 200, 120, 0.08), transparent 55%); }
+[data-look='workshop'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='workshop'] .theme { border-radius: 3px; }
+
+/* Receipt: a till's thermal paper. Monaco, dashed rules, a barcode by the headings, popups torn off with a zigzag
+   edge, printed-black selections */
+[data-look='receipt'] { --radius: 0px; --ui-font: Monaco, Menlo, monospace;
+  --tear: conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 12px 6px repeat-x, linear-gradient(#000 0 0) top / 100% calc(100% - 6px) no-repeat; }
+[data-look='receipt'] :is(.settings-main h2, .tunnel-head b) { font-size: 13px; font-weight: 700; letter-spacing: 3px; text-transform: uppercase; }
+[data-look='receipt'] .settings-main h2::after { content: ''; display: inline-block; width: 70px; height: 14px; margin-left: 12px; vertical-align: -2px;
+  background: repeating-linear-gradient(90deg, var(--fg) 0 2px, transparent 2px 3px, var(--fg) 3px 4px, transparent 4px 7px, var(--fg) 7px 10px, transparent 10px 11px); }
+[data-look='receipt'] .project-head { letter-spacing: 2px; }
+[data-look='receipt'] .sidebar { border-right: 2px dotted #b8b8b0; }
+[data-look='receipt'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px dashed var(--fg); border-radius: 0; background: transparent; text-transform: uppercase; }
+[data-look='receipt'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='receipt'] .seg button.on { background: var(--fg); color: var(--bg); }
+[data-look='receipt'] button.primary { border: none; border-radius: 0; background: var(--fg); color: var(--bg); text-transform: uppercase; letter-spacing: 2px; }
+[data-look='receipt'] input:not([type='radio'], [type='checkbox'], [type='range']) { border: none; border-bottom: 1px dashed var(--fg); border-radius: 0; background: transparent; }
+[data-look='receipt'] :is(select, textarea) { border: 1px dashed var(--fg); border-radius: 0; }
+[data-look='receipt'] :is(.menu, .modal, .tunnel-pop) { border: 1px solid #e0e0d8; border-bottom: none; border-radius: 0; padding-bottom: 14px; background: #fff; box-shadow: none; -webkit-mask: var(--tear); mask: var(--tear); }
+[data-look='receipt'] .menu-item { border-radius: 0; }
+[data-look='receipt'] .menu-item:hover { background: var(--fg); color: var(--bg); }
+[data-look='receipt'] .ws.sel { --muted: #b8b8b0; background: var(--fg); color: var(--bg); border-left-color: transparent; }
+[data-look='receipt'] .settings-nav button.on { background: var(--fg); color: var(--bg); }
+[data-look='receipt'] .tab { border-radius: 0; }
+[data-look='receipt'] .tab.sel { background: #fff; box-shadow: inset 0 2px 0 var(--tab-c, var(--fg)); }
+[data-look='receipt'] :is(.tabbar, .settings-head) { border-bottom: 1px dashed var(--muted); }
+[data-look='receipt'] .status { border-top: 1px dashed var(--muted); }
+[data-look='receipt'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(90deg, rgba(0, 0, 0, 0.04), transparent 3%, transparent 97%, rgba(0, 0, 0, 0.04)); }
+[data-look='receipt'] :is(.toggle-track, .toggle-knob) { border-radius: 0; }
+[data-look='receipt'] .theme { border-radius: 0; }
+
+/* Aquarelle: watercolour on cold-press paper. Soft washes of blue, rose and ochre, Snell Roundhand headings,
+   wobbly deckled shapes for buttons and popups, a brush stroke under the selected tab */
+[data-look='aquarelle'] { --radius: 12px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --script: 'Snell Roundhand', 'Apple Chancery', cursive;
+  --wash: radial-gradient(ellipse 60% 40% at 15% 20%, rgba(79, 127, 196, 0.14), transparent 70%), radial-gradient(ellipse 50% 45% at 85% 70%, rgba(210, 112, 154, 0.12), transparent 70%),
+    radial-gradient(ellipse 45% 35% at 60% 10%, rgba(217, 154, 58, 0.1), transparent 70%);
+  --deckle: 14px 9px 16px 7px / 9px 15px 8px 14px; }
+[data-look='aquarelle'] :is(.sidebar, .settings-nav) { background: var(--wash), var(--side); }
+[data-look='aquarelle'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--script); font-size: 26px; font-weight: 700; color: #4f6fa8; }
+[data-look='aquarelle'] .project-head { color: var(--purple); letter-spacing: 1.5px; }
+[data-look='aquarelle'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: none; border-radius: var(--deckle); background: radial-gradient(ellipse at 30% 40%, rgba(79, 127, 196, 0.22), rgba(79, 127, 196, 0.1) 70%); }
+[data-look='aquarelle'] :is(.buttons button, .seg button, .scripts-tabs button):hover { background: radial-gradient(ellipse at 30% 40%, rgba(79, 127, 196, 0.32), rgba(79, 127, 196, 0.16) 70%); }
+[data-look='aquarelle'] .seg button.on { background: radial-gradient(ellipse at 30% 40%, rgba(210, 112, 154, 0.3), rgba(210, 112, 154, 0.12) 70%); }
+[data-look='aquarelle'] button.primary { border: none; border-radius: var(--deckle); background: radial-gradient(ellipse at 35% 35%, #7fa4dc, #4f7fc4 70%, #3f6fb4); color: #fff; box-shadow: 0 2px 6px rgba(79, 127, 196, 0.35); }
+[data-look='aquarelle'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 10px 6px 12px 5px / 6px 11px 5px 10px; background: var(--panel); }
+[data-look='aquarelle'] :is(.menu, .modal, .tunnel-pop) { border: none; border-radius: 18px 12px 20px 10px / 12px 20px 10px 18px; background: var(--wash), var(--panel); box-shadow: 0 10px 30px rgba(80, 60, 100, 0.18), 0 0 0 1px rgba(80, 60, 100, 0.06); }
+[data-look='aquarelle'] .menu-item:hover { background: rgba(79, 127, 196, 0.14); border-radius: var(--deckle); }
+[data-look='aquarelle'] .ws.sel { background: radial-gradient(ellipse 80% 120% at 30% 50%, rgba(79, 127, 196, 0.25), transparent 75%); border-left-color: transparent; }
+[data-look='aquarelle'] .settings-nav button.on { background: radial-gradient(ellipse 80% 120% at 30% 50%, rgba(79, 127, 196, 0.25), transparent 75%); }
+[data-look='aquarelle'] .tab.sel { box-shadow: none; background: linear-gradient(90deg, transparent, var(--tab-c, rgba(79, 127, 196, 0.55)) 15% 85%, transparent) bottom / 100% 3px no-repeat, var(--tab-sel, var(--term-bg)); }
+[data-look='aquarelle'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: var(--wash); opacity: 0.7; }
+[data-look='aquarelle'] .toggle-track { border-radius: 8px 5px 9px 4px / 5px 8px 4px 9px; }
+[data-look='aquarelle'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='aquarelle'] .theme { border-radius: var(--deckle); }
+
+/* Cosmos: the night sky. Stars on the sidebar, the popups and the terminals (some twinkling), a faint nebula, thin
+   letterspaced capitals with a ✦ and a line to the next star, Skia, round buttons and a sunrise main one */
+[data-look='cosmos'] { --radius: 8px; --ui-font: Skia, 'Avenir Next', sans-serif;
+  --stars: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 0.8px, transparent 1.2px) 0 0 / 97px 89px, radial-gradient(circle, rgba(255, 240, 200, 0.8) 0 1px, transparent 1.5px) 31px 47px / 151px 137px,
+    radial-gradient(circle, rgba(200, 220, 255, 0.7) 0 0.6px, transparent 1px) 63px 13px / 53px 61px; }
+[data-look='cosmos'] :is(.sidebar, .settings-nav) { background: var(--stars), radial-gradient(ellipse at 0 100%, rgba(122, 80, 255, 0.12), transparent 60%), var(--side); }
+[data-look='cosmos'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Avenir Next', var(--ui-font); font-weight: 200; font-size: 20px; letter-spacing: 6px; text-transform: uppercase; color: #fff; }
+[data-look='cosmos'] .settings-main h2::before { content: '\2726  '; color: var(--accent); }
+[data-look='cosmos'] .settings-main h2::after { content: ''; display: inline-block; width: 60px; height: 1px; margin-left: 12px; vertical-align: middle; background: linear-gradient(90deg, var(--accent), transparent); }
+[data-look='cosmos'] .project-head { color: var(--purple); letter-spacing: 3px; }
+[data-look='cosmos'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2a2f5a; border-radius: 999px; background: rgba(255, 255, 255, 0.03); }
+[data-look='cosmos'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='cosmos'] .seg button.on { border-color: var(--accent); color: var(--accent); }
+[data-look='cosmos'] button.primary { border: none; border-radius: 999px; background: linear-gradient(135deg, #ffd27a, #ff9a6a); color: #05060f; box-shadow: 0 0 14px rgba(255, 210, 122, 0.4); }
+[data-look='cosmos'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #2a2f5a; background: #04050c; }
+[data-look='cosmos'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #2a2f5a; border-radius: 12px; background: var(--stars), var(--panel); box-shadow: 0 0 0 1px rgba(255, 210, 122, 0.05), 0 20px 50px rgba(0, 0, 0, 0.7); }
+[data-look='cosmos'] .menu-item:hover { background: rgba(180, 138, 255, 0.14); }
+[data-look='cosmos'] .ws.sel { background: linear-gradient(90deg, rgba(180, 138, 255, 0.2), transparent); border-left-color: var(--accent); }
+[data-look='cosmos'] .settings-nav button.on { background: rgba(180, 138, 255, 0.16); }
+[data-look='cosmos'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.5;
+  background: radial-gradient(ellipse at 80% 20%, rgba(180, 138, 255, 0.12), transparent 50%), var(--stars); }
+[data-look='cosmos'] .term-wrap::before { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; animation: cosmos-twinkle 3.5s ease-in-out infinite alternate;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.9) 0 1px, transparent 1.6px) 17px 29px / 211px 173px, radial-gradient(circle, rgba(255, 210, 122, 0.8) 0 1.2px, transparent 2px) 120px 80px / 263px 227px; }
+@keyframes cosmos-twinkle { from { opacity: 0.15; } to { opacity: 0.7; } }
+[data-look='cosmos'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='cosmos'] .toggle.on .toggle-knob { box-shadow: 0 0 6px rgba(255, 210, 122, 0.8); }
+[data-look='cosmos'] .theme { border-radius: 10px; }
+@media (prefers-reduced-motion: reduce) { [data-look='modular'] .term-wrap::after, [data-look='abyss'] .term-wrap::before, [data-look='cosmos'] .term-wrap::before { animation: none; } }

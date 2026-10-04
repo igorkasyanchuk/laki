@@ -34,7 +34,7 @@ const TOOLS: Tool[] = [
       {
         project: str('a project id, from laki_state'),
         prompt: str('what the agent should do, as for a new colleague: the goal, where to look, how to tell it is done'),
-        preset: str('claude (the default), codex, a preset of theirs, shell or none'),
+        preset: str('claude (the default), codex, gemini, grok, opencode, a preset of theirs, shell or none'),
         name: str('a short name for the workspace and its branch'),
         base: str('the branch to start from (default: the repo’s current one)'),
         local: { type: 'boolean', description: 'work in the project’s own folder instead of a new worktree' },
@@ -78,7 +78,7 @@ const TOOLS: Tool[] = [
         project: str('a project id'),
         when: str('e.g. "weekdays at 9am", "every day at 2am except weekends", "every 2 hours from 9am to 6pm", "tomorrow at 7am"'),
         prompt: str('what the agent should do each run; {{DD-MM-YY}}-style dates become the run’s'),
-        preset: str('claude (the default), codex or a preset of theirs'),
+        preset: str('claude (the default), codex, gemini, grok, opencode or a preset of theirs'),
         name: str('the task’s name, also each run’s workspace name; may hold {{DD-MM}}'),
         where: str('new (a new worktree each run), local (the project folder, one session), local-new (the folder, a new session each run) or a workspace id'),
       },

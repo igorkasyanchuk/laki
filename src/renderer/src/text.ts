@@ -1,8 +1,12 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-// a prompt template (Settings → Prompt templates): {{prompt}} is what you type, {{project}} and {{base}}
-// the new workspace's; an unknown {{name}} stays as it is
-export type Template = { name: string; text: string }
+// a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
+// {{base}} the new workspace's; an unknown {{name}} stays as it is
+import type { RunAction, Template } from '../../shared/types'
+export type { Template }
+
+// a project's templates first, then the global ones it doesn't replace (one of the same name)
+export const templatesFor = (global: Template[] = [], project: Template[] = []) => [...project, ...global.filter(g => !project.some(t => t.name.trim() === g.name.trim()))]
 
 export const fillTemplate = (text: string, vars: Record<string, string | undefined>) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m)) // not {{constructor}}
 // the prompt through a template; one without {{prompt}} gets the typed text after it
@@ -28,8 +32,8 @@ export const MAIL_OK = /^(?:\*|[^\s@*,]+)@[^\s@*,]+\.[^\s@*,]+$/
 export const parseMails = (s: string) =>
   [...new Set(s.split(/[\s,;]+/).filter(Boolean).map(m => (m.includes('@') ? m.replace(/^@/, '*@') : `*@${m}`)))]
 
-// an action (Settings › Actions, or a project's): a prompt for Claude Code or Codex, or a command for a terminal
-export type RunAction = { name: string; target: 'claude' | 'codex' | 'shell'; text: string }
+// an action (Settings › Actions, or a project's): a prompt for an agent, or a command for a terminal
+export type { RunAction }
 export type ActionTab = { id: string; agent?: string; shell?: boolean } // a workspace's live tab: its agent, or a shell
 
 // Run ▾'s actions, worked out as it opens: the global ones, then the project's (one with a global one's name and

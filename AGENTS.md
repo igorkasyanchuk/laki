@@ -60,10 +60,11 @@ every view as `api`; a running daemon below the renderer's (it outlives app upda
 the app · restart* in the status bar (`StaleDaemon` in `ui.tsx`: `shutdown`, then main starts the new one).
 Bump `API` when the renderer starts relying on a new method or daemon behavior (1: the tunnel methods; 2: a
 project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a project's `actions`, kept by `projectSet`;
-4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever; 7: `prComment`, `muted`). A
+4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever; 7: `prComment`, `muted`; 8: a project's
+`templates`, kept by `projectSet`; 9: browsers in `apps`, `openIn` `default`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
-- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`), `openIn` (an app id, or `editor`: the default);
+- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `reorder` (projects or workspaces by id), `wsSet` (color, `muted`), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color, `muted`), `send`, `queueClear`;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
@@ -130,6 +131,24 @@ node/Electron path and the CLI's path, and map to states:
 | StopFailure | usage limit (`limits.ts`) |
 
 Codex gets `-c notify=[…,"hook","done"]`, which reports the thread id and the end of a turn.
+
+The other agents (`AGENTS` in `shared/types.ts`: the command is the id; `presets()` defaults to claude, codex and
+those on PATH):
+- **Gemini**: `gemini -i <prompt>` (0.4.1 answers a bare prompt and exits), `--resume <id>`. Hooks (versions that
+  have them, in a folder Gemini trusts) in `<data>/gemini-settings.json`, given as `GEMINI_CLI_SYSTEM_DEFAULTS_PATH`
+  (the lowest layer; hook lists add up with the user's): SessionStart (session_id), BeforeAgent/AfterTool (running),
+  Notification (waiting), AfterAgent (idle, `prompt_response`); each prints `{}` (gemini wants JSON back). Superset
+  puts the same hooks in `~/.gemini/settings.json`; Laki may not. Laki doesn't trust folders for it.
+- **OpenCode**: `opencode --prompt <p>`, `--session <id>`. `OPENCODE_CONFIG_DIR=<data>/opencode` (on top of the
+  user's config) loads `plugin/laki.js` (`OPENCODE_PLUGIN`): session.created (not a subagent's: `parentID`) →
+  start, session.status busy/idle (idle with the last answer, from `client.session.messages`),
+  permission.asked/question.asked → waiting, session.error → failed (an Esc's `MessageAbortedError`: interrupted), and
+  the idle after either says nothing; reports go one at a time, in order.
+- **Grok**: `grok --session-id <uuid> <prompt>`: Laki picks the chat's id, `--resume <id>` after. Its TUI takes hooks
+  only from `~/.grok` (or `~/.claude/settings.json`), so it has none: Enter or a prompt sets running; `sweepRunning`
+  reads its window title (`Session.title`: `BUSY` while it works, `ASKS` "Action Required": waiting) and ends the
+  turn after `QUIET` with no `BUSY` text, as a hook would (a done notification; a turn started by Enter only after 8s, `Runtime.since`: likely a menu). Gemini without
+  hooks too (`Runtime.hooked`: a hook came from the tab; `turn` is `hook` without marking it).
 
 ### Projects
 
@@ -297,7 +316,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
   `glassTerm` and `glassGlow`; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
   see-through `--app-bg` (with the glow's radial gradients), `--side` and `--term-bg` (`#rrggbbaa`: xterm reads only
-  that) and frosts what floats; the window's own blur is native
+  that); what floats is nearly opaque, never `backdrop-filter` (over the see-through window Electron repaints it badly:
+  flicker, stale tooltips, rectangles around menus); the window's own blur is native
   (`setVibrancy` over IPC). `main.tsx` loads the fonts
   before the first render: a terminal measures its cells once.
 - **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB);
@@ -306,7 +326,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   which replace a global one of the same name and target; an agent's only with a live tab of it, the focused one
   first; a shell's to the focused shell, any, or none: each app's `runAction` opens one), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and
   `MAIL_OK` (what the daemons take: kept in step with their `MAIL`/`mailRe`); prompt templates (`templated`, `fillTemplate`: `{{prompt}}`, `{{project}}`, `{{base}}`;
-  `settings.templates`, filled in by the new-workspace page; `nameOf`: a templated workspace's name from the typed
+  `settings.templates` and a project's `config.templates`, merged by `templatesFor`: the project's first, replacing a
+  global one of the same name; filled in by the new-workspace page; `nameOf`: a templated workspace's name from the typed
   prompt, the daemons' first-4-words rule) and `shortPath` (the status bar's).
 - **`PromptInput.tsx`**: a prompt with pasted/dropped images (saved by the daemon) and dictation;
   `withImages` appends their paths. The mic keeps the text box focused and starts dictation 150 ms later: macOS
@@ -322,8 +343,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 - **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size (its preview cancels
   that); presets, `EnvField` (KEY=value lines), fonts,
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
-  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, interface font, glass: `paint` applies
-  them at once, before the save), Prompt templates (`settings.templates`), Remote access (`RemoteSection`, shown when App.tsx
+  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, scrolled into view; interface font, glass: `paint` applies
+  them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…24h, then the QR code and link), and `ScriptsField` (a project's
   setup/teardown/run scripts, Import from a file). A
   setting back at its default is saved as that value: an unset key wouldn't replace the saved one. Projects
@@ -332,7 +353,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   file/folder, changed files marked), Changes (the diff by file, each line with its old and new numbers from the
   hunks; a click opens `CommentBox`: the PR, or the agent), Review (`PRSection` from `Info.tsx`, review
   threads), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line), `FileFinder` (⌘P, `findFiles`: a
-  basename match first); `RunButton` and `actionMenu` (Run ▾'s Agent and Terminal actions). App.tsx passes a `PanelApi` over the daemon. One right panel at a time: it or
+  basename match first); a right click in Files is App's `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Terminal actions). App.tsx passes a `PanelApi` over the daemon. One right panel at a time: it or
   the info panel.
 - **`Tunnel.tsx`**: Expose to the world: the status bar's globe next to each port (`TunnelButton`) and its
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
@@ -343,7 +364,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   folder picker, or a typed path in a browser, then `projectAdd`), the tasks (switch, Run now, edit, delete), the runs' log (a click goes to
   the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
   `laki.runsSeen` (localStorage: the newest run the page showed).
-- **`Usage.tsx`**: the status bar's first item, the plan-limits ring (`UsageButton`: the most-used limit, asked
+- **`Usage.tsx`**: the status bar's first item, the plan-limits ring (`UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
   every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset.
   `USAGE_AGENTS` names the agents Settings › General has switches for.
 - **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys, status glyphs, where things are, the main CLI
@@ -380,7 +401,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift` |
 
 ## Conventions

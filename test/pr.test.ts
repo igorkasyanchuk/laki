@@ -40,7 +40,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   // CI: gh's failing checks go to the agent (no log when gh has none)
   await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'ci' }), /no failing checks on PR #7/)
   writeFileSync(join(gh, 'checks.json'), JSON.stringify([{ name: 'test', bucket: 'fail', link: job(1) }, { name: 'e2e', bucket: 'fail', link: 'https://ci.invalid/2' }, { name: 'lint', bucket: 'pass', link: '' }]))
-  await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'ci' }), /has no running agent \(claude or codex\)/)
+  await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'ci' }), /has no running agent/)
   const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
   await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
   await rig.rpc('prFix', { ws: ws.id, what: 'ci' })

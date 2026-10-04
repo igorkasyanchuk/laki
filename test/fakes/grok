@@ -1,0 +1,32 @@
+#!/usr/bin/env node
+// fake grok: records its args, answers each prompt (no hooks: Laki reads its screen and title), then goes quiet;
+// "ask…" waits on a permission prompt (its title says Action Required) until y
+const fs = require('fs')
+const args = process.argv.slice(2)
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'grok', tab: process.env.LAKI_TAB, args }) + '\n')
+const ri = args.indexOf('--resume')
+if (ri >= 0 && args[ri + 1].startsWith('gone-')) {
+  process.stdout.write(`Error: session not found: ${args[ri + 1]}\r\n`)
+  process.exit(1)
+}
+process.stdout.write(`\x1b[?2004hfake grok ${args.join(' ')}\r\n`)
+const title = t => process.stdout.write(`\x1b]2;${t}\x07`)
+let asking = ''
+const turn = t => {
+  title('⠋ - Thinking - s - grok')
+  if (t.startsWith('ask')) return void ((asking = t), title('⚠ Action Required - s - grok'), process.stdout.write('allow? (y/n)\r\n'))
+  setTimeout(() => (title('s - grok'), process.stdout.write(`answer: ${t}\r\n> `)), 300)
+}
+const flags = ['--resume', '--session-id', '--model']
+const positional = args.filter((a, i) => !a.startsWith('--') && !flags.includes(args[i - 1]))
+if (positional.length) turn(positional.at(-1))
+else process.stdout.write('> ')
+let line = ''
+process.stdin.setRawMode(true)
+process.stdin.on('data', d => {
+  for (const ch of d.toString().replace(/\x1b\[20[01]~/g, '')) {
+    if (ch === '\r') { process.stdout.write('\r\n'); const t = line; line = ''; if (t === 'exit') process.exit(0); if (asking && t === 'y') { asking = ''; turn('allowed') } else turn(t) }
+    else if (ch === '\x03') process.exit(130)
+    else { line += ch; process.stdout.write(ch) }
+  }
+})

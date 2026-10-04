@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import type { NotifyKind } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, type NotifyKind, type Preset } from '../../shared/types'
 import { MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
@@ -18,8 +18,7 @@ const Says = ({ title, hint }: { title: ReactNode; hint?: ReactNode }) => (
   </span>
 )
 
-// how an agent starts: claude or codex with extra args, or any command; env on top of the project's
-export type Preset = { name: string; agent: 'claude' | 'codex' | 'command'; args?: string; cmd?: string; env?: Record<string, string> }
+export type { Preset }
 
 export type AppSettings = Paint & {
   editor?: string // an app id from the daemon's list, or 'custom' (editorCmd)
@@ -42,17 +41,12 @@ export type AppSettings = Paint & {
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
-  presets?: Preset[]
+  presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   remoteMail?: string // the one address remote access lets in
 }
 
-export type AppInfo = { id: string; name: string } // somewhere a folder can open
+export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
 
-export const DEFAULT_PRESETS: Preset[] = [
-  { name: 'claude', agent: 'claude' },
-  { name: 'codex', agent: 'codex' },
-]
-export const presetsOf = (s: AppSettings) => s.presets ?? DEFAULT_PRESETS
 
 const EXAMPLE_TEMPLATE: Template = {
   name: 'fix',
@@ -214,22 +208,55 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
-export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; env?: Record<string, string> } // expose: emails, *@domains
+export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string> } // expose: emails, *@domains
 export type ProjectInfo = { id: string; name: string; path: string; git: boolean; config?: ProjectConfig }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
-const TARGETS: [RunAction['target'], string][] = [
-  ['claude', 'Claude Code'],
-  ['codex', 'Codex'],
-  ['shell', 'Terminal'],
-]
+const TARGETS: [RunAction['target'], string][] = [...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Terminal']]
 const ACTION_EG: Record<RunAction['target'], string> = {
   claude: 'Run a code review twice and fix what it finds',
   codex: 'Run $code-review and fix the findings',
+  gemini: 'Review the changes and fix what you find',
+  grok: 'Review the changes and fix what you find',
+  opencode: 'Review the changes and fix what you find',
   shell: 'bundle exec rails db:migrate',
+}
+// a preset's args, for example
+const ARGS_EG: Record<Agent, string> = {
+  claude: '--model opus --permission-mode acceptEdits',
+  codex: '--model gpt-5 --full-auto',
+  gemini: '--model gemini-2.5-pro --approval-mode auto_edit',
+  grok: '--model grok-4.5 --permission-mode acceptEdits',
+  opencode: '--model anthropic/claude-sonnet-4-5 --agent build',
 }
 
 // actions (Settings › Actions, a project's): a name, who it's for, and the prompt or command
+// prompt templates (Settings › Prompt templates, and a project's own): a name and a text with {{prompt}}
+function TemplatesField({ value = [], onChange }: { value?: Template[]; onChange: (v: Template[]) => void }) {
+  const keys = useRef<number[]>([]) // like ActionsField's
+  while (keys.current.length < value.length) keys.current.push(Math.random())
+  const setAt = (i: number, t: Partial<Template>) => onChange(value.map((x, j) => (j === i ? { ...x, ...t } : x)))
+  const drop = (i: number) => (keys.current.splice(i, 1), onChange(value.filter((_, j) => j !== i)))
+  return (
+    <>
+      {value.map((t, i) => (
+        <div key={keys.current[i]} className="preset">
+          <div className="row">
+            <input value={t.name} placeholder="name" onChange={e => setAt(i, { name: e.target.value })} />
+            <IconButton icon="trash" title="Remove template" onClick={() => drop(i)} />
+          </div>
+          <textarea className="mono" rows={5} spellCheck={false} value={t.text} placeholder="Fix this: {{prompt}}" onChange={e => setAt(i, { text: e.target.value })} />
+        </div>
+      ))}
+      <div className="row">
+        <button type="button" onClick={() => onChange([...value, value.length ? { name: `template-${value.length + 1}`, text: '{{prompt}}' } : EXAMPLE_TEMPLATE])}>
+          <Icon name="plus" /> Add template
+        </button>
+      </div>
+    </>
+  )
+}
+
 function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange: (v: RunAction[]) => void }) {
   const keys = useRef<number[]>([]) // like keys, for the cards
   while (keys.current.length < value.length) keys.current.push(Math.random())
@@ -314,6 +341,12 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
           Actions <span className="muted">· in Run ▾ after the global ones (Settings › Actions); one with a global one's name replaces it here</span>
         </span>
         <ActionsField value={c.actions} onChange={actions => setC(y => ({ ...y, actions }))} />
+      </div>
+      <div className="field">
+        <span>
+          Prompt templates <span className="muted">· a new workspace here lists them first, then the global ones (Settings › Prompt templates); one with a global one's name replaces it</span>
+        </span>
+        <TemplatesField value={c.templates} onChange={templates => setC(y => ({ ...y, templates }))} />
       </div>
     </>
   )
@@ -509,10 +542,15 @@ export function SettingsPage(p: {
   script?: keyof Scripts // a project's script tab to show
   skill?: SkillApi
   remote?: RemoteApi
+  presets: Preset[] // the daemon's: the settings', or its defaults
 }) {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   const [sec, setSec] = useState(p.section ?? 'general')
+  // Appearance opens with the current theme in sight (66 of them)
+  useEffect(() => {
+    if (sec === 'appearance') document.querySelector('.themes .theme.on')?.scrollIntoView({ block: 'nearest' })
+  }, [sec])
   const set = (k: Partial<AppSettings>) => setS(x => ({ ...x, ...k }))
   // theme, glass, interface font: painted now (the app paints again once saved)
   const paint = (k: Partial<AppSettings>) => (applyTheme({ ...s, ...k }), set(k))
@@ -543,23 +581,15 @@ export function SettingsPage(p: {
     return () => window.removeEventListener('keydown', f, true)
   }, [onClose])
 
-  const presets = presetsOf(s)
+  const presets = s.presets ?? p.presets
   const setPreset = (i: number, p: Partial<Preset>) => set({ presets: presets.map((x, j) => (j === i ? { ...x, ...p } : x)) })
   // a key per preset card that survives removing one above it (names change as you type)
   const keys = useRef<number[]>([])
   while (keys.current.length < presets.length) keys.current.push(Math.random())
-  const setPresets = (next: Preset[], drop?: number) => {
+  const setPresets = (next: Preset[] | null, drop?: number) => {
     if (drop !== undefined) keys.current.splice(drop, 1)
-    if (next === DEFAULT_PRESETS) keys.current = []
+    if (!next) keys.current = []
     set({ presets: next })
-  }
-  const templates = s.templates ?? []
-  const tkeys = useRef<number[]>([]) // like keys, for template cards
-  while (tkeys.current.length < templates.length) tkeys.current.push(Math.random())
-  const setTemplate = (i: number, t: Partial<Template>) => set({ templates: templates.map((x, j) => (j === i ? { ...x, ...t } : x)) })
-  const setTemplates = (next: Template[], drop?: number) => {
-    if (drop !== undefined) tkeys.current.splice(drop, 1)
-    set({ templates: next })
   }
   const editor = s.editor || 'cursor'
   const fonts = useMemo(installedFonts, [])
@@ -739,11 +769,17 @@ export function SettingsPage(p: {
                     <button
                       key={t.id}
                       className={`theme ${on ? 'on' : ''}`}
+                      aria-pressed={on}
                       style={{ background: bg, color: fg }}
                       onClick={() => paint({ theme: t.id })}
                     >
                       <span className="theme-bar" style={{ background: panel }}>
                         <span style={{ background: accent }} />
+                        {on && (
+                          <b className="theme-check" style={{ background: fg, color: bg }}>
+                            ✓
+                          </b>
+                        )}
                       </span>
                       <span className="theme-dots">
                         {ansi.map((c, i) => (
@@ -835,7 +871,7 @@ export function SettingsPage(p: {
                 <select value={editor} onChange={e => set({ editor: e.target.value })}>
                   {!apps.some(a => a.id === editor) && editor !== 'custom' && <option value={editor}>{editor} (not found)</option>}
                   {apps
-                    .filter(a => a.id !== 'custom')
+                    .filter(a => a.id !== 'custom' && !a.browser)
                     .map(a => (
                       <option key={a.id} value={a.id}>
                         {a.name}
@@ -859,22 +895,10 @@ export function SettingsPage(p: {
               <h2>Prompt templates</h2>
               <p className="muted small">
                 Pick one under a new workspace's prompt and the agent gets it filled in: <code>{'{{prompt}}'}</code> is what you typed, <code>{'{{project}}'}</code> and{' '}
-                <code>{'{{base}}'}</code> the project and base branch. A template without <code>{'{{prompt}}'}</code> gets the prompt after it.
+                <code>{'{{base}}'}</code> the project and base branch. A template without <code>{'{{prompt}}'}</code> gets the prompt after it. Each project can
+                have its own too (its section below): they come first there.
               </p>
-              {templates.map((t, i) => (
-                <div key={tkeys.current[i]} className="preset">
-                  <div className="row">
-                    <input value={t.name} placeholder="name" onChange={e => setTemplate(i, { name: e.target.value })} />
-                    <IconButton icon="trash" title="Remove template" onClick={() => setTemplates(templates.filter((_, j) => j !== i), i)} />
-                  </div>
-                  <textarea className="mono" rows={5} spellCheck={false} value={t.text} placeholder="Fix this: {{prompt}}" onChange={e => setTemplate(i, { text: e.target.value })} />
-                </div>
-              ))}
-              <div className="row">
-                <button onClick={() => setTemplates([...templates, templates.length ? { name: `template-${templates.length + 1}`, text: '{{prompt}}' } : EXAMPLE_TEMPLATE])}>
-                  <Icon name="plus" /> Add template
-                </button>
-              </div>
+              <TemplatesField value={s.templates} onChange={templates => set({ templates })} />
             </>
           )}
           {sec === 'actions' && (
@@ -900,8 +924,11 @@ export function SettingsPage(p: {
                   <div className="row">
                     <input className="mono" value={p.name} placeholder="name" onChange={e => setPreset(i, { name: e.target.value.replace(/\s+/g, '-') })} />
                     <select value={p.agent} onChange={e => setPreset(i, { agent: e.target.value as Preset['agent'] })}>
-                      <option value="claude">Claude Code</option>
-                      <option value="codex">Codex</option>
+                      {AGENTS.map(a => (
+                        <option key={a} value={a}>
+                          {AGENT_NAMES[a]}
+                        </option>
+                      ))}
                       <option value="command">Command</option>
                     </select>
                     <IconButton icon="trash" title="Remove preset" onClick={() => setPresets(presets.filter((_, j) => j !== i), i)} />
@@ -912,7 +939,7 @@ export function SettingsPage(p: {
                     <input
                       className="mono"
                       value={p.args ?? ''}
-                      placeholder={p.agent === 'claude' ? '--model opus --permission-mode acceptEdits' : '--model gpt-5 --full-auto'}
+                      placeholder={ARGS_EG[p.agent as Agent]}
                       onChange={e => setPreset(i, { args: e.target.value })}
                     />
                   )}
@@ -923,9 +950,9 @@ export function SettingsPage(p: {
                 <button onClick={() => setPresets([...presets, { name: `claude-${presets.length + 1}`, agent: 'claude' }])}>
                   <Icon name="plus" /> Add preset
                 </button>
-                {JSON.stringify(presets) !== JSON.stringify(DEFAULT_PRESETS) && (
-                  <button className="link" onClick={() => setPresets(DEFAULT_PRESETS)}>
-                    Reset to claude and codex
+                {s.presets && (
+                  <button className="link" onClick={() => setPresets(null)}>
+                    Reset to the agents installed
                   </button>
                 )}
               </div>

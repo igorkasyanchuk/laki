@@ -2,7 +2,7 @@
 
 Everything Laki does, how to use it, and where it keeps things. The short version is the [README](../README.md).
 
-A macOS app for running coding agents (Claude Code, Codex, or any command) side by side, each in its own
+A macOS app for running coding agents (Claude Code, Codex, Gemini, Grok, OpenCode, or any command) side by side, each in its own
 git worktree. You get a sidebar of projects and workspaces, tabs per workspace, real terminals you can split
 into panes, and live agent status (running, waiting for you, finished). It also has a follow-up queue, a
 side panel (files, changes, review), a Run button, dev servers, listening ports, PRs and ship. Agents keep running when you quit the app;
@@ -18,14 +18,14 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Workspaces**: one git worktree and branch per task (or the repo or a plain folder itself), with setup and
   teardown scripts (worktrees only: a folder's own workspace never runs them), env, a `$PORT` of its own, and a
   name you can change.
-- **Agents**: Claude Code, Codex or any command, started from presets (args, env). Live status per tab and
+- **Agents**: Claude Code, Codex, Gemini, Grok, OpenCode or any command, started from presets (args, env). Live status per tab and
   workspace; notifications; a follow-up queue; resume after a restart; usage limits wait and continue.
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
   closed. ⌘F finds with every match in yellow; copy on select; font, size, line height, weight, cursor
   and zoom, with a live preview.
 - **New workspace prompt**: type, dictate (macOS dictation) or paste/drop screenshots; the agent gets the text
   and the images' paths. Prompt templates wrap it (`{{prompt}}`).
-- **Plan limits**: a ring in the status bar fills to the most-used limit of your Claude and Codex plans; click
+- **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans; click
   it for each one (5-hour, weekly, per model) and when it resets.
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI or new review
   comments to the agent on their own; an info panel with the PR, its checks and what the agents said last.
@@ -39,7 +39,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
   run script in its tab, ■ stops it; listening ports you click to open, or expose to the world (a public
   trycloudflare.com link and its QR code, optionally only for some email addresses).
-- **Look**: 50 themes, including Warp-style gradients and thirty-two that also change shapes, borders and type;
+- **Look**: 66 themes, including Warp-style gradients and forty-eight that also change shapes, borders and type;
   glass (a see-through window, as see-through as you set, with a color glow); Inter and JetBrains Mono built
   in; tab and workspace colors.
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
@@ -54,7 +54,8 @@ You need:
 - Node 22.6+ (23 recommended) and npm
 - git
 
-Optional: `gh` (logged in, for PRs and ship), `claude` and/or `codex` on your PATH.
+Optional: `gh` (logged in, for PRs and ship), and the agents you use on your PATH: `claude`, `codex`, `gemini`,
+`grok`, `opencode`. Each one found there is a preset; Claude Code and Codex always are.
 
 ```bash
 cd ~/projects/laki
@@ -79,7 +80,7 @@ npm link
 1. Open the app. It starts its background daemon if one isn't running.
 2. Add a project: **⌘O**, the folder icon at the top of the sidebar, or drag a folder from Finder onto the
    window. It can be a git repository or any other folder.
-3. The new-workspace page opens. Pick an agent (claude, codex, shell, or a custom command) and,
+3. The new-workspace page opens. Pick an agent (claude, codex, gemini, grok, opencode, shell, or a custom command) and,
    optionally, a first prompt.
    - For a git repository, also pick a base branch. The workspace gets a worktree in
      `~/.laki/worktrees/<project>/<id>` on branch `laki/<id>`, its setup command runs, then the
@@ -105,7 +106,7 @@ npm link
 - Drag projects, and workspaces within a project, to reorder them.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
-- ＋ in the tab bar opens a new tab: shell (⌘T), one of your agent presets (claude, codex, …) or a command.
+- ＋ in the tab bar opens a new tab: shell (⌘T), one of your agent presets (claude, codex, gemini, …) or a command.
 - Splitting:
   - Drag a tab onto a pane's edge: it moves into that tab, on that side.
   - *Split right* / *Split down* (⋯ menu or ⌘K) open a new shell next to the active pane.
@@ -117,8 +118,8 @@ npm link
   stays open to read, and ⏎ starts it again.
 - Each workspace remembers its tabs and splits.
 - Right click a tab (or a pane's header) for *Rename*, a color, *Split right/down*, *Move to its own tab*,
-  *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange and codex
-  tabs teal unless you pick another color (or none).
+  *Restart* (an ended agent or dev server), *Close* and *Close other tabs*. Claude tabs are orange, codex
+  teal, gemini blue, grok purple and opencode green, unless you pick another color (or none).
 
 **Menus:** every item has a key, shown on its right: press it while the menu is open (e.g. right click a
 workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 pick a color.
@@ -138,7 +139,7 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,
   opens `localhost:$PORT` or edits the script. With no run script, Run opens the project's scripts.
   ▾ also lists your actions (Settings → *Actions*, and the project's), worked out as it opens:
-  - *Agent actions*: a prompt for Claude Code or Codex, listed while the workspace runs that agent. It goes to
+  - *Agent actions*: a prompt for an agent (Claude Code, Codex, Gemini, Grok, OpenCode), listed while the workspace runs that agent. It goes to
     the focused tab if it's that agent, else its first tab, now or (while it works) when its turn ends.
   - *Terminal actions*: a command, typed into the focused shell, else the workspace's first, else a new one.
 
@@ -182,8 +183,8 @@ email address only.
 
 **Scheduled tasks** (the clock at the top of the sidebar, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
 times you write in plain English.
-- Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, or a preset of
-  theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
+- Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
+  OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
   project's own checkout or folder, a new agent and sidebar row every run; *In its folder, one session*: the same
   agent gets every run; or one of the project's workspaces: its running agent of that kind gets the prompt, queued
   while it works, or a new tab starts), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
@@ -200,7 +201,7 @@ times you write in plain English.
   minutes late (the Mac asleep, Laki not running) is skipped and logged as missed.
 
 **Plan limits** (the ring at the start of the status bar): green, yellow past 70%, red past 90%, filled to
-the most-used limit of the agents' plans. Click it for each agent's windows: Claude's 5-hour session, the week,
+the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
 the week per model and extra usage; Codex's 5-hour and weekly windows. Each shows when it resets. The daemon
 reads them the way Superset and CodexBar do: with the sign-in the agent already keeps on this Mac (Claude
 Code's Keychain item or `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the
@@ -212,7 +213,9 @@ until the agent's next run renews it. Settings › General turns each agent off 
   the like). Search filters by path. New file and new folder go in the selected folder; a new file opens in
   your editor. A click on a file previews it next to the terminal (text with line numbers, code in color up
   to 50 KB, or an image),
-  with *Open in editor*; a double-click opens it in the editor. Changed files are colored (modified, new, deleted) and their
+  with *Open in editor*; a double-click opens it in the editor. A right click opens it elsewhere: its default
+  app, a browser (HTML, SVG, PDF, images, JSON, XML), any editor, Finder (shows it), a terminal (in its folder);
+  or copies its path. Changed files are colored (modified, new, deleted) and their
   folders get a dot. Refresh, collapse all.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
   for its diff, with links to preview the file or open it in the editor. Click a line of a diff to write a
@@ -222,7 +225,7 @@ until the agent's next run renews it. Settings › General turns each agent off 
 - *Review*: the PR with its checks, the *fix CI* / *review* switches and the send buttons, and the open
   review threads (from reviewers with write access and bots: what the agent would get). Click a thread's
   file to preview it at that line.
-- *Preview*: the workspace's dev server in a browser: `$PORT` or a listening port (the menu), a path, back,
+- *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first, or a listening port (the menu), a path, back,
   forward, reload, open in your browser. The camera takes a screenshot of the page and sends it to the agent
   with what you write. It opens pages on this Mac (`localhost`, `127.0.0.1`; links may lead elsewhere), without
   popups, the camera, the microphone or clipboard reads. Its cookies are its own and kept. While the page has the focus, ⌘ keys go to it:
@@ -249,8 +252,8 @@ the prompt:
   thumbnail, and its path goes after your text;
 - the mic starts macOS dictation (or press Fn twice). *mic & language…* opens System Settings → Keyboard →
   Dictation, where you pick the microphone and the languages;
-- *Template* (under the prompt, once you have one in Settings → *Prompt templates*): the prompt goes in its
-  `{{prompt}}`; the box below shows what the agent will get;
+- *Template* (under the prompt, once you have one in Settings → *Prompt templates* or in the project's settings;
+  the project's come first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
 - ⌘⏎ creates it.
 
 **⌘K palette:** jump to any workspace or tab, or run any action.
@@ -303,9 +306,9 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups 
   variables for every session (a project's or preset's env wins over them).
 - *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
-  terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first): Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
+  terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked, in sight as the page opens): Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
   Velvet, Nightfall, Paper (light), Mist (light), and the Warp-style gradients Cyber Wave, Koi, Pink City, Leafy,
-  Aurora, Sunset and Snowy (light); and thirty-two ✦ themes that change more than colors: Phosphor (a CRT: mono,
+  Aurora, Sunset and Snowy (light); and forty-eight ✦ themes that change more than colors: Phosphor (a CRT: mono,
   dashed, glowing, scanlines), Neon Arcade (pills and glow), Brutalist (light: thick black lines, hard
   shadows), Bubblegum (light: round and soft), Blueprint (a drafting grid, mono capitals), Cyberpunk (clipped
   corners, hazard stripes, yellow tabs), Art Deco (gold double rules, serif capitals, a sunburst), Classic
@@ -327,21 +330,32 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups 
   hard shadows, caption boxes, speech-bubble popups, Ben-Day dots), Groovy (light: the seventies' four stripes,
   Cooper type, pills, a rainbow), Sonar (range rings and a slow sweep, a pulsing blip), Luna (light: a 2001
   desktop's blue title bars, a task pane, a green Start button), Quest (a role-playing game's blue windows and
-  ▶ pointer), Terrarium (leaf-shaped corners, moss, fireflies) and Bricks (light: toy bricks with studs).
+  ▶ pointer), Terrarium (leaf-shaped corners, moss, fireflies), Bricks (light: toy bricks with studs), Zero Day (a
+  hacker's green mono, a root prompt with a blinking cursor, [ bracketed ] buttons, digital rain behind the terminals),
+  Glitch (condensed caps split red and cyan, controls that jump on hover, a tear rolling down the terminals), Greenbar
+  (light: line-printer paper with green bands, tractor-feed holes, *** banner *** headings), Noir (black and white,
+  Didot italics, light through venetian blinds, film grain), Big Top (light: a striped valance, marquee bulbs around
+  the popups, a ticket button), Darkroom (a red safelight, a film strip with frame numbers down the sidebar), Transit
+  (light: a subway map, each workspace a station on the line, black signage), Modular (a synth rack: brushed
+  aluminium, screws, LED switches, an oscilloscope trace), Topo (light: contour lines, a map legend with a scale bar),
+  Abyss (the deep sea: bioluminescent glows, rising bubbles), Manuscript (light: parchment, Luminari capitals in red
+  and gold, a wax seal), Mixtape (cassette labels and tape-deck keys), Workshop (wood grain, a pegboard, a tape
+  measure for the status bar), Receipt (light: thermal paper torn off in a zigzag, a barcode), Aquarelle (light:
+  watercolour washes, Snell Roundhand) and Cosmos (stars that twinkle, a nebula).
   Terminals take its 16 colors.
 - *Terminal*: font (JetBrains Mono by default; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
   cursor style (block, bar, underline) and blinking, and copy selected text to the clipboard (on by default),
   with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
-- *Agent presets*: how agents start. A preset is Claude Code or Codex with extra arguments (e.g.
-  `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each one is in
-  the new-tab menu and the new-workspace page. Edit `claude` and `codex` to change how every new one
-  starts; a tab started from a preset uses its current settings when it restarts or resumes.
+- *Agent presets*: how agents start. A preset is an agent (Claude Code, Codex, Gemini, Grok, OpenCode) with extra
+  arguments (e.g. `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each
+  one is in the new-tab menu and the new-workspace page. The defaults are the agents on your PATH (*Reset to the
+  agents installed* goes back to them). Edit `claude` or `codex` to change how every new one starts; a tab started from a preset uses its current settings when it restarts or resumes.
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
   `{{base}}` the workspace's project and base branch; a template without `{{prompt}}` gets the prompt after
-  it. *Add template* starts from an example.
-- *Actions*: Run ▾'s shortcuts, each a name, who it's for (Claude Code, Codex or a terminal) and the prompt
+  it. *Add template* starts from an example. A project can have its own (its settings, below).
+- *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent or a terminal) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
   findings` for Codex, `bundle exec rails db:migrate` for a terminal.
 - *Agent skill*: installs a skill for Claude Code and Codex in your home folder (`~/.claude/skills/laki`,
@@ -369,6 +383,8 @@ tab). Saved as you type:
 - *Env*: `KEY=value` lines for every tab of the project's workspaces, and its setup and teardown.
 - *Expose to the world*: who can open its tunnels, as addresses and `*@domains` (e.g. `me@x.dev, *@team.com`).
   The popup starts from it every time: *Only these emails*, filled in. Empty: *Anyone with the link*.
+- *Prompt templates*: this project's, listed first under a new workspace's prompt here, then the global ones;
+  one with a global one's name replaces it. Saved in the app only.
 - *Actions*: Run ▾'s for this project, after the global ones; one with a global one's name and kind replaces
   it here (e.g. its own *Migrate*). Saved in the app only, not in `.laki.json`.
 
@@ -491,7 +507,8 @@ agents find their conversations by those paths. It holds:
 After pulling or changing the code, rebuild (`npm run pack`) and reopen the app. The running daemon stays the
 old build until it restarts. When the app relies on something that daemon lacks, the status bar says *daemon
 older than the app · restart*: click it, then again to confirm. Or run `laki stop` and open the app. Agents
-come back resumed (`claude --resume`, `codex resume`); shells and dev servers start fresh.
+come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`);
+shells and dev servers start fresh.
 
 Coming from Laki Electron (the app's old name): build, quit *Laki Electron*, and open `dist/mac-arm64/Laki.app`.
 It finds the same daemon and data, and says the daemon is older: restart it there. Then delete the old app. The
@@ -501,7 +518,7 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
 ## Troubleshooting
 
 - **The app shows "connecting to the daemon…"**: check `~/.laki/daemon.log`. To restart the daemon, run `laki stop`, then reopen the app.
-- **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude` and `codex` must be on the PATH your `~/.zshrc` sets.
+- **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude`, `codex` and the others must be on the PATH your `~/.zshrc` sets.
 - **No PR badge**: run `gh auth status`. PRs are checked once a minute.
 
 ## Known limits
@@ -510,5 +527,10 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
 - **Startup**: when the daemon starts, every tab of every workspace starts (agents resume). After a reboot that can mean many agents at once.
 - **Daemon**: if it dies, its terminals end. Agents come back resumed; shells start fresh.
 - **Codex** has no prompt hook, so "running" is a guess (Enter in an idle codex tab).
+- **How Laki follows the other agents**: OpenCode through a plugin of Laki's (`OPENCODE_CONFIG_DIR`, on top of your
+  config), Gemini through hooks in a settings file of Laki's (`GEMINI_CLI_SYSTEM_DEFAULTS_PATH`, added to yours;
+  Gemini versions with hooks, in folders Gemini trusts). Grok's terminal UI takes no hooks from outside `~/.grok`,
+  so Laki reads its screen and window title: Enter or a prompt starts a turn, *Action Required* is waiting, a few
+  quiet seconds end it and notify (a turn you started with Enter only after 8 seconds: a shorter one is likely a menu). Gemini without hooks works the same way. Laki never writes `~/.gemini`, `~/.grok` or `~/.config/opencode`.
 - **Snapshots** keep 5,000 lines of scrollback.
 - **Fork** copies commits only; uncommitted changes stay behind.

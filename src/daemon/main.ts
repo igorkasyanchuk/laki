@@ -59,7 +59,7 @@ const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
 if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 core.load()
-core.writeClaudeSettings()
+core.writeHooks()
 core.restoreAll()
 
 const token = randomBytes(32).toString('hex')

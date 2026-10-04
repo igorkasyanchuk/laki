@@ -117,7 +117,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           <Row k="Tabs">Drag a tab onto a pane to split it; double click to rename; right click for colors, split, restart.</Row>
           <Row k="▷ Run">The project’s run script in a dev tab, with $PORT; ■ stops it.</Row>
           <Row k="Status bar">
-            The plan-limits ring (the most-used limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT
+            The plan-limits ring (the 5-hour limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT
             (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review switches. <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in
             progress is cut off).
           </Row>
@@ -127,20 +127,20 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           </Row>
           <Row k="Sidebar">Right click a workspace to rename, color, fork or archive it; drag to reorder.</Row>
           <Row k="Templates">
-            Settings › Prompt templates: a prompt with <code>{'{{prompt}}'}</code> in it (and <code>{'{{project}}'}</code>, <code>{'{{base}}'}</code>). Pick one under a new
-            workspace's prompt: the agent gets it filled in.
+            Settings › Prompt templates, and each project's own: a prompt with <code>{'{{prompt}}'}</code> in it (and <code>{'{{project}}'}</code>, <code>{'{{base}}'}</code>). Pick one
+            under a new workspace's prompt: the agent gets it filled in.
           </Row>
           <Row k="Actions">
-            Settings › Actions (and a project's): a prompt for Claude Code or Codex, or a command for a terminal. Run ▾ lists them for the workspace you're in.
+            Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in.
           </Row>
           <Row k="Scheduled">
-            The clock at the top of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for Claude Code or Codex at times you write, like “every day at 2am except weekends”, in a
+            The clock at the top of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a
             new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {'{{DD-MM-YY}}'} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.
           </Row>
-          <Row k="Look">Settings › Appearance: themes (✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow) and the interface font.</Row>
-          <Row k="Files">The side panel's preview colors code up to 50 KB; the status bar's path has a copy button.</Row>
+          <Row k="Look">Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow) and the interface font.</Row>
+          <Row k="Files">The side panel's preview colors code up to 50 KB; right-click a file to open it in a browser or another app. The status bar's path has a copy button.</Row>
           <Row k="Changes">Click a line of a diff to comment on it: on the PR (GitHub), or to the agent.</Row>
-          <Row k="Preview">The side panel's Preview shows the dev server ($PORT or a listening port); the camera sends a screenshot to the agent.</Row>
+          <Row k="Preview">The toolbar's globe opens the side panel's Preview at localhost:$PORT (the menu has the other listening ports); the camera sends a screenshot to the agent.</Row>
           <Row k="Links">
             <code>laki://ws/&lt;id&gt;</code> opens a workspace (a workspace's or tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one,
             <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://help</code> open pages.

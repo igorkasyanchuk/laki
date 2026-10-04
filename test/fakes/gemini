@@ -1,0 +1,32 @@
+#!/usr/bin/env node
+// fake gemini: records its args, runs the hooks in $GEMINI_CLI_SYSTEM_DEFAULTS_PATH (each must print JSON), echoes
+const fs = require('fs'), { execSync } = require('child_process')
+const args = process.argv.slice(2)
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'gemini', tab: process.env.LAKI_TAB, args }) + '\n')
+const hooks = (() => { try { return JSON.parse(fs.readFileSync(process.env.GEMINI_CLI_SYSTEM_DEFAULTS_PATH, 'utf8')).hooks } catch { return {} } })()
+const val = f => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined)
+const session = val('--resume') ?? 'gem-' + Math.random().toString(36).slice(2, 8)
+const hook = (ev, payload) => {
+  for (const g of hooks[ev] ?? []) for (const h of g.hooks) {
+    const out = execSync(h.command, { input: JSON.stringify({ hook_event_name: ev, session_id: session, ...payload }), shell: '/bin/sh', timeout: 5000 }).toString()
+    JSON.parse(out) // gemini needs JSON back
+  }
+}
+process.stdout.write(`\x1b[?2004hfake gemini ${args.join(' ')}\r\n`)
+hook('SessionStart', { source: val('--resume') ? 'resume' : 'startup' })
+const turn = t => {
+  hook('BeforeAgent', { prompt: t })
+  process.stdout.write('⠋ Thinking (esc to cancel, 1s)\r\n')
+  setTimeout(() => (process.stdout.write(`answer: ${t}\r\n> `), hook('AfterAgent', { prompt: t, prompt_response: `answer: ${t}` })), 300)
+}
+if (val('-i')) turn(val('-i'))
+else process.stdout.write('> ')
+let line = ''
+process.stdin.setRawMode(true)
+process.stdin.on('data', d => {
+  for (const ch of d.toString().replace(/\x1b\[20[01]~/g, '')) {
+    if (ch === '\r') { process.stdout.write('\r\n'); const t = line; line = ''; if (t === 'exit') process.exit(0); turn(t) }
+    else if (ch === '\x03') process.exit(130)
+    else { line += ch; process.stdout.write(ch) }
+  }
+})

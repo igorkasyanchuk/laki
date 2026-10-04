@@ -21,13 +21,13 @@ function files(at: string): Record<string, string> {
     'laki': `#!/bin/sh\n# the laki CLI, for agents (written by laki: Settings → Agent skill)\nexec /usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')} "$@"\n`,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki.
 ---
 
 # Laki
 
 Laki runs each task in a **workspace**: a git worktree on its own branch (\`laki/<id>\`), or the repo itself
-(\`--local\`), with tabs for agents (claude, codex), shells and a dev server. A **project** is a repo (or a
+(\`--local\`), with tabs for agents (claude, codex, gemini, grok, opencode), shells and a dev server. A **project** is a repo (or a
 folder) added to Laki. The app shows all of it live; the CLI drives the same daemon.
 
 Run the CLI through this launcher (an absolute path: it works from any shell; keep the quotes):
@@ -51,7 +51,7 @@ ${USAGE}
 ## Start work
 
 1. \`laki ls --json\`: the projects (ids), workspaces (id, branch, path) and tabs with their status.
-2. \`laki new <project> --prompt "<task>" [--preset claude|codex] [--name short-name] [--base <branch>]\`:
+2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode] [--name short-name] [--base <branch>]\`:
    a new worktree on a new branch, set up by the project's setup script, with the agent started on the
    prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent.
 3. Check on it: \`laki screen <ws>\` (the agent's screen), \`laki ls --json\` (running, waiting for a
@@ -75,7 +75,7 @@ more than 30 minutes late is skipped and logged as missed).
 - \`--where\`: \`new\` (the default in a repo: a new worktree and workspace each run), \`folder\` (the project's
   own folder, no worktree, one session; the default for a folder without git), \`folder-new\` (the folder, a new
   session and sidebar row each run) or a workspace id (its running agent gets the prompt, queued while it works).
-- \`--preset claude|codex|<preset>\`; \`--name "Nightly deps {{DD-MM}}"\`: \`{{DD-MM-YY}}\`, \`{{YYYY-MM-DD}}\`,
+- \`--preset claude|codex|gemini|grok|opencode|<preset>\`; \`--name "Nightly deps {{DD-MM}}"\`: \`{{DD-MM-YY}}\`, \`{{YYYY-MM-DD}}\`,
   \`{{HH:mm}}\` or \`{{ddd D MMM}}\` in the name or the prompt become the run's date, so each run's workspace
   has its own name.
 - \`laki schedule\` lists them (id, next run), \`laki schedule log\` the last runs; \`on\`, \`off\`, \`run\` (now)

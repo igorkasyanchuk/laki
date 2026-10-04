@@ -294,6 +294,12 @@ export function useMenu(): [ReactNode, (e: MouseEvent, items: MenuItem[], align?
 // tooltips for anything with data-tip, after a short hover (WebKit doesn't show title tooltips reliably)
 export function Tips() {
   const [tip, setTip] = useState<{ text: string; x: number; y: number; below: boolean } | null>(null)
+  const box = useRef<HTMLDivElement>(null)
+  // centered on the element, but kept inside the window (measured before it's painted)
+  useLayoutEffect(() => {
+    const el = box.current
+    if (el && tip) el.style.left = `${Math.max(8, Math.min(tip.x - el.offsetWidth / 2, window.innerWidth - el.offsetWidth - 8))}px`
+  }, [tip])
   useEffect(() => {
     let timer = 0
     let cur: HTMLElement | null = null
@@ -326,7 +332,7 @@ export function Tips() {
   }, [])
   if (!tip) return null
   return (
-    <div className="tip" style={{ left: Math.min(Math.max(tip.x, 70), window.innerWidth - 70), top: tip.y, transform: `translate(-50%, ${tip.below ? '0' : '-100%'})` }}>
+    <div className="tip" ref={box} style={{ top: tip.y, transform: tip.below ? undefined : 'translateY(-100%)' }}>
       {tip.text}
     </div>
   )

@@ -8,7 +8,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { API, type Check, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type State, type Status, type Tab, type TabView, type Tunnel, type View, type Workspace } from '../shared/types.ts'
+import { AGENTS, API, type Check, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type State, type Status, type Tab, type TabView, type Template, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
@@ -19,22 +19,23 @@ export const dir = dataDir()
 const statePath = join(dir, 'state.json')
 const runDir = join(dir, 'run')
 export const settingsPath = join(dir, 'claude-settings.json')
+const opencodeDir = join(dir, 'opencode') // OPENCODE_CONFIG_DIR for its tabs: Laki's plugin, on top of the user's config
+const geminiSettings = join(dir, 'gemini-settings.json') // GEMINI_CLI_SYSTEM_DEFAULTS_PATH for its tabs: Laki's hooks, added to the user's
 export const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
-// the agents to start: Settings' presets, or claude and codex as they are
-const DEFAULT_PRESETS: Preset[] = [
-  { name: 'claude', agent: 'claude' },
-  { name: 'codex', agent: 'codex' },
-]
-export const presets = () => state.settings?.presets ?? DEFAULT_PRESETS
+// the agents to start: Settings' presets, or each agent as it is: claude and codex, and the others found on PATH
+// ponytail: looked for once; one installed later shows after a daemon restart, or added in Settings
+let found: Preset[] | undefined
+const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
+export const presets = (): Preset[] => state.settings?.presets ?? (found ??= AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a })))
 const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
 const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number }
+type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean }
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const prs = new Map<string, PR>()
@@ -71,7 +72,8 @@ export const cliEnv = process.versions.electron ? ['ELECTRON_RUN_AS_NODE=1'] : [
 export const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
 const hookCmd = (st: string) => [...cliEnv, ...cliArgv.map(q), 'hook', st].join(' ')
 
-export function writeClaudeSettings() {
+// how an agent's hooks reach `laki hook`: claude's settings file, gemini's, opencode's plugin
+export function writeHooks() {
   const h = (st: string, matcher?: string) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: hookCmd(st), timeout: 5 }] }]
   const settings = {
     hooks: {
@@ -86,7 +88,57 @@ export function writeClaudeSettings() {
     },
   }
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
+  // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
+  const g = (st: string) => [{ hooks: [{ type: 'command', command: `${hookCmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
+  const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
+  writeFileSync(geminiSettings, JSON.stringify(gemini, null, 2))
+  mkdirSync(join(opencodeDir, 'plugin'), { recursive: true })
+  writeFileSync(join(opencodeDir, 'plugin', 'laki.js'), OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(['/usr/bin/env', ...cliEnv, ...cliArgv])))
 }
+
+// opencode's events as claude's hooks: a session (not a subagent's) made, busy, asking, idle
+const OPENCODE_PLUGIN = `// Laki's plugin (Laki writes it): tells Laki when this tab's turns start and end
+import { execFile } from 'node:child_process'
+const hook = HOOK
+export const LakiPlugin = async ({ client }) => {
+  if (!process.env.LAKI_TAB || globalThis.__laki) return {}
+  globalThis.__laki = true
+  let last = Promise.resolve() // one report at a time, in order: running then waiting must not arrive swapped
+  const report = (state, payload = {}) =>
+    (last = last.then(async () => {
+      const p = typeof payload === 'function' ? await payload().catch(() => ({})) : payload
+      await new Promise(done => execFile(hook[0], [...hook.slice(1), 'hook', state, JSON.stringify(p)], () => done()))
+    }))
+  // the session's last answer, for the notification
+  const answer = async id => {
+    const { data = [] } = await client.session.messages({ path: { id } })
+    const m = data.findLast(m => m.info?.role === 'assistant')
+    return { last_assistant_message: (m?.parts ?? []).filter(x => x.type === 'text').map(x => x.text).join('\\n') }
+  }
+  const subagents = new Set()
+  let now = 'idle'
+  // a state once: failed or interrupted end the turn, so the idle that follows them says nothing
+  const to = (state, payload) => {
+    const k = state === 'running' || state === 'waiting' ? state : 'idle'
+    return k !== now && ((now = k), report(state, payload))
+  }
+  return {
+    event: async ({ event }) => {
+      const p = event.properties ?? {}
+      const id = p.sessionID ?? p.info?.id
+      if (event.type === 'session.created') return p.info?.parentID ? subagents.add(id) : report('start', { session_id: id })
+      if (!id || subagents.has(id)) return
+      const t = event.type === 'session.status' ? 'session.' + p.status?.type : event.type
+      if (t === 'session.busy') to('running')
+      else if (t === 'session.idle') to('idle', () => answer(id))
+      else if (t === 'session.error' && p.error?.name === 'MessageAbortedError') to('interrupted') // Esc
+      else if (t === 'session.error') to('failed', { error: p.error?.data?.message ?? p.error?.message })
+      else if (t === 'permission.asked' || t === 'question.asked') to('waiting')
+    },
+    'tool.execute.after': async input => now === 'waiting' && !subagents.has(input?.sessionID) && to('running'), // answered
+  }
+}
+`
 
 // A Finder-launched app has a bare PATH: take the login shell's, so git/gh/claude are found.
 export function adoptLoginPath() {
@@ -105,13 +157,26 @@ const rtOf = (id: string) => {
   return r
 }
 
-export const hasHooks = (t: Tab) => t.kind === 'agent' && (t.preset === 'claude' || t.preset === 'codex')
+// an agent whose turns Laki follows: by its hooks (HOOKED), or by its screen (sweepRunning)
+export const tracked = (t: Tab) => t.kind === 'agent' && isAgent(t.preset)
+// a hook, notify or plugin says when a turn ends; gemini's do in versions that have hooks (Runtime.hooked: one came)
+const HOOKED = new Set(['claude', 'codex', 'opencode'])
+// what an agent shows while it works, on screen or in its window title: a quiet screen without it means the turn is over
+const BUSY: Record<string, RegExp> = {
+  claude: /esc to interrupt/i,
+  codex: /esc to interrupt/i,
+  gemini: /esc to cancel|working…/i,
+  grok: /^[^\n]* - (thinking|responding|running|compacting|waiting)\b/i, // its title (the first line): "⠋ - Thinking - <session> - grok"
+  opencode: /esc (again to )?interrupt/i,
+}
+const ASKS = /action required/i // gemini's and grok's title while a permission prompt waits
+const QUIET = 4000
 
 export function view(): View {
   const tabs: TabView[] = state.tabs.map(t => {
     const s = sessions.get(t.id)
     const r = rtOf(t.id)
-    const status: Status = !s || s.exited ? 'exited' : hasHooks(t) ? r.status : 'idle'
+    const status: Status = !s || s.exited ? 'exited' : tracked(t) ? r.status : 'idle'
     return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last }
   })
   return {
@@ -258,7 +323,7 @@ export function projectConfig(ws: Workspace): ProjectConfig {
       break
     } catch {}
   }
-  const { env, actions: _, ...cmds } = proj?.config ?? {} // actions: the renderer's (Run ▾)
+  const { env, actions: _, templates: __, ...cmds } = proj?.config ?? {} // actions, templates: the renderer's (Run ▾, a new workspace's prompt)
   const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => v?.trim()))
   return { ...file, ...own, env: { ...file.env, ...env } }
 }
@@ -272,9 +337,15 @@ export function projectFileConfig(ref: string): ProjectConfig {
   }
 }
 
-// a project's actions as kept: for claude, codex or a shell (an unfinished one too, as Settings has it: Run ▾ skips it)
+// a project's prompt templates as kept: a name and a text each
+const templatesOk = (l: unknown): Template[] | undefined => {
+  const ok = (Array.isArray(l) ? l : []).filter((t): t is Template => typeof t?.name === 'string' && typeof t.text === 'string')
+  return ok.length ? ok.map(t => ({ name: t.name, text: t.text })) : undefined
+}
+
+// a project's actions as kept: for an agent or a shell (an unfinished one too, as Settings has it: Run ▾ skips it)
 function actionsOk(l: unknown): RunAction[] | undefined {
-  const ok = (Array.isArray(l) ? l : []).filter((a): a is RunAction => typeof a?.name === 'string' && typeof a.text === 'string' && ['claude', 'codex', 'shell'].includes(a.target))
+  const ok = (Array.isArray(l) ? l : []).filter((a): a is RunAction => typeof a?.name === 'string' && typeof a.text === 'string' && (a.target === 'shell' || isAgent(a.target)))
   return ok.length ? ok.map(a => ({ name: a.name, target: a.target, text: a.text })) : undefined
 }
 
@@ -289,6 +360,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       run: o.config.run?.trim() || undefined,
       expose: o.config.expose?.trim() || undefined,
       actions: actionsOk(o.config.actions),
+      templates: templatesOk(o.config.templates),
       env: Object.keys(env).length ? env : undefined,
     }
   }
@@ -351,26 +423,41 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
     PORT: String(ws.port),
     LAKI_HOME: dir,
     LAKI_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
+    // ponytail: these replace one the user set
+    ...(tab.preset === 'opencode' && { OPENCODE_CONFIG_DIR: opencodeDir }),
+    ...(tab.preset === 'gemini' && { GEMINI_CLI_SYSTEM_DEFAULTS_PATH: geminiSettings }), // the lowest layer; hooks add up
     ...extra,
   }
 }
 
 function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean): string {
   const pr = presetOf(tab)
+  const again = resume && tab.resumeId // its chat, again
   let argv: string[]
+  let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
   if (tab.preset === 'claude') {
     argv = ['claude', '--settings', settingsPath]
-    if (resume && tab.resumeId) argv.push('--resume', tab.resumeId)
+    if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
   } else if (tab.preset === 'codex') {
-    argv = resume && tab.resumeId ? ['codex', 'resume', tab.resumeId] : ['codex']
+    argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
     argv.push('-c', 'notify=' + JSON.stringify(['/usr/bin/env', ...cliEnv, ...cliArgv, 'hook', 'done']))
+  } else if (tab.preset === 'gemini') {
+    argv = again ? ['gemini', '--resume', again] : ['gemini']
+    if (ask.length) ask = ['-i', ...ask] // a bare prompt would answer it and exit
+  } else if (tab.preset === 'grok') {
+    // grok takes the id of a new chat, so the tab knows its chat from the start
+    if (!again) (tab.resumeId = randomUUID()), save()
+    argv = ['grok', again ? '--resume' : '--session-id', tab.resumeId!]
+  } else if (tab.preset === 'opencode') {
+    argv = again ? ['opencode', '--session', again] : ['opencode']
+    if (ask.length) ask = ['--prompt', ...ask] // its positional is a folder
   } else {
     return (pr?.agent === 'command' && pr.cmd?.trim()) || tab.cmd || 'true'
   }
   // a preset's args go in as written (a shell runs the line), before the prompt
-  return [argv.map(q).join(' '), pr?.args?.trim(), prompt && !resume ? q(prompt) : ''].filter(Boolean).join(' ')
+  return [argv.map(q).join(' '), pr?.args?.trim(), ask.map(q).join(' ')].filter(Boolean).join(' ')
 }
 
 type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string> }
@@ -392,6 +479,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   sessions.set(tab.id, s)
   const r = rtOf(tab.id)
   r.status = o.prompt && !o.resume ? 'running' : 'idle'
+  r.since = undefined // a turn started by a prompt, not by Enter (input): it always notifies
   r.done = false
   s.onExit = code => {
     if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true })
@@ -414,12 +502,12 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
 
 // what claude --resume / codex resume print for a chat id they don't have.
 // ponytail: matched by message; a reworded message means Enter retries the dead id.
-const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|(conversation|session|thread)\b[^\n]*not found/i
+const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|(conversation|session|thread)\b[^\n]*not found|invalid session identifier|session does not exist/i
 
 // why addTab would refuse an agent: checked before wsNew makes a worktree for it
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
-  if (preset && !['claude', 'codex', 'shell', 'custom'].includes(preset) && !presetNamed(preset))
+  if (preset && !isAgent(preset) && preset !== 'shell' && preset !== 'custom' && !presetNamed(preset))
     throw new Error(`unknown preset ${preset} (see Settings: Agent presets)`)
 }
 
@@ -527,17 +615,30 @@ export const APPS: Record<string, string> = {
   ghostty: 'Ghostty',
 }
 
-// the apps installed (Finder and Terminal always are)
+// what a file can also open in (the Files panel's right click)
+export const BROWSERS: Record<string, string> = {
+  safari: 'Safari',
+  chrome: 'Google Chrome',
+  firefox: 'Firefox',
+  arc: 'Arc',
+  brave: 'Brave Browser',
+  edge: 'Microsoft Edge',
+}
+const TERMINALS = ['terminal', 'iterm', 'warp', 'ghostty'] // a file opens its folder in them
+
+// the apps installed (Finder and Terminal always are); browsers are only for files
 export function apps() {
   const dirs = ['/Applications', '/System/Applications/Utilities', join(homedir(), 'Applications')]
-  return Object.entries(APPS)
+  return Object.entries({ ...APPS, ...BROWSERS })
     .filter(([id, name]) => id === 'finder' || dirs.some(d => existsSync(join(d, `${name}.app`))))
-    .map(([id, name]) => ({ id, name }))
+    .map(([id, name]) => ({ id, name, ...(BROWSERS[id] && { browser: true }) }))
 }
 
-// open a workspace's (or a project's) folder in an app; 'editor' is the one in Settings
+// open a workspace's (or a project's) folder, or a file in it, in an app; 'editor' is the one in Settings, 'default'
+// macOS's for the file
 export async function openIn(o: { ws?: string; project?: string; app: string; file?: string }) {
-  const path = o.file && o.ws ? inside(findWs(o.ws), o.file) : o.ws ? findWs(o.ws).path : findProject(o.project ?? '').path
+  const file = !!(o.file && o.ws)
+  const path = file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : findProject(o.project ?? '').path
   const s = state.settings ?? {}
   const app = o.app === 'editor' ? s.editor || 'cursor' : o.app
   const fail = (e: any) => {
@@ -547,8 +648,10 @@ export async function openIn(o: { ws?: string; project?: string; app: string; fi
     if (!s.editorCmd?.trim()) throw new Error('set the editor command in Settings (⌘,)')
     return void (await run(shell, ['-lc', `${s.editorCmd} "$1"`, 'editor', path], { timeout: 20000 }).catch(fail))
   }
-  if (!APPS[app]) throw new Error(`no app ${app}`)
-  await run('open', app === 'finder' ? [path] : ['-a', APPS[app], path]).catch(fail)
+  const name = APPS[app] ?? BROWSERS[app]
+  if (!name && app !== 'default') throw new Error(`no app ${app}`)
+  const args = app === 'default' || app === 'finder' ? [...(file && app === 'finder' ? ['-R'] : []), path] : ['-a', name, file && TERMINALS.includes(app) && !statSync(path, { throwIfNoEntry: false })?.isDirectory() ? dirname(path) : path]
+  await run('open', args).catch(fail)
 }
 
 export function closeTab(id: string) {
@@ -701,6 +804,12 @@ export function restoreAll() {
 // ---------- agent status (hooks)
 
 export function hook(p: { tab: string; state: string; payload?: any }) {
+  if (state.tabs.some(t => t.id === p.tab)) rtOf(p.tab).hooked = true
+  turn(p)
+}
+
+// a turn's state, from a hook or from the screen (sweepRunning)
+function turn(p: { tab: string; state: string; payload?: any }) {
   const tab = state.tabs.find(t => t.id === p.tab)
   if (!tab) return
   const r = rtOf(tab.id)
@@ -731,12 +840,13 @@ export function hook(p: { tab: string; state: string; payload?: any }) {
         tab.resumeId = id
         save()
       }
-      const last = pl.last_assistant_message ?? pl['last-assistant-message']
+      const last = pl.last_assistant_message ?? pl['last-assistant-message'] ?? pl.prompt_response // claude's, codex's, gemini's
       if (last) {
         r.last = String(last)
         writeFileSync(join(runDir, `${tab.id}.last`), r.last)
       }
-      if (p.state === 'failed' || tab.preset === 'codex') checkLimit(tab, p.state === 'failed' ? `${last ?? ''}\n${JSON.stringify(pl.error_details ?? pl.error ?? '')}` : '')
+      const err = pl.error_details ?? pl.error ?? '' // a message as it is: quoted, a limit notice isn't read
+      if (p.state === 'failed' || tab.preset === 'codex') checkLimit(tab, p.state === 'failed' ? `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}` : '')
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '' })
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
@@ -775,7 +885,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean }) {
   if (!s || s.exited) throw new Error(`${tab.name} isn't running`)
   const r = rtOf(tab.id)
   if (p.whenIdle) {
-    if (!hasHooks(tab)) throw new Error(`${tab.name} doesn't report when it's done (claude and codex do): send it now`)
+    if (!tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
     if (r.status !== 'idle' || r.limit || tab.queue?.length) {
       tab.queue = [...(tab.queue ?? []), p.text]
       save()
@@ -784,7 +894,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean }) {
     }
   }
   typeInto(s, p.text)
-  if (hasHooks(tab)) r.status = 'running'
+  if (tracked(tab)) r.status = 'running'
   changed()
   return { tab: tab.id, sent: true }
 }
@@ -809,7 +919,7 @@ export function clearQueue(target: string) {
   changed()
 }
 
-// input from a client's keyboard. Codex reports only the end of a turn: Enter starts one.
+// input from a client's keyboard. Agents but claude don't say when a turn starts: Enter does.
 export function input(id: string, data: string, c?: Client) {
   const s = sessions.get(id)
   if (!s) return
@@ -820,11 +930,13 @@ export function input(id: string, data: string, c?: Client) {
     return
   }
   s.write(data)
-  if (tab?.preset === 'codex' && data.includes('\r') && rtOf(id).status === 'idle') {
-    rtOf(id).status = 'running' // ponytail: Enter in an idle codex starts a turn; its notify ends it
+  if (tab && tracked(tab) && tab.preset !== 'claude' && data.includes('\r') && rtOf(id).status === 'idle') {
+    // ponytail: Enter in an idle agent starts a turn (claude's hook says so itself); codex's notify ends it, the
+    // others' quiet screen (sweepRunning)
+    Object.assign(rtOf(id), { status: 'running', since: Date.now() })
     changed()
   }
-  if (tab && hasHooks(tab) && (data === '\x1b' || data === '\x03')) interrupted(tab.id, s)
+  if (tab && tracked(tab) && (data === '\x1b' || data === '\x03')) interrupted(tab.id, s)
 }
 
 // Esc or ⌃C stops a turn, and no hook says so: idle once the screen shows "Interrupted" (claude's
@@ -1213,13 +1325,13 @@ async function autoPR(ws: Workspace, pr: PR) {
   }
 }
 
-// the workspace's agent: the first claude or codex tab
-const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => hasHooks(t) && sessions.get(t.id) && !sessions.get(t.id)!.exited)
+// the workspace's agent: its first live agent tab
+const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && sessions.get(t.id) && !sessions.get(t.id)!.exited)
 
 // tellAgent types text into the workspace's agent, now or when its turn ends
 function tellAgent(ws: Workspace, text: string) {
   const tab = agentOf(ws)
-  if (!tab) throw new Error(`${ws.id} has no running agent (claude or codex)`)
+  if (!tab) throw new Error(`${ws.id} has no running agent`)
   return send({ target: tab.id, text, whenIdle: true })
 }
 
@@ -1315,13 +1427,25 @@ function reviewMessage(pr: PR, threads: Thread[], push: boolean) {
 }
 
 // a turn that ended without a hook (an interrupt, a resumed chat's recap): running, no output for a
-// while and no "esc to interrupt" on screen (claude and codex show it while they work) means idle
+// while and no "esc to interrupt" on screen (claude and codex show it while they work) means idle. For an agent
+// without hooks it's how every turn ends: done, as a hook would say (ponytail: a turn under 8s, likely Enter on a
+// menu, ends without a notification)
 export function sweepRunning(now = Date.now()) {
   for (const t of state.tabs) {
     const s = sessions.get(t.id)
     const r = rt.get(t.id)
-    if (!s || s.exited || r?.status !== 'running' || !hasHooks(t) || now - s.lastOutput < 4000) continue
-    if (/esc to interrupt/i.test(s.screenText(15))) continue
+    const screen = tracked(t) && !HOOKED.has(t.preset!) && !r?.hooked // no hooks: the screen and title are all it says
+    if (screen && s && !s.exited && r && r.status !== 'idle') {
+      const asks = ASKS.test(s.title)
+      if (asks && r.status === 'running') turn({ tab: t.id, state: 'waiting' })
+      else if (!asks && r.status === 'waiting') turn({ tab: t.id, state: 'running' }) // answered
+    }
+    if (!s || s.exited || r?.status !== 'running' || !tracked(t) || now - s.lastOutput < QUIET) continue
+    if (BUSY[t.preset!]?.test(`${s.title}\n${s.screenText(15)}`)) continue
+    if (screen && now - (r.since ?? 0) > 2 * QUIET) {
+      turn({ tab: t.id, state: 'idle' })
+      continue
+    }
     r.status = 'idle'
     changed()
     if (t.queue?.length) setTimeout(() => deliver(t.id), 800) // what waited for this turn's end (autoPR's too)
@@ -1526,7 +1650,6 @@ const RUNS_SHOWN = 50
 // a run this late (the Mac asleep, Laki not running) is skipped, and the log says so
 // ponytail: missed runs never catch up; run them on wake if that's what people want
 export const MISSED_AFTER = 30 * 60e3
-const AGENTS = ['claude', 'codex']
 
 const findSchedule = (id: string) => {
   const s = state.schedules?.find(x => x.id === id)
@@ -1557,8 +1680,8 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     const agent = state.settings?.agent
     s.preset ||= agent && presetNamed(agent) && presetNamed(agent)!.agent !== 'command' ? agent : 'claude'
   }
-  const pr = presetNamed(s.preset) // claude or codex: a command preset takes no prompt
-  if (!(pr ? pr.agent !== 'command' : AGENTS.includes(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't a claude or codex preset`)
+  const pr = presetNamed(s.preset) // an agent's: a command preset takes no prompt
+  if (!(pr ? pr.agent !== 'command' : isAgent(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't an agent's preset`)
   if (s.ws === 'new') {
     if (proj.git === false) throw new Error(`${proj.name} isn't a git repository: run it in its folder instead of a new workspace`)
   } else if (s.ws !== 'local' && s.ws !== 'local-new') {
@@ -1626,7 +1749,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       r.ws = ws.id
       const live = tabsOf(ws.id).find(t => t.kind === 'agent' && (t.profile ?? t.preset) === s.preset && sessions.get(t.id) && !sessions.get(t.id)!.exited)
       if (live) {
-        const sent = send({ target: live.id, text: prompt, whenIdle: hasHooks(live) })
+        const sent = send({ target: live.id, text: prompt, whenIdle: tracked(live) })
         r.tab = live.id
         r.what = 'queued' in sent ? `queued for ${live.name} (it was working)` : `sent to ${live.name}`
       } else {

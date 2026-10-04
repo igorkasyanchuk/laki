@@ -172,6 +172,69 @@ test('codex: notify ends a turn and records the thread id', async t => {
   assert.match(tv.resumeId, /^thread-/)
 })
 
+test('grok: Laki picks its chat id, a quiet screen ends its turn, a restart resumes the chat', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  assert.ok((await rig.rpc('state')).presets.some((x: any) => x.name === 'grok'), 'an agent on PATH is a default preset')
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'grok', prompt: 'hello grok' })
+  const tab = await rig.tab(ws.id)
+  assert.equal(tab.status, 'running')
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'grok'), 'grok up')
+  assert.equal(run.args[0], '--session-id')
+  assert.equal(run.args[1], tab.resumeId)
+  assert.match(tab.resumeId, /^[0-9a-f-]{36}$/)
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle once its screen is quiet', 10000)
+  // its title says when it asks, and when it's answered
+  await rig.rpc('input', { tab: tab.id, data: 'ask to edit\r' })
+  await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting: Action Required in its title', 6000)
+  await rig.rpc('input', { tab: tab.id, data: 'y\r' })
+  await until(async () => (await rig.tab(ws.id)).status !== 'waiting', 'answered', 6000)
+  await rig.stop()
+  await rig.start()
+  await until(() => rig.fakeLog().filter(l => l.bin === 'grok').length === 2, 'grok restarted')
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'grok')[1].args, ['--resume', tab.resumeId])
+})
+
+test('gemini: its hooks (from Laki\'s system settings) give the session and the answer; a restart resumes it', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'gemini', prompt: 'hello gemini' })
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'gemini'), 'gemini up')
+  assert.deepEqual(run.args, ['-i', 'hello gemini']) // interactive: a bare prompt would answer and exit
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: hello gemini', 'AfterAgent hook')
+  const tab = await rig.tab(ws.id)
+  assert.equal(tab.status, 'idle')
+  assert.match(tab.resumeId, /^gem-/)
+  await rig.stop()
+  await rig.start()
+  await until(() => rig.fakeLog().filter(l => l.bin === 'gemini').length === 2, 'gemini restarted')
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'gemini')[1].args, ['--resume', tab.resumeId])
+})
+
+test('opencode: Laki\'s plugin reports its session and turns (not a subagent\'s), a restart resumes the session', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'opencode', prompt: 'hello opencode' })
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'opencode'), 'opencode up')
+  assert.deepEqual(run.args, ['--prompt', 'hello opencode'])
+  const id = (await until(async () => (await rig.tab(ws.id)).resumeId, 'session id from the plugin')) as string
+  assert.match(id, /^ses_/)
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle from the plugin')
+  const tab = await rig.tab(ws.id)
+  assert.equal(tab.last, 'answer: hello opencode') // read from its session by the plugin
+  // an error, then the idle after it: one end of turn, so the limit it set stays
+  await rig.rpc('input', { tab: tab.id, data: 'hit the limit\r' })
+  const hit = await until(async () => (await rig.tab(ws.id)).limit && (await rig.tab(ws.id)), 'limit from the error')
+  await new Promise(r => setTimeout(r, 1500))
+  assert.equal((await rig.tab(ws.id)).limit, hit.limit, 'the idle after the error keeps the limit')
+  await rig.rpc('input', { tab: tab.id, data: 'ask first\r' })
+  await until(async () => (await rig.tab(ws.id)).status === 'waiting', 'waiting on a permission')
+  await rig.stop()
+  await rig.start()
+  await until(() => rig.fakeLog().filter(l => l.bin === 'opencode').length === 2, 'opencode restarted')
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'opencode')[1].args, ['--session', id])
+})
+
 test('resume after a daemon restart: agents get --resume <id>, shells start fresh', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -374,8 +437,10 @@ test('a folder without git is a project (local workspaces only); project setting
     { name: 'x', target: 'vim', text: 'ls' },
     { name: 'y', target: 'codex', text: ' ' },
   ]
-  const withActions = await rig.rpc('projectSet', { id: p.id, config: { run: 'echo from-app', actions } })
+  const templates = [{ name: 'fix', text: 'Fix {{prompt}}', extra: 1 }, { name: 'bad' }, { text: 'no name' }]
+  const withActions = await rig.rpc('projectSet', { id: p.id, config: { run: 'echo from-app', actions, templates } })
   assert.deepEqual(withActions.config.actions, [actions[0], actions[1], actions[2], actions[4]])
+  assert.deepEqual(withActions.config.templates, [{ name: 'fix', text: 'Fix {{prompt}}' }])
   // and the run script still comes from the config with them in it
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })
   const dev = await rig.rpc('run', { ws: ws.id })

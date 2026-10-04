@@ -87,7 +87,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     <Page title="Scheduled tasks" onClose={onClose}>
       <div className="schedules">
         <p className="muted small">
-          A prompt for Claude Code or Codex at the times you write, like “every day at 2am except weekends”. Laki runs it while it's running (the
+          A prompt for an agent at the times you write, like “every day at 2am except weekends”. Laki runs it while it's running (the
           daemon, not the window): a run the Mac slept through is skipped, and the log says so.
         </p>
         {err && <div className="field-err">{err}</div>}

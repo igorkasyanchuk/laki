@@ -1,4 +1,4 @@
-// The status bar's first item: a ring filled to the most-used limit of the agents' plans, and its popup with every
+// The status bar's first item: a ring filled to the shortest limit (the 5-hour session) of the agents' plans, and its popup with every
 // limit (the 5-hour session, the week, per model) and when each resets. The daemon reads them with the agents' own
 // sign-in, at most every 5 minutes (usage.ts); Settings › General picks the agents.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
@@ -15,9 +15,10 @@ const NAMES = USAGE_AGENTS
 // a window whose reset has passed starts over
 const live = (w: UsageWindow, now: number) => (w.resets && w.resets <= now ? 0 : w.used)
 const level = (p: number) => (p >= 90 ? 'high' : p >= 70 ? 'mid' : 'low')
+// the ring's: the shortest window, which usage.ts lists first (Claude's 5-hour, Codex's primary)
 const topOf = (r: AgentUsage, now: number) => {
-  const ps = r.windows.filter(w => !w.note).map(w => live(w, now))
-  return ps.length ? Math.max(...ps) : undefined
+  const w = r.windows.find(w => !w.note)
+  return w && live(w, now)
 }
 
 export function resetsIn(t: number, now: number) {

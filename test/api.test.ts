@@ -141,8 +141,13 @@ test('apps and open in: Finder, an app, a file, the editor; errors', async t => 
   await rig.rpc('openIn', { project: p.id, app: 'finder' })
   await rig.rpc('openIn', { ws: ws.id, app: 'zed', file: 'README.md' })
   await rig.rpc('openIn', { ws: ws.id, app: 'editor' }) // Cursor, unless Settings say otherwise
+  // a file: its default app, a browser, revealed in Finder, its folder in a terminal
+  for (const app of ['default', 'safari', 'finder', 'terminal']) await rig.rpc('openIn', { ws: ws.id, app, file: 'README.md' })
+  mkdirSync(join(ws.path, 'docs'))
+  await rig.rpc('openIn', { ws: ws.id, app: 'terminal', file: 'docs' }) // a folder: itself
   const opened = readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('open '))
-  assert.deepEqual(opened, [`open ${p.path}`, `open -a Zed ${join(ws.path, 'README.md')}`, `open -a Cursor ${ws.path}`])
+  const readme = join(ws.path, 'README.md')
+  assert.deepEqual(opened, [`open ${p.path}`, `open -a Zed ${readme}`, `open -a Cursor ${ws.path}`, `open ${readme}`, `open -a Safari ${readme}`, `open -R ${readme}`, `open -a Terminal ${ws.path}`, `open -a Terminal ${join(ws.path, 'docs')}`])
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'zed', file: 'gone.txt' }), /The file \S+gone\.txt does not exist\./)
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'emacs' }), /no app emacs/)
   await rig.rpc('settingsSet', { editor: 'custom' })

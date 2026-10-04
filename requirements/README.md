@@ -1,6 +1,6 @@
 # Laki: what we're building
 
-Laki is a macOS desktop app for running several coding agents at once (Claude Code, Codex, or any command
+Laki is a macOS desktop app for running several coding agents at once (Claude Code, Codex, Gemini, Grok, OpenCode, or any command
 line program), each task in its own git worktree, in real terminals. You see every agent's state at a
 glance, step in when one needs you, and ship its branch as a PR. It's the successor of **wb**
 (`~/projects/specdrop-cli`), a tmux + iTerm workbench with the same goal.
@@ -26,8 +26,10 @@ cmux.
 
 ## Principles
 
-- **Agents stay real CLIs.** `claude` and `codex` run in real PTYs, exactly as in a terminal. Status comes
-  from the agents' own hooks (Claude's `--settings` hooks, Codex's `notify`), not from screen scraping.
+- **Agents stay real CLIs.** `claude`, `codex`, `gemini`, `grok` and `opencode` run in real PTYs, exactly as in a
+  terminal. Status comes from the agents' own hooks (Claude's `--settings` hooks, Codex's `notify`, Gemini's hooks
+  and an OpenCode plugin, all given through flags or env, never the user's config), not from screen scraping;
+  only Grok, which takes no hooks from outside its home, is read from its screen and window title.
   A headless mode (stream-json, codex app-server) may come later.
 - **A daemon owns the sessions.** The app is a client: closing it never stops an agent. Background work
   (PR checks, usage-limit waits, the follow-up queue) runs in the daemon, with the app open or not.
@@ -37,7 +39,8 @@ cmux.
 - **Isolation by default.** One worktree and branch per task (`laki/<id>`), its own `$PORT`, its own setup.
   Local (in the repo) and plain (no git) folders work too.
 - **Small and boring.** Few dependencies, platform features first, no telemetry. Data stays in the app's
-  own folder; `~/.claude` and `~/.codex` are only written when the user installs the skill.
+  own folder; `~/.claude` and `~/.codex` are only written when the user installs the skill; `~/.gemini`,
+  `~/.grok` and `~/.config/opencode` never.
 
 ## Stack
 
@@ -54,7 +57,8 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - **Workspace**: one task. A git worktree on branch `<prefix><id>` (default `laki/`), or the repo itself
   (*local*), or the folder (*plain*). Has a `$PORT`, a color, a name, and maybe a PR.
 - **Tab**: holds one terminal or several panes (split, stacked). Kinds: agent, shell, setup, dev (Run), ship.
-- **Preset**: how an agent starts: Claude Code, Codex or any command, with args and env.
+- **Preset**: how an agent starts: Claude Code, Codex, Gemini, Grok, OpenCode or any command, with args and env.
+  The defaults: Claude Code, Codex and the others found on PATH.
 - **Status**: running, waiting (a permission prompt), done while you weren't looking, idle, usage limit,
   ended (ok / failed). A workspace shows its most urgent tab.
 - **Queue**: follow-ups typed into an agent when its turn ends (`send --when-idle`).
@@ -80,7 +84,8 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - Live status per tab and workspace, macOS notifications when an off-screen tab waits or finishes: which kinds
   (waiting, finished, usage limit) and the sound in Settings, a workspace or tab muted from its menu.
 - Esc / ⌃C interrupt goes back to idle. Usage limits: wait for the reset, then type `continue`.
-- Resume after a daemon restart: `claude --resume`, `codex resume`. The app menu's *Quit … Completely*
+- Resume after a daemon restart: `claude --resume`, `codex resume`, `gemini --resume`, `grok --resume` (Laki picks
+  its chat id), `opencode --session`. The app menu's *Quit … Completely*
   stops the daemon too (asking first when an agent is working). A daemon older than the app (it outlives
   updates) gets a restart button in the status bar.
 - ⌘F find in the terminal; copy on select; font, size, line height, weight, contrast, cursor, zoom.
@@ -93,22 +98,24 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - Info panel (⌘I): PR, checks, description, what each agent said last.
 
 **Files**
-- Side panel (⌥⌘B): files (changed ones marked), changes against the base with diffs, PR review threads.
+- Side panel (⌥⌘B): files (changed ones marked), changes against the base with diffs, PR review threads. A right
+  click on a file: its default app, a browser (HTML, SVG, PDF, images…), any Open in app, or Copy path.
 - A diff line's comment: posted on the PR at that line (`gh api`), or sent to the agent with the file and line.
-- Preview: the dev server in the side panel (a webview kept to localhost), back, forward, a port picker; a
+- Preview: the dev server in the side panel (a webview kept to localhost; the toolbar's globe opens it at $PORT),
+  back, forward, a port picker; a
   screenshot goes to the agent with a note.
 - ⌘P / "Find files…" in ⌘K: fuzzy file search; preview text and images in the app; ⌘W closes the preview.
 - Open in any installed editor or terminal (⌘E for the default).
 
 **Run**
 - ▷ Run starts the project's run script in a dev tab with `$PORT`; ■ stops it; open `localhost:$PORT`.
-- Actions (Settings, global and per project): a name and a prompt for Claude Code or Codex, or a command for a
+- Actions (Settings, global and per project): a name and a prompt for an agent, or a command for a
   terminal. Run ▾ lists them in two groups, Agent actions (only agents the workspace runs) and Terminal
   actions; a project's replaces a global one of the same name and kind.
-- Plan limits: a ring at the start of the status bar, filled to the most-used limit of the Claude and Codex
+- Plan limits: a ring at the start of the status bar, filled to the 5-hour limit of the Claude and Codex
   plans; its popup lists each window (5-hour, weekly, per model, extra usage) and when it resets. Read with the
   agents' own sign-in (never refreshed), at most every 5 minutes; Settings turns each agent off.
-- Scheduled tasks: a prompt for an agent (claude, codex or a preset of theirs) in a project (or any folder), in a new workspace
+- Scheduled tasks: a prompt for an agent (claude, codex, gemini, grok, opencode or a preset of theirs) in a project (or any folder), in a new workspace
   each run, the folder itself (no worktree) or one workspace's agent, at times written in English (`every day at 2am except weekends`, `every
   2 hours from 9am to 6pm`, `tomorrow at 7am`); `{{DD-MM-YY}}`-style dates in the name and prompt, so each run's workspace is
   told apart (and has a clock in the sidebar); a log of runs (missed ones too); a clock in the sidebar's header.
@@ -125,13 +132,14 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - ⌘/ (or the sidebar's ?): a page with the keys, status glyphs, where things are and the main CLI commands.
 
 **Look**
-- 50 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; thirty-two of
+- 66 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; forty-eight of
   them also change shapes, borders and type (a CRT, Win95-style bevels, Aqua gel, soft clay, a handheld's LCD, a
-  ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass, stained glass, a comic, a radar…).
+  ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass, stained glass, a comic, a radar, a hacker's terminal, a darkroom…).
   Glass (a see-through, blurred window, with
   sliders for the window, sidebar and terminals, and a color glow); Inter and
   JetBrains Mono bundled as the default interface and terminal fonts; an interface font setting.
-- Prompt templates (`{{prompt}}`, `{{project}}`, `{{base}}`) picked under a new workspace's prompt.
+- Prompt templates (`{{prompt}}`, `{{project}}`, `{{base}}`) picked under a new workspace's prompt: global ones and a
+  project's own (listed first; one of a global one's name replaces it).
 - File preview with syntax colors (up to 50 KB); the status bar's path short, with a copy button.
 - Tab and workspace colors; compact layout aligned with the window's traffic lights; resizable, collapsible
   sidebar (⌘B).
@@ -146,7 +154,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 ## Quality bar
 
 - macOS on Apple silicon first.
-- End-to-end tests with fake `claude`, `codex` and `gh`, temp homes and their own daemons; never the real
+- End-to-end tests with fake `claude`, `codex`, `gemini`, `grok`, `opencode` and `gh`, temp homes and their own daemons; never the real
   data folders. Coverage of daemon and CLI code: 90%+.
 - Typing latency and screen replay fidelity are the main risks for a terminal app; both are checked by hand
   on each big change.

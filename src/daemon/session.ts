@@ -25,6 +25,7 @@ export class Session {
   exited = false
   exitCode = 0
   lastOutput = Date.now() // when the program last printed
+  title = '' // the window title it set (OSC 0/2): gemini's and grok's say whether they work or ask
   onExit: (code: number) => void = () => {}
   onOutput: (data: string) => void = () => {}
 
@@ -34,6 +35,7 @@ export class Session {
     const rows = opts.rows || 32
     this.term = new headless.Terminal({ cols, rows, scrollback: SCROLLBACK, allowProposedApi: true })
     this.term.loadAddon(this.ser as any)
+    this.term.onTitleChange(t => (this.title = t))
     // headless replies go to the PTY only while no client answers instead
     this.term.onData(d => {
       if (!this.responder && !this.exited) this.pty.write(d)

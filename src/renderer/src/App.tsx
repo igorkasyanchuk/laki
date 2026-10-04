@@ -4,7 +4,7 @@ import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
 import { AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt } from './panels'
-import { type AppInfo, FONT_SIZE, isSection, presetsOf, SettingsPage, type SkillInfo, termLook } from './Settings'
+import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { Glyph } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
@@ -39,11 +39,14 @@ function rollup(tabs: TabView[]) {
   return limit && best !== 'waiting' && best !== 'running' ? 'limit' : best
 }
 
-// a tab's color: its own, else claude's or codex's ('none' turns that off)
-const colorOf = (t?: TabView) => t?.color ?? (t?.preset === 'claude' ? 'orange' : t?.preset === 'codex' ? 'teal' : undefined)
+// a tab's color: its own, else its agent's ('none' turns that off)
+const AGENT_COLORS: Record<string, string> = { claude: 'orange', codex: 'teal', gemini: 'blue', grok: 'purple', opencode: 'green' }
+const colorOf = (t?: TabView) => t?.color ?? AGENT_COLORS[t?.preset ?? '']
 
 // where a folder opens: editors (one of them is ⌘E's), Finder, terminals
 const EDITOR_IDS = ['cursor', 'zed', 'vscode', 'windsurf', 'sublime', 'webstorm', 'intellij', 'xcode', 'custom']
+type Where = { ws?: string; project?: string; file?: string } // what Open in opens: a folder, or a file in a workspace
+const WEB = /\.(x?html?|svg|pdf|xml|json|png|jpe?g|gif|webp)$/i // what browsers show
 const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_IDS.includes(id) ? 'code' : 'terminal')
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
@@ -224,7 +227,7 @@ export function App() {
       }
     } else if (l?.to === 'new') {
       if (!view.projects.length) return toast('Add a project first (⌘O)')
-      const presets = [...presetsOf(view.settings).map(p => p.name), 'shell', 'none']
+      const presets = [...view.presets.map(p => p.name), 'shell', 'none']
       if (l.project && !proj(l.project)) toast(`No project ${l.project}: pick one`)
       setNewFor(proj(l.project))
       setNewInit({ prompt: l.prompt, name: l.name, ...(l.preset && presets.includes(l.preset) && { preset: l.preset }) })
@@ -363,6 +366,7 @@ export function App() {
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
     toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent')),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
+    menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
   })
   const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast('Copied'), fail)
   const tunnelApi = (w: WorkspaceView): TunnelApi => ({
@@ -375,18 +379,28 @@ export function App() {
   const settings = view?.settings ?? {}
   const tracked = Object.keys(USAGE_AGENTS).filter(a => settings.usage?.[a] !== false) // the status bar's plan limits
   const editor = settings.editor || 'cursor'
-  const targets: AppInfo[] = [...apps, ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
+  const targets: AppInfo[] = [...apps.filter(a => !a.browser), ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
   const editorName = targets.find(a => a.id === editor && a.id !== 'custom')?.name ?? 'editor'
-  const openIn = (app: string, where: { ws?: string; project?: string } = { ws: ws?.id }) => {
+  const openIn = (app: string, where: Where = { ws: ws?.id }) => {
     call('openIn', { ...where, app }).catch(() => {})
-    // an editor picked from the list is ⌘E's from now on
-    if (EDITOR_IDS.includes(app) && app !== editor) call('settingsSet', { editor: app }).catch(() => {})
+    // an editor picked from the list is ⌘E's from now on (for a folder: a file's pick is just for it)
+    if (EDITOR_IDS.includes(app) && app !== editor && !where.file) call('settingsSet', { editor: app }).catch(() => {})
   }
   // Open in: every app, ⌘E's first
-  const openInItems = (where: { ws?: string; project?: string } = { ws: ws?.id }): MenuItem[] =>
+  const openInItems = (where: Where = { ws: ws?.id }): MenuItem[] =>
     [...targets]
       .sort((a, b) => Number(b.id === editor) - Number(a.id === editor))
-      .map(a => ({ label: a.name, icon: appIcon(a.id), hint: a.id === editor ? '⌘E' : undefined, run: () => openIn(a.id, where) }))
+      .map(a => ({ label: a.name, icon: appIcon(a.id), hint: a.id === editor && !where.file ? '⌘E' : undefined, run: () => openIn(a.id, where) }))
+  // right click in Files: a file in its default app, a browser (for what they show), or any app (Finder reveals it,
+  // a terminal opens its folder)
+  const fileMenu = (w: WorkspaceView, file: string, dir: boolean): MenuItem[] => [
+    { head: 'Open in' },
+    ...(dir ? [] : [{ label: 'Default app', icon: 'file', key: 'o', run: () => openIn('default', { ws: w.id, file }) } as MenuItem]),
+    ...(!dir && WEB.test(file) ? apps.filter(a => a.browser).map(a => ({ label: a.name, icon: 'globe', run: () => openIn(a.id, { ws: w.id, file }) }) as MenuItem) : []),
+    ...openInItems({ ws: w.id, file }),
+    null,
+    { label: 'Copy path', icon: 'copy', key: 'c', run: () => copy(`${w.path}/${file}`) },
+  ]
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)
   const fontSize = settings.fontSize ?? FONT_SIZE
   const zoomed = useRef(fontSize) // the size asked for last: quick presses add up before the view comes back
@@ -736,6 +750,7 @@ export function App() {
                 <>
                   <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
                   <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => showInfo()} />
+                  <IconButton icon="globe" title={`Preview localhost:${ws.port}`} on={panelOpen && panelTab === 'preview'} onClick={() => togglePanel('preview')} />
                 </>
               )}
               <IconButton icon="panel" title="Files, changes, review, preview (⌥⌘B)" on={panelOpen} onClick={() => togglePanel()} />
@@ -847,6 +862,7 @@ export function App() {
           <SettingsPage
             key={settingsKey}
             settings={view.settings}
+            presets={view.presets}
             apps={apps}
             onClose={() => setDialog(null)}
             onSave={s => call('settingsSet', s).catch(() => {})}

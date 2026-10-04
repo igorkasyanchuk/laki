@@ -3,7 +3,7 @@ import type { View } from '../../shared/types'
 import { api, bridge } from './api'
 import { Glyph } from './Glyph'
 import { type Img, PromptInput, TemplatePick, withImages } from './PromptInput'
-import { nameOf, templated } from './text'
+import { nameOf, templated, templatesFor } from './text'
 import { Icon, type IconName, Page } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -33,10 +33,11 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
   const [saving, setSaving] = useState(false) // an image isn't saved yet
   const [tpl, setTpl] = useState('') // a prompt template's index ('' none)
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
-  const templates = view.settings.templates ?? []
+  const templates = templatesFor(view.settings.templates, view.projects.find(x => x.id === p.project)?.config?.templates)
   const filled = templated(tpl ? templates[Number(tpl)] : undefined, p.prompt ?? '', { project: view.projects.find(x => x.id === p.project)?.name, base: p.base })
   const plain = view.projects.find(x => x.id === p.project)?.git === false // a folder without git: local only
   useEffect(() => {
+    setTpl('') // another project, other templates
     if (!p.project) return
     api.call('branches', { project: p.project }).then(
       r => {

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { fillTemplate, MAIL_OK, nameOf, parseMails, shortPath, templated } from '../src/renderer/src/text.ts'
+import { fillTemplate, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -11,6 +11,13 @@ test('prompt templates: variables, unknown ones kept, a template without {{promp
   assert.equal(templated(undefined, 'as typed'), 'as typed')
   assert.equal(nameOf('  the cart total rounding is off '), 'the cart total rounding')
   assert.equal(nameOf(' '), undefined)
+})
+
+test("prompt templates: a project's first, replacing a global one of its name", () => {
+  const global = [{ name: 'fix', text: 'g fix {{prompt}}' }, { name: 'review', text: 'g review' }]
+  assert.deepEqual(templatesFor(global, [{ name: ' fix', text: 'p fix' }, { name: 'ship', text: 'p ship' }]).map(t => t.text), ['p fix', 'p ship', 'g review'])
+  assert.deepEqual(templatesFor(global), global)
+  assert.deepEqual(templatesFor(undefined, global), global)
 })
 
 test('short paths for the status bar', () => {

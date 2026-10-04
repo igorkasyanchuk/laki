@@ -1,0 +1,44 @@
+#!/usr/bin/env node
+// fake opencode: records its args, loads the plugins in $OPENCODE_CONFIG_DIR/plugin and sends them a session's
+// events (a subagent's too), as the real one does
+const fs = require('fs'), path = require('path'), { pathToFileURL } = require('url')
+const args = process.argv.slice(2)
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'opencode', tab: process.env.LAKI_TAB, args }) + '\n')
+const val = f => (args.includes(f) ? args[args.indexOf(f) + 1] : undefined)
+const session = val('--session') ?? 'ses_' + Math.random().toString(36).slice(2, 8)
+if (session.startsWith('gone-')) {
+  process.stdout.write(`Error: Session not found: ${session}\r\n`)
+  process.exit(1)
+}
+;(async () => {
+  const dir = path.join(process.env.OPENCODE_CONFIG_DIR || '/nonexistent', 'plugin')
+  const answers = []
+  const client = { session: { messages: async () => ({ data: answers.map(text => ({ info: { role: 'assistant' }, parts: [{ type: 'text', text }] })) }) } }
+  const plugins = []
+  for (const f of fs.existsSync(dir) ? fs.readdirSync(dir) : [])
+    for (const make of Object.values(await import(pathToFileURL(path.join(dir, f)).href))) plugins.push(await make({ client }))
+  const emit = (type, properties) => plugins.forEach(p => p.event?.({ event: { type, properties } }))
+  const status = type => emit('session.status', { sessionID: session, status: { type } })
+  process.stdout.write(`\x1b[?2004hfake opencode ${args.join(' ')}\r\n`)
+  if (!val('--session')) emit('session.created', { info: { id: session } })
+  emit('session.created', { info: { id: 'ses_sub', parentID: session } })
+  const turn = t => {
+    status('busy')
+    emit('session.status', { sessionID: 'ses_sub', status: { type: 'idle' } }) // a subagent's: not the tab's
+    if (t.startsWith('ask')) return void (process.stdout.write('allow? (y/n)\r\n'), emit('permission.asked', { sessionID: session }))
+    // a failed turn: the error, then idle, as the real one sends them
+    if (t.includes('limit')) return void (emit('session.error', { sessionID: session, error: { name: 'APIError', data: { message: "You've hit your usage limit. Try again in 2 hours." } } }), status('idle'))
+    setTimeout(() => (answers.push(`answer: ${t}`), process.stdout.write(`answer: ${t}\r\n> `), status('idle')), 300)
+  }
+  if (val('--prompt')) turn(val('--prompt'))
+  else process.stdout.write('> ')
+  let line = ''
+  process.stdin.setRawMode(true)
+  process.stdin.on('data', d => {
+    for (const ch of d.toString().replace(/\x1b\[20[01]~/g, '')) {
+      if (ch === '\r') { process.stdout.write('\r\n'); const t = line; line = ''; if (t === 'exit') process.exit(0); turn(t) }
+      else if (ch === '\x03') process.exit(130)
+      else { line += ch; process.stdout.write(ch) }
+    }
+  })
+})()

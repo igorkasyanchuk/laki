@@ -1,6 +1,6 @@
 # Laki
 
-**Run Claude Code, Codex, or any terminal command side by side on macOS. Each task gets its own git worktree.**
+**Run Claude Code, Codex, Gemini, Grok, OpenCode, or any terminal command side by side on macOS. Each task gets its own git worktree.**
 
 Give each task its own workspace (a branch and a folder), start an agent in it with a prompt, and keep working
 while it runs. Laki shows which agents are working, which are waiting for you and which are done. Agents keep
@@ -29,7 +29,7 @@ running when you close the window.
   only lets in your email. It lasts 1 to 24 hours, or until you stop it.
 - **Plan limits.** A ring shows how much of your Claude and Codex plans you've used, and when each limit
   resets.
-- **Your look.** 50 themes, 32 of which also change shapes and type. Glass mode makes the window
+- **Your look.** 66 themes, 48 of which also change shapes and type. Glass mode makes the window
   see-through. Fonts are built in.
 - **Notifications your way.** Pick which turns notify and the sound; mute a workspace or a tab.
 - **Keyboard first.** ⌘ shortcuts, a ⌘K palette, a key for every menu item, and a `laki` CLI that the agents
@@ -37,8 +37,8 @@ running when you close the window.
 
 ## Install
 
-You need macOS on Apple silicon, Node 22.6+ and git. Optional: `claude` and/or `codex` on your PATH, and
-`gh` (logged in) for PRs.
+You need macOS on Apple silicon, Node 22.6+ and git. Optional: the agents you use on your PATH (`claude`, `codex`,
+`gemini`, `grok`, `opencode`), and `gh` (logged in) for PRs.
 
 ```bash
 git clone https://github.com/igorkasyanchuk/laki && cd laki
