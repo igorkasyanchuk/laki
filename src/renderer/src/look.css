@@ -68,6 +68,8 @@
 .setting-box { display: flex; flex-direction: column; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); }
 .setting-box > :is(.switch-row, .sliders) + :is(.switch-row, .sliders) { border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); } /* over button.on's */
 .setting-box > .switch-row { padding: 10px 0; border-radius: 0; }
+.setting-box > .switch-row.sub { flex-direction: row-reverse; padding-left: 18px; color: var(--fg); font-size: 13px; } /* a switch under another, and a label row */
+.switch-row.sub select { flex: none; width: auto; }
 /* sliders: a label, the track, the value, lined up in columns */
 .sliders { display: flex; flex-direction: column; gap: 4px; padding: 10px 0 12px; }
 .form .slider-row { display: grid; grid-template-columns: 7em minmax(0, 1fr) 3.5em; align-items: center; gap: 14px; color: var(--fg); font-size: 13px; }

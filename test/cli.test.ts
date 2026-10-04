@@ -171,6 +171,8 @@ test('cli: schedule add, ls, run, log, off, rm; the defaults a new one takes', a
   assert.deepEqual([r.code, r.err.trim()], [1, 'laki: At what time? (every day at 9am)'])
   r = await rig.cli('schedule', 'add', proj.id, '--when', 'daily at 8pm', '--where', 'folder', '--preset', 'codex', '--name', 'Notes {{DD-MM}}', 'tidy')
   assert.match(r.out, / on {3}Every day at 20:00, next .+ · codex · folder {2}Notes \{\{DD-MM\}\}$/m)
+  r = await rig.cli('schedule', 'add', proj.id, '--when', 'daily at 9pm', '--where', 'folder-new', 'sum', 'up')
+  assert.match(r.out, / · claude · folder-new {2}sum up$/m)
   r = await rig.cli('schedule', 'ls')
   assert.match(r.out, new RegExp(`^${s.id} {2}on {3}Weekdays at 09:00, next .+ {2}${proj.id} · claude · new {2}check the build$`, 'm'))
   r = await rig.cli('schedule', 'run', s.id)
@@ -182,4 +184,32 @@ test('cli: schedule add, ls, run, log, off, rm; the defaults a new one takes', a
   assert.equal((await rig.cli('schedule', 'rm', s.id)).out.trim(), `removed ${s.id}`)
   r = await rig.cli('schedule', 'nope')
   assert.match(r.err, /usage: laki schedule/)
+})
+
+test('laki mcp: initialize, tools, a call, errors', async t => {
+  const rig = await fresh(t)
+  const proj = JSON.parse((await rig.cli('project', 'add', rig.repo, '--json')).out)
+  const msgs = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '1' } } },
+    { jsonrpc: '2.0', method: 'notifications/initialized' },
+    { jsonrpc: '2.0', id: 2, method: 'tools/list' },
+    { jsonrpc: '2.0', id: 3, method: 'tools/call', params: { name: 'laki_new_workspace', arguments: { project: proj.id, prompt: 'hi', preset: 'shell', name: 'mcp-ws' } } },
+    { jsonrpc: '2.0', id: 4, method: 'tools/call', params: { name: 'laki_screen', arguments: { target: 'nope' } } },
+    { jsonrpc: '2.0', id: 5, method: 'resources/list' },
+  ]
+  const r = await rig.cliIn(msgs.map(m => JSON.stringify(m)).join('\n') + '\n', 'mcp')
+  assert.equal(r.code, 0, r.err)
+  const got = Object.fromEntries(r.out.trim().split('\n').map(l => JSON.parse(l)).map(m => [m.id, m]))
+  assert.deepEqual(Object.keys(got).sort(), ['1', '2', '3', '4', '5']) // the notification gets no answer
+  assert.equal(got[1].result.protocolVersion, '2025-03-26')
+  assert.equal(got[1].result.serverInfo.name, 'laki')
+  const names = got[2].result.tools.map((t: any) => t.name)
+  assert.ok(names.includes('laki_state') && names.includes('laki_send'))
+  assert.ok(!names.some((n: string) => /rm|archive|ship/.test(n)))
+  assert.ok(!got[3].result.isError, got[3].result.content[0].text)
+  assert.equal(JSON.parse(got[3].result.content[0].text).id, 'mcp-ws')
+  assert.equal(got[4].result.isError, true)
+  assert.equal(got[5].error.code, -32601)
+  const v = JSON.parse((await rig.cli('ls', '--json')).out)
+  assert.ok(v.workspaces.some((w: any) => w.id === 'mcp-ws'))
 })

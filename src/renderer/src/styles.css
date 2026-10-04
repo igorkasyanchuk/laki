@@ -324,6 +324,8 @@ kbd { font-family: var(--mono); }
 .sp-tabs > button:not(.ib):hover { color: var(--fg); background: var(--hover); }
 .sp-tabs > button.on { color: var(--fg); background: var(--bg); border-color: var(--line); }
 .sp-tabs > .ib { align-self: center; margin-bottom: 4px; }
+.sp-tabs { container-type: inline-size; } /* not the panel: containment would anchor its fixed menus to it */
+@container (max-width: 420px) { .sp-tabs > button:not(.on, .ib) .sp-tab-label { display: none; } } /* a narrow panel: the other tabs as icons */
 .sp-tools { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--line); color: var(--muted); }
 .sp-tools > svg { margin: 0 4px 0 2px; flex: none; }
 .sp-tools input { flex: 1; min-width: 0; border: none; background: none; padding: 3px 2px; }
@@ -356,6 +358,17 @@ kbd { font-family: var(--mono); }
 .sp-diff .dl-del { color: var(--del); background: var(--del-bg); }
 .sp-diff .dl-hunk { color: var(--hunk); }
 .sp-diff > button { margin: 4px 6px 0; }
+.sp-diff .dl-line { cursor: pointer; }
+.sp-diff .dl-line:hover { box-shadow: inset 2px 0 var(--accent); }
+.dl-comment { position: sticky; left: 8px; width: calc(100% - 16px); display: flex; flex-direction: column; gap: 6px; margin: 4px 8px 6px; white-space: normal; padding: 8px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--panel, var(--bg)); font-family: var(--ui-font, inherit); }
+.web-tools select { flex: none; width: auto; padding: 2px 4px; font-size: 12px; }
+.web-tools input { font-family: var(--mono); font-size: 12px; }
+.web-body { flex: 1; display: flex; min-height: 0; }
+.web-view { flex: 1; display: flex; width: 100%; height: 100%; border: 0; }
+.web-shot { position: static; width: auto; }
+.web-shot img { max-height: 140px; object-fit: contain; align-self: flex-start; max-width: 100%; border: 1px solid var(--line); border-radius: 4px; }
+.dl-comment textarea { width: 100%; resize: vertical; font: inherit; font-size: 12px; }
+.dl-comment .row { gap: 6px; flex-wrap: wrap; }
 .sp-thread { border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); overflow: hidden; }
 .sp-thread-head { display: flex; align-items: center; gap: 6px; padding: 4px 8px; border-bottom: 1px solid var(--line); cursor: pointer; overflow-wrap: anywhere; }
 .sp-thread-head:hover { color: var(--accent); }
@@ -519,6 +532,6 @@ kbd { font-family: var(--mono); }
 .schedule-run b { flex: none; font-weight: 600; }
 .schedule-only { margin-left: auto; width: auto; max-width: 50%; }
 .schedule-path { margin-top: -6px; font-family: var(--mono); overflow-wrap: anywhere; }
-.ws-sched { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; }
+.ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
 .narrow .schedule { flex-wrap: wrap; }
 .narrow .schedule-run { flex-wrap: wrap; }

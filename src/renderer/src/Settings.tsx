@@ -3,6 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import type { NotifyKind } from '../../shared/types'
 import { MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
@@ -38,6 +39,8 @@ export type AppSettings = Paint & {
   actions?: RunAction[] // Run ▾'s actions, with each project's
   env?: Record<string, string> // every session's
   notify?: boolean
+  notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
+  notifySound?: string // a macOS sound, 'none', or unset: the default
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   presets?: Preset[]
   remoteMail?: string // the one address remote access lets in
@@ -55,6 +58,13 @@ const EXAMPLE_TEMPLATE: Template = {
   name: 'fix',
   text: 'Fix this in {{project}}: {{prompt}}\n\nFind the cause first. Write a test that fails before the fix and passes after it, run the tests, then sum up what changed.',
 }
+
+const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
+  ['waiting', 'Waiting for you', 'A permission prompt, or CI that keeps failing'],
+  ['done', 'Finished', 'The end of a turn, with its last words'],
+  ['limit', 'Usage limit', 'An agent hit its plan limit'],
+]
+const SOUNDS = ['Basso', 'Blow', 'Bottle', 'Frog', 'Funk', 'Glass', 'Hero', 'Morse', 'Ping', 'Pop', 'Purr', 'Sosumi', 'Submarine', 'Tink']
 
 export const FONT_SIZE = 13
 export const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'JetBrains Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', 'Cascadia Mono',
@@ -125,7 +135,7 @@ function TermPreview({ s }: { s: AppSettings }) {
 
 const SCRIPTS = [
   { k: 'setup', label: 'Setup', hint: 'Runs in each new worktree, in a setup tab; agents and Run wait for it. $LAKI_PROJECT_PATH is the repo itself.', eg: 'npm install\ncp "$LAKI_PROJECT_PATH/.env" .env' },
-  { k: 'teardown', label: 'Teardown', hint: 'Runs when a workspace is deleted or archived, for a minute at most.', eg: 'docker compose down' },
+  { k: 'teardown', label: 'Teardown', hint: 'Runs when a worktree workspace is deleted or archived, for a minute at most (never in the project’s own folder).', eg: 'docker compose down' },
   { k: 'run', label: 'Run', hint: 'The Run button: starts it in a run tab, e.g. a dev server on $PORT.', eg: 'npm run dev -- --port $PORT' },
 ] as const
 export type Scripts = { setup?: string; teardown?: string; run?: string }
@@ -323,6 +333,7 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'skill', label: 'Agent skill', icon: 'import' },
   { id: 'remote', label: 'Remote access', icon: 'globe' },
 ]
+export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
 
 // remote access: this app in a browser elsewhere, through cloudflared, for one email; no link yet: starting
 export type Remote = { mail: string; until?: number; url?: string; link?: string }
@@ -412,7 +423,7 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
   )
 }
 
-export type SkillInfo = { agent: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated' }
+export type SkillInfo = { agent: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string }
 // how an app reads and writes its skill; app: its name, for the text
 export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean) => Promise<SkillInfo[]> }
 
@@ -421,6 +432,7 @@ function SkillSection({ api }: { api: SkillApi }) {
   const [rows, setRows] = useState<SkillInfo[] | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [copied, setCopied] = useState('')
   const fail = (e: any) => setErr(String(e?.message ?? e))
   useEffect(() => void api.load().then(setRows, fail), [])
   const set = (agent: string, on: boolean) => {
@@ -458,6 +470,28 @@ function SkillSection({ api }: { api: SkillApi }) {
         </div>
       ))}
       <p className="muted small">It holds where {api.app} is installed: after moving the app, update it here.</p>
+      {rows?.some(r => r.mcp) && (
+        <>
+          <h2>MCP server</h2>
+          <p className="muted">
+            Or give agents {api.app}'s tools over MCP: its state, a new workspace, a message to an agent, a tab's screen, a diff, scheduled tasks. Nothing that deletes, archives or ships.
+            Run the command once in a terminal; it goes in the agent's own settings.
+          </p>
+          {rows.map(
+            r =>
+              r.mcp && (
+                <div key={r.agent} className="preset">
+                  <div className="row">
+                    <b>{r.name}</b>
+                    <span className="grow" />
+                    <button onClick={() => navigator.clipboard.writeText(r.mcp!).then(() => (setCopied(r.agent), setTimeout(() => setCopied(''), 2000)), fail)}>{copied === r.agent ? 'Copied' : 'Copy'}</button>
+                  </div>
+                  <div className="muted small mono" style={{ wordBreak: 'break-all', userSelect: 'text' }}>{r.mcp}</div>
+                </div>
+              ),
+          )}
+        </>
+      )}
     </>
   )
 }
@@ -601,8 +635,27 @@ export function SettingsPage(p: {
               </label>
               <div className="setting-box">
                 <Switch className="switch-row" on={s.notify !== false} onChange={v => set({ notify: v })}>
-                  <Says title="macOS notifications" hint="When an agent off screen waits or finishes, or CI keeps failing" />
+                  <Says title="macOS notifications" hint="When an agent off screen waits or finishes, or CI keeps failing. A workspace's or tab's menu mutes just it." />
                 </Switch>
+                {s.notify !== false && (
+                  <>
+                    {NOTIFY_KINDS.map(([k, title, hint]) => (
+                      <Switch key={k} className="switch-row sub" on={s.notifyOn?.[k] !== false} onChange={v => set({ notifyOn: { ...s.notifyOn, [k]: v } })}>
+                        <Says title={title} hint={hint} />
+                      </Switch>
+                    ))}
+                    <label className="switch-row sub">
+                      <select value={s.notifySound ?? ''} onChange={e => set({ notifySound: e.target.value })}>
+                        <option value="">Default</option>
+                        <option value="none">None</option>
+                        {SOUNDS.map(x => (
+                          <option key={x}>{x}</option>
+                        ))}
+                      </select>
+                      <Says title="Sound" hint="macOS's sounds, as in System Settings › Sound" />
+                    </label>
+                  </>
+                )}
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
                   <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
                     <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />

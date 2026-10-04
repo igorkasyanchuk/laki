@@ -67,7 +67,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 **Workspaces and projects**
 - Add a repo or folder; new workspace (a page of its own) from a base branch with a name, an agent and a
   first prompt (text, dictation, pasted or dropped images).
-- Setup script per new worktree (agents and Run wait for it), teardown on delete or archive, env per project
+- Setup script per new worktree (agents and Run wait for it), teardown when a worktree is deleted or archived, env per project
   and globally, `$LAKI_PROJECT_PATH` to copy files like `.env` from the repo.
 - Rename, color, reorder (drag), fork (new worktree + forked Claude chat), archive and restore (chats
   resume), delete.
@@ -77,8 +77,8 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - Tabs and panes: split by dragging or from menus, resize, move, rename (double click), color, restart.
 - A shell tab closes when it exits; an agent tab when it ends cleanly (exit 0). A failed one stays to read,
   and Enter starts it again.
-- Live status per tab and workspace, macOS notifications when an off-screen tab waits or finishes (a setting
-  turns them off).
+- Live status per tab and workspace, macOS notifications when an off-screen tab waits or finishes: which kinds
+  (waiting, finished, usage limit) and the sound in Settings, a workspace or tab muted from its menu.
 - Esc / ⌃C interrupt goes back to idle. Usage limits: wait for the reset, then type `continue`.
 - Resume after a daemon restart: `claude --resume`, `codex resume`. The app menu's *Quit … Completely*
   stops the daemon too (asking first when an agent is working). A daemon older than the app (it outlives
@@ -94,6 +94,9 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 
 **Files**
 - Side panel (⌥⌘B): files (changed ones marked), changes against the base with diffs, PR review threads.
+- A diff line's comment: posted on the PR at that line (`gh api`), or sent to the agent with the file and line.
+- Preview: the dev server in the side panel (a webview kept to localhost), back, forward, a port picker; a
+  screenshot goes to the agent with a note.
 - ⌘P / "Find files…" in ⌘K: fuzzy file search; preview text and images in the app; ⌘W closes the preview.
 - Open in any installed editor or terminal (⌘E for the default).
 
@@ -135,8 +138,10 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 
 **CLI**
 - `ls [--json]`, `project add|ls|rm`, `new`, `tab`, `send [--when-idle]`, `screen`, `diff`, `run`, `rm`,
-  `archive`, `restore`, `fork`, `open`, `daemon`, `stop`, `ship`. Agents' hooks call
-  the same CLI.
+  `archive`, `restore`, `fork`, `open`, `daemon`, `stop`, `ship`, `schedule`, `mcp` (an MCP server: state, new
+  workspace, send, screen, diff, schedules; nothing destructive). Agents' hooks call the same CLI.
+- `laki://` links: a workspace or tab (Copy link in their menus), the new-workspace page filled in, Scheduled
+  tasks, Settings, Help. They never start anything.
 
 ## Quality bar
 
@@ -152,7 +157,8 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - **Pick the stack**: Electron or Go, then drop the other build.
 - **Wanted next**: diagrams, drawing in the title bar, Linux and Windows.
 - **Sessions that survive a daemon crash** (a holder process per session, as the wb-diri prototype did).
-- **A status / MCP / JSON-schema layer** for other tools (as the wb-bot prototype had).
+- **A JSON-schema layer** for other tools (as the wb-bot prototype had). The MCP server (`laki mcp`) covers
+  agents.
 - **Several PRs per workspace**: the model tracks one per branch today.
 - **Custom-command tabs** (e.g. `npm test`) close on a clean exit like agents do, which hides their output.
   Keep, or close only claude/codex and shells?

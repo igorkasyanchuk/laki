@@ -29,6 +29,7 @@ export type WsInfo = {
   base: string
   path: string
   port: number
+  ports?: number[] // listening
   kind: string
   created?: number // ms
   pr?: PRInfo

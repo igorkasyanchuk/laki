@@ -14,7 +14,7 @@ const KEYS: [string, string][] = [
   ['⌘P', 'find a file in the workspace'],
   ['⌘F', 'find in the terminal'],
   ['⌘D', 'changes against the base branch'],
-  ['⌥⌘B', 'side panel: files, changes, review'],
+  ['⌥⌘B', 'side panel: files, changes, review, preview'],
   ['⌘I', 'workspace info: PR, checks, what each agent said last'],
   ['⌘E', 'open the workspace in your editor'],
   ['⌘B', 'hide / show the sidebar'],
@@ -52,6 +52,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
     ...(ship ? ([[`${cli} ship <ws> -m "message"`, 'commit, push and open a PR']] as [string, string][]) : []),
     [`${cli} archive <ws> · restore <ws> · fork <ws> · rm <ws>`, 'put a workspace away, bring it back, branch off it, delete it'],
     [`${cli} schedule add <project> --when "weekdays at 9am" "…"`, 'a prompt on repeat (--where new|folder|<ws>, --name "Nightly {{DD-MM}}"); schedule, schedule log, on|off|run|rm <id>'],
+    [`${cli} mcp`, 'an MCP server for Claude Code, Codex…: Settings › Agent skill has the command that adds it'],
     [`${cli} stop`, 'stop the daemon: agents resume when it starts again'],
     [`${cli} help`, 'every command'],
   ]
@@ -109,7 +110,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
               {v}
             </Row>
           ))}
-          <p className="muted small">A tab that waits or finishes off screen sends a macOS notification; Settings › General turns them off.</p>
+          <p className="muted small">A tab that waits or finishes off screen sends a macOS notification; Settings › General picks which and the sound, a workspace's or tab's menu mutes it.</p>
         </section>
         <section>
           <h2>Around the window</h2>
@@ -133,11 +134,17 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
             Settings › Actions (and a project's): a prompt for Claude Code or Codex, or a command for a terminal. Run ▾ lists them for the workspace you're in.
           </Row>
           <Row k="Scheduled">
-            The clock at the top of the sidebar (or ⌘K): a prompt for Claude Code or Codex at times you write, like “every day at 2am except weekends”, in a
-            new workspace each run or one you pick. {'{{DD-MM-YY}}'} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.
+            The clock at the top of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for Claude Code or Codex at times you write, like “every day at 2am except weekends”, in a
+            new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {'{{DD-MM-YY}}'} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.
           </Row>
           <Row k="Look">Settings › Appearance: themes (✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow) and the interface font.</Row>
           <Row k="Files">The side panel's preview colors code up to 50 KB; the status bar's path has a copy button.</Row>
+          <Row k="Changes">Click a line of a diff to comment on it: on the PR (GitHub), or to the agent.</Row>
+          <Row k="Preview">The side panel's Preview shows the dev server ($PORT or a listening port); the camera sends a screenshot to the agent.</Row>
+          <Row k="Links">
+            <code>laki://ws/&lt;id&gt;</code> opens a workspace (a workspace's or tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one,
+            <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://help</code> open pages.
+          </Row>
           <Row k="Quit">⌘Q quits the app: agents keep running in the daemon. Quit … Completely (the app menu) stops the daemon too; agents resume next time.</Row>
         </section>
         <section className="help-cmds">

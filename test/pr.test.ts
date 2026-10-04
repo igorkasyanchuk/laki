@@ -119,3 +119,24 @@ test('autoFix and autoReview: they wait for an agent; CI goes over to you after 
   await until(async () => (await fix())?.tries === 0, 'a pass starts over')
   c.close()
 })
+
+test('a diff line comment on the PR: gh api with the head commit, a line not in the PR, checks', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), 'no pull requests found')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const c = { ws: ws.id, path: 'a.ts', line: 3, side: 'RIGHT', body: 'why "this"?' }
+  await assert.rejects(rig.rpc('prComment', c), /has no PR/)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 9, state: 'OPEN', url: 'https://example.invalid/pr/9', headRefOid: 'beef', statusCheckRollup: [] }))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  await assert.rejects(rig.rpc('prComment', { ...c, path: '../x' }), /not a path inside/)
+  await assert.rejects(rig.rpc('prComment', { ...c, path: undefined }), /not a path inside/)
+  await assert.rejects(rig.rpc('prComment', { ...c, line: 0 }), /which line/)
+  await assert.rejects(rig.rpc('prComment', { ...c, body: ' ' }), /empty/)
+  await assert.rejects(rig.rpc('prComment', c), /isn't in the PR's diff/)
+  writeFileSync(join(gh, 'comment.json'), JSON.stringify({ html_url: 'https://example.invalid/pr/9#c1' }))
+  assert.deepEqual(await rig.rpc('prComment', { ...c, side: 'LEFT' }), { url: 'https://example.invalid/pr/9#c1' })
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/comments -f body=why "this"\? -f commit_id=beef -f path=a\.ts -F line=3 -f side=LEFT/)
+})

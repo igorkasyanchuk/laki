@@ -1,15 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, type Project, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, type Project, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
-import { AddProject, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
-import { type AppInfo, FONT_SIZE, SettingsPage, type SkillInfo, termLook } from './Settings'
+import { AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt } from './panels'
+import { type AppInfo, FONT_SIZE, isSection, presetsOf, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { Glyph } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
 import { Term, xterms } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
+import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
@@ -19,7 +20,10 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'schedules' | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'schedules' | { schedules: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
+
+// the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
+const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -98,6 +102,8 @@ export function App() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
+  const [newInit, setNewInit] = useState<Partial<NewWsParams>>() // a laki://new link's prompt, preset, name
+  const [link, setLink] = useState<string>() // a laki:// link, routed once the view is in
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review
   const [panelTab, setPanelTab] = useState<PanelTab>(() => load('laki.panelTab', 'files'))
   const [panelW, setPanelW] = useState<number>(() => load('laki.panelW', PANEL_WIDTH))
@@ -138,12 +144,6 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.info', JSON.stringify(info)), [info])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
-  useEffect(() => {
-    const id = view?.runs?.[0]?.id
-    if (dialog !== 'schedules' || !id) return
-    setRunsSeen(id)
-    localStorage.setItem('laki.runsSeen', JSON.stringify(id))
-  }, [dialog, view?.runs?.[0]?.id])
   // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
   useEffect(() => void (narrow && document.querySelector('.tab.sel')?.scrollIntoView({ block: 'nearest', inline: 'start' })), [narrow, tab?.id])
   useEffect(() => {
@@ -194,16 +194,46 @@ export function App() {
       else if (m.ev === 'turn') {
         const t = viewRef.current?.tabs.find(t => t.id === m.tab)
         const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
-        if (!t || shown || viewRef.current?.settings.notify === false) return
+        const s = viewRef.current?.settings
+        const w = viewRef.current?.workspaces.find(w => w.id === t?.workspace)
+        if (!t || shown || s?.notify === false || s?.notifyOn?.[m.kind as NotifyKind] === false || t.muted || w?.muted) return
         const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
-        const w = viewRef.current?.workspaces.find(w => w.id === t.workspace)
-        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id))
+        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound)
       }
     })
     api.connect()
     bridge?.onFocusTab(selectTab)
+    bridge?.onDeepLink?.(setLink)
     return off
   }, [selectTab])
+
+  // laki:// links select and fill in; nothing starts from one
+  useEffect(() => {
+    if (!link || !view) return
+    setLink(undefined)
+    const l = parseLink(link)
+    const proj = (id?: string) => view.projects.find(p => p.id === id || p.name === id)?.id
+    if (l?.to === 'ws') {
+      const w = view.workspaces.find(w => w.id === l.ws)
+      const t = view.tabs.find(t => t.id === l.tab && t.workspace === w?.id)
+      if (!w) toast(`No workspace ${l.ws}`)
+      else if (w.archived) toast(`${wsName(w)} is archived`)
+      else {
+        setDialog(null)
+        t ? selectTab(t) : setWsId(w.id)
+      }
+    } else if (l?.to === 'new') {
+      if (!view.projects.length) return toast('Add a project first (⌘O)')
+      const presets = [...presetsOf(view.settings).map(p => p.name), 'shell', 'none']
+      if (l.project && !proj(l.project)) toast(`No project ${l.project}: pick one`)
+      setNewFor(proj(l.project))
+      setNewInit({ prompt: l.prompt, name: l.name, ...(l.preset && presets.includes(l.preset) && { preset: l.preset }) })
+      setDialog('new')
+    } else if (l?.to === 'schedules') setDialog({ schedules: proj(l.project) ?? '' })
+    else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section } : 'settings')
+    else if (l?.to === 'help') setDialog('help')
+    else toast(`Laki can't open ${link.slice(0, 80)}`)
+  }, [link, view])
 
   // tell the daemon what's on screen: it clears ● there and doesn't set it
   const current = useRef<string | null>(null)
@@ -330,6 +360,9 @@ export function App() {
     preview: (path, line) => setPreview({ ws: w.id, path, line, n: ++requests }),
     changes: () => api.call<Changes>('diff', { ws: w.id }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
+    comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
+    toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent')),
+    saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
   })
   const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast('Copied'), fail)
   const tunnelApi = (w: WorkspaceView): TunnelApi => ({
@@ -375,6 +408,8 @@ export function App() {
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
     { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
     { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true)) },
+    { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
+    ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(w.id)) } as MenuItem] : []),
     null,
     { head: 'Open in' },
     ...openInItems({ ws: w.id }),
@@ -406,6 +441,8 @@ export function App() {
     return [
       { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ rename: ts[0].id }) },
       { colors: TAB_COLORS, value: colorOf(ts[0]), pick: c => ts.forEach(t => call('tabSet', { id: t.id, color: c })) },
+      { label: ts[0].muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => ts.forEach(t => call('tabSet', { id: t.id, muted: !ts[0].muted })) },
+      ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),
       null,
       { label: 'Split right', icon: 'splitRight', run: () => (selectTab(ts[0].id), split('right', ts[0].id)) },
       { label: 'Split down', icon: 'splitDown', run: () => (selectTab(ts[0].id), split('bottom', ts[0].id)) },
@@ -493,11 +530,13 @@ export function App() {
         { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
         { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(ws, false) },
       ]
+  const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
+      { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
       { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => confirm(`Remove project ${p.name}? Its files stay.`) && call('projectRm', { id: p.id }) },
       null,
       { head: 'Open in' },
@@ -564,6 +603,7 @@ export function App() {
 
   const settingsFor = dialog && typeof dialog === 'object' && 'settings' in dialog ? view.projects.find(p => p.id === dialog.settings) : undefined
   const section = dialog && typeof dialog === 'object' && 'section' in dialog ? dialog.section : undefined // a Settings section asked for
+  const schedulesFor = schedulesOf(dialog)
   const ports = ws ? portsOf(ws.ports, ws.tunnels).filter(p => p !== ws.port) : [] // $PORT has its own, always
   const nextTask = (view.schedules ?? []).filter(s => s.on && s.next).sort((a, b) => a.next! - b.next!)[0]
   const runs = view.runs ?? [] // newest first: the ones above the last read
@@ -592,9 +632,9 @@ export function App() {
           <IconButton
             icon="clock"
             title={nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'}
-            on={dialog === 'schedules'}
+            on={schedulesFor !== undefined}
             className={runFailed ? 'dot' : ''}
-            onClick={() => setDialog(d => (d === 'schedules' ? null : 'schedules'))}
+            onClick={() => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))}
           />
           <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
           <IconButton icon="gear" title="Settings (⌘,)" on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
@@ -629,12 +669,17 @@ export function App() {
                       onPointerDown={e => rows.start(e, 'ws', w.id, p.id)}
                       onClick={() => (setWsId(w.id), narrow && setSideOpen(false))}
                       onContextMenu={e => openMenu(e, wsMenu(w))}
-                      title={`${w.branch || w.path} · $PORT ${w.port}${w.schedule ? ` · from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd() : ''}`}
+                      title={`${w.branch || w.path} · $PORT ${w.port}${w.schedule ? ` · from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd() : ''}${w.muted ? ' · notifications muted' : ''}`}
                     >
                       <Glyph s={w.setup ? 'running' : rollup(wt)} />
                       <span className="ws-name">{wsName(w)}</span>
                       {queued > 0 && <span className="badge">+{queued}</span>}
                       <span className="spacer" />
+                      {w.muted && (
+                        <span className="ws-mark">
+                          <Icon name="bellOff" size={11} />
+                        </span>
+                      )}
                       {w.schedule && (
                         <span className="ws-sched">
                           <Icon name="clock" size={11} />
@@ -671,6 +716,11 @@ export function App() {
               >
                 <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
                 <span>{ts.map(t => t.name).join(' · ')}</span>
+                {ts.some(t => t.muted) && (
+                  <span className="ws-mark">
+                    <Icon name="bellOff" size={11} />
+                  </span>
+                )}
                 {queued > 0 && <span className="badge">+{queued}</span>}
                 <button className="x" data-tip="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
                   ×
@@ -688,7 +738,7 @@ export function App() {
                   <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => showInfo()} />
                 </>
               )}
-              <IconButton icon="panel" title="Files, changes, review (⌥⌘B)" on={panelOpen} onClick={() => togglePanel()} />
+              <IconButton icon="panel" title="Files, changes, review, preview (⌥⌘B)" on={panelOpen} onClick={() => togglePanel()} />
               {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
               <IconButton icon="search" title="Commands (⌘K)" onClick={() => setDialog('palette')} />
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
@@ -811,9 +861,12 @@ export function App() {
           />
         )}
         {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
-        {dialog === 'schedules' && (
+        {schedulesFor !== undefined && (
           <SchedulesPage
+            key={schedulesFor /* another project's menu: its filter */}
+            project={schedulesFor}
             view={view}
+            onSeen={id => (setRunsSeen(id), localStorage.setItem('laki.runsSeen', JSON.stringify(id)))}
             onClose={() => setDialog(null)}
             api={{
               set: s => api.call('scheduleSet', s),
@@ -829,19 +882,22 @@ export function App() {
         )}
         {dialog === 'new' && (
           <NewWorkspace
-            key={newFor} // another project asked for while it's open (＋, a dropped folder)
+            key={`${newFor}${JSON.stringify(newInit ?? '')}`} // another project asked for while it's open (＋, a dropped folder, a link)
             view={view}
             project={newFor ?? ws?.project}
             agent={settings.agent}
+            initial={newInit}
             onClose={() => {
               setDialog(null)
               setNewFor(undefined)
+              setNewInit(undefined)
             }}
             onCreate={async p => {
               const w = await call<WorkspaceView>('wsNew', p)
               setWsId(w.id)
               setDialog(null)
               setNewFor(undefined)
+              setNewInit(undefined)
             }}
           />
         )}

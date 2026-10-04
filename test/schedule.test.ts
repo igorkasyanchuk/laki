@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { describe, nextRun, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
@@ -111,8 +111,10 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   const today = stamp('{{YYYY-MM-DD}}', Date.now())
   const runs = [await rig.rpc('scheduleRun', { id: s.id }), await rig.rpc('scheduleRun', { id: s.id })]
   const twins = (await rig.rpc('state')).workspaces.filter((w: any) => runs.some(r => r.ws === w.id)).map((w: any) => [w.id, w.name])
-  const [[, a], [id2, b]] = twins // a: "Deps <today>", or "… 2" when the tick's run was today too (before 2am)
-  assert.ok(a.startsWith(`Deps ${today}`) && b.startsWith(`Deps ${today} `) && b !== a && id2.startsWith(`deps-${today}-`), String(twins))
+  const [[, a], [id2, b]] = twins // a: "Deps <today>", or with a tail when the tick's run was today too (before 2am)
+  assert.ok(a.startsWith(`Deps ${today}`) && b !== a, String(twins))
+  assert.match(id2, new RegExp(`^deps-${today}-[a-z0-9]{4}$`))
+  assert.equal(b, `Deps ${today}${id2.slice(-5)}`) // the id's tail
   for (const r of runs) await rig.rpc('wsRm', { id: r.ws })
 
   // into that workspace: its running claude gets the prompt (Run now); off, it doesn't run
@@ -166,4 +168,28 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   await until(async () => (await rig.tab(one.ws)).last === 'answer: tidy the notes', 'the agent in the folder got it')
   const two = await rig.rpc('scheduleRun', { id: local.id })
   assert.deepEqual([two.ws, two.tab], [one.ws, one.tab])
+
+  // in the folder, a new session each run: a local workspace (a sidebar row) and agent per run, beside that one
+  const each = await task({ project: np.id, ws: 'local-new', name: 'Notes {{DD-MM}}', prompt: 'sum up', when: 'every day at 9pm' })
+  const [r1, r2] = [await rig.rpc('scheduleRun', { id: each.id }), await rig.rpc('scheduleRun', { id: each.id })]
+  assert.match(r1.what, /^started in a new session in its folder, notes-/)
+  const rows = (await rig.rpc('state')).workspaces.filter((w: any) => [r1.ws, r2.ws, one.ws].includes(w.id))
+  assert.equal(new Set(rows.map((w: any) => w.id)).size, 3)
+  assert.deepEqual(rows.map((w: any) => [w.kind, w.path]), Array(3).fill(['local', realpathSync(plain)]))
+  const day = stamp('{{DD-MM}}', Date.now())
+  const [n1, n2] = rows.filter((w: any) => w.id !== one.ws)
+  assert.deepEqual([n1.name, n1.schedule, n2.schedule], [`Notes ${day}`, each.id, each.id])
+  assert.match(n2.name, new RegExp(`^Notes ${day}-[a-z0-9]{4}$`))
+  assert.notEqual(r1.tab, r2.tab)
+  await until(async () => (await rig.tab(r2.ws)).last === 'answer: sum up', 'the second session got the prompt')
+  // the folder's own workspace stays its own, whatever the order: not a run's session
+  await rig.rpc('reorder', { workspaces: [r2.ws, r1.ws, one.ws] })
+  assert.equal((await rig.rpc('wsNew', { project: np.id, local: true, preset: 'none' })).id, one.ws)
+  // deleting a session leaves the folder, and its teardown isn't run there
+  await rig.rpc('projectSet', { id: np.id, config: { teardown: 'touch torn-down' } })
+  assert.equal((await rig.rpc('state')).projects.find((x: any) => x.id === np.id).config.teardown, 'touch torn-down')
+  await rig.rpc('wsRm', { id: r1.ws })
+  assert.ok(existsSync(plain) && !existsSync(join(plain, 'torn-down')))
+  // the sessions left keep the project: delete them first
+  await assert.rejects(rig.rpc('projectRm', { id: np.id }), new RegExp(`has workspaces: delete them first \\(${r2.ws}\\)`))
 })

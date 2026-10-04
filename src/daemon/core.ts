@@ -218,9 +218,13 @@ const slug = (s: string) =>
     .slice(0, 32)
     .replace(/-+$/, '')
 
-// uniqueWsId: an id no workspace, worktree dir or kept laki/<id> branch (wsRm keeps branches) uses yet
+// four random letters or digits: what tells two workspaces of one name apart (fix-login-k3x9)
+const tail = () => Math.random().toString(36).slice(2, 6).padEnd(4, '0')
+
+// uniqueWsId: an id no workspace, worktree dir or kept laki/<id> branch (wsRm keeps branches) uses yet; a taken one
+// gets a random tail
 async function uniqueWsId(want: string, proj?: Project) {
-  const base = want || `ws-${randomUUID().slice(0, 4)}`
+  const base = want || `ws-${tail()}`
   const taken = async (id: string) =>
     state.workspaces.some(w => w.id === id) ||
     (!!proj &&
@@ -230,7 +234,7 @@ async function uniqueWsId(want: string, proj?: Project) {
           () => false,
         ))))
   let id = base
-  for (let n = 2; await taken(id); n++) id = `${base}-${n}`
+  while (await taken(id)) id = `${base}-${tail()}`
   return id
 }
 
@@ -316,7 +320,8 @@ export async function projectAdd(path: string): Promise<Project> {
 
 export function projectRm(ref: string) {
   const p = findProject(ref)
-  const live = state.workspaces.filter(w => w.project === p.id && w.kind === 'worktree' && !w.archived)
+  // worktrees, and the folder's sessions scheduled tasks made (their own agents): delete them first
+  const live = state.workspaces.filter(w => w.project === p.id && (w.kind === 'worktree' || w.schedule) && !w.archived)
   if (live.length) throw new Error(`${p.name} has workspaces: delete them first (${live.map(w => w.id).join(', ')})`)
   for (const w of state.workspaces.filter(w => w.project === p.id)) dropWs(w)
   state.projects = state.projects.filter(x => x !== p)
@@ -442,17 +447,18 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
 }
 
 // rename a tab, or color it
-export function tabSet(o: { id: string; name?: string; color?: string }) {
+export function tabSet(o: { id: string; name?: string; color?: string; muted?: boolean }) {
   const t = findTab(o.id)
   if (o.name?.trim()) t.name = o.name.trim().slice(0, 40)
   if (o.color !== undefined) t.color = o.color || undefined
+  if (o.muted !== undefined) t.muted = o.muted || undefined
   save()
   changed()
   return t
 }
 
-// a workspace's sidebar color, name, and whether CI failures and review comments go to its agent
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean }) {
+// a workspace's sidebar color, name, notifications, and whether CI failures and review comments go to its agent
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; muted?: boolean }) {
   const w = findWs(o.id)
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.name !== undefined) {
@@ -461,6 +467,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   }
   if (o.autoFix !== undefined) w.autoFix = o.autoFix || undefined
   if (o.autoReview !== undefined) w.autoReview = o.autoReview || undefined
+  if (o.muted !== undefined) w.muted = o.muted || undefined
   save()
   changed()
   if (o.autoFix || o.autoReview) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
@@ -556,7 +563,8 @@ export function closeTab(id: string) {
 
 // ---------- workspaces
 
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; forkOf?: string }
+// another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string }
 
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const proj = findProject(o.project)
@@ -565,9 +573,10 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
   let ws: Workspace
   if (o.local || proj.git === false) {
-    const have = state.workspaces.find(w => w.project === proj.id && w.kind === 'local')
-    if (have) return have
-    ws = { id: await uniqueWsId(proj.id), project: proj.id, path: proj.path, branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
+    const have = state.workspaces.find(w => w.project === proj.id && w.kind === 'local' && !w.schedule) // the folder's own, not a scheduled run's session
+    if (have && !o.another) return have
+    const id = await uniqueWsId(o.another ? slug(o.name || '') || proj.id : proj.id)
+    ws = { id, project: proj.id, path: proj.path, branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
   } else {
     const want = slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' '))
     const id = await uniqueWsId(want, proj)
@@ -602,7 +611,8 @@ async function teardown(ws: Workspace) {
     sessions.delete(t.id)
   }
   const cfg = projectConfig(ws)
-  if (cfg.teardown && existsSync(ws.path))
+  // a worktree's, as setup is: a local workspace is the project's own folder, which other sessions (and you) still use
+  if (cfg.teardown && ws.kind === 'worktree' && existsSync(ws.path))
     await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, { id: '', workspace: ws.id, name: '', kind: 'shell' }), timeout: 60000 }).catch(() => {})
   if (ws.kind === 'worktree') {
     const proj = state.projects.find(p => p.id === ws.project)
@@ -1469,6 +1479,25 @@ export function fileRead(o: { ws: string; path: string }) {
   return { size: st.size, text: buf.toString('utf8'), cut: st.size > MAX_TEXT || undefined }
 }
 
+// prComment: a review comment on a line of the PR's diff (the side panel's Changes); side LEFT is the old file's line
+export async function prComment(o: { ws: string; path: string; line: number; side?: 'LEFT' | 'RIGHT'; body: string }) {
+  const ws = findWs(o.ws)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  if (!pr.head) throw new Error(`PR #${pr.number}'s head commit isn't known yet: try again in a minute`)
+  inside(ws, String(o.path ?? ''))
+  if (!Number.isInteger(o.line) || o.line < 1) throw new Error('which line?')
+  if (!o.body?.trim()) throw new Error('the comment is empty')
+  const side = o.side === 'LEFT' ? 'LEFT' : 'RIGHT'
+  const args = ['api', `repos/{owner}/{repo}/pulls/${pr.number}/comments`, '-f', `body=${o.body}`, '-f', `commit_id=${pr.head}`, '-f', `path=${o.path}`, '-F', `line=${o.line}`, '-f', `side=${side}`]
+  const { stdout } = await run('gh', args, { cwd: ws.path, timeout: 20000 }).catch(e => {
+    const why = String(e.stderr || e.stdout || '').trim()
+    throw new Error(/422|Unprocessable|could not be resolved|pull_request_review_thread\.line/i.test(why) ? "that line isn't in the PR's diff: commit and push it first" : `gh couldn't comment: ${why.split('\n')[0] || 'it failed'}`)
+  })
+  const c = JSON.parse(stdout || '{}')
+  return { url: c.html_url as string | undefined }
+}
+
 // prThreads: the PR's review threads, for the side panel
 export async function prThreads(ref: string) {
   const ws = findWs(ref)
@@ -1532,7 +1561,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
   if (!(pr ? pr.agent !== 'command' : AGENTS.includes(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't a claude or codex preset`)
   if (s.ws === 'new') {
     if (proj.git === false) throw new Error(`${proj.name} isn't a git repository: run it in its folder instead of a new workspace`)
-  } else if (s.ws !== 'local') {
+  } else if (s.ws !== 'local' && s.ws !== 'local-new') {
     const ws = findWs(s.ws)
     if (ws.project !== proj.id) throw new Error(`${ws.id} isn't in ${proj.name}`)
     s.ws = ws.id
@@ -1575,17 +1604,21 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
   const prompt = stamp(s.prompt, now)
   s.last = now
   try {
-    if (s.ws === 'new') {
+    if (s.ws === 'new' || s.ws === 'local-new') {
+      // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
       const title = wsTitle(s, now)
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title })
-      let name = title // told apart in the sidebar, as its id is: Check 05-10 2 (an hourly 'Check {{DD-MM}}')
-      for (let n = 2; state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === name); n++) name = `${title} ${n}`
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, ...(s.ws === 'local-new' && { local: true, another: true }) })
+      // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
+      const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
+      const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''
+      let name = taken(title) ? title + (own || `-${tail()}`) : title
+      while (taken(name)) name = `${title}-${tail()}`
       Object.assign(ws, { name, schedule: s.id })
       save()
       changed()
       r.ws = ws.id
       r.tab = tabsOf(ws.id).find(t => t.kind === 'agent')?.id
-      r.what = `started in a new workspace, ${ws.id}`
+      r.what = `started in a new ${s.ws === 'new' ? 'workspace' : 'session in its folder'}, ${ws.id}`
     } else {
       // its folder: the project's local workspace, made the first time (no worktree, no agent of its own)
       const ws = s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : findWs(s.ws)

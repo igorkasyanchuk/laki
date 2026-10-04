@@ -103,10 +103,14 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       if (b.error) throw new Error(b.error)
       return b.result
     },
-    // the CLI, from source, against this rig's daemon
+    // the CLI, from source, against this rig's daemon; stdin: what it reads, then the end
     cli(...args: string[]): Promise<{ code: number; out: string; err: string }> {
+      return rig.cliIn(undefined, ...args)
+    },
+    cliIn(stdin: string | undefined, ...args: string[]): Promise<{ code: number; out: string; err: string }> {
       return new Promise(r => {
         const p = spawn(node[0], [...node.slice(1), join(root, 'src/cli/main.ts'), ...args], { env })
+        if (stdin !== undefined) p.stdin.end(stdin)
         let out = ''
         let err = ''
         p.stdout.on('data', d => (out += d))

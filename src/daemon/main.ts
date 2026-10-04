@@ -126,6 +126,7 @@ const api: Record<string, Handler> = {
   fileRead: p => core.fileRead(p),
   skills: () => skills(),
   skillSet: p => skillSet(p),
+  prComment: p => core.prComment(p),
   prThreads: p => core.prThreads(p.ws),
   run: p => core.runDev(p.ws),
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),

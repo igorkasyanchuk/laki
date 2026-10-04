@@ -4,7 +4,7 @@
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
-  notify(title: string, body: string, tab: string): void
+  notify(title: string, body: string, tab: string, sound?: string): void
   onFocusTab(cb: (tab: string) => void): void
   pickFolder(): Promise<string | null>
   pathOf?(f: File): string
@@ -12,6 +12,8 @@ type Bridge = {
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void
+  onDeepLink?(cb: (url: string) => void): void
+  capture?(webContentsId: number): Promise<string>
 }
 export const bridge: Bridge | undefined = (window as any).laki
 
@@ -87,9 +89,9 @@ export const api = new Api()
 
 export const openExternal = (url: string) => (bridge ? bridge.openExternal(url) : window.open(url, '_blank', 'noopener'))
 
-export function notify(title: string, body: string, tab: string, onClick: () => void) {
-  if (bridge) return bridge.notify(title, body, tab)
+export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string) {
+  if (bridge) return bridge.notify(title, body, tab, sound)
   if (!('Notification' in window)) return
   if (Notification.permission === 'default') Notification.requestPermission()
-  if (Notification.permission === 'granted') new Notification(title, { body }).onclick = onClick
+  if (Notification.permission === 'granted') new Notification(title, { body, silent: sound === 'none' }).onclick = onClick
 }

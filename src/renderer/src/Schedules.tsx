@@ -1,7 +1,7 @@
 // Scheduled tasks (the clock at the top of the sidebar, or ⌘K): a prompt for an agent at the times a line of English
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
 import { Icon, IconButton, Page, Switch } from './ui'
@@ -18,12 +18,15 @@ const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, 
 const at = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string }
 
-export function SchedulesPage({ view, api, onClose }: { view: View; api: SchedulesApi; onClose: () => void }) {
-  const [picked, setPicked] = useState('') // a project's tasks and runs; '': all
-  const only = view.projects.some(p => p.id === picked) ? picked : '' // a removed project: all again
+// project: the filter it opens with (a project's ⋯ menu); onSeen: the newest run, once all projects' runs show (the clock's dot)
+export function SchedulesPage({ view, api, project: start = '', onSeen, onClose }: { view: View; api: SchedulesApi; project?: string; onSeen?: (run: string) => void; onClose: () => void }) {
+  const [picked, setPicked] = useState(start) // a project's tasks and runs; '': all
+  const only = view.projects.length > 1 && view.projects.some(p => p.id === picked) ? picked : '' // a removed project, or the only one: all
   const schedules = (view.schedules ?? []).filter(s => !only || s.project === only)
   const runs = (view.runs ?? []).filter(r => !only || (r.project ?? view.schedules?.find(s => s.id === r.schedule)?.project) === only)
   const agents = view.presets.filter(p => p.agent !== 'command').map(p => p.name)
+  const newest = view.runs?.[0]?.id
+  useEffect(() => void (!only && newest && onSeen?.(newest)), [only, newest]) // filtered: another project's failure stays unread
   const where0 = (project: string) => (view.projects.find(p => p.id === project)?.git === false ? 'local' : 'new') // a folder without git: no worktrees
   const blank = (): Form => {
     const project = only || view.projects[0]?.id || ''
@@ -39,6 +42,7 @@ export function SchedulesPage({ view, api, onClose }: { view: View; api: Schedul
   const rule = form?.when.trim() ? parseWhen(form.when) : null
   const fail = (e: unknown) => setErr((e as Error).message)
   const first = rule && !('error' in rule) ? nextRun(rule, Date.now()) : undefined // the next run: what the names preview
+  const makes = form?.ws === 'new' || form?.ws === 'local-new' // a row of its own each run, named
 
   const save = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -57,12 +61,13 @@ export function SchedulesPage({ view, api, onClose }: { view: View; api: Schedul
   const edit = (s: Schedule) => {
     // the project's local workspace is its folder; one that's gone: what the Where select shows, not an id it lacks
     const w = view.workspaces.find(x => x.id === s.ws && x.project === s.project && !x.archived)
-    const ws = ['new', 'local'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
+    const ws = ['new', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
     setErr('')
     setForm({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when })
   }
   const rm = (s: Schedule) => confirm(`Delete the scheduled task ${s.name || s.prompt.slice(0, 40)}?`) && api.rm(s.id).catch(fail)
-  const where = (s: Schedule) => (s.ws === 'new' ? 'a new workspace each run' : s.ws === 'local' ? 'in its folder' : `in ${view.workspaces.find(w => w.id === s.ws)?.name || s.ws}`)
+  const where = (s: Schedule) =>
+    ({ new: 'a new workspace each run', 'local-new': 'in its folder, a new session each run', local: 'in its folder, one session' })[s.ws] ?? `in ${view.workspaces.find(w => w.id === s.ws)?.name || s.ws}`
   const pickProject = async (id: string) => {
     const p = id === '+' ? await api.pick().catch(e => (fail(e), null)) : { id }
     if (p) set({ project: p.id, ws: where0(p.id) })
@@ -105,7 +110,8 @@ export function SchedulesPage({ view, api, onClose }: { view: View; api: Schedul
                 Where
                 <select value={form.ws} onChange={e => set({ ws: e.target.value })}>
                   {project?.git !== false && <option value="new">A new workspace each run (a worktree)</option>}
-                  <option value="local">In its folder, no worktree</option>
+                  <option value="local-new">In its folder, a new session each run</option>
+                  <option value="local">In its folder, one session</option>
                   {wsOf(form.project).map(w => (
                     <option key={w.id} value={w.id}>
                       In {w.name || w.id}
@@ -114,7 +120,7 @@ export function SchedulesPage({ view, api, onClose }: { view: View; api: Schedul
                 </select>
               </label>
             </div>
-            {form.ws === 'local' && project && <div className="muted small schedule-path">{project.path}</div>}
+            {form.ws.startsWith('local') && project && <div className="muted small schedule-path">{project.path}</div>}
             <label>
               Agent
               <div className="seg">
@@ -152,15 +158,15 @@ export function SchedulesPage({ view, api, onClose }: { view: View; api: Schedul
               <span>
                 Name <span className="muted">(optional; a new workspace is named after it)</span>
               </span>
-              <input value={form.name} placeholder={form.ws === 'new' ? 'from the prompt, with the date' : 'from the prompt'} spellCheck={false} onChange={e => set({ name: e.target.value })} />
+              <input value={form.name} placeholder={makes ? 'from the prompt, with the date' : 'from the prompt'} spellCheck={false} onChange={e => set({ name: e.target.value })} />
             </label>
             <div className="muted small">
               In the name or the prompt, {'{{DD-MM-YY}}'}, {'{{YYYY-MM-DD}}'}, {'{{HH:mm}}'} or {'{{ddd D MMM}}'} become the run's date and time.
             </div>
-            {first !== undefined && form.prompt.trim() && (form.ws === 'new' || stamp(form.prompt, first) !== form.prompt) && (
+            {first !== undefined && form.prompt.trim() && (makes || stamp(form.prompt, first) !== form.prompt) && (
               <div className="schedule-preview">
                 <Icon name="clock" />
-                {[form.ws === 'new' && `Its workspace: ${wsTitle({ name: form.name.trim(), prompt: form.prompt }, first)}`, stamp(form.prompt, first) !== form.prompt && `${form.ws === 'new' ? 'its' : 'Its'} prompt: “${stamp(form.prompt, first).slice(0, 80)}”`]
+                {[makes && `Its ${form.ws === 'new' ? 'workspace' : 'session'}: ${wsTitle({ name: form.name.trim(), prompt: form.prompt }, first)}`, stamp(form.prompt, first) !== form.prompt && `${makes ? 'its' : 'Its'} prompt: “${stamp(form.prompt, first).slice(0, 80)}”`]
                   .filter(Boolean)
                   .join(' · ')}
               </div>

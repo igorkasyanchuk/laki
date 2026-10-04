@@ -7,6 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
 import type { Schedule, ScheduleRun, View } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
+import { mcp } from './mcp.ts'
 import { describe } from '../shared/when.ts'
 
 const argv = process.argv.slice(2)
@@ -71,6 +72,8 @@ async function main() {
     }
     case 'stop':
       return rpc('shutdown').catch(() => {})
+    case 'mcp':
+      return mcp() // starts the daemon at its first tool call: stdout is the protocol's
   }
   await ensureDaemon()
   switch (cmd) {
@@ -144,7 +147,7 @@ async function main() {
     case 'schedule': {
       const [sub = 'ls', id, ...words] = rest
       const at = (t?: number) => (t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
-      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.preset} · ${s.ws === 'local' ? 'folder' : s.ws}  ${s.name || s.prompt}`
+      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.preset} · ${({ local: 'folder', 'local-new': 'folder-new' } as Record<string, string>)[s.ws] ?? s.ws}  ${s.name || s.prompt}`
       if (sub === 'ls' || sub === 'log') {
         const v: View = await rpc('state')
         if (sub === 'ls') return out(v.schedules ?? [], (v.schedules ?? []).map(line).join('\n') || 'no scheduled tasks')
@@ -152,7 +155,7 @@ async function main() {
       }
       if (sub === 'add') {
         if (!flags.when) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>')
-        const where = flags.where === 'folder' ? 'local' : flags.where || undefined
+        const where = ({ folder: 'local', 'folder-new': 'local-new' } as Record<string, string>)[String(flags.where)] ?? (flags.where || undefined)
         const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, name: flags.name, prompt: flags.prompt || words.join(' ') })
         return out(s, line(s))
       }

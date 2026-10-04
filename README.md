@@ -20,8 +20,9 @@ running when you close the window.
 - **PRs and git.** The status bar shows the workspace's PR and its CI. Switches send failing CI or new review
   comments to the agent. Ship commits, pushes and opens a PR in one step. You can fork a workspace, archive
   it and restore it.
-- **Side panel.** Files, changes against the base branch, and review threads for the workspace. ⌘P finds a
-  file.
+- **Side panel.** Files, changes against the base branch (click a line to comment on the PR or tell the
+  agent), review threads, and a browser preview of the dev server that sends screenshots to the agent. ⌘P
+  finds a file.
 - **Dev servers and ports.** ▷ Run starts the project's run script. Laki lists the ports that are listening:
   click one to open it, or share it with a public link and QR code.
 - **Remote access.** Use the whole app from your phone or another computer, through a Cloudflare tunnel that
@@ -30,8 +31,9 @@ running when you close the window.
   resets.
 - **Your look.** 50 themes, 32 of which also change shapes and type. Glass mode makes the window
   see-through. Fonts are built in.
+- **Notifications your way.** Pick which turns notify and the sound; mute a workspace or a tab.
 - **Keyboard first.** ⌘ shortcuts, a ⌘K palette, a key for every menu item, and a `laki` CLI that the agents
-  themselves can use.
+  themselves can use, also as an MCP server (`laki mcp`). `laki://` links open a workspace or a tab.
 
 ## Install
 
@@ -73,6 +75,7 @@ laki ls                                              # projects, workspaces, tab
 laki send fix-the-login --when-idle "now add tests"  # typed in when its turn ends
 laki schedule add app --when "weekdays at 9am" "triage new issues"
 laki ship fix-the-login -m "Fix the login redirect"
+claude mcp add -s user laki -- laki mcp              # Laki's tools for any MCP client
 ```
 
 Run `laki help` for every command. Settings › Agent skill teaches Claude Code and Codex to use it too.

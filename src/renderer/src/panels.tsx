@@ -24,8 +24,9 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 
 export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean }
 
-export function NewWorkspace({ view, project, agent, onClose, onCreate }: { view: View; project?: string; agent?: string; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
-  const [p, setP] = useState<NewWsParams>({ project: project ?? view.projects[0]?.id ?? '', preset: agent || 'claude', base: '' })
+// initial: a laki://new link's prompt, preset and name
+export function NewWorkspace({ view, project, agent, initial, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
+  const [p, setP] = useState<NewWsParams>({ project: project ?? view.projects[0]?.id ?? '', preset: agent || 'claude', base: '', ...initial })
   const [branches, setBranches] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
   const [images, setImages] = useState<Img[]>([])

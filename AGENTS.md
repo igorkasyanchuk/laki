@@ -60,18 +60,21 @@ every view as `api`; a running daemon below the renderer's (it outlives app upda
 the app · restart* in the status bar (`StaleDaemon` in `ui.tsx`: `shutdown`, then main starts the new one).
 Bump `API` when the renderer starts relying on a new method or daemon behavior (1: the tunnel methods; 2: a
 project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a project's `actions`, kept by `projectSet`;
-4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever). A
+4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever; 7: `prComment`, `muted`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`), `openIn` (an app id, or `editor`: the default);
-- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `reorder` (projects or workspaces by id), `wsSet` (color), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
-- tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color), `send`, `queueClear`;
+- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `reorder` (projects or workspaces by id), `wsSet` (color, `muted`), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+- tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color, `muted`), `send`, `queueClear`;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from), `tunnelStart`
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
-- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only), `prThreads`, `openIn` with a `file` (paths must stay inside the
+- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only), `prThreads`, `prComment` (`path`,
+  `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
+  PR's diff"), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`);
-- the agent skill (Settings): `skills`, `skillSet` with an `agent` (claude, codex) and `on`;
+- the agent skill (Settings): `skills` (each with `mcp`: the `claude|codex mcp add` command, shown, never run),
+  `skillSet` with an `agent` (claude, codex) and `on`;
 - scheduled tasks: `scheduleSet` (makes one, or changes one by `id`: name, project, preset, ws, prompt, when, on;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
@@ -195,13 +198,45 @@ Origin: the files hold no secrets. Paths that leave the folder, or don't decode,
 (a line of English to days of the week and minutes after midnight, in the Mac's time zone; `once` for
 `once`/`tomorrow`), kept with the text so "tomorrow" means the day it was saved; `nextRun` gives `next`; `stamp` fills `{{DD-MM-YY}}`-style
 dates (only braces of date tokens) in the name and prompt with the run's time. A run (ws) makes a new workspace
-(`new`: `wsNew` with the preset and prompt; `wsTitle` names it, the task's `schedule` id marks it: the sidebar's clock),
-or uses the project's own folder (`local`: its local workspace, made by the first run, no worktree) or a workspace
-(its id); in those two, the prompt goes to the
+(`new`: `wsNew` with the preset and prompt; `wsTitle` names it, with the id's random tail when another workspace has that name; the task's `schedule` id marks
+it: the sidebar's clock),
+or a new session in the project's own folder (`local-new`: `wsNew` `local` + `another`, a local workspace beside the one
+it has, so each run is a sidebar row), or uses that folder (`local`: its local workspace, made by the first run) or a workspace
+(its id); in those last two, the prompt goes to the
 workspace's running agent of that preset (`send` whenIdle), else a new tab with it. Every run, or a missed one (more
 than `MISSED_AFTER`, 30 minutes, late: skipped), goes to `state.runs` (the last 200; the view has 50). A tick moves
 every due task on before it runs any, so a slow worktree isn't started twice. Removing a project removes its tasks; a
 gone or archived workspace is a failed run.
+
+### MCP
+
+`src/cli/mcp.ts`, `laki mcp`: JSON-RPC 2.0 over stdio, a message per line (`initialize` echoes the client's
+protocol version; `tools/list`, `tools/call`, `ping`; notifications get no answer, other methods -32601). Each tool is
+one or two `rpc` calls; none deletes, archives or ships. stdout is the protocol's, so the daemon starts at the first
+tool call (`ensureDaemon`), never before. Tested in `test/cli.test.ts`.
+
+### Links
+
+`laki://` (electron-builder's `protocols`, `setAsDefaultProtocolClient` when packaged): main's `open-url` queues a
+link until the renderer says `deep-link-ready` (preload's `onDeepLink`; a main-frame navigation resets it), then
+sends `deep-link`. `links.ts` `parseLink` (tested in `test/links.test.ts`), App routes it once the view is in: a
+workspace or tab, the new-workspace page filled in (`initial`), Scheduled tasks, Settings, Help. Links select and fill
+in; they never create or run anything.
+
+### Preview
+
+The side panel's Preview: a `<webview>` (`webviewTag`) made by hand in `SidePanel.tsx` `PreviewTab`. Main's
+`will-attach-webview` drops any preload, forces no node, sandbox and context isolation, and refuses a `src` that
+isn't `http://localhost` or `127.0.0.1`, or a partition other than `persist:preview`, whose session grants only
+`PREVIEW_OK` permissions (Electron grants all by default). No `allowpopups`: its popups are blocked. `capture` (IPC) takes a webview of the
+asking window by its `webContentsId` and returns a PNG (base64); `ShotBox` saves it (`imageSave`) and sends its path to
+the agent. In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
+
+### Notifications
+
+The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
+`settings.notifyOn[waiting|done|limit] === false`, or a muted workspace or tab (`muted`, ⋯ and right-click menus).
+`settings.notifySound` (a macOS sound's name, `none`, unset: the default) goes to main's `Notification`.
 
 ### Usage
 
@@ -294,16 +329,17 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   setting back at its default is saved as that value: an unset key wouldn't replace the saved one. Projects
   are sections of it (`ProjectSection`: name, scripts, env; saved 400 ms after typing and on leaving).
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Files (tree from the daemon's file list, search, new
-  file/folder, changed files marked), Changes (the diff by file), Review (`PRSection` from `Info.tsx`, review
-  threads); `FilePreview` (a click in Files, or a thread's line), `FileFinder` (⌘P, `findFiles`: a
+  file/folder, changed files marked), Changes (the diff by file, each line with its old and new numbers from the
+  hunks; a click opens `CommentBox`: the PR, or the agent), Review (`PRSection` from `Info.tsx`, review
+  threads), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line), `FileFinder` (⌘P, `findFiles`: a
   basename match first); `RunButton` and `actionMenu` (Run ▾'s Agent and Terminal actions). App.tsx passes a `PanelApi` over the daemon. One right panel at a time: it or
   the info panel.
 - **`Tunnel.tsx`**: Expose to the world: the status bar's globe next to each port (`TunnelButton`) and its
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
   or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
   as SVG, also Remote access's.
-- **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar header's clock, ⌘K): a project filter
-  (`only`), the form with `parseWhen`'s reading, the next runs and the dated names (*Another folder…*: `pick`, the
+- **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar header's clock, ⌘K, a project's ⋯ menu:
+  App's `schedulesOf`, the dialog `{ schedules: <project> }`): a project filter (`only`, starting at `project`), the form with `parseWhen`'s reading, the next runs and the dated names (*Another folder…*: `pick`, the
   folder picker, or a typed path in a browser, then `projectAdd`), the tasks (switch, Run now, edit, delete), the runs' log (a click goes to
   the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
   `laki.runsSeen` (localStorage: the newest run the page showed).
@@ -317,6 +353,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   compares a code with macOS CoreImage's (`test/qr.test.ts`).
 - **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings), the palette,
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker).
+- **`links.ts`**: `parseLink` and `wsLink` (laki:// links, above).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
 
@@ -328,8 +365,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications, `pick-folder` IPC |
-| `src/preload/index.ts` | `bridge`: conn info, notify, glass, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
+| `src/preload/index.ts` | `bridge`: conn info, notify, glass, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/skill.ts` | the agent skill: SKILL.md and a CLI launcher in `~/.claude/skills/laki` and `~/.codex/skills/laki` (`skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
@@ -340,9 +377,10 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` and `wsTitle` (a run's dated names) |
 | `src/cli/main.ts` | the `laki` CLI and `laki hook` |
+| `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift` |
 
 ## Conventions

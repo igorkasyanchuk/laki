@@ -16,7 +16,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 ## Features
 
 - **Workspaces**: one git worktree and branch per task (or the repo or a plain folder itself), with setup and
-  teardown scripts, env, a `$PORT` of its own, and a name you can change.
+  teardown scripts (worktrees only: a folder's own workspace never runs them), env, a `$PORT` of its own, and a
+  name you can change.
 - **Agents**: Claude Code, Codex or any command, started from presets (args, env). Live status per tab and
   workspace; notifications; a follow-up queue; resume after a restart; usage limits wait and continue.
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
@@ -29,7 +30,11 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI or new review
   comments to the agent on their own; an info panel with the PR, its checks and what the agents said last.
 - **Side panel** (⌥⌘B): the workspace's files (search, preview, new file or folder, changed files marked),
-  its changes against the base branch, and its PR's checks and review comments. ⌘P finds a file by name.
+  its changes against the base branch (click a line to comment on the PR or tell the agent), its PR's checks
+  and review comments, and a browser preview of its dev server (a screenshot goes to the agent). ⌘P finds a
+  file by name.
+- **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
+  a workspace, a tab or a page of the app.
 - **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
   run script in its tab, ■ stops it; listening ports you click to open, or expose to the world (a public
@@ -88,13 +93,15 @@ npm link
 - ⋯ on a project opens its menu:
   - *New workspace*;
   - *Settings…* (see Project settings below);
+  - *Scheduled tasks…* (the project's tasks and runs; the count of its tasks on the right);
   - *Remove project*;
   - its archived workspaces, which you click to restore.
 - Drag the sidebar's right edge to resize it; double-click the edge to reset. ⌘B (or the sidebar icon) hides
   and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
 - Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
-  *Info*, *Open in*, fork, archive and delete.
+  *Info*, *Mute notifications*, *Copy link* (`laki://ws/<id>`), *Open in*, fork, archive and delete. A tab's
+  menu has *Mute notifications* and *Copy link* too.
 - Drag projects, and workspaces within a project, to reorder them.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
@@ -173,11 +180,12 @@ email address only.
 - It stops on its own when the time is up, when you stop it, or with the daemon. Each start makes a new key, so
   an old link never works again.
 
-**Scheduled tasks** (the clock at the top of the sidebar, or *Scheduled tasks* in ⌘K): a prompt for an agent at
+**Scheduled tasks** (the clock at the top of the sidebar, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
 times you write in plain English.
 - Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, or a preset of
-  theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, no worktree*: the project's own
-  checkout or folder; or one of the project's workspaces: its running agent of that kind gets the prompt, queued
+  theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
+  project's own checkout or folder, a new agent and sidebar row every run; *In its folder, one session*: the same
+  agent gets every run; or one of the project's workspaces: its running agent of that kind gets the prompt, queued
   while it works, or a new tab starts), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
   `mon, wed and fri at 18:30`, `every 2 hours from 9am to 6pm`, `every 30 minutes`, `hourly on weekends`,
   `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). The form says how
@@ -185,7 +193,7 @@ times you write in plain English.
 - Dates in the name or the prompt: `{{DD-MM-YY}}`, `{{YYYY-MM-DD}}`, `{{HH:mm}}`, `{{ddd D MMM}}` (`Nightly deps
   {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time. A new workspace is named after the task, or
   with no name after the date and the prompt's first words (*05-10 02:00 update the deps and*), and gets a clock
-  in the sidebar.
+  in the sidebar. A name a workspace already has gets four random characters (*Nightly deps 05-10-k3x9*).
 - *Run now* runs one at once; the switch turns one off; *Runs* lists the last 50 (click one to go to its
   workspace); *All projects* narrows both lists to one project. The clock gets a red dot when a run failed since you last looked.
 - The daemon runs them (closing the window doesn't stop them), in the Mac's time zone. A run more than 30
@@ -207,10 +215,18 @@ until the agent's next run renews it. Settings › General turns each agent off 
   with *Open in editor*; a double-click opens it in the editor. Changed files are colored (modified, new, deleted) and their
   folders get a dot. Refresh, collapse all.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
-  for its diff, with links to preview the file or open it in the editor.
+  for its diff, with links to preview the file or open it in the editor. Click a line of a diff to write a
+  comment on it: *Comment on PR #n* posts it on GitHub at that line (`gh`; the line must be in the PR's diff,
+  so commit and push first), *Send to the agent* gives it to the workspace's agent with the file and line
+  (when its turn ends). ⌘⏎ does the first that applies, Esc closes it.
 - *Review*: the PR with its checks, the *fix CI* / *review* switches and the send buttons, and the open
   review threads (from reviewers with write access and bots: what the agent would get). Click a thread's
   file to preview it at that line.
+- *Preview*: the workspace's dev server in a browser: `$PORT` or a listening port (the menu), a path, back,
+  forward, reload, open in your browser. The camera takes a screenshot of the page and sends it to the agent
+  with what you write. It opens pages on this Mac (`localhost`, `127.0.0.1`; links may lead elsewhere), without
+  popups, the camera, the microphone or clipboard reads. Its cookies are its own and kept. While the page has the focus, ⌘ keys go to it:
+  click outside it first. In a browser (remote access), it works only on the Mac itself.
 
 **Find files** (*Find files…*, first in ⌘K; or ⌘P): type parts of a path (`crt` finds `src/cart.ts`); names match
 before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
@@ -251,7 +267,8 @@ the prompt:
 | ✓ / ✖ | process ended (ok / failed) |
 
 A workspace shows its most urgent tab. A terminal that waits or finishes while off screen sends a macOS
-notification (Settings › General turns them off); click it to jump there. Follow-ups queued with `laki send --when-idle` show as `+n`.
+notification; click it to jump there. Settings › General picks which (waiting, finished, usage limit) and the
+sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups queued with `laki send --when-idle` show as `+n`.
 
 ### Keys
 
@@ -266,7 +283,7 @@ notification (Settings › General turns them off); click it to jump there. Foll
 | ⌘K | palette |
 | ⌘P | find a file in the workspace |
 | ⌘D | changes (the side panel) |
-| ⌥⌘B | side panel: files, changes, review |
+| ⌥⌘B | side panel: files, changes, review, preview |
 | ⌘I | workspace info |
 | ⌘F | find in the terminal |
 | ⌘E | open in the editor |
@@ -280,7 +297,8 @@ notification (Settings › General turns them off); click it to jump there. Foll
 ⌘, or the gear at the top of the sidebar opens the settings page. Changes save as you make them, into
 `state.json`. The page grows and shrinks with the terminal font size; on/off options are switches.
 - *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `laki/`),
-  *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K), *plan limits* for
+  *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
+  kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), and environment
   variables for every session (a project's or preset's env wins over them).
 - *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Glass* (a see-through
@@ -329,7 +347,9 @@ notification (Settings › General turns them off); click it to jump there. Foll
 - *Agent skill*: installs a skill for Claude Code and Codex in your home folder (`~/.claude/skills/laki`,
   `~/.codex/skills/laki`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
-  It holds the app's path: update it after moving the app. *Remove* takes only its own files.
+  It holds the app's path: update it after moving the app. *Remove* takes only its own files. Below it, *MCP
+  server*: the command that adds Laki to Claude Code or Codex as an MCP server (Copy, then run it in a
+  terminal: it goes in the agent's own settings, which Laki never writes).
 - *Remote access*: the email it lets in, how long, start and stop, the QR code and link (above).
 - *Projects*: each project's settings (below).
 
@@ -375,12 +395,39 @@ laki screen fix-the-login/claude
 laki diff fix-the-login | run fix-the-login | ship fix-the-login -m "Fix redirect"
 laki archive fix-the-login | restore … | fork … | rm …
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
-laki schedule add app --when "daily at 2am" --where folder --name "Deps {{DD-MM}}" "update the deps"
+laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
 laki open                                               # the app
+laki mcp                                                # an MCP server on stdio (below)
 laki stop                                               # stop the daemon (agents resume when it starts again)
 laki daemon                                             # run the daemon in the foreground
 ```
+
+### MCP
+
+`laki mcp` is an MCP server on stdio, for Claude Code, Codex or any MCP client. Its tools: `laki_state`
+(projects, workspaces, tabs and their status), `laki_new_workspace`, `laki_send`, `laki_screen`, `laki_diff`,
+`laki_schedules` and `laki_schedule_add`. None deletes, archives or ships. Add it with the command in
+*Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
+
+```bash
+claude mcp add -s user laki -- laki mcp
+codex mcp add laki -- laki mcp
+```
+
+### Links
+
+`laki://` links open the app at a place; they select and fill in, and never start anything:
+
+| link | opens |
+|---|---|
+| `laki://ws/<id>[?tab=<tab>]` | a workspace, or one of its tabs (*Copy link* in their menus) |
+| `laki://new?project=<id>&prompt=…&preset=…&name=…` | the new-workspace page, filled in |
+| `laki://schedules[/<project>]` | Scheduled tasks, filtered to a project |
+| `laki://settings[/<section>]` | Settings (`general`, `appearance`, `remote`…) |
+| `laki://help` | Help |
+
+`open 'laki://ws/fix-the-login'` works from a terminal, a note or a calendar invite.
 
 ### Recipes
 

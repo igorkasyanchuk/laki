@@ -1,6 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
-// native services for the renderer: daemon address, notifications, folder picker, external links.
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell } from 'electron'
+// native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
+// the preview pane's webview (localhost only) and its screenshots.
+import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, session, shell, webContents } from 'electron'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
@@ -10,9 +11,43 @@ const dev = !!process.env.ELECTRON_RENDERER_URL
 let win: BrowserWindow | null = null
 let pendingTab: string | null = null
 let quitting = false
+let link: string | null = null // a laki:// link that came before the renderer listened
+let linkReady = false // the renderer listens for links
 
 if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', () => show())
+// laki://… (Info.plist names the scheme): the renderer routes it; it only selects and opens pages, never creates
+app.on('open-url', (e, url) => {
+  e.preventDefault()
+  if (!url.startsWith('laki:')) return
+  if (linkReady && win) win.webContents.send('deep-link', url)
+  else link = url
+  if (app.isReady()) show()
+})
+ipcMain.on('deep-link-ready', () => {
+  linkReady = true
+  if (link) win?.webContents.send('deep-link', link)
+  link = null
+})
+// the preview pane's <webview>: a page on this Mac, in its own session, without node or a preload (and, with no
+// allowpopups, without popups)
+const PREVIEW = 'persist:preview'
+const local = (u: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)
+app.on('web-contents-created', (_e, wc) => {
+  wc.on('will-attach-webview', (e, prefs, params) => {
+    delete prefs.preload
+    Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true })
+    if (!local(params.src) || params.partition !== PREVIEW) e.preventDefault()
+  })
+})
+// Electron grants a page every permission by default: the preview (which links can take anywhere) gets none of the
+// sensitive ones (camera, microphone, location, clipboard reads, notifications…)
+const PREVIEW_OK = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock'])
+app.whenReady().then(() => {
+  const s = session.fromPartition(PREVIEW)
+  s.setPermissionRequestHandler((_wc, perm, cb) => cb(PREVIEW_OK.has(perm)))
+  s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
+})
 
 const daemon = () =>
   ensureDaemon({
@@ -37,6 +72,7 @@ function create() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      webviewTag: true, // the preview pane; will-attach-webview keeps it to localhost
     },
   })
   win.once('ready-to-show', () => {
@@ -54,7 +90,8 @@ function create() {
     e.preventDefault()
     win?.hide()
   })
-  win.on('closed', () => (win = null))
+  win.on('closed', () => ((win = null), (linkReady = false)))
+  win.webContents.on('did-start-navigation', e => e.isMainFrame && !e.isSameDocument && (linkReady = false)) // a reload: links wait for the new page
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
     pendingTab = null
@@ -83,14 +120,16 @@ ipcMain.handle('conn', async () => {
   const { port, token } = await daemon()
   return { port, token }
 })
-ipcMain.on('notify', (_e, title: string, body: string, tab: string) => {
-  if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab }) + '\n') // smoke tests
-  const n = new Notification({ title, body, silent: false })
+// sound: a macOS sound's name (Settings › General), 'none', or unset: the default
+ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string) => {
+  if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab, sound }) + '\n') // smoke tests
+  const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
+  const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }) })
   n.on('click', () => show(tab))
   n.show()
 })
 ipcMain.handle('pick-folder', async () => {
-  const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory'] })
+  const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] }) // createDirectory: macOS's New Folder button
   return r.canceled ? null : r.filePaths[0]
 })
 // macOS dictation, as Edit › Start Dictation does; its language and microphone are in System Settings
@@ -100,6 +139,14 @@ ipcMain.on('dictation-settings', () => shell.openExternal('x-apple.systemprefere
 ipcMain.on('glass', (_e, on: boolean) => {
   win?.setVibrancy(on ? 'under-window' : null)
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
+})
+// the preview pane's screenshot: a webview of this window's, as a PNG in base64
+ipcMain.handle('capture', async (e, id: number) => {
+  const wc = webContents.fromId(id)
+  if (!wc || wc.getType() !== 'webview' || wc.hostWebContents !== e.sender) throw new Error('no such preview')
+  const img = await wc.capturePage()
+  if (img.isEmpty()) throw new Error('nothing on screen to capture yet')
+  return img.toPNG().toString('base64')
 })
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url)
@@ -150,6 +197,7 @@ Menu.setApplicationMenu(
 )
 
 app.whenReady().then(async () => {
+  if (app.isPackaged) app.setAsDefaultProtocolClient('laki')
   await daemon().catch(e => dialog.showErrorBox('Laki', `The daemon didn't start: ${e.message}`))
   create()
 })

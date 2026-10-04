@@ -53,6 +53,7 @@
       "package.json"
     ],
     "asar": false,
+    "protocols": [{ "name": "Laki", "schemes": ["laki"] }],
     "directories": {
       "output": "dist"
     },

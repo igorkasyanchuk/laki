@@ -1,13 +1,14 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
 // checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
 // passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { bridge } from './api'
 import { highlight } from './highlight'
 import { type AutoKey, PRSection, type WsInfo } from './Info'
 import { type actionsFor, type RunAction } from './text'
 import { Icon, IconButton, type IconName, type MenuItem } from './ui'
 
-export type PanelTab = 'files' | 'changes' | 'review'
+export type PanelTab = 'files' | 'changes' | 'review' | 'preview'
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
 export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string }[] }
@@ -20,6 +21,9 @@ export type PanelApi = {
   preview: (path: string, line?: number) => void // in the app
   changes: () => Promise<Changes>
   threads: () => Promise<Thread[]>
+  comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
+  toAgent: (text: string) => Promise<unknown> // to the workspace's agent, when its turn ends
+  saveImage: (base64png: string) => Promise<string> // its path, for a prompt
 }
 
 export const PANEL_WIDTH = 340
@@ -27,6 +31,7 @@ const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
   { id: 'files', label: 'Files', icon: 'file' },
   { id: 'changes', label: 'Changes', icon: 'changes' },
   { id: 'review', label: 'Review', icon: 'review' },
+  { id: 'preview', label: 'Preview', icon: 'globe' },
 ]
 
 // what load gives, again every few seconds while the window is in front, and on reload()
@@ -192,25 +197,94 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
 // the diff of one file, without its header lines
 const fileOf = (l: string) => l.match(/ b\/(.*)$/)?.[1] ?? ''
 
-function ChangesTab({ api, ws }: { api: PanelApi; ws: string }) {
+// a diff line with its line numbers: old (the base's) and new (the branch's); a hunk header has neither
+type DiffLine = { text: string; old?: number; new?: number }
+
+// a comment on one diff line: to the PR on GitHub, or to the workspace's agent. The text lives in ChangesTab: a
+// refresh can move the line, and the box with it.
+function CommentBox({ path, line, text, setText, pr, api, onClose }: { path: string; line: DiffLine; text: string; setText: (t: string) => void; pr?: number; api: PanelApi; onClose: () => void }) {
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const n = line.new ?? line.old!
+  const go = (f: () => Promise<unknown>) => {
+    if (busy || !text.trim()) return
+    setBusy(true)
+    setErr('')
+    f().then(onClose, e => (setErr(String(e?.message ?? e)), setBusy(false)))
+  }
+  const toPR = () => pr && go(() => api.comment({ path, line: n, side: line.new === undefined ? 'LEFT' : 'RIGHT', body: text }))
+  const toAgent = () => go(() => api.toAgent(`About ${path}, line ${n}${line.new === undefined ? ' (removed)' : ''}: \`${line.text.slice(1).trim()}\`\n\n${text}`))
+  return (
+    <div className="dl-comment" onClick={e => e.stopPropagation()}>
+      <textarea
+        autoFocus
+        rows={3}
+        value={text}
+        placeholder={`A comment on line ${n} · ⌘⏎ ${pr ? 'posts it' : 'sends it to the agent'}`}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => {
+          if (e.key === 'Escape') onClose()
+          else if (e.key === 'Enter' && e.metaKey) pr ? toPR() : toAgent()
+        }}
+      />
+      {err && <div className="warn small">{err}</div>}
+      <div className="row">
+        {pr ? (
+          <button className="primary" disabled={busy || !text.trim()} onClick={toPR}>
+            Comment on PR #{pr}
+          </button>
+        ) : (
+          <span className="muted small">No PR yet</span>
+        )}
+        <button disabled={busy || !text.trim()} onClick={toAgent}>
+          Send to the agent
+        </button>
+        <span className="grow" />
+        <button className="link small" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number }) {
   const [d, err, reload] = useLoad(api.changes, ws, 8000)
   const [open, setOpen] = useState<Set<string>>(new Set())
-  useEffect(() => setOpen(new Set()), [ws])
+  const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
+  useEffect(() => (setOpen(new Set()), setAt(null)), [ws])
   const byFile = useMemo(() => {
-    const m = new Map<string, string[]>()
-    let cur: string[] | null = null
+    const m = new Map<string, DiffLine[]>()
+    let cur: DiffLine[] | null = null
+    let old = 0
+    let now = 0
     for (const l of d?.diff.split('\n') ?? []) {
+      const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l)
       if (l.startsWith('diff --git ')) m.set(fileOf(l), (cur = []))
-      else if (cur && !/^(index |--- |\+\+\+ |new file|deleted file|similarity|rename |old mode|new mode)/.test(l)) cur.push(l)
+      else if (!cur || /^(index |--- |\+\+\+ |new file|deleted file|similarity|rename |old mode|new mode)/.test(l)) continue
+      else if (h) (old = +h[1]), (now = +h[2]), cur.push({ text: l })
+      else if (l[0] === '+') cur.push({ text: l, new: now++ })
+      else if (l[0] === '-') cur.push({ text: l, old: old++ })
+      else if (l[0] === ' ') cur.push({ text: l, old: old++, new: now++ })
+      else cur.push({ text: l }) // \ No newline at end of file
     }
     return m
   }, [d])
+  const same = (a: DiffLine, b: DiffLine) => a.old === b.old && a.new === b.new && a.text === b.text
+  // a click (not a drag that selects text) on a line opens its comment box
+  const pick = (path: string, l: DiffLine) => (l.old ?? l.new) !== undefined && !window.getSelection()?.toString() && setAt(a => (a?.path === path && same(a.line, l) ? null : { path, line: l, text: '' }))
+  // where the box goes after a refresh: under its line, else (the line changed) at the end of the file's diff
+  const boxAt = (path: string, lines: DiffLine[]) => {
+    if (at?.path !== path) return -1
+    const i = lines.findIndex(l => same(l, at.line))
+    return i < 0 ? lines.length - 1 : i
+  }
   const toggle = (p: string) => setOpen(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
   const files = d?.files ?? []
   return (
     <>
       <div className="sp-tools">
-        <span className="muted small grow">{d ? `${files.length} file${files.length === 1 ? '' : 's'} changed vs ${d.base}` : 'Loading…'}</span>
+        <span className="muted small grow">{d ? `${files.length} file${files.length === 1 ? '' : 's'} changed vs ${d.base}${files.length ? ' · click a line to comment' : ''}` : 'Loading…'}</span>
         <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} />
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
@@ -235,11 +309,20 @@ function ChangesTab({ api, ws }: { api: PanelApi; ws: string }) {
             </div>
             {open.has(f.path) && (
               <div className="sp-diff">
-                {(byFile.get(f.path) ?? ['(no text diff: binary, or past the size cap)']).map((l, i) => (
-                  <div key={i} className={`dl ${l.startsWith('@@') ? 'dl-hunk' : l[0] === '+' ? 'dl-add' : l[0] === '-' ? 'dl-del' : ''}`}>
-                    {l || ' '}
-                  </div>
-                ))}
+                {(lines => {
+                  const box = boxAt(f.path, lines)
+                  return lines.map((l, i) => (
+                    <Fragment key={i}>
+                      <div
+                        className={`dl ${l.text.startsWith('@@') ? 'dl-hunk' : l.new === undefined && l.old !== undefined ? 'dl-del' : l.old === undefined && l.new !== undefined ? 'dl-add' : ''}${(l.old ?? l.new) !== undefined ? ' dl-line' : ''}`}
+                        onClick={() => pick(f.path, l)}
+                      >
+                        {l.text || ' '}
+                      </div>
+                      {at && i === box && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr} api={api} onClose={() => setAt(null)} />}
+                    </Fragment>
+                  ))
+                })(byFile.get(f.path) ?? [{ text: '(no text diff: binary, or past the size cap)' }])}
                 {f.status[0] !== 'D' && (
                   <span className="row">
                     <button className="link small" onClick={() => api.preview(f.path)}>
@@ -312,7 +395,7 @@ export function SidePanel(p: {
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: 'ci' | 'review') => void
 }) {
-  const tabs = TABS.filter(t => p.git || t.id === 'files')
+  const tabs = TABS.filter(t => p.git || t.id === 'files' || t.id === 'preview')
   const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
     <div className="side-panel" style={{ width: p.width }}>
@@ -325,16 +408,148 @@ export function SidePanel(p: {
       />
       <div className="sp-tabs">
         {tabs.map(t => (
-          <button key={t.id} className={t.id === tab ? 'on' : ''} onClick={() => p.onTab(t.id)}>
-            <Icon name={t.icon} /> {t.label}
+          <button key={t.id} className={t.id === tab ? 'on' : ''} data-tip={t.label} onClick={() => p.onTab(t.id)}>
+            <Icon name={t.icon} /> <span className="sp-tab-label">{t.label}</span>
           </button>
         ))}
         <span className="grow" />
         <IconButton icon="x" title="Close (⌥⌘B)" onClick={p.onClose} />
       </div>
       {tab === 'files' && <Files api={p.api} ws={p.w.id} />}
-      {tab === 'changes' && <ChangesTab api={p.api} ws={p.w.id} />}
+      {tab === 'changes' && <ChangesTab api={p.api} ws={p.w.id} pr={p.w.pr?.number} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} />}
+      {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
+    </div>
+  )
+}
+
+const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/ // main's will-attach-webview takes only these
+const canFrame = !bridge && ['localhost', '127.0.0.1'].includes(location.hostname) // a browser on this Mac: an iframe
+
+// Preview: the workspace's dev server in the panel. In the app a <webview> (no node, no preload; main keeps it to
+// localhost), with back, forward and a screenshot for the agent; in a browser on this Mac an iframe.
+// ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them)
+function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void }) {
+  const ports = [...new Set([...(w.ports ?? []), w.port])]
+  const [port, setPort] = useState(ports[0])
+  const [addr, setAddr] = useState('/') // the address bar: a path on the port, or a whole URL
+  const [url, setUrl] = useState(`http://localhost:${ports[0]}/`) // what's shown
+  const [n, setN] = useState(0) // the iframe's reloads
+  const [err, setErr] = useState('')
+  const [shot, setShot] = useState<{ data: string; url: string } | null>(null)
+  const host = useRef<HTMLDivElement>(null)
+  const view = useRef<any>(null) // the webview element
+  // its methods throw until it's attached and ready
+  const on = (f: (v: any) => unknown) => {
+    try {
+      return view.current && f(view.current)
+    } catch {}
+  }
+  const load = (u: string) => {
+    if (!LOCAL.test(u)) return /^https?:\/\//.test(u) && onOpen(u) // elsewhere: the browser
+    setErr('')
+    setUrl(u)
+    if (view.current && on(v => v.loadURL(u).catch(() => {})) === undefined) view.current.setAttribute('src', u) // a failure comes as did-fail-load
+  }
+  // a path on the port, a whole URL, or localhost:5173/x without the http://
+  const go = (p = port, a = addr.trim()) => load(/^https?:\/\//.test(a) ? a : LOCAL.test(`http://${a}`) ? `http://${a}` : `http://localhost:${p}${a.startsWith('/') ? a : `/${a}`}`)
+  useEffect(() => {
+    if (!bridge || !host.current) return
+    const v = document.createElement('webview') as any
+    v.setAttribute('src', url)
+    v.setAttribute('partition', 'persist:preview') // its own cookies, kept: a dev app's sign-in stays
+    v.className = 'web-view'
+    const at = (e: any) => {
+      setUrl(e.url)
+      setErr('')
+      const u = new URL(e.url)
+      if (!LOCAL.test(e.url)) return setAddr(e.url)
+      setPort(Number(u.port) || 80)
+      setAddr(u.pathname + u.search + u.hash)
+    }
+    v.addEventListener('did-navigate', at)
+    v.addEventListener('did-navigate-in-page', (e: any) => e.isMainFrame && at(e))
+    v.addEventListener('did-fail-load', (e: any) => e.isMainFrame && e.errorCode !== -3 && setErr(e.errorCode === -102 ? `Nothing listens on ${new URL(e.validatedURL).host} yet: ▷ Run starts the dev server` : e.errorDescription || 'It didn’t load'))
+    host.current.appendChild(v)
+    view.current = v
+    return () => {
+      v.remove()
+      view.current = null
+    }
+  }, [])
+  const capture = () => {
+    const id = on(v => v.getWebContentsId())
+    if (bridge?.capture && id) bridge.capture(id).then(data => setShot({ data, url: on(v => v.getURL()) || url }), e => setErr(String(e?.message ?? e)))
+  }
+  if (!bridge && !canFrame) return <div className="muted small pad">The preview shows this Mac's localhost: open {w.name || w.id} in the app there. To open a port from here, share it with the globe in the status bar.</div>
+  return (
+    <>
+      <div className="sp-tools web-tools">
+        {bridge && <IconButton icon="back" title="Back" onClick={() => on(v => v.goBack())} />}
+        {bridge && <IconButton icon="forward" title="Forward" onClick={() => on(v => v.goForward())} />}
+        <IconButton icon="refresh" title="Reload" onClick={() => (setErr(''), bridge ? on(v => v.reload()) : setN(x => x + 1))} />
+        <select
+          value={port}
+          title="Port"
+          onChange={e => {
+            setPort(Number(e.target.value))
+            setAddr('/')
+            go(Number(e.target.value), '/')
+          }}
+        >
+          {[...new Set([...ports, port])].map(x => (
+            <option key={x} value={x}>
+              :{x}
+            </option>
+          ))}
+        </select>
+        <input value={addr} spellCheck={false} onChange={e => setAddr(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} />
+        {bridge?.capture && <IconButton icon="camera" title="Screenshot to the agent" onClick={capture} />}
+        <IconButton icon="link" title="Open in the browser" onClick={() => onOpen(url)} />
+      </div>
+      {shot && <ShotBox shot={shot} api={api} onClose={() => setShot(null)} />}
+      {err && <div className="warn small pad">{err}</div>}
+      <div className="web-body" ref={host}>
+        {!bridge && <iframe key={n} className="web-view" src={url} title="Preview" />}
+      </div>
+    </>
+  )
+}
+
+// a preview's screenshot on its way to the agent, with what to say about it
+function ShotBox({ shot, api, onClose }: { shot: { data: string; url: string }; api: PanelApi; onClose: () => void }) {
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  const send = () => {
+    if (busy) return
+    setBusy(true)
+    api
+      .saveImage(shot.data)
+      .then(path => api.toAgent(`${text.trim() || 'Here is how the page looks now.'}\n\nA screenshot of ${shot.url}: ${path}`))
+      .then(onClose, e => (setErr(String(e?.message ?? e)), setBusy(false)))
+  }
+  return (
+    <div className="dl-comment web-shot">
+      <img src={`data:image/png;base64,${shot.data}`} alt="The screenshot" />
+      <textarea
+        autoFocus
+        rows={2}
+        value={text}
+        placeholder="What should the agent do about it? · ⌘⏎ sends"
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => (e.key === 'Escape' ? onClose() : e.key === 'Enter' && e.metaKey && send())}
+      />
+      {err && <div className="warn small">{err}</div>}
+      <div className="row">
+        <button className="primary" disabled={busy} onClick={send}>
+          Send to the agent
+        </button>
+        <span className="grow" />
+        <button className="link small" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
     </div>
   )
 }

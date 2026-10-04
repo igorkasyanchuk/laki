@@ -8,9 +8,11 @@ import { cliArgv, cliEnv, dir, q } from './core.ts'
 
 const AGENTS = { claude: { name: 'Claude Code', home: '.claude' }, codex: { name: 'Codex', home: '.codex' } }
 export type SkillAgent = keyof typeof AGENTS
-export type SkillInfo = { agent: SkillAgent; name: string; path: string; state: 'missing' | 'installed' | 'outdated' }
+// mcp: the command that adds Laki as the agent's MCP server (the user runs it: we never write the agents' config)
+export type SkillInfo = { agent: SkillAgent; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp: string }
 
 const skillDir = (a: SkillAgent) => join(homedir(), AGENTS[a].home, 'skills', 'laki')
+const mcpCmd = (a: SkillAgent) => `${a} mcp add ${a === 'claude' ? '-s user ' : ''}laki -- ${['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp'].map(q).join(' ')}`
 
 // the files, as they'd be written now: the launcher holds this install's paths
 function files(at: string): Record<string, string> {
@@ -71,8 +73,8 @@ more than 30 minutes late is skipped and logged as missed).
   Every 5 minutes at most; name the days instead of "every few days". A wording it can't read is refused
   with what it needs.
 - \`--where\`: \`new\` (the default in a repo: a new worktree and workspace each run), \`folder\` (the project's
-  own folder, no worktree; the default for a folder without git) or a workspace id (its running agent gets the
-  prompt, queued while it works).
+  own folder, no worktree, one session; the default for a folder without git), \`folder-new\` (the folder, a new
+  session and sidebar row each run) or a workspace id (its running agent gets the prompt, queued while it works).
 - \`--preset claude|codex|<preset>\`; \`--name "Nightly deps {{DD-MM}}"\`: \`{{DD-MM-YY}}\`, \`{{YYYY-MM-DD}}\`,
   \`{{HH:mm}}\` or \`{{ddd D MMM}}\` in the name or the prompt become the run's date, so each run's workspace
   has its own name.
@@ -106,7 +108,7 @@ function info(a: SkillAgent): SkillInfo {
   const want = Object.entries(files(at))
   const have = want.filter(([f]) => existsSync(join(at, f)))
   const state = !have.length ? 'missing' : have.length === want.length && want.every(([f, t]) => readFileSync(join(at, f), 'utf8') === t) ? 'installed' : 'outdated'
-  return { agent: a, name: AGENTS[a].name, path: at, state }
+  return { agent: a, name: AGENTS[a].name, path: at, state, mcp: mcpCmd(a) }
 }
 
 export const skills = () => (Object.keys(AGENTS) as SkillAgent[]).map(info)

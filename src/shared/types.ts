@@ -24,6 +24,7 @@ export type Workspace = {
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
+  muted?: boolean // no notifications from its tabs
   autoFix?: boolean // failing CI goes to the agent
   autoReview?: boolean // new PR review comments go to the agent
   fix?: PRFix // what autoFix/autoReview sent already
@@ -46,10 +47,14 @@ export type Tab = {
   forkOf?: string // claude session to fork on first start
   queue?: string[] // follow-ups for when the agent is idle
   color?: string // a tab color's name (red, blue, …); 'none' turns the agent's default off
+  muted?: boolean // no notifications from it
 }
 
 // how an agent starts: claude or codex with extra args, or any command; env on top of the project's
 export type Preset = { name: string; agent: 'claude' | 'codex' | 'command'; args?: string; cmd?: string; env?: Record<string, string> }
+
+// what a notification is about: an agent waiting for you, done with its turn, at a usage limit
+export type NotifyKind = 'waiting' | 'done' | 'limit'
 
 // the app's settings (⌘,): editor is an app id (cursor, zed, …, see APPS) or 'custom' (editorCmd + the path)
 export type Settings = {
@@ -61,6 +66,8 @@ export type Settings = {
   fontFamily?: string
   copyOnSelect?: boolean
   notify?: boolean
+  notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
+  notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
   presets?: Preset[]
   theme?: string
   glass?: boolean // a see-through, blurred window
@@ -88,7 +95,7 @@ export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[];
 
 // a scheduled task: at the times `when` says (rule: what it said when saved, shared/when.ts), its prompt goes to an
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
-// no worktree), or in that workspace (its running agent of the preset, queued while it works; else a new tab). next:
+// no worktree, one session; 'local-new': a new session, a sidebar row, each run), or in that workspace (its running agent of the preset, queued while it works; else a new tab). next:
 // when it runs (none: off, or a once that ran)
 export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number }
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
@@ -134,4 +141,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 6
+export const API = 7

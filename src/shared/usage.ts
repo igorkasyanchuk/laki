@@ -11,9 +11,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
   laki diff <ws> | run <ws> | ship <ws> -m <message>
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
-  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|<ws>] [--name n] <prompt>
+  laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--name n] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
+  laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
   laki daemon | stop                          run the daemon in the foreground | stop it
   --json prints machine-readable output`

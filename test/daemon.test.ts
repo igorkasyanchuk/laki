@@ -68,8 +68,8 @@ test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch
   assert.equal(ws3.port, 3100)
   // the same name again: laki/feat-one is kept, so the new one gets its own id and branch
   const again = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'feat one' })
-  assert.equal(again.id, 'feat-one-2')
-  assert.equal(again.branch, 'laki/feat-one-2')
+  assert.match(again.id, /^feat-one-[a-z0-9]{4}$/)
+  assert.equal(again.branch, `laki/${again.id}`)
   // a local workspace is the repo root itself
   const local = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'shell' })
   assert.equal(local.path, p.path)
