@@ -1,0 +1,528 @@
+/* The bundled fonts, syntax colors for the file preview, the shared components' own styles, the glass (translucent)
+   window, and the creative themes' looks (themes.ts `look`). It loads after the app's stylesheet: at equal specificity
+   it wins, and glass (:where) loses to a look. */
+
+/* Inter (the interface) and JetBrains Mono (terminals, code): SIL Open Font License, fonts/NOTICE.md */
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap; src: url(./fonts/inter-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap; src: url(./fonts/inter-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: swap; src: url(./fonts/inter-cyrillic.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap; src: url(./fonts/jetbrains-mono-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap; src: url(./fonts/jetbrains-mono-latin-ext.woff2) format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
+@font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap; src: url(./fonts/jetbrains-mono-cyrillic.woff2) format('woff2');
+  unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+
+/* syntax colors (highlight.ts), from the theme's tab colors */
+.hl-c { color: var(--muted); font-style: italic; }
+.hl-s { color: var(--tc-green); }
+.hl-k { color: var(--tc-purple); }
+.hl-n { color: var(--tc-orange); }
+.hl-f { color: var(--tc-blue); }
+.hl-t { color: var(--tc-teal); }
+.hl-p { color: var(--tc-red); }
+.hl-a { color: var(--tc-yellow); }
+.hl-v { color: var(--tc-pink); }
+.hl-h { color: var(--accent); font-weight: 700; }
+
+/* the tunnel popup's who-can-open choice and its list; a tunnel's link in the info panel */
+.tunnel-head b { min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tunnel-radios { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+.tunnel-radios label.check { display: inline-flex; flex-direction: row; align-items: center; gap: 6px; }
+.tunnel-who { display: flex; flex-wrap: wrap; gap: 4px; }
+.tunnel-who .chip { padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--hover); font-size: 12px; }
+.tunnel-who .chip.bad { border-color: var(--error); color: var(--error); }
+.field-err { color: var(--error); font-size: 12px; }
+.info-link { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; min-width: 0; }
+.info-link a { color: var(--accent); overflow-wrap: anywhere; }
+/* the status bar's plan-limits ring (Usage.tsx) and its popup */
+.usage-btn { display: inline-flex; align-items: center; flex: none; background: none; border: none; padding: 0; cursor: pointer; }
+.usage-btn:hover { background: none; filter: brightness(1.3); }
+.usage-ring { display: block; flex: none; }
+.usage-ring circle { fill: none; stroke-width: 2.4; }
+.usage-ring .track { stroke: color-mix(in srgb, var(--muted) 40%, transparent); }
+.usage-ring .fill { stroke: var(--done); stroke-linecap: round; }
+.usage-ring.mid .fill, .usage-bar.mid i { stroke: var(--waiting); background: var(--waiting); }
+.usage-ring.high .fill, .usage-bar.high i { stroke: var(--error); background: var(--error); }
+.tunnel-pop.usage-pop { width: 420px; }
+.usage-agent { display: flex; flex-direction: column; gap: 6px; padding-top: 8px; border-top: 1px solid var(--line); }
+.usage-name { display: flex; align-items: baseline; gap: 8px; }
+.usage-row { display: grid; grid-template-columns: 8.5em minmax(40px, 1fr) 3.2em 10.5em; align-items: center; gap: 10px; font-size: 12px; }
+.usage-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.usage-bar { height: 6px; border-radius: 3px; overflow: hidden; background: color-mix(in srgb, var(--muted) 22%, transparent); }
+.usage-bar i { display: block; height: 100%; border-radius: inherit; background: var(--done); }
+.usage-pct { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.usage-when { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Settings: switches as rows, glass's sliders */
+.switch-row.toggle { background: none; } /* not button.on's */
+.switch-row { display: flex; flex-direction: row-reverse; justify-content: space-between; align-items: center; gap: 12px; width: 100%; padding: 4px 0; text-align: left; color: var(--fg); font-size: 13px; }
+.switch-row .toggle-track { flex: none; width: 34px; height: 20px; border-radius: 10px; }
+.switch-row .toggle-knob { top: 3px; left: 3px; width: 14px; height: 14px; }
+.switch-row.on .toggle-knob { left: 17px; }
+.switch-text { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.switch-text .muted { font-size: 12px; line-height: 1.4; }
+/* a box of settings, one per line with a rule between */
+.setting-box { display: flex; flex-direction: column; padding: 0 14px; border: 1px solid var(--line); border-radius: var(--radius); }
+.setting-box > :is(.switch-row, .sliders) + :is(.switch-row, .sliders) { border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); } /* over button.on's */
+.setting-box > .switch-row { padding: 10px 0; border-radius: 0; }
+/* sliders: a label, the track, the value, lined up in columns */
+.sliders { display: flex; flex-direction: column; gap: 4px; padding: 10px 0 12px; }
+.form .slider-row { display: grid; grid-template-columns: 7em minmax(0, 1fr) 3.5em; align-items: center; gap: 14px; color: var(--fg); font-size: 13px; }
+.slider-val { text-align: right; color: var(--muted); font-variant-numeric: tabular-nums; }
+.range { -webkit-appearance: none; appearance: none; width: 100%; height: 20px; margin: 0; padding: 0; border: none; background: transparent; box-shadow: none; cursor: pointer; }
+.range::-webkit-slider-runnable-track { height: 4px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent) calc(7px + (100% - 14px) * var(--p, 50) / 100), color-mix(in srgb, var(--muted) 28%, transparent) 0); }
+.range::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; margin-top: -5px; border-radius: 50%; background: var(--accent);
+  border: 3px solid var(--bg); box-shadow: 0 0 0 1px var(--accent), 0 1px 4px rgba(0, 0, 0, 0.35); transition: transform 0.1s; }
+.range:hover::-webkit-slider-thumb { transform: scale(1.15); }
+.range:focus-visible { outline: none; }
+.range:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 1px var(--accent), 0 0 0 5px color-mix(in srgb, var(--accent) 30%, transparent); }
+
+/* Settings › Remote access: the form, then the QR code beside its link; the status bar's sign while it runs */
+.remote-form { display: flex; flex-direction: column; gap: 12px; }
+.remote-form .seg button { min-width: 3.2em; }
+.remote-on { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
+.remote-on .tunnel-qr { width: 180px; height: 180px; flex: none; }
+.remote-side { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }
+.remote-side p { margin: 0; }
+.status .remote-badge { display: inline-flex; align-items: center; gap: 5px; flex: none; background: none; border: none; padding: 0; color: var(--done); font: inherit; cursor: pointer; }
+.status .remote-badge::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.status .remote-badge.starting { color: var(--waiting); }
+
+/* glass: the window behind shows through, blurred (themes.ts makes the backgrounds see-through, as the sliders
+   say, and lights them with the theme's glow). Floating things are frosted panes with a lit top edge. */
+html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --glass-hi: rgba(255, 255, 255, 0.08); }
+:where(html.glass) :is(.menu, .modal, .tunnel-pop, .toast, .tip) {
+  background: color-mix(in srgb, var(--panel) 60%, transparent); border-color: var(--glass-edge);
+  backdrop-filter: blur(30px) saturate(1.8); -webkit-backdrop-filter: blur(30px) saturate(1.8);
+  box-shadow: inset 0 1px 0 var(--glass-hi), 0 24px 70px rgba(0, 0, 0, 0.42); }
+:where(html.glass) :is(.info, .side-panel) { background: color-mix(in srgb, var(--panel) 45%, transparent); border-left-color: var(--glass-edge);
+  backdrop-filter: blur(24px) saturate(1.5); -webkit-backdrop-filter: blur(24px) saturate(1.5); }
+:where(html.glass) .sidebar { border-right-color: var(--glass-edge); box-shadow: inset -1px 0 0 var(--glass-hi); }
+:where(html.glass) :is(.tabbar, .settings-head) { border-bottom-color: var(--glass-edge); }
+:where(html.glass) .status { background: color-mix(in srgb, var(--side) 55%, transparent); border-top-color: var(--glass-edge); }
+:where(html.glass) .tab.sel { border-color: var(--glass-edge); }
+:where(html.glass) .ws.sel { background-color: color-mix(in srgb, var(--sel) 65%, transparent); box-shadow: inset 0 1px 0 var(--glass-hi), inset 0 -1px 0 var(--glass-hi); }
+:where(html.glass) :is(.buttons button:not(.primary), .seg button, .run-btn) { background-color: color-mix(in srgb, var(--panel) 50%, transparent); border-color: var(--glass-edge); box-shadow: inset 0 1px 0 var(--glass-hi); }
+:where(html.glass) :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { background-color: color-mix(in srgb, var(--bg) 40%, transparent); border-color: var(--glass-edge); }
+:where(html.glass) button.primary { box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.25), 0 4px 18px color-mix(in srgb, var(--accent) 35%, transparent); }
+:where(html.glass) .settings-page { background: color-mix(in srgb, var(--bg) 55%, transparent); backdrop-filter: blur(36px) saturate(1.4); -webkit-backdrop-filter: blur(36px) saturate(1.4); }
+:where(html.glass) :is(.settings-head, .settings-nav) { background: transparent; }
+:where(html.glass) .settings-nav { border-right-color: var(--glass-edge); }
+
+/* ---------- looks: more than colors ---------- */
+
+/* Phosphor: a CRT. Mono everywhere, square and dashed, glowing text, scanlines over the terminals */
+[data-look='retro'] { --radius: 0px; --ui-font: var(--mono); }
+[data-look='retro'] body { text-shadow: 0 0 5px color-mix(in srgb, var(--fg) 40%, transparent); }
+[data-look='retro'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea, .menu, .modal, .tunnel-pop, .toast, .theme, .run-btn, kbd) {
+  border-style: dashed; border-radius: 0; }
+[data-look='retro'] .ib { border-radius: 0; }
+[data-look='retro'] :is(.menu, .modal, .tunnel-pop) { box-shadow: 0 0 0 1px color-mix(in srgb, var(--accent) 50%, transparent), 0 0 28px color-mix(in srgb, var(--accent) 22%, transparent); }
+[data-look='retro'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+[data-look='retro'] :is(.project-head, .settings-main h2) { letter-spacing: 2px; }
+[data-look='retro'] .ws.sel { box-shadow: inset 3px 0 0 var(--accent); }
+[data-look='retro'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(0deg, rgba(0, 0, 0, 0.16) 0 1px, transparent 1px 3px); }
+
+/* Neon Arcade: pill buttons, glowing edges and selections */
+[data-look='neon'] { --radius: 10px; }
+[data-look='neon'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button) { border-radius: 999px; }
+[data-look='neon'] button.primary { box-shadow: 0 0 16px color-mix(in srgb, var(--accent) 65%, transparent); }
+[data-look='neon'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { box-shadow: 0 0 0 1px var(--accent), 0 0 16px color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='neon'] :is(.menu, .modal, .tunnel-pop, .toast) { border-radius: 16px; border-color: color-mix(in srgb, var(--accent) 55%, transparent);
+  box-shadow: 0 0 34px -6px var(--accent), 0 20px 60px rgba(0, 0, 0, 0.6); }
+[data-look='neon'] .tab { border-radius: 12px 12px 0 0; }
+[data-look='neon'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, var(--accent)), 0 -8px 22px -12px var(--tab-c, var(--accent)); }
+[data-look='neon'] .ws.sel { box-shadow: inset 3px 0 0 var(--tab-c, var(--accent)), 0 0 22px -8px var(--tab-c, var(--accent)); }
+[data-look='neon'] .sidebar { border-right-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+[data-look='neon'] :is(.tabbar, .settings-head) { border-bottom-color: color-mix(in srgb, var(--accent) 35%, transparent); }
+[data-look='neon'] .status { border-top-color: color-mix(in srgb, var(--tc-pink) 40%, transparent); }
+[data-look='neon'] .project-head { color: var(--accent); text-shadow: 0 0 10px color-mix(in srgb, var(--accent) 70%, transparent); }
+[data-look='neon'] .theme.on { box-shadow: 0 0 18px -2px var(--accent); }
+
+/* Brutalist: thick black lines, square corners, hard offset shadows */
+[data-look='brutal'] { --radius: 0px; }
+[data-look='brutal'] body { font-weight: 500; }
+[data-look='brutal'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea, .menu, .modal, .tunnel-pop, .toast, .theme, .run-btn) {
+  border: 2px solid var(--fg); border-radius: 0; box-shadow: 3px 3px 0 var(--fg); }
+[data-look='brutal'] button.primary:active { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--fg); }
+[data-look='brutal'] :is(.menu, .modal, .tunnel-pop) { box-shadow: 6px 6px 0 var(--fg); }
+[data-look='brutal'] .tab { border-radius: 0; font-weight: 700; }
+[data-look='brutal'] .tab.sel { background: var(--fg); color: var(--bg); box-shadow: inset 0 4px 0 var(--tab-c, var(--fg)); }
+[data-look='brutal'] .ws.sel { background: var(--accent); color: var(--accent-fg); }
+[data-look='brutal'] .sidebar { border-right: 2px solid var(--fg); }
+[data-look='brutal'] :is(.tabbar, .settings-head) { border-bottom: 2px solid var(--fg); }
+[data-look='brutal'] .status { border-top: 2px solid var(--fg); }
+[data-look='brutal'] .project-head { color: var(--fg); font-weight: 800; letter-spacing: 1.5px; }
+
+/* Bubblegum: round, soft and floating */
+[data-look='bubble'] { --radius: 12px; }
+[data-look='bubble'] .ws { margin: 1px 8px; padding-left: 10px; border-left-width: 0; border-radius: 10px; }
+[data-look='bubble'] .tab { border-radius: 12px 12px 0 0; }
+[data-look='bubble'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button) { border-radius: 999px; }
+[data-look='bubble'] button.primary { box-shadow: 0 4px 14px color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='bubble'] :is(.menu, .modal, .tunnel-pop, .toast) { border-radius: 18px; border-color: transparent; box-shadow: 0 14px 44px color-mix(in srgb, var(--accent) 30%, transparent); }
+[data-look='bubble'] .theme { border-radius: 16px; }
+[data-look='bubble'] .sidebar { border-right-color: transparent; }
+[data-look='bubble'] .tabbar { border-bottom-color: transparent; }
+
+/* Blueprint: a drafting grid, mono capitals, hairlines */
+[data-look='blueprint'] { --radius: 2px; --ui-font: var(--mono);
+  --grid: linear-gradient(color-mix(in srgb, var(--fg) 7%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 7%, transparent) 1px, transparent 1px); }
+[data-look='blueprint'] :is(.sidebar, .settings-page, .splash) { background-image: var(--grid); background-size: 22px 22px; }
+[data-look='blueprint'] :is(.project-head, .settings-main h2, .tab) { text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='blueprint'] .tab { font-size: 11px; }
+[data-look='blueprint'] :is(button, input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea, .menu, .modal, .tunnel-pop) { border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+[data-look='blueprint'] .ws.sel { outline: 1px dashed color-mix(in srgb, var(--fg) 65%, transparent); outline-offset: -3px; }
+
+/* Cyberpunk: clipped corners, hazard stripes, yellow on black, a glitch in the headings */
+[data-look='cyber'] { --radius: 0px; --cut: polygon(0 0, calc(100% - 9px) 0, 100% 9px, 100% 100%, 9px 100%, 0 calc(100% - 9px)); }
+[data-look='cyber'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, .run-btn, .theme) { clip-path: var(--cut); text-transform: uppercase; letter-spacing: 1px; font-size: 11px; }
+[data-look='cyber'] button.primary { font-weight: 800; box-shadow: none; }
+[data-look='cyber'] :is(.menu, .modal, .tunnel-pop, .toast) { border-radius: 0; border-left: 3px solid var(--accent);
+  clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 16px, 100% 100%, 16px 100%, 0 calc(100% - 16px)); }
+[data-look='cyber'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-width: 0 0 2px; border-bottom-color: var(--accent); }
+[data-look='cyber'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { border-bottom-color: var(--running); }
+[data-look='cyber'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1px; font-size: 11px; clip-path: polygon(0 0, calc(100% - 10px) 0, 100% 100%, 0 100%); padding-right: 16px; }
+[data-look='cyber'] .tab.sel { background: var(--accent); color: var(--accent-fg); box-shadow: inset 0 -3px 0 var(--tab-c, transparent); }
+[data-look='cyber'] .ws.sel { background: linear-gradient(90deg, color-mix(in srgb, var(--accent) 24%, transparent), transparent); border-left: 3px solid var(--accent); }
+[data-look='cyber'] :is(.project-head, .settings-main h2) { color: var(--accent); letter-spacing: 2px;
+  text-shadow: 1.5px 0 color-mix(in srgb, var(--tc-pink) 70%, transparent), -1.5px 0 color-mix(in srgb, var(--running) 70%, transparent); }
+[data-look='cyber'] .sidebar { border-right: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='cyber'] .status { border-top: 3px solid transparent; border-image: repeating-linear-gradient(-45deg, var(--accent) 0 7px, var(--bg) 7px 14px) 3; }
+
+/* Art Deco: gold on deep teal, double rules, serif capitals, a sunburst behind the sidebar */
+[data-look='deco'] { --radius: 0px; }
+[data-look='deco'] .sidebar { border-right: 3px double color-mix(in srgb, var(--accent) 60%, transparent);
+  background-image: repeating-conic-gradient(from -90deg at 50% 100%, color-mix(in srgb, var(--accent) 7%, transparent) 0 4deg, transparent 4deg 9deg); }
+[data-look='deco'] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3) { font-family: Didot, 'Bodoni 72', Georgia, serif; text-transform: uppercase; letter-spacing: 3px; color: var(--accent); }
+[data-look='deco'] .settings-main h2::after { content: ' \25C6'; font-size: 0.6em; vertical-align: middle; }
+[data-look='deco'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, .run-btn) { border-radius: 0; text-transform: uppercase; letter-spacing: 2px; font-size: 11px; border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+[data-look='deco'] button.primary { background: linear-gradient(180deg, #ecd078, #b8902c); border-color: #ecd078; }
+[data-look='deco'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 3px double var(--accent); border-radius: 0;
+  box-shadow: 0 0 0 4px var(--panel), 0 0 0 5px color-mix(in srgb, var(--accent) 35%, transparent), 0 24px 60px rgba(0, 0, 0, 0.6); }
+[data-look='deco'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 0; border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
+[data-look='deco'] .tab { border-radius: 0; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; }
+[data-look='deco'] .tab.sel { box-shadow: inset 0 3px 0 -1px var(--bg), inset 0 4px 0 var(--tab-c, var(--accent)); }
+[data-look='deco'] .ws.sel { background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--accent) 20%, transparent), transparent); border-left-color: transparent; color: var(--accent); }
+[data-look='deco'] .status { border-top: 3px double color-mix(in srgb, var(--accent) 50%, transparent); }
+[data-look='deco'] .theme.on { outline: 3px double var(--accent); outline-offset: 2px; }
+
+/* Classic: a 1995 desktop. Grey bevels, navy title bars, sunken fields, Tahoma */
+[data-look='classic'] { --radius: 0px; --ui-font: Tahoma, Verdana, Geneva, sans-serif;
+  --raise: inset -1px -1px #0a0a0a, inset 1px 1px #ffffff, inset -2px -2px #808080, inset 2px 2px #dfdfdf;
+  --sink: inset 1px 1px #808080, inset 2px 2px #0a0a0a, inset -1px -1px #ffffff, inset -2px -2px #dfdfdf; }
+[data-look='classic'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, .run-btn, .theme) { border: none; border-radius: 0; background: #c0c0c0; color: #000; box-shadow: var(--raise); font-weight: 400; }
+[data-look='classic'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button):active { box-shadow: var(--sink); }
+[data-look='classic'] button.primary { outline: 1px solid #000; outline-offset: -1px; font-weight: 700; }
+[data-look='classic'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: none; border-radius: 0; background: #fff; box-shadow: var(--sink); }
+[data-look='classic'] :is(.menu, .modal, .tunnel-pop, .toast) { border: none; border-radius: 0; background: #c0c0c0; box-shadow: var(--raise), 4px 4px 0 rgba(0, 0, 0, 0.35); }
+[data-look='classic'] .tunnel-head { margin: -9px -9px 0; padding: 3px 4px 3px 8px; background: linear-gradient(90deg, #000080, #1084d0); color: #fff; }
+[data-look='classic'] .tunnel-head :is(.ib, svg) { color: #fff; }
+[data-look='classic'] .modal h3 { margin: -13px -15px 12px; padding: 4px 8px; background: linear-gradient(90deg, #000080, #1084d0); color: #fff; font-size: 13px; }
+[data-look='classic'] .menu-item:hover { background: #000080; color: #fff; }
+[data-look='classic'] .tab { border-radius: 0; background: #c0c0c0; box-shadow: inset 1px 1px #ffffff, inset -1px 0 #808080; }
+[data-look='classic'] .tab.sel { background: #d4d0c8; font-weight: 700; box-shadow: inset 1px 1px #ffffff, inset -1px 0 #0a0a0a, inset 0 3px 0 var(--tab-c, #000080); }
+[data-look='classic'] .ws.sel { background: #000080; color: #fff; border-left-color: #000080; }
+[data-look='classic'] .sidebar { box-shadow: inset -1px 0 #808080, inset -2px 0 #ffffff; border-right: 1px solid #0a0a0a; }
+[data-look='classic'] .status { box-shadow: inset 1px 1px #808080, inset -1px -1px #ffffff; background: #c0c0c0; border-top: 1px solid #dfdfdf; }
+[data-look='classic'] .term-wrap { box-shadow: var(--sink); }
+[data-look='classic'] .project-head { color: #000; font-weight: 700; }
+
+/* Notebook: Ruled lines with a red margin, ink sketches, a highlighter, handwritten headings */
+[data-look='notebook'] { --radius: 3px; --ui-font: 'Iowan Old Style', Palatino, Georgia, serif;
+  --sketch: 255px 15px 225px 15px / 15px 225px 15px 255px; }
+[data-look='notebook'] .sidebar { background-image: linear-gradient(90deg, transparent 21px, color-mix(in srgb, var(--error) 45%, transparent) 21px 22px, transparent 22px),
+  repeating-linear-gradient(transparent 0 25px, color-mix(in srgb, var(--accent) 15%, transparent) 25px 26px); }
+[data-look='notebook'] :is(.project-head, .settings-main h2, .tunnel-head b) { font-family: Noteworthy, 'Bradley Hand', 'Marker Felt', cursive; text-transform: none; letter-spacing: 0; color: var(--accent); font-size: 1.15em; }
+[data-look='notebook'] :is(.buttons button, .seg button, button.primary, .scripts-tabs button, .run-btn) { border: 1.5px solid var(--fg); border-radius: var(--sketch); }
+[data-look='notebook'] button.primary { background: var(--accent); border-color: var(--accent); box-shadow: 2px 2px 0 color-mix(in srgb, var(--fg) 25%, transparent); }
+[data-look='notebook'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-width: 0 0 1.5px; border-radius: 0; background: transparent; border-color: color-mix(in srgb, var(--fg) 45%, transparent); }
+[data-look='notebook'] :is(.menu, .tunnel-pop, .toast, .modal) { border: 1px solid var(--line); border-radius: 2px; box-shadow: 2px 3px 0 rgba(0, 0, 0, 0.06), 0 14px 34px rgba(60, 45, 20, 0.18); }
+[data-look='notebook'] .toast { transform: rotate(-0.6deg); }
+[data-look='notebook'] .tab { border-radius: 0; }
+[data-look='notebook'] .tab.sel { box-shadow: none; text-decoration: underline wavy var(--tab-c, var(--accent)); text-underline-offset: 5px; }
+[data-look='notebook'] .ws.sel { background: linear-gradient(transparent 18%, var(--sel) 18% 82%, transparent 82%); border-left-color: transparent; }
+[data-look='notebook'] .status { border-top: 1.5px dashed var(--line); }
+[data-look='notebook'] .theme { border-radius: var(--sketch); }
+
+/* Aqua: lickable gel. Pill buttons with a glossy top half, pinstriped panels, a blue jelly selection, glowing focus
+   rings and jelly scrollbars (not the terminal's: its width is measured once) */
+[data-look='aqua'] { --radius: 6px; --ui-font: 'Lucida Grande', 'Helvetica Neue', Helvetica, sans-serif;
+  --gel: linear-gradient(180deg, #ffffff 0%, #f1f1f3 49%, #dcdde1 51%, #f6f6f8 100%);
+  --gel-blue: linear-gradient(180deg, #b9ddff 0%, #5aaaf5 49%, #2c86ea 51%, #74c3ff 100%);
+  --pinstripe: repeating-linear-gradient(180deg, rgba(255, 255, 255, 0.55) 0 2px, transparent 2px 4px); }
+[data-look='aqua'] :is(.sidebar, .tabbar, .status, .settings-head, .settings-nav) { background-image: var(--pinstripe); }
+[data-look='aqua'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #9a9ca3; border-radius: 999px; background: var(--gel);
+  box-shadow: inset 0 1px 0 #fff, 0 1px 2px rgba(0, 0, 0, 0.18); }
+[data-look='aqua'] button.primary { border: 1px solid #1d5fb8; border-radius: 999px; background: var(--gel-blue); color: #fff; text-shadow: 0 -1px 0 rgba(0, 40, 110, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7), 0 2px 5px rgba(0, 70, 160, 0.35); }
+[data-look='aqua'] button.primary:active { filter: brightness(0.9); }
+[data-look='aqua'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 4px; border-color: #9a9ca3; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18); }
+[data-look='aqua'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { border-color: #4f93e6; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.18), 0 0 0 3px rgba(80, 150, 255, 0.45); }
+[data-look='aqua'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(0, 0, 0, 0.22); border-radius: 8px; box-shadow: 0 18px 50px rgba(0, 0, 0, 0.32); }
+[data-look='aqua'] .tunnel-head { margin: -12px -12px 0; padding: 7px 10px; border-radius: 8px 8px 0 0; background: var(--gel); border-bottom: 1px solid #b4b6bc; }
+[data-look='aqua'] .menu-item:hover { background: var(--gel-blue); color: #fff; }
+[data-look='aqua'] .tab { border-radius: 8px 8px 0 0; }
+[data-look='aqua'] .tab.sel { background: var(--gel); box-shadow: inset 0 3px 0 -1px var(--tab-c, #5aaaf5), inset 0 1px 0 #fff; }
+[data-look='aqua'] .ws.sel { background: linear-gradient(180deg, #7fb2f5, #3a76db); color: #fff; border-left-color: transparent; text-shadow: 0 -1px 0 rgba(0, 40, 110, 0.4); }
+[data-look='aqua'] .settings-nav button.on { background: linear-gradient(180deg, #7fb2f5, #3a76db); color: #fff; }
+[data-look='aqua'] .toggle.on .toggle-track { background: var(--gel-blue); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+[data-look='aqua'] .toggle-track { box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.25); }
+[data-look='aqua'] .toggle-knob { background: var(--gel); box-shadow: 0 1px 2px rgba(0, 0, 0, 0.4); }
+[data-look='aqua'] .theme { border-radius: 10px; }
+[data-look='aqua'] :not(.xterm-viewport)::-webkit-scrollbar { width: 13px; height: 13px; background: var(--pinstripe), #e9eaee; }
+[data-look='aqua'] :not(.xterm-viewport)::-webkit-scrollbar-thumb { border: 1px solid #2f6fc4; border-radius: 7px;
+  background: linear-gradient(90deg, #3a82e0, #a9d4ff 35%, #64b0f8 60%, #2f78d8); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
+
+/* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass']) .run-btn button:not(:hover) { background: transparent; color: inherit; }
+
+/* Clay: soft UI. One color everywhere, shapes raised out of it or pressed into it by light from the top left */
+[data-look='clay'] { --radius: 12px;
+  --up: 5px 5px 11px #c2c8d3, -5px -5px 11px #ffffff; --up-sm: 3px 3px 6px #c2c8d3, -3px -3px 6px #ffffff;
+  --down: inset 3px 3px 7px #c2c8d3, inset -3px -3px 7px #ffffff; }
+[data-look='clay'] :is(.sidebar, .tabbar, .settings-head, .settings-nav, .info, .side-panel) { border-color: transparent; }
+[data-look='clay'] .status { border-top-color: transparent; box-shadow: 0 -4px 10px -6px #c2c8d3; }
+[data-look='clay'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn, button.primary) { border: none; border-radius: 12px; box-shadow: var(--up-sm); }
+[data-look='clay'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):is(:active, .on) { box-shadow: var(--down); }
+[data-look='clay'] button.primary { background: linear-gradient(145deg, #7d75ff, #5a51e6); box-shadow: 4px 4px 10px #b6bcd0, -4px -4px 10px #ffffff; }
+[data-look='clay'] button.primary:active { box-shadow: inset 3px 3px 7px #4a42c4, inset -3px -3px 7px #8a83ff; }
+[data-look='clay'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: none; border-radius: 12px; background: var(--bg); box-shadow: var(--down); }
+[data-look='clay'] :is(.menu, .modal, .tunnel-pop, .toast) { border: none; border-radius: 20px; background: var(--bg); box-shadow: 10px 10px 30px #b9c0cc, -10px -10px 30px #ffffff; }
+[data-look='clay'] .menu-item:hover { background: var(--bg); box-shadow: var(--down); border-radius: 10px; }
+[data-look='clay'] .tab { margin: 0 3px 4px; height: 26px; border-radius: 10px; }
+[data-look='clay'] .tab.sel { background: var(--bg); box-shadow: var(--down), inset 0 -2px 0 var(--tab-c, transparent); }
+[data-look='clay'] .ws { margin: 2px 8px; border-left-width: 0; border-radius: 10px; }
+[data-look='clay'] .ws.sel { background: var(--bg); box-shadow: var(--down); color: var(--accent); }
+[data-look='clay'] .settings-nav button.on { background: var(--bg); box-shadow: var(--down); border-radius: 10px; color: var(--accent); }
+[data-look='clay'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; box-shadow: var(--down); }
+[data-look='clay'] .toggle-track { background: var(--bg); box-shadow: var(--down); }
+[data-look='clay'] .toggle.on .toggle-track { background: var(--accent); box-shadow: inset 2px 2px 4px #4a42c4, inset -2px -2px 4px #8a83ff; }
+[data-look='clay'] .toggle-knob { background: var(--bg); box-shadow: 1px 1px 3px #a9b0bd; }
+[data-look='clay'] .theme { border: none; border-radius: 16px; box-shadow: var(--up); }
+[data-look='clay'] .theme.on { box-shadow: var(--down); }
+[data-look='clay'] :is(.setting-box, .preset) { border: none; box-shadow: var(--down); }
+
+/* Pocket: a handheld's LCD. Four greens, pixel-stepped corners, capitals, a ▶ cursor on the selection, the screen's
+   dot grid over the terminals, a round crimson A button */
+[data-look='pocket'] { --radius: 0px; --ui-font: var(--mono); --ink: #0f2a12;
+  --pixel: 0 -3px 0 0 var(--ink), 0 3px 0 0 var(--ink), -3px 0 0 0 var(--ink), 3px 0 0 0 var(--ink); }
+[data-look='pocket'] body { font-weight: 600; }
+[data-look='pocket'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn, input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea, .theme) {
+  border: none; border-radius: 0; box-shadow: var(--pixel); }
+[data-look='pocket'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn, .tab, .project-head, .settings-main h2) { text-transform: uppercase; letter-spacing: 1px; }
+[data-look='pocket'] :is(.buttons button, .seg button, .scripts-tabs button):active { transform: translateY(2px); }
+[data-look='pocket'] button.primary { border: none; border-radius: 999px; background: #8b2252; color: #f4e3ea; text-transform: uppercase; letter-spacing: 1px;
+  box-shadow: 0 3px 0 #4f1230, inset 0 2px 0 rgba(255, 255, 255, 0.25); }
+[data-look='pocket'] button.primary:active { transform: translateY(2px); box-shadow: 0 1px 0 #4f1230; }
+[data-look='pocket'] :is(.menu, .modal, .tunnel-pop, .toast) { border: none; border-radius: 0; box-shadow: var(--pixel), 6px 6px 0 3px rgba(15, 42, 18, 0.35); }
+[data-look='pocket'] .menu-item:hover { background: var(--ink); color: var(--panel); }
+[data-look='pocket'] .tab { border-radius: 0; font-size: 11px; }
+[data-look='pocket'] .tab.sel { background: var(--ink); color: var(--panel); box-shadow: inset 0 -3px 0 var(--tab-c, var(--ink)); }
+[data-look='pocket'] .ws.sel { background: transparent; border-left-color: transparent; color: var(--ink); font-weight: 800; }
+[data-look='pocket'] .ws.sel::before { content: '\25B6'; font-size: 9px; margin-left: -10px; }
+[data-look='pocket'] .settings-nav button.on { background: var(--ink); color: var(--panel); }
+[data-look='pocket'] .sidebar { border-right: 3px solid var(--ink); }
+[data-look='pocket'] :is(.tabbar, .settings-head) { border-bottom: 3px solid var(--ink); }
+[data-look='pocket'] .status { border-top: 3px solid var(--ink); background: var(--ink); color: var(--panel); }
+[data-look='pocket'] .status :is(button, a, .muted, .path):not(.menu-backdrop *) { color: var(--panel); } /* not its popups */
+[data-look='pocket'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: linear-gradient(90deg, rgba(15, 42, 18, 0.06) 1px, transparent 1px) 0 0 / 3px 3px, linear-gradient(rgba(15, 42, 18, 0.06) 1px, transparent 1px) 0 0 / 3px 3px; }
+[data-look='pocket'] .toggle-track, [data-look='pocket'] .toggle-knob { border-radius: 0; }
+[data-look='pocket'] .toggle-track { box-shadow: var(--pixel); background: var(--panel); }
+[data-look='pocket'] .toggle.on .toggle-track { background: var(--ink); }
+[data-look='pocket'] .toggle-knob { background: var(--ink); box-shadow: none; }
+[data-look='pocket'] .toggle.on .toggle-knob { background: var(--panel); }
+[data-look='pocket'] :not(.xterm-viewport)::-webkit-scrollbar { width: 9px; height: 9px; background: transparent; }
+[data-look='pocket'] :not(.xterm-viewport)::-webkit-scrollbar-thumb { background: var(--ink); border: 3px solid transparent; background-clip: padding-box; }
+
+/* Starship: a ship's console. Black, with pill buttons in flat pastels, rounded elbows framing the popups, a
+   segmented column down the sidebar, condensed capitals */
+[data-look='starship'] { --radius: 14px; --ui-font: 'Avenir Next Condensed', 'Arial Narrow', 'Helvetica Neue', sans-serif;
+  --lav: #cc99cc; --peri: #9999ff; --tan: #ffcc99; }
+[data-look='starship'] body { letter-spacing: 0.4px; }
+[data-look='starship'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn, button.primary, .tab, .project-head, .settings-main h2, .settings-nav button, .tunnel-head b) {
+  text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='starship'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: none; border-radius: 999px; background: var(--lav); color: #000; font-weight: 600; }
+[data-look='starship'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):hover { background: var(--tan); color: #000; }
+[data-look='starship'] .seg button.on { background: var(--accent); }
+[data-look='starship'] button.primary { border: none; border-radius: 999px; background: var(--accent); color: #000; font-weight: 700; padding-left: 18px; text-align: right; }
+[data-look='starship'] button.primary:hover { background: var(--tan); }
+[data-look='starship'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid var(--peri); border-radius: 14px; background: #000; }
+[data-look='starship'] :is(.menu, .modal, .tunnel-pop, .toast) { border: none; border-left: 14px solid var(--lav); border-top: 8px solid var(--lav); border-radius: 28px 0 0 0; background: #000;
+  box-shadow: 0 0 0 1px #1b1a2b, 0 24px 60px rgba(0, 0, 0, 0.8); }
+[data-look='starship'] .menu-item:hover { background: var(--accent); color: #000; border-radius: 0 999px 999px 0; }
+[data-look='starship'] .tab { border-radius: 999px 999px 0 0; }
+[data-look='starship'] .tab.sel { background: var(--tab-c, var(--accent)); color: #000; box-shadow: none; font-weight: 700; }
+[data-look='starship'] .tab.sel :is(.x, .ib, svg) { color: #000; }
+[data-look='starship'] .tabbar { border-bottom: 5px solid var(--accent); }
+[data-look='starship'] .ws { border-left-width: 0; margin-right: 10px; border-radius: 0 999px 999px 0; }
+[data-look='starship'] .ws.sel { background: var(--accent); color: #000; font-weight: 700; }
+[data-look='starship'] .settings-nav button { border-radius: 0 999px 999px 0; }
+[data-look='starship'] .settings-nav button.on { background: var(--peri); color: #000; }
+[data-look='starship'] .project-head { margin: 6px 40px 2px 0; border-radius: 0 999px 999px 0; background: var(--peri); color: #000; height: 22px; }
+[data-look='starship'] .project-head .ib { width: 20px; height: 20px; color: #000; }
+[data-look='starship'] .settings-main h2 { color: var(--accent); }
+[data-look='starship'] .settings-main h2::after { content: ''; display: inline-block; width: 60px; height: 0.55em; margin-left: 10px; border-radius: 999px; background: var(--lav); }
+[data-look='starship'] .sidebar { border-right: 8px solid transparent;
+  border-image: linear-gradient(180deg, var(--lav) 0 34%, #000 34% calc(34% + 5px), var(--accent) calc(34% + 5px) 58%, #000 58% calc(58% + 5px), var(--peri) calc(58% + 5px) 82%, #000 82% calc(82% + 5px), var(--tan) calc(82% + 5px)) 1; }
+[data-look='starship'] .status { border-top: none; border-left: 12px solid var(--peri); border-bottom-left-radius: 14px; box-shadow: inset 0 3px 0 var(--peri); }
+[data-look='starship'] .toggle-track { background: #2f2c48; }
+[data-look='starship'] .toggle.on .toggle-track { background: var(--accent); }
+[data-look='starship'] .theme { border-radius: 18px; }
+
+/* Gazette: a broadsheet. Serif type, ink rules (double where a newspaper has them), a masthead on the popups, small
+   caps, a red drop cap on the headings, a ¶ on the selection, a halftone over the terminals */
+[data-look='gazette'] { --radius: 0px; --ui-font: Charter, Georgia, 'Times New Roman', serif; --head: 'Big Caslon', Baskerville, 'Times New Roman', serif; }
+[data-look='gazette'] :is(.settings-main h2, .tunnel-head b, .modal h3) { font-family: var(--head); font-weight: 700; letter-spacing: 0.3px; }
+[data-look='gazette'] .settings-main h2 { font-size: 22px; padding-bottom: 4px; border-bottom: 3px double var(--fg); }
+[data-look='gazette'] .settings-main h2::first-letter { color: var(--accent); font-size: 1.35em; }
+[data-look='gazette'] .project-head { font-family: var(--head); text-transform: none; font-variant: small-caps; font-size: 13px; letter-spacing: 1.5px; color: var(--fg); border-bottom: 1px solid var(--line); margin: 0 10px; padding-left: 2px; }
+[data-look='gazette'] .sidebar { border-right: 3px double var(--fg); }
+[data-look='gazette'] :is(.tabbar, .settings-head) { border-bottom: 3px double var(--fg); }
+[data-look='gazette'] .status { border-top: 3px double var(--fg); font-style: italic; }
+[data-look='gazette'] .tab { border-radius: 0; font-style: italic; }
+[data-look='gazette'] .tab.sel { font-style: normal; font-weight: 700; box-shadow: inset 0 3px 0 var(--tab-c, var(--fg)); }
+[data-look='gazette'] .ws.sel { background: transparent; border-left-color: transparent; font-weight: 700; }
+[data-look='gazette'] .ws.sel::before { content: '\00B6'; color: var(--accent); margin-left: -10px; }
+[data-look='gazette'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--fg); border-radius: 0; background: transparent; font-variant: small-caps; letter-spacing: 1px; }
+[data-look='gazette'] button.primary { border: 1px solid var(--fg); border-radius: 0; background: var(--fg); color: var(--bg); font-variant: small-caps; letter-spacing: 1.5px; }
+[data-look='gazette'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-width: 0 0 1px; border-radius: 0; border-color: var(--fg); background: transparent; }
+[data-look='gazette'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--fg); border-top: 5px solid var(--fg); border-radius: 0; box-shadow: 4px 4px 0 rgba(28, 26, 23, 0.14); }
+[data-look='gazette'] .menu-item:hover { background: var(--fg); color: var(--bg); }
+[data-look='gazette'] .settings-nav button.on { background: transparent; font-weight: 700; box-shadow: inset 3px 0 0 var(--accent); }
+[data-look='gazette'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle, rgba(28, 26, 23, 0.07) 0.6px, transparent 1px) 0 0 / 4px 4px; }
+[data-look='gazette'] .toggle-track, [data-look='gazette'] .toggle-knob { border-radius: 0; }
+[data-look='gazette'] .toggle-track { background: transparent; box-shadow: inset 0 0 0 1px var(--fg); }
+[data-look='gazette'] .toggle.on .toggle-track { background: var(--fg); }
+[data-look='gazette'] .theme { border-radius: 0; }
+
+/* Holo: iridescent foil. Popups edged in a moving rainbow, headings printed in it, a foil button, prism lines along
+   the sidebar, the tab bar and the status bar (still, as the system asks, without motion) */
+[data-look='holo'] { --radius: 12px; --holo: linear-gradient(115deg, #5ee7ff, #a98bff, #ff7bd5, #ffd36b, #7cf2b0, #5ee7ff);
+  --prism: linear-gradient(90deg, #5ee7ff, #a98bff, #ff7bd5, #ffd36b, #7cf2b0); }
+@keyframes holo-shift { to { background-position: 0 0, 300% 0; } }
+@keyframes holo-text { to { background-position: 300% 0; } }
+[data-look='holo'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid transparent; border-radius: 16px;
+  background: linear-gradient(var(--panel), var(--panel)) padding-box, var(--holo) border-box; background-size: 100% 100%, 300% 100%;
+  animation: holo-shift 9s linear infinite; box-shadow: 0 0 40px -12px #a98bff, 0 24px 60px rgba(0, 0, 0, 0.6); }
+[data-look='holo'] :is(.settings-main h2, .tunnel-head b) { background: var(--holo); background-size: 300% 100%; -webkit-background-clip: text; background-clip: text; color: transparent;
+  animation: holo-text 9s linear infinite; }
+[data-look='holo'] .project-head { color: #c8c0ff; letter-spacing: 1.5px; }
+[data-look='holo'] button.primary { border: none; border-radius: 999px; background: var(--holo); background-size: 300% 100%; color: #0b0d17; font-weight: 700; }
+[data-look='holo'] button.primary:hover { animation: holo-text 3s linear infinite; } /* idle: still, no repaint every frame */
+[data-look='holo'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border-radius: 999px; border-color: color-mix(in srgb, #a98bff 45%, transparent); }
+[data-look='holo'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-radius: 10px; }
+[data-look='holo'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea):focus { border-color: transparent;
+  background: linear-gradient(var(--bg), var(--bg)) padding-box, var(--prism) border-box; }
+[data-look='holo'] .sidebar { border-right: 1px solid transparent; border-image: linear-gradient(180deg, #5ee7ff, #a98bff, #ff7bd5, #ffd36b) 1; }
+[data-look='holo'] .tabbar { border-bottom: 1px solid transparent; border-image: var(--prism) 1; }
+[data-look='holo'] .status { border-top: 1px solid transparent; border-image: var(--prism) 1; }
+[data-look='holo'] .tab.sel { box-shadow: none; background: var(--prism) top / 100% 2px no-repeat, var(--tab-sel, var(--term-bg)); }
+[data-look='holo'] .ws.sel { border-left: 2px solid transparent; border-image: linear-gradient(180deg, #5ee7ff, #ff7bd5) 1;
+  background: linear-gradient(90deg, color-mix(in srgb, #a98bff 30%, transparent), color-mix(in srgb, #5ee7ff 8%, transparent)); }
+[data-look='holo'] .menu-item:hover { background: linear-gradient(90deg, color-mix(in srgb, #5ee7ff 22%, transparent), color-mix(in srgb, #ff7bd5 22%, transparent)); }
+[data-look='holo'] .toggle.on .toggle-track { background: var(--prism); }
+[data-look='holo'] .theme.on { border-color: #a98bff; box-shadow: 0 0 16px -2px #ff7bd5; } /* the swatch's own background is inline */
+@media (prefers-reduced-motion: reduce) {
+  [data-look='holo'] :is(.menu, .modal, .tunnel-pop, .toast, .settings-main h2, .tunnel-head b, button.primary) { animation: none !important; } }
+
+/* Bauhaus: Futura, primary colors and pure shapes. A circle, a square and a triangle before the headings, a red dot on
+   the selection, flat color blocks for buttons, round icon buttons, a tricolor band on the popups */
+[data-look='bauhaus'] { --radius: 0px; --ui-font: Futura, 'Century Gothic', 'Avenir Next', sans-serif;
+  --red: #d7261e; --yellow: #f3c623; --blue: #1f4fa3; --ink: #1d1d1b; }
+[data-look='bauhaus'] :is(.project-head, .settings-main h2, .tunnel-head b, .tab, .buttons button, .seg button, button.primary) { text-transform: uppercase; letter-spacing: 1.2px; }
+[data-look='bauhaus'] .project-head { color: var(--ink); font-weight: 700; }
+[data-look='bauhaus'] .settings-main h2 { font-weight: 700; font-size: 17px; }
+[data-look='bauhaus'] .settings-main h2::before { content: ''; display: inline-block; width: 50px; height: 14px; margin-right: 12px; vertical-align: -1px;
+  background: radial-gradient(circle at 7px 7px, var(--red) 6.5px, transparent 7px), linear-gradient(var(--blue), var(--blue)) 19px 1px / 12px 12px no-repeat,
+  linear-gradient(to top right, var(--yellow) 50%, transparent 50%) 36px 0 / 14px 14px no-repeat; }
+[data-look='bauhaus'] .sidebar { border-right: 3px solid var(--ink); }
+[data-look='bauhaus'] :is(.tabbar, .settings-head) { border-bottom: 3px solid var(--ink); }
+[data-look='bauhaus'] .status { border-top: 3px solid var(--ink); }
+[data-look='bauhaus'] .tab { border-radius: 0; font-size: 11px; font-weight: 600; }
+[data-look='bauhaus'] .tab.sel { background: var(--yellow); color: var(--ink); box-shadow: inset 0 -4px 0 var(--tab-c, var(--ink)); }
+[data-look='bauhaus'] .tab.sel :is(.x, svg) { color: var(--ink); }
+[data-look='bauhaus'] .ws.sel { background: transparent; border-left-color: transparent; font-weight: 700; }
+[data-look='bauhaus'] .ws.sel::before { content: ''; flex: none; width: 9px; height: 9px; margin-left: -8px; border-radius: 50%; background: var(--red); }
+[data-look='bauhaus'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid var(--ink); border-radius: 0; background: var(--panel); font-weight: 600; }
+[data-look='bauhaus'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn):hover { background: var(--yellow); }
+[data-look='bauhaus'] .seg button.on { background: var(--blue); color: #fff; }
+[data-look='bauhaus'] button.primary { border: 2px solid var(--ink); border-radius: 0; background: var(--red); color: #fff; font-weight: 700; }
+[data-look='bauhaus'] .ib { border-radius: 50%; }
+[data-look='bauhaus'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid var(--ink); border-radius: 0; }
+[data-look='bauhaus'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 3px solid var(--ink); border-radius: 0; box-shadow: none;
+  background: linear-gradient(90deg, var(--red) 0 33.3%, var(--yellow) 0 66.6%, var(--blue) 0) top / 100% 7px no-repeat, var(--panel); }
+[data-look='bauhaus'] .menu-item:hover { background: var(--blue); color: #fff; }
+[data-look='bauhaus'] .settings-nav button.on { background: var(--yellow); color: var(--ink); font-weight: 700; }
+[data-look='bauhaus'] .toggle-track { border-radius: 0; background: var(--panel); box-shadow: inset 0 0 0 2px var(--ink); }
+[data-look='bauhaus'] .toggle.on .toggle-track { background: var(--blue); }
+[data-look='bauhaus'] .toggle-knob { background: var(--ink); box-shadow: none; }
+[data-look='bauhaus'] .toggle.on .toggle-knob { background: var(--yellow); }
+[data-look='bauhaus'] .theme { border: 2px solid var(--ink); border-radius: 0; }
+
+/* Chalkboard: chalk on a green board. Smudged panels, dashed chalk lines, the selection circled by hand, popups in a
+   wooden frame, the status bar as the chalk ledge */
+[data-look='chalk'] { --radius: 6px; --ui-font: 'Chalkboard SE', 'Comic Sans MS', 'Marker Felt', sans-serif; --chalk: color-mix(in srgb, var(--fg) 55%, transparent); --board-muted: var(--muted);
+  --wood: linear-gradient(180deg, #a8743f, #7a4e26 55%, #5e3a1a); --smudge: radial-gradient(ellipse at 22% 28%, rgba(255, 255, 255, 0.05), transparent 42%),
+  radial-gradient(ellipse at 74% 78%, rgba(255, 255, 255, 0.04), transparent 46%); }
+[data-look='chalk'] body { text-shadow: 0 0 1px rgba(255, 255, 255, 0.3); }
+[data-look='chalk'] :is(.sidebar, .settings-page, .info, .side-panel) { background-image: var(--smudge); }
+[data-look='chalk'] .sidebar { border-right: 2px dashed var(--chalk); }
+[data-look='chalk'] :is(.tabbar, .settings-head) { border-bottom: 2px dashed var(--chalk); }
+[data-look='chalk'] :is(.project-head, .settings-main h2, .tunnel-head b) { color: var(--accent); text-transform: none; letter-spacing: 0.5px; }
+[data-look='chalk'] .settings-main h2 { font-size: 19px; text-decoration: underline 2px var(--chalk); text-underline-offset: 6px; }
+[data-look='chalk'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px dashed var(--chalk); border-radius: 8px 11px 7px 12px; background: transparent; }
+[data-look='chalk'] button.primary { border: 2px solid var(--accent); border-radius: 8px 11px 7px 12px; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); }
+[data-look='chalk'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-width: 0 0 2px; border-style: dashed; border-radius: 0; border-color: var(--chalk); background: transparent; }
+[data-look='chalk'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 7px solid #7a4e26; border-image: linear-gradient(135deg, #b07a43, #6e4520 50%, #a8743f) 1; border-radius: 0;
+  background: var(--smudge), var(--panel); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); }
+[data-look='chalk'] .menu-item:hover { background: color-mix(in srgb, var(--fg) 12%, transparent); }
+[data-look='chalk'] .tab { border-radius: 0; }
+[data-look='chalk'] .tab.sel { background: transparent; box-shadow: none; text-decoration: underline 2px var(--tab-c, var(--accent)); text-underline-offset: 5px; }
+[data-look='chalk'] .ws.sel { background: transparent; border-left-color: transparent; margin: 0 6px; padding-left: 6px;
+  border-radius: 50px 38px 60px 44px / 16px 22px 14px 20px; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 75%, transparent); }
+[data-look='chalk'] .settings-nav button.on { background: transparent; box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 70%, transparent); border-radius: 40px 30px 46px 34px / 14px 18px 12px 16px; }
+[data-look='chalk'] .status { --muted: #f2e3cb; border-top: 2px solid #c08a52; background: var(--wood); color: #f6ead6; text-shadow: 0 1px 0 rgba(0, 0, 0, 0.35); }
+[data-look='chalk'] .status .menu-backdrop { --muted: var(--board-muted); text-shadow: none; } /* its popups are on the board */
+[data-look='chalk'] .toggle-track { background: transparent; box-shadow: inset 0 0 0 2px var(--chalk); }
+[data-look='chalk'] .toggle.on .toggle-track { background: color-mix(in srgb, var(--accent) 70%, transparent); }
+[data-look='chalk'] .theme { border-style: dashed; }
+
+/* Brass: steampunk. Brass and copper plates with rivets in the corners, copper pipes along the edges, engraved
+   capitals */
+[data-look='brass'] { --radius: 4px; --ui-font: Optima, Palatino, Georgia, serif; --head: Copperplate, 'Copperplate Gothic Light', Optima, serif;
+  --plate: linear-gradient(180deg, #f3d48a, #c9973f 45%, #8a6424 55%, #d8ac55);
+  --copper: linear-gradient(180deg, #f0b48a, #b8693a 50%, #7a3f1e);
+  --rivet: #f3d48a 0 1.8px, #5a3d14 2.3px 3px, transparent 3.3px; }
+[data-look='brass'] :is(.project-head, .settings-main h2, .tunnel-head b, .modal h3) { font-family: var(--head); text-transform: uppercase; letter-spacing: 1.5px;
+  color: var(--accent); text-shadow: 0 1px 0 rgba(0, 0, 0, 0.7); }
+[data-look='brass'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #5a3d14; border-radius: 4px; background: var(--plate); color: #2a1b08; font-weight: 600;
+  text-shadow: 0 1px 0 rgba(255, 240, 200, 0.5); box-shadow: inset 0 1px 0 rgba(255, 245, 210, 0.6), 0 2px 3px rgba(0, 0, 0, 0.5); }
+[data-look='brass'] button.primary { border: 1px solid #4a2410; border-radius: 4px; background: var(--copper); color: #fff4e6; font-weight: 700; text-shadow: 0 -1px 0 rgba(0, 0, 0, 0.45);
+  box-shadow: inset 0 1px 0 rgba(255, 220, 190, 0.55), 0 2px 3px rgba(0, 0, 0, 0.5); }
+[data-look='brass'] :is(.buttons button, .seg button, .scripts-tabs button, button.primary):active { filter: brightness(0.85); }
+[data-look='brass'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 1px solid #8a6424; background: #120d08; box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.6); }
+[data-look='brass'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #8a6424; border-image: var(--plate) 1; border-radius: 0;
+  background: radial-gradient(circle at 9px 9px, var(--rivet)), radial-gradient(circle at calc(100% - 9px) 9px, var(--rivet)),
+  radial-gradient(circle at 9px calc(100% - 9px), var(--rivet)), radial-gradient(circle at calc(100% - 9px) calc(100% - 9px), var(--rivet)), var(--panel);
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.7); }
+[data-look='brass'] .menu-item:hover { background: var(--plate); color: #2a1b08; }
+[data-look='brass'] .sidebar { border-right: 7px solid #b8693a; border-image: linear-gradient(90deg, #5a2e15, #f0b48a 40%, #b8693a 62%, #4a2410) 1; }
+[data-look='brass'] .tabbar { border-bottom: 6px solid #b8693a; border-image: linear-gradient(180deg, #f0b48a, #b8693a 50%, #4a2410) 1; }
+[data-look='brass'] .status { border-top: 6px solid #b8693a; border-image: linear-gradient(180deg, #f0b48a, #b8693a 50%, #4a2410) 1; }
+[data-look='brass'] .tab { border-radius: 4px 4px 0 0; }
+[data-look='brass'] .tab.sel { background: var(--plate); color: #2a1b08; font-weight: 600; box-shadow: inset 0 2px 0 var(--tab-c, transparent); }
+[data-look='brass'] .tab.sel :is(.x, svg) { color: #2a1b08; }
+[data-look='brass'] .ws.sel { background: linear-gradient(90deg, color-mix(in srgb, #d4a24c 34%, transparent), transparent); border-left: 3px solid #d4a24c; }
+[data-look='brass'] .settings-nav button.on { background: var(--plate); color: #2a1b08; }
+[data-look='brass'] .toggle-track { background: #120d08; box-shadow: inset 0 0 0 1px #8a6424; }
+[data-look='brass'] .toggle.on .toggle-track { background: var(--plate); }
+[data-look='brass'] .toggle-knob { background: var(--copper); }
+[data-look='brass'] .theme { border-color: #8a6424; }

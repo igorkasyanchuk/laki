@@ -1,0 +1,152 @@
+// Help (⌘/, the ? at the top of the sidebar, or ⌘K): the keys, the status glyphs, where things are and the
+// CLI's main commands, on a page like Settings. cli: the app's command.
+import type { ReactNode } from 'react'
+import { Glyph } from './Glyph'
+import { Icon, Page } from './ui'
+
+const KEYS: [string, string][] = [
+  ['⌘O', 'open a project folder (or drop one on the window), then a new workspace in it'],
+  ['⌘N', 'new workspace'],
+  ['⌘T / ⌘W', 'new shell tab / close the tab (or the file preview)'],
+  ['⌘1…⌘9', 'go to a tab'],
+  ['⌘↑ / ⌘↓', 'previous / next workspace'],
+  ['⌘K', 'the palette: every workspace, tab and action'],
+  ['⌘P', 'find a file in the workspace'],
+  ['⌘F', 'find in the terminal'],
+  ['⌘D', 'changes against the base branch'],
+  ['⌥⌘B', 'side panel: files, changes, review'],
+  ['⌘I', 'workspace info: PR, checks, what each agent said last'],
+  ['⌘E', 'open the workspace in your editor'],
+  ['⌘B', 'hide / show the sidebar'],
+  ['⌘,', 'settings'],
+  ['⌘+ / ⌘− / ⌘0', 'terminal font bigger / smaller / default'],
+  ['⌘/', 'this page'],
+  ['Esc', 'close a page, dialog or menu; in an agent, interrupt its turn'],
+]
+
+const GLYPHS: [string, string][] = [
+  ['waiting', 'needs you: a permission prompt or a question'],
+  ['running', 'working'],
+  ['done', 'finished while you were looking elsewhere'],
+  ['idle', 'idle'],
+  ['limit', 'usage limit: it types continue after the reset'],
+  ['ok', 'ended fine'],
+  ['exited', 'ended with an error: Enter starts it again'],
+]
+
+const Row = ({ k, children }: { k: ReactNode; children: ReactNode }) => (
+  <div className="help-row">
+    <span className="help-k">{k}</span>
+    <span>{children}</span>
+  </div>
+)
+
+export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; onClose: () => void }) {
+  const cmds: [string, string][] = [
+    [`${cli} ls`, 'projects, workspaces and tabs, with their status (--json for scripts)'],
+    [`${cli} new <project> --prompt "fix the login"`, 'a workspace with an agent (--preset codex|shell, --base, --name, --local)'],
+    [`${cli} send <ws>[/<tab>] "run the tests"`, 'type into an agent now; --when-idle waits for its turn to end'],
+    [`${cli} screen <ws>[/<tab>]`, 'the bottom of a tab’s screen'],
+    [`${cli} tab <ws> --preset codex`, 'a new tab (a shell by default)'],
+    [`${cli} run <ws>`, 'the run script, in a dev tab'],
+    ...(ship ? ([[`${cli} ship <ws> -m "message"`, 'commit, push and open a PR']] as [string, string][]) : []),
+    [`${cli} archive <ws> · restore <ws> · fork <ws> · rm <ws>`, 'put a workspace away, bring it back, branch off it, delete it'],
+    [`${cli} stop`, 'stop the daemon: agents resume when it starts again'],
+    [`${cli} help`, 'every command'],
+  ]
+  // ready to paste: a recipe is a comment line, then its commands
+  const recipes = [
+    '# three agents on three tasks, at once',
+    'for t in "fix the login redirect" "add dark mode" "speed up the tests"; do',
+    `  ${cli} new app --prompt "$t"`,
+    'done',
+    '',
+    '# a follow-up, typed in when its turn ends',
+    `${cli} send fix-login --when-idle "now add tests and run them"`,
+    '',
+    '# Codex, from another branch, with a name',
+    `${cli} new app --preset codex --base develop --name api-v2 --prompt "add the v2 endpoints"`,
+    '',
+    '# watch an agent from another terminal',
+    `while sleep 5; do clear; ${cli} screen fix-login; done`,
+    '',
+    '# a tab that runs the tests on every change',
+    `${cli} tab fix-login --cmd "npm test -- --watch"`,
+    '',
+    '# done: look, then ship or put it away',
+    `${cli} diff fix-login | less`,
+    ...(ship ? [`${cli} ship fix-login -m "Fix the login redirect"`] : []),
+    `${cli} archive fix-login`,
+  ].join('\n')
+  return (
+    <Page title="Help" onClose={onClose}>
+      <div className="help">
+        <section>
+          <h2>Start</h2>
+          <ol>
+            <li>Open a project: ⌘O, the folder icon at the top of the sidebar, or drop a folder on the window.</li>
+            <li>New workspace (⌘N): a git worktree and branch of its own (or the repo itself, with Local), an agent and a first prompt.</li>
+            <li>Watch the sidebar: each workspace shows its most urgent tab. Click one to step in; ⌘K jumps anywhere.</li>
+            <li>When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.</li>
+          </ol>
+        </section>
+        <section>
+          <h2>Keys</h2>
+          {KEYS.map(([k, v]) => (
+            <Row key={k} k={<kbd>{k}</kbd>}>
+              {v}
+            </Row>
+          ))}
+        </section>
+        <section>
+          <h2>Status</h2>
+          {GLYPHS.map(([g, v]) => (
+            <Row key={g} k={<Glyph s={g} />}>
+              {v}
+            </Row>
+          ))}
+          <p className="muted small">A tab that waits or finishes off screen sends a macOS notification; Settings › General turns them off.</p>
+        </section>
+        <section>
+          <h2>Around the window</h2>
+          <Row k="Tabs">Drag a tab onto a pane to split it; double click to rename; right click for colors, split, restart.</Row>
+          <Row k="▷ Run">The project’s run script in a dev tab, with $PORT; ■ stops it.</Row>
+          <Row k="Status bar">
+            The plan-limits ring (the most-used limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT
+            (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review switches. <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in
+            progress is cut off).
+          </Row>
+          <Row k={<Icon name="globe" />}>
+            Expose to the world: next to a port, a public trycloudflare.com link with a QR code for your phone, optionally only for some email addresses.
+            Needs cloudflared (<code>brew install cloudflared</code>).
+          </Row>
+          <Row k="Sidebar">Right click a workspace to rename, color, fork or archive it; drag to reorder.</Row>
+          <Row k="Templates">
+            Settings › Prompt templates: a prompt with <code>{'{{prompt}}'}</code> in it (and <code>{'{{project}}'}</code>, <code>{'{{base}}'}</code>). Pick one under a new
+            workspace's prompt: the agent gets it filled in.
+          </Row>
+          <Row k="Actions">
+            Settings › Actions (and a project's): a prompt for Claude Code or Codex, or a command for a terminal. Run ▾ lists them for the workspace you're in.
+          </Row>
+          <Row k="Look">Settings › Appearance: themes (✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow) and the interface font.</Row>
+          <Row k="Files">The side panel's preview colors code up to 50 KB; the status bar's path has a copy button.</Row>
+          <Row k="Quit">⌘Q quits the app: agents keep running in the daemon. Quit … Completely (the app menu) stops the daemon too; agents resume next time.</Row>
+        </section>
+        <section className="help-cmds">
+          <h2>Command line</h2>
+          <p className="muted small">
+            Scripts and agents drive the same daemon with <code>{cli}</code> (the README says how to put it on your PATH). Agents learn it from the agent skill
+            (Settings › Agent skill).
+          </p>
+          {cmds.map(([c, v]) => (
+            <Row key={c} k={<code>{c}</code>}>
+              {v}
+            </Row>
+          ))}
+          <h3>Recipes</h3>
+          <pre className="help-pre">{recipes}</pre>
+        </section>
+      </div>
+    </Page>
+  )
+}

@@ -5,8 +5,8 @@ line program), each task in its own git worktree, in real terminals. You see eve
 glance, step in when one needs you, and ship its branch as a PR. It's the successor of **wb**
 (`~/projects/specdrop-cli`), a tmux + iTerm workbench with the same goal.
 
-This folder is the product side: what Laki is for, what it does, and what's still open. How each build
-works is in its own `AGENTS.md`; how to use it, in its `README.md`.
+This folder is the product side: what Laki is for, what it does, and what's still open. How it works is in
+`AGENTS.md`; how to use it, in `README.md` (both at the repository's root).
 
 ## Why
 
@@ -39,23 +39,14 @@ cmux.
 - **Small and boring.** Few dependencies, platform features first, no telemetry. Data stays in the app's
   own folder; `~/.claude` and `~/.codex` are only written when the user installs the skill.
 
-## Two builds, one product
+## Stack
 
-Laki is built twice while we decide on the stack. Both have the same features and share their UI code
-(identical `layout.ts`, `Panes.tsx`, `Find.tsx`, `ui.tsx`, `Settings.tsx`, `themes.ts`, `PromptInput.tsx`,
-`Info.tsx`, `Glyph.tsx`, `SidePanel.tsx`): every change goes into both.
+Electron + a Node daemon (node-pty, @xterm/headless) + React + xterm.js. The daemon talks HTTP and WebSocket
+on 127.0.0.1 behind a token. CLI `laki`, data `~/.laki` (`LAKI_HOME`). The app is ~290 MB and uses ~500 MB.
 
-| | [Laki Electron](../electron) | [Laki Go](../go) |
-|---|---|---|
-| stack | Electron + Node daemon (node-pty, @xterm/headless) + React + xterm.js | Go daemon (creack/pty, x/vt) + Wails (system WebKit) + React + xterm.js |
-| CLI | `laki-electron` | `laki-go` |
-| data | `~/.laki-electron` (`LAKI_ELECTRON_HOME`) | `~/.laki-go` (`LAKI_GO_HOME`) |
-| daemon link | HTTP + WebSocket on 127.0.0.1, token | unix socket in the data folder |
-| app size / memory | ~290 MB / ~500 MB | ~10 MB / much less |
-| strong at | rich UI next steps, Linux/Windows later, one language | memory, size, reuse of wb's Go engine |
-
-Our current lean is Laki Electron, because the next asks (image preview, diagrams, drawing in the title
-bar, Linux/Windows) are easiest there. Laki Go wins on memory, size and Go reuse. Not decided.
+Laki was built twice while we picked the stack: this one, and **Laki Go** (a Go daemon + Wails, ~10 MB, much
+less memory; now its own repository, `igorkasyanchuk/laki-go`). We picked Electron: the next asks (image
+preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, and it's one language.
 
 ## Concepts
 
@@ -74,8 +65,8 @@ bar, Linux/Windows) are easiest there. Laki Go wins on memory, size and Go reuse
 ## What it does today
 
 **Workspaces and projects**
-- Add a repo or folder; new workspace from a base branch with a name, an agent and a first prompt (text,
-  dictation, pasted or dropped images).
+- Add a repo or folder; new workspace (a page of its own) from a base branch with a name, an agent and a
+  first prompt (text, dictation, pasted or dropped images).
 - Setup script per new worktree (agents and Run wait for it), teardown on delete or archive, env per project
   and globally, `$LAKI_PROJECT_PATH` to copy files like `.env` from the repo.
 - Rename, color, reorder (drag), fork (new worktree + forked Claude chat), archive and restore (chats
@@ -86,9 +77,12 @@ bar, Linux/Windows) are easiest there. Laki Go wins on memory, size and Go reuse
 - Tabs and panes: split by dragging or from menus, resize, move, rename (double click), color, restart.
 - A shell tab closes when it exits; an agent tab when it ends cleanly (exit 0). A failed one stays to read,
   and Enter starts it again.
-- Live status per tab and workspace, macOS notifications when an off-screen tab waits or finishes.
+- Live status per tab and workspace, macOS notifications when an off-screen tab waits or finishes (a setting
+  turns them off).
 - Esc / ⌃C interrupt goes back to idle. Usage limits: wait for the reset, then type `continue`.
-- Resume after a daemon restart: `claude --resume`, `codex resume`.
+- Resume after a daemon restart: `claude --resume`, `codex resume`. The app menu's *Quit … Completely*
+  stops the daemon too (asking first when an agent is working). A daemon older than the app (it outlives
+  updates) gets a restart button in the status bar.
 - ⌘F find in the terminal; copy on select; font, size, line height, weight, contrast, cursor, zoom.
 
 **Git and PRs**
@@ -105,15 +99,38 @@ bar, Linux/Windows) are easiest there. Laki Go wins on memory, size and Go reuse
 
 **Run**
 - ▷ Run starts the project's run script in a dev tab with `$PORT`; ■ stops it; open `localhost:$PORT`.
+- Actions (Settings, global and per project): a name and a prompt for Claude Code or Codex, or a command for a
+  terminal. Run ▾ lists them in two groups, Agent actions (only agents the workspace runs) and Terminal
+  actions; a project's replaces a global one of the same name and kind.
+- Plan limits: a ring at the start of the status bar, filled to the most-used limit of the Claude and Codex
+  plans; its popup lists each window (5-hour, weekly, per model, extra usage) and when it resets. Read with the
+  agents' own sign-in (never refreshed), at most every 5 minutes; Settings turns each agent off.
+- Remote access: the whole app in a browser elsewhere (a phone, another computer), through a cloudflared
+  tunnel to the daemon for one email address (Cloudflare's one-time code) plus a key in the link; 1, 2, 4, 8
+  or 24 hours, then it stops; a QR code; a new key each time.
+- Expose to the world: $PORT or a listening port at a trycloudflare.com link (cloudflared Quick Tunnels, no account),
+  with a QR code for a phone; public by default, or only some email addresses and whole domains (`*@gmail.com`;
+  `--allowed-mail`, one-time codes). A project's default (its settings, or `expose` in `.laki.json`) fills the popup
+  every time. The info panel shows each public link. Install instructions when cloudflared is missing.
+
+**Help**
+- ⌘/ (or the sidebar's ?): a page with the keys, status glyphs, where things are and the main CLI commands.
 
 **Look**
-- 14 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette.
+- 36 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; eighteen of
+  them also change shapes, borders and type (a CRT, Win95-style bevels, Aqua gel, soft clay, a handheld's LCD, a
+  ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass…).
+  Glass (a see-through, blurred window, with
+  sliders for the window, sidebar and terminals, and a color glow); Inter and
+  JetBrains Mono bundled as the default interface and terminal fonts; an interface font setting.
+- Prompt templates (`{{prompt}}`, `{{project}}`, `{{base}}`) picked under a new workspace's prompt.
+- File preview with syntax colors (up to 50 KB); the status bar's path short, with a copy button.
 - Tab and workspace colors; compact layout aligned with the window's traffic lights; resizable, collapsible
   sidebar (⌘B).
 
 **CLI**
 - `ls [--json]`, `project add|ls|rm`, `new`, `tab`, `send [--when-idle]`, `screen`, `diff`, `run`, `rm`,
-  `archive`, `restore`, `fork`, `open`, `daemon`, `stop`; Laki Electron's also has `ship`. Agents' hooks call
+  `archive`, `restore`, `fork`, `open`, `daemon`, `stop`, `ship`. Agents' hooks call
   the same CLI.
 
 ## Quality bar
@@ -137,7 +154,7 @@ bar, Linux/Windows) are easiest there. Laki Go wins on memory, size and Go reuse
 - **UI tests**: the React code has no tests yet.
 - **Dictation** in the new-workspace prompt: the fix isn't confirmed with a real voice yet.
 - **Ligatures** aren't drawn (needs an xterm.js add-on).
-- **Signing, icon, auto-update** for both builds.
+- **Signing, auto-update.**
 
 ## History
 
@@ -148,3 +165,6 @@ bar, Linux/Windows) are easiest there. Laki Go wins on memory, size and Go reuse
 - **2026-10-03**: renamed to **Laki**. wb-superset became Laki Electron (`laki/electron`), wb-spike became
   Laki Go (`laki/go`). Both start with fresh data folders; the old apps' data (`~/.wb-superset`,
   `~/.wb-spike`) is left as it was.
+- **2026-10-04**: picked Electron. Laki Electron became **Laki** (CLI `laki`, data `~/.laki`; an existing
+  `~/.laki-electron` stays in use), its code moved to the repository's root, with an icon of its own. Laki Go
+  moved to its own repository (`igorkasyanchuk/laki-go`). Remote access added.

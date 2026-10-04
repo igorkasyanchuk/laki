@@ -1,6 +1,6 @@
 // The daemon connection: one authenticated WebSocket, requests by id, events to listeners.
-// In Electron the preload bridge hands out the address and token; in a plain browser (dev) they come
-// in the URL hash: http://127.0.0.1:5199/#port=…&token=…
+// In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
+// http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone on the daemon's own page (remote access).
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
   notify(title: string, body: string, tab: string): void
@@ -10,15 +10,16 @@ type Bridge = {
   openExternal(url: string): void
   dictate?(): void
   dictationSettings?(): void
+  glass?(on: boolean): void
 }
 export const bridge: Bridge | undefined = (window as any).laki
 
 export type Msg = { ev: string; [k: string]: any }
 
-async function connInfo() {
-  if (bridge) return bridge.conn()
-  const h = new URLSearchParams(location.hash.slice(1))
-  return { port: Number(h.get('port')), token: h.get('token') ?? '' }
+async function wsURL() {
+  const { port, token } = bridge ? await bridge.conn() : (h => ({ port: h.get('port'), token: h.get('token') ?? '' }))(new URLSearchParams(location.hash.slice(1)))
+  const at = port ? `ws://127.0.0.1:${port}` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` // no port: the page's own daemon
+  return `${at}/ws?token=${encodeURIComponent(token)}`
 }
 
 class Api {
@@ -30,8 +31,7 @@ class Api {
 
   async connect() {
     try {
-      const { port, token } = await connInfo()
-      const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${encodeURIComponent(token)}`)
+      const ws = new WebSocket(await wsURL())
       this.ws = ws
       ws.onopen = () => {
         this.connected = true

@@ -1,18 +1,23 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { Project, ProjectConfig, TabView, View, WorkspaceView } from '../../shared/types'
+import { API, type Project, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
 import { AddProject, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
 import { type AppInfo, FONT_SIZE, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { Glyph } from './Glyph'
+import icon from './icon.svg'
+import { HelpPage } from './Help'
 import { Term } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { type Changes, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
-import { applyTheme } from './themes'
-import { colorVar, IconButton, type IconName, type MenuItem, moveId, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
+import { actionMenu, type Changes, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
+import { actionsFor, type RunAction, shortPath } from './text'
+import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
+import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
+import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
+import { colorVar, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | { settings: string; script?: 'run' } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -48,8 +53,8 @@ const load = <T,>(k: string, d: T): T => {
   }
 }
 
-// the last theme, until the daemon's settings arrive
-applyTheme(load<string>('laki.theme', ''))
+// the last theme (and glass, font), until the daemon's settings arrive
+applyTheme(load<string | Paint>('laki.theme', ''))
 
 export function App() {
   const [view, setView] = useState<View | null>(null)
@@ -101,12 +106,15 @@ export function App() {
   }, [panelOpen, panelTab, panelW])
 
   // the theme, painted before the terminals read it (their effects run before ours)
-  const theme = view?.settings.theme ?? ''
+  const paint = paintOf(view?.settings)
+  const theme = paintKey(paint) // terminals repaint when it changes
   const painted = useRef<string | null>(null)
+  const glassed = useRef<boolean | null>(null)
   if (view && painted.current !== theme) {
+    if (glassed.current !== !!paint.glass) bridge?.glass?.((glassed.current = !!paint.glass)) // the window's own blur
     painted.current = theme
-    applyTheme(theme)
-    localStorage.setItem('laki.theme', JSON.stringify(theme))
+    applyTheme(paint)
+    localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
 
   const toast = (m: string) => {
@@ -242,6 +250,19 @@ export function App() {
   const devTab = ws ? view?.tabs.find(t => t.workspace === ws.id && t.kind === 'dev') : undefined
   const devRunning = !!devTab && devTab.status !== 'exited'
   const editScripts = () => project && setDialog({ settings: project.id, script: 'run' })
+  // an action from Run ▾: a prompt to its agent's tab (queued while it works), a command to a shell (a new one if none)
+  const runAction = async (w: WorkspaceView, a: RunAction, tab?: string) => {
+    // a new tab goes in whole: the view doesn't have it yet
+    const t = tab ? byId(tab) : await call<TabView>('tabNew', { ws: w.id, preset: 'shell' }).catch(() => null)
+    if (!t) return
+    selectTab(t)
+    const r = await call<{ queued?: number }>('send', { target: t.id, text: a.text, whenIdle: a.target !== 'shell' }).catch(() => null)
+    if (r?.queued) toast(`${a.name}: queued for when the agent's turn ends`)
+  }
+  const actionItems = (w: WorkspaceView): MenuItem[] => {
+    const live = tabs.filter(t => t.status !== 'exited').map(t => ({ id: t.id, agent: t.kind === 'agent' ? t.preset : undefined, shell: t.kind === 'shell' }))
+    return actionMenu(actionsFor(settings.actions, project?.config?.actions, live, tab?.id), id => byId(id)?.name, (a, t) => runAction(w, a, t))
+  }
   const runMenu = (): MenuItem[] =>
     ws
       ? [
@@ -249,8 +270,10 @@ export function App() {
           ...(devRunning ? [{ label: 'Stop', icon: 'stop', key: 's', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) } as MenuItem] : []),
           ...(devTab ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', run: () => selectTab(devTab.id) } as MenuItem] : []),
           { label: `Open localhost:${ws.port}`, icon: 'link', key: 'o', run: () => openPort(ws.port) },
+          ...actionItems(ws),
           null,
           { label: ws.run ? 'Edit the run script…' : 'Set a run script…', icon: 'pencil', key: 'e', run: editScripts },
+          ...(project ? [{ label: 'Edit actions…', icon: 'pencil', run: () => setDialog({ settings: project.id }) } as MenuItem] : []),
         ]
       : []
   const panelApi = (w: WorkspaceView): PanelApi => ({
@@ -261,7 +284,16 @@ export function App() {
     changes: () => api.call<Changes>('diff', { ws: w.id }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
   })
+  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast('Copied'), fail)
+  const tunnelApi = (w: WorkspaceView): TunnelApi => ({
+    check: () => api.call<Cloudflared>('cloudflared', { ws: w.id }),
+    start: (port, mails) => api.call('tunnelStart', { ws: w.id, port, mails }),
+    stop: port => api.call('tunnelStop', { ws: w.id, port }),
+    open: openExternal,
+    copy,
+  })
   const settings = view?.settings ?? {}
+  const tracked = Object.keys(USAGE_AGENTS).filter(a => settings.usage?.[a] !== false) // the status bar's plan limits
   const editor = settings.editor || 'cursor'
   const targets: AppInfo[] = [...apps, ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
   const editorName = targets.find(a => a.id === editor && a.id !== 'custom')?.name ?? 'editor'
@@ -367,7 +399,8 @@ export function App() {
     const act: Record<string, () => void> = {
       n: () => newWs(ws?.project),
       b: () => setSideOpen(o => !o),
-      ',': () => setDialog(d => (d === 'settings' || (typeof d === 'object' && d && 'settings' in d) ? null : 'settings')),
+      ',': () => setDialog(d => (d === 'settings' || (typeof d === 'object' && d && ('settings' in d || 'section' in d)) ? null : 'settings')),
+      '/': () => setDialog(d => (d === 'help' ? null : 'help')),
       e: () => ws && openIn(editor),
       '=': () => zoom(1),
       '+': () => zoom(1),
@@ -438,7 +471,9 @@ export function App() {
     a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
+    a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
     a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: '⌘B', run: () => setSideOpen(o => !o) })
+    a({ label: `Turn macOS notifications ${settings.notify === false ? 'on' : 'off'}`, icon: 'bell', run: () => call('settingsSet', { notify: settings.notify === false }).catch(() => {}) })
     if (ws) {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
       for (const x of targets) a({ label: `Open in ${x.name}`, icon: appIcon(x.id), hint: x.id === editor ? '⌘E' : undefined, run: () => openIn(x.id) })
@@ -464,12 +499,18 @@ export function App() {
   if (!view)
     return (
       <div className="splash">
-        <div className="logo">Laki</div>
+        <div className="logo">
+          <img src={icon} alt="" />
+          Laki
+        </div>
         <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>
       </div>
     )
 
   const settingsFor = dialog && typeof dialog === 'object' && 'settings' in dialog ? view.projects.find(p => p.id === dialog.settings) : undefined
+  const section = dialog && typeof dialog === 'object' && 'section' in dialog ? dialog.section : undefined // a Settings section asked for
+  const ports = ws ? portsOf(ws.ports, ws.tunnels).filter(p => p !== ws.port) : [] // $PORT has its own, always
+  const portUp = !!ws?.ports.includes(ws.port)
   const label = (id: string) => {
     const t = byId(id)
     return (
@@ -489,6 +530,7 @@ export function App() {
           <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
           <span className="spacer" />
           <IconButton icon="folderPlus" title="Open a project folder (⌘O), or drop one on the window" onClick={openProject} />
+          <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
           <IconButton icon="gear" title="Settings (⌘,)" on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
         <div className="side-scroll">
@@ -597,6 +639,7 @@ export function App() {
                 ghost={drag && (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null).map(id => byId(id)?.name).join(' · ') : label(drag.tab))}
                 render={id => (
                   <Term
+                    key={transparent() ? 'clear' : 'solid' /* xterm takes allowTransparency only as it opens */}
                     tab={id}
                     active={id === tab?.id && !dialog}
                     findSeq={finds[id] ?? 0}
@@ -668,10 +711,11 @@ export function App() {
               onFix={what => prFix(ws, what)}
               onRename={() => setDialog({ renameWs: ws.id })}
               onAgent={selectTab}
+              onCopy={copy}
             />
           )}
         </div>
-        {(dialog === 'settings' || settingsFor) && (
+        {(dialog === 'settings' || settingsFor || section) && (
           <SettingsPage
             key={settingsKey}
             settings={view.settings}
@@ -682,12 +726,33 @@ export function App() {
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             renameProjects
-            skill={{ app: 'Laki Electron', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => api.call<SkillInfo[]>('skillSet', { agent, on }) }}
-            section={settingsFor && `project:${settingsFor.id}`}
+            skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => api.call<SkillInfo[]>('skillSet', { agent, on }) }}
+            remote={{ state: view.remote, start: (hours, mail) => api.call('remoteStart', { hours, mail }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+            section={settingsFor ? `project:${settingsFor.id}` : section}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
           />
         )}
+        {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
+        {dialog === 'new' && (
+          <NewWorkspace
+            key={newFor} // another project asked for while it's open (＋, a dropped folder)
+            view={view}
+            project={newFor ?? ws?.project}
+            agent={settings.agent}
+            onClose={() => {
+              setDialog(null)
+              setNewFor(undefined)
+            }}
+            onCreate={async p => {
+              const w = await call<WorkspaceView>('wsNew', p)
+              setWsId(w.id)
+              setDialog(null)
+              setNewFor(undefined)
+            }}
+          />
+        )}
         <div className="status">
+          {tracked.length > 0 && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage')} /> /* remounts as agents are turned on or off */}
           {ws && (
             <>
               {git && (
@@ -696,24 +761,47 @@ export function App() {
                   {ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
                 </span>
               )}
-              <button className="listen port-main" data-tip={`$PORT · open http://localhost:${ws.port}`} onClick={() => openPort(ws.port)}>
-                $PORT {ws.port}
-              </button>
-              {ws.ports.map(port => (
-                <button key={port} className="listen" data-tip={`listening · open http://localhost:${port}`} onClick={() => openPort(port)}>
-                  ↗{port}
+              <span className="port-item">
+                <button
+                  className={`listen ${portUp ? '' : 'port-main'}`}
+                  data-tip={`$PORT · ${portUp ? 'listening · ' : ''}open http://localhost:${ws.port}`}
+                  onClick={() => openPort(ws.port)}
+                >
+                  $PORT {ws.port}
                 </button>
+                <TunnelButton key={ws.id} port={ws.port} tunnel={ws.tunnels?.find(t => t.port === ws.port)} api={tunnelApi(ws)} />
+              </span>
+              {ports.map(port => (
+                <span key={`${ws.id}:${port}`} className="port-item">
+                  <button className="listen" data-tip={ws.ports.includes(port) ? `listening · open http://localhost:${port}` : 'not listening now'} onClick={() => openPort(port)}>
+                    ↗{port}
+                  </button>
+                  <TunnelButton port={port} tunnel={ws.tunnels?.find(t => t.port === port) /* an older daemon has none */} api={tunnelApi(ws)} />
+                </span>
               ))}
               <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} />
               {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
           )}
           <span className="spacer" />
-          {ws && (
-            <span className="path" title={ws.path}>
-              {'\u200e' + ws.path /* keeps the leading / in the right-to-left truncation */}
-            </span>
+          {view.remote && (
+            <button
+              className={`remote-badge ${view.remote.url ? '' : 'starting'}`}
+              data-tip={`Remote access for ${view.remote.mail}: Settings › Remote access`}
+              onClick={() => setDialog({ section: 'remote' })}
+            >
+              {view.remote.url ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote starting…'}
+            </button>
           )}
+          {ws && (
+            <>
+              <span className="path" data-tip={ws.path}>
+                {'\u200e' + shortPath(ws.path) /* keeps the leading ~ in the right-to-left truncation */}
+              </span>
+              <IconButton icon="copy" title="Copy the path" className="path-copy" onClick={() => copy(ws.path)} />
+            </>
+          )}
+          {connected && (view.api ?? 0) < API && <StaleDaemon restart={() => api.call('shutdown')} />}
           {!connected && <span className="warn">reconnecting…</span>}
         </div>
       </main>
@@ -722,23 +810,6 @@ export function App() {
       <Tips />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {error && <div className="toast">{error}</div>}
-      {dialog === 'new' && (
-        <NewWorkspace
-          view={view}
-          project={newFor ?? ws?.project}
-          agent={settings.agent}
-          onClose={() => {
-            setDialog(null)
-            setNewFor(undefined)
-          }}
-          onCreate={async p => {
-            const w = await call<WorkspaceView>('wsNew', p)
-            setWsId(w.id)
-            setDialog(null)
-            setNewFor(undefined)
-          }}
-        />
-      )}
       {dialog === 'project' && (
         <AddProject
           onClose={() => setDialog(null)}

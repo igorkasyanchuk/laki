@@ -23,7 +23,7 @@ export default defineConfig({
         name: 'csp', // only in the build: the dev server injects inline scripts
         apply: 'build',
         transformIndexHtml: html =>
-          html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />`),
+          html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data:" />`),
       },
     ],
     server: { port: 5199, strictPort: true, host: '127.0.0.1' },

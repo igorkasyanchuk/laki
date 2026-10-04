@@ -1,6 +1,7 @@
-// Color themes (Settings → Appearance). A theme sets the CSS variables of both apps (laki-electron, laki-go) on
+// Color themes (Settings → Appearance). A theme sets the app's CSS variables on
 // <html>; 'default' keeps the app's own (:root in its stylesheet). The terminal's 16 colors are --ansi-0…15
-// and termTheme() reads them. The same file is in both apps.
+// and termTheme() reads them. A theme with a look also changes shapes, borders, shadows and type (look.css,
+// <html data-look>). Glass makes the window see-through, as much as its sliders say.
 
 type Colors = {
   bg: string
@@ -21,8 +22,9 @@ type Colors = {
   pink: string
   purple: string // a violet: a theme's magenta can be its pink
 }
-// grad: a gradient behind the sidebar and the terminals (Warp-style); side is then see-through
-export type Theme = { id: string; name: string; light?: boolean; c?: Colors; ansi?: string[]; grad?: [string, string] }
+// grad: a gradient behind the sidebar and the terminals (Warp-style); side is then see-through.
+// look: look.css's [data-look] rules for it
+export type Theme = { id: string; name: string; light?: boolean; c?: Colors; ansi?: string[]; grad?: [string, string]; look?: string }
 
 export const THEMES: Theme[] = [
   { id: 'default', name: 'Midnight' },
@@ -94,6 +96,28 @@ export const THEMES: Theme[] = [
       '#636366', '#ff6961', '#4ae374', '#ffe066', '#409cff', '#da8fff', '#8fe2ff', '#ffffff'],
   },
   {
+    id: 'velvet',
+    name: 'Velvet',
+    c: {
+      bg: '#1e1e2e', side: '#181825', panel: '#24243a', raised: '#313244', line: '#3b3d52', fg: '#cdd6f4', muted: '#9095b3',
+      accent: '#cba6f7', accentFg: '#1e1e2e', sel: '#45475a', running: '#89b4fa', waiting: '#f9e2af', done: '#a6e3a1', error: '#f38ba8',
+      orange: '#fab387', pink: '#f5c2e7', purple: '#b4befe',
+    },
+    ansi: ['#45475a', '#f38ba8', '#a6e3a1', '#f9e2af', '#89b4fa', '#f5c2e7', '#94e2d5', '#bac2de',
+      '#585b70', '#f5a3ba', '#bcebb8', '#fbebc4', '#a3c5fb', '#f9d3ee', '#ade9df', '#e2e8fa'],
+  },
+  {
+    id: 'nightfall',
+    name: 'Nightfall',
+    c: {
+      bg: '#1a1b26', side: '#16161e', panel: '#1f2132', raised: '#292e42', line: '#2f3549', fg: '#c0caf5', muted: '#7a82ab',
+      accent: '#7aa2f7', accentFg: '#1a1b26', sel: '#364a82', running: '#7dcfff', waiting: '#e0af68', done: '#9ece6a', error: '#f7768e',
+      orange: '#ff9e64', pink: '#f39bd1', purple: '#bb9af7',
+    },
+    ansi: ['#292e42', '#f7768e', '#9ece6a', '#e0af68', '#7aa2f7', '#bb9af7', '#7dcfff', '#a9b1d6',
+      '#545c7e', '#ff8ea3', '#b3e07f', '#ecc184', '#94b6ff', '#cbb0ff', '#9dddff', '#c0caf5'],
+  },
+  {
     id: 'paper',
     name: 'Paper',
     light: true,
@@ -104,6 +128,18 @@ export const THEMES: Theme[] = [
     },
     ansi: ['#ebe8e1', '#cf222e', '#1a7f37', '#9a6700', '#0969da', '#8250df', '#1b7c83', '#57606a',
       '#8c959f', '#a40e26', '#116329', '#7d4e00', '#0550ae', '#6639ba', '#3192aa', '#24292f'],
+  },
+  {
+    id: 'mist',
+    name: 'Mist',
+    light: true,
+    c: {
+      bg: '#eff1f5', side: '#e6e9ef', panel: '#f7f8fa', raised: '#dce0e8', line: '#ccd0da', fg: '#4c4f69', muted: '#767990',
+      accent: '#8839ef', accentFg: '#ffffff', sel: '#dcd4f7', running: '#1e66f5', waiting: '#b8730c', done: '#40a02b', error: '#d20f39',
+      orange: '#fe640b', pink: '#d55ab5', purple: '#8839ef',
+    },
+    ansi: ['#dce0e8', '#d20f39', '#40a02b', '#b8730c', '#1e66f5', '#8839ef', '#179299', '#5c5f77',
+      '#9ca0b0', '#e64553', '#2f8a1f', '#9c6108', '#1550c7', '#7028d6', '#0f7a80', '#3a3d55'],
   },
   // Warp-style: a gradient behind everything
   {
@@ -167,6 +203,18 @@ export const THEMES: Theme[] = [
       '#4f6d85', '#ff8fa6', '#8ff7d6', '#f7e08f', '#9cc3ff', '#d4adff', '#8fdcf7', '#ffffff'],
   },
   {
+    id: 'sunset',
+    name: 'Sunset',
+    grad: ['#1c1240', '#8c3b2b'],
+    c: {
+      bg: '#3a1d3c', side: '#1c124080', panel: '#2a1838', raised: '#43264a', line: '#5a3358', fg: '#fff0e8', muted: '#c9a3a8',
+      accent: '#ffab5e', accentFg: '#1c1240', sel: '#6e3550', running: '#7fc8ff', waiting: '#ffd36b', done: '#8fe0a0', error: '#ff6b6b',
+      orange: '#ffab5e', pink: '#ff8fb8', purple: '#b9a0ff',
+    },
+    ansi: ['#2a1838', '#ff6b6b', '#8fe0a0', '#ffd36b', '#7fa8ff', '#e09cff', '#6fd8d0', '#f2dcd6',
+      '#7a5470', '#ff8f8f', '#b2efbf', '#ffe39a', '#a6c3ff', '#ecbcff', '#97e8e1', '#ffffff'],
+  },
+  {
     id: 'snowy',
     name: 'Snowy',
     light: true,
@@ -179,17 +227,247 @@ export const THEMES: Theme[] = [
     ansi: ['#e6eef5', '#c53030', '#2f855a', '#b7791f', '#2b6cb0', '#805ad5', '#2c7a7b', '#4a5568',
       '#a0aec0', '#e53e3e', '#38a169', '#d69e2e', '#3182ce', '#9f7aea', '#319795', '#1a202c'],
   },
+  // looks: more than colors (look.css)
+  {
+    id: 'phosphor',
+    name: 'Phosphor',
+    look: 'retro',
+    c: {
+      bg: '#050a06', side: '#07100a', panel: '#0a160d', raised: '#0f2214', line: '#1d4a28', fg: '#7dff9a', muted: '#46b864',
+      accent: '#ffb000', accentFg: '#050a06', sel: '#123a1c', running: '#7dff9a', waiting: '#ffb000', done: '#b6ff6a', error: '#ff5f56',
+      orange: '#ff9f1c', pink: '#ff7edb', purple: '#b39cff',
+    },
+    ansi: ['#0f2214', '#ff5f56', '#7dff9a', '#ffb000', '#5fd7ff', '#d787ff', '#5fffd7', '#b8ffc8',
+      '#2f6b3d', '#ff8a80', '#a8ffbc', '#ffd166', '#8ae0ff', '#e3a8ff', '#8affe3', '#e8ffee'],
+  },
+  {
+    id: 'neon',
+    name: 'Neon Arcade',
+    look: 'neon',
+    c: {
+      bg: '#0d0221', side: '#0a011a', panel: '#150535', raised: '#1f0a4a', line: '#2e1065', fg: '#f0e6ff', muted: '#9b86c9',
+      accent: '#ff2a6d', accentFg: '#0d0221', sel: '#3b0f6e', running: '#05d9e8', waiting: '#ffd319', done: '#00ff9f', error: '#ff2a6d',
+      orange: '#ff8c42', pink: '#ff2a6d', purple: '#b967ff',
+    },
+    ansi: ['#1f0a4a', '#ff2a6d', '#00ff9f', '#ffd319', '#05d9e8', '#b967ff', '#01ffc3', '#e0d4ff',
+      '#5a3e99', '#ff5c8f', '#5cffbf', '#ffe066', '#4de9f2', '#d199ff', '#5cffd8', '#ffffff'],
+  },
+  {
+    id: 'brutalist',
+    name: 'Brutalist',
+    light: true,
+    look: 'brutal',
+    c: {
+      bg: '#fffdf2', side: '#fff6c7', panel: '#ffffff', raised: '#f2ecd0', line: '#111111', fg: '#111111', muted: '#5c564a',
+      accent: '#ffd400', accentFg: '#111111', sel: '#ffe866', running: '#0047ff', waiting: '#a85c00', done: '#007a3d', error: '#d40000',
+      orange: '#ff6a00', pink: '#e0007a', purple: '#6a00ff',
+    },
+    ansi: ['#f2ecd0', '#d00000', '#007a3d', '#a86400', '#0047ff', '#6a00ff', '#007c8a', '#333333',
+      '#8a8576', '#ff2a2a', '#00a352', '#c27a00', '#3366ff', '#8a33ff', '#00a0b0', '#000000'],
+  },
+  {
+    id: 'bubblegum',
+    name: 'Bubblegum',
+    light: true,
+    look: 'bubble',
+    c: {
+      bg: '#fff5fa', side: '#ffe9f4', panel: '#ffffff', raised: '#ffe0ef', line: '#f6c9df', fg: '#4a2b45', muted: '#9a7090',
+      accent: '#ff5fa2', accentFg: '#ffffff', sel: '#ffd3e8', running: '#4f7fe0', waiting: '#c27800', done: '#23946c', error: '#e5484d',
+      orange: '#ff8a3d', pink: '#ff5fa2', purple: '#9b6bff',
+    },
+    ansi: ['#ffe0ef', '#e5484d', '#23946c', '#c27800', '#4f7fe0', '#9b6bff', '#1f9fb0', '#6d4a66',
+      '#c4a3b8', '#ff6b70', '#2fb383', '#e09a1a', '#7aa5ff', '#b48cff', '#36bccd', '#3a2236'],
+  },
+  {
+    id: 'blueprint',
+    name: 'Blueprint',
+    look: 'blueprint',
+    c: {
+      bg: '#123c73', side: '#0f3466', panel: '#164682', raised: '#1d5296', line: '#3d6fae', fg: '#e8f1ff', muted: '#a4c0e8',
+      accent: '#ffffff', accentFg: '#123c73', sel: '#2a64ad', running: '#9fd8ff', waiting: '#ffe08a', done: '#a8f0c6', error: '#ffa8a8',
+      orange: '#ffc48a', pink: '#ffb8e0', purple: '#d0bcff',
+    },
+    ansi: ['#164682', '#ff9a9a', '#a8f0c6', '#ffe08a', '#9fd8ff', '#d0bcff', '#8ef0f0', '#e8f1ff',
+      '#5a86c2', '#ffb8b8', '#c4f7d9', '#fff0b3', '#c2e6ff', '#e2d4ff', '#b3f7f7', '#ffffff'],
+  },
+  {
+    id: 'cyberpunk',
+    name: 'Cyberpunk',
+    look: 'cyber',
+    c: {
+      bg: '#0a0a0f', side: '#0d0d14', panel: '#12121c', raised: '#1c1c2b', line: '#2c2c42', fg: '#e8f6ff', muted: '#8391a8',
+      accent: '#fcee0a', accentFg: '#0a0a0f', sel: '#2e2b0c', running: '#00f0ff', waiting: '#fcee0a', done: '#39ff88', error: '#ff003c',
+      orange: '#ff7a00', pink: '#ff2e97', purple: '#a855f7',
+    },
+    ansi: ['#1c1c2b', '#ff003c', '#39ff88', '#fcee0a', '#2d7bff', '#ff2e97', '#00f0ff', '#d6e4f0',
+      '#4b4b6b', '#ff4d6d', '#7dffb0', '#fff35c', '#6aa0ff', '#ff6eb5', '#6ff7ff', '#ffffff'],
+  },
+  {
+    id: 'deco',
+    name: 'Art Deco',
+    look: 'deco',
+    c: {
+      bg: '#0f1517', side: '#0b1012', panel: '#151c1f', raised: '#1e272a', line: '#4a4128', fg: '#f1e8d2', muted: '#a59c84',
+      accent: '#d4af37', accentFg: '#0f1517', sel: '#2b2a1b', running: '#6fc3c9', waiting: '#e0b04a', done: '#93c48e', error: '#e0705f',
+      orange: '#dc8b4a', pink: '#d68fab', purple: '#a993cf',
+    },
+    ansi: ['#1e272a', '#e0705f', '#93c48e', '#e0b04a', '#6f9fd8', '#a993cf', '#6fc3c9', '#e4dcc6',
+      '#5c5848', '#f08f7f', '#b2dcae', '#f2cd72', '#93bdf0', '#c6b3e8', '#93dde2', '#fffaf0'],
+  },
+  {
+    id: 'classic',
+    name: 'Classic',
+    light: true,
+    look: 'classic',
+    c: {
+      bg: '#ffffff', side: '#c0c0c0', panel: '#c0c0c0', raised: '#d4d0c8', line: '#808080', fg: '#000000', muted: '#3c3c3c',
+      accent: '#000080', accentFg: '#ffffff', sel: '#b4cdf0', running: '#000080', waiting: '#806000', done: '#007000', error: '#c00000',
+      orange: '#c05800', pink: '#b0008a', purple: '#5a00b4',
+    },
+    ansi: ['#c0c0c0', '#aa0000', '#007000', '#806000', '#0000aa', '#aa00aa', '#007878', '#404040',
+      '#808080', '#e00000', '#00a000', '#a08000', '#0000ff', '#c000c0', '#00a0a0', '#000000'],
+  },
+  {
+    id: 'notebook',
+    name: 'Notebook',
+    light: true,
+    look: 'notebook',
+    c: {
+      bg: '#fbf8f1', side: '#f4eee0', panel: '#fffdf8', raised: '#efe7d6', line: '#d8cdb4', fg: '#2a2933', muted: '#7a7466',
+      accent: '#2f5fd0', accentFg: '#ffffff', sel: '#fff1a0', running: '#2f5fd0', waiting: '#b7791f', done: '#2f855a', error: '#d64545',
+      orange: '#dd6b20', pink: '#c2417a', purple: '#6b46c1',
+    },
+    ansi: ['#efe7d6', '#d64545', '#2f855a', '#a8700f', '#2f5fd0', '#6b46c1', '#2c7a7b', '#4a4752',
+      '#a39d8c', '#e05555', '#38a169', '#c98a1a', '#4a7be0', '#805ad5', '#319795', '#1d1c24'],
+  },  {
+    id: 'aqua',
+    name: 'Aqua',
+    light: true,
+    look: 'aqua',
+    c: {
+      bg: '#ffffff', side: '#eceef2', panel: '#f7f7f8', raised: '#e6e7ea', line: '#bcbfc6', fg: '#1b1b1f', muted: '#6a6d75',
+      accent: '#2f7de1', accentFg: '#ffffff', sel: '#c9ddf9', running: '#1f6fd6', waiting: '#b06d00', done: '#2b8a3e', error: '#d0342c',
+      orange: '#e07b00', pink: '#d6337f', purple: '#7b4fd6',
+    },
+    ansi: ['#e6e7ea', '#c4302b', '#2b8a3e', '#a86a00', '#1f6fd6', '#8a3fd1', '#13879a', '#3b3d44',
+      '#9a9da6', '#e0443e', '#38a852', '#c98400', '#3d8bf0', '#a260e8', '#1ba4ba', '#0d0d10'],
+  },
+  {
+    id: 'clay',
+    name: 'Clay',
+    light: true,
+    look: 'clay',
+    c: {
+      bg: '#e4e8ee', side: '#e4e8ee', panel: '#e8ecf2', raised: '#dce1e9', line: '#cdd3dd', fg: '#2f3b55', muted: '#7a849a',
+      accent: '#6c63ff', accentFg: '#ffffff', sel: '#d7dcf6', running: '#3a7cc2', waiting: '#b7791f', done: '#2a9468', error: '#dc4c5a',
+      orange: '#e8833a', pink: '#dc5c9a', purple: '#8a6cf0',
+    },
+    ansi: ['#d3d9e3', '#d6455a', '#2a9468', '#b07a10', '#3a7cc2', '#7a5ce0', '#2b8f9c', '#45506a',
+      '#a3abbd', '#e8607a', '#36ad7e', '#cc9020', '#5a96d8', '#957bf0', '#3aa8b6', '#1f2638'],
+  },
+  {
+    id: 'pocket',
+    name: 'Pocket',
+    light: true,
+    look: 'pocket',
+    c: {
+      bg: '#c4cf9a', side: '#b3c189', panel: '#ced8a6', raised: '#a8b87c', line: '#3f5a30', fg: '#0f2a12', muted: '#4a6838',
+      accent: '#306230', accentFg: '#d6dfae', sel: '#9db26b', running: '#1d5d5a', waiting: '#6f5200', done: '#1e5f1e', error: '#8c1d2c',
+      orange: '#8a5200', pink: '#8b2252', purple: '#4b3a7a',
+    },
+    ansi: ['#a8b87c', '#8c1d2c', '#1e5f1e', '#6f5200', '#1d4f6e', '#5a2d6e', '#1d5d5a', '#24401c',
+      '#6f8a52', '#a8283a', '#2d7a2d', '#8a6a00', '#2a6a8f', '#7a3d94', '#287a76', '#081a0a'],
+  },
+  {
+    id: 'starship',
+    name: 'Starship',
+    look: 'starship',
+    c: {
+      bg: '#000000', side: '#000000', panel: '#0c0b14', raised: '#1b1a2b', line: '#2f2c48', fg: '#f6e7c9', muted: '#a097bb',
+      accent: '#ff9c00', accentFg: '#000000', sel: '#2a1d05', running: '#99ccff', waiting: '#ffcc66', done: '#99dd99', error: '#ff5a5a',
+      orange: '#ff9966', pink: '#cc6699', purple: '#cc99cc',
+    },
+    ansi: ['#1b1a2b', '#ff5a5a', '#99dd99', '#ffcc66', '#9999ff', '#cc99cc', '#66ccff', '#e8dcc4',
+      '#5a5478', '#ff8080', '#b8f0b8', '#ffdd88', '#b8b8ff', '#e0b8e0', '#99ddff', '#ffffff'],
+  },  {
+    id: 'gazette',
+    name: 'Gazette',
+    light: true,
+    look: 'gazette',
+    c: {
+      bg: '#f6f1e6', side: '#efe8d8', panel: '#fbf8f0', raised: '#e8e0cc', line: '#2a2723', fg: '#1c1a17', muted: '#6b6457',
+      accent: '#b3261e', accentFg: '#fbf8f0', sel: '#e6dcc4', running: '#1f4e8c', waiting: '#8a5a00', done: '#2f6b3a', error: '#b3261e',
+      orange: '#b5651d', pink: '#a8326e', purple: '#5b3f8c',
+    },
+    ansi: ['#e8e0cc', '#b3261e', '#2f6b3a', '#8a5a00', '#1f4e8c', '#6b3f8c', '#1f6b6b', '#3a3631',
+      '#8f8676', '#d0362c', '#3d8a4b', '#a87000', '#2f65b0', '#8550b0', '#2a8a8a', '#0d0c0a'],
+  },
+  {
+    id: 'holo',
+    name: 'Holo',
+    look: 'holo',
+    c: {
+      bg: '#0b0d17', side: '#090b14', panel: '#11142a', raised: '#1a1e3a', line: '#2a2f55', fg: '#eef0ff', muted: '#9aa0c8',
+      accent: '#8b7bff', accentFg: '#0b0d17', sel: '#232a55', running: '#5ee7ff', waiting: '#ffd36b', done: '#7cf2b0', error: '#ff6b9a',
+      orange: '#ffa36b', pink: '#ff7bd5', purple: '#a98bff',
+    },
+    ansi: ['#1a1e3a', '#ff6b9a', '#7cf2b0', '#ffd36b', '#6b9bff', '#c18bff', '#5ee7ff', '#d8dcf5',
+      '#4a5080', '#ff8fb3', '#a3f7cc', '#ffe299', '#94b8ff', '#d6b0ff', '#8ff0ff', '#ffffff'],
+  },
+  {
+    id: 'bauhaus',
+    name: 'Bauhaus',
+    light: true,
+    look: 'bauhaus',
+    c: {
+      bg: '#f5f1e8', side: '#ece6d6', panel: '#fbf9f3', raised: '#e3dccb', line: '#1d1d1b', fg: '#1d1d1b', muted: '#5e5a52',
+      accent: '#d7261e', accentFg: '#ffffff', sel: '#f3d34a', running: '#1f4fa3', waiting: '#a86e00', done: '#2a7a3b', error: '#d7261e',
+      orange: '#e8742c', pink: '#c73b7a', purple: '#4b3b8f',
+    },
+    ansi: ['#e3dccb', '#d7261e', '#2a7a3b', '#a86e00', '#1f4fa3', '#7a3b8f', '#1f7a7a', '#3a3834',
+      '#8f897c', '#ec3a30', '#38964d', '#c98800', '#2f66c4', '#9550b0', '#2a9a9a', '#0d0d0c'],
+  },
+  {
+    id: 'chalkboard',
+    name: 'Chalkboard',
+    look: 'chalk',
+    c: {
+      bg: '#1f3a2e', side: '#1a3227', panel: '#24433a', raised: '#2c4f43', line: '#4f7366', fg: '#f2f0e6', muted: '#a9bdb2',
+      accent: '#ffe27a', accentFg: '#1f3a2e', sel: '#2f5a4a', running: '#9fd3ff', waiting: '#ffe27a', done: '#b9f0a8', error: '#ff9a8a',
+      orange: '#ffb87a', pink: '#ffa8d0', purple: '#c9b3ff',
+    },
+    ansi: ['#2c4f43', '#ff9a8a', '#b9f0a8', '#ffe27a', '#9fd3ff', '#d9b8ff', '#8fe8d8', '#e8e6dc',
+      '#5f8577', '#ffb8ab', '#d2f7c6', '#fff0a8', '#c2e4ff', '#e8d2ff', '#b5f2e6', '#ffffff'],
+  },
+  {
+    id: 'brass',
+    name: 'Brass',
+    look: 'brass',
+    c: {
+      bg: '#1b140e', side: '#17110b', panel: '#241a12', raised: '#2f2217', line: '#5a4126', fg: '#f0dfc0', muted: '#b39b78',
+      accent: '#d4a24c', accentFg: '#1b140e', sel: '#3a2a18', running: '#7fb8b0', waiting: '#e0b04a', done: '#9bc47a', error: '#d9694a',
+      orange: '#d98a4a', pink: '#c9788f', purple: '#a58ac2',
+    },
+    ansi: ['#2f2217', '#d9694a', '#9bc47a', '#e0b04a', '#7f9fc4', '#b58ac2', '#7fb8b0', '#e6d4b4',
+      '#6b5238', '#ee8a6a', '#b8dc98', '#f2cb72', '#a0bde0', '#cfa8da', '#a0d4cc', '#fff4dc'],
+  },
 ]
 
 const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
 const PREVIEW = ['--bg', '--panel', '--fg', '--accent', '--ansi-1', '--ansi-2', '--ansi-3', '--ansi-4', '--ansi-5']
-// a variable as the stylesheet's :root has it (the default theme), whatever theme paints <html> now
+// a variable as the stylesheet's :root has it (the default theme), whatever theme paints <html> now; found once
+const roots = new Map<string, string>()
 function rootVar(v: string) {
+  if (roots.has(v)) return roots.get(v)!
   for (const sheet of Array.from(document.styleSheets))
     try {
-      for (const r of Array.from(sheet.cssRules)) if (r instanceof CSSStyleRule && r.selectorText === ':root' && r.style.getPropertyValue(v)) return r.style.getPropertyValue(v).trim()
+      for (const r of Array.from(sheet.cssRules))
+        if (r instanceof CSSStyleRule && r.selectorText === ':root' && r.style.getPropertyValue(v)) {
+          roots.set(v, r.style.getPropertyValue(v).trim())
+          return roots.get(v)!
+        }
     } catch {} // another origin's sheet
-  return ''
+  return '' // not loaded yet, maybe: not remembered
 }
 const gradient = (g: [string, string]) => `linear-gradient(135deg, ${g[0]}, ${g[1]})`
 
@@ -199,26 +477,64 @@ export const preview = (t: Theme) => {
   return [t.grad ? gradient(t.grad) : bg, ...rest]
 }
 
-// a gradient theme: terminals are see-through (xterm's allowTransparency, which costs some text quality)
-export const transparent = (id?: string) => !!THEMES.find(t => t.id === id)?.grad
+// what paints the window (Settings → Appearance): the theme, the interface's font ('system': the Mac's), glass
+// and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
+export type Paint = { theme?: string; uiFont?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean }
+const PAINT = ['theme', 'uiFont', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow'] as const
+export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
+export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
+export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
+// a color at pct% strength (of its own alpha, if it has one): #rrggbbaa from a hex (xterm reads only that), else color-mix
+function alpha(c: string, pct: number) {
+  const m = /^(#[\da-f]{6})([\da-f]{2})?$/i.exec(c)
+  if (!m) return `color-mix(in srgb, ${c} ${pct}%, transparent)`
+  const a = m[2] ? parseInt(m[2], 16) : 255
+  return m[1] + Math.round((pct / 100) * a).toString(16).padStart(2, '0')
+}
+export const UI_FALLBACK = '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
+export const UI_FONTS = ['Inter', 'system', 'JetBrains Mono', 'Avenir Next', 'Helvetica Neue', 'Futura', 'Gill Sans', 'Optima', 'Menlo']
 
-// paints <html> with a theme; an unknown id is the default
-export function applyTheme(id?: string) {
-  const t = THEMES.find(x => x.id === id) ?? THEMES[0]
-  const st = document.documentElement.style
+let seeThrough = false
+// terminals are see-through with a gradient theme, or glass that lets something through them (xterm's
+// allowTransparency, which costs some text quality)
+export const transparent = () => seeThrough
+
+// paints <html> with a theme (an unknown id is the default), or a whole Paint
+export function applyTheme(p: string | Paint = '') {
+  const o: Paint = typeof p === 'string' ? { theme: p } : p
+  const t = THEMES.find(x => x.id === o.theme) ?? THEMES[0]
+  const root = document.documentElement
+  const st = root.style
   for (const k of Array.from(st)) if (k.startsWith('--')) st.removeProperty(k)
   st.colorScheme = ''
+  root.dataset.look = t.look ?? ''
+  root.classList.toggle('glass', !!o.glass)
+  seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad
+  const font = o.uiFont?.trim()
+  if (font) st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
+  if (o.glass) {
+    // the window's blur shows through: backgrounds at part strength (the default theme's from the stylesheet)
+    const v = (k: keyof Colors, css: string) => t.c?.[k] ?? rootVar(css)
+    const solid = (k: keyof typeof GLASS) => 100 - Math.min(100, Math.max(0, o[k] ?? GLASS[k])) // the slider says how see-through
+    const w = solid('glassWindow')
+    const base = t.grad ? `linear-gradient(135deg, ${alpha(t.grad[0], w)}, ${alpha(t.grad[1], w)})` : `linear-gradient(${alpha(v('bg', '--bg'), w)} 0 0)`
+    // the glow: the theme's accent and violet, lit from two corners behind everything
+    const glow = (at: string, c: string) => `radial-gradient(70% 60% at ${at}, color-mix(in srgb, var(${c}) 26%, transparent), transparent 70%)`
+    st.setProperty('--app-bg', o.glassGlow === false ? base : `${glow('0% 0%', '--accent')}, ${glow('100% 100%', '--tc-purple')}, ${base}`)
+    st.setProperty('--term-bg', alpha(v('bg', '--bg'), solid('glassTerm')))
+    st.setProperty('--side', alpha(v('side', '--side'), solid('glassSide')))
+    st.setProperty('--tab-sel', alpha(v('fg', '--fg'), 10))
+  }
   if (!t.c || !t.ansi) return
   const { c, ansi: a } = t
-  // each color under both apps' names (Laki Electron's first, then Laki Go's)
   const vars: Record<string, string> = {
-    '--bg': c.bg, '--app-bg': t.grad ? gradient(t.grad) : c.bg, '--term-bg': t.grad ? '#00000000' : c.bg, '--tab-sel': t.grad ? c.fg + '1f' : c.bg, '--side': c.side, '--panel': c.panel, '--raised': c.raised, '--hover': c.raised,
-    '--line': c.line, '--fg': c.fg, '--muted': c.muted, '--dim': c.muted, '--accent': c.accent, '--accent-fg': c.accentFg, '--sel': c.sel,
-    '--running': c.running, '--run': c.running, '--waiting': c.waiting, '--warn': c.waiting, '--done': c.done, '--ok': c.done,
-    '--error': c.error, '--err': c.error, '--add': a[2], '--del': a[1], '--add-bg': a[2] + '1f', '--del-bg': a[1] + '1f', '--hunk': a[5],
+    '--bg': c.bg, '--app-bg': t.grad ? gradient(t.grad) : c.bg, '--term-bg': t.grad ? '#00000000' : c.bg, '--tab-sel': t.grad ? c.fg + '1f' : c.bg, '--side': c.side, '--panel': c.panel, '--hover': c.raised,
+    '--line': c.line, '--fg': c.fg, '--muted': c.muted, '--accent': c.accent, '--accent-fg': c.accentFg, '--sel': c.sel,
+    '--running': c.running, '--waiting': c.waiting, '--done': c.done, '--error': c.error, '--add': a[2], '--del': a[1], '--add-bg': a[2] + '1f', '--del-bg': a[1] + '1f', '--hunk': a[5],
     '--tc-red': a[1], '--tc-orange': c.orange, '--tc-yellow': a[3], '--tc-green': a[2], '--tc-teal': a[6], '--tc-blue': a[4], '--tc-purple': c.purple, '--tc-pink': c.pink,
   }
   a.forEach((x, i) => (vars[`--ansi-${i}`] = x))
+  if (o.glass) for (const k of ['--app-bg', '--term-bg', '--side', '--tab-sel']) delete vars[k] // glass's, set above
   for (const [k, v] of Object.entries(vars)) st.setProperty(k, v)
   st.colorScheme = t.light ? 'light' : 'dark'
 }

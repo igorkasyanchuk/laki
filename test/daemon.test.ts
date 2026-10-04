@@ -4,6 +4,7 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { API } from '../src/shared/types.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 
 test('rejects a wrong token and a foreign Origin', async t => {
@@ -28,10 +29,11 @@ test('single instance: a second daemon exits', async t => {
   const r = await rig.cli('daemon')
   assert.match(r.out, /already running/)
   assert.equal(JSON.parse(readFileSync(join(rig.data, 'daemon.json'), 'utf8')).pid, pid)
+  assert.equal((await rig.rpc('state')).api, API) // or the app offers to restart it
 })
 
 test('workspace lifecycle: worktree, setup gating, port, delete keeps the branch', async t => {
-  const rig = await fresh(t, { config: { setup: 'echo setting-up; sleep 1; echo setup-ok > .setup-ran', teardown: 'echo bye > "$LAKI_ELECTRON_TEARDOWN_MARK"' } })
+  const rig = await fresh(t, { config: { setup: 'echo setting-up; sleep 1; echo setup-ok > .setup-ran', teardown: 'echo bye > "$LAKI_TEARDOWN_MARK"' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'build the thing', name: 'feat one' })
   assert.equal(ws.id, 'feat-one')
@@ -262,20 +264,20 @@ test('agent skill: installed in HOME for claude and codex, its launcher drives t
   const states = (s: { state: string }[]) => s.map(x => x.state)
   assert.deepEqual(states(await rig.rpc('skills')), ['missing', 'missing'])
   assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: true })), ['installed', 'missing'])
-  const at = join(rig.home, '.claude/skills/laki-electron')
-  assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki-electron\ndescription: /)
+  const at = join(rig.home, '.claude/skills/laki')
+  assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki\ndescription: /)
   // the launcher finds this daemon from a bare environment, as an agent's shell would
-  const ls = JSON.parse(execFileSync(join(at, 'laki-electron'), ['ls', '--json'], { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' }))
+  const ls = JSON.parse(execFileSync(join(at, 'laki'), ['ls', '--json'], { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' }))
   assert.equal(ls.projects.length, 1)
   writeFileSync(join(at, 'SKILL.md'), 'edited')
   assert.deepEqual(states(await rig.rpc('skills')), ['outdated', 'missing'])
   assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'codex', on: true })), ['outdated', 'installed'])
-  assert.ok(existsSync(join(rig.home, '.codex/skills/laki-electron/SKILL.md')))
+  assert.ok(existsSync(join(rig.home, '.codex/skills/laki/SKILL.md')))
   writeFileSync(join(at, 'notes.md'), 'the user’s')
   assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: false })), ['missing', 'installed'])
   assert.ok(existsSync(join(at, 'notes.md')) && !existsSync(join(at, 'SKILL.md'))) // only its own files go
   await rig.rpc('skillSet', { agent: 'codex', on: false })
-  assert.ok(!existsSync(join(rig.home, '.codex/skills/laki-electron'))) // an emptied folder goes too
+  assert.ok(!existsSync(join(rig.home, '.codex/skills/laki'))) // an emptied folder goes too
   await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key
 })
@@ -358,6 +360,17 @@ test('a folder without git is a project (local workspaces only); project setting
   const saved = (await rig.rpc('state')).projects.find((x: any) => x.id === p.id)
   assert.equal(saved.name, 'Shop')
   assert.deepEqual(saved.config, { run: 'echo from-app' }) // blanks dropped
+  // Run ▾'s actions: kept for claude, codex or a shell, unfinished ones too (Settings has them as typed)
+  const actions = [
+    { name: ' review ', target: 'claude', text: 'review it twice' },
+    { name: 'migrate', target: 'shell', text: 'rails db:migrate' },
+    { name: '', target: 'shell', text: 'ls' },
+    { name: 'x', target: 'vim', text: 'ls' },
+    { name: 'y', target: 'codex', text: ' ' },
+  ]
+  const withActions = await rig.rpc('projectSet', { id: p.id, config: { run: 'echo from-app', actions } })
+  assert.deepEqual(withActions.config.actions, [actions[0], actions[1], actions[2], actions[4]])
+  // and the run script still comes from the config with them in it
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })
   const dev = await rig.rpc('run', { ws: ws.id })
   await until(async () => (await rig.screen(dev.id)).includes('from-app'), 'the app config wins over .laki.json')

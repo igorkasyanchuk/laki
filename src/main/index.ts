@@ -3,7 +3,8 @@
 import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, shell } from 'electron'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
-import { ensureDaemon } from '../shared/conn.ts'
+import { ensureDaemon, rpc } from '../shared/conn.ts'
+import type { View } from '../shared/types.ts'
 
 const dev = !!process.env.ELECTRON_RENDERER_URL
 let win: BrowserWindow | null = null
@@ -16,8 +17,8 @@ app.on('second-instance', () => show())
 const daemon = () =>
   ensureDaemon({
     ELECTRON_RUN_AS_NODE: '1',
-    LAKI_ELECTRON_FROM_APP: '1',
-    ...(dev ? { LAKI_ELECTRON_DEV_ORIGIN: new URL(process.env.ELECTRON_RENDERER_URL!).origin } : {}),
+    LAKI_FROM_APP: '1',
+    ...(dev ? { LAKI_DEV_ORIGIN: new URL(process.env.ELECTRON_RENDERER_URL!).origin } : {}),
   })
 
 function create() {
@@ -27,6 +28,7 @@ function create() {
     minWidth: 700,
     minHeight: 400,
     backgroundColor: '#0e1014',
+    visualEffectState: 'active', // glass keeps its blur when the window isn't focused
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 12 }, // centered in the 38px sidebar header
     show: false, // shown maximized once ready
@@ -56,8 +58,8 @@ function create() {
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
     pendingTab = null
-    // LAKI_ELECTRON_CAPTURE=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
-    const out = process.env.LAKI_ELECTRON_CAPTURE
+    // LAKI_CAPTURE=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
+    const out = process.env.LAKI_CAPTURE
     if (out) setTimeout(async () => win && writeFileSync(out, (await win.webContents.capturePage()).toPNG()), 3000)
   })
   if (dev) win.loadURL(process.env.ELECTRON_RENDERER_URL!)
@@ -77,11 +79,12 @@ function show(tab?: string) {
 }
 
 ipcMain.handle('conn', async () => {
+  if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
   const { port, token } = await daemon()
   return { port, token }
 })
 ipcMain.on('notify', (_e, title: string, body: string, tab: string) => {
-  if (process.env.LAKI_ELECTRON_NOTIFY_LOG) appendFileSync(process.env.LAKI_ELECTRON_NOTIFY_LOG, JSON.stringify({ title, body, tab }) + '\n') // smoke tests
+  if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab }) + '\n') // smoke tests
   const n = new Notification({ title, body, silent: false })
   n.on('click', () => show(tab))
   n.show()
@@ -93,14 +96,53 @@ ipcMain.handle('pick-folder', async () => {
 // macOS dictation, as Edit › Start Dictation does; its language and microphone are in System Settings
 ipcMain.on('dictate', () => Menu.sendActionToFirstResponder('startDictation:'))
 ipcMain.on('dictation-settings', () => shell.openExternal('x-apple.systempreferences:com.apple.Keyboard-Settings.extension'))
+// Glass (Settings › Appearance): macOS's blur behind the page, whose backgrounds go see-through
+ipcMain.on('glass', (_e, on: boolean) => {
+  win?.setVibrancy(on ? 'under-window' : null)
+  win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
+})
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url)
 })
 
+// Quit Completely: the daemon too, so every agent stops (they resume when the app opens again)
+async function quitCompletely() {
+  const v = await rpc<View>('state', {}, 3000).catch(() => null)
+  const n = v?.tabs.filter(t => t.status === 'running').length ?? 0
+  if (n) {
+    const r = await dialog.showMessageBox({
+      type: 'question',
+      message: `Quit ${app.name} completely?`,
+      detail: `${n === 1 ? 'An agent is' : `${n} agents are`} working: stopping the daemon cuts the turn off. Agents resume when ${app.name} opens again.`,
+      buttons: ['Quit Completely', 'Cancel'],
+      defaultId: 0,
+      cancelId: 1,
+    })
+    if (r.response !== 0) return
+  }
+  quitting = true
+  await rpc('shutdown', {}, 3000).catch(() => {})
+  app.quit()
+}
+
 // no ⌘W/⌘N/⌘T/⌘K accelerators: the renderer owns those keys
 Menu.setApplicationMenu(
   Menu.buildFromTemplate([
-    { role: 'appMenu' },
+    {
+      label: app.name,
+      submenu: [
+        { role: 'about' },
+        { type: 'separator' },
+        { role: 'services' },
+        { type: 'separator' },
+        { role: 'hide' },
+        { role: 'hideOthers' },
+        { role: 'unhide' },
+        { type: 'separator' },
+        { role: 'quit' },
+        { label: `Quit ${app.name} Completely`, click: quitCompletely },
+      ],
+    },
     { role: 'editMenu' },
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'togglefullscreen' }] },
     { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }] },
@@ -108,7 +150,7 @@ Menu.setApplicationMenu(
 )
 
 app.whenReady().then(async () => {
-  await daemon().catch(e => dialog.showErrorBox('Laki Electron', `The daemon didn't start: ${e.message}`))
+  await daemon().catch(e => dialog.showErrorBox('Laki', `The daemon didn't start: ${e.message}`))
   create()
 })
 app.on('before-quit', () => (quitting = true))

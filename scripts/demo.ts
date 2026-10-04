@@ -1,24 +1,25 @@
-// A throwaway demo world for trying the UI: temp LAKI_ELECTRON_HOME and HOME, a temp git repo, fake claude/codex/gh
+// A throwaway demo world for trying the UI: temp LAKI_HOME and HOME, a temp git repo, fake claude/codex/gh
 // (test/fakes) first on PATH, and a daemon serving the dev renderer origin. Prints the URL to open.
-//   node --experimental-strip-types scripts/demo.ts [dir]      stop: LAKI_ELECTRON_HOME=<dir>/data laki-electron stop
+//   node --experimental-strip-types scripts/demo.ts [dir]      stop: LAKI_HOME=<dir>/data laki stop
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
-const home = process.argv[2] ?? mkdtempSync('/tmp/laki-electron-demo-')
+const home = process.argv[2] ?? mkdtempSync('/tmp/laki-demo-')
 mkdirSync(home, { recursive: true })
 const repo = join(home, 'shop')
 Object.assign(process.env, {
   HOME: home,
-  LAKI_ELECTRON_HOME: join(home, 'data'),
-  PATH: `${join(root, 'test/fakes')}:${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`,
+  LAKI_HOME: join(home, 'data'),
+  // <dir>/bin: link test/cloudflared there to try Expose to the world
+  PATH: `${join(home, 'bin')}:${join(root, 'test/fakes')}:${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`,
   SHELL: join(root, 'test/fakes/tsh'),
   FAKE_LOG: join(home, 'fake.log'),
   FAKE_TURN_MS: '4000',
   FAKE_GH: join(home, 'gh'),
-  LAKI_ELECTRON_DEV_ORIGIN: 'http://127.0.0.1:5199,http://localhost:5199',
+  LAKI_DEV_ORIGIN: 'http://127.0.0.1:5199,http://localhost:5199',
   GIT_AUTHOR_NAME: 'demo',
   GIT_AUTHOR_EMAIL: 'demo@example.invalid',
   GIT_COMMITTER_NAME: 'demo',

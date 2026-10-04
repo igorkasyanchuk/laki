@@ -42,6 +42,10 @@ const paths = {
   chevron: 'M4.5 6.5L8 10l3.5-3.5',
   chevronRight: 'M6.5 4.5L10 8l-3.5 3.5',
   stop: 'M4.5 4.5h7v7h-7z',
+  globe: 'M8 14a6 6 0 100-12 6 6 0 000 12zM2 8h12M8 2c1.6 1.7 2.4 3.7 2.4 6S9.6 12.3 8 14M8 2C6.4 3.7 5.6 5.7 5.6 8s.8 4.3 2.4 6',
+  copy: 'M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3',
+  bell: 'M4 11V7a4 4 0 018 0v4l1.5 1.5h-11zM6.5 13.5a1.5 1.5 0 003 0',
+  help: 'M8 14a6 6 0 100-12 6 6 0 000 12zM6.2 6.3a1.9 1.9 0 113 1.5c-.7.5-1.2.9-1.2 1.7M8 11.2v.01',
   pr: 'M5.8 3a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM5.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM12.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM4.5 4.3v7.4M11.5 11.7V7.5a2 2 0 00-2-2H7M8.5 4L7 5.5 8.5 7',
 }
 export type IconName = keyof typeof paths
@@ -58,6 +62,58 @@ export function IconButton({ icon, title, onClick, on, className = '' }: { icon:
   return (
     <button className={`ib ${on ? 'on' : ''} ${className}`} data-tip={title} aria-label={title} onClick={onClick}>
       <Icon name={icon} />
+    </button>
+  )
+}
+
+// an on/off switch: the status bar's auto toggles, Settings' options (a row: className="switch-row")
+export function Switch({ on, onChange, tip, className = '', children }: { on?: boolean; onChange: (v: boolean) => void; tip?: string; className?: string; children?: ReactNode }) {
+  return (
+    <button type="button" role="switch" aria-checked={!!on} className={`toggle ${on ? 'on' : ''} ${className}`} data-tip={tip} onClick={() => onChange(!on)}>
+      <span className="toggle-track">
+        <span className="toggle-knob" />
+      </span>
+      {children}
+    </button>
+  )
+}
+
+// a page over the main area, as Settings is (the new-workspace form): its title, ✕ and Esc close it
+export function Page({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    window.addEventListener('keydown', f)
+    return () => window.removeEventListener('keydown', f)
+  }, [onClose])
+  return (
+    <div className="settings-page" role="dialog" aria-label={title}>
+      <div className="settings-head">
+        <b>{title}</b>
+        <span className="grow" />
+        <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
+      </div>
+      <div className="page-body">{children}</div>
+    </div>
+  )
+}
+
+// The daemon outlives the app, so after an update it can be an older one that lacks what this app asks of
+// it. The status bar says so; restarting it (a second click to confirm) ends the agents, which resume.
+export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
+  const [step, setStep] = useState<'' | 'sure' | 'busy'>('')
+  useEffect(() => {
+    if (!step) return
+    const t = setTimeout(() => setStep(''), step === 'sure' ? 5000 : 15000) // busy: unless the new daemon answers first (this goes)
+    return () => clearTimeout(t)
+  }, [step])
+  return (
+    <button
+      className="stale"
+      disabled={step === 'busy'}
+      data-tip="Laki's daemon is older than this app: newer things (like expose to the world) fail until it restarts. Restarting stops every agent and resumes it; a turn in progress is cut off."
+      onClick={() => (step === 'sure' ? (setStep('busy'), restart().catch(() => setStep(''))) : setStep('sure'))}
+    >
+      {step === 'busy' ? 'restarting the daemon…' : step === 'sure' ? 'click again to restart it: agents resume' : 'daemon older than the app · restart'}
     </button>
   )
 }

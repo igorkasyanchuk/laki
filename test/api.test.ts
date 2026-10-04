@@ -1,7 +1,7 @@
 // The daemon's API beyond the happy paths: errors, projects, tabs, workspaces, files, open in, ship, start.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { connect, fresh, until } from './helpers.ts'
@@ -260,7 +260,7 @@ test('daemon start: a stale lock is taken over; from the app, the login shell\'s
   // a login shell whose profile adds /login/bin (only the PATH probe sees it: tabs show what the daemon took)
   const sh = join(rig.home, 'login-sh')
   writeFileSync(sh, `#!/bin/sh\ncase "$2" in *__LAKI__*) PATH="$PATH:/login/bin" ;; esac\nexec '${rig.env.SHELL}' "$@"\n`, { mode: 0o755 })
-  Object.assign(rig.env, { SHELL: sh, LAKI_ELECTRON_FROM_APP: '1', LAKI_ELECTRON_DEV_ORIGIN: 'http://127.0.0.1:5199' })
+  Object.assign(rig.env, { SHELL: sh, LAKI_FROM_APP: '1', LAKI_DEV_ORIGIN: 'http://127.0.0.1:5199' })
   await rig.start()
   assert.equal(readFileSync(join(rig.data, 'daemon.lock'), 'utf8'), String(rig.info().pid))
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -272,4 +272,152 @@ test('daemon start: a stale lock is taken over; from the app, the login shell\'s
   assert.equal(await c.call('ping'), 'pong')
   c.close()
   await assert.rejects(connect(rig, 'http://localhost:5199'))
+})
+
+test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, cloudflared failing, stop while starting, gone with the workspace and the daemon', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'tun' })
+  const log = () => readFileSync(rig.env.FAKE_LOG, 'utf8')
+  assert.deepEqual(await rig.rpc('cloudflared'), { mails: [] }) // no version: not installed; no git user.email
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 5173 }), /cloudflared isn't installed: brew install cloudflared/)
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  assert.equal((await rig.rpc('cloudflared')).version, '2026.9.3')
+  // the project's default for the popup: its .laki.json, its own setting over that (trimmed; blank: the file's)
+  const expose = async () => (await rig.rpc('cloudflared', { ws: ws.id })).expose
+  assert.equal(await expose(), undefined)
+  writeFileSync(join(ws.path, '.laki.json'), JSON.stringify({ expose: '*@file.dev' }))
+  assert.equal(await expose(), '*@file.dev')
+  await rig.rpc('projectSet', { id: p.id, config: { expose: ' me@x.dev, *@team.dev ' } })
+  assert.equal(await expose(), 'me@x.dev, *@team.dev')
+  await rig.rpc('projectSet', { id: p.id, config: { expose: ' ' } })
+  assert.equal(await expose(), '*@file.dev')
+  rmSync(join(ws.path, '.laki.json'))
+  assert.equal(await expose(), undefined)
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: ['nope'] }), /not an email address or \*@domain: nope/)
+  for (const m of ['me*@x.dev', '*@*.x.dev', 'a@b.dev,c@d.dev', '*@localhost'])
+    await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: [m] }), /not an email address or \*@domain/)
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 70000 }), /not a port: 70000/)
+  await assert.rejects(rig.rpc('tunnelStart', { ws: 'nope', port: 5173 }), /no workspace nope/)
+
+  // protected: the login page's URL isn't the tunnel's; the list is remembered
+  const tn = await rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: [' me@x.dev', '*@team.dev', 'me@x.dev', ''] })
+  assert.deepEqual(tn, { port: 5173, url: 'https://fake-5173.trycloudflare.com', mails: ['me@x.dev', '*@team.dev'] })
+  assert.match(log(), /cloudflared tunnel --url http:\/\/localhost:5173 --allowed-mail=me@x\.dev --allowed-mail=\*@team\.dev\n/)
+  assert.deepEqual((await rig.rpc('cloudflared')).mails, ['me@x.dev', '*@team.dev'])
+  assert.deepEqual(await rig.rpc('tunnelStart', { ws: ws.id, port: 5173 }), tn) // running already: that one
+  const pub = await rig.rpc('tunnelStart', { ws: ws.id, port: 3000 })
+  assert.deepEqual(pub, { port: 3000, url: 'https://fake-3000.trycloudflare.com', mails: [] })
+  assert.deepEqual((await rig.rpc('state')).workspaces[0].tunnels, [tn, pub])
+
+  writeFileSync(join(rig.home, 'cf-version'), '2025.1.0')
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 4000, mails: ['me@x.dev'] }), /cloudflared 2025\.1\.0 can't limit who opens a tunnel \(that needs 2026\.9\.3\): brew upgrade cloudflared/)
+  rmSync(join(rig.home, 'cf-version'))
+  writeFileSync(join(rig.home, 'cf-fail'), 'failed to request quick Tunnel: 429 Too Many Requests')
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 4000 }), /cloudflared ended \(exit 1\):\n.*Requesting new quick Tunnel[^]*429 Too Many Requests/)
+  rmSync(join(rig.home, 'cf-fail'))
+  writeFileSync(join(rig.home, 'cf-silent'), '')
+  const starting = rig.rpc('tunnelStart', { ws: ws.id, port: 4000 })
+  await until(async () => (await rig.rpc('state')).workspaces[0].tunnels.some((x: any) => x.port === 4000 && !x.url), 'a starting tunnel')
+  await rig.rpc('tunnelStop', { ws: ws.id, port: 4000 })
+  assert.deepEqual(await starting, { port: 4000, mails: [] }) // stopped: no URL, no error
+  rmSync(join(rig.home, 'cf-silent'))
+
+  await rig.rpc('tunnelStop', { ws: ws.id, port: 3000 })
+  await until(() => log().includes('cloudflared 3000 stopped'), 'the public tunnel stopped')
+  await rig.rpc('wsRm', { id: ws.id })
+  await until(() => log().includes('cloudflared 5173 stopped'), 'the workspace takes its tunnel')
+  const other = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'tun2' })
+  await rig.rpc('tunnelStart', { ws: other.id, port: 8080 })
+  await rig.stop()
+  await until(() => log().includes('cloudflared 8080 stopped'), 'the daemon takes its tunnels')
+})
+
+test('remote access: the page, one email for some hours, a token of its own; gone when stopped, past its time or with the daemon', async t => {
+  const rig = await fresh(t)
+  const { port } = rig.info()
+  const at = `http://127.0.0.1:${port}`
+  const log = () => (existsSync(rig.env.FAKE_LOG) ? readFileSync(rig.env.FAKE_LOG, 'utf8') : '')
+  const stops = () => log().split(`cloudflared ${port} stopped`).length - 1
+
+  // the page: its files to any origin (no secrets in them), nothing outside its folder
+  assert.equal((await fetch(`${at}/`)).status, 404)
+  const page = rig.env.LAKI_PAGE
+  mkdirSync(join(page, 'assets'), { recursive: true })
+  writeFileSync(join(page, 'index.html'), '<title>Laki</title>')
+  writeFileSync(join(page, 'assets/app.js'), 'x')
+  writeFileSync(join(rig.home, 'secret'), 'no')
+  const r = await fetch(`${at}/`, { headers: { origin: 'https://evil.example' } })
+  assert.deepEqual([r.status, r.headers.get('content-type'), await r.text()], [200, 'text/html; charset=utf-8', '<title>Laki</title>'])
+  assert.equal((await fetch(`${at}/assets/app.js`)).headers.get('content-type'), 'text/javascript')
+  for (const path of ['/..%2fsecret', '/assets/..%2f..%2fsecret', '/%E0%A4%A'])
+    assert.equal((await fetch(at + path)).status, 404, path)
+
+  // refusals; the email is kept (the global setting) once it is one
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1 }), /the email that may open it: Settings › Remote access/)
+  await assert.rejects(rig.rpc('remoteStart', { hours: 3, mail: 'me@x.dev' }), /for how long: 1, 2, 4, 8, 24 hours/)
+  for (const m of ['*@x.dev', 'a@b.dev,c@d.dev', 'nope'])
+    await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: m }), /not an email address/)
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: ' me@x.dev ' }), /cloudflared isn't installed: brew install cloudflared/)
+  assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  writeFileSync(join(rig.home, 'cf-version'), '2025.1.0')
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1 }), /can't limit who opens a tunnel/)
+  rmSync(join(rig.home, 'cf-version'))
+
+  // on: cloudflared in front of the daemon itself, for that email only
+  const t0 = Date.now()
+  const on = await rig.rpc('remoteStart', { hours: 2 })
+  const url = `https://fake-${port}.trycloudflare.com`
+  assert.deepEqual([on.mail, on.url], ['me@x.dev', url])
+  assert.match(on.link, new RegExp(`^${url}/#token=[0-9a-f]{64}$`))
+  assert.ok(Math.abs(on.until - (t0 + 2 * 3600e3)) < 5000)
+  assert.match(log(), new RegExp(`cloudflared tunnel --url http://127\\.0\\.0\\.1:${port} --allowed-mail=me@x\\.dev\n`))
+  assert.deepEqual((await rig.rpc('state')).remote, on)
+  assert.deepEqual(await rig.rpc('remoteStart', { hours: 8 }), on) // running already: that one
+
+  // its token, from its page's origin; no other origin
+  const key = on.link.split('#token=')[1]
+  const ping = (token: string, origin?: string) =>
+    fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
+  assert.equal(await ping(key, url), 200)
+  assert.equal(await ping(key, 'https://evil.example'), 403)
+  const c = await connect(rig, url, key)
+  assert.equal(await c.call('ping'), 'pong')
+  c.close()
+  await assert.rejects(connect(rig, 'https://evil.example', key))
+
+  // stopped: the token and the origin go with it
+  await rig.rpc('remoteStop')
+  await until(() => stops() === 1, 'cloudflared stopped')
+  assert.equal((await rig.rpc('state')).remote, undefined)
+  assert.equal(await ping(key), 401)
+  assert.equal(await ping(rig.info().token, url), 403)
+
+  // past its time; a new start has a new token
+  const again = await rig.rpc('remoteStart', { hours: 1 })
+  assert.notEqual(again.link, on.link)
+  await rig.rpc('remoteTick', { now: again.until - 1000 })
+  assert.ok((await rig.rpc('state')).remote)
+  await rig.rpc('remoteTick', { now: again.until })
+  assert.equal((await rig.rpc('state')).remote, undefined)
+  await until(() => stops() === 2, 'cloudflared stopped at its time')
+
+  // cloudflared failing; stopped while starting
+  writeFileSync(join(rig.home, 'cf-fail'), '429 Too Many Requests')
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1 }), /cloudflared ended \(exit 1\)[^]*429 Too Many Requests/)
+  assert.equal((await rig.rpc('state')).remote, undefined)
+  rmSync(join(rig.home, 'cf-fail'))
+  writeFileSync(join(rig.home, 'cf-silent'), '')
+  const starting = rig.rpc('remoteStart', { hours: 1 })
+  await until(async () => (r => r && !r.url && !r.link)((await rig.rpc('state')).remote), 'starting')
+  await rig.rpc('remoteStop')
+  assert.equal(await starting, null)
+  rmSync(join(rig.home, 'cf-silent'))
+
+  // the daemon takes it
+  await rig.rpc('remoteStart', { hours: 24 })
+  const n = stops()
+  await rig.stop()
+  await until(() => stops() === n + 1, 'the daemon takes remote access')
 })

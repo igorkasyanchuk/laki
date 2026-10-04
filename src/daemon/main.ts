@@ -3,12 +3,14 @@
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
 import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
-import { createServer, type IncomingMessage } from 'node:http'
-import { join } from 'node:path'
+import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import { dirname, extname, join, normalize, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
 import * as core from './core.ts'
 import { skills, skillSet } from './skill.ts'
+import { usage } from './usage.ts'
 
 const { dir } = core
 mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -18,7 +20,7 @@ chmodSync(dir, 0o700) // state, queued messages and agents' answers live here
 // pid, so no one ever reads it empty and takes a starting daemon's lock for a stale one.
 // ponytail: two starters that both find the same stale lock can still both remove it; flock if that matters.
 const lockPath = join(dir, 'daemon.lock')
-// a live process running the daemon (node …/daemon/main.ts, Electron-as-node …/daemon.js, or `laki-electron daemon`)
+// a live process running the daemon (node …/daemon/main.ts, Electron-as-node …/daemon.js, or `laki daemon`)
 function isDaemon(pid: number) {
   try {
     return /daemon(\.js|\/main\.ts)|\sdaemon\s*$/m.test(execFileSync('ps', ['-p', String(pid), '-o', 'command='], { encoding: 'utf8' }))
@@ -49,22 +51,45 @@ function takeLock(): boolean {
   }
 }
 if (!takeLock()) {
-  console.log('laki-electron daemon already running')
+  console.log('laki daemon already running')
   process.exit(0)
 }
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
-if (process.env.LAKI_ELECTRON_FROM_APP) core.adoptLoginPath()
+if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 core.load()
 core.writeClaudeSettings()
 core.restoreAll()
 
 const token = randomBytes(32).toString('hex')
 // Browsers always send Origin on a WebSocket; node clients (CLI, hooks, Electron main) send none.
-const origins = new Set(['file://', ...(process.env.LAKI_ELECTRON_DEV_ORIGIN ? process.env.LAKI_ELECTRON_DEV_ORIGIN.split(',') : [])])
-const originOk = (o: string | undefined) => o === undefined || origins.has(o)
-const tokenOk = (t: string | null | undefined) => !!t && t.length === token.length && timingSafeEqual(Buffer.from(t), Buffer.from(token))
+const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN ? process.env.LAKI_DEV_ORIGIN.split(',') : [])])
+// remote access (core.ts) adds its page's origin and its own token while it runs
+const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === core.remoteOrigin())
+const same = (t: string, want: string | undefined) => !!want && t.length === want.length && timingSafeEqual(Buffer.from(t), Buffer.from(want))
+const tokenOk = (t: string | null | undefined) => !!t && (same(t, token) || same(t, core.remoteToken()))
+
+// the app's page, for remote access: the built renderer (out/renderer, next to the built daemon; from source, after a
+// build; LAKI_PAGE: that folder instead, as tests do). Its files hold no secrets: the token comes in the
+// link's #, which never reaches a server.
+const here = dirname(fileURLToPath(import.meta.url))
+const pageDir = process.env.LAKI_PAGE || [join(here, '../renderer'), join(here, '../../out/renderer')].find(d => existsSync(join(d, 'index.html')))
+const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' }
+function page(path: string, res: ServerResponse) {
+  let file = ''
+  let body: Buffer | undefined
+  try {
+    file = pageDir ? normalize(join(pageDir, path === '/' ? 'index.html' : decodeURIComponent(path))) : ''
+    if (file.startsWith(pageDir + sep)) body = readFileSync(file) // nothing outside it
+  } catch {}
+  if (!body) {
+    res.writeHead(404, { 'content-type': 'text/plain' })
+    return res.end(pageDir ? 'not found' : 'no app page here: build it (npm run build)')
+  }
+  res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' })
+  res.end(body)
+}
 
 // ---------- the API: same methods over HTTP and WebSocket
 
@@ -103,6 +128,10 @@ const api: Record<string, Handler> = {
   skillSet: p => skillSet(p),
   prThreads: p => core.prThreads(p.ws),
   run: p => core.runDev(p.ws),
+  cloudflared: (o: { ws?: string }) => core.cloudflared(o),
+  usage: () => usage(core.state.settings?.usage),
+  tunnelStart: p => core.tunnelStart(p),
+  tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message),
   screen: p => core.screen(p.target, p.lines),
   input: p => core.input(p.tab, p.data),
@@ -110,6 +139,9 @@ const api: Record<string, Handler> = {
   view: (p, c) => c && core.setView(c, p),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
+  remoteStart: p => core.remoteStart(p),
+  remoteStop: () => core.remoteStop(),
+  remoteTick: p => core.remoteTick(p.now), // tests move the clock
   shutdown: () => void setTimeout(shutdown, 50),
 }
 
@@ -125,6 +157,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(code, { 'content-type': 'application/json' })
     res.end(text)
   }
+  if (req.method === 'GET') return page(new URL(req.url ?? '/', 'http://x').pathname, res) // no secrets: any origin
   if (!originOk(req.headers.origin)) return reply(403, { error: 'origin not allowed' })
   if (req.method !== 'POST' || req.url !== '/rpc') return reply(404, { error: 'not found' })
   if (!tokenOk(req.headers.authorization?.replace(/^Bearer /, ''))) return reply(401, { error: 'bad token' })
@@ -193,24 +226,28 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 })
 
 const timers: NodeJS.Timeout[] = []
-server.listen(Number(process.env.LAKI_ELECTRON_PORT || 0), '127.0.0.1', () => {
+server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
   const port = typeof addr === 'object' && addr ? addr.port : 0
   const info = join(dir, 'daemon.json')
   writeFileSync(info, JSON.stringify({ port, token, pid: process.pid }), { mode: 0o600 })
   chmodSync(info, 0o600)
-  log(`laki-electron daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
+  log(`laki daemon on 127.0.0.1:${port} (pid ${process.pid}, data ${dir})`)
+  core.setDaemonPort(port)
   const every = (ms: number, f: () => unknown) => timers.push(setInterval(() => Promise.resolve(f()).catch(e => log(e)), ms))
-  every(Number(process.env.LAKI_ELECTRON_PORT_SCAN_MS || 5000), core.scanPorts)
-  every(Number(process.env.LAKI_ELECTRON_PR_SCAN_MS || 60000), core.scanPRs)
+  every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), core.scanPorts)
+  every(Number(process.env.LAKI_PR_SCAN_MS || 60000), core.scanPRs)
   every(2000, core.sweepRunning)
   every(30000, () => core.watchLimits())
+  every(15000, () => core.remoteTick())
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)
 })
 
 function shutdown() {
   log('shutting down')
   timers.forEach(clearInterval)
+  core.stopTunnels()
+  core.remoteStop()
   for (const s of core.sessions.values()) s.kill()
   core.sessions.clear() // their exits aren't ones to act on (onExit)
   rmSync(join(dir, 'daemon.json'), { force: true })

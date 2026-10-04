@@ -1,13 +1,33 @@
 // A prompt for an agent: text, screenshots pasted or dropped in (the daemon saves them; their paths go
-// after the text, and the agent opens them), and macOS dictation. The same file is in both apps
-// (laki-electron, laki-go); each passes in how its daemon saves an image and how dictation starts.
+// after the text, and the agent opens them), and macOS dictation. App.tsx passes
+// in how the daemon saves an image and how dictation starts.
 import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import type { Template } from './text'
 import { Icon } from './ui'
 
 export type Img = { path: string; url: string } // saved file, and a data: URL for its thumbnail
 
 // the prompt the agent gets
 export const withImages = (text: string, imgs: Img[]) => [text.trim(), imgs.map(i => i.path).join('\n')].filter(Boolean).join('\n\n')
+
+// the template picker under a new workspace's prompt, and what the agent will get; value: the template's
+// index ('' none), so names may repeat or be blank
+export function TemplatePick(p: { templates: Template[]; value: string; onChange: (i: string) => void; preview: string }) {
+  if (!p.templates.length) return null
+  return (
+    <>
+      <select className="template-pick" value={p.value} onChange={e => p.onChange(e.target.value)} aria-label="Prompt template">
+        <option value="">No template: the prompt as typed</option>
+        {p.templates.map((t, i) => (
+          <option key={i} value={String(i)}>
+            Template: {t.name || '(no name)'}
+          </option>
+        ))}
+      </select>
+      {p.value && <div className="template-preview muted small">{p.preview || ' '}</div>}
+    </>
+  )
+}
 
 // what agents read (claude, codex): other images (HEIC, SVG, …) are refused
 const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }

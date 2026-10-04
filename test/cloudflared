@@ -1,0 +1,18 @@
+#!/bin/sh
+# fake cloudflared, not on PATH until a test links it into $HOME/bin. --version says $HOME/cf-version's
+# (default 2026.9.3). tunnel logs its args, prints a quick tunnel's banner for its port and runs until
+# stopped; $HOME/cf-fail: that error and exit 1; $HOME/cf-silent: no URL.
+v=$(cat "$HOME/cf-version" 2>/dev/null || echo 2026.9.3)
+[ "$1" = --version ] && { echo "cloudflared version $v (built 2026-09-30-1200 UTC)"; exit 0; }
+echo "cloudflared $*" >> "${FAKE_LOG:-/dev/null}"
+port=$(printf '%s\n' "$*" | sed -nE 's/.*(localhost|127\.0\.0\.1):([0-9]+).*/\2/p')
+echo "2026-10-03T10:00:00Z INF Requesting new quick Tunnel on trycloudflare.com..." >&2
+[ -f "$HOME/cf-fail" ] && { echo "2026-10-03T10:00:01Z ERR failed to request quick Tunnel: Post \"https://api.trycloudflare.com/tunnel\": $(cat "$HOME/cf-fail")" >&2; exit 1; }
+case "$*" in *--allowed-mail*) echo "2026-10-03T10:00:01Z INF Visitors sign in at https://login.trycloudflare.com (email rules: on)" >&2 ;; esac
+[ -f "$HOME/cf-silent" ] || {
+  echo "2026-10-03T10:00:01Z INF |  Your quick Tunnel has been created! Visit it at (it may take some time to be reachable):  |" >&2
+  echo "2026-10-03T10:00:01Z INF |  https://fake-$port.trycloudflare.com  |" >&2
+}
+trap 'echo "cloudflared $port stopped" >> "${FAKE_LOG:-/dev/null}"; kill $! 2>/dev/null; exit 0' TERM INT
+sleep 600 &
+wait $!

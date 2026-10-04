@@ -44,7 +44,7 @@ export function Term({
       ...look,
       scrollback: 5000,
       allowProposedApi: true,
-      allowTransparency: transparent(theme),
+      allowTransparency: transparent(),
       macOptionIsMeta: true,
       theme: termTheme(),
     })
@@ -143,7 +143,7 @@ export function Term({
   }, [lookKey, xt])
   useEffect(() => {
     if (!xt) return
-    xt.term.options.allowTransparency = transparent(theme)
+    xt.term.options.allowTransparency = transparent()
     xt.term.options.theme = termTheme()
   }, [theme, xt])
   return (

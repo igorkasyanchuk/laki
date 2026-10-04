@@ -10,4 +10,5 @@ contextBridge.exposeInMainWorld('laki', {
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
+  glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
 })

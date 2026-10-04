@@ -1,7 +1,7 @@
-// Test rig: a temp LAKI_ELECTRON_HOME (and HOME), fake claude/codex/gh/open first on PATH, a test $SHELL without
+// Test rig: a temp LAKI_HOME (and HOME), fake claude/codex/gh/open first on PATH, a test $SHELL without
 // profiles, a temp git repo, and a daemon started from source. Nothing touches real data or the network.
 import { type ChildProcess, execFileSync, spawn } from 'node:child_process'
-import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import type { TestContext } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -40,26 +40,30 @@ export async function until<T>(f: () => T | Promise<T>, what = 'condition', ms =
 
 export type Rig = Awaited<ReturnType<typeof fresh>>
 
-export async function fresh(t: TestContext, o: { setup?: string; config?: object } = {}) {
-  const home = mkdtempSync('/tmp/laki-electron-')
+export async function fresh(t: TestContext, o: { setup?: string; config?: object; env?: Record<string, string> } = {}) {
+  const home = mkdtempSync('/tmp/laki-')
   const repo = join(home, 'repo')
   const env: Record<string, string> = {
     ...(process.env as Record<string, string>),
     HOME: home,
-    LAKI_ELECTRON_HOME: join(home, 'data'),
-    PATH: `${fakes}:${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`, // node for the fakes
+    LAKI_HOME: join(home, 'data'),
+    // $HOME/bin: fakes a test installs (cloudflared); node for the fakes
+    PATH: `${join(home, 'bin')}:${fakes}:${dirname(process.execPath)}:/usr/bin:/bin:/usr/sbin:/sbin`,
     SHELL: join(fakes, 'tsh'),
     FAKE_LOG: join(home, 'fake.log'),
     FAKE_GH: join(home, 'gh'), // the fake gh's answers, when there (fakes/gh)
-    LAKI_ELECTRON_PORT_SCAN_MS: '300',
-    LAKI_ELECTRON_PR_SCAN_MS: '500',
+    LAKI_PAGE: join(home, 'page'), // the page remote access serves: a test's own, never the build
+    LAKI_PORT_SCAN_MS: '300',
+    LAKI_PR_SCAN_MS: '500',
     GIT_CONFIG_NOSYSTEM: '1',
     GIT_AUTHOR_NAME: 't',
     GIT_AUTHOR_EMAIL: 't@t',
     GIT_COMMITTER_NAME: 't',
     GIT_COMMITTER_EMAIL: 't@t',
   }
-  for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX') delete env[k]
+  for (const k of Object.keys(env)) if (k.startsWith('CLAUDE') || k.startsWith('ELECTRON_') || k === 'TMUX' || k === 'CODEX_HOME') delete env[k]
+  Object.assign(env, o.env)
+  mkdirSync(join(home, 'bin'))
   execFileSync('git', ['init', '-q', '-b', 'main', repo], { env })
   writeFileSync(join(repo, 'README.md'), 'hello\n')
   if (o.config) writeFileSync(join(repo, '.laki.json'), JSON.stringify(o.config))
@@ -71,7 +75,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     home,
     repo,
     env,
-    data: env.LAKI_ELECTRON_HOME,
+    data: env.LAKI_HOME,
     async start() {
       daemon = spawn(node[0], [...node.slice(1), join(root, 'src/daemon/main.ts')], { env, stdio: ['ignore', 'pipe', 'pipe'] })
       let log = ''
@@ -87,7 +91,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
       d.kill('SIGTERM')
       await gone
     },
-    info: () => JSON.parse(readFileSync(join(env.LAKI_ELECTRON_HOME, 'daemon.json'), 'utf8')) as { port: number; token: string; pid: number },
+    info: () => JSON.parse(readFileSync(join(env.LAKI_HOME, 'daemon.json'), 'utf8')) as { port: number; token: string; pid: number },
     async rpc(method: string, params: object = {}): Promise<any> {
       const { port, token } = rig.info()
       const res = await fetch(`http://127.0.0.1:${port}/rpc`, {
@@ -125,7 +129,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
   t.after(async () => {
     await rig.stop()
     // a daemon the CLI started in this home (autostart): shut down through its own daemon.json
-    if (existsSync(join(env.LAKI_ELECTRON_HOME, 'daemon.json'))) {
+    if (existsSync(join(env.LAKI_HOME, 'daemon.json'))) {
       const { pid } = rig.info()
       if (await rig.rpc('shutdown').then(() => true, () => false)) await until(() => !running(pid), 'autostarted daemon gone').catch(() => {})
     }

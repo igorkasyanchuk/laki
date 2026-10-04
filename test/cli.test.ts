@@ -1,9 +1,24 @@
-// The laki-electron CLI against a daemon in a temp home.
+// The laki CLI against a daemon in a temp home.
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { dataDir } from '../src/shared/conn.ts'
 import { fresh, running, until } from './helpers.ts'
+
+test('data folder: ~/.laki, or the ~/.laki-electron a Mac already has; LAKI_HOME over both', t => {
+  const was = process.env.LAKI_HOME
+  t.after(() => (was === undefined ? delete process.env.LAKI_HOME : (process.env.LAKI_HOME = was)))
+  delete process.env.LAKI_HOME
+  const home = mkdtempSync('/tmp/laki-home-')
+  assert.equal(dataDir(home), join(home, '.laki'))
+  mkdirSync(join(home, '.laki-electron'))
+  assert.equal(dataDir(home), join(home, '.laki-electron'))
+  mkdirSync(join(home, '.laki'))
+  assert.equal(dataDir(home), join(home, '.laki'))
+  process.env.LAKI_HOME = '/x'
+  assert.equal(dataDir(home), '/x')
+})
 
 test('cli: project add, new, ls, send, screen, rm (--json)', async t => {
   const rig = await fresh(t)
@@ -49,21 +64,21 @@ test('cli: help, usage errors, open', async t => {
   for (const a of [[], ['help']]) {
     const r = await rig.cli(...a)
     assert.equal(r.code, 0)
-    assert.match(r.out, /^laki-electron: coding agents/)
+    assert.match(r.out, /^laki: coding agents/)
   }
   let r = await rig.cli('frob')
   assert.equal(r.code, 1)
   assert.match(r.err, /unknown command frob/)
   r = await rig.cli('new')
-  assert.match(r.err, /usage: laki-electron new <project>/)
+  assert.match(r.err, /usage: laki new <project>/)
   // open: this checkout's build when there is one, else the app by its bundle id (the fake open only records it)
   r = await rig.cli('open')
   assert.equal(r.code, 0, r.err)
-  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^open (-b dev\.laki\.electron|\S.*\/Laki Electron\.app)$/m)
-  rig.env.FAKE_OPEN_MISSING = 'Laki Electron'
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /^open (-b dev\.laki\.app|\S.*\/Laki\.app)$/m)
+  rig.env.FAKE_OPEN_MISSING = 'Laki'
   r = await rig.cli('open')
   assert.equal(r.code, 1)
-  assert.match(r.err, /Laki Electron\.app not found: build it with `npm run pack`/)
+  assert.match(r.err, /Laki\.app not found: build it with `npm run pack`/)
 })
 
 // a dev server on two ports
@@ -124,13 +139,13 @@ test('cli: every command, as text', async t => {
 test('cli: starts the daemon when none runs; stop ends it', async t => {
   const rig = await fresh(t)
   await rig.stop()
-  delete rig.env.LAKI_ELECTRON_PORT_SCAN_MS // its own scan intervals
-  delete rig.env.LAKI_ELECTRON_PR_SCAN_MS
+  delete rig.env.LAKI_PORT_SCAN_MS // its own scan intervals
+  delete rig.env.LAKI_PR_SCAN_MS
   let r = await rig.cli('ls', '--json')
   assert.equal(r.code, 0, r.err)
   assert.deepEqual(JSON.parse(r.out).projects, [])
   const { pid } = rig.info()
-  assert.match(readFileSync(join(rig.data, 'daemon.log'), 'utf8'), new RegExp(`laki-electron daemon on 127\\.0\\.0\\.1:\\d+ \\(pid ${pid}`))
+  assert.match(readFileSync(join(rig.data, 'daemon.log'), 'utf8'), new RegExp(`laki daemon on 127\\.0\\.0\\.1:\\d+ \\(pid ${pid}`))
   r = await rig.cli('stop')
   assert.equal(r.code, 0)
   await until(() => !running(pid), 'daemon gone')

@@ -1,9 +1,10 @@
 // A workspace's info panel (the ⓘ in the tab bar) and its PR in the status bar: CI, review, and the
-// switches that send failing CI or new review comments to the agent. The same file is in both apps
-// (laki-electron, laki-go); each maps its own workspace to WsInfo.
+// switches that send failing CI or new review comments to the agent. App.tsx maps a
+// workspace to WsInfo.
 import { type ReactNode } from 'react'
 import { Glyph } from './Glyph'
-import { Icon, IconButton } from './ui'
+import { type Tunnel } from './Tunnel'
+import { Icon, IconButton, Switch } from './ui'
 
 export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string }
 export type PRInfo = {
@@ -34,6 +35,7 @@ export type WsInfo = {
   autoFix?: boolean
   autoReview?: boolean
   fixTries?: number // failing CI sent this many times in a row for the current PR
+  tunnels?: Tunnel[] // ports exposed to the world
   agents: { id: string; name: string; glyph: string; last?: string }[]
 }
 export type AutoKey = 'autoFix' | 'autoReview'
@@ -59,23 +61,16 @@ const ago = (t?: string | number) => {
   return s < 90 ? 'just now' : s < 5400 ? `${Math.round(s / 60)}m ago` : s < 129600 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`
 }
 
-function Toggle({ on, label, tip, onChange }: { on?: boolean; label: string; tip: string; onChange: (v: boolean) => void }) {
-  return (
-    <button type="button" role="switch" aria-checked={!!on} className={`toggle ${on ? 'on' : ''}`} data-tip={tip} onClick={() => onChange(!on)}>
-      <span className="toggle-track">
-        <span className="toggle-knob" />
-      </span>
-      {label}
-    </button>
-  )
-}
-
 // the auto switches, in the status bar and the panel
 export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
   return (
     <>
-      <Toggle on={w.autoFix} label="fix CI" tip={`Failing CI goes to the agent, once per commit (${MAX_CI_FIXES} tries in a row)`} onChange={v => onToggle('autoFix', v)} />
-      <Toggle on={w.autoReview} label="review" tip="New review comments on the PR go to the agent" onChange={v => onToggle('autoReview', v)} />
+      <Switch on={w.autoFix} tip={`Failing CI goes to the agent, once per commit (${MAX_CI_FIXES} tries in a row)`} onChange={v => onToggle('autoFix', v)}>
+        fix CI
+      </Switch>
+      <Switch on={w.autoReview} tip="New review comments on the PR go to the agent" onChange={v => onToggle('autoReview', v)}>
+        review
+      </Switch>
     </>
   )
 }
@@ -174,6 +169,7 @@ export function InfoPanel(p: {
   onFix: (what: 'ci' | 'review') => void
   onRename: () => void
   onAgent: (tab: string) => void
+  onCopy: (text: string) => void
 }) {
   const { w } = p
   return (
@@ -200,6 +196,23 @@ export function InfoPanel(p: {
             <span className="mono small">{w.path}</span>
           </Row>
           <Row k="$PORT">{w.port}</Row>
+          {w.tunnels?.map(t => (
+            <Row key={t.port} k="public">
+              {t.url ? (
+                <span className="info-link">
+                  <a href={t.url} onClick={e => (e.preventDefault(), p.onOpen(t.url!))}>
+                    {t.url.replace(/^https:\/\//, '')}
+                  </a>
+                  <IconButton icon="copy" title="Copy the link" onClick={() => p.onCopy(t.url!)} />
+                  <span className="muted small">
+                    :{t.port} · {t.mails?.length ? `only ${t.mails.join(', ')}` : 'anyone with the link'}
+                  </span>
+                </span>
+              ) : (
+                <span className="muted">:{t.port} · starting…</span>
+              )}
+            </Row>
+          ))}
           {w.created ? <Row k="created">{ago(w.created)}</Row> : null}
         </section>
 

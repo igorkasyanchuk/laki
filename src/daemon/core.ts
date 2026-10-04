@@ -1,14 +1,14 @@
 // The daemon's model: projects, workspaces (git worktrees), tabs (PTY sessions), agent status from hooks,
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
-import { execFile, execFileSync } from 'node:child_process'
-import { randomUUID } from 'node:crypto'
+import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
+import { randomBytes, randomUUID } from 'node:crypto'
 import { closeSync, type Dirent, existsSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import type { Check, PR, PRFix, Preset, Project, ProjectConfig, Settings, State, Status, Tab, TabView, View, Workspace } from '../shared/types.ts'
+import { API, type Check, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Settings, type State, type Status, type Tab, type TabView, type Tunnel, type View, type Workspace } from '../shared/types.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
 
@@ -114,10 +114,12 @@ export function view(): View {
   return {
     projects: state.projects,
     // ponytail: run reads .laki.json per workspace on every view; cache by mtime if many workspaces
-    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], pr: prs.get(w.id), run: !!projectConfig(w).run })),
+    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!projectConfig(w).run })),
     tabs,
     presets: presets(),
     settings: state.settings ?? {},
+    remote: remoteView(),
+    api: API,
   }
 }
 
@@ -247,7 +249,7 @@ export function projectConfig(ws: Workspace): ProjectConfig {
       break
     } catch {}
   }
-  const { env, ...cmds } = proj?.config ?? {}
+  const { env, actions: _, ...cmds } = proj?.config ?? {} // actions: the renderer's (Run ▾)
   const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => v?.trim()))
   return { ...file, ...own, env: { ...file.env, ...env } }
 }
@@ -261,6 +263,12 @@ export function projectFileConfig(ref: string): ProjectConfig {
   }
 }
 
+// a project's actions as kept: for claude, codex or a shell (an unfinished one too, as Settings has it: Run ▾ skips it)
+function actionsOk(l: unknown): RunAction[] | undefined {
+  const ok = (Array.isArray(l) ? l : []).filter((a): a is RunAction => typeof a?.name === 'string' && typeof a.text === 'string' && ['claude', 'codex', 'shell'].includes(a.target))
+  return ok.length ? ok.map(a => ({ name: a.name, target: a.target, text: a.text })) : undefined
+}
+
 export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig }) {
   const p = findProject(ref)
   if (o.name?.trim()) p.name = o.name.trim()
@@ -270,6 +278,8 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       setup: o.config.setup?.trim() || undefined,
       teardown: o.config.teardown?.trim() || undefined,
       run: o.config.run?.trim() || undefined,
+      expose: o.config.expose?.trim() || undefined,
+      actions: actionsOk(o.config.actions),
       env: Object.keys(env).length ? env : undefined,
     }
   }
@@ -328,7 +338,7 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
     LAKI_WORKSPACE: ws.id,
     LAKI_TAB: tab.id,
     PORT: String(ws.port),
-    LAKI_ELECTRON_HOME: dir,
+    LAKI_HOME: dir,
     LAKI_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
     ...extra,
   }
@@ -580,6 +590,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
 }
 
 async function teardown(ws: Workspace) {
+  stopTunnels(ws.id)
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
     sessions.delete(t.id)
@@ -598,6 +609,7 @@ async function teardown(ws: Workspace) {
 }
 
 function dropWs(ws: Workspace) {
+  stopTunnels(ws.id)
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
     sessions.delete(t.id)
@@ -625,6 +637,7 @@ export async function wsArchive(ref: string) {
   await teardown(ws)
   ws.archived = true
   ws.port = 0
+  stopTunnels(ws.id) // one started during the teardown
   state.tabs = state.tabs.filter(t => t.workspace !== ws.id || t.kind === 'agent' || t.kind === 'shell')
   save()
   changed()
@@ -889,6 +902,182 @@ export async function scanPorts() {
     for (const [k, v] of next) ports.set(k, v)
     changed()
   }
+}
+
+// ---------- tunnels: a port exposed at a trycloudflare.com URL by cloudflared (Cloudflare Quick Tunnels).
+// With mails, only those addresses (or *@domain) get in, after a one-time code from Cloudflare Access.
+// They live in this process only: a daemon restart ends them.
+
+type TunnelRun = Tunnel & { ws: string; cf: Cf }
+const tunnels = new Map<string, TunnelRun>() // by `<ws>:<port>`
+export const MAIL_VERSION = '2026.9.3' // the first cloudflared with --allowed-mail
+// a quick tunnel's name is random words with dashes: not api. (in cloudflared's errors) or login.
+const TUNNEL_URL = /https:\/\/[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com/
+const MAIL = /^(?:\*|[^\s@*,]+)@[^\s@*,]+\.[^\s@*,]+$/ // an address, or *@domain: a whole domain
+const tunnelsOf = (ws: string) => [...tunnels.values()].filter(t => t.ws === ws).map(({ port, url, mails }) => ({ port, url, mails }))
+// a < b, for x.y.z versions
+const older = (a: string, b: string) => {
+  const [x, y] = [a, b].map(v => v.split('.').map(Number))
+  for (let i = 0; i < 3; i++) if ((x[i] || 0) !== (y[i] || 0)) return (x[i] || 0) < (y[i] || 0)
+  return false
+}
+const cfVersion = () => run('cloudflared', ['--version'], { timeout: 10000 }).then(r => /\d+\.\d+\.\d+/.exec(r.stdout + r.stderr)?.[0] ?? '?', () => undefined)
+
+// is cloudflared installed (its version), and who to let in by default: the workspace's project says (expose:
+// only those; its settings, else .laki.json), else the popup offers the last list, or git's user.email
+export async function cloudflared(o: { ws?: string } = {}): Promise<{ version?: string; mails: string[]; expose?: string }> {
+  const expose = o.ws ? projectConfig(findWs(o.ws)).expose?.trim() || undefined : undefined
+  const version = await cfVersion()
+  let mails = state.settings?.tunnelMails ?? []
+  if (!mails.length) mails = await run('git', ['config', '--global', '--get', 'user.email'], { timeout: 5000 }).then(r => (r.stdout.trim() ? [r.stdout.trim()] : []), () => [])
+  return { version, mails, expose }
+}
+
+// cloudflared publishing target (with mails: only those, after a one-time code from Cloudflare Access). url resolves
+// once it prints one (undefined: stopped first) or fails with its output; ended: it went after giving the URL.
+type Cf = { stop: () => void }
+function cloudflare(target: string, mails: string[], ended: (why: string) => void): { cf: Cf; url: Promise<string | undefined> } {
+  // the values go in as arguments of their own (=), so one starting with - is no flag
+  const proc = spawn('cloudflared', ['tunnel', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let stopped = false
+  const cf = { stop: () => ((stopped = true), proc.kill()) }
+  const url = new Promise<string | undefined>((resolve, reject) => {
+    let out = ''
+    let got = false
+    const fail = (why: string) => {
+      clearTimeout(timer)
+      proc.kill()
+      if (stopped) return resolve(undefined)
+      const tail = out.trim().split('\n').slice(-8).join('\n')
+      reject(new Error(tail ? `${why}:\n${tail}` : why))
+    }
+    const timer = setTimeout(() => fail('cloudflared gave no URL within 60 s'), 60000)
+    const read = (b: Buffer) => {
+      out = (out + b).slice(-16000)
+      const m = !got && TUNNEL_URL.exec(out)
+      if (!m) return
+      got = true
+      clearTimeout(timer)
+      resolve(m[0])
+    }
+    proc.stdout!.on('data', read)
+    proc.stderr!.on('data', read)
+    proc.on('error', e => fail(`cloudflared didn't start: ${e.message}`))
+    proc.on('close', (code, sig) => { // after its output: an error's last line is in
+      if (!got) return fail(`cloudflared ended (${sig ?? `exit ${code}`})`)
+      if (!stopped) ended(sig ?? `exit ${code}`)
+    })
+  })
+  return { cf, url }
+}
+
+// cloudflared's version, failing when it can't limit who gets in (mails) or isn't there
+async function cfReady(mails: boolean) {
+  const version = await cfVersion()
+  if (!version) throw new Error("cloudflared isn't installed: brew install cloudflared")
+  if (mails && version !== '?' && older(version, MAIL_VERSION))
+    throw new Error(`cloudflared ${version} can't limit who opens a tunnel (that needs ${MAIL_VERSION}): brew upgrade cloudflared`)
+}
+
+// tunnelStart resolves once cloudflared prints the URL (or was stopped meanwhile), and fails with its output
+export async function tunnelStart(o: { ws: string; port: number; mails?: string[] }): Promise<Tunnel> {
+  const ws = findWs(o.ws)
+  const live = () => state.workspaces.includes(ws) && !ws.archived
+  const port = Number(o.port)
+  if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`not a port: ${o.port}`)
+  const mails = [...new Set((o.mails ?? []).map(m => m.trim()).filter(Boolean))]
+  const bad = mails.find(m => !MAIL.test(m))
+  if (bad) throw new Error(`not an email address or *@domain: ${bad}`)
+  const key = `${ws.id}:${port}`
+  await cfReady(mails.length > 0)
+  if (!live()) throw new Error(`no workspace ${o.ws}`) // archived, or gone while cloudflared answered
+  const cur = tunnels.get(key)
+  if (cur) return { port, url: cur.url, mails: cur.mails }
+  if (mails.length) settingsSet({ tunnelMails: mails })
+  const drop = () => {
+    if (tunnels.get(key) !== t) return
+    tunnels.delete(key)
+    changed()
+  }
+  const { cf, url } = cloudflare(`http://localhost:${port}`, mails, why => (log(`tunnel ${key} ended (${why})`), drop()))
+  const t: TunnelRun = { ws: ws.id, port, mails, cf }
+  tunnels.set(key, t)
+  changed()
+  try {
+    t.url = await url
+  } catch (e) {
+    drop()
+    throw e
+  }
+  if (!t.url) return { port, mails } // stopped first (tunnelStop took it out)
+  changed()
+  return { port, url: t.url, mails }
+}
+
+export function tunnelStop(o: { ws: string; port: number }) {
+  const t = tunnels.get(`${findWs(o.ws).id}:${Number(o.port)}`)
+  if (!t) return
+  tunnels.delete(`${t.ws}:${t.port}`)
+  t.cf.stop()
+  changed()
+}
+
+// every tunnel, or a workspace's
+export function stopTunnels(ws?: string) {
+  for (const t of [...tunnels.values()]) if (!ws || t.ws === ws) tunnelStop({ ws: t.ws, port: t.port })
+}
+
+// ---------- remote access: this daemon, and the app's page it serves (main.ts), at a trycloudflare.com URL for the
+// one email in Settings: Cloudflare Access sends it a one-time code, and the link carries a token of its own. It
+// ends after the hours asked for (remoteTick), on remoteStop, or with the daemon; a new token each time, so a stopped
+// link is dead.
+export const REMOTE_HOURS = [1, 2, 4, 8, 24]
+const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
+type RemoteRun = { mail: string; until: number; token: string; url?: string; cf: Cf }
+let remote: RemoteRun | undefined
+let daemonPort = 0
+export const setDaemonPort = (p: number) => (daemonPort = p)
+export const remoteToken = () => remote?.token
+export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
+export const remoteView = (): Remote | undefined =>
+  remote && { mail: remote.mail, until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#token=${remote.token}` }
+
+export async function remoteStart(o: { hours: number; mail?: string }): Promise<Remote | undefined> {
+  const hours = Number(o.hours)
+  if (!REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.join(', ')} hours`)
+  const mail = (o.mail ?? state.settings?.remoteMail ?? '').trim()
+  if (!ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
+  if (mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail })
+  if (remote) return remoteView()
+  await cfReady(true)
+  if (remote) return remoteView() // started meanwhile
+  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, [mail], why => (log(`remote access ended (${why})`), remoteStop()))
+  const r: RemoteRun = { mail, until: Date.now() + hours * 3600e3, token: randomBytes(32).toString('hex'), cf }
+  remote = r
+  changed()
+  try {
+    r.url = await url
+  } catch (e) {
+    if (remote === r) remoteStop()
+    throw e
+  }
+  if (remote !== r) return undefined // stopped meanwhile
+  log(`remote access at ${r.url} for ${mail}, until ${new Date(r.until).toISOString()}`)
+  changed()
+  return remoteView()
+}
+
+export function remoteStop() {
+  const r = remote
+  if (!r) return
+  remote = undefined
+  r.cf.stop()
+  changed()
+}
+
+// remote access past its time ends (main.ts asks every 15 s; tests move the clock)
+export function remoteTick(now = Date.now()) {
+  if (remote && now >= remote.until) remoteStop()
 }
 
 // one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)

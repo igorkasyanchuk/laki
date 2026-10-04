@@ -1,10 +1,11 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
-// checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. The
-// same file is in both apps (laki-electron, laki-go); each passes in how its daemon lists, reads and makes
-// files, opens one in the editor, diffs and reads reviews.
+// checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
+// passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { highlight } from './highlight'
 import { type AutoKey, PRSection, type WsInfo } from './Info'
-import { Icon, IconButton, type IconName } from './ui'
+import { type actionsFor, type RunAction } from './text'
+import { Icon, IconButton, type IconName, type MenuItem } from './ui'
 
 export type PanelTab = 'files' | 'changes' | 'review'
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
@@ -352,6 +353,15 @@ export function RunButton({ running, onRun, onStop, onMenu }: { running: boolean
   )
 }
 
+// Run ▾'s two groups of actions (actionsFor's); tabName: a tab's name, for the hint; run: the app sends it
+export function actionMenu({ agent, terminal }: ReturnType<typeof actionsFor>, tabName: (id: string) => string | undefined, run: (a: RunAction, tab?: string) => void): MenuItem[] {
+  const item = (a: RunAction, tab: string | undefined, hint: string): MenuItem => ({ label: a.name, icon: a.target === 'shell' ? 'terminal' : 'agent', hint, run: () => run(a, tab) })
+  return [
+    ...(agent.length ? [null, { head: 'Agent actions' }, ...agent.map(x => item(x.action, x.tab, tabName(x.tab) ?? x.action.target))] : []),
+    ...(terminal.length ? [null, { head: 'Terminal actions' }, ...terminal.map(x => item(x.action, x.tab, (x.tab && tabName(x.tab)) || (x.tab ? 'shell' : 'new shell')))] : []),
+  ]
+}
+
 const sizeText = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 
 // a file in the app, next to the panel: text with line numbers, an image, or what it is
@@ -372,7 +382,7 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
     if (p.line) body.current?.querySelector('.pv-line.at')?.scrollIntoView({ block: 'center' })
     else body.current?.scrollTo(0, 0)
   }, [f, p.line])
-  const lines = useMemo(() => f?.text?.split('\n') ?? [], [f])
+  const lines = useMemo(() => (f?.text === undefined ? [] : highlight(p.path, f.text)), [f, p.path]) // colored up to 50 KB
   const cut = p.path.lastIndexOf('/') + 1
   return (
     <div className="preview">
@@ -399,7 +409,7 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
           lines.map((l, i) => (
             <div key={i} className={`pv-line ${p.line === i + 1 ? 'at' : ''}`}>
               <span className="pv-n">{i + 1}</span>
-              {l || ' '}
+              {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
             </div>
           ))}
         {f?.cut && <div className="muted small pad">Showing the start of the file. Open it in the editor for the rest.</div>}

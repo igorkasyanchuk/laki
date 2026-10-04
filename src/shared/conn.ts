@@ -5,7 +5,10 @@ import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-export const dataDir = () => process.env.LAKI_ELECTRON_HOME || join(homedir(), '.laki-electron')
+// ~/.laki; a Mac that ran Laki as "Laki Electron" keeps its ~/.laki-electron: workspaces' worktrees are in it, and
+// agents find their conversations by those paths
+export const dataDir = (home = homedir()) =>
+  process.env.LAKI_HOME || (!existsSync(join(home, '.laki')) && existsSync(join(home, '.laki-electron')) ? join(home, '.laki-electron') : join(home, '.laki'))
 
 export type DaemonInfo = { port: number; token: string; pid: number }
 

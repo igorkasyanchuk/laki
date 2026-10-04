@@ -1,12 +1,12 @@
 {
-  "name": "laki-electron",
-  "productName": "Laki Electron",
+  "name": "laki",
+  "productName": "Laki",
   "version": "0.1.0",
   "description": "Workbench for coding agents in parallel git worktrees",
   "type": "module",
   "main": "out/main/index.js",
   "bin": {
-    "laki-electron": "bin/laki-electron.js"
+    "laki": "bin/laki.js"
   },
   "scripts": {
     "dev": "electron-vite dev",
@@ -44,8 +44,8 @@
     "vite": "^7.3.6"
   },
   "build": {
-    "appId": "dev.laki.electron",
-    "productName": "Laki Electron",
+    "appId": "dev.laki.app",
+    "productName": "Laki",
     "files": [
       "out/**/*",
       "package.json"

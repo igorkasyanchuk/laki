@@ -2,7 +2,10 @@
 
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
 // each field overrides .laki.json's (env key by key)
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; env?: Record<string, string> }
+// expose: who Expose to the world lets in by default (emails, *@domains; empty: anyone with the link)
+// actions: Run ▾'s for the project's workspaces, after the global ones (one of the same name and target replaces it)
+export type RunAction = { name: string; target: 'claude' | 'codex' | 'shell'; text: string }
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; env?: Record<string, string> }
 
 // git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)
 export type Project = { id: string; name: string; path: string; git?: boolean; config?: ProjectConfig }
@@ -58,8 +61,28 @@ export type Settings = {
   notify?: boolean
   presets?: Preset[]
   theme?: string
+  glass?: boolean // a see-through, blurred window
+  glassWindow?: number // how see-through glass makes the window, the sidebar, the terminals: %
+  glassSide?: number
+  glassTerm?: number
+  glassGlow?: boolean // the theme's colors behind the glass (unset: on)
+  uiFont?: string // the interface's font
+  templates?: { name: string; text: string }[] // prompt templates ({{prompt}}…), for new workspaces
+  actions?: RunAction[] // Run ▾'s: a prompt for an agent, or a command for a terminal
   env?: Record<string, string> // every session's, under the project's and the preset's
+  tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
+  usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
+  remoteMail?: string // the one email remote access lets in
 }
+
+// remote access (core.ts): who may open it, until when (ms), and once cloudflared has one, its URL and the link
+// with the token
+export type Remote = { mail: string; until: number; url?: string; link?: string }
+
+// a plan's limit (daemon/usage.ts): used %, when it resets (ms); note: what the % is of, for an amount (extra usage)
+export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
+// an agent's limits; error: why there are none (signed out…); at: when they were read
+export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number }
 
 export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings }
 
@@ -87,8 +110,17 @@ export type PR = {
 
 export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string }
 
-// run: the project has a dev command
-export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; pr?: PR; run: boolean }
+// a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
+export type Tunnel = { port: number; url?: string; mails?: string[] }
 
-// presets: the agents a tab or workspace can start (Settings' presets, or claude and codex)
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings }
+// run: the project has a dev command
+export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; tunnels: Tunnel[]; pr?: PR; run: boolean }
+
+// presets: the agents a tab or workspace can start (Settings' presets, or claude and codex); api: the
+// daemon's API (none: older than API existed)
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; api?: number }
+
+// The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
+// outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
+// on a new method or behavior of the daemon.
+export const API = 5
