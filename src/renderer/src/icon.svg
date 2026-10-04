@@ -1,26 +1,13 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
-  <!-- Laki: an L whose foot is a terminal's cursor, beside the lines agents write. build/icon.icns (the app icon) is rendered from it
-       (scripts/icon.swift); the splash and the browser tab show it as it is. -->
-  <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0.4" y2="1">
-      <stop offset="0" stop-color="#262b52"/>
-      <stop offset="1" stop-color="#0d0f20"/>
-    </linearGradient>
-    <radialGradient id="glow" cx="0.5" cy="0.68" r="0.42">
-      <stop offset="0" stop-color="#2dd4bf" stop-opacity="0.34"/>
-      <stop offset="1" stop-color="#2dd4bf" stop-opacity="0"/>
-    </radialGradient>
-    <linearGradient id="cursor" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#6ff3dc"/>
-      <stop offset="1" stop-color="#14b8a6"/>
-    </linearGradient>
+  <!-- Laki (Finnish: a summit): a prompt's caret for the peak, and the sun beside it. build/icon.icns (the app
+       icon) is rendered from it (scripts/icon.swift); the splash and the browser tab show it as it is. -->
+  <defs><clipPath id="tile"><rect x="100" y="100" width="824" height="824" rx="186"/></clipPath>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1c1d26"/><stop offset="1" stop-color="#0b0c11"/></linearGradient>
   </defs>
-  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#bg)"/>
-  <rect x="100" y="100" width="824" height="824" rx="186" fill="url(#glow)"/>
-  <rect x="101" y="101" width="822" height="822" rx="185" fill="none" stroke="#ffffff" stroke-opacity="0.10" stroke-width="2"/>
-  <rect x="300" y="262" width="136" height="500" rx="24" fill="#f5f6fb"/>
-  <rect x="300" y="626" width="424" height="136" rx="24" fill="url(#cursor)"/>
-  <rect x="496" y="276" width="228" height="52" rx="26" fill="#ffffff" fill-opacity="0.30"/>
-  <rect x="496" y="372" width="164" height="52" rx="26" fill="#ffffff" fill-opacity="0.22"/>
-  <rect x="496" y="468" width="200" height="52" rx="26" fill="#ffffff" fill-opacity="0.16"/>
+  <g clip-path="url(#tile)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#bg)"/>
+    <path d="M262 680 L512 414 L762 680" fill="none" stroke="#ffffff" stroke-width="96" stroke-linecap="round" stroke-linejoin="round"/>
+    <circle cx="716" cy="282" r="58" fill="#ff7a45"/>
+  </g>
+  <rect x="101" y="101" width="822" height="822" rx="185" fill="none" stroke="#ffffff" stroke-opacity="0.12" stroke-width="2"/>
 </svg>

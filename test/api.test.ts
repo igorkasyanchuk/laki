@@ -355,7 +355,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
 
   // refusals; the email is kept (the global setting) once it is one
   await assert.rejects(rig.rpc('remoteStart', { hours: 1 }), /the email that may open it: Settings › Remote access/)
-  await assert.rejects(rig.rpc('remoteStart', { hours: 3, mail: 'me@x.dev' }), /for how long: 1, 2, 4, 8, 24 hours/)
+  for (const hours of [3, null, '', '0', false]) await assert.rejects(rig.rpc('remoteStart', { hours, mail: 'me@x.dev' }), /for how long: 1, 2, 4, 8, 24 hours, or 0 \(until stopped\)/)
   for (const m of ['*@x.dev', 'a@b.dev,c@d.dev', 'nope'])
     await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: m }), /not an email address/)
   await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: ' me@x.dev ' }), /cloudflared isn't installed: brew install cloudflared/)
@@ -370,14 +370,14 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   const on = await rig.rpc('remoteStart', { hours: 2 })
   const url = `https://fake-${port}.trycloudflare.com`
   assert.deepEqual([on.mail, on.url], ['me@x.dev', url])
-  assert.match(on.link, new RegExp(`^${url}/#token=[0-9a-f]{64}$`))
+  assert.match(on.link, new RegExp(`^${url}/\\?token=[0-9a-f]{64}$`))
   assert.ok(Math.abs(on.until - (t0 + 2 * 3600e3)) < 5000)
   assert.match(log(), new RegExp(`cloudflared tunnel --url http://127\\.0\\.0\\.1:${port} --allowed-mail=me@x\\.dev\n`))
   assert.deepEqual((await rig.rpc('state')).remote, on)
   assert.deepEqual(await rig.rpc('remoteStart', { hours: 8 }), on) // running already: that one
 
   // its token, from its page's origin; no other origin
-  const key = on.link.split('#token=')[1]
+  const key = on.link.split('?token=')[1]
   const ping = (token: string, origin?: string) =>
     fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
   assert.equal(await ping(key, url), 200)
@@ -402,6 +402,14 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   await rig.rpc('remoteTick', { now: again.until })
   assert.equal((await rig.rpc('state')).remote, undefined)
   await until(() => stops() === 2, 'cloudflared stopped at its time')
+
+  // forever: no until, the clock never ends it
+  const ever = await rig.rpc('remoteStart', { hours: 0 })
+  assert.equal(ever.until, undefined)
+  await rig.rpc('remoteTick', { now: Date.now() + 3650 * 86400e3 })
+  assert.equal((await rig.rpc('state')).remote?.link, ever.link)
+  await rig.rpc('remoteStop')
+  await until(() => stops() === 3, 'cloudflared stopped')
 
   // cloudflared failing; stopped while starting
   writeFileSync(join(rig.home, 'cf-fail'), '429 Too Many Requests')

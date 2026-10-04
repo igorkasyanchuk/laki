@@ -1,6 +1,7 @@
 // The daemon connection: one authenticated WebSocket, requests by id, events to listeners.
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
-// http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone on the daemon's own page (remote access).
+// http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone in the query on the daemon's own page (remote
+// access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
   notify(title: string, body: string, tab: string): void
@@ -17,7 +18,7 @@ export const bridge: Bridge | undefined = (window as any).laki
 export type Msg = { ev: string; [k: string]: any }
 
 async function wsURL() {
-  const { port, token } = bridge ? await bridge.conn() : (h => ({ port: h.get('port'), token: h.get('token') ?? '' }))(new URLSearchParams(location.hash.slice(1)))
+  const { port, token } = bridge ? await bridge.conn() : (h => ({ port: h.get('port'), token: h.get('token') ?? new URLSearchParams(location.search).get('token') ?? '' }))(new URLSearchParams(location.hash.slice(1)))
   const at = port ? `ws://127.0.0.1:${port}` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` // no port: the page's own daemon
   return `${at}/ws?token=${encodeURIComponent(token)}`
 }

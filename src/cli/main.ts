@@ -5,14 +5,14 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import type { View } from '../shared/types.ts'
+import type { Schedule, ScheduleRun, View } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
-
+import { describe } from '../shared/when.ts'
 
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where'])
 const BOOL = new Set(['json', 'local', 'when-idle'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -140,6 +140,29 @@ async function main() {
     case 'ship': {
       const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message })
       return out(t, `shipping in tab ${t.name} (${t.id})`)
+    }
+    case 'schedule': {
+      const [sub = 'ls', id, ...words] = rest
+      const at = (t?: number) => (t ? new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '')
+      const line = (s: Schedule) => `${s.id}  ${s.on ? 'on ' : 'off'}  ${describe(s.rule)}${s.next ? `, next ${at(s.next)}` : ''}  ${s.project} · ${s.preset} · ${s.ws === 'local' ? 'folder' : s.ws}  ${s.name || s.prompt}`
+      if (sub === 'ls' || sub === 'log') {
+        const v: View = await rpc('state')
+        if (sub === 'ls') return out(v.schedules ?? [], (v.schedules ?? []).map(line).join('\n') || 'no scheduled tasks')
+        return out(v.runs ?? [], (v.runs ?? []).map((r: ScheduleRun) => `${at(r.at)}  ${r.ok ? '✓' : '✗'}  ${r.name}  ${r.what}`).join('\n') || 'no runs yet')
+      }
+      if (sub === 'add') {
+        if (!flags.when) throw new Error('when? laki schedule add <project> --when "weekdays at 9am" <prompt>')
+        const where = flags.where === 'folder' ? 'local' : flags.where || undefined
+        const s = await rpc('scheduleSet', { project: id, when: flags.when, preset: flags.preset, ws: where, name: flags.name, prompt: flags.prompt || words.join(' ') })
+        return out(s, line(s))
+      }
+      if (sub === 'on' || sub === 'off') return out(await rpc('scheduleSet', { id, on: sub === 'on' }), `${id} ${sub}`)
+      if (sub === 'run') {
+        const r = await rpc('scheduleRun', { id }, 120000)
+        return out(r, `${r.ok ? '✓' : '✗'} ${r.what}`)
+      }
+      if (sub === 'rm') return out((await rpc('scheduleRm', { id })) ?? { ok: true }, `removed ${id}`)
+      throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" <prompt> | on|off|run|rm <id>`)
     }
     default:
       throw new Error(`unknown command ${cmd}\n\n${USAGE}`)

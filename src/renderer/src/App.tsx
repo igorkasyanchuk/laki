@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { API, type Project, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
 import { AddProject, NewWorkspace, Palette, type PaletteItem, Prompt } from './panels'
@@ -7,17 +8,18 @@ import { type AppInfo, FONT_SIZE, SettingsPage, type SkillInfo, termLook } from 
 import { Glyph } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
-import { Term } from './Term'
+import { Term, xterms } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
+import { SchedulesPage } from './Schedules'
 import { actionsFor, type RunAction, shortPath } from './text'
 import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { colorVar, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
+import { colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'schedules' | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
 
 const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
 
@@ -56,6 +58,38 @@ const load = <T,>(k: string, d: T): T => {
 // the last theme (and glass, font), until the daemon's settings arrive
 applyTheme(load<string | Paint>('laki.theme', ''))
 
+// a media query's answer, kept current (useSyncExternalStore): a phone's narrow layout, a touch screen's keys
+const media = (q: string) => {
+  const m = matchMedia(q)
+  return { on: (f: () => void) => (m.addEventListener('change', f), () => m.removeEventListener('change', f)), now: () => m.matches }
+}
+const NARROW = media('(max-width: 640px)') // under the app window's minWidth (700): phones and narrow browsers only
+const TOUCH = media('(pointer: coarse)')
+
+// keys a phone's keyboard lacks, typed into the focused pane (claude and codex ask with arrows, Esc, ⇧⇥)
+const KEYS: [string, string][] = [['esc', '\x1b'], ['tab', '\t'], ['⇧tab', '\x1b[Z'], ['^C', '\x03'], ['←', '\x1b[D'], ['↑', '\x1b[A'], ['↓', '\x1b[B'], ['→', '\x1b[C'], ['⏎', '\r']]
+// a press that doesn't take the focus: the terminal keeps it, and the phone its keyboard
+const keep = (e: { preventDefault(): void }) => e.preventDefault()
+function KeyBar({ onKey }: { onKey: (data: string) => void }) {
+  const typing = () => {
+    const ta = document.querySelector<HTMLTextAreaElement>('.pane.active .xterm-helper-textarea')
+    if (ta && document.activeElement === ta) ta.blur()
+    else ta?.focus()
+  }
+  return (
+    <div className="keybar">
+      <button onPointerDown={keep} onMouseDown={keep} onClick={typing} aria-label="Keyboard">
+        ⌨
+      </button>
+      {KEYS.map(([k, data]) => (
+        <button key={k} onPointerDown={keep} onMouseDown={keep} onClick={() => onKey(data)}>
+          {k}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
@@ -73,12 +107,15 @@ export function App() {
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
   const [sideW, setSideW] = useState<number>(() => load('laki.side', SIDE))
   const [sideOpen, setSideOpen] = useState<boolean>(() => load('laki.sideOpen', true))
+  const [runsSeen, setRunsSeen] = useState<string>(() => load('laki.runsSeen', '')) // the newest scheduled run read
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [error, setError] = useState('')
   const [menu, openMenu] = useMenu()
   const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
+  const narrow = useSyncExternalStore(NARROW.on, NARROW.now) // a phone: one pane at a time, the sidebar and panels over it
+  const touch = useSyncExternalStore(TOUCH.on, TOUCH.now)
   const mru = useRef<string[]>([]) // sessions, most recently focused first: which pane a tab focuses
 
   const live = useMemo(() => view?.workspaces.filter(w => !w.archived) ?? [], [view])
@@ -88,7 +125,8 @@ export function App() {
   const git = project?.git !== false
   const tabs = useMemo(() => view?.tabs.filter(t => t.workspace === ws?.id) ?? [], [view, ws])
   const byId = (id: string) => tabs.find(t => t.id === id)
-  const groups = groupsOf(stored[ws?.id ?? ''], tabs.map(t => t.id))
+  const placed = groupsOf(stored[ws?.id ?? ''], tabs.map(t => t.id))
+  const groups = narrow ? placed.flatMap(g => tabsOf(g).map(tab => ({ tab }))) : placed // too narrow for splits: a tab per pane
   const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
   const group = groups.find(g => tabsOf(g).includes(tab?.id ?? '')) ?? null
   const visible = tabsOf(group)
@@ -99,6 +137,15 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.side', JSON.stringify(sideW)), [sideW])
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.info', JSON.stringify(info)), [info])
+  useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
+  useEffect(() => {
+    const id = view?.runs?.[0]?.id
+    if (dialog !== 'schedules' || !id) return
+    setRunsSeen(id)
+    localStorage.setItem('laki.runsSeen', JSON.stringify(id))
+  }, [dialog, view?.runs?.[0]?.id])
+  // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
+  useEffect(() => void (narrow && document.querySelector('.tab.sel')?.scrollIntoView({ block: 'nearest', inline: 'start' })), [narrow, tab?.id])
   useEffect(() => {
     localStorage.setItem('laki.panel', JSON.stringify(panelOpen))
     localStorage.setItem('laki.panelTab', JSON.stringify(panelTab))
@@ -133,7 +180,7 @@ export function App() {
     setTabByWs(m => ({ ...m, [t.workspace]: t.id }))
   }, [])
   const selectGroup = (g: Layout) => selectTab(mru.current.find(id => tabsOf(g).includes(id)) ?? tabsOf(g)[0])
-  const setGroups = (next: Layout[]) => ws && setStored(m => ({ ...m, [ws.id]: next }))
+  const setGroups = (next: Layout[]) => ws && !narrow && setStored(m => ({ ...m, [ws.id]: next })) // narrow shows them flat: kept as they were
 
   // the daemon connection
   useEffect(() => {
@@ -471,8 +518,16 @@ export function App() {
     a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
+    a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
     a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: '⌘B', run: () => setSideOpen(o => !o) })
+    if (!view?.remote) {
+      if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
+      a({ label: 'Remote access…', icon: 'link', run: () => setDialog({ section: 'remote' }) })
+    } else {
+      a({ label: 'Remote access: the link and QR code', icon: 'link', run: () => setDialog({ section: 'remote' }) })
+      a({ label: 'Stop remote access', icon: 'stop', danger: true, run: () => call('remoteStop').catch(() => {}) })
+    }
     a({ label: `Turn macOS notifications ${settings.notify === false ? 'on' : 'off'}`, icon: 'bell', run: () => call('settingsSet', { notify: settings.notify === false }).catch(() => {}) })
     if (ws) {
       newTabActions.forEach(x => a({ ...x, label: `New tab: ${x.label}` }))
@@ -501,7 +556,7 @@ export function App() {
       <div className="splash">
         <div className="logo">
           <img src={icon} alt="" />
-          Laki
+          <span className="wordmark">Laki</span>
         </div>
         <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>
       </div>
@@ -510,6 +565,10 @@ export function App() {
   const settingsFor = dialog && typeof dialog === 'object' && 'settings' in dialog ? view.projects.find(p => p.id === dialog.settings) : undefined
   const section = dialog && typeof dialog === 'object' && 'section' in dialog ? dialog.section : undefined // a Settings section asked for
   const ports = ws ? portsOf(ws.ports, ws.tunnels).filter(p => p !== ws.port) : [] // $PORT has its own, always
+  const nextTask = (view.schedules ?? []).filter(s => s.on && s.next).sort((a, b) => a.next! - b.next!)[0]
+  const runs = view.runs ?? [] // newest first: the ones above the last read
+  const seen = runs.findIndex(r => r.id === runsSeen)
+  const runFailed = runs.slice(0, seen < 0 ? undefined : seen).some(r => !r.ok) // the clock gets a dot
   const portUp = !!ws?.ports.includes(ws.port)
   const label = (id: string) => {
     const t = byId(id)
@@ -523,13 +582,20 @@ export function App() {
     )
   }
   return (
-    <div className={`app ${sideOpen ? '' : 'side-closed'}`}>
+    <div className={`app ${sideOpen ? '' : 'side-closed'} ${narrow ? 'narrow' : ''} ${bridge ? 'electron' : ''}`}>
       {sideOpen && (
       <aside className="sidebar" style={{ width: sideW }}>
         <div className="side-head drag">
           <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
           <span className="spacer" />
           <IconButton icon="folderPlus" title="Open a project folder (⌘O), or drop one on the window" onClick={openProject} />
+          <IconButton
+            icon="clock"
+            title={nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'}
+            on={dialog === 'schedules'}
+            className={runFailed ? 'dot' : ''}
+            onClick={() => setDialog(d => (d === 'schedules' ? null : 'schedules'))}
+          />
           <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
           <IconButton icon="gear" title="Settings (⌘,)" on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
@@ -561,14 +627,19 @@ export function App() {
                       data-row={`ws:${w.id}`}
                       data-group={p.id}
                       onPointerDown={e => rows.start(e, 'ws', w.id, p.id)}
-                      onClick={() => setWsId(w.id)}
+                      onClick={() => (setWsId(w.id), narrow && setSideOpen(false))}
                       onContextMenu={e => openMenu(e, wsMenu(w))}
-                      title={`${w.branch || w.path} · $PORT ${w.port}`}
+                      title={`${w.branch || w.path} · $PORT ${w.port}${w.schedule ? ` · from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd() : ''}`}
                     >
                       <Glyph s={w.setup ? 'running' : rollup(wt)} />
                       <span className="ws-name">{wsName(w)}</span>
                       {queued > 0 && <span className="badge">+{queued}</span>}
                       <span className="spacer" />
+                      {w.schedule && (
+                        <span className="ws-sched">
+                          <Icon name="clock" size={11} />
+                        </span>
+                      )}
                     </div>
                   )
                 })}
@@ -578,7 +649,7 @@ export function App() {
         </div>
       </aside>
       )}
-      {sideOpen && <SideHandle width={sideW} onWidth={setSideW} init={SIDE} />}
+      {sideOpen && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} />)}
 
       <main className="main">
         <div className="tabbar drag" data-tabbar>
@@ -611,10 +682,14 @@ export function App() {
           <span className="spacer" />
           {ws && (
             <div className="actions nodrag">
-              <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
-              <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => showInfo()} />
+              {!narrow && ( // a phone: in ⌘K's palette (the search button)
+                <>
+                  <IconButton icon="code" title={`Open in… (⌘E: ${editorName})`} onClick={e => openMenu(e, openInItems(), 'right')} />
+                  <IconButton icon="info" title="Workspace info (⌘I)" on={info} onClick={() => showInfo()} />
+                </>
+              )}
               <IconButton icon="panel" title="Files, changes, review (⌥⌘B)" on={panelOpen} onClick={() => togglePanel()} />
-              {ws.kind === 'worktree' && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
+              {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
               <IconButton icon="search" title="Commands (⌘K)" onClick={() => setDialog('palette')} />
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
               <RunButton
@@ -643,7 +718,7 @@ export function App() {
                     tab={id}
                     active={id === tab?.id && !dialog}
                     findSeq={finds[id] ?? 0}
-                    fontSize={fontSize}
+                    fontSize={narrow ? Math.min(fontSize, 11) : fontSize /* ponytail: a phone's own size, not a setting */}
                     fontFamily={settings.fontFamily}
                     copyOnSelect={settings.copyOnSelect !== false}
                     theme={theme}
@@ -715,6 +790,9 @@ export function App() {
             />
           )}
         </div>
+        {touch && tab && !(narrow && (panelOpen || info || previewed)) /* not under a panel */ && (
+          <KeyBar onKey={data => api.send('input', { tab: tab.id, data: xterms.get(tab.id)?.modes.applicationCursorKeysMode ? data.replace(/^\x1b\[([ABCD])$/, '\x1bO$1') : data })} />
+        )}
         {(dialog === 'settings' || settingsFor || section) && (
           <SettingsPage
             key={settingsKey}
@@ -733,6 +811,22 @@ export function App() {
           />
         )}
         {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
+        {dialog === 'schedules' && (
+          <SchedulesPage
+            view={view}
+            onClose={() => setDialog(null)}
+            api={{
+              set: s => api.call('scheduleSet', s),
+              rm: id => api.call('scheduleRm', { id }),
+              run: id => api.call('scheduleRun', { id }),
+              open: (w, t) => (setDialog(null), t && view.tabs.some(x => x.id === t) ? selectTab(t) : setWsId(w)),
+              pick: async () => {
+                const path = bridge ? await bridge.pickFolder() : prompt('The folder’s full path') // a browser has no folder picker
+                return path?.trim() ? api.call<Project>('projectAdd', { path: path.trim() }) : null
+              },
+            }}
+          />
+        )}
         {dialog === 'new' && (
           <NewWorkspace
             key={newFor} // another project asked for while it's open (＋, a dropped folder)
@@ -790,7 +884,7 @@ export function App() {
               data-tip={`Remote access for ${view.remote.mail}: Settings › Remote access`}
               onClick={() => setDialog({ section: 'remote' })}
             >
-              {view.remote.url ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote starting…'}
+              {!view.remote.url ? 'Remote starting…' : view.remote.until ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote on'}
             </button>
           )}
           {ws && (

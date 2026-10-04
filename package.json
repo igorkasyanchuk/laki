@@ -3,6 +3,8 @@
   "productName": "Laki",
   "version": "0.1.0",
   "description": "Workbench for coding agents in parallel git worktrees",
+  "license": "MIT",
+  "author": "Igor Kasyanchuk",
   "type": "module",
   "main": "out/main/index.js",
   "bin": {

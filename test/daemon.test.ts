@@ -104,6 +104,12 @@ test('attach, reattach, resize, multiple clients', async t => {
   await until(() => b.events.some(e => e.ev === 'responder' && !e.on), 'b is not')
   c.notify('input', { tab: tab.id, data: 'stty size\r' })
   await until(() => b.data(tab.id).includes('30 100') && c.data(tab.id).includes('30 100'), 'both clients see output')
+  // typing from b gives the PTY b's size back (a Mac after a phone); c resizing takes it again
+  b.notify('input', { tab: tab.id, data: 'stty size\r' })
+  await until(() => c.data(tab.id).split('30 100')[1]?.includes('20 90'), "b's size")
+  c.notify('resize', { tab: tab.id, cols: 70, rows: 25 })
+  c.notify('input', { tab: tab.id, data: 'stty size\r' })
+  await until(() => b.data(tab.id).includes('25 70'), "c's new size")
   c.close()
   await until(() => b.events.filter(e => e.ev === 'responder' && e.on).length === 2, 'b answers again after c left')
   b.close()

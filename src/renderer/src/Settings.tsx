@@ -325,9 +325,9 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
 ]
 
 // remote access: this app in a browser elsewhere, through cloudflared, for one email; no link yet: starting
-export type Remote = { mail: string; until: number; url?: string; link?: string }
+export type Remote = { mail: string; until?: number; url?: string; link?: string }
 export type RemoteApi = { state?: Remote; start: (hours: number, mail: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
-const REMOTE_HOURS = [1, 2, 4, 8, 24] // the daemon's too
+const REMOTE_HOURS = [1, 2, 4, 8, 24, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; onMail: (mail: string) => void }) {
@@ -352,7 +352,7 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
       <p className="muted small">
         This app in a browser on another computer or a phone: its terminals and agents, as if you sat here. cloudflared publishes Laki's daemon at a
         random trycloudflare.com address; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of
-        its own. It stops after the time you pick, when you stop it, or with the daemon, and a stopped link never works again.
+        its own. It stops after the time you pick (or never: Forever), when you stop it, or with the daemon, and a stopped link never works again.
       </p>
       <p className="warn-soft small">Whoever gets in has a shell on this Mac as you: use an address only you read.</p>
       {r?.link ? (
@@ -365,7 +365,7 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
               <IconButton icon="link" title="Open" onClick={() => api.open(r.link!)} />
             </div>
             <p className="muted small">
-              Only <b>{r.mail}</b> gets in. Scan it with a phone, or send the link to yourself. Ends {ends(r.until)}.
+              Only <b>{r.mail}</b> gets in. Scan it with a phone, or send the link to yourself. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
             </p>
             <div className="row">
               <button className="danger" onClick={stop}>
@@ -395,7 +395,7 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
             <div className="seg" role="radiogroup" aria-label="For how long">
               {REMOTE_HOURS.map(h => (
                 <button key={h} type="button" role="radio" aria-checked={h === hours} className={h === hours ? 'on' : ''} onClick={() => setHours(h)}>
-                  {h}h
+                  {h ? `${h}h` : 'Forever'}
                 </button>
               ))}
             </div>
@@ -679,7 +679,7 @@ export function SettingsPage(p: {
               </div>
               <div className="muted small">Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.</div>
               <div className="themes">
-                {THEMES.map(t => {
+                {[...THEMES].reverse().map(t => { /* the newest first */
                   const [bg, panel, fg, accent, ...ansi] = preview(t)
                   const on = (s.theme || 'default') === t.id
                   return (

@@ -8,7 +8,8 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { API, type Check, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Settings, type State, type Status, type Tab, type TabView, type Tunnel, type View, type Workspace } from '../shared/types.ts'
+import { API, type Check, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type State, type Status, type Tab, type TabView, type Tunnel, type View, type Workspace } from '../shared/types.ts'
+import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
 
@@ -51,6 +52,8 @@ export function load() {
   state.projects ??= []
   state.workspaces ??= []
   state.tabs ??= []
+  state.schedules ??= []
+  state.runs ??= []
 }
 
 export function save() {
@@ -119,6 +122,8 @@ export function view(): View {
     presets: presets(),
     settings: state.settings ?? {},
     remote: remoteView(),
+    schedules: state.schedules,
+    runs: state.runs?.slice(0, RUNS_SHOWN),
     api: API,
   }
 }
@@ -315,6 +320,7 @@ export function projectRm(ref: string) {
   if (live.length) throw new Error(`${p.name} has workspaces: delete them first (${live.map(w => w.id).join(', ')})`)
   for (const w of state.workspaces.filter(w => w.project === p.id)) dropWs(w)
   state.projects = state.projects.filter(x => x !== p)
+  state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
   save()
   changed()
 }
@@ -794,9 +800,10 @@ export function clearQueue(target: string) {
 }
 
 // input from a client's keyboard. Codex reports only the end of a turn: Enter starts one.
-export function input(id: string, data: string) {
+export function input(id: string, data: string, c?: Client) {
   const s = sessions.get(id)
   if (!s) return
+  if (c) s.follow(c)
   const tab = state.tabs.find(t => t.id === id)
   if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev') && data.includes('\r')) {
     spawnTab(tab, { resume: true }) // Enter on an ended agent or dev server starts it again
@@ -827,9 +834,11 @@ function interrupted(id: string, s: Session) {
     }, ms)
 }
 
-export function resize(id: string, cols: number, rows: number) {
+export function resize(id: string, cols: number, rows: number, c?: Client) {
   lastSize = { cols, rows }
-  sessions.get(id)?.resize(cols, rows)
+  const s = sessions.get(id)
+  if (c) s?.resizeFor(c, cols, rows)
+  else s?.resize(cols, rows)
 }
 
 // ---------- usage limits (Claude's StopFailure, codex's screen): continue after the reset
@@ -1029,22 +1038,22 @@ export function stopTunnels(ws?: string) {
 
 // ---------- remote access: this daemon, and the app's page it serves (main.ts), at a trycloudflare.com URL for the
 // one email in Settings: Cloudflare Access sends it a one-time code, and the link carries a token of its own. It
-// ends after the hours asked for (remoteTick), on remoteStop, or with the daemon; a new token each time, so a stopped
-// link is dead.
-export const REMOTE_HOURS = [1, 2, 4, 8, 24]
+// ends after the hours asked for (remoteTick; 0: forever, no until), on remoteStop, or with the daemon; a new token each
+// time, so a stopped link is dead.
+export const REMOTE_HOURS = [1, 2, 4, 8, 24, 0]
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
-type RemoteRun = { mail: string; until: number; token: string; url?: string; cf: Cf }
+type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf }
 let remote: RemoteRun | undefined
 let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
 export const remoteToken = () => remote?.token
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, until: remote.until, url: remote.url, link: remote.url && `${remote.url}/#token=${remote.token}` }
+  remote && { mail: remote.mail, until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
 
 export async function remoteStart(o: { hours: number; mail?: string }): Promise<Remote | undefined> {
-  const hours = Number(o.hours)
-  if (!REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.join(', ')} hours`)
+  const hours = o.hours // a number: null or '' would be 0, forever
+  if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
   const mail = (o.mail ?? state.settings?.remoteMail ?? '').trim()
   if (!ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
   if (mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail })
@@ -1052,7 +1061,7 @@ export async function remoteStart(o: { hours: number; mail?: string }): Promise<
   await cfReady(true)
   if (remote) return remoteView() // started meanwhile
   const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, [mail], why => (log(`remote access ended (${why})`), remoteStop()))
-  const r: RemoteRun = { mail, until: Date.now() + hours * 3600e3, token: randomBytes(32).toString('hex'), cf }
+  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf }
   remote = r
   changed()
   try {
@@ -1062,7 +1071,7 @@ export async function remoteStart(o: { hours: number; mail?: string }): Promise<
     throw e
   }
   if (remote !== r) return undefined // stopped meanwhile
-  log(`remote access at ${r.url} for ${mail}, until ${new Date(r.until).toISOString()}`)
+  log(`remote access at ${r.url} for ${mail}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
   return remoteView()
 }
@@ -1077,7 +1086,7 @@ export function remoteStop() {
 
 // remote access past its time ends (main.ts asks every 15 s; tests move the clock)
 export function remoteTick(now = Date.now()) {
-  if (remote && now >= remote.until) remoteStop()
+  if (remote?.until && now >= remote.until) remoteStop()
 }
 
 // one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)
@@ -1479,4 +1488,145 @@ export function screen(target: string, lines = 30) {
   const tab = resolveTarget(target)
   const s = sessions.get(tab.id)
   return s ? s.flushed().then(() => s.screenText(lines)) : ''
+}
+
+// ---------- scheduled tasks: a prompt to an agent at the times a line of English says (shared/when.ts)
+
+const RUNS_KEPT = 200
+const RUNS_SHOWN = 50
+// a run this late (the Mac asleep, Laki not running) is skipped, and the log says so
+// ponytail: missed runs never catch up; run them on wake if that's what people want
+export const MISSED_AFTER = 30 * 60e3
+const AGENTS = ['claude', 'codex']
+
+const findSchedule = (id: string) => {
+  const s = state.schedules?.find(x => x.id === id)
+  if (!s) throw new Error(`no scheduled task ${id}`)
+  return s
+}
+
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on'] as const // what a client sets: the daemon works out the rest
+
+export function scheduleSet(o: ScheduleIn): Schedule {
+  const old = o.id ? findSchedule(o.id) : undefined
+  const given = Object.fromEntries(SCHEDULE_IN.filter(k => o[k] !== undefined).map(k => [k, o[k]]))
+  if (old && given.on === false && Object.keys(given).length === 1) {
+    // off takes no checks: a task whose workspace or preset is gone can still be stopped
+    Object.assign(old, { on: false, next: undefined })
+    save()
+    changed()
+    return old
+  }
+  const s: Schedule = { ...(old ?? { id: randomUUID().slice(0, 8), on: true, project: '', preset: '', ws: 'new', prompt: '', when: '', rule: { days: [], times: [] } }), ...given }
+  s.on = s.on !== false
+  const proj = findProject(s.project)
+  s.project = proj.id
+  if (!old) {
+    // what a new one leaves out (the CLI): a worktree each run, or the folder without git; the default agent
+    if (o.ws === undefined) s.ws = proj.git === false ? 'local' : 'new'
+    const agent = state.settings?.agent
+    s.preset ||= agent && presetNamed(agent) && presetNamed(agent)!.agent !== 'command' ? agent : 'claude'
+  }
+  const pr = presetNamed(s.preset) // claude or codex: a command preset takes no prompt
+  if (!(pr ? pr.agent !== 'command' : AGENTS.includes(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't a claude or codex preset`)
+  if (s.ws === 'new') {
+    if (proj.git === false) throw new Error(`${proj.name} isn't a git repository: run it in its folder instead of a new workspace`)
+  } else if (s.ws !== 'local') {
+    const ws = findWs(s.ws)
+    if (ws.project !== proj.id) throw new Error(`${ws.id} isn't in ${proj.name}`)
+    s.ws = ws.id
+  }
+  s.prompt = s.prompt?.trim() ?? ''
+  if (!s.prompt) throw new Error('the prompt is empty')
+  s.name = s.name?.trim() || undefined
+  if (!old || o.when !== undefined) {
+    const r = parseWhen(s.when ?? '')
+    if ('error' in r) throw new Error(r.error)
+    s.rule = r
+  }
+  s.next = s.on ? nextRun(s.rule, Date.now()) : undefined
+  state.schedules = old ? state.schedules!.map(x => (x === old ? s : x)) : [...state.schedules!, s]
+  save()
+  changed()
+  return s
+}
+
+export function scheduleRm(id: string) {
+  const s = findSchedule(id)
+  state.schedules = state.schedules!.filter(x => x !== s)
+  save()
+  changed()
+}
+
+const runName = (s: Schedule, at: number) => stamp(s.name || s.prompt.split(/\s+/).slice(0, 6).join(' '), at)
+
+const logRun = (r: ScheduleRun) => {
+  state.runs = [r, ...(state.runs ?? [])].slice(0, RUNS_KEPT)
+  save()
+  changed()
+  return r
+}
+
+// one run: a new workspace with the agent and the prompt, or the prompt to the workspace's agent
+export async function runSchedule(s: Schedule, now = Date.now()): Promise<ScheduleRun> {
+  s = state.schedules?.find(x => x.id === s.id) ?? s // scheduleSet replaces a task: the current one
+  const r: ScheduleRun = { id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, now), at: now, ok: true, what: '' }
+  const prompt = stamp(s.prompt, now)
+  s.last = now
+  try {
+    if (s.ws === 'new') {
+      const title = wsTitle(s, now)
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title })
+      let name = title // told apart in the sidebar, as its id is: Check 05-10 2 (an hourly 'Check {{DD-MM}}')
+      for (let n = 2; state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === name); n++) name = `${title} ${n}`
+      Object.assign(ws, { name, schedule: s.id })
+      save()
+      changed()
+      r.ws = ws.id
+      r.tab = tabsOf(ws.id).find(t => t.kind === 'agent')?.id
+      r.what = `started in a new workspace, ${ws.id}`
+    } else {
+      // its folder: the project's local workspace, made the first time (no worktree, no agent of its own)
+      const ws = s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : findWs(s.ws)
+      if (ws.archived) throw new Error(`${ws.id} is archived`)
+      r.ws = ws.id
+      const live = tabsOf(ws.id).find(t => t.kind === 'agent' && (t.profile ?? t.preset) === s.preset && sessions.get(t.id) && !sessions.get(t.id)!.exited)
+      if (live) {
+        const sent = send({ target: live.id, text: prompt, whenIdle: hasHooks(live) })
+        r.tab = live.id
+        r.what = 'queued' in sent ? `queued for ${live.name} (it was working)` : `sent to ${live.name}`
+      } else {
+        const t = addTab(ws.id, { preset: s.preset, prompt })
+        r.tab = t.id
+        r.what = `started in a new ${t.name} tab`
+      }
+    }
+  } catch (e) {
+    r.ok = false
+    r.what = (e as Error).message
+  }
+  return logRun(r)
+}
+
+export function scheduleRun(id: string) {
+  return runSchedule(findSchedule(id))
+}
+
+// every 30 s (tests pass `now`): what's due runs, what's long overdue is logged as missed; then the next time
+export async function scheduleTick(now = Date.now()) {
+  // every due one moves on first: a tick while a run is still starting (a worktree takes a while) doesn't start it again
+  const due = (state.schedules ?? []).filter(s => s.on && s.next !== undefined && s.next <= now).map(s => ({ s, at: s.next! }))
+  for (const { s } of due) {
+    s.next = s.rule.once ? undefined : nextRun(s.rule, now)
+    if (s.rule.once) s.on = false
+  }
+  if (!due.length) return
+  save()
+  changed()
+  for (const { s, at } of due) {
+    if (!state.schedules?.some(x => x.id === s.id)) continue // deleted while an earlier one started
+    if (now - at > MISSED_AFTER) logRun({ id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, at), at, ok: false, what: "missed: the Mac was asleep or Laki wasn't running" })
+    else await runSchedule(s, now)
+  }
 }

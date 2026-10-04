@@ -6,7 +6,7 @@ glance, step in when one needs you, and ship its branch as a PR. It's the succes
 (`~/projects/specdrop-cli`), a tmux + iTerm workbench with the same goal.
 
 This folder is the product side: what Laki is for, what it does, and what's still open. How it works is in
-`AGENTS.md`; how to use it, in `README.md` (both at the repository's root).
+`AGENTS.md`; how to use it, in `README.md` (the short version) and `docs/guide.md` (all of it).
 
 ## Why
 
@@ -105,9 +105,14 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - Plan limits: a ring at the start of the status bar, filled to the most-used limit of the Claude and Codex
   plans; its popup lists each window (5-hour, weekly, per model, extra usage) and when it resets. Read with the
   agents' own sign-in (never refreshed), at most every 5 minutes; Settings turns each agent off.
+- Scheduled tasks: a prompt for an agent (claude, codex or a preset of theirs) in a project (or any folder), in a new workspace
+  each run, the folder itself (no worktree) or one workspace's agent, at times written in English (`every day at 2am except weekends`, `every
+  2 hours from 9am to 6pm`, `tomorrow at 7am`); `{{DD-MM-YY}}`-style dates in the name and prompt, so each run's workspace is
+  told apart (and has a clock in the sidebar); a log of runs (missed ones too); a clock in the sidebar's header.
 - Remote access: the whole app in a browser elsewhere (a phone, another computer), through a cloudflared
   tunnel to the daemon for one email address (Cloudflare's one-time code) plus a key in the link; 1, 2, 4, 8
-  or 24 hours, then it stops; a QR code; a new key each time.
+  or 24 hours, then it stops, or forever (until stopped); a QR code; a new key each time; also from ⌘K. A phone gets its own layout: a
+  sliding sidebar, one pane at a time, full-screen panels, and keys a phone keyboard lacks.
 - Expose to the world: $PORT or a listening port at a trycloudflare.com link (cloudflared Quick Tunnels, no account),
   with a QR code for a phone; public by default, or only some email addresses and whole domains (`*@gmail.com`;
   `--allowed-mail`, one-time codes). A project's default (its settings, or `expose` in `.laki.json`) fills the popup
@@ -117,9 +122,9 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - ⌘/ (or the sidebar's ?): a page with the keys, status glyphs, where things are and the main CLI commands.
 
 **Look**
-- 36 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; eighteen of
+- 50 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; thirty-two of
   them also change shapes, borders and type (a CRT, Win95-style bevels, Aqua gel, soft clay, a handheld's LCD, a
-  ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass…).
+  ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass, stained glass, a comic, a radar…).
   Glass (a see-through, blurred window, with
   sliders for the window, sidebar and terminals, and a color glow); Inter and
   JetBrains Mono bundled as the default interface and terminal fonts; an interface font setting.

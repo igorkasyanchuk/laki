@@ -51,6 +51,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
     [`${cli} run <ws>`, 'the run script, in a dev tab'],
     ...(ship ? ([[`${cli} ship <ws> -m "message"`, 'commit, push and open a PR']] as [string, string][]) : []),
     [`${cli} archive <ws> · restore <ws> · fork <ws> · rm <ws>`, 'put a workspace away, bring it back, branch off it, delete it'],
+    [`${cli} schedule add <project> --when "weekdays at 9am" "…"`, 'a prompt on repeat (--where new|folder|<ws>, --name "Nightly {{DD-MM}}"); schedule, schedule log, on|off|run|rm <id>'],
     [`${cli} stop`, 'stop the daemon: agents resume when it starts again'],
     [`${cli} help`, 'every command'],
   ]
@@ -69,6 +70,9 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
     '',
     '# watch an agent from another terminal',
     `while sleep 5; do clear; ${cli} screen fix-login; done`,
+    '',
+    '# a nightly agent in a fresh worktree, named by its date',
+    `${cli} schedule add app --when "every day at 2am except weekends" --name "Nightly {{DD-MM}}" "update the deps, run the tests"`,
     '',
     '# a tab that runs the tests on every change',
     `${cli} tab fix-login --cmd "npm test -- --watch"`,
@@ -127,6 +131,10 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           </Row>
           <Row k="Actions">
             Settings › Actions (and a project's): a prompt for Claude Code or Codex, or a command for a terminal. Run ▾ lists them for the workspace you're in.
+          </Row>
+          <Row k="Scheduled">
+            The clock at the top of the sidebar (or ⌘K): a prompt for Claude Code or Codex at times you write, like “every day at 2am except weekends”, in a
+            new workspace each run or one you pick. {'{{DD-MM-YY}}'} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.
           </Row>
           <Row k="Look">Settings › Appearance: themes (✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow) and the interface font.</Row>
           <Row k="Files">The side panel's preview colors code up to 50 KB; the status bar's path has a copy button.</Row>

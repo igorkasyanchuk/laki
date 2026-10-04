@@ -1,7 +1,8 @@
 # AGENTS.md
 
 Notes for coding agents working on **Laki** (CLI `laki`): how the code works and how to change it
-safely. User-facing docs are in `README.md`; the product, in `requirements/`. Laki is a successor to wb
+safely. User-facing docs: `README.md` (the short version: features, install, quick start) and `docs/guide.md` (the
+full guide); the product, in `requirements/`. Laki is a successor to wb
 (`~/projects/specdrop-cli`, tmux + iTerm). That repo is read-only from here; ideas and code are ported
 from it (limits, hooks).
 
@@ -59,7 +60,7 @@ every view as `api`; a running daemon below the renderer's (it outlives app upda
 the app · restart* in the status bar (`StaleDaemon` in `ui.tsx`: `shutdown`, then main starts the new one).
 Bump `API` when the renderer starts relying on a new method or daemon behavior (1: the tunnel methods; 2: a
 project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a project's `actions`, kept by `projectSet`;
-4: `usage`; 5: remote access). A
+4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`), `openIn` (an app id, or `editor`: the default);
@@ -71,6 +72,9 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
 - worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only), `prThreads`, `openIn` with a `file` (paths must stay inside the
   workspace: `inside`);
 - the agent skill (Settings): `skills`, `skillSet` with an `agent` (claude, codex) and `on`;
+- scheduled tasks: `scheduleSet` (makes one, or changes one by `id`: name, project, preset, ws, prompt, when, on;
+  a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
+  `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`: resolves once there's a link),
   `remoteStop`, `remoteTick` (`now`: tests move the clock);
 - terminals: `screen`, `input`, `resize`, `view`, `detach`.
@@ -91,7 +95,8 @@ on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
 - **Attach** sends a snapshot, built with `@xterm/addon-serialize`, plus what serialize leaves out:
   cursor visibility and style, mouse encoding, scroll region.
 - The live stream follows on the same socket, in order.
-- Any number of clients can attach.
+- Any number of clients can attach. The PTY takes the size of the one that typed or resized last (`resizeFor`,
+  `follow`: a phone, then the Mac).
 - **Exit**: a signal reports code 128+signal. A shell's exit, or an agent's with code 0, closes its tab
   (`core.ts` `onExit`), unless the daemon ended it: closing, archiving and shutdown drop the session from `sessions`
   first, restarting replaces it.
@@ -174,15 +179,29 @@ cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. T
 
 `core.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
 (`http://127.0.0.1:<daemon port>`), always with one `--allowed-mail` (`ONE_MAIL`: an address, never a
-`*@domain`; kept as `settings.remoteMail`), for `REMOTE_HOURS` (1, 2, 4, 8, 24). Each start makes a
-`remoteToken`; `remoteView` (`view.remote`) gives the link, `<url>/#token=<token>`, which the renderer
-(`api.ts`: no port in the hash) uses on the page's own origin. While it runs, `main.ts` takes that token as
+`*@domain`; kept as `settings.remoteMail`), for `REMOTE_HOURS` (1, 2, 4, 8, 24, or 0: forever, no `until`). Each start makes a
+`remoteToken`; `remoteView` (`view.remote`) gives the link, `<url>/?token=<token>` (a query: Cloudflare's email sign-in drops a
+hash), which the renderer (`api.ts`: no port) uses on the page's own origin. While it runs, `main.ts` takes that token as
 well as its own and the tunnel's URL as an Origin; `remoteStop` drops both, so an old link is dead. It ends by
 `remoteStop`, at `until` (`remoteTick`, every 15 s), when cloudflared exits, or at shutdown.
 
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`, or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's
 `connect-src 'self'` lets the page reach its own daemon over `wss://`.
+
+### Scheduled tasks
+
+`core.ts` `scheduleSet`, `scheduleTick` (every 30 s), `runSchedule`; the rule comes from `shared/when.ts` `parseWhen`
+(a line of English to days of the week and minutes after midnight, in the Mac's time zone; `once` for
+`once`/`tomorrow`), kept with the text so "tomorrow" means the day it was saved; `nextRun` gives `next`; `stamp` fills `{{DD-MM-YY}}`-style
+dates (only braces of date tokens) in the name and prompt with the run's time. A run (ws) makes a new workspace
+(`new`: `wsNew` with the preset and prompt; `wsTitle` names it, the task's `schedule` id marks it: the sidebar's clock),
+or uses the project's own folder (`local`: its local workspace, made by the first run, no worktree) or a workspace
+(its id); in those two, the prompt goes to the
+workspace's running agent of that preset (`send` whenIdle), else a new tab with it. Every run, or a missed one (more
+than `MISSED_AFTER`, 30 minutes, late: skipped), goes to `state.runs` (the last 200; the view has 50). A tick moves
+every due task on before it runs any, so a slow worktree isn't started twice. Removing a project removes its tasks; a
+gone or archived workspace is a failed run.
 
 ### Usage
 
@@ -209,14 +228,20 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.side`: the sidebar width; `laki.sideOpen`: whether it's shown; `laki.info`: the info panel;
     - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel;
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
+    - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
   - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one.
   - The project and workspace order is the daemon's (`reorder`).
+- **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
+  sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
+  `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
+  xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only.
 - **`Term.tsx`**: one xterm per pane. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a
-  dialog (and so focused the terminal) would type a stray ⏎.
+  dialog (and so focused the terminal) would type a stray ⏎. On window focus or a page turning visible it sends
+  its size again, so a look is enough to get it back after a phone.
 - **`layout.ts`**: tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
   session is in exactly one tab and nothing nests. Pure functions: `groupsOf` (stored tabs minus ended
   sessions, plus one tab per unplaced session), `move` (a pane or a whole tab next to a pane, or out to the
@@ -277,12 +302,17 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
   or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
   as SVG, also Remote access's.
+- **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar header's clock, ⌘K): a project filter
+  (`only`), the form with `parseWhen`'s reading, the next runs and the dated names (*Another folder…*: `pick`, the
+  folder picker, or a typed path in a browser, then `projectAdd`), the tasks (switch, Run now, edit, delete), the runs' log (a click goes to
+  the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
+  `laki.runsSeen` (localStorage: the newest run the page showed).
 - **`Usage.tsx`**: the status bar's first item, the plan-limits ring (`UsageButton`: the most-used limit, asked
   every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset.
   `USAGE_AGENTS` names the agents Settings › General has switches for.
 - **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys, status glyphs, where things are, the main CLI
   commands and recipes (`cli`: the app's command; `ship`: list `ship`). Keep it in step with
-  README's keys and CLI recipes.
+  the guide's keys and CLI recipes.
 - **`qr.ts`**: a QR encoder (byte mode, level M, versions 1–40, best mask), for the tunnel's link. Its test
   compares a code with macOS CoreImage's (`test/qr.test.ts`).
 - **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings), the palette,
@@ -308,10 +338,11 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 5 minutes |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
+| `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` and `wsTitle` (a run's dated names) |
 | `src/cli/main.ts` | the `laki` CLI and `laki hook` |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `actions` (Run ▾'s), `usage` (plan limits, a fake server) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift` |
 
 ## Conventions
@@ -326,6 +357,6 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
   origin of its own that end with it; only the page's static files skip the checks.
 - **Colors** come from CSS variables in `styles.css` (`:root`). The terminal theme reads them through `css('--…')`.
 - **`asar` is off**, because node-pty's helper must be a real file. The packaged daemon runs on Electron's node.
-- **User-facing text** is short and plain. When adding commands or keys, update `README.md` (keys, CLI)
-  and the CLI's usage.
+- **User-facing text** is short and plain. When adding commands or keys, update `docs/guide.md` (keys, CLI),
+  `README.md` when it's a main one, and the CLI's usage (`src/shared/usage.ts`, which the agent skill quotes).
 - **Commits** end with the `Co-Authored-By` trailer. Never push.

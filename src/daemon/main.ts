@@ -134,11 +134,15 @@ const api: Record<string, Handler> = {
   tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message),
   screen: p => core.screen(p.target, p.lines),
-  input: p => core.input(p.tab, p.data),
-  resize: p => core.resize(p.tab, p.cols, p.rows),
+  input: (p, c) => core.input(p.tab, p.data, c),
+  resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
   view: (p, c) => c && core.setView(c, p),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
+  scheduleSet: p => core.scheduleSet(p),
+  scheduleRm: p => core.scheduleRm(p.id),
+  scheduleRun: p => core.scheduleRun(p.id),
+  scheduleTick: p => core.scheduleTick(p.now), // tests move the clock
   remoteStart: p => core.remoteStart(p),
   remoteStop: () => core.remoteStop(),
   remoteTick: p => core.remoteTick(p.now), // tests move the clock
@@ -240,6 +244,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(2000, core.sweepRunning)
   every(30000, () => core.watchLimits())
   every(15000, () => core.remoteTick())
+  every(30000, () => core.scheduleTick())
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)
 })
 

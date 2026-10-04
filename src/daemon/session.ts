@@ -20,7 +20,7 @@ export class Session {
   readonly pty: IPty
   readonly term: InstanceType<typeof headless.Terminal>
   private ser = new serializeAddon.SerializeAddon()
-  private clients = new Map<Client, { ready: boolean; pending: string[] }>()
+  private clients = new Map<Client, { ready: boolean; pending: string[]; size?: [number, number] }>() // size: the client's own
   responder: Client | null = null
   exited = false
   exitCode = 0
@@ -64,7 +64,7 @@ export class Session {
   // reply gets null when a newer attach (or a detach) of the same client came first.
   attach(c: Client, cols: number | undefined, rows: number | undefined, reply: (r: { snapshot: string; cols: number; rows: number } | null) => void) {
     if (cols && rows) this.resize(cols, rows)
-    const st = { ready: false, pending: [] as string[] }
+    const st = { ready: false, pending: [] as string[], size: cols && rows ? ([cols, rows] as [number, number]) : undefined }
     this.clients.set(c, st)
     // the callback runs once the headless terminal parsed everything written so far
     this.term.write('', () => {
@@ -98,6 +98,17 @@ export class Session {
 
   write(data: string) {
     if (!this.exited) this.pty.write(data)
+  }
+
+  // one PTY, clients of different sizes (a phone, a Mac): it takes the size of the one that typed or resized last
+  resizeFor(c: Client, cols: number, rows: number) {
+    const st = this.clients.get(c)
+    if (st) st.size = [cols, rows]
+    this.resize(cols, rows)
+  }
+  follow(c: Client) {
+    const z = this.clients.get(c)?.size
+    if (z) this.resize(z[0], z[1])
   }
 
   resize(cols: number, rows: number) {

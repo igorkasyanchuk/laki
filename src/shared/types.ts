@@ -1,4 +1,5 @@
 // Shapes shared by the daemon, the CLI and the renderer.
+import type { Rule } from './when.ts'
 
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
 // each field overrides .laki.json's (env key by key)
@@ -22,6 +23,7 @@ export type Workspace = {
   archived?: boolean
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
+  schedule?: string // the scheduled task that made it (its clock in the sidebar)
   autoFix?: boolean // failing CI goes to the agent
   autoReview?: boolean // new PR review comments go to the agent
   fix?: PRFix // what autoFix/autoReview sent already
@@ -75,16 +77,24 @@ export type Settings = {
   remoteMail?: string // the one email remote access lets in
 }
 
-// remote access (core.ts): who may open it, until when (ms), and once cloudflared has one, its URL and the link
+// remote access (core.ts): who may open it, until when (ms; none: until stopped), and once cloudflared has one, its URL and the link
 // with the token
-export type Remote = { mail: string; until: number; url?: string; link?: string }
+export type Remote = { mail: string; until?: number; url?: string; link?: string }
 
 // a plan's limit (daemon/usage.ts): used %, when it resets (ms); note: what the % is of, for an amount (extra usage)
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
 // an agent's limits; error: why there are none (signed out…); at: when they were read
 export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings }
+// a scheduled task: at the times `when` says (rule: what it said when saved, shared/when.ts), its prompt goes to an
+// agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
+// no worktree), or in that workspace (its running agent of the preset, queued while it works; else a new tab). next:
+// when it runs (none: off, or a once that ran)
+export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number }
+// one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
+export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
+
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[] }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -118,9 +128,10 @@ export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; tunne
 
 // presets: the agents a tab or workspace can start (Settings' presets, or claude and codex); api: the
 // daemon's API (none: older than API existed)
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; api?: number }
+// schedules and runs (newest first): scheduled tasks and their log
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; api?: number }
 
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 5
+export const API = 6

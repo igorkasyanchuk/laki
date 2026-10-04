@@ -12,6 +12,8 @@ import { FindBar } from './Find'
 import { FONT_SIZE, fontStack, termLook } from './Settings'
 import { termTheme, transparent } from './themes'
 
+export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
+
 export function Term({
   tab,
   active = true,
@@ -112,15 +114,23 @@ export function Term({
       raf = requestAnimationFrame(() => box.current?.offsetParent && fit.fit())
     })
     ro.observe(box.current!)
+    // the size is the last client's to look (a phone, then this Mac): back here, it's this one's again
+    const mine = () => document.visibilityState === 'visible' && api.send('resize', { tab, cols: term.cols, rows: term.rows })
+    window.addEventListener('focus', mine)
+    document.addEventListener('visibilitychange', mine)
     if (api.connected) attach()
     setXt({ term, search, fit })
     ;(window as any).__term = term // for inspection in dev tools
+    xterms.set(tab, term)
     return () => {
       alive = false
       api.send('detach', { tab })
       off()
       ro.disconnect()
+      window.removeEventListener('focus', mine)
+      document.removeEventListener('visibilitychange', mine)
       hooks.forEach(h => h.dispose())
+      if (xterms.get(tab) === term) xterms.delete(tab)
       term.dispose()
     }
   }, [tab])

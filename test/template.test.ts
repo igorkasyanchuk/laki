@@ -35,3 +35,61 @@ test('themes: unique ids, and every look has rules in look.css', async () => {
   assert.equal(new Set(THEMES.map(t => t.id)).size, THEMES.length)
   for (const t of THEMES) if (t.look) assert.ok(css.includes(`[data-look='${t.look}']`), t.look)
 })
+
+// themes.ts paints <html>: a stand-in with a style of CSS variables, and the stylesheet's :root (the default theme)
+function fakeDom(root: Record<string, string>) {
+  const props = new Map<string, string>()
+  const style = {
+    setProperty: (k: string, v: string) => void props.set(k, v),
+    removeProperty: (k: string) => void props.delete(k),
+    getPropertyValue: (k: string) => props.get(k) ?? '',
+    colorScheme: '',
+    [Symbol.iterator]: () => props.keys(),
+  }
+  const classes = new Set<string>()
+  const html = { style, dataset: {} as Record<string, string>, classList: { toggle: (c: string, on: boolean) => void (on ? classes.add(c) : classes.delete(c)) } }
+  class CSSStyleRule {
+    selectorText = ':root'
+    style = { getPropertyValue: (k: string) => root[k] ?? '' }
+  }
+  Object.assign(globalThis, { CSSStyleRule, document: { documentElement: html, styleSheets: [{ cssRules: [new CSSStyleRule()] }] }, getComputedStyle: () => style })
+  return { props, style, html, classes }
+}
+
+test('themes: applyTheme paints a theme, glass at its sliders, then the default again; termTheme reads it back', async () => {
+  const { THEMES, applyTheme, preview, paintOf, paintKey, termTheme, transparent, UI_FALLBACK } = await import('../src/renderer/src/themes.ts')
+  const { props, style, html, classes } = fakeDom({ '--bg': '#0e1014', '--side': '#12151b', '--fg': '#d5d9e3' })
+  const kraft = THEMES.find(t => t.id === 'kraft')!
+
+  applyTheme('kraft')
+  assert.deepEqual([props.get('--bg'), props.get('--ansi-15'), props.get('--tc-purple'), html.dataset.look, style.colorScheme], ['#dcc39a', kraft.ansi![15], kraft.c!.purple, 'kraft', 'light'])
+  assert.equal(transparent(), false)
+  const term = termTheme()
+  assert.deepEqual([term.background, term.red, term.brightWhite, term.cursor], ['#dcc39a', kraft.ansi![1], kraft.ansi![15], kraft.c!.accent])
+
+  // glass: the window at 100 - 50%, the sidebar at 100 - 60% (its default), solid terminals; no glow
+  applyTheme({ theme: 'circuit', glass: true, glassWindow: 50, glassTerm: 0, glassGlow: false, uiFont: 'Futura' })
+  assert.deepEqual([props.get('--app-bg'), props.get('--side'), props.get('--term-bg'), props.get('--bg')], ['linear-gradient(#06261c80 0 0)', '#05201766', '#06261cff', '#06261c'])
+  assert.equal(props.get('--ui-font'), `"Futura", ${UI_FALLBACK}`)
+  assert.ok(classes.has('glass'))
+  assert.equal(transparent(), false) // nothing shows through the terminals
+
+  // the default theme under glass: the stylesheet's colors, with the glow; see-through terminals
+  applyTheme({ glass: true, uiFont: 'system' })
+  assert.match(props.get('--app-bg')!, /^radial-gradient.*linear-gradient\(#0e10148c 0 0\)$/)
+  assert.deepEqual([props.get('--term-bg'), props.get('--ui-font'), props.get('--bg'), html.dataset.look], ['#0e101400', UI_FALLBACK, undefined, ''])
+  assert.equal(transparent(), true)
+
+  // a gradient theme: see-through terminals without glass; an unknown id is the default, every variable gone
+  applyTheme('aurora')
+  assert.deepEqual([props.get('--term-bg'), transparent()], ['#00000000', true])
+  applyTheme('nope')
+  assert.deepEqual([[...props.keys()], style.colorScheme, classes.has('glass'), transparent()], [[], '', false, false])
+
+  // Settings' cards and what the terminals watch
+  assert.deepEqual(preview(kraft), [kraft.c!.bg, kraft.c!.panel, kraft.c!.fg, kraft.c!.accent, ...kraft.ansi!.slice(1, 6)])
+  assert.match(preview(THEMES.find(t => t.id === 'aurora')!)[0], /^linear-gradient\(135deg/)
+  assert.equal(preview(THEMES[0])[0], '#0e1014')
+  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined })
+  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null]')
+})
