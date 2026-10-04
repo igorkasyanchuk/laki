@@ -17,12 +17,14 @@ let linkReady = false // the renderer listens for links
 if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', () => show())
 // laki://… (Info.plist names the scheme): the renderer routes it; it only selects and opens pages, never creates
-app.on('open-url', (e, url) => {
-  e.preventDefault()
-  if (!url.startsWith('laki:')) return
+const openLink = (url: string) => {
   if (linkReady && win) win.webContents.send('deep-link', url)
   else link = url
   if (app.isReady()) show()
+}
+app.on('open-url', (e, url) => {
+  e.preventDefault()
+  if (url.startsWith('laki:')) openLink(url)
 })
 ipcMain.on('deep-link-ready', () => {
   linkReady = true
@@ -178,7 +180,7 @@ Menu.setApplicationMenu(
     {
       label: app.name,
       submenu: [
-        { role: 'about' },
+        { label: `About ${app.name}`, click: () => openLink('laki://about') }, // the renderer's: with the website
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },

@@ -51,13 +51,16 @@ const paths = {
   bellOff: 'M4 11V7a4 4 0 018 0v4l1.5 1.5h-11zM6.5 13.5a1.5 1.5 0 003 0M2.5 2.5l11 11',
   clock: 'M8 14a6 6 0 100-12 6 6 0 000 12zM8 4.7V8l2.3 1.5',
   help: 'M8 14a6 6 0 100-12 6 6 0 000 12zM6.2 6.3a1.9 1.9 0 113 1.5c-.7.5-1.2.9-1.2 1.7M8 11.2v.01',
+  // GitHub's mark (Octicons, MIT), filled
+  github:
+    'M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z',
   pr: 'M5.8 3a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM5.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM12.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM4.5 4.3v7.4M11.5 11.7V7.5a2 2 0 00-2-2H7M8.5 4L7 5.5 8.5 7',
 }
 export type IconName = keyof typeof paths
 
 export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
   return (
-    <svg className="icon-svg" width={size} height={size} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={name === 'more' ? 2.4 : 1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <svg className="icon-svg" width={size} height={size} viewBox="0 0 16 16" fill={name === 'github' ? 'currentColor' : 'none'} stroke={name === 'github' ? 'none' : 'currentColor'} strokeWidth={name === 'more' ? 2.4 : 1.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
       <path d={paths[name]} />
     </svg>
   )
@@ -134,6 +137,7 @@ export type RowDrop = { kind: string; id: string; target: string; after: boolean
 // pointer would drop, for an insertion line
 export function useRowDrag(onDrop: (d: RowDrop) => void) {
   const [over, setOver] = useState<RowDrop | null>(null)
+  const dragged = useRef(false)
   const done = useRef(onDrop)
   done.current = onDrop
   const start = (e: PE, kind: string, id: string, group = '') => {
@@ -141,6 +145,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
     const y0 = e.clientY
     let cur: RowDrop | null = null
     let moved = false
+    dragged.current = false
     const move = (ev: PointerEvent) => {
       if (!moved && Math.abs(ev.clientY - y0) < 5) return
       moved = true
@@ -155,6 +160,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
       setOver(null)
+      dragged.current = moved // the click that ends a drag isn't one
       if (cur) done.current(cur)
     }
     window.addEventListener('pointermove', move)
@@ -162,7 +168,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
   }
   // the class a row gets while something would drop next to it
   const at = (kind: string, id: string) => (over?.kind === kind && over.target === id ? (over.after ? 'drop-after' : 'drop-before') : '')
-  return { start, at }
+  return { start, at, dragged: () => dragged.current }
 }
 
 // ids with d.id moved next to d.target

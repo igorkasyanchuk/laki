@@ -1,18 +1,30 @@
-// The agent skill: SKILL.md and a launcher for the CLI in ~/.claude/skills/laki and ~/.codex/skills/laki, so
-// Claude Code and Codex sessions know laki and can drive it. Written only when the user asks (Settings).
+// The agent skill: SKILL.md and a launcher for the CLI in each agent's skills folder (~/.claude/skills/laki,
+// ~/.codex/…, ~/.gemini/…, ~/.grok/…, ~/.config/opencode/…), so their sessions know laki and can drive it. Written
+// only when the user asks (Settings).
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { USAGE } from '../shared/usage.ts'
 import { cliArgv, cliEnv, dir, q } from './core.ts'
 
-const AGENTS = { claude: { name: 'Claude Code', home: '.claude' }, codex: { name: 'Codex', home: '.codex' } }
+// home: the agent's folder in ~ (its skills/ is where it looks); add: its `mcp add` for the user's scope, before the
+// command (gemini's takes no --: the command's arguments follow its name)
+const AGENTS = {
+  claude: { name: 'Claude Code', home: '.claude', add: 'claude mcp add -s user laki --' },
+  codex: { name: 'Codex', home: '.codex', add: 'codex mcp add laki --' },
+  gemini: { name: 'Gemini', home: '.gemini', add: 'gemini mcp add -s user laki' },
+  grok: { name: 'Grok', home: '.grok', add: 'grok mcp add -s user laki --' },
+  opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // ponytail: ~/.config, not $XDG_CONFIG_HOME
+}
 export type SkillAgent = keyof typeof AGENTS
-// mcp: the command that adds Laki as the agent's MCP server (the user runs it: we never write the agents' config)
-export type SkillInfo = { agent: SkillAgent; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp: string }
+// mcp: what adds Laki as the agent's MCP server, which the user runs or pastes (we never write the agents' config):
+// a command, or for opencode (its `mcp add` only asks questions) the lines for mcpIn, its config file
+export type SkillInfo = { agent: SkillAgent; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp: string; mcpIn?: string }
 
 const skillDir = (a: SkillAgent) => join(homedir(), AGENTS[a].home, 'skills', 'laki')
-const mcpCmd = (a: SkillAgent) => `${a} mcp add ${a === 'claude' ? '-s user ' : ''}laki -- ${['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp'].map(q).join(' ')}`
+const mcpArgv = () => ['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp']
+const mcpCmd = (a: SkillAgent) =>
+  AGENTS[a].add ? `${AGENTS[a].add} ${mcpArgv().map(q).join(' ')}` : JSON.stringify({ mcp: { laki: { type: 'local', command: mcpArgv() } } }, null, 2)
 
 // the files, as they'd be written now: the launcher holds this install's paths
 function files(at: string): Record<string, string> {
@@ -108,7 +120,7 @@ function info(a: SkillAgent): SkillInfo {
   const want = Object.entries(files(at))
   const have = want.filter(([f]) => existsSync(join(at, f)))
   const state = !have.length ? 'missing' : have.length === want.length && want.every(([f, t]) => readFileSync(join(at, f), 'utf8') === t) ? 'installed' : 'outdated'
-  return { agent: a, name: AGENTS[a].name, path: at, state, mcp: mcpCmd(a) }
+  return { agent: a, name: AGENTS[a].name, path: at, state, mcp: mcpCmd(a), ...(!AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, 'opencode.json') }) }
 }
 
 export const skills = () => (Object.keys(AGENTS) as SkillAgent[]).map(info)

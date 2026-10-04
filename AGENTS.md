@@ -74,8 +74,9 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`);
-- the agent skill (Settings): `skills` (each with `mcp`: the `claude|codex mcp add` command, shown, never run),
-  `skillSet` with an `agent` (claude, codex) and `on`;
+- the agent skill (Settings): `skills` (each with `mcp`: the agent's `mcp add` command, shown, never run; for
+  opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
+  (claude, codex, gemini, grok, opencode: `skill.ts` `AGENTS`, each one's home and `mcp add`) and `on`;
 - scheduled tasks: `scheduleSet` (makes one, or changes one by `id`: name, project, preset, ws, prompt, when, on;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
@@ -239,7 +240,7 @@ tool call (`ensureDaemon`), never before. Tested in `test/cli.test.ts`.
 `laki://` (electron-builder's `protocols`, `setAsDefaultProtocolClient` when packaged): main's `open-url` queues a
 link until the renderer says `deep-link-ready` (preload's `onDeepLink`; a main-frame navigation resets it), then
 sends `deep-link`. `links.ts` `parseLink` (tested in `test/links.test.ts`), App routes it once the view is in: a
-workspace or tab, the new-workspace page filled in (`initial`), Scheduled tasks, Settings, Help. Links select and fill
+workspace or tab, the new-workspace page filled in (`initial`), Scheduled tasks, Settings, Help, About. Links select and fill
 in; they never create or run anything.
 
 ### Preview
@@ -280,12 +281,16 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.tabs`: the selected tab per workspace;
     - `laki.groups`: each workspace's tabs, each a split tree of sessions;
     - `laki.side`: the sidebar width; `laki.sideOpen`: whether it's shown; `laki.info`: the info panel;
+    - `laki.folded`: the projects whose workspaces the sidebar hides (a click on the project's head; `rows.dragged`
+      keeps a drag's click from folding it);
     - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel;
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
   - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one.
+  - A workspace with a PR gets GitHub's mark in the sidebar (`.ws-pr`, its `prState` and failing checks as colors),
+    unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`).
   - The project and workspace order is the daemon's (`reorder`).
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
@@ -364,7 +369,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   folder picker, or a typed path in a browser, then `projectAdd`), the tasks (switch, Run now, edit, delete), the runs' log (a click goes to
   the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
   `laki.runsSeen` (localStorage: the newest run the page showed).
-- **`Usage.tsx`**: the status bar's first item, the plan-limits ring (`UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
+- **`Usage.tsx`**: the status bar's first item, the plan-limits ring (in the theme's `--accent`, then `--waiting` and `--error`; `UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
   every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset.
   `USAGE_AGENTS` names the agents Settings › General has switches for.
 - **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys, status glyphs, where things are, the main CLI
@@ -373,7 +378,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 - **`qr.ts`**: a QR encoder (byte mode, level M, versions 1–40, best mask), for the tunnel's link. Its test
   compares a code with macOS CoreImage's (`test/qr.test.ts`).
 - **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings), the palette,
-  prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker).
+  prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
+  (`SITE`, the version from `package.json`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`).
 - **`links.ts`**: `parseLink` and `wsLink` (laki:// links, above).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
@@ -390,7 +396,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
-| `src/daemon/skill.ts` | the agent skill: SKILL.md and a CLI launcher in `~/.claude/skills/laki` and `~/.codex/skills/laki` (`skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
+| `src/daemon/skill.ts` | the agent skill: SKILL.md and a CLI launcher in each agent's `skills/laki` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
 | `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 5 minutes |

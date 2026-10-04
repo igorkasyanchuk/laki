@@ -2,8 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { API, type Project, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
-import { type AutoKey, InfoPanel, PRStatus, type WsInfo } from './Info'
-import { AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt } from './panels'
+import { type AutoKey, ciText, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
+import { About, AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { Glyph } from './Glyph'
 import icon from './icon.svg'
@@ -20,7 +20,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'schedules' | { schedules: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'schedules' | { schedules: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -116,6 +116,7 @@ export function App() {
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
   const [sideW, setSideW] = useState<number>(() => load('laki.side', SIDE))
   const [sideOpen, setSideOpen] = useState<boolean>(() => load('laki.sideOpen', true))
+  const [folded, setFolded] = useState<string[]>(() => load('laki.folded', [])) // projects whose workspaces are hidden
   const [runsSeen, setRunsSeen] = useState<string>(() => load('laki.runsSeen', '')) // the newest scheduled run read
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [error, setError] = useState('')
@@ -145,6 +146,7 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
   useEffect(() => void localStorage.setItem('laki.side', JSON.stringify(sideW)), [sideW])
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
+  useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
   useEffect(() => void localStorage.setItem('laki.info', JSON.stringify(info)), [info])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
   // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
@@ -235,6 +237,7 @@ export function App() {
     } else if (l?.to === 'schedules') setDialog({ schedules: proj(l.project) ?? '' })
     else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section } : 'settings')
     else if (l?.to === 'help') setDialog('help')
+    else if (l?.to === 'about') setDialog('about')
     else toast(`Laki can't open ${link.slice(0, 80)}`)
   }, [link, view])
 
@@ -545,10 +548,13 @@ export function App() {
         { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(ws, false) },
       ]
   const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
+  // fold a project's workspaces away, or back; ids of removed projects go
+  const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => view?.projects.some(p => p.id === x)))
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
+      { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
       { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => confirm(`Remove project ${p.name}? Its files stay.`) && call('projectRm', { id: p.id }) },
@@ -573,6 +579,9 @@ export function App() {
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
+    a({ label: 'About Laki', icon: 'info', run: () => setDialog('about') })
+    a({ label: 'Collapse all projects', icon: 'chevronRight', run: () => setFolded(view?.projects.map(p => p.id) ?? []) })
+    a({ label: 'Expand all projects', icon: 'chevron', run: () => setFolded([]) })
     a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: '⌘B', run: () => setSideOpen(o => !o) })
     if (!view?.remote) {
       if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
@@ -654,22 +663,39 @@ export function App() {
           <IconButton icon="gear" title="Settings (⌘,)" on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
         <div className="side-scroll">
-          {view.projects.map(p => (
+          {view.projects.map(p => {
+            const mine = live.filter(w => w.project === p.id)
+            const shut = folded.includes(p.id)
+            // a folded project's busiest (a setup script counts as running, as on its row)
+            const sum = shut ? rollup([...view.tabs.filter(t => mine.some(w => w.id === t.workspace)), ...(mine.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])]) : 'idle'
+            return (
             <div key={p.id} className="project">
               <div
                 className={`project-head ${rows.at('project', p.id)}`}
-                title={p.path}
+                data-tip={`${p.path} · click to ${shut ? 'expand' : 'collapse'}`}
                 data-row={`project:${p.id}`}
                 onPointerDown={e => rows.start(e, 'project', p.id)}
+                onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(p.id)}
                 onContextMenu={e => openMenu(e, projectActions(p))}
               >
+                <span className="project-chev">
+                  <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
+                </span>
+                <span className="project-icon">
+                  <Icon name={p.git === false ? 'folder' : 'fork'} size={12} />
+                </span>
                 <span className="project-name">{p.name}</span>
+                {shut && mine.length > 0 && (
+                  <>
+                    {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}
+                    <span className="project-count">{mine.length}</span>
+                  </>
+                )}
                 <span className="spacer" />
                 <IconButton icon="plus" title="New workspace" onClick={() => newWs(p.id)} />
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
-              {live
-                .filter(w => w.project === p.id)
+              {(shut ? mine.filter(w => w.id === ws?.id) : mine) // folded: the selected one stays
                 .map(w => {
                   const wt = view.tabs.filter(t => t.workspace === w.id)
                   const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -683,7 +709,7 @@ export function App() {
                       onPointerDown={e => rows.start(e, 'ws', w.id, p.id)}
                       onClick={() => (setWsId(w.id), narrow && setSideOpen(false))}
                       onContextMenu={e => openMenu(e, wsMenu(w))}
-                      title={`${w.branch || w.path} · $PORT ${w.port}${w.schedule ? ` · from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd() : ''}${w.muted ? ' · notifications muted' : ''}`}
+                      data-tip={`${w.branch || w.path} · $PORT ${w.port}${w.schedule ? ` · from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd() : ''}${w.muted ? ' · notifications muted' : ''}`}
                     >
                       <Glyph s={w.setup ? 'running' : rollup(wt)} />
                       <span className="ws-name">{wsName(w)}</span>
@@ -699,11 +725,17 @@ export function App() {
                           <Icon name="clock" size={11} />
                         </span>
                       )}
+                      {w.pr && settings.prIcon !== false && (
+                        <span className={`ws-pr ${prState(w.pr)} ${w.pr.checks === 'fail' ? 'fail' : ''}`} data-tip={`PR #${w.pr.number} · ${prState(w.pr)}${w.pr.checks ? ` · ${ciText(w.pr)}` : ''}${w.pr.title ? ` · ${w.pr.title}` : ''}`}>
+                          <Icon name="github" size={11} />
+                        </span>
+                      )}
                     </div>
                   )
                 })}
             </div>
-          ))}
+            )
+          })}
           {!view.projects.length && <div className="empty-side muted">Open a folder (⌘O) or drop one here.</div>}
         </div>
       </aside>
@@ -877,6 +909,7 @@ export function App() {
           />
         )}
         {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
+        {dialog === 'about' && <About onClose={() => setDialog(null)} />}
         {schedulesFor !== undefined && (
           <SchedulesPage
             key={schedulesFor /* another project's menu: its filter */}

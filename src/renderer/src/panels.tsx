@@ -1,6 +1,8 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { version } from '../../../package.json'
 import type { View } from '../../shared/types'
-import { api, bridge } from './api'
+import { api, bridge, openExternal } from './api'
+import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { type Img, PromptInput, TemplatePick, withImages } from './PromptInput'
 import { nameOf, templated, templatesFor } from './text'
@@ -19,6 +21,25 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
         {children}
       </div>
     </div>
+  )
+}
+
+const SITE = 'https://laki.igorkasyanchuk.com'
+
+// About (the app menu's, ⌘K): the version and the website
+export function About({ onClose }: { onClose: () => void }) {
+  return (
+    <Modal title="About Laki" onClose={onClose}>
+      <div className="about">
+        <img src={icon} width={72} height={72} alt="" />
+        <b className="about-name">Laki</b>
+        <span className="muted small">Version {version}</span>
+        <p>Coding agents side by side, each task in its own git worktree.</p>
+        <a href={SITE} onClick={e => (e.preventDefault(), openExternal(SITE))}>
+          {SITE.replace('https://', '')}
+        </a>
+      </div>
+    </Modal>
   )
 }
 

@@ -186,6 +186,10 @@ textarea { resize: vertical; font-family: inherit; }
 .modal { width: 520px; max-width: calc(100vw - 32px); background: var(--panel); border: 1px solid var(--line); border-radius: 10px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5); padding: 14px; max-height: 76vh; display: flex; flex-direction: column; }
 .modal.wide { width: 680px; }
 .modal-title { font-weight: 600; margin-bottom: 10px; }
+.about { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 0 12px; text-align: center; }
+.about-name { font-size: 18px; }
+.about p { margin: 4px 0; color: var(--muted); }
+.about a { color: var(--accent); }
 .form { display: flex; flex-direction: column; gap: 10px; }
 .form label { display: flex; flex-direction: column; gap: 4px; color: var(--muted); font-size: 12px; }
 .form label.check { flex-direction: row; align-items: center; gap: 6px; }
@@ -423,6 +427,8 @@ kbd { font-family: var(--mono); }
 .ff-item b { color: var(--accent); font-weight: 700; }
 .settings-nav-head { margin: 14px 10px 4px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em; color: var(--muted); }
 .settings-nav button { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.settings-nav button > svg { flex: none; } /* a long project name squeezed its icon away */
+.settings-nav button > span { overflow: hidden; text-overflow: ellipsis; }
 
 /* expose to the world (Tunnel.tsx): the status bar's globe and its popup */
 .port-item { display: inline-flex; align-items: center; gap: 3px; }
@@ -535,5 +541,17 @@ kbd { font-family: var(--mono); }
 .schedule-only { margin-left: auto; width: auto; max-width: 50%; }
 .schedule-path { margin-top: -6px; font-family: var(--mono); overflow-wrap: anywhere; }
 .ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
+/* a workspace's PR (Settings › General): open, draft, merged, closed; failing checks win */
+.ws-pr { display: inline-flex; flex: none; color: var(--done); }
+.ws-pr.draft, .ws-pr.closed { color: var(--muted); }
+.ws-pr.merged { color: var(--tc-purple); }
+.ws-pr.fail { color: var(--error); }
+/* a project's head: click to fold its workspaces away */
+.project-head { cursor: pointer; }
+.project-chev, .project-icon { display: inline-flex; flex: none; color: var(--muted); }
+.project-chev { margin-left: -8px; width: 14px; opacity: 0.7; }
+.project-icon { margin-right: 5px; }
+.project-head .glyph { margin-left: 6px; }
+.project-count { margin-left: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
 .narrow .schedule { flex-wrap: wrap; }
 .narrow .schedule-run { flex-wrap: wrap; }

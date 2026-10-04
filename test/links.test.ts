@@ -11,6 +11,7 @@ test('links: workspaces, tabs, pages; nothing else', () => {
   assert.deepEqual(parseLink('laki://schedules'), { to: 'schedules', project: undefined })
   assert.deepEqual(parseLink('laki://settings/remote'), { to: 'settings', section: 'remote' })
   assert.deepEqual(parseLink('laki://help'), { to: 'help' })
+  assert.deepEqual(parseLink('laki://about'), { to: 'about' })
   assert.deepEqual(parseLink('laki://Help'), { to: 'help' }) // the host as typed: a non-special scheme keeps its case
   for (const bad of ['laki://ws', 'laki://rm/x', 'https://ws/x', 'laki:ws/x', 'nonsense', 'laki://ws/%E0%A4%A']) {
     const l = parseLink(bad)

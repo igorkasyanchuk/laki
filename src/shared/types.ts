@@ -74,6 +74,7 @@ export type Settings = {
   fontFamily?: string
   copyOnSelect?: boolean
   notify?: boolean
+  prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
   presets?: Preset[] | null // null: the defaults

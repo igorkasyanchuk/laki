@@ -125,7 +125,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
             Expose to the world: next to a port, a public trycloudflare.com link with a QR code for your phone, optionally only for some email addresses.
             Needs cloudflared (<code>brew install cloudflared</code>).
           </Row>
-          <Row k="Sidebar">Right click a workspace to rename, color, fork or archive it; drag to reorder.</Row>
+          <Row k="Sidebar">Click a project to fold its workspaces away; right click a workspace to rename, color, fork or archive it; drag to reorder. GitHub's mark: the workspace has a PR (red: failing checks).</Row>
           <Row k="Templates">
             Settings › Prompt templates, and each project's own: a prompt with <code>{'{{prompt}}'}</code> in it (and <code>{'{{project}}'}</code>, <code>{'{{base}}'}</code>). Pick one
             under a new workspace's prompt: the agent gets it filled in.
@@ -143,7 +143,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           <Row k="Preview">The toolbar's globe opens the side panel's Preview at localhost:$PORT (the menu has the other listening ports); the camera sends a screenshot to the agent.</Row>
           <Row k="Links">
             <code>laki://ws/&lt;id&gt;</code> opens a workspace (a workspace's or tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one,
-            <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://help</code> open pages.
+            <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://help</code>, <code>laki://about</code> open pages.
           </Row>
           <Row k="Quit">⌘Q quits the app: agents keep running in the daemon. Quit … Completely (the app menu) stops the daemon too; agents resume next time.</Row>
         </section>

@@ -63,8 +63,10 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
   ended (ok / failed). A workspace shows its most urgent tab.
 - **Queue**: follow-ups typed into an agent when its turn ends (`send --when-idle`).
 - **Scripts**: setup, teardown and run per project, in the app or in the repo's `.laki.json`.
-- **Agent skill**: `SKILL.md` and a CLI launcher in `~/.claude/skills/<cli>` and `~/.codex/skills/<cli>`, so
-  agents know Laki and can start workspaces, message other agents and read their screens.
+- **Agent skill**: `SKILL.md` and a CLI launcher in each agent's skills folder (`~/.claude/skills/<cli>`,
+  `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so agents know Laki and can start workspaces,
+  message other agents and read their screens; and what adds Laki as each one's MCP server (a command to run, or
+  OpenCode's config lines).
 
 ## What it does today
 
@@ -112,7 +114,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - Actions (Settings, global and per project): a name and a prompt for an agent, or a command for a
   terminal. Run ▾ lists them in two groups, Agent actions (only agents the workspace runs) and Terminal
   actions; a project's replaces a global one of the same name and kind.
-- Plan limits: a ring at the start of the status bar, filled to the 5-hour limit of the Claude and Codex
+- Plan limits: a ring at the start of the status bar in the theme's colors, filled to the 5-hour limit of the Claude and Codex
   plans; its popup lists each window (5-hour, weekly, per model, extra usage) and when it resets. Read with the
   agents' own sign-in (never refreshed), at most every 5 minutes; Settings turns each agent off.
 - Scheduled tasks: a prompt for an agent (claude, codex, gemini, grok, opencode or a preset of theirs) in a project (or any folder), in a new workspace
@@ -130,11 +132,13 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 
 **Help**
 - ⌘/ (or the sidebar's ?): a page with the keys, status glyphs, where things are and the main CLI commands.
+- About (the app menu, ⌘K): the version and a link to the website, laki.igorkasyanchuk.com.
 
 **Look**
-- 66 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; forty-eight of
+- 76 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; fifty-eight of
   them also change shapes, borders and type (a CRT, Win95-style bevels, Aqua gel, soft clay, a handheld's LCD, a
-  ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass, stained glass, a comic, a radar, a hacker's terminal, a darkroom…).
+  ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass, stained glass, a comic, a radar, a hacker's terminal, a darkroom,
+  cherry blossoms, a lava field, Lisbon's tiles, a diner, an e-reader, neon in the rain, folded paper…).
   Glass (a see-through, blurred window, with
   sliders for the window, sidebar and terminals, and a color glow); Inter and
   JetBrains Mono bundled as the default interface and terminal fonts; an interface font setting.
@@ -142,7 +146,8 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
   project's own (listed first; one of a global one's name replaces it).
 - File preview with syntax colors (up to 50 KB); the status bar's path short, with a copy button.
 - Tab and workspace colors; compact layout aligned with the window's traffic lights; resizable, collapsible
-  sidebar (⌘B).
+  sidebar (⌘B); each project's workspaces fold away (a click on it), with its busiest status and count left; a
+  project's icon says repo or folder; GitHub's mark on a workspace with a PR (its state's color; a setting).
 
 **CLI**
 - `ls [--json]`, `project add|ls|rm`, `new`, `tab`, `send [--when-idle]`, `screen`, `diff`, `run`, `rm`,

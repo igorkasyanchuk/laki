@@ -327,26 +327,36 @@ test('a tab whose program ends cleanly closes, and a shell on any exit; a failed
   }, 'the clean one and the shell closed, the failed one exited')
 })
 
-test('agent skill: installed in HOME for claude and codex, its launcher drives the daemon, removed again', async t => {
+test('agent skill: installed in HOME for each agent, its launcher drives the daemon, removed again', async t => {
   const rig = await fresh(t)
   await rig.rpc('projectAdd', { path: rig.repo })
   const states = (s: { state: string }[]) => s.map(x => x.state)
-  assert.deepEqual(states(await rig.rpc('skills')), ['missing', 'missing'])
-  assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: true })), ['installed', 'missing'])
+  assert.deepEqual(states(await rig.rpc('skills')), ['missing', 'missing', 'missing', 'missing', 'missing'])
+  assert.deepEqual(states((await rig.rpc('skillSet', { agent: 'claude', on: true })).slice(0, 2)), ['installed', 'missing'])
   const at = join(rig.home, '.claude/skills/laki')
   assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki\ndescription: /)
   // the launcher finds this daemon from a bare environment, as an agent's shell would
   const ls = JSON.parse(execFileSync(join(at, 'laki'), ['ls', '--json'], { env: { PATH: '/usr/bin:/bin' }, encoding: 'utf8' }))
   assert.equal(ls.projects.length, 1)
   writeFileSync(join(at, 'SKILL.md'), 'edited')
-  assert.deepEqual(states(await rig.rpc('skills')), ['outdated', 'missing'])
-  assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'codex', on: true })), ['outdated', 'installed'])
+  assert.deepEqual(states((await rig.rpc('skills')).slice(0, 2)), ['outdated', 'missing'])
+  assert.deepEqual(states((await rig.rpc('skillSet', { agent: 'codex', on: true })).slice(0, 2)), ['outdated', 'installed'])
   assert.ok(existsSync(join(rig.home, '.codex/skills/laki/SKILL.md')))
   writeFileSync(join(at, 'notes.md'), 'the user’s')
-  assert.deepEqual(states(await rig.rpc('skillSet', { agent: 'claude', on: false })), ['missing', 'installed'])
+  assert.deepEqual(states((await rig.rpc('skillSet', { agent: 'claude', on: false })).slice(0, 2)), ['missing', 'installed'])
   assert.ok(existsSync(join(at, 'notes.md')) && !existsSync(join(at, 'SKILL.md'))) // only its own files go
   await rig.rpc('skillSet', { agent: 'codex', on: false })
   assert.ok(!existsSync(join(rig.home, '.codex/skills/laki'))) // an emptied folder goes too
+  // the others' folders, and how each adds Laki's MCP server (opencode: lines for its config)
+  const all = await rig.rpc('skillSet', { agent: 'opencode', on: true })
+  assert.ok(existsSync(join(rig.home, '.config/opencode/skills/laki/SKILL.md')))
+  assert.deepEqual(all.map((x: { path: string }) => x.path.slice(rig.home.length)), ['/.claude/skills/laki', '/.codex/skills/laki', '/.gemini/skills/laki', '/.grok/skills/laki', '/.config/opencode/skills/laki'])
+  const mcp = Object.fromEntries(all.map((x: { agent: string; mcp: string }) => [x.agent, x.mcp]))
+  assert.match(mcp.gemini, /^gemini mcp add -s user laki '\/usr\/bin\/env' /)
+  assert.match(mcp.grok, /^grok mcp add -s user laki -- '\/usr\/bin\/env' /)
+  assert.equal(JSON.parse(mcp.opencode).mcp.laki.command.at(-1), 'mcp')
+  assert.equal(all.at(-1).mcpIn, '~/.config/opencode/opencode.json')
+  await rig.rpc('skillSet', { agent: 'opencode', on: false })
   await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key
 })

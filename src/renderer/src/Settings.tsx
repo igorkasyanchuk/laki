@@ -38,6 +38,7 @@ export type AppSettings = Paint & {
   actions?: RunAction[] // Run ▾'s actions, with each project's
   env?: Record<string, string> // every session's
   notify?: boolean
+  prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
@@ -456,11 +457,11 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
   )
 }
 
-export type SkillInfo = { agent: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string }
+export type SkillInfo = { agent: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in
 // how an app reads and writes its skill; app: its name, for the text
 export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean) => Promise<SkillInfo[]> }
 
-// the skill that teaches Claude Code and Codex about the app, in the user's ~/.claude and ~/.codex
+// the skill that teaches the agents about the app, in each one's folder in the user's home
 function SkillSection({ api }: { api: SkillApi }) {
   const [rows, setRows] = useState<SkillInfo[] | null>(null)
   const [err, setErr] = useState('')
@@ -477,7 +478,7 @@ function SkillSection({ api }: { api: SkillApi }) {
     <>
       <h2>Agent skill</h2>
       <p className="muted">
-        Teaches Claude Code and Codex about {api.app}: list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all
+        Teaches your agents about {api.app}: list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all
         through the {api.app} command line. It goes in your home folder, so every session has it, in {api.app} or not.
       </p>
       {err && <div className="warn small">{err}</div>}
@@ -508,7 +509,7 @@ function SkillSection({ api }: { api: SkillApi }) {
           <h2>MCP server</h2>
           <p className="muted">
             Or give agents {api.app}'s tools over MCP: its state, a new workspace, a message to an agent, a tab's screen, a diff, scheduled tasks. Nothing that deletes, archives or ships.
-            Run the command once in a terminal; it goes in the agent's own settings.
+            Run the command once in a terminal (or paste the lines into the file named); it goes in the agent's own settings.
           </p>
           {rows.map(
             r =>
@@ -516,10 +517,11 @@ function SkillSection({ api }: { api: SkillApi }) {
                 <div key={r.agent} className="preset">
                   <div className="row">
                     <b>{r.name}</b>
+                    {r.mcpIn && <span className="muted small">in {r.mcpIn}, merged with what's there</span>}
                     <span className="grow" />
                     <button onClick={() => navigator.clipboard.writeText(r.mcp!).then(() => (setCopied(r.agent), setTimeout(() => setCopied(''), 2000)), fail)}>{copied === r.agent ? 'Copied' : 'Copy'}</button>
                   </div>
-                  <div className="muted small mono" style={{ wordBreak: 'break-all', userSelect: 'text' }}>{r.mcp}</div>
+                  <div className="muted small mono" style={{ wordBreak: 'break-all', userSelect: 'text', whiteSpace: 'pre-wrap' }}>{r.mcp}</div>
                 </div>
               ),
           )}
@@ -629,7 +631,7 @@ export function SettingsPage(p: {
           {!!p.projects?.length && <div className="settings-nav-head">Projects</div>}
           {p.projects?.map(x => (
             <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => setSec(`project:${x.id}`)} data-tip={x.path}>
-              <Icon name="folder" /> {x.name}
+              <Icon name={x.git === false ? 'folder' : 'fork'} /> <span>{x.name}</span>
             </button>
           ))}
         </nav>
@@ -686,6 +688,9 @@ export function SettingsPage(p: {
                     </label>
                   </>
                 )}
+                <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
+                  <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
+                </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
                   <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
                     <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />

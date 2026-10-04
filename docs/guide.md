@@ -39,7 +39,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
   run script in its tab, ■ stops it; listening ports you click to open, or expose to the world (a public
   trycloudflare.com link and its QR code, optionally only for some email addresses).
-- **Look**: 66 themes, including Warp-style gradients and forty-eight that also change shapes, borders and type;
+- **Look**: 76 themes, including Warp-style gradients and fifty-eight that also change shapes, borders and type;
   glass (a see-through window, as see-through as you set, with a color glow); Inter and JetBrains Mono built
   in; tab and workspace colors.
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
@@ -89,10 +89,15 @@ npm link
 
 ## Using it
 
-**Sidebar:** projects and their workspaces, one line each (status, name). The selected workspace's PR is in the status bar.
+**Sidebar:** projects (a branch icon for a repo, a folder for a plain folder) and their workspaces, one line each
+(status, name; GitHub's mark when it has a PR: green open, purple merged, red failing checks, gray draft or closed;
+off in Settings › General). The selected workspace's PR is in the status bar.
+- Click a project to fold its workspaces away (its busiest status and their count stay), again to unfold;
+  *Collapse all projects* and *Expand all projects* are in ⌘K.
 - ＋ on a project creates a new workspace in it.
 - ⋯ on a project opens its menu:
   - *New workspace*;
+  - *Collapse* / *Expand*;
   - *Settings…* (see Project settings below);
   - *Scheduled tasks…* (the project's tasks and runs; the count of its tasks on the right);
   - *Remove project*;
@@ -200,7 +205,8 @@ times you write in plain English.
 - The daemon runs them (closing the window doesn't stop them), in the Mac's time zone. A run more than 30
   minutes late (the Mac asleep, Laki not running) is skipped and logged as missed.
 
-**Plan limits** (the ring at the start of the status bar): green, yellow past 70%, red past 90%, filled to
+**Plan limits** (the ring at the start of the status bar): the theme's accent color, its waiting color past 70%,
+its error color past 90%, filled to
 the 5-hour session of the agents' plans (the busier agent's). Click it for each agent's windows: Claude's 5-hour session, the week,
 the week per model and extra usage; Codex's 5-hour and weekly windows. Each shows when it resets. The daemon
 reads them the way Superset and CodexBar do: with the sign-in the agent already keeps on this Mac (Claude
@@ -302,13 +308,14 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups 
 - *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `laki/`),
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
-  Claude Code and for Codex (the status bar's ring; on by default), and environment
+  Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
+  mark on a workspace with a PR; on by default), and environment
   variables for every session (a project's or preset's env wins over them).
 - *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked, in sight as the page opens): Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
   Velvet, Nightfall, Paper (light), Mist (light), and the Warp-style gradients Cyber Wave, Koi, Pink City, Leafy,
-  Aurora, Sunset and Snowy (light); and forty-eight ✦ themes that change more than colors: Phosphor (a CRT: mono,
+  Aurora, Sunset and Snowy (light); and fifty-eight ✦ themes that change more than colors: Phosphor (a CRT: mono,
   dashed, glowing, scanlines), Neon Arcade (pills and glow), Brutalist (light: thick black lines, hard
   shadows), Bubblegum (light: round and soft), Blueprint (a drafting grid, mono capitals), Cyberpunk (clipped
   corners, hazard stripes, yellow tabs), Art Deco (gold double rules, serif capitals, a sunburst), Classic
@@ -341,7 +348,11 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups 
   Abyss (the deep sea: bioluminescent glows, rising bubbles), Manuscript (light: parchment, Luminari capitals in red
   and gold, a wax seal), Mixtape (cassette labels and tape-deck keys), Workshop (wood grain, a pegboard, a tape
   measure for the status bar), Receipt (light: thermal paper torn off in a zigzag, a barcode), Aquarelle (light:
-  watercolour washes, Snell Roundhand) and Cosmos (stars that twinkle, a nebula).
+  watercolour washes, Snell Roundhand), Cosmos (stars that twinkle, a nebula), Sakura (light: petals drifting down),
+  Magma (glowing seams, rising embers), Azulejo (light: Lisbon's blue tiles), Field Ops (olive drab, hazard stripes,
+  HUD brackets), Diner (light: a checkerboard floor, chrome buttons), E-Ink (light: an e-reader's ink on paper),
+  Vapor (light: vaporwave windows and a pastel grid), Shibuya (neon in the rain), Origami (light: folded paper) and
+  Tiki (bamboo and torchlight).
   Terminals take its 16 colors.
 - *Terminal*: font (JetBrains Mono by default; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
@@ -358,12 +369,13 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups 
 - *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent or a terminal) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
   findings` for Codex, `bundle exec rails db:migrate` for a terminal.
-- *Agent skill*: installs a skill for Claude Code and Codex in your home folder (`~/.claude/skills/laki`,
-  `~/.codex/skills/laki`), so every session knows Laki: what it is, and how to drive it with its CLI (list
+- *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
+  (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   It holds the app's path: update it after moving the app. *Remove* takes only its own files. Below it, *MCP
-  server*: the command that adds Laki to Claude Code or Codex as an MCP server (Copy, then run it in a
-  terminal: it goes in the agent's own settings, which Laki never writes).
+  server*: the command that adds Laki to each agent as an MCP server (Copy, then run it in a terminal: it goes in
+  the agent's own settings, which Laki never writes); OpenCode's `mcp add` only asks questions, so it gets the
+  lines to merge into `~/.config/opencode/opencode.json`.
 - *Remote access*: the email it lets in, how long, start and stop, the QR code and link (above).
 - *Projects*: each project's settings (below).
 
@@ -421,7 +433,7 @@ laki daemon                                             # run the daemon in the 
 
 ### MCP
 
-`laki mcp` is an MCP server on stdio, for Claude Code, Codex or any MCP client. Its tools: `laki_state`
+`laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. Its tools: `laki_state`
 (projects, workspaces, tabs and their status), `laki_new_workspace`, `laki_send`, `laki_screen`, `laki_diff`,
 `laki_schedules` and `laki_schedule_add`. None deletes, archives or ships. Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
@@ -429,7 +441,12 @@ laki daemon                                             # run the daemon in the 
 ```bash
 claude mcp add -s user laki -- laki mcp
 codex mcp add laki -- laki mcp
+gemini mcp add -s user laki laki mcp
+grok mcp add -s user laki -- laki mcp
 ```
+
+OpenCode's `mcp add` only asks questions: put `"mcp": { "laki": { "type": "local", "command": ["laki", "mcp"] } }` in
+`~/.config/opencode/opencode.json`.
 
 ### Links
 
@@ -442,6 +459,7 @@ codex mcp add laki -- laki mcp
 | `laki://schedules[/<project>]` | Scheduled tasks, filtered to a project |
 | `laki://settings[/<section>]` | Settings (`general`, `appearance`, `remote`…) |
 | `laki://help` | Help |
+| `laki://about` | About (the version and the website) |
 
 `open 'laki://ws/fix-the-login'` works from a terminal, a note or a calendar invite.
 
@@ -500,7 +518,7 @@ agents find their conversations by those paths. It holds:
 - `claude-settings.json`: the hooks Claude gets through `--settings`;
 - `worktrees/` and `run/`.
 
-`~/.claude` and `~/.codex` are left alone, except the skill folders *Settings → Agent skill* writes when you click Install.
+`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok` and `~/.config/opencode` are left alone, except the skill folders *Settings → Agent skill* writes when you click Install.
 
 ## Updating
 

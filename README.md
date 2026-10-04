@@ -29,7 +29,7 @@ running when you close the window.
   only lets in your email. It lasts 1 to 24 hours, or until you stop it.
 - **Plan limits.** A ring shows how much of your Claude and Codex plans you've used, and when each limit
   resets.
-- **Your look.** 66 themes, 48 of which also change shapes and type. Glass mode makes the window
+- **Your look.** 76 themes, 58 of which also change shapes and type. Glass mode makes the window
   see-through. Fonts are built in.
 - **Notifications your way.** Pick which turns notify and the sound; mute a workspace or a tab.
 - **Keyboard first.** ⌘ shortcuts, a ⌘K palette, a key for every menu item, and a `laki` CLI that the agents
@@ -78,7 +78,7 @@ laki ship fix-the-login -m "Fix the login redirect"
 claude mcp add -s user laki -- laki mcp              # Laki's tools for any MCP client
 ```
 
-Run `laki help` for every command. Settings › Agent skill teaches Claude Code and Codex to use it too.
+Run `laki help` for every command. Settings › Agent skill teaches Claude Code, Codex, Gemini, Grok and OpenCode to use it too.
 
 ## More
 
