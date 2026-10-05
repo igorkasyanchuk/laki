@@ -3,7 +3,7 @@ import { API, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, ty
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, ciText, type FixWhat, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
-import { About, AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Welcome } from './panels'
+import { About, AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, StarLaki, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
 import { ComparePage } from './Compare'
@@ -978,20 +978,14 @@ export function App() {
               <div className="empty">
                 {ws ? (
                   <>
-                    <p>No tabs in {wsName(ws)}.</p>
-                    <div className="row">
-                      {newTabActions.slice(0, 3).map(x => (
-                        <button key={x.label} onClick={x.run}>
-                          {x.label}
-                        </button>
-                      ))}
-                    </div>
+                    <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} actions={newTabActions.filter(x => x.label !== 'Command…')} />
                   </>
                 ) : (
                   view.projects.length ? (
                     <>
                       <p>No workspaces yet.</p>
-                      <button onClick={() => newWs()}>New workspace  ⌘N</button>
+                      <button className="primary" onClick={() => newWs()}>New workspace  ⌘N</button>
+                      <StarLaki />
                     </>
                   ) : (
                     <Welcome onOpen={openProject} check={() => api.call<Doctor>('doctor')} />

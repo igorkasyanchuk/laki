@@ -372,6 +372,52 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
   )
 }
 
+const REPO = 'https://github.com/igorkasyanchuk/laki'
+
+// a nudge to star the repo, at the foot of the empty pages
+export const StarLaki = () => (
+  <button className="ready-star" onClick={() => openExternal(REPO)}>
+    <Icon name="github" size={14} /> Enjoying Laki? <b>Give it a star on GitHub</b> <span aria-hidden>★</span>
+  </button>
+)
+
+const TIPS: [string, string, string][] = [
+  ['⌘N', 'A workspace per task', 'Its own branch, worktree and $PORT: agents never trip over each other'],
+  ['⌘J', 'Jump to who needs you', 'The next agent waiting for an answer, or done'],
+  ['Race', 'One prompt, many agents', 'Compare their work side by side and keep the best'],
+  ['⌘K', 'Everything by name', 'Workspaces, tabs, actions and settings'],
+]
+
+// a workspace without tabs: start something (agents first), what Laki is good at, and the star
+export function Ready({ name, branch, actions }: { name: string; branch?: string; actions: { label: string; icon?: IconName; hint?: string; run: () => void }[] }) {
+  const agents = actions.filter(a => a.icon === 'agent')
+  return (
+    <div className="ready">
+      <img src={icon} alt="" />
+      <h1>{name} is ready</h1>
+      <p className="muted">{branch ? <>A worktree of its own on <code>{branch}</code>. Start an agent on the task, or a shell to look around.</> : 'Start an agent on the task, or a shell to look around.'}</p>
+      <div className="ready-starts">
+        {[...agents, ...actions.filter(a => !agents.includes(a))].map((a, i) => (
+          <button key={a.label} className={i === 0 && agents.length ? 'primary' : ''} onClick={a.run}>
+            <Icon name={a.icon ?? 'terminal'} size={14} /> {a.label}
+            {a.hint && <kbd>{a.hint}</kbd>}
+          </button>
+        ))}
+      </div>
+      <div className="ready-tips">
+        {TIPS.map(([k, title, text]) => (
+          <div key={title} className="ready-tip">
+            <kbd>{k}</kbd>
+            <b>{title}</b>
+            <span className="muted">{text}</span>
+          </div>
+        ))}
+      </div>
+      <StarLaki />
+    </div>
+  )
+}
+
 // no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target)
 export function Welcome({ onOpen, check }: { onOpen: () => void; check: () => Promise<Doctor> }) {
   const [d, setD] = useState<Doctor | null>(null)

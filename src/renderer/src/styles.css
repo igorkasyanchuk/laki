@@ -657,6 +657,24 @@ kbd { font-family: var(--mono); }
 .toast.has-undo { display: flex; align-items: center; gap: 12px; border-color: var(--line); }
 .toast-undo { flex: none; border: none; background: none; color: var(--accent); font-weight: 600; padding: 2px 4px; }
 /* no project yet */
+.ready { display: flex; flex-direction: column; align-items: center; gap: 12px; max-width: 600px; padding: 24px; text-align: center; color: var(--muted); }
+.ready img { width: 52px; height: 52px; filter: drop-shadow(0 10px 24px color-mix(in srgb, var(--accent) 30%, transparent)); }
+.ready h1 { margin: 0; font-size: 22px; color: var(--fg); }
+.ready p { margin: 0; max-width: 440px; line-height: 1.5; }
+.ready p code { color: var(--fg); }
+.ready-starts { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 8px 0 4px; }
+.ready-starts button { display: inline-flex; align-items: center; gap: 6px; padding: 7px 14px; border-radius: 999px; }
+.ready-starts kbd { font-size: 11px; opacity: 0.7; }
+.ready-tips { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; width: 100%; margin-top: 10px; text-align: left; }
+.ready-tip { display: grid; grid-template-columns: auto 1fr; column-gap: 10px; row-gap: 2px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; background: color-mix(in srgb, var(--panel) 60%, transparent); }
+.ready-tip kbd { grid-row: span 2; align-self: start; min-width: 34px; text-align: center; font-size: 11px; color: var(--accent); border: 1px solid var(--line); border-radius: 5px; padding: 2px 5px; }
+.ready-tip b { color: var(--fg); font-size: 12.5px; }
+.ready-tip .muted { font-size: 11.5px; line-height: 1.4; }
+.ready-star { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font-size: 12px; }
+.ready-star b { color: var(--fg); font-weight: 600; }
+.ready-star span { color: #f5c542; }
+.ready-star:hover { border-color: #f5c542; color: var(--fg); }
+.narrow .ready-tips { grid-template-columns: 1fr; }
 .welcome { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 440px; padding: 24px; text-align: center; }
 .welcome img { width: 56px; height: 56px; }
 .welcome h1 { margin: 0; font-size: 20px; color: var(--fg); }
