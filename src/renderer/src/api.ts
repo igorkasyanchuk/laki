@@ -47,7 +47,8 @@ class Api {
         if (m.id !== undefined) {
           const w = this.waiting.get(m.id)
           this.waiting.delete(m.id)
-          if (m.error) w?.rej(new Error(m.error))
+          // unknown method: a daemon older than the app, still running (it outlives updates)
+          if (m.error) w?.rej(new Error(/^unknown method /.test(m.error) ? "Laki's daemon is older than the app: restart it from the status bar (agents resume)" : m.error))
           else w?.res(m.result)
         } else this.emit(m)
       }
