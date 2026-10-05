@@ -1,6 +1,6 @@
 // Finding, starting and calling the daemon from Node (CLI, Electron main, tests).
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, openSync, readFileSync } from 'node:fs'
+import { existsSync, mkdirSync, openSync, readFileSync, renameSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -53,12 +53,17 @@ export function daemonScript(): string {
 export async function ensureDaemon(env: Record<string, string> = {}): Promise<DaemonInfo> {
   if (await alive()) return daemonInfo()!
   mkdirSync(dataDir(), { recursive: true, mode: 0o700 })
-  const log = openSync(join(dataDir(), 'daemon.log'), 'a')
+  const logPath = join(dataDir(), 'daemon.log')
+  // ponytail: rotated only as a daemon starts; one that runs for months grows until the next start
+  try {
+    if (statSync(logPath).size > 10e6) renameSync(logPath, logPath + '.1')
+  } catch {}
+  const log = openSync(logPath, 'a')
   const args = [...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), daemonScript()]
   spawn(process.execPath, args, { detached: true, stdio: ['ignore', log, log], env: { ...process.env, ...env } }).unref()
   for (let i = 0; i < 100; i++) {
     await new Promise(r => setTimeout(r, 100))
     if (await alive()) return daemonInfo()!
   }
-  throw new Error(`daemon didn't start; see ${join(dataDir(), 'daemon.log')}`)
+  throw new Error(`daemon didn't start; see ${logPath}`)
 }

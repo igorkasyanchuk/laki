@@ -35,6 +35,7 @@ npm run dev                       # Electron + renderer dev server on :5199
 - The user runs their own daemon with real agents in it, in `~/.laki-electron` (from when the app was called
   Laki Electron; `dataDir` in `src/shared/conn.ts` keeps an existing one). Never stop it and never point tests
   at it.
+- Releasing: `docs/release.md` (checks, both builds, `scripts/pack-smoke.sh` once before each release).
 - The app icon is `build/icon.icns`, rendered from the mark `src/renderer/src/icon.svg` (also the splash and the
   browser tab's icon) by `swift scripts/icon.swift`: change the SVG, then run it.
 
@@ -257,7 +258,9 @@ they work).
 
 ### Resume
 
-`state.json` keeps projects, workspaces, tabs and resume ids. Starting the daemon brings every tab back:
+`state.json` keeps projects, workspaces, tabs and resume ids (`save`: fsync, then rename; `load` copies one that
+reads as `state.json.bak`, and moves one that doesn't to `state.json.broken-<ms>`, then loads the `.bak`: never
+empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon starts. Starting the daemon brings every tab back:
 `claude --resume <id>`, `codex resume <id>`; shells start fresh.
 
 ### Scans

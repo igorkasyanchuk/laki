@@ -10,6 +10,9 @@
   "bin": {
     "laki": "bin/laki.js"
   },
+  "engines": {
+    "node": ">=22.6"
+  },
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",

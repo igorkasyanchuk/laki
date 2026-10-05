@@ -1,7 +1,7 @@
 // The daemon end to end: real PTYs, git worktrees, hooks via the CLI, fake agents.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { API } from '../src/shared/types.ts'
@@ -177,7 +177,7 @@ test('hooks drive status; queue delivered on Stop; done until viewed', async t =
   await until(async () => (await rig.tab(ws.id)).last === 'answer: fourth', 'fourth answered')
   // enter: false types into the prompt and leaves it there (the preview's picked element); an escape in the text
   // (one that would end the paste) is dropped
-  await rig.rpc('send', { target: ws.id, text: 'the button main > a.cta \x1b[201~x', enter: false })
+  await rig.rpc('send', { target: ws.id, text: 'the button main > a.cta \x1b[201~x\x03\x04', enter: false })
   await until(async () => (await rig.screen(tab.id)).includes('the button main > a.cta x'), 'in the prompt')
   await new Promise(r => setTimeout(r, 600))
   tv = await rig.tab(ws.id)
@@ -509,6 +509,19 @@ test('a folder without git is a project (local workspaces only); project setting
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })
   const dev = await rig.rpc('run', { ws: ws.id })
   await until(async () => (await rig.screen(dev.id)).includes('from-app'), 'the app config wins over .laki.json')
+})
+
+test('an unreadable state.json is kept aside and the last good one loads: nothing is written over', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.stop()
+  await rig.start() // loads it: state.json.bak
+  await rig.stop()
+  const statePath = join(rig.data, 'state.json')
+  writeFileSync(statePath, readFileSync(statePath, 'utf8').slice(0, 40)) // a crash mid-write
+  await rig.start()
+  assert.ok((await rig.rpc('state')).projects.some((x: any) => x.id === p.id))
+  assert.ok(readdirSync(rig.data).some(f => f.startsWith('state.json.broken-')))
 })
 
 test('a chat that cannot be resumed is dropped: Enter starts a new one', async t => {

@@ -4,7 +4,7 @@ import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_pro
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
-import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, userInfo } from 'node:os'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -46,11 +46,35 @@ let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start
 
 // ---------- persistence
 
+const readState = (p: string): State => {
+  const s = JSON.parse(readFileSync(p, 'utf8'))
+  if (!s || typeof s !== 'object' || Array.isArray(s)) throw new Error('not an object')
+  return s
+}
+
 export function load() {
   mkdirSync(runDir, { recursive: true, mode: 0o700 })
-  try {
-    state = JSON.parse(readFileSync(statePath, 'utf8'))
-  } catch {}
+  if (existsSync(statePath)) {
+    try {
+      state = readState(statePath)
+    } catch (e) {
+      // never start empty over it: the next save would write over every project, workspace and resume id
+      const broken = `${statePath}.broken-${Date.now()}`
+      renameSync(statePath, broken)
+      log(`state.json unreadable (${(e as Error).message}): kept as ${broken}`)
+      try {
+        state = readState(statePath + '.bak')
+        log('loaded state.json.bak')
+      } catch (e) {
+        log(`state.json.bak: ${(e as Error).message}; starting empty`)
+      }
+    }
+    try {
+      if (existsSync(statePath)) copyFileSync(statePath, statePath + '.bak') // the last state that loaded
+    } catch (e) {
+      log(`state.json.bak: ${(e as Error).message}`)
+    }
+  }
   state.projects ??= []
   state.workspaces ??= []
   state.tabs ??= []
@@ -60,7 +84,13 @@ export function load() {
 }
 
 export function save() {
-  writeFileSync(statePath + '.tmp', JSON.stringify(state, null, 2))
+  const fd = openSync(statePath + '.tmp', 'w')
+  try {
+    writeFileSync(fd, JSON.stringify(state, null, 2))
+    fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
+  } finally {
+    closeSync(fd)
+  }
   renameSync(statePath + '.tmp', statePath)
 }
 
@@ -1451,7 +1481,9 @@ function turn(p: { tab: string; state: string; payload?: any }) {
 const typing = new WeakMap<Session, Promise<void>>()
 export function typeInto(s: Session, text: string | Promise<string>, enter = true) {
   const next = (typing.get(s) ?? Promise.resolve()).then(async () => {
-    const t = (await text).replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '') // no escapes: a \x1b[201~ in it would end the paste and type the rest as keys
+    // no escapes (a \x1b[201~ in it would end the paste and type the rest as keys), nor other controls (a CI log's
+    // ⌃C or ⌃D would be keys to the agent): only tab and newline stay
+    const t = (await text).replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '').replace(/[\x00-\x08\x0b-\x1f\x7f-\x9f]/g, '')
     await new Promise<void>(done => {
       s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${t}\x1b[201~` : enter ? t : t.replace(/[\r\n]+/g, ' '))
       if (!enter) return done()
