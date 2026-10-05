@@ -13,7 +13,7 @@ type Bridge = {
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void
-  badge?(n: number): void
+  badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
 }

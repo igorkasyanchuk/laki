@@ -131,6 +131,7 @@ export type Settings = {
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
+  menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
 }
 
 // Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format

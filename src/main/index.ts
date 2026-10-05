@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, BrowserWindow, dialog, ipcMain, Menu, Notification, session, shell, webContents } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, session, shell, Tray, webContents } from 'electron'
 import { appendFileSync, writeFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
@@ -92,7 +92,7 @@ function create() {
     e.preventDefault()
     win?.hide()
   })
-  win.on('closed', () => ((win = null), (linkReady = false), app.dock?.setBadge(''))) // the badge's count came from the window
+  win.on('closed', () => ((win = null), (linkReady = false), app.dock?.setBadge(''), tray?.setTitle(''))) // the count came from the window
   win.webContents.on('did-start-navigation', e => e.isMainFrame && !e.isSameDocument && (linkReady = false)) // a reload: links wait for the new page
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
@@ -216,8 +216,41 @@ ipcMain.on('glass', (_e, on: boolean) => {
   win?.setVibrancy(on ? 'under-window' : null)
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
 })
-// the Dock icon's count: agents waiting for you or done while you looked away (none: no badge)
-ipcMain.on('badge', (_e, n: number) => app.dock?.setBadge(Number.isInteger(n) && n > 0 ? String(n) : ''))
+// the Dock icon's count: agents waiting for you or done while you looked away (none: no badge); and the menu bar's
+// item, from the same message so the two never disagree: the count, a menu of those tabs (a click shows one, as a
+// notification's does), Open and Quit. tray false: Settings › General hid it
+let tray: Tray | null = null
+ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = [], on = true) => {
+  const count = Number.isInteger(n) && n > 0 ? String(n) : ''
+  app.dock?.setBadge(count)
+  if (!on) return void (tray?.destroy(), (tray = null))
+  tray ??= new Tray(trayIcon())
+  tray.setTitle(count, { fontType: 'monospacedDigit' })
+  tray.setToolTip(count ? `${app.name}: ${count} need${count === '1' ? 's' : ''} you` : app.name)
+  const tabs: MenuItemConstructorOptions[] = (Array.isArray(items) ? items : []).slice(0, 30).map(i => ({ label: String(i.label).slice(0, 90), click: () => show(String(i.tab)) }))
+  tray.setContextMenu(Menu.buildFromTemplate([...tabs, ...(tabs.length ? [{ type: 'separator' as const }] : []), { label: `Open ${app.name}`, click: () => show() }, { label: 'Quit', click: () => app.quit() }]))
+})
+
+// the menu bar's icon: Laki's mark (a chevron and a dot) drawn as a 32×32 template image (@2x): macOS colors it for a
+// light or dark menu bar from its alpha alone
+function trayIcon() {
+  const S = 32
+  const px = Buffer.alloc(S * S * 4) // BGRA, black
+  const seg = (x: number, y: number, ax: number, ay: number, bx: number, by: number) => {
+    const [dx, dy] = [bx - ax, by - ay]
+    const t = Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / (dx * dx + dy * dy)))
+    return Math.hypot(x - ax - t * dx, y - ay - t * dy)
+  }
+  for (let y = 0; y < S; y++)
+    for (let x = 0; x < S; x++) {
+      const [cx, cy] = [x + 0.5, y + 0.5]
+      const d = Math.min(Math.min(seg(cx, cy, 6, 23, 15, 12), seg(cx, cy, 15, 12, 24, 23)) - 2.6, Math.hypot(cx - 25, cy - 7) - 3)
+      px[(y * S + x) * 4 + 3] = Math.round(255 * Math.max(0, Math.min(1, 0.5 - d))) // antialiased edges
+    }
+  const img = nativeImage.createFromBitmap(px, { width: S, height: S, scaleFactor: 2 })
+  img.setTemplateImage(true)
+  return img
+}
 // the preview pane's screenshot: a webview of this window's, as a PNG in base64
 ipcMain.handle('capture', async (e, id: number) => {
   const wc = webContents.fromId(id)

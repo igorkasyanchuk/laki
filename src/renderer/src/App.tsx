@@ -150,8 +150,16 @@ export function App() {
   // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
   const quiet = new Set(view?.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
   const needsYou = (t: TabView) => (t.status === 'waiting' || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
-  const attention = view?.tabs.filter(needsYou).length ?? 0
-  useEffect(() => bridge?.badge?.(attention), [attention])
+  // the Dock's count, and the menu bar's item from the same list: waiting ones first, each with what it asks
+  const waits = useRef(new Map<string, string>()) // a tab's last waiting turn's text (turn events)
+  const needing = view?.tabs.filter(needsYou) ?? []
+  const trayItems = [...needing.filter(t => t.status === 'waiting'), ...needing.filter(t => t.status !== 'waiting')].map(t => {
+    const w = view?.workspaces.find(w => w.id === t.workspace)
+    const asks = t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') || 'waiting for you' : 'finished'
+    return { tab: t.id, label: `${w ? wsName(w) : t.workspace} · ${t.name}: ${asks.replace(/\s+/g, ' ').slice(0, 60)}` }
+  })
+  const trayKey = JSON.stringify([trayItems, view?.settings.menuBar])
+  useEffect(() => bridge?.badge?.(trayItems.length, trayItems, view?.settings.menuBar !== false), [trayKey])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
   // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
   useEffect(() => void (narrow && document.querySelector('.tab.sel')?.scrollIntoView({ block: 'nearest', inline: 'start' })), [narrow, tab?.id])
@@ -220,6 +228,7 @@ export function App() {
       }
       else if (m.ev === 'close') setConnected(false)
       else if (m.ev === 'turn') {
+        if (m.kind === 'waiting') waits.current.set(m.tab, m.text ?? '')
         const t = viewRef.current?.tabs.find(t => t.id === m.tab)
         const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
         const s = viewRef.current?.settings
@@ -241,7 +250,7 @@ export function App() {
       }
     })
     api.connect()
-    bridge?.onFocusTab(selectTab)
+    bridge?.onFocusTab(id => (setDialog(null), selectTab(id))) // a notification's or the menu bar's: over any page, as ⌘J
     bridge?.onDeepLink?.(setLink)
     return off
   }, [selectTab])

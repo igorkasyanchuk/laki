@@ -12,7 +12,8 @@ contextBridge.exposeInMainWorld('laki', {
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
   glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
-  badge: (n: number) => ipcRenderer.send('badge', n), // the Dock's count: agents that need a look
+  // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
+  badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean) => ipcRenderer.send('badge', n, items, tray),
   onDeepLink: (cb: (url: string) => void) => {
     ipcRenderer.on('deep-link', (_e, url: string) => cb(url))
     ipcRenderer.send('deep-link-ready') // then main sends one that came first

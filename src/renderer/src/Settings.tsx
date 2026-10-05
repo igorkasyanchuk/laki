@@ -73,6 +73,7 @@ export type AppSettings = Paint & {
   prTries?: number // fix CI's and fix conflicts' tries in a row
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
+  menuBar?: boolean // the menu bar's item (unset: on)
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -456,6 +457,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Sound', 'notification'],
   ['webhook', 'Notifications webhook', 'phone push ntfy slack telegram json notify waiting done'],
   ['webhook', 'Send test', 'webhook phone push'],
+  ['general', 'Menu bar item', 'tray status count waiting needs you'],
   ['general', 'Pull requests in the sidebar', 'pr github icon'],
   ['general', 'Turn timers', 'elapsed time'],
   ['general', 'Diff size in the sidebar', 'lines added removed changes stat'],
@@ -928,6 +930,9 @@ export function SettingsPage(p: {
                     </label>
                   </>
                 )}
+                <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
+                  <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
+                </Switch>
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
                 </Switch>
