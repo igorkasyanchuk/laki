@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, type Doctor, type Project, type ProjectLook, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, ciText, type FixWhat, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
@@ -32,7 +32,7 @@ const AGENT_COLORS: Record<string, string> = { claude: 'orange', codex: 'teal', 
 const colorOf = (t?: TabView) => t?.color ?? AGENT_COLORS[t?.preset ?? '']
 
 // where a folder opens: editors (one of them is ⌘E's), Finder, terminals
-const EDITOR_IDS = ['cursor', 'zed', 'vscode', 'windsurf', 'sublime', 'webstorm', 'intellij', 'xcode', 'custom']
+const EDITOR_IDS = ['cursor', 'zed', 'vscode', 'windsurf', 'antigravity', 'sublime', 'webstorm', 'intellij', 'xcode', 'custom']
 type Where = { ws?: string; project?: string; file?: string } // what Open in opens: a folder, or a file in a workspace
 const WEB = /\.(x?html?|svg|pdf|xml|json|png|jpe?g|gif|webp)$/i // what browsers show
 const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_IDS.includes(id) ? 'code' : 'terminal')
@@ -502,7 +502,9 @@ export function App() {
   // a workspace for the info panel and the status bar's PR
   const infoOf = (w: WorkspaceView): WsInfo => ({
     ...w,
-    fixTries: w.fix?.pr === w.pr?.number ? w.fix?.tries : 0,
+    ...(w.fix?.pr === w.pr?.number && { fixTries: w.fix?.tries, mergeTries: w.fix?.merges }), // this PR's counts only
+    prScan: settings.prScan || PR_SCAN,
+    prTries: settings.prTries || PR_TRIES,
     agents: (view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent').map(t => ({ id: t.id, name: t.name, glyph: tabGlyph(t), last: t.last })),
   })
   const setAuto = (w: WorkspaceView, k: AutoKey, v: boolean) => call('wsSet', { id: w.id, [k]: v }).catch(() => {})

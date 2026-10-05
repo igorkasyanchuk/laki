@@ -1,14 +1,14 @@
 // Small text helpers, kept apart from React so tests can load them.
 
+import { fillTemplate, type RunAction, type Template } from '../../shared/types.ts'
+export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's; an unknown {{name}} stays as it is
-import type { RunAction, Template } from '../../shared/types'
-export type { Template }
+export { fillTemplate }
 
 // a project's templates first, then the global ones it doesn't replace (one of the same name)
 export const templatesFor = (global: Template[] = [], project: Template[] = []) => [...project, ...global.filter(g => !project.some(t => t.name.trim() === g.name.trim()))]
 
-export const fillTemplate = (text: string, vars: Record<string, string | undefined>) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m)) // not {{constructor}}
 // the prompt through a template; one without {{prompt}} gets the typed text after it
 export function templated(t: Template | undefined, prompt: string, vars: Record<string, string | undefined> = {}) {
   if (!t) return prompt

@@ -165,7 +165,7 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 
 **Tab bar icons** (right side; hover for a tooltip):
 - info (⌘I): the workspace info panel (below);
-- editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Sublime Text, JetBrains IDEs, Xcode, Finder,
+- editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
 - panel (⌥⌘B): the side panel (below); ⌘D opens it on *Changes*;
 - ship: commit, push and open a PR, in a *ship* tab;
@@ -285,20 +285,36 @@ before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 
 **Info panel** (ⓘ or ⌘I): the workspace's name, branch, path and `$PORT`; each public link (Expose to the
 world: open, copy, and who can open it); its PR's title, author, state,
-review decision, size, checks (each links to its run) and description; buttons that send the failing CI or
-the open review comments to the agent now; and what each agent said last.
+review decision, size, checks (each links to its run) and description; the PR switches, with a note when *fix CI* or
+*fix conflicts* gave up (turn it off and on to try again); buttons that send the failing CI, the open review comments or
+the merge conflicts to the agent now; and what each agent said last.
 
-**PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute, and right after an agent's turn
-ends. If an agent switches the workspace to another branch, Laki follows it (the status bar and the PR are that branch's).
-- *fix CI*: when CI fails on a new commit, the failing checks and the end of their GitHub Actions logs go to
-  the workspace's agent (when it's idle), asking it to fix, commit and push. Once per commit; after 3 tries
-  in a row it stops and tells you.
-- *review*: new review comments (unresolved inline threads), yours included, go to the agent, asking it to
-  address them and push. The agent comments as you, so a comment of yours made while it works counts as its own and
-  doesn't start another round; comment while it's idle.
+**PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute (Settings › *Pull requests*:
+1 to 30 minutes), and a couple of seconds after an agent's turn ends (at most every 20 seconds), so a PR the agent just
+opened shows up at once. If an agent switches the workspace to another branch, Laki follows it (the status bar and the
+PR are that branch's). Hover a switch for what it does, how often it checks and how many tries it gets.
+
+The three switches in the status bar (and the info panel), each on or off per workspace, act on an open PR after each
+check. Each sends its prompt to the workspace's first running agent (Claude Code, Codex…), queued until its turn ends;
+with no agent running nothing is sent, and the next check tries again.
+- *fix CI*: when CI fails on a new commit, the failing checks and the end of their GitHub Actions logs (the last 80
+  lines of up to 3 jobs) go to the agent, asking it to fix, commit and push. Once per commit: its push makes a new
+  commit, and CI runs again. After 3 tries in a row (*Tries in a row*) it stops: the agent's tab shows ◆ waiting and
+  you get a notification. A passing run starts the count over; so does turning the switch off and on (which also sends
+  the current commit's failure again).
+- *review*: new review comments (unresolved inline threads from people with write access to the repo, and bots) go
+  to the agent, asking it to address them and push. Yours count too, but the agent comments as you, so a comment of
+  yours made while it works counts as its own and doesn't start another round: comment while it's idle. A thread goes
+  again only when someone adds to it.
 - *fix conflicts*: when the PR has merge conflicts with its base branch, the agent is asked to merge the base in
   (no rebase, no force push), resolve them, commit and push. Once per commit; after 3 tries in a row it stops and tells
-  you.
+  you. Right after a push GitHub doesn't know yet whether it conflicts: that keeps the count; no conflicts, or the
+  switch turned off and on, starts it over.
+
+What each sends is a prompt in Settings › *Pull requests*, which you can change: `{{pr}}` is the PR's number, `{{url}}`
+its link, `{{base}}` its base branch; the failing checks or the review threads go after it. *Reset* puts the default
+back. The info panel's *Send failing CI*, *Send review comments* and *Send merge conflicts* buttons send the same
+prompts once, switches or not.
 
 **New workspace** (a page, like Settings; Esc closes it): pick the project, base branch, name and agent (for an
 agent, its model, like `opus` or a full name, and for Claude Code and Codex its effort; both blank: the agent's
@@ -435,6 +451,8 @@ lit for a moment.
   arguments (e.g. `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each
   one is in the new-tab menu and the new-workspace page. The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them). Edit `claude` or `codex` to change how every new one starts; a tab started from a preset uses its current settings when it restarts or resumes.
+- *Pull requests*: how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
+  conflicts* get (3), and the prompts the PR switches send (above, in *PRs*).
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
   `{{base}}` the workspace's project and base branch; a template without `{{prompt}}` gets the prompt after
   it. *Add template* starts from an example. A project can have its own (its settings, below).

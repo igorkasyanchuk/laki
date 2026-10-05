@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type NotifyKind, type Preset, type ProjectLook, type SideLook } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook } from '../../shared/types'
 import { MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
@@ -22,7 +22,7 @@ export type { Preset }
 
 // the sidebar's project names (ProjectLook): each option over the theme's; App.tsx puts them on the sidebar as data-ph-*
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', prPrompts: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
 
 const PROJECT_LOOK: [keyof ProjectLook, string, [string, string][]][] = [
   ['font', 'Font', [['theme', "Theme's"], ['ui', 'Interface'], ['mono', 'Monospace']]],
@@ -68,6 +68,9 @@ export type AppSettings = Paint & {
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   remoteMail?: string // the one address remote access lets in
+  prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
+  prScan?: number // minutes between PR checks
+  prTries?: number // fix CI's and fix conflicts' tries in a row
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -77,6 +80,13 @@ const EXAMPLE_TEMPLATE: Template = {
   name: 'fix',
   text: 'Fix this in {{project}}: {{prompt}}\n\nFind the cause first. Write a test that fails before the fix and passes after it, run the tests, then sum up what changed.',
 }
+
+// the PR switches' prompts (Settings › Pull requests): the status bar's names
+const PR_KINDS: [FixWhat, string, string][] = [
+  ['ci', 'Fix CI', 'the failing checks and the end of their logs go after it'],
+  ['review', 'Review', 'the open review threads go after it'],
+  ['conflict', 'Fix conflicts', ''],
+]
 
 const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
   ['waiting', 'Waiting for you', 'A permission prompt, or CI that keeps failing'],
@@ -411,9 +421,14 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'Blinking cursor', 'blink'],
   ['terminal', 'Copy selected text', 'clipboard selection'],
   ['terminal', 'Dim other panes', 'split focus fade'],
-  ['open', 'Default', 'editor cursor vs code open in'],
+  ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
   ['open', 'Custom command', 'editor'],
   ['presets', 'Agent presets', 'claude codex gemini args env model'],
+  ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
+  ['pr', 'Tries in a row', 'pr fix ci conflicts limit attempts how many times'],
+  ['pr', 'Fix CI', 'pr prompt failing checks auto'],
+  ['pr', 'Review', 'pr prompt comments auto'],
+  ['pr', 'Fix conflicts', 'pr prompt merge auto'],
   ['templates', 'Prompt templates', 'prompt'],
   ['actions', 'Actions', 'run menu prompt command'],
   ['skill', 'Agent skill', 'mcp server laki cli'],
@@ -426,6 +441,7 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'terminal', label: 'Terminal', icon: 'terminal' },
   { id: 'open', label: 'Open in', icon: 'code' },
   { id: 'presets', label: 'Agent presets', icon: 'agent' },
+  { id: 'pr', label: 'Pull requests', icon: 'pr' },
   { id: 'templates', label: 'Prompt templates', icon: 'pencil' },
   { id: 'actions', label: 'Actions', icon: 'run' },
   { id: 'skill', label: 'Agent skill', icon: 'import' },
@@ -1099,6 +1115,37 @@ export function SettingsPage(p: {
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'remote' && p.remote && <RemoteSection api={p.remote} mail={s.remoteMail ?? ''} onMail={remoteMail => set({ remoteMail })} />}
+          {sec === 'pr' && (
+            <>
+              <h2>Pull requests</h2>
+              <p className="muted small">
+                The status bar's <b>fix CI</b>, <b>review</b> and <b>fix conflicts</b> switches, on for a workspace with a PR, send these to its agent
+                (when it's idle), and so do the info panel's send buttons. <code>{'{{pr}}'}</code> is the PR's number, <code>{'{{url}}'}</code> its link,{' '}
+                <code>{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
+              </p>
+              <div className="grid2">
+                {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}
+                {pick('Tries in a row', 'prTries', PR_TRIES, [1, 2, 3, 5, 10], n => `${n} · then it's over to you`)}
+              </div>
+              {PR_KINDS.map(([k, title, after]) => {
+                const v = s.prPrompts?.[k]
+                return (
+                  <div key={k} className="field">
+                    <span>
+                      {title}
+                      {after && <span className="muted"> · {after}</span>}
+                      {v !== undefined && v !== PR_PROMPTS[k] && (
+                        <button type="button" className="link" onClick={() => set({ prPrompts: { ...s.prPrompts, [k]: undefined } })}>
+                          Reset
+                        </button>
+                      )}
+                    </span>
+                    <textarea className="mono" rows={5} spellCheck={false} value={v ?? PR_PROMPTS[k]} placeholder={PR_PROMPTS[k]} onChange={e => set({ prPrompts: { ...s.prPrompts, [k]: e.target.value === PR_PROMPTS[k] ? undefined : e.target.value } })} />
+                  </div>
+                )
+              })}
+            </>
+          )}
           {sec === 'templates' && (
             <>
               <h2>Prompt templates</h2>

@@ -50,6 +50,21 @@ export type Workspace = {
 export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number } // mine: the agent's comments (it comments as you)
 export type FixWhat = 'ci' | 'review' | 'conflict'
 
+// what fix CI, review and fix conflicts (and the info panel's send buttons) tell the agent; settings.prPrompts
+// replaces any of them. {{pr}}: the PR's number, {{url}}: its link, {{base}}: its base branch. The failing checks
+// (with the end of their logs) or the open review threads go after it.
+export const PR_PROMPTS: Record<FixWhat, string> = {
+  ci: 'CI fails on PR #{{pr}} ({{url}}). Find the cause and fix it, run what you can locally, then commit and push the fix, then say what you changed.',
+  review:
+    "Address the open review comments on PR #{{pr}} ({{url}}). Fix what you agree with; then commit and push the fix, then say what you changed, and what you didn't and why. Answer here, not on GitHub.",
+  conflict:
+    'PR #{{pr}} ({{url}}) has merge conflicts with {{base}}. Merge it in (git fetch origin {{base}}, then git merge origin/{{base}}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, then commit and push the merge, then say what you changed.',
+}
+// {{name}} (spaces inside allowed) as vars say; an unknown one stays as it is (not {{constructor}}): prompt templates', PR_PROMPTS'
+export const fillTemplate = (text: string, vars: Record<string, string | undefined>) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
+export const PR_SCAN = 1 // minutes between PR checks (settings.prScan)
+export const PR_TRIES = 3 // failing CI or conflicts go to the agent this many times in a row (settings.prTries), then over to you
+
 export type TabKind = 'agent' | 'shell' | 'setup' | 'dev' | 'ship'
 
 export type Tab = {
@@ -107,6 +122,9 @@ export type Settings = {
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
+  prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
+  prScan?: number // minutes between PR checks (unset: PR_SCAN)
+  prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
 }
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
@@ -185,4 +203,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 13
+export const API = 14

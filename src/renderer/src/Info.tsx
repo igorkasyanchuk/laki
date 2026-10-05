@@ -38,12 +38,14 @@ export type WsInfo = {
   autoReview?: boolean
   autoMerge?: boolean
   fixTries?: number // failing CI sent this many times in a row for the current PR
+  mergeTries?: number // and its merge conflicts
+  prScan: number // minutes between PR checks (Settings › Pull requests)
+  prTries: number // failing CI or conflicts go to the agent this many times in a row
   tunnels?: Tunnel[] // ports exposed to the world
   agents: { id: string; name: string; glyph: string; last?: string }[]
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
-const MAX_FIXES = 3 // the daemon's: failing CI or conflicts go to the agent this many times in a row
 
 // CI in a few characters: ✓ 5/5, ✗ 2 failing, … 3 running
 export function ciText(pr: PRInfo) {
@@ -67,15 +69,16 @@ const ago = (t?: string | number) => {
 
 // the auto switches, in the status bar and the panel
 export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
+  const when = `Checked every ${w.prScan === 1 ? 'minute' : `${w.prScan} minutes`} and after each turn; the prompt and pace: Settings › Pull requests.`
   return (
     <>
-      <Switch on={w.autoFix} tip={`Failing CI goes to the agent, once per commit (${MAX_FIXES} tries in a row)`} onChange={v => onToggle('autoFix', v)}>
+      <Switch on={w.autoFix} tip={`Failing CI on a new commit goes to the agent, with the failed logs: it fixes and pushes. Up to ${w.prTries} tries in a row, then it's over to you. ${when}`} onChange={v => onToggle('autoFix', v)}>
         fix CI
       </Switch>
-      <Switch on={w.autoReview} tip="New review comments on the PR go to the agent" onChange={v => onToggle('autoReview', v)}>
+      <Switch on={w.autoReview} tip={`New review comments on the PR go to the agent: it addresses them and pushes. ${when}`} onChange={v => onToggle('autoReview', v)}>
         review
       </Switch>
-      <Switch on={w.autoMerge} tip={`Merge conflicts with the base branch go to the agent: it merges the base in and pushes (${MAX_FIXES} tries in a row)`} onChange={v => onToggle('autoMerge', v)}>
+      <Switch on={w.autoMerge} tip={`Merge conflicts with the base branch go to the agent: it merges the base in and pushes. Up to ${w.prTries} tries in a row, then it's over to you. ${when}`} onChange={v => onToggle('autoMerge', v)}>
         fix conflicts
       </Switch>
     </>
@@ -157,7 +160,8 @@ export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (
               </div>
               <div className="info-auto">
                 <AutoToggles w={w} onToggle={onToggle} />
-                {w.autoFix && (w.fixTries ?? 0) > MAX_FIXES && <span className="warn small">gave up after {MAX_FIXES} fixes; push to try again</span>}
+                {w.autoFix && (w.fixTries ?? 0) > w.prTries && <span className="warn small">gave up after {w.prTries} fixes; turn fix CI off and on to try again</span>}
+                {w.autoMerge && (w.mergeTries ?? 0) > w.prTries && <span className="warn small">gave up on the conflicts after {w.prTries} tries; turn fix conflicts off and on to try again</span>}
               </div>
               <div className="row">
                 <button onClick={() => onFix('ci')} disabled={pr.checks !== 'fail'}>

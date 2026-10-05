@@ -64,7 +64,8 @@ project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a pro
 4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever; 7: `prComment`, `muted`; 8: a project's
 `templates`, kept by `projectSet`; 9: browsers in `apps`, `openIn` `default`; 10: `send` `enter: false`; 11: a tab's `runAt`, `model` and `effort`, the
 board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `stat`; 13: a tab's `ask`, `answer`,
-`unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`). A
+`unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`; 14: settings' `prPrompts`, `prScan`,
+`prTries`, which the PR switches' tooltips quote). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -222,16 +223,20 @@ they work).
   workspace's `git diff --numstat` against `diff`'s base, new files' lines (the first 100, up to 1 MB) and `git status`'s
   count as `stat` (`WorkspaceView.stat`: add, del, files, dirty); one scan at a time.
 - PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, base
-  branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, size, body), every 60s; one scan at a time (`scanPRs`), so `autoPR` never sends twice.
+  branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, size, body), every `settings.prScan` minutes
+  (`PR_SCAN`, 1; `prTick`, each minute; `LAKI_PR_SCAN_MS`: tests' pace instead); one scan at a time (`scanPRs`), so `autoPR` never sends twice.
 - `autoPR` (workspace `autoFix` / `autoReview` / `autoMerge`, ported from wb's `review.go`): failing CI on a new head
-  commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`), at most 3 in a row
-  (`MAX_FIXES`), then status waiting and a notification (`overToYou`); conflicts on a new head commit →
-  `prFix('conflict')` (merge the base in, push), `fix.merge`/`fix.merges`, the same 3 (mergeable UNKNOWN, as after a
-  push, keeps the count); new review threads → `reviewMessage`
+  commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`), at most `settings.prTries` in a row
+  (`PR_TRIES`, 3), then status waiting and a notification (`overToYou`, once, as the count goes over); conflicts on a new head commit →
+  `prFix('conflict')` (merge the base in, push), `fix.merge`/`fix.merges`, the same tries (mergeable UNKNOWN, as after a
+  push, keeps the count); `wsSet` turning a switch on again gives its tries back at the next scan (`retry`: a scan under way
+  would write its copy of `ws.fix` over a reset made then). New review threads → `reviewMessage`
   (GraphQL `reviewThreads`; `reviewKey` counts yours too, but not the agent's: it comments as you, so yours made while a
   tab of the workspace was running, `busy`/`agentSaid` from `changed()`, ±`SKEW`, are its, their ids kept as `fix.mine`).
   What was sent is `workspace.fix`.
-  Messages go to the first live claude/codex tab with `send({ whenIdle })`.
+  Messages go to the first live claude/codex tab with `send({ whenIdle })`. Each starts with `prPrompt`: the
+  `settings.prPrompts` text for ci, review or conflict, else `PR_PROMPTS` (`shared/types.ts`), `{{pr}}`, `{{url}}`,
+  `{{base}}` filled in; the checks' logs or the threads follow. The info panel's send buttons use the same.
 - Images pasted into a prompt: `imageSave` writes them to `<data>/images/`; the prompt gets their paths.
 
 ### Tunnels
@@ -407,7 +412,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,
   which replace a global one of the same name and target; an agent's only with a live tab of it, the focused one
   first; a shell's to the focused shell, any, or none: each app's `runAction` opens one), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and
-  `MAIL_OK` (what the daemons take: kept in step with their `MAIL`/`mailRe`); prompt templates (`templated`, `fillTemplate`: `{{prompt}}`, `{{project}}`, `{{base}}`;
+  `MAIL_OK` (what the daemons take: kept in step with their `MAIL`/`mailRe`); prompt templates (`templated`, `fillTemplate`, from `shared/types.ts`: the daemon's `prPrompt` uses it too; `{{prompt}}`, `{{project}}`, `{{base}}`;
   `settings.templates` and a project's `config.templates`, merged by `templatesFor`: the project's first, replacing a
   global one of the same name; filled in by the new-workspace page; `nameOf`: a templated workspace's name from the typed
   prompt, the daemons' first-4-words rule) and `shortPath` (the status bar's).
@@ -434,7 +439,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
   them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…24h, then the QR code and link), and `ScriptsField` (a project's
-  setup/teardown/run scripts, Import from a file), and General's Export/Import (`laki-settings.json`: `{ laki:
+  setup/teardown/run scripts, Import from a file), Pull requests (`PR_KINDS`: the PR switches' prompts over `PR_PROMPTS`,
+  each with Reset; `prScan`, `prTries`), and General's Export/Import (`laki-settings.json`: `{ laki:
   'settings', version: 1, settings }`; an import goes through `paint`, so it's painted and autosaved like typing, after
   `KINDS` refuses a field of the wrong kind: add a new list, object or number setting there). *Find a setting* (`FIND`: section, the title as the page writes it, more
   words; add new settings there) opens a section and lights (`.spot`) the first label, row or heading that starts with

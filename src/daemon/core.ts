@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, type FixWhat, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
@@ -636,6 +636,10 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
     const name = Array.from(o.name.trim()).slice(0, 60).join('') // by character: an emoji stays whole
     w.name = name && name !== w.id ? name : undefined // the id itself: back to it
   }
+  // turned on again: fix CI and fix conflicts get their tries back at the next scan (autoPR: a scan under way would
+  // write its own copy of ws.fix over a reset made here)
+  if (o.autoFix && !w.autoFix && w.fix) retry.add(`${w.id}:ci`)
+  if (o.autoMerge && !w.autoMerge && w.fix) retry.add(`${w.id}:merge`)
   if (o.autoFix !== undefined) w.autoFix = o.autoFix || undefined
   if (o.autoReview !== undefined) w.autoReview = o.autoReview || undefined
   if (o.autoMerge !== undefined) w.autoMerge = o.autoMerge || undefined
@@ -689,6 +693,7 @@ export const APPS: Record<string, string> = {
   zed: 'Zed',
   vscode: 'Visual Studio Code',
   windsurf: 'Windsurf',
+  antigravity: 'Antigravity',
   sublime: 'Sublime Text',
   webstorm: 'WebStorm',
   intellij: 'IntelliJ IDEA',
@@ -1416,6 +1421,14 @@ function checkOf(c: any): Check {
 const checksOf = (list: Check[]): PR['checks'] =>
   !list.length ? '' : list.some(c => c.state === 'fail') ? 'fail' : list.some(c => c.state === 'pending') ? 'pending' : 'pass'
 
+// the timer's scan (every minute): once settings.prScan minutes have gone by (a little early: the timer drifts)
+let prLast = 0
+export function prTick(now = Date.now()) {
+  if (now - prLast < (state.settings?.prScan || PR_SCAN) * 60000 - 5000) return
+  prLast = now
+  return scanPRs()
+}
+
 let prScan: Promise<void> | null = null
 let prAgain = false
 export function scanPRs(): Promise<void> {
@@ -1474,22 +1487,25 @@ async function scanPR(ws: Workspace) {
 
 // ---------- PR feedback to the agent: failing CI, review comments (from wb's fix-ci / fix-review)
 
-const MAX_FIXES = 3 // failing CI or conflicts, in a row, one per pushed commit; then it's over to you
+// autoPR, after each scan of an open PR: with autoFix, failing CI goes to the agent once per commit (settings.prTries
+// times in a row at most, then it's over to you); with autoReview, new review comments do; with autoMerge, merge
+// conflicts do, the same way. The prompts (PR_PROMPTS, settings.prPrompts) ask it to push.
+const retry = new Set<string>() // `<ws>:ci`, `<ws>:merge`: a switch turned on again (wsSet)
 
-// autoPR, after each scan of an open PR: with autoFix, failing CI goes to the agent once per commit (3
-// times in a row at most); with autoReview, new review comments do; with autoMerge, merge conflicts do, the same
-// way. It's asked to push.
 async function autoPR(ws: Workspace, pr: PR) {
   if (pr.state !== 'OPEN' || !(ws.autoFix || ws.autoReview || ws.autoMerge)) return
   const f: PRFix = ws.fix?.pr === pr.number ? { ...ws.fix } : { pr: pr.number }
+  if (retry.delete(`${ws.id}:ci`)) Object.assign(f, { ci: undefined, tries: 0 }) // and the current commit's failure goes again
+  if (retry.delete(`${ws.id}:merge`)) Object.assign(f, { merge: undefined, merges: 0 })
+  const max = state.settings?.prTries || PR_TRIES
   if (ws.autoFix) {
     if (pr.checks === 'pass') f.tries = 0
     else if (pr.checks === 'fail' && pr.head && pr.head !== f.ci) {
       const tries = (f.tries ?? 0) + 1
-      if (tries > MAX_FIXES) {
-        if (tries === MAX_FIXES + 1) overToYou(ws, `CI still fails after ${MAX_FIXES} fixes`)
+      if (tries > max) {
+        if (tries - 1 <= max) overToYou(ws, `CI still fails after ${max} fixes`) // once, as it goes over (max may have changed)
         Object.assign(f, { ci: pr.head, tries })
-      } else if (await prFix({ ws: ws.id, what: 'ci', push: true }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), false)))
+      } else if (await prFix({ ws: ws.id, what: 'ci' }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), false)))
         Object.assign(f, { ci: pr.head, tries }) // recorded once sent: no agent yet means the next scan tries again
     }
   }
@@ -1499,10 +1515,10 @@ async function autoPR(ws: Workspace, pr: PR) {
     const merges = (f.merges ?? 0) + 1
     if (pr.conflict === false) f.merges = 0 // not unknown: that comes after every push, and would undo the limit
     else if (pr.conflict && pr.head && pr.head !== f.merge) {
-      if (merges > MAX_FIXES) {
-        if (merges === MAX_FIXES + 1) overToYou(ws, `Merge conflicts remain after ${MAX_FIXES} tries`)
+      if (merges > max) {
+        if (merges - 1 <= max) overToYou(ws, `Merge conflicts remain after ${max} tries`)
         Object.assign(f, { merge: pr.head, merges })
-      } else if (await prFix({ ws: ws.id, what: 'conflict', push: true }).then(() => true, e => (log(`fix conflicts ${ws.id}: ${e.message}`), false)))
+      } else if (await prFix({ ws: ws.id, what: 'conflict' }).then(() => true, e => (log(`fix conflicts ${ws.id}: ${e.message}`), false)))
         Object.assign(f, { merge: pr.head, merges })
     }
   }
@@ -1514,7 +1530,7 @@ async function autoPR(ws: Workspace, pr: PR) {
     if (ids.size) f.mine = [...ids].slice(-200)
     if (t && k !== null && newReview(k, f.review))
       try {
-        tellAgent(ws, reviewMessage(pr, t.threads, true))
+        tellAgent(ws, reviewMessage(pr, t.threads))
         f.review = k
       } catch (e) {
         log(`fix review ${ws.id}: ${(e as Error).message}`)
@@ -1546,22 +1562,25 @@ function tellAgent(ws: Workspace, text: string) {
   return send({ target: tab.id, text, whenIdle: true })
 }
 
-const pushAsk = (push: boolean) => (push ? 'commit and push the fix, then say what you changed' : 'say what you changed')
+// what to tell the agent about a PR: settings.prPrompts' or PR_PROMPTS' text, its {{pr}}, {{url}} and {{base}} filled in
+function prPrompt(what: FixWhat, pr: PR) {
+  const v: Record<string, string> = { pr: String(pr.number), url: pr.url, base: pr.base ?? 'main' }
+  return fillTemplate(String(state.settings?.prPrompts?.[what] ?? '').trim() || PR_PROMPTS[what], v)
+}
 
-// prFix sends the PR's failing CI (with the end of the failed GitHub Actions logs) or its open review
-// comments to the workspace's agent
-export async function prFix(o: { ws: string; what: FixWhat; push?: boolean }) {
+// prFix sends the PR's failing CI (with the end of the failed GitHub Actions logs), its open review comments or its
+// merge conflicts to the workspace's agent
+export async function prFix(o: { ws: string; what: FixWhat }) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
   if (o.what === 'conflict') {
     if (!pr.conflict) throw new Error(`PR #${pr.number} has no merge conflicts`)
-    const b = pr.base ?? 'main'
-    return tellAgent(ws, `PR #${pr.number} (${pr.url}) has merge conflicts with ${b}. Merge it in (git fetch origin ${b}, then git merge origin/${b}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, then ${o.push ? 'commit and push the merge' : 'commit the merge'}, then say what you changed.`)
+    return tellAgent(ws, prPrompt('conflict', pr))
   }
   if (o.what === 'review') {
     const { threads } = await reviewThreads(ws.path, pr.number)
-    const msg = reviewMessage(pr, threads, !!o.push)
+    const msg = reviewMessage(pr, threads)
     if (!msg) throw new Error(`no open review comments on PR #${pr.number}`)
     return tellAgent(ws, msg)
   }
@@ -1589,7 +1608,7 @@ export async function prFix(o: { ws: string; what: FixWhat; push?: boolean }) {
       }
     }
   }
-  return tellAgent(ws, `CI fails on PR #${pr.number} (${pr.url}). Find the cause and fix it, run what you can locally, then ${pushAsk(!!o.push)}.\n${body}`)
+  return tellAgent(ws, `${prPrompt('ci', pr)}\n${body}`)
 }
 
 type Comment = { id?: string; author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string; createdAt?: string }
@@ -1631,7 +1650,7 @@ export const reviewKey = (threads: Thread[], me: string, mine: (c: Comment) => b
 export const newReview = (key: string, sent = '') => key.split(' ').some(t => t && !sent.split(' ').includes(t))
 
 // ponytail: inline threads only, not review summaries or plain PR comments
-function reviewMessage(pr: PR, threads: Thread[], push: boolean) {
+function reviewMessage(pr: PR, threads: Thread[]) {
   const open = threads.filter(t => !t.isResolved && t.comments.nodes.length)
   if (!open.length) return ''
   const items = open.map((t, i) => {
@@ -1639,7 +1658,7 @@ function reviewMessage(pr: PR, threads: Thread[], push: boolean) {
     const said = t.comments.nodes.map(c => `   @${c.author?.login ?? '?'}: ${c.body.trim().replace(/\n/g, '\n   ')}`).join('\n')
     return `\n${i + 1}. ${where}\n${said}`
   })
-  return `Address the open review comments on PR #${pr.number} (${pr.url}). Fix what you agree with; then ${pushAsk(push)}, and what you didn't and why. Answer here, not on GitHub.\n${items.join('\n')}`
+  return `${prPrompt('review', pr)}\n${items.join('\n')}`
 }
 
 // a turn that ended without a hook (an interrupt, a resumed chat's recap): running, no output for a

@@ -48,7 +48,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   const last = () => until(async () => (await rig.tab(ws.id)).last, 'an answer')
   assert.equal(
     await last(),
-    `answer: CI fails on PR #7 (https://example.invalid/pr/7). Find the cause and fix it, run what you can locally, then say what you changed.\n\n## test\n${job(1)}\n\n## e2e\nhttps://ci.invalid/2\n`,
+    `answer: CI fails on PR #7 (https://example.invalid/pr/7). Find the cause and fix it, run what you can locally, then commit and push the fix, then say what you changed.\n\n## test\n${job(1)}\n\n## e2e\nhttps://ci.invalid/2\n`,
   )
 
   // review: gh failing, no threads, none open; then the open ones (a bot's, a deleted user's)
@@ -63,7 +63,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
     { path: 'a.ts', line: 1, resolved: true, outdated: false, comments: [{ author: 'ann', body: 'done already' }] },
     { path: 'b.ts', resolved: false, outdated: true, comments: [{ author: 'lint-bot', body: 'unused import' }, { author: 'ghost', body: 'ghost here\nsecond line' }] },
   ])
-  await rig.rpc('prFix', { ws: ws.id, what: 'review', push: true })
+  await rig.rpc('prFix', { ws: ws.id, what: 'review' })
   await until(async () => (await last()).startsWith('answer: Address'), 'review sent')
   assert.equal(
     await last(),
@@ -135,7 +135,7 @@ test('autoFix and autoReview: they wait for an agent; CI goes over to you after 
   c.close()
 })
 
-test('autoMerge: merge conflicts go to the agent once per head commit; unknown keeps the count, none starts it over', async t => {
+test('autoMerge: merge conflicts go to the agent once per head commit, with your prompt and tries; unknown keeps the count, none starts it over', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH
   mkdirSync(gh)
@@ -149,19 +149,28 @@ test('autoMerge: merge conflicts go to the agent once per head commit; unknown k
   await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'conflict' }), /PR #5 has no merge conflicts/)
   await until(async () => (await rig.screen((await rig.tab(ws.id)).id)).includes('>'), 'claude up')
   pr('h1')
+  await rig.rpc('settingsSet', { prTries: 2, prPrompts: { conflict: 'Merge {{base}} into #{{ pr }} ({{url}}), {{nope}} {{constructor}}' } })
+  const c = await rig.connect()
   await rig.rpc('wsSet', { id: ws.id, autoMerge: true })
   await until(async () => (await fix())?.merge === 'h1', 'conflicts sent')
   assert.equal((await fix()).merges, 1)
-  await until(async () => /has merge conflicts with dev\. Merge it in \(git fetch origin dev, then git merge origin\/dev/.test((await rig.tab(ws.id)).last ?? ''), 'to the agent')
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: Merge dev into #5 (https://example.invalid/pr/5), {{nope}} {{constructor}}', 'your prompt, filled in')
   pr('h2') // its push still conflicts: again
   await until(async () => (await fix())?.merges === 2, 'sent again')
+  pr('h2b') // and again: over the 2 tries, over to you
+  await until(() => c.events.some(e => e.ev === 'turn' && e.kind === 'waiting' && e.text === 'Merge conflicts remain after 2 tries'), 'over to you')
+  await until(async () => (await fix())?.merges === 3, 'counted')
+  c.close()
+  await rig.rpc('wsSet', { id: ws.id, autoMerge: false })
+  await rig.rpc('wsSet', { id: ws.id, autoMerge: true })
+  await until(async () => (await fix())?.merges === 1, 'off and on: its tries back, sent again')
   pr('h3', 'UNKNOWN') // GitHub right after a push
   const n = readFileSync(rig.env.FAKE_LOG, 'utf8').split('gh pr view').length
   await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').split('gh pr view').length > n + 1, 'scanned')
-  assert.equal((await fix()).merges, 2)
+  assert.equal((await fix()).merges, 1)
   pr('h3', 'MERGEABLE')
   await until(async () => (await fix())?.merges === 0, 'resolved: the count starts over')
-  assert.equal((await fix()).merge, 'h2')
+  assert.equal((await fix()).merge, 'h2b')
 })
 
 test('a diff line comment on the PR: gh api with the head commit, a line not in the PR, checks', async t => {

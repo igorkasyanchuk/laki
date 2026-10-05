@@ -125,7 +125,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           <Row k="▷ Run">The project’s run script in a dev tab, with $PORT; ■ stops it.</Row>
           <Row k="Status bar">
             The plan-limits ring (the 5-hour limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT
-            (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review / fix conflicts switches. <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in
+            (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review / fix conflicts switches (their prompts, how often they check and how many tries: Settings › Pull requests). <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in
             progress is cut off).
           </Row>
           <Row k={<Icon name="globe" />}>
