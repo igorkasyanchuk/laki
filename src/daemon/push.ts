@@ -17,7 +17,8 @@ export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit 
   switch (w.format ?? 'ntfy') {
     case 'ntfy': // a header is bytes: anything past ASCII (an emoji in a name) as RFC 2047, which ntfy reads
       return { method: 'POST', headers: { title: /^[\x20-\x7e]*$/.test(title) ? title : `=?UTF-8?B?${Buffer.from(title).toString('base64')}?=` }, body: p.question || title }
-    case 'slack':
+    case 'slack': // Slack reads <…> as links and mentions (<!channel>)
+      return json({ text: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') })
     case 'telegram':
       return json({ text })
     default:

@@ -195,7 +195,7 @@ test('a diff line comment on the PR: gh api with the head commit, a line not in 
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/comments -f body=why "this"\? -f commit_id=beef -f path=a\.ts -F line=3 -f side=LEFT/)
 })
 
-test('a workspace from a PR: gh pr checkout on its branch, named after it, its PR by number; gh and branch errors', async t => {
+test('a workspace from a PR: gh pr checkout on its branch, named after it, its PR by URL, a fork’s as <owner>/<branch>; gh and branch errors', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH
   mkdirSync(gh)
@@ -208,14 +208,18 @@ test('a workspace from a PR: gh pr checkout on its branch, named after it, its P
   writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 123, title: 'Fix the login page!', url: 'https://github.com/o/r/pull/123', headRefName: 'fix-login', baseRefName: 'main', isCrossRepository: false }))
   writeFileSync(join(gh, 'checkout'), 'fix-login')
   const ws = await fromPR('https://github.com/o/r/pull/123')
-  assert.deepEqual([ws.id, ws.branch, ws.base, ws.prNumber], ['pr-123-fix-the-login-page', 'fix-login', 'main', 123])
+  assert.deepEqual([ws.id, ws.branch, ws.base, ws.prUrl], ['pr-123-fix-the-login-page', 'fix-login', 'main', 'https://github.com/o/r/pull/123'])
   assert.equal(execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ws.path, encoding: 'utf8' }).trim(), 'fix-login')
-  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').includes('gh pr view 123 --json number,state'), 'its PR, by number')
+  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').includes('gh pr view https://github.com/o/r/pull/123 --json number,state'), 'its PR, by URL')
   await assert.rejects(fromPR('123'), new RegExp(`already checked out in workspace ${ws.id}$`))
   await assert.rejects(rig.rpc('wsFan', { project: p.id, pr: '123', presets: ['claude', 'codex'] }), /can't start from a PR/)
   await rig.rpc('wsRm', { id: ws.id }) // the branch stays: gh checks it out again
   const r = await rig.cli('new', p.id, '--pr', '123', '--preset', 'none')
   assert.match(r.out, /^pr-123-fix-the-login-page .*\(branch fix-login,/)
+  // a fork's PR from its main (the repo's own branch here): <owner>/main, not "checked out in the repo"
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 7, title: 'Typo', url: 'https://github.com/o/r/pull/7', headRefName: 'main', baseRefName: 'main', isCrossRepository: true, headRepositoryOwner: { login: 'alice' } }))
+  assert.equal((await fromPR('7')).branch, 'alice/main')
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh pr checkout https:\/\/github.com\/o\/r\/pull\/7 --branch alice\/main/)
 })
 
 test('a merged PR archives its workspace once it is clean (archiveMerged), not with changes or unpushed commits; Undo stays', async t => {

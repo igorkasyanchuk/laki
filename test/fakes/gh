@@ -7,7 +7,7 @@ case "$*" in
     [ -n "$FAKE_GH" ] && [ -f "$FAKE_GH/noauth" ] && { echo 'To get started with GitHub CLI, please run:  gh auth login' >&2; exit 4; }
     f prhead.json || { echo 'GraphQL: Could not resolve to a PullRequest with the number of 99. (repository.pullRequest)' >&2; exit 1; }
     exit 0 ;;
-  "pr checkout "*) b=$(f checkout) || exit 1; git checkout -q "$b" 2>/dev/null || git checkout -q -b "$b"; exit $? ;;
+  "pr checkout "*) b=$(f checkout) || exit 1; a="$*"; case "$a" in *" --branch "*) b=${a##* --branch }; esac; git checkout -q "$b" 2>/dev/null || git checkout -q -b "$b"; exit $? ;;
 esac
 case "$1 $2" in
   "pr view") f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;

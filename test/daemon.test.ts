@@ -395,7 +395,7 @@ test('ports of the workspace process tree, their names, stopping one; PR from gh
   const rig = await fresh(t, {
     config: {
       run: `exec node -e 'process.on("SIGTERM", () => {}); const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port + " PORT=" + process.env.PORT))'`,
-      ports: { '3100': 'web' },
+      ports: { '3100': 'web', '3200': { name: 'api' } }, // not a string: left out
     },
   })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

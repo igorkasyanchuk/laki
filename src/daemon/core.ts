@@ -194,7 +194,7 @@ export function view(): View {
     // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
     workspaces: state.workspaces.map(w => {
       const c = projectConfig(w)
-      const portNames = c.ports && typeof c.ports === 'object' ? c.ports : undefined
+      const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
       return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, stat: stats.get(w.id) }
     }),
     tabs,
@@ -828,13 +828,15 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // before the worktree: a wrong one makes nothing
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
   const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
-  // a PR: the worktree on its head branch, named after it, its base the PR's, linked to it for the PR status
+  // a PR: the worktree on its head branch, named after it, its base the PR's, linked to it (by URL) for the PR status
+  if (o.pr?.trim() && (o.local || proj.git === false)) throw new Error('a PR needs a worktree: a git project, not Local')
   const pr = o.pr?.trim() ? await prHead(proj, o.pr.trim()) : undefined
+  // a fork's branch as <owner>/<branch> (gh's own name for a fork's main): never one of yours of the same name
+  const local = pr && (pr.isCrossRepository && pr.headRepositoryOwner?.login ? `${pr.headRepositoryOwner.login}/${pr.headRefName}` : pr.headRefName)
   if (pr) {
-    if (o.local || proj.git === false) throw new Error('a PR needs a worktree: a git project, not Local')
-    const have = state.workspaces.find(w => w.project === proj.id && !w.archived && w.kind === 'worktree' && w.branch === pr.headRefName)
-    if (have) throw new Error(`PR #${pr.number}'s branch ${pr.headRefName} is already checked out in workspace ${have.id}`)
-    if (current === pr.headRefName) throw new Error(`PR #${pr.number}'s branch ${pr.headRefName} is checked out in ${proj.path}: switch it to another branch first`)
+    const have = state.workspaces.find(w => w.project === proj.id && !w.archived && w.kind === 'worktree' && w.branch === local)
+    if (have) throw new Error(`PR #${pr.number}'s branch ${local} is already checked out in workspace ${have.id}`)
+    if (current === local) throw new Error(`PR #${pr.number}'s branch ${local} is checked out in ${proj.path}: switch it to another branch first`)
     o = { ...o, name: o.name || `pr-${pr.number}-${slug(pr.title).slice(0, 24)}`.replace(/-+$/, '') }
   }
   let ws: Workspace
@@ -855,15 +857,16 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
     })
     if (pr) {
-      // gh pr checkout makes the branch (from a fork too, with its remote) where the worktree is
-      await run('gh', ['pr', 'checkout', String(pr.number)], { cwd: path, timeout: 120000 }).catch(async e => {
+      // gh pr checkout makes the branch (from a fork too, with its remote) where the worktree is; by URL: a number
+      // would be gh's default repo's
+      await run('gh', ['pr', 'checkout', pr.url, '--branch', local!], { cwd: path, timeout: 120000 }).catch(async e => {
         await git(proj.path, 'worktree', 'remove', '--force', path).catch(() => {})
         throw new Error(`gh pr checkout ${pr.number}: ${ghSays(e, `PR ${pr.number}`)}`)
       })
       branch = await git(path, 'rev-parse', '--abbrev-ref', 'HEAD')
       base = pr.baseRefName
     }
-    ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prNumber: pr.number }) }
+    ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }) }
     await copyIncludes(proj, ws) // before setup and the agent: they may read .env
   }
   if (o.race) ws.race = o.race
@@ -1261,7 +1264,7 @@ function syncBranches() {
     const b = headOf(w.path)
     if (!b || b === w.branch) continue
     w.branch = b
-    w.prNumber = undefined // nor the PR it started from
+    w.prUrl = undefined // nor the PR it started from
     prs.delete(w.id) // the old branch's PR isn't this one's
     moved = true
   }
@@ -1333,7 +1336,10 @@ export async function portKill(o: { ws: string; port: number }) {
   if (!p) throw new Error(`nothing of ${ws.id}'s listens on :${o.port}`)
   // its owner and start time: the SIGKILL goes only to the same process, not one that took its pid since
   const who = () => run('ps', ['-o', 'uid=,lstart=', '-p', String(p.pid)]).then(r => r.stdout.trim(), () => '')
-  const was = await who()
+  // and that it still listens there: the scan is up to 5 s old, and a pid may be another process's by now
+  const listens = run('lsof', ['-nP', '-a', '-p', String(p.pid), `-iTCP:${Number(o.port)}`, '-sTCP:LISTEN', '-t']).then(r => !!r.stdout.trim(), () => false)
+  const [was, still] = await Promise.all([who(), listens])
+  if (!still) throw (void scanPorts(), new Error(`${p.cmd} (pid ${p.pid}) no longer listens on :${o.port}`))
   if (was.split(/\s+/)[0] !== String(process.getuid?.())) throw new Error(`${p.cmd} (pid ${p.pid}) isn't yours to stop`)
   process.kill(p.pid, 'SIGTERM')
   setTimeout(() => void scanPorts(), 500)
@@ -1574,7 +1580,7 @@ const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,
 async function scanPR(ws: Workspace) {
   let pr: PR
   try {
-    const { stdout } = await run('gh', ['pr', 'view', String(ws.prNumber ?? ws.branch), '--json', PR_FIELDS], { cwd: ws.path, timeout: 20000 })
+    const { stdout } = await run('gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { cwd: ws.path, timeout: 20000 })
     const j = JSON.parse(stdout)
     const list: Check[] = (j.statusCheckRollup ?? []).map(checkOf)
     pr = {
@@ -1614,8 +1620,12 @@ async function archiveMerged(ws: Workspace, pr: PR) {
   if (!state.settings?.archiveMerged || ws.kind !== 'worktree' || ws.archived || ws.autoArchived === pr.number || !pr.head) return
   if (tabsOf(ws.id).some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return
   if ((await git(ws.path, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return // unpushed (or git can't tell)
-  ws.autoArchived = pr.number
-  if ((await wsArchive(ws.id, { ifClean: true }))?.dirty) return void (ws.autoArchived = undefined)
+  ws.autoArchived = pr.number // before: wsArchive saves it
+  const r = await wsArchive(ws.id, { ifClean: true }).catch(e => {
+    ws.autoArchived = undefined // failed: the next scan tries again
+    throw e
+  })
+  if (r?.dirty) return void (ws.autoArchived = undefined)
   log(`archived ${ws.id}: PR #${pr.number} merged`)
   broadcast({ ev: 'archived', ws: ws.id, name: ws.name || ws.id, pr: pr.number })
 }

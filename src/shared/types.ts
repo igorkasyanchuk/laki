@@ -45,7 +45,7 @@ export type Workspace = {
   fix?: PRFix // what autoFix/autoReview/autoMerge sent already
   race?: string // one prompt fanned out to several agents: the workspaces of one race share it (Compare)
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
-  prNumber?: number // the GitHub PR it was started from (laki new --pr): its PR by number, a fork's too, until the branch moves
+  prUrl?: string // the GitHub PR it was started from (laki new --pr): its PR by URL (a fork's, another repo's), until the branch moves
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
 }
 
