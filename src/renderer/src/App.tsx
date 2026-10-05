@@ -229,6 +229,8 @@ export function App() {
         // a permission prompt: Allow and Deny on the notification pick its menu's first and last choice
         const asks = m.kind === 'waiting' && /permission/i.test(m.text ?? '')
         notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, asks ? ['Allow', 'Deny'] : undefined)
+      } else if (m.ev === 'archived') {
+        toast(`Archived ${m.name}: PR #${m.pr} merged`, () => call('wsRestore', { id: m.ws }).catch(() => {}))
       } else if (m.ev === 'browse' && bridge?.browse) {
         // the agent browser (laki browser): main drives a hidden window; its answer goes back to the daemon
         const { req: id, ev: _, ...r } = m // req: an event with an id would be taken for a reply
@@ -819,6 +821,11 @@ export function App() {
                       {w.pr?.conflict && w.pr.state === 'OPEN' && settings.prIcon !== false && (
                         <span className="ws-pr conflict" data-tip={`PR #${w.pr.number} has merge conflicts`}>
                           <Icon name="conflict" size={11} />
+                        </span>
+                      )}
+                      {settings.archiveMerged && w.pr?.state === 'MERGED' && (
+                        <span className="ws-merged" data-tip={`PR #${w.pr.number} merged; kept: it has changes, or an agent at work`}>
+                          merged
                         </span>
                       )}
                       {w.pr && settings.prIcon !== false && (

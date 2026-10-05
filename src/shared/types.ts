@@ -45,6 +45,7 @@ export type Workspace = {
   race?: string // one prompt fanned out to several agents: the workspaces of one race share it (Compare)
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
   prNumber?: number // the GitHub PR it was started from (laki new --pr): its PR by number, a fork's too, until the branch moves
+  autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
@@ -128,6 +129,7 @@ export type Settings = {
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
   webhook?: Webhook // pushes to your phone
+  archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
 }
 
 // Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format

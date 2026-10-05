@@ -217,3 +217,39 @@ test('a workspace from a PR: gh pr checkout on its branch, named after it, its P
   const r = await rig.cli('new', p.id, '--pr', '123', '--preset', 'none')
   assert.match(r.out, /^pr-123-fix-the-login-page .*\(branch fix-login,/)
 })
+
+test('a merged PR archives its workspace once it is clean (archiveMerged), not with changes or unpushed commits; Undo stays', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const git = (...a: string[]) => execFileSync('git', a, { cwd: ws.path, env: rig.env, encoding: 'utf8' }).trim()
+  const head = git('rev-parse', 'HEAD')
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 8, state: 'MERGED', url: 'https://example.invalid/pr/8', headRefOid: head, statusCheckRollup: [] }))
+  const c = await rig.connect()
+  const live = async () => !(await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived
+  const views = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('gh pr view').length
+  const scans = async () => {
+    const n = views()
+    await until(() => views() > n + 1, 'two scans')
+  }
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr?.state === 'MERGED', 'scanned')
+  await scans()
+  assert.ok(await live(), 'off by default')
+  await rig.rpc('settingsSet', { archiveMerged: true })
+  writeFileSync(join(ws.path, 'wip.txt'), 'x')
+  await scans()
+  assert.ok(await live(), 'uncommitted')
+  git('add', '-A')
+  git('commit', '-qm', 'wip')
+  await scans()
+  assert.ok(await live(), 'past the PR head')
+  git('reset', '-q', '--hard', head)
+  await until(async () => !(await live()), 'archived')
+  assert.ok(c.events.some(e => e.ev === 'archived' && e.ws === ws.id && e.pr === 8))
+  await rig.rpc('wsRestore', { id: ws.id })
+  await scans()
+  assert.ok(await live(), 'once: an Undo stays')
+  c.close()
+})

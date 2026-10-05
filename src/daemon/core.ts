@@ -1568,6 +1568,20 @@ async function scanPR(ws: Workspace) {
     changed()
   }
   await autoPR(ws, pr).catch(e => log(`autoPR ${ws.id}: ${e.message}`))
+  if (pr.state === 'MERGED') await archiveMerged(ws, pr).catch(e => log(`archive merged ${ws.id}: ${e.message}`))
+}
+
+// a workspace whose PR merged, archived when Settings say so (archiveMerged): only clean (nothing uncommitted, no
+// commit past the PR's head) and with no agent at work, once per PR (autoArchived: an Undo stays undone). The app
+// shows it with Undo; one left alone shows "merged" in the sidebar
+async function archiveMerged(ws: Workspace, pr: PR) {
+  if (!state.settings?.archiveMerged || ws.kind !== 'worktree' || ws.archived || ws.autoArchived === pr.number || !pr.head) return
+  if (tabsOf(ws.id).some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return
+  if ((await git(ws.path, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return // unpushed (or git can't tell)
+  ws.autoArchived = pr.number
+  if ((await wsArchive(ws.id, { ifClean: true }))?.dirty) return void (ws.autoArchived = undefined)
+  log(`archived ${ws.id}: PR #${pr.number} merged`)
+  broadcast({ ev: 'archived', ws: ws.id, name: ws.name || ws.id, pr: pr.number })
 }
 
 // ---------- PR feedback to the agent: failing CI, review comments (from wb's fix-ci / fix-review)

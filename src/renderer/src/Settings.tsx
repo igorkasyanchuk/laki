@@ -72,6 +72,7 @@ export type AppSettings = Paint & {
   prScan?: number // minutes between PR checks
   prTries?: number // fix CI's and fix conflicts' tries in a row
   webhook?: Webhook // pushes to your phone
+  archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -483,6 +484,7 @@ const FIND: [string, string, string?][] = [
   ['open', 'Custom command', 'editor'],
   ['presets', 'Agent presets', 'claude codex gemini args env model'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
+  ['pr', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
   ['pr', 'Tries in a row', 'pr fix ci conflicts limit attempts how many times'],
   ['pr', 'Fix CI', 'pr prompt failing checks auto'],
   ['pr', 'Review', 'pr prompt comments auto'],
@@ -1188,6 +1190,9 @@ export function SettingsPage(p: {
                 {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}
                 {pick('Tries in a row', 'prTries', PR_TRIES, [1, 2, 3, 5, 10], n => `${n} · then it's over to you`)}
               </div>
+              <Switch className="switch-row" on={!!s.archiveMerged} onChange={v => set({ archiveMerged: v })}>
+                <Says title="Archive workspace when its PR merges" hint="Only a clean one: nothing uncommitted or unpushed, no agent at work. A toast offers Undo; one left alone says merged in the sidebar." />
+              </Switch>
               {PR_KINDS.map(([k, title, after]) => {
                 const v = s.prPrompts?.[k]
                 return (
