@@ -18,7 +18,8 @@ export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opu
 export type RunAction = { name: string; target: Agent | 'shell'; text: string }
 // a prompt template: {{prompt}} (what's typed), {{project}}, {{base}}; settings.templates and a project's own
 export type Template = { name: string; text: string }
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string> }
+// copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[] }
 
 // git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)
 export type Project = { id: string; name: string; path: string; git?: boolean; config?: ProjectConfig }

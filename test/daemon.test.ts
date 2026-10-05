@@ -1,8 +1,8 @@
 // The daemon end to end: real PTYs, git worktrees, hooks via the CLI, fake agents.
 import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { chmodSync, existsSync, mkdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
 import { test } from 'node:test'
 import { API } from '../src/shared/types.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
@@ -21,6 +21,26 @@ test('rejects a wrong token and a foreign Origin', async t => {
   const ok = await connect(rig, 'file://')
   assert.equal(await ok.call('ping'), 'pong')
   ok.close()
+})
+
+test('a new worktree gets the ignored files .worktreeinclude and .laki.json copy name, with their modes, before setup', async t => {
+  const rig = await fresh(t, { config: { setup: 'cat .env .env.local secrets/key > seen.txt', copy: ['secrets/'] } })
+  const put = (f: string, s: string) => (mkdirSync(dirname(join(rig.repo, f)), { recursive: true }), writeFileSync(join(rig.repo, f), s))
+  put('.env', 'A=1\n')
+  chmodSync(join(rig.repo, '.env'), 0o600)
+  put('.env.local', 'B=2\n')
+  put('secrets/key', 'k\n')
+  put('sub/.env', 'not this\n') // /.env: the root's only
+  put('.env.prod', 'nor this\n')
+  symlinkSync('/etc/hosts', join(rig.repo, '.env.link')) // out of the repo: never
+  put('.worktreeinclude', '# what new worktrees get\n/.env\n.env.local\n.env.link\n')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const seen = join(ws.path, 'seen.txt')
+  await until(() => existsSync(seen) && readFileSync(seen, 'utf8').length >= 8, 'setup read them')
+  assert.equal(readFileSync(seen, 'utf8'), 'A=1\nB=2\nk\n')
+  assert.equal(statSync(join(ws.path, '.env')).mode & 0o777, 0o600)
+  for (const f of ['sub/.env', '.env.prod', '.env.link']) assert.ok(!existsSync(join(ws.path, f)), f)
 })
 
 test('single instance: a second daemon exits', async t => {

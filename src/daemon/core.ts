@@ -4,9 +4,9 @@ import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_pro
 import { randomBytes, randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
-import { closeSync, type Dirent, existsSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
-import { basename, dirname, extname, join, resolve } from 'node:path'
+import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
@@ -349,7 +349,7 @@ export function projectConfig(ws: Workspace): ProjectConfig {
     } catch {}
   }
   const { env, actions: _, templates: __, ...cmds } = proj?.config ?? {} // actions, templates: the renderer's (Run ▾, a new workspace's prompt)
-  const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => v?.trim()))
+  const own = Object.fromEntries(Object.entries(cmds).filter(([, v]) => typeof v === 'string' && v.trim()))
   return { ...file, ...own, env: { ...file.env, ...env } }
 }
 
@@ -819,6 +819,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
     })
     ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now() }
+    await copyIncludes(proj, ws) // before setup and the agent: they may read .env
   }
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
@@ -835,6 +836,46 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     changed() // the workspace is made, even when its agent didn't start
   }
   return ws
+}
+
+// files git doesn't keep (.env…) that a new worktree needs: what .worktreeinclude (gitignore-style, at the repo's root)
+// and .laki.json's copy match in the main checkout (git ls-files does the matching), with their modes, before setup
+// and the agent start. One already in the worktree stays; a symlink counts only when it points inside the repo. A
+// failure is a line in daemon.log, not a failed workspace.
+async function copyIncludes(proj: Project, ws: Workspace) {
+  const list = projectConfig(ws).copy
+  const pats = (Array.isArray(list) ? list : []).filter((p): p is string => typeof p === 'string' && !!p.trim()).map(p => `--exclude=${p.trim()}`)
+  const file = join(proj.path, '.worktreeinclude')
+  if (existsSync(file)) pats.push(`--exclude-from=${file}`)
+  if (!pats.length) return
+  const within = (root: string, p: string) => p === root || p.startsWith(root + sep)
+  const copied: string[] = []
+  try {
+    const root = realpathSync(proj.path)
+    const to = realpathSync(ws.path)
+    const out = await git(proj.path, 'ls-files', '-z', '--others', '--ignored', ...pats)
+    for (const rel of out.split('\0').filter(Boolean)) {
+      const dst = join(ws.path, rel)
+      try {
+        if (lstatSync(dst, { throwIfNoEntry: false })) continue
+        const src = realpathSync(join(proj.path, rel))
+        if (!within(root, src) || !statSync(src).isFile()) {
+          log(`copy into ${ws.id}: skipped ${rel} (a link out of the repo, or not a file)`)
+          continue
+        }
+        mkdirSync(dirname(dst), { recursive: true })
+        if (!within(to, realpathSync(dirname(dst)))) continue // a folder the worktree links elsewhere
+        copyFileSync(src, dst)
+        chmodSync(dst, statSync(src).mode & 0o7777)
+        copied.push(rel)
+      } catch (e) {
+        log(`copy into ${ws.id}: ${rel}: ${(e as Error).message}`)
+      }
+    }
+  } catch (e) {
+    log(`copy into ${ws.id}: ${(e as Error).message}`)
+  }
+  if (copied.length) log(`copied into ${ws.id}: ${copied.join(', ')}`)
 }
 
 async function teardown(ws: Workspace) {
@@ -904,6 +945,7 @@ export async function wsRestore(ref: string) {
   await git(proj.path, 'worktree', 'add', ws.path, ws.branch).catch(e => {
     throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
   })
+  await copyIncludes(proj, ws) // archiving took them with the worktree
   ws.archived = false
   ws.port = allocPort()
   save()
