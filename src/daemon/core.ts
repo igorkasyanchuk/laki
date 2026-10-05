@@ -1842,10 +1842,12 @@ export function sweepRunning(now = Date.now()) {
 
 // ---------- diff, dev server, ship
 
+// what a workspace's changes are against: a worktree's merge base with its base branch, else HEAD
+const diffBase = (ws: Workspace) => (ws.kind === 'worktree' ? git(ws.path, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : Promise.resolve('HEAD'))
+
 export async function diff(ref: string) {
   const ws = findWs(ref)
-  let from = 'HEAD'
-  if (ws.kind === 'worktree') from = await git(ws.path, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD')
+  const from = await diffBase(ws)
   const [text, numstat, untracked] = await Promise.all([
     git(ws.path, 'diff', '--no-color', '--no-ext-diff', '-M', from),
     git(ws.path, 'diff', '--numstat', '-M', from),
@@ -2061,9 +2063,20 @@ export function fileNew(o: { ws: string; path: string; dir?: boolean }) {
 const IMAGES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', bmp: 'image/bmp' }
 const MAX_TEXT = 512 << 10
 
-// fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size
-export function fileRead(o: { ws: string; path: string }) {
-  const abs = inside(findWs(o.ws), o.path)
+// fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size. base: an image
+// as it was where the workspace's changes start (diff's base, through git show), for Changes' before and after
+export async function fileRead(o: { ws: string; path: string; base?: boolean }) {
+  const ws = findWs(o.ws)
+  const abs = inside(ws, o.path)
+  if (o.base) {
+    const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
+    if (!mime) throw new Error(`${o.path} isn't an image`)
+    const rel = abs.slice(ws.path.length + 1)
+    const { stdout } = await run('git', ['show', `${await diffBase(ws)}:${rel}`], { cwd: ws.path, encoding: 'buffer', maxBuffer: 10 << 20 }).catch(e => {
+      throw new Error(/maxBuffer/i.test(String(e.message)) ? 'over 10 MB' : `not in ${ws.base}`)
+    })
+    return { size: stdout.length, image: `data:${mime};base64,${stdout.toString('base64')}` }
+  }
   const st = statSync(abs)
   if (!st.isFile()) throw new Error(`${o.path} isn't a file`)
   const mime = IMAGES[extname(abs).slice(1).toLowerCase()]

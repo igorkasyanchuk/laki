@@ -425,6 +425,7 @@ export function App() {
     openFile: file => void call('openIn', { ws: w.id, app: 'editor', file }).catch(() => {}),
     preview: (path, line) => setPreview({ ws: w.id, path, line, n: ++requests }),
     changes: () => api.call<Changes>('diff', { ws: w.id }),
+    read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
     toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent')),

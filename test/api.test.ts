@@ -528,3 +528,23 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   assert.equal((await rig.rpc('browse', { ws: ws.id, op: 'text', url: '/about' })).url, `http://localhost:${ws.port}/about`)
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'click', selector: '#nope' }), /no element matches #nope/)
 })
+
+test('an image as it was where the changes start (Changes before and after), and as it is now', async t => {
+  const rig = await fresh(t)
+  const png = (n: number) => Buffer.from([0x89, 0x50, 0x4e, 0x47, n])
+  writeFileSync(join(rig.repo, 'logo.png'), png(1))
+  writeFileSync(join(rig.repo, 'notes.txt'), 'x\n')
+  execFileSync('git', ['add', '-A'], { cwd: rig.repo, env: rig.env })
+  execFileSync('git', ['commit', '-qm', 'logo'], { cwd: rig.repo, env: rig.env })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  writeFileSync(join(ws.path, 'logo.png'), png(2))
+  execFileSync('git', ['commit', '-qam', 'new logo'], { cwd: ws.path, env: rig.env }) // committed: still against the base
+  writeFileSync(join(ws.path, 'added.png'), png(3))
+  const read = (path: string, base?: boolean) => rig.rpc('fileRead', { ws: ws.id, path, base })
+  assert.deepEqual(await read('logo.png', true), { size: 5, image: `data:image/png;base64,${png(1).toString('base64')}` })
+  assert.deepEqual(await read('logo.png'), { size: 5, image: `data:image/png;base64,${png(2).toString('base64')}` })
+  await assert.rejects(read('added.png', true), /not in main/)
+  await assert.rejects(read('notes.txt', true), /isn't an image/)
+  await assert.rejects(read('../x.png', true), /not a path inside/)
+})

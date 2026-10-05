@@ -21,6 +21,7 @@ export type PanelApi = {
   openFile: (path: string) => void // in the editor
   preview: (path: string, line?: number) => void // in the app
   changes: () => Promise<Changes>
+  read: (path: string, base?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image)
   threads: () => Promise<Thread[]>
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
   toAgent: (text: string) => Promise<unknown> // to the workspace's agent, when its turn ends
@@ -252,6 +253,63 @@ function CommentBox({ path, line, text, setText, pr, api, onClose }: { path: str
   )
 }
 
+// an image the changes touched, before and after side by side (one side when it's new or gone), each with its size in
+// pixels and bytes; a click shows it full size. An SVG is an <img> too: never markup in the page
+const IMAGE = /\.(png|jpe?g|gif|webp|svg)$/i
+function ImageDiff({ api, path, status }: { api: PanelApi; path: string; status: string }) {
+  const s = status[0] === '?' ? 'A' : status[0]
+  const [sides, setSides] = useState<[string, FileContent | string][]>([])
+  const [zoom, setZoom] = useState<string | null>(null)
+  useEffect(() => {
+    const want: [string, Promise<FileContent> | null][] = [
+      ['before', s === 'A' || s === 'R' ? null : api.read(path, true)], // a rename's old path isn't known here
+      ['after', s === 'D' ? null : api.read(path)],
+    ]
+    let live = true
+    Promise.all(want.filter(([, p]) => p).map(([label, p]) => p!.then(c => [label, c] as [string, FileContent], e => [label, (e as Error).message] as [string, string]))).then(r => live && setSides(r))
+    return () => void (live = false)
+  }, [path, s])
+  useEffect(() => {
+    if (!zoom) return
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), setZoom(null))
+    window.addEventListener('keydown', f, true)
+    return () => window.removeEventListener('keydown', f, true)
+  }, [zoom])
+  return (
+    <div className="img-diff">
+      {!sides.length && <span className="muted small pad">Loading…</span>}
+      {sides.map(([label, c]) => (
+        <ImageSide key={label} label={label} c={c} onZoom={setZoom} />
+      ))}
+      {zoom && (
+        <div className="img-zoom" onClick={() => setZoom(null)} data-tip="Click or Esc to close">
+          <img src={zoom} alt={path} />
+        </div>
+      )}
+    </div>
+  )
+}
+
+function ImageSide({ label, c, onZoom }: { label: string; c: FileContent | string; onZoom: (src: string) => void }) {
+  const [px, setPx] = useState('')
+  if (typeof c === 'string' || !c.image)
+    return (
+      <figure className="img-side">
+        <span className="muted small">{typeof c === 'string' ? c : `too big to show (${sizeText(c.size)})`}</span>
+        <figcaption className="muted small">{label}</figcaption>
+      </figure>
+    )
+  return (
+    <figure className="img-side">
+      <img src={c.image} alt={label} onLoad={e => setPx(`${e.currentTarget.naturalWidth}×${e.currentTarget.naturalHeight} · `)} onClick={() => onZoom(c.image!)} />
+      <figcaption className="muted small">
+        {label} · {px}
+        {sizeText(c.size)}
+      </figcaption>
+    </figure>
+  )
+}
+
 function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number }) {
   const [d, err, reload] = useLoad(api.changes, ws, 8000)
   const [open, setOpen] = useState<Set<string>>(new Set())
@@ -305,13 +363,14 @@ function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number })
               <span className="sp-name">
                 {f.path.slice(f.path.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f.path)}</span>
               </span>
-              {f.add !== undefined && (
+              {f.add !== undefined && !IMAGE.test(f.path) /* git counts no lines in an image */ && (
                 <span className="mono small">
                   <span className="add">+{f.add}</span> <span className="del">−{f.del ?? 0}</span>
                 </span>
               )}
             </div>
-            {open.has(f.path) && (
+            {open.has(f.path) && IMAGE.test(f.path) && <ImageDiff api={api} path={f.path} status={f.status} />}
+            {open.has(f.path) && !IMAGE.test(f.path) && (
               <div className="sp-diff">
                 {(lines => {
                   const box = boxAt(f.path, lines)
