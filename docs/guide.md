@@ -467,7 +467,7 @@ lit for a moment.
   double or nothing; the indent, row height and text size, each the theme's unless you pick one; *Button labels*: words
   beside Scheduled, Board, Video, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
-  terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked, in sight as the page opens; hovering one shows it on
+  terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds
   one by name): Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
   Velvet, Nightfall, Paper (light), Mist (light), and the Warp-style gradients Cyber Wave, Koi, Pink City, Leafy,

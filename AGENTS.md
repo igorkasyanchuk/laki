@@ -521,7 +521,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 - **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size (its preview cancels
   that); presets, `EnvField` (KEY=value lines), fonts,
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
-  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, scrolled into view, a name filter that stays in sight;
+  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, a name filter that stays in sight;
   accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's,
   `--accent-fg` by `onAccent`; `tabsAt`;
   `PROJECT_LOOK`: the sidebar's project names over the theme, `settings.projectLook`, App's `phAttrs`/`phVars` put them

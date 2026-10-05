@@ -718,10 +718,8 @@ export function SettingsPage(p: {
   findRef.current = findQ
   const [spot, setSpot] = useState<{ title: string; n: number }>() // the setting a result goes to
   const shownThemes = [...THEMES].reverse().filter(t => t.name.toLowerCase().includes(themeQ.trim().toLowerCase())) // the newest first
-  // Appearance opens with the current theme in sight (there are many)
-  useEffect(() => {
-    if (sec === 'appearance') document.querySelector('.themes .theme.on')?.scrollIntoView({ block: 'nearest' })
-  }, [sec])
+  // a section picked opens at its top, the one already open too (a Find result scrolls to its setting instead)
+  const openSec = (id: string) => (setSec(id), document.querySelector('.settings-main')?.scrollTo(0, 0))
   const set = (k: Partial<AppSettings>) => setS(x => ({ ...x, ...k }))
   // a theme under the mouse is painted, the chosen one again as it leaves the grid or the page closes
   const latest = useRef(s)
@@ -885,13 +883,13 @@ export function SettingsPage(p: {
             </>
           )}
           {!findQ.trim() && SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote)).map(x => (
-            <button key={x.id} className={sec === x.id ? 'on' : ''} onClick={() => setSec(x.id)}>
+            <button key={x.id} className={sec === x.id ? 'on' : ''} onClick={() => openSec(x.id)}>
               <Icon name={x.icon} /> {x.label}
             </button>
           ))}
           {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Projects</div>}
           {!findQ.trim() && p.projects?.map(x => (
-            <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => setSec(`project:${x.id}`)} data-tip={x.path}>
+            <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => openSec(`project:${x.id}`)} data-tip={x.path}>
               <Icon name={x.host ? 'server' : x.git === false ? 'folder' : 'fork'} /> <span>{x.name}</span>
             </button>
           ))}
