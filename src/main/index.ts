@@ -49,6 +49,11 @@ app.whenReady().then(() => {
   const s = session.fromPartition(PREVIEW)
   s.setPermissionRequestHandler((_wc, perm, cb) => cb(PREVIEW_OK.has(perm)))
   s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
+  // the sidebar's video: YouTube's embed plays only with a Referer, and a file:// page sends none (its Error 153);
+  // the app's id, as YouTube asks of apps
+  session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (d, cb) =>
+    cb({ requestHeaders: { ...d.requestHeaders, Referer: d.requestHeaders.Referer || 'https://dev.laki.app/' } }),
+  )
 })
 
 const daemon = () =>

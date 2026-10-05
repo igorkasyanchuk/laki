@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
@@ -448,9 +448,15 @@ function actionsOk(l: unknown): RunAction[] | undefined {
   return ok.length ? ok.map(a => ({ name: a.name, target: a.target, text: a.text })) : undefined
 }
 
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[] }) {
   const p = findProject(ref)
   if (o.name?.trim()) p.name = o.name.trim()
+  if (Array.isArray(o.seps)) {
+    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join('') }))
+    p.seps = seps.length ? seps : undefined
+    if (!p.seps) p.rows = undefined
+  }
+  if (Array.isArray(o.rows) && p.seps) p.rows = o.rows.filter(x => typeof x === 'string').slice(0, 2000)
   if (o.config) {
     const env = Object.fromEntries(Object.entries(o.config.env ?? {}).filter(([k]) => ENV_KEY.test(k)))
     p.config = {
@@ -1016,7 +1022,11 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
     return [...list].sort((a, b) => at(a) - at(b)) // stable: the rest keep their order
   }
   if (o.projects) state.projects = by(state.projects, o.projects)
-  if (o.workspaces) state.workspaces = by(state.workspaces, o.workspaces)
+  if (o.workspaces) {
+    state.workspaces = by(state.workspaces, o.workspaces)
+    // a project with seps keeps the whole order, theirs too
+    for (const p of state.projects) if (p.seps?.some(x => o.workspaces!.includes(x.id))) p.rows = o.workspaces.filter(x => typeof x === 'string').slice(0, 2000)
+  }
   save()
   changed()
 }
@@ -2530,7 +2540,13 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean }) 
     closeSync(fd)
   }
   if (buf.subarray(0, 8000).includes(0)) return { size: st.size } // binary
-  return { size: st.size, text: buf.toString('utf8'), cut: st.size > MAX_TEXT || undefined }
+  return textOf(buf, st.size)
+}
+
+// a text file's answer; lossy: not UTF-8 (the text isn't its bytes: saving it would change them)
+function textOf(buf: Buffer, size: number) {
+  const text = buf.toString('utf8')
+  return { size, text, cut: size > MAX_TEXT || undefined, lossy: (size <= MAX_TEXT && !Buffer.from(text).equals(buf)) || undefined }
 }
 
 // fileRead on an SSH host: the same answers, read there (base64: text over ssh)
@@ -2546,7 +2562,25 @@ async function hostFileRead(ws: Workspace, abs: string, rel: string) {
   const buf = Buffer.from(stdout.slice(nl + 1), 'base64')
   if (mime) return size > max ? { size } : { size, image: `data:${mime};base64,${buf.toString('base64')}` }
   if (buf.subarray(0, 8000).includes(0)) return { size } // binary
-  return { size, text: buf.toString('utf8'), cut: size > MAX_TEXT || undefined }
+  return textOf(buf, size)
+}
+
+// fileWrite: the file preview's edit, saved over the file (its mode kept). Only a whole UTF-8 text file the preview
+// could show; was: the text the edit started from, so a file changed since (an agent at work) isn't written over
+// unless force
+export async function fileWrite(o: { ws: string; path: string; text: string; was?: string; force?: boolean }) {
+  const ws = findWs(o.ws)
+  const abs = inside(ws, o.path)
+  if (typeof o.text !== 'string') throw new Error('no text to save')
+  if (Buffer.byteLength(o.text) > MAX_TEXT) throw new Error('over 512 KB: edit it in your editor')
+  const now = await fileRead({ ws: o.ws, path: o.path })
+  if (!('text' in now) || now.cut || now.lossy) throw new Error(`${o.path} can't be edited here: open it in your editor`)
+  if (!o.force && now.text !== o.was) throw new Error(`${o.path} changed since you opened it`)
+  // there: inside() only read the path, so the shell checks where it leads (pwd -P: its folders' links followed; the
+  // file itself no link), as realpath does here
+  if (ws.host) await sshIn(ws.host, `r=$(cd ${q(ws.path)} && pwd -P) && d=$(cd ${q(dirname(abs))} && pwd -P) && f="$d"/${q(basename(abs))} && case "$f" in "$r"/*) [ -f "$f" ] && [ ! -L "$f" ] ;; *) false ;; esac || { echo ${q(`${o.path}: not a file inside the workspace`)} >&2; exit 3; }; cat > "$f"`, o.text)
+  else writeFileSync(abs, o.text)
+  return { size: Buffer.byteLength(o.text) }
 }
 
 // prComment: a review comment on a line of the PR's diff (the side panel's Changes); side LEFT is the old file's line

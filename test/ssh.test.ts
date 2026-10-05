@@ -1,7 +1,7 @@
 // Projects on SSH hosts, through fakes/ssh: the host is this machine, so its files can be checked; nothing reaches it
 // but ssh (a host's env has none of the daemon's LAKI_ or TEST_ vars), and hooks come back on the tab's terminal.
 import assert from 'node:assert/strict'
-import { existsSync, readdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
+import { existsSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -48,6 +48,17 @@ test('a project over SSH: a worktree, setup, the agent and its hooks, files and 
   assert.ok(fl.files.includes('new.txt') && fl.changed['new.txt'] === 'A')
   assert.deepEqual(await rig.rpc('fileRead', { ws: ws.id, path: 'new.txt' }), { size: 8, text: 'one\ntwo\n' })
   await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: 'nope.txt' }), /nope\.txt isn't a file/)
+  // an edit saved there; one made over a changed file is refused
+  await rig.rpc('fileWrite', { ws: ws.id, path: 'new.txt', text: 'one\n2\n', was: 'one\ntwo\n' })
+  assert.equal((await rig.rpc('fileRead', { ws: ws.id, path: 'new.txt' })).text, 'one\n2\n')
+  await assert.rejects(rig.rpc('fileWrite', { ws: ws.id, path: 'new.txt', text: 'x', was: 'one\ntwo\n' }), /changed since you opened it/)
+  await rig.rpc('fileWrite', { ws: ws.id, path: 'new.txt', text: 'one\ntwo\n', was: 'one\n2\n' })
+  // a link out of the workspace: read through, never written through
+  writeFileSync(join(rig.home, 'outside.txt'), 'mine\n')
+  symlinkSync(join(rig.home, 'outside.txt'), join(ws.path, 'out.txt'))
+  await assert.rejects(rig.rpc('fileWrite', { ws: ws.id, path: 'out.txt', text: 'theirs\n', was: 'mine\n' }), /not a file inside the workspace/)
+  assert.equal(readFileSync(join(rig.home, 'outside.txt'), 'utf8'), 'mine\n')
+  unlinkSync(join(ws.path, 'out.txt'))
   await rig.rpc('fileNew', { ws: ws.id, path: 'sub/made.txt' })
   assert.ok(existsSync(join(ws.path, 'sub/made.txt')))
   await assert.rejects(rig.rpc('fileNew', { ws: ws.id, path: 'new.txt' }), /new\.txt is there already/)

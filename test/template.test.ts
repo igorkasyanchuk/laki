@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { fillTemplate, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor } from '../src/renderer/src/text.ts'
+import { fillTemplate, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -90,6 +90,14 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   // a gradient theme: see-through terminals without glass; an unknown id is the default, every variable gone
   applyTheme('aurora')
   assert.deepEqual([props.get('--term-bg'), transparent()], ['#00000000', true])
+
+  // Appearance's accent (text on it black or white, whichever reads) and corners, over the theme's; a bad color is skipped
+  applyTheme({ theme: 'kraft', accent: '#ffe066', radius: '0px' })
+  assert.deepEqual([props.get('--accent'), props.get('--accent-fg'), props.get('--radius'), props.get('--bg')], ['#ffe066', '#000000', '0px', '#dcc39a'])
+  applyTheme({ accent: '#1a237e' })
+  assert.deepEqual([props.get('--accent'), props.get('--accent-fg')], ['#1a237e', '#ffffff'])
+  applyTheme({ theme: 'kraft', accent: 'red;x' })
+  assert.equal(props.get('--accent'), kraft.c!.accent)
   applyTheme('nope')
   assert.deepEqual([[...props.keys()], style.colorScheme, classes.has('glass'), transparent()], [[], '', false, false])
 
@@ -97,6 +105,34 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.deepEqual(preview(kraft), [kraft.c!.bg, kraft.c!.panel, kraft.c!.fg, kraft.c!.accent, ...kraft.ansi!.slice(1, 6)])
   assert.match(preview(THEMES.find(t => t.id === 'aurora')!)[0], /^linear-gradient\(135deg/)
   assert.equal(preview(THEMES[0])[0], '#0e1014')
-  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined })
-  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null]')
+  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined })
+  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null]')
+})
+
+test("the sidebar's video: YouTube links as embeds, anything else refused", () => {
+  const e = 'https://www.youtube-nocookie.com/embed/'
+  assert.equal(youtubeEmbed('https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1m30s'), `${e}dQw4w9WgXcQ?start=90`)
+  assert.equal(youtubeEmbed(' youtu.be/dQw4w9WgXcQ?t=42 '), `${e}dQw4w9WgXcQ?start=42`)
+  assert.equal(youtubeEmbed('https://m.youtube.com/shorts/dQw4w9WgXcQ'), `${e}dQw4w9WgXcQ`)
+  assert.equal(youtubeEmbed('https://www.youtube.com/live/dQw4w9WgXcQ?si=x'), `${e}dQw4w9WgXcQ`)
+  assert.equal(youtubeEmbed('https://music.youtube.com/watch?v=dQw4w9WgXcQ&list=PL1-x_y'), `${e}dQw4w9WgXcQ?list=PL1-x_y`)
+  assert.equal(youtubeEmbed('https://www.youtube.com/playlist?list=PL1-x_y'), `${e}videoseries?list=PL1-x_y`)
+  assert.equal(youtubeEmbed('dQw4w9WgXcQ'), `${e}dQw4w9WgXcQ`)
+  for (const bad of ['https://vimeo.com/123', 'https://www.youtube.com/', 'https://www.youtube.com/watch?v=short', 'javascript:alert(1)', 'https://evil.com/watch?v=dQw4w9WgXcQ', 'https://www.youtube.com.evil.com/watch?v=dQw4w9WgXcQ', ''])
+    assert.equal(youtubeEmbed(bad), null, bad)
+})
+
+test("the sidebar's timer: lengths as typed, its clock", () => {
+  const m = 60000
+  assert.equal(parseDuration('25'), 25 * m)
+  assert.equal(parseDuration(' 2.5 '), 150000)
+  assert.equal(parseDuration('1h 30m'), 90 * m)
+  assert.equal(parseDuration('1h30m'), 90 * m)
+  assert.equal(parseDuration('90s'), 90000)
+  assert.equal(parseDuration('45 min'), 45 * m)
+  assert.equal(parseDuration('2 hours'), 120 * m)
+  assert.equal(parseDuration('1 hour 5 minutes 10 seconds'), 65 * m + 10000)
+  for (const bad of ['', 'soon', '0', '25 x', '25 parsecs', '-5', '25h', 'm', '1h 2'])
+    assert.equal(parseDuration(bad), null, bad)
+  assert.deepEqual([clock(0), clock(999), clock(65000), clock(3723000), clock(-5)], ['0:00', '0:01', '1:05', '1:02:03', '0:00'])
 })

@@ -33,11 +33,15 @@ const PROJECT_LOOK: [keyof ProjectLook, string, [string, string][]][] = [
 ]
 // the sidebar's lines and rows (SideLook): CSS values, App.tsx puts them on the sidebar as the variables looks set
 const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]][] = [
-  ['guide', 'Guide line', [['theme', "Theme's"], ['1px solid var(--line)', 'Thin'], ['1px dashed var(--line)', 'Dashed'], ['2px solid color-mix(in srgb, var(--accent) 60%, transparent)', 'Accent'], ['none', 'None']]],
-  ['divider', 'Between projects', [['theme', "Theme's"], ['1px solid var(--line)', 'A line'], ['none', 'Nothing']]],
+  ['guide', 'Guide line', [['theme', "Theme's"], ['1px solid var(--line)', 'Thin'], ['2px solid var(--line)', 'Thick'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['2px dotted var(--muted)', 'Big dots'], ['2px solid color-mix(in srgb, var(--accent) 60%, transparent)', 'Accent'], ['2px dotted var(--accent)', 'Accent dots'], ['none', 'None']]],
+  ['divider', 'Between projects', [['theme', "Theme's"], ['1px solid var(--line)', 'A line'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['3px double var(--line)', 'Double'], ['none', 'Nothing']]],
   ['indent', 'Indent', [['theme', "Theme's"], ['0px', 'None'], ['11px', 'Small'], ['20px', 'Large']]],
   ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Normal'], ['32px', 'Roomy']]],
+  ['text', 'Text size', [['theme', "Theme's"], ['11px', '11'], ['12px', '12'], ['13px', '13'], ['14px', '14'], ['15px', '15']]],
 ]
+// Appearance's corners (--radius) and where the tabs go
+const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
+const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
 
 export type AppSettings = Paint & {
   editor?: string // an app id from the daemon's list, or 'custom' (editorCmd)
@@ -61,6 +65,8 @@ export type AppSettings = Paint & {
   timers?: boolean // a turn's time on its tab and row (unset: off)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: off)
+  hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
+  tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   projectLook?: ProjectLook // the sidebar's project names
   sideLook?: SideLook // the sidebar's lines, rows and button labels
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
@@ -475,8 +481,11 @@ const FIND: [string, string, string?][] = [
   ['general', 'Environment', 'env variables'],
   ['general', 'Move to another Mac', 'export import backup file'],
   ['appearance', 'Interface font', 'ui type'],
+  ['appearance', 'Accent color', 'colour highlight'],
+  ['appearance', 'Corners', 'radius rounded square'],
+  ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Project names in the sidebar', 'font case letter spacing size weight'],
-  ['appearance', 'The sidebar', 'guide line divider indent row height'],
+  ['appearance', 'The sidebar', 'guide line divider indent row height dotted dashed text size'],
   ['appearance', 'Button labels', 'sidebar scheduled board settings words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
   ['appearance', 'Glow', 'glass colors'],
@@ -491,6 +500,7 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'Blinking cursor', 'blink'],
   ['terminal', 'Copy selected text', 'clipboard selection'],
   ['terminal', 'Dim other panes', 'split focus fade'],
+  ['terminal', 'Focus the pane under the mouse', 'split hover caret cursor follows'],
   ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
   ['open', 'Custom command', 'editor'],
   ['presets', 'Agent presets', 'claude codex gemini args env model'],
@@ -1002,6 +1012,37 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
+                <label>
+                  Accent color
+                  <span className="row-buttons">
+                    <input type="color" className="color-pick" value={s.accent || THEMES.find(t => t.id === (s.theme || 'default'))?.c?.accent || '#7aa2f7'} onChange={e => paint({ accent: e.target.value })} />
+                    {s.accent && (
+                      <button type="button" onClick={() => paint({ accent: '' })}>
+                        Theme's
+                      </button>
+                    )}
+                  </span>
+                </label>
+                <label>
+                  Corners
+                  <select value={s.radius ?? ''} onChange={e => paint({ radius: e.target.value })}>
+                    {CORNERS.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Tabs
+                  <select value={s.tabsAt ?? 'top'} onChange={e => set({ tabsAt: e.target.value as AppSettings['tabsAt'] })}>
+                    {TABS_AT.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
               <div className="field">
                 <span>
@@ -1015,7 +1056,7 @@ export function SettingsPage(p: {
                 </span>
                 {lookGrid('sideLook', SIDE_LOOK)}
                 <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
-                  <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled tasks, Board, Settings" />
+                  <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled, Board, Video, Timer, Settings; the last ones drop theirs when the row is too narrow" />
                 </Switch>
               </div>
               <div className="setting-box">
@@ -1149,6 +1190,9 @@ export function SettingsPage(p: {
                   </Switch>
                   <Switch className="switch-row" on={!!s.dimPanes} onChange={v => set({ dimPanes: v })}>
                     Dim other panes
+                  </Switch>
+                  <Switch className="switch-row" on={!!s.hoverFocus} onChange={v => set({ hoverFocus: v })}>
+                    Focus the pane under the mouse
                   </Switch>
                 </div>
               </div>

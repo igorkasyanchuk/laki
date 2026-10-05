@@ -68,11 +68,12 @@ board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `
 `unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`; 14: settings' `prPrompts`, `prScan`,
 `prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
 workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
-workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`). A
+workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
-- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `reorder` (projects or workspaces by id), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `seps`: the sidebar's named lines between its
+  workspaces, and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
 - `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns `{ dirty }`;
   `doctor` (the first-run screen's: git, `gh auth status`, which agents are on PATH);
@@ -97,7 +98,7 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from), `tunnelStart`
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
-- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `prThreads`, `prComment` (`path`,
+- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads`, `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`, links followed, by `realpath`);
@@ -418,6 +419,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
     - `laki.recent`: the palette's last 30 picks, by label: first in it, and ahead of a close match.
     - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
+    - `laki.video`: the sidebar's video (an embed URL), back after a reload without autoplay.
+    - `laki.timers`: the sidebar's timers (`id`, `end`, `ms`, `then`); ones that ended while the app was closed are dropped.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
     `Tray`, `trayIcon` drawn in code as a template image; the count as its title, a menu of those tabs, waiting first
@@ -435,9 +438,25 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - `toast(text, undo?)`: one message at a time (a newer one restarts the timer); `archive` asks `wsArchive` with
     `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is).
   - No project: `Welcome` (panels.tsx) with `doctor`'s checks. `settings.dimPanes`: `.dim-panes` on `.app`.
-  - `.side-head` (top): hide, open a project, help; `.side-foot` (pinned at the bottom): Scheduled tasks, Board, Settings,
-    with words (`IconButton` `label`: Scheduled tasks, Board, Settings) unless `settings.sideLook.labels === false`, or the sidebar
-    (a `side` container) is under 225px.
+  - While a video plays, a closed sidebar is hidden (`hidden`), not unmounted, so it plays on. The video (`Video` in
+    panels.tsx, the foot's play button and ⌘K, the `video` dialog): `text.ts` `youtubeEmbed` turns a link into a `youtube-nocookie.com/embed` URL
+    (else refused), an iframe sandboxed without top navigation; the CSP's `frame-src` allows that host, and main sets a
+    `Referer` on its requests (`dev.laki.app`): from a `file://` page YouTube's player refuses to play (Error 153).
+    `min`: only its bar (the iframe `hidden`, playing on). Its src has `enablejsapi=1`: `videoCommand` (panels.tsx)
+    posts `playVideo`/`pauseVideo` to it.
+  - Timers (App's `timers`, any number: the foot's button and `startMenu` add one; each a `TimerBar`, panels.tsx, over
+    the foot, its time left ticking, its `timerMenu`: more time, start over, what happens as it ends, stop; the `timer`
+    dialog, `{ timer: id }` for one's new length, with `text.ts` `parseDuration`): as one ends (`ring`), `TIMER_THEN`'s
+    action (pause, play or close the video; with no video, only the notice; `command`: `tabNew` `custom` with the
+    timer's `cmd` in its `ws`, the workspace selected when it was picked, not focused; gone or archived, only the
+    notice), then `notify` (no tab: it shows the window) and a toast.
+  - Tabs (`tabList`) go in the top bar, or a `.tabstrip` (`data-tabbar`, a drop target too) under or beside the terminals:
+    `settings.tabsAt`, top on a phone. `settings.hoverFocus`: a pane the mouse enters (no button held, window focused)
+    gets the keyboard (`Panes` `onPointerEnter`).
+  - `.side-head` (top): hide, open a project, help; `.side-foot` (pinned at the bottom): Scheduled, Board, Video,
+    Timer, Settings, with words (`IconButton` `label`) unless `settings.sideLook.labels === false`; one row: App's `fit`
+    (a `ResizeObserver`, and the theme's font) sets `data-bare`, how many buttons from the right lose their words, until
+    it fits.
   - The project and workspace order is the daemon's (`reorder`).
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
@@ -503,10 +522,12 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   that); presets, `EnvField` (KEY=value lines), fonts,
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
   (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, scrolled into view, a name filter that stays in sight;
+  accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's,
+  `--accent-fg` by `onAccent`; `tabsAt`;
   `PROJECT_LOOK`: the sidebar's project names over the theme, `settings.projectLook`, App's `phAttrs`/`phVars` put them
   on `.sidebar` as `data-ph-*` and `--ph-*`, styles.css overrides any look with `!important`; `SIDE_LOOK`,
   `settings.sideLook`: the sidebar's lines and rows as CSS values, App's `sideVars` sets `--ws-guide`, `--proj-divider`,
-  `--ws-indent`, `--ws-h` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of look.css;
+  `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of look.css;
   `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
   them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…24h, then the QR code and link), and `ScriptsField` (a project's
@@ -553,7 +574,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
   (`SITE`, the version from `package.json`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
   `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the tab bar's
-  smiley: `meme`, Next, Copy image: a PNG drawn on a canvas, the clipboard takes no other). The new-workspace page's *Pull request* sends `pr` (no Base, no race with it).
+  smiley: `meme`, Next, Copy image: a PNG drawn on a canvas, the clipboard takes no other; a right click on it: copy,
+  download through an `<a download>`, open on Reddit). The new-workspace page's *Pull request* sends `pr` (no Base, no race with it).
 - **`links.ts`**: `parseLink` and `wsLink` (laki:// links, above).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
@@ -575,7 +597,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
 | `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 5 minutes |
 | `src/daemon/push.ts` | phone pushes: each format's request (`pushRequest`), the URL's check, `pushTo` |
-| `src/daemon/fun.ts` | `meme`: r/memes' `random.json`, else meme-api.com (Reddit's bot wall), no NSFW or spoilers, the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
+| `src/daemon/fun.ts` | `meme`: r/memes, r/ProgrammerHumor, r/wholesomememes (`SUBS`, in a random order): each one's hot pictures (Reddit's `hot.json`, else meme-api.com's `gimme/<sub>/50`: Reddit's bot wall), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` and `wsTitle` (a run's dated names) |
@@ -589,7 +611,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 ## Conventions
 
 - **Keep it small.** Use node's stdlib plus the existing deps (Electron, node-pty, xterm and its addons,
-  React); no new dependencies. Fonts are bundled (`fonts/`, OFL), never loaded from the web. Mark deliberate shortcuts with a `ponytail:` comment naming the limit.
+  React); no new dependencies. Fonts are bundled (`fonts/`: OFL, Hack MIT; each in `NOTICE.md`), never loaded from the web. Mark deliberate shortcuts with a `ponytail:` comment naming the limit.
 - **`laki hook` must never fail or block the agent.**
 - **Never write** `~/.claude/settings.json` or `~/.codex/*`. Agents get settings and notify through
   flags only.

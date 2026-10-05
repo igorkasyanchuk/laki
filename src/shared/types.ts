@@ -24,7 +24,17 @@ export type ProjectConfig = { setup?: string; teardown?: string; run?: string; e
 
 // git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)
 // host: an SSH host (a ~/.ssh/config name or user@host): the folder is there, and so are git, gh and its tabs' programs
-export type Project = { id: string; name: string; path: string; git?: boolean; host?: string; config?: ProjectConfig }
+export type Project = {
+  id: string
+  name: string
+  path: string
+  git?: boolean
+  host?: string
+  config?: ProjectConfig
+  seps?: Sep[] // the sidebar's named lines between its workspaces
+  rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
+}
+export type Sep = { id: string; name: string }
 // a folder over SSH, as scp writes it: host:path (the host never an option, -…)
 export const REMOTE = /^([A-Za-z0-9_][\w.@-]*):(.+)$/
 
@@ -134,6 +144,8 @@ export type Settings = {
   glassTerm?: number
   glassGlow?: boolean // the theme's colors behind the glass (unset: on)
   uiFont?: string // the interface's font
+  accent?: string // #rrggbb over the theme's accent (unset: the theme's)
+  radius?: string // corners, a CSS length over the theme's (unset: the theme's)
   templates?: Template[] // prompt templates ({{prompt}}…), for new workspaces; a project's own come first
   actions?: RunAction[] // Run ▾'s: a prompt for an agent, or a command for a terminal
   env?: Record<string, string> // every session's, under the project's and the preset's
@@ -145,6 +157,8 @@ export type Settings = {
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
+  hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
+  tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
@@ -161,7 +175,7 @@ export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | '
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
-export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; labels?: boolean }
+export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; labels?: boolean }
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
 export type Todo = { id: string; project: string; text: string; at: number }
@@ -235,4 +249,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 19
+export const API = 21

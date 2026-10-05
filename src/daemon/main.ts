@@ -136,6 +136,7 @@ const api: Record<string, Handler> = {
   files: p => core.files(p.ws),
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
+  fileWrite: p => core.fileWrite(p),
   skills: () => skills(),
   skillSet: p => skillSet(p),
   prComment: p => core.prComment(p),

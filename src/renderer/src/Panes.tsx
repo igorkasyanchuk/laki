@@ -20,6 +20,9 @@ function overAt(x: number, y: number): Over | undefined {
   return { pane: p.dataset.pane!, edge }
 }
 
+// a text field outside the panes has the keyboard (a terminal's own textarea is inside one): hover focus waits
+const typing = () => !!document.activeElement?.matches('input, textarea, select, [contenteditable]') && !document.activeElement.closest('.pane')
+
 // a pane header (one session) or a tab (whole: all its panes) dragged more than a few pixels; on release
 // over a target, onDrop
 export function useTabDrag(onDrop: (tab: string, whole: boolean, over: Over) => void) {
@@ -66,6 +69,7 @@ export function Panes(p: {
   ghost: ReactNode // what follows the pointer while dragging
   render: (tab: string) => ReactNode
   onFocus: (tab: string) => void
+  hoverFocus?: boolean // the pane under the mouse gets the keyboard (Settings › Terminal)
   onClose: (tab: string) => void
   onResize: (path: string, at: number) => void
   startDrag: (e: PE, tab: string) => void
@@ -87,6 +91,7 @@ export function Panes(p: {
           className={`pane ${panes.length > 1 ? 'multi' : ''} ${tab === p.active ? 'active' : ''}`}
           style={{ left: pct(box.x), top: pct(box.y), width: pct(box.w), height: pct(box.h) }}
           onPointerDownCapture={() => p.onFocus(tab)}
+          onPointerEnter={e => p.hoverFocus && !e.buttons && document.hasFocus() && !typing() && p.onFocus(tab) /* not mid-drag or mid-selection, nor while typing elsewhere */}
         >
           {panes.length > 1 && (
             <div className="pane-head" style={colorVar(p.color(tab))} onPointerDown={e => p.startDrag(e, tab)} onContextMenu={e => p.onMenu(e, tab)}>

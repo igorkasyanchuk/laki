@@ -1,9 +1,9 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, ciText, type FixWhat, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
-import { About, AddProject, Fun, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, StarLaki, Welcome } from './panels'
+import { About, AddProject, Fun, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, StarLaki, TimerBar, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
 import { ComparePage } from './Compare'
@@ -14,15 +14,15 @@ import { Term, xterms } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
+import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, nameOf, type RunAction, shortPath } from './text'
+import { actionsFor, nameOf, parseDuration, type RunAction, shortPath, youtubeEmbed } from './text'
 import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | { schedules: string } | { compare: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -45,8 +45,21 @@ const phVars = (pl?: ProjectLook) => Object.fromEntries((['spacing', 'size', 'we
 // a row's +/-: 1234 as 1.2k, 12345 as 12k
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
 // …and its lines and rows (SideLook): the variables looks set (styles.css .project-ws), nearer than the theme's
-const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h' } as const
+const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font' } as const
 const sideVars = (sl?: SideLook) => Object.fromEntries((Object.keys(SIDE_VARS) as (keyof typeof SIDE_VARS)[]).flatMap(k => (sl?.[k] && sl[k] !== 'theme' ? [[SIDE_VARS[k], sl[k]]] : []))) as CSSProperties
+
+// the sidebar's timers: what happens as one ends (a notification and a message always); its quick lengths, minutes
+const TIMER_THEN = [
+  ['notify', 'Just notify me', 'bell'],
+  ['pause', 'Pause the video', 'stop'],
+  ['play', 'Play the video', 'run'],
+  ['close', 'Close the video', 'x'],
+  ['command', 'Run a command…', 'terminal'],
+] as const
+type Then = (typeof TIMER_THEN)[number][0]
+type Timer = { id: string; end: number; ms: number; then: Then; cmd?: string; ws?: string } // cmd: then's command, run in ws
+const MINUTES = [5, 10, 15, 25, 30, 45, 60]
+const span = (ms = 0) => (ms % 3600000 === 0 ? `${ms / 3600000} h` : ms % 60000 === 0 ? `${ms / 60000} min` : [Math.floor(ms / 60000) && `${Math.floor(ms / 60000)} min`, `${Math.round((ms % 60000) / 1000)} s`].filter(Boolean).join(' '))
 
 const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'idle' ? 'done' : t.status === 'exited' && t.code === 0 ? 'ok' : t.status)
 const SIDE = 240 // the sidebar's default width
@@ -96,6 +109,13 @@ function KeyBar({ onKey }: { onKey: (data: string) => void }) {
   )
 }
 
+// a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others after)
+const rowsOf = (p: Project, ws: WorkspaceView[]): (WorkspaceView | Sep)[] => {
+  const at = new Map((p.rows ?? []).map((id, i) => [id, i]))
+  const end = at.size
+  return [...(p.seps ?? []), ...ws.filter(w => w.project === p.id)].sort((a, b) => (at.get(a.id) ?? end) - (at.get(b.id) ?? end)) // stable
+}
+
 export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
@@ -109,7 +129,7 @@ export function App() {
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review
   const [panelTab, setPanelTab] = useState<PanelTab>(() => load('laki.panelTab', 'files'))
   const [panelW, setPanelW] = useState<number>(() => load('laki.panelW', PANEL_WIDTH))
-  const [preview, setPreview] = useState<{ ws: string; path: string; line?: number; n: number } | null>(null) // a file shown in the app; n: each request reloads it
+  const [preview, setPreview] = useState<{ ws: string; path: string; line?: number; n: number; edit?: Edit } | null>(null) // a file shown in the app; n: each request reloads it; edit: its unsaved edit
   const [info, setInfo] = useState<boolean>(() => load('laki.info', false)) // the workspace info panel
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
@@ -117,6 +137,13 @@ export function App() {
   const [sideOpen, setSideOpen] = useState<boolean>(() => load('laki.sideOpen', true))
   const [folded, setFolded] = useState<string[]>(() => load('laki.folded', [])) // projects whose workspaces are hidden
   const [runsSeen, setRunsSeen] = useState<string>(() => load('laki.runsSeen', '')) // the newest scheduled run read
+  // the sidebar's video (its embed URL); play: just asked for, so it starts (one kept from before waits for a click), at:
+  // when, so the same link asked for again starts over; min: only its bar shows (it plays on)
+  const [video, setVideo] = useState<{ src: string; play?: boolean; at?: number; min?: boolean } | null>(() => {
+    const kept = load<unknown>('laki.video', null)
+    const src = typeof kept === 'string' && youtubeEmbed(kept) // checked again: it becomes an iframe's src
+    return src ? { src } : null
+  })
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string } | null>(null) // the toast, maybe with Undo (or another action: label)
   const [menu, openMenu] = useMenu()
@@ -151,6 +178,43 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
   useEffect(() => void localStorage.setItem('laki.info', JSON.stringify(info)), [info])
+  useEffect(() => void localStorage.setItem('laki.video', JSON.stringify(video?.src ?? null)), [video?.src])
+  // the sidebar's timers, each a bar over its foot: when it ends, how long it was set for, and what happens then (ones
+  // that ended while Laki was closed are dropped)
+  const [timers, setTimers] = useState<Timer[]>(() => {
+    const kept = load<unknown>('laki.timers', [])
+    return (Array.isArray(kept) ? kept : []).flatMap((t: Partial<Timer>) =>
+      typeof t?.id === 'string' && typeof t.end === 'number' && t.end > Date.now() && typeof t.ms === 'number' && t.ms > 0
+        ? [{ id: t.id, end: t.end, ms: t.ms, then: TIMER_THEN.some(x => x[0] === t.then) && (t.then !== 'command' || (typeof t.cmd === 'string' && !!t.cmd.trim() && typeof t.ws === 'string')) ? t.then! : 'notify', cmd: t.cmd, ws: t.ws }]
+        : [],
+    )
+  })
+  useEffect(() => void localStorage.setItem('laki.timers', JSON.stringify(timers)), [timers])
+  const addTimer = (ms: number) => setTimers(l => [...l, { id: Math.random().toString(36).slice(2, 10), end: Date.now() + ms, ms, then: 'notify' }])
+  const setTimer = (id: string, f: (t: Timer) => Timer | null) => setTimers(l => l.map(t => (t.id === id ? f(t) : t)).filter((t): t is Timer => !!t)) // null: gone
+  // one ends: what was picked, then a notification (it's what you asked for: muting doesn't apply) and a message
+  const timersRef = useRef(timers)
+  timersRef.current = timers
+  const ring = (id: string) => {
+    const t = timersRef.current.find(x => x.id === id)
+    if (!t) return
+    setTimer(id, () => null)
+    // no video now, or the command's workspace gone: only the notice (which says so for the command)
+    const gone = t.then === 'command' && !viewRef.current?.workspaces.some(w => w.id === t.ws && !w.archived)
+    const then = gone || (t.then !== 'command' && t.then !== 'notify' && !document.querySelector('.video')) ? 'notify' : t.then
+    if (then === 'pause') videoCommand('pauseVideo')
+    else if (then === 'play') (setVideo(v => v && { ...v, min: false }), setSideOpen(true), videoCommand('playVideo'))
+    else if (then === 'close') setVideo(null)
+    else if (then === 'command') call('tabNew', { ws: t.ws, preset: 'custom', cmd: t.cmd }).catch(() => {}) // a tab of its own, not focused: it closes when the command succeeds
+    const did = gone ? `: ${t.cmd} didn't run, its workspace is gone` : then === 'notify' ? '' : then === 'command' ? `: ran ${t.cmd}` : `: ${TIMER_THEN.find(x => x[0] === then)![1].toLowerCase()}`
+    notify('Timer', `${span(t.ms)} is up${did}`, '', () => {}, viewRef.current?.settings.notifySound)
+    toast(`Timer: ${span(t.ms)} is up${did}`)
+  }
+  const ends = timers.map(t => `${t.id}:${t.end}`).join()
+  useEffect(() => {
+    const ts = timersRef.current.map(t => setTimeout(() => ring(t.id), t.end - Date.now()))
+    return () => ts.forEach(clearTimeout)
+  }, [ends])
   // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
   const quiet = new Set(view?.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
   const needsYou = (t: TabView) => (t.status === 'waiting' || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)
@@ -188,14 +252,17 @@ export function App() {
   const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const archived = useRef<string[]>([]) // workspaces archived for a merged PR, while their toast shows
   const archivedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
-  // the sidebar's foot: its words while they fit, else icons only; measured as the sidebar resizes and the theme
-  // (its font) changes
+  // the sidebar's foot, in one row: its words dropped one by one from the right (data-bare: how many) until it fits;
+  // measured as the sidebar resizes and the theme (its font) changes
   const footRef = useRef<HTMLDivElement | null>(null)
   const fit = () => {
     const el = footRef.current
     if (!el) return
-    el.classList.remove('compact')
-    el.classList.toggle('compact', el.scrollWidth > el.clientWidth + 1)
+    const n = el.querySelectorAll('.ib-label').length
+    for (let bare = 0; bare <= n; bare++) {
+      el.dataset.bare = String(bare)
+      if (el.scrollWidth <= el.clientWidth + 1) break
+    }
   }
   const fitFoot = useCallback((el: HTMLDivElement | null) => {
     footRef.current = el
@@ -432,11 +499,14 @@ export function App() {
           ...(project ? [{ label: 'Edit actions…', icon: 'pencil', run: () => setDialog({ settings: project.id }) } as MenuItem] : []),
         ]
       : []
+  // the file preview goes (closed, or another file shown): an unsaved edit only once you say so
+  const leavePreview = async () => !edited(preview?.edit) || ask(`Discard your changes to ${preview!.path.split('/').pop()}?`, { text: "They aren't saved.", ok: 'Discard', danger: true })
+  const closePreview = async () => void ((await leavePreview()) && setPreview(null))
   const panelApi = (w: WorkspaceView): PanelApi => ({
     files: () => api.call<FileList>('files', { ws: w.id }),
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
     openFile: file => void call('openIn', { ws: w.id, app: 'editor', file }).catch(() => {}),
-    preview: (path, line) => setPreview({ ws: w.id, path, line, n: ++requests }),
+    preview: async (path, line) => (await leavePreview()) && setPreview({ ws: w.id, path, line, n: ++requests }),
     changes: () => api.call<Changes>('diff', { ws: w.id }),
     read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
@@ -461,7 +531,7 @@ export function App() {
     copy,
   })
   const settings = view?.settings ?? {}
-  useEffect(() => void requestAnimationFrame(fit), [theme, settings.sideLook?.labels, sideOpen, !!view]) // a new font: measured again
+  useEffect(() => void requestAnimationFrame(fit), [theme, settings.uiFont, settings.sideLook?.labels, sideOpen, !!view]) // a new font: measured again
   const tracked = Object.keys(USAGE_AGENTS).filter(a => settings.usage?.[a] !== false) // the status bar's plan limits
   const editor = settings.editor || 'cursor'
   const targets: AppInfo[] = [...apps.filter(a => !a.browser), ...(settings.editorCmd?.trim() ? [{ id: 'custom', name: 'Custom command' }] : [])]
@@ -495,12 +565,47 @@ export function App() {
   }
   useEffect(() => void (zoomed.current = fontSize), [fontSize])
 
-  // the sidebar's order: projects, and workspaces within their project, dragged
-  const rows = useRowDrag(d =>
-    d.kind === 'project'
-      ? call('reorder', { projects: moveId(view!.projects.map(p => p.id), d) })
-      : call('reorder', { workspaces: moveId(live.filter(w => w.project === live.find(x => x.id === d.id)?.project).map(w => w.id), d) }),
-  )
+  // the sidebar's order: projects, and workspaces and seps within their project, dragged
+  const rows = useRowDrag(d => {
+    if (d.kind === 'project') return void call('reorder', { projects: moveId(view!.projects.map(p => p.id), d) })
+    const p = view!.projects.find(p => p.seps?.some(x => x.id === d.id) || live.some(w => w.id === d.id && w.project === p.id))
+    if (p) call('reorder', { workspaces: moveId(rowsOf(p, view!.workspaces).map(x => x.id), d) }) // archived ones too: a restore keeps its place
+  })
+  // a sep: name it (a new one goes under after, else at the top), or rename it
+  const sepName = async (o: { sep: string; id?: string; after?: string }, name: string) => {
+    const p = view!.projects.find(p => p.id === o.sep)
+    if (!p) return
+    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name } : x)) }))
+    const id = `sep-${Math.random().toString(36).slice(2, 10)}`
+    const ids = rowsOf(p, view!.workspaces).map(x => x.id)
+    ids.splice(o.after ? ids.indexOf(o.after) + 1 : 0, 0, id)
+    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name }], rows: ids })
+  }
+  const sepMenu = (p: Project, s: Sep): MenuItem[] => [
+    { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ sep: p.id, id: s.id }) },
+    { label: 'Delete separator', icon: 'trash', key: 'd', danger: true, run: () => call('projectSet', { id: p.id, seps: p.seps?.filter(x => x.id !== s.id), rows: p.rows?.filter(x => x !== s.id) }) },
+  ]
+
+  // the foot's timer button: a new one, for a length
+  const startMenu = (): MenuItem[] => [
+    { head: 'Start a timer' },
+    ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => addTimer(m * 60000) }) as MenuItem),
+    { label: 'Other length…', icon: 'pencil', key: 'o', run: () => setDialog('timer') },
+  ]
+  // a timer's own (its bar): more time, a new length, what happens as it ends, or stop it
+  const timerMenu = (t: Timer): MenuItem[] => [
+    { head: `Ends at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}` },
+    { label: 'Add 5 minutes', icon: 'plus', key: 'a', run: () => setTimer(t.id, x => ({ ...x, end: x.end + 300000, ms: x.ms + 300000 })) },
+    null,
+    { head: 'Start over with' },
+    ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => setTimer(t.id, x => ({ ...x, end: Date.now() + m * 60000, ms: m * 60000 })) }) as MenuItem),
+    { label: 'Other length…', icon: 'pencil', key: 'o', run: () => setDialog({ timer: t.id }) },
+    null,
+    { head: 'When it ends' },
+    ...TIMER_THEN.filter(([id]) => id !== 'command' || ws).map(([id, label, icon]) => ({ label, icon, hint: t.then === id ? '✓' : undefined, run: () => (id === 'command' ? setDialog({ timerCmd: t.id }) : setTimer(t.id, x => ({ ...x, then: id }))) }) as MenuItem), // a command runs in a workspace: none, none offered
+    null,
+    { label: 'Stop the timer', icon: 'stop', key: 's', danger: true, run: () => setTimer(t.id, () => null) },
+  ]
 
   // right click on a workspace in the sidebar
   const wsMenu = (w: WorkspaceView): MenuItem[] => [
@@ -509,6 +614,7 @@ export function App() {
     { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true)) },
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
     { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
+    ...(w.pinned ? [] : [{ label: 'Add a separator below', icon: 'sep', key: 's', run: () => setDialog({ sep: w.project, after: w.id }) } as MenuItem]),
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
     ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(w.id)) } as MenuItem] : []),
@@ -597,7 +703,7 @@ export function App() {
       o: openProject,
       f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
       t: () => newTab('shell'),
-      w: () => (previewed ? setPreview(null) : tab && closeTabs([tab])), // the file preview first
+      w: () => (previewed ? closePreview() : tab && closeTabs([tab])), // the file preview first
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       p: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
       d: () => git && togglePanel('changes'),
@@ -652,6 +758,7 @@ export function App() {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
+      { label: 'Add a separator', icon: 'sep', run: () => setDialog({ sep: p.id }) },
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
@@ -688,6 +795,10 @@ export function App() {
     a({ label: 'Collapse all projects', icon: 'chevronRight', run: () => setFolded(view?.projects.map(p => p.id) ?? []) })
     a({ label: 'Expand all projects', icon: 'chevron', run: () => setFolded([]) })
     a({ label: sideOpen ? 'Hide sidebar' : 'Show sidebar', icon: 'sidebar', hint: '⌘B', run: () => setSideOpen(o => !o) })
+    a({ label: video ? 'Another YouTube video…' : 'Watch a YouTube video…', icon: 'youtube', run: () => setDialog('video') })
+    if (video) a({ label: 'Close the video', icon: 'x', run: () => setVideo(null) })
+    if (timers.length) a({ label: timers.length > 1 ? 'Stop all timers' : 'Stop the timer', icon: 'stop', run: () => setTimers([]) })
+    a({ label: 'Start a timer…', icon: 'timer', run: () => setDialog('timer') })
     if (!view?.remote) {
       if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
       a({ label: 'Remote access…', icon: 'link', run: () => setDialog({ section: 'remote' }) })
@@ -708,7 +819,7 @@ export function App() {
       if (devRunning) a({ label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
-      if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: '⌘W', run: () => setPreview(null) })
+      if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: '⌘W', run: closePreview })
       if (tab) a({ label: `Close ${tab.name}`, icon: 'x', hint: previewed ? undefined : '⌘W', run: () => closeTabs([tab]) })
       if (ws.pr) a({ label: `Open PR #${ws.pr.number}`, icon: 'pr', run: () => openExternal(ws.pr!.url) })
       for (const p of ws.ports) a({ label: `Open localhost:${p}`, icon: 'link', run: () => openExternal(`http://localhost:${p}`) })
@@ -716,7 +827,7 @@ export function App() {
     }
     for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${wsName(w)}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
-  }, [view, live, ws, tab, group, sideOpen, apps, previewed])
+  }, [view, live, ws, tab, group, sideOpen, apps, previewed, video, timers.length])
 
   if (!view)
     return (
@@ -837,10 +948,71 @@ export function App() {
       </div>
     )
   }
+  // a sep: a named line between a project's workspaces, dragged like one
+  const sepRow = (p: Project, s: Sep) => (
+    <div
+      key={s.id}
+      className={`ws-sep ${rows.at('ws', s.id)}` /* not .ws: the looks' workspace styles stay off it */}
+      data-row={`ws:${s.id}`}
+      data-group={p.id}
+      data-tip="drag to move · double click to rename · right click for more"
+      onPointerDown={e => rows.start(e, 'ws', s.id, p.id)}
+      onDoubleClick={() => setDialog({ sep: p.id, id: s.id })}
+      onContextMenu={e => openMenu(e, sepMenu(p, s))}
+    >
+      <span className="ws-name">{s.name}</span>
+      <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+        <IconButton icon="more" title="Separator" onClick={e => openMenu(e, sepMenu(p, s))} />
+      </span>
+    </div>
+  )
+  // the tabs: in the top bar (the default), or a strip of their own under the terminals or beside them (Settings ›
+  // Appearance; a phone keeps them on top)
+  const tabsAt = (!narrow && (['bottom', 'left', 'right'] as const).find(x => x === settings.tabsAt)) || 'top' // an unknown value: top
+  const tabList = (
+    <>
+      {groups.map(g => {
+        const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
+        const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
+        return (
+          <div
+            key={ts[0]?.id}
+            className={`tab nodrag ${g === group ? 'sel' : ''}`}
+            style={colorVar(colorOf(ts[0]))}
+            onClick={() => selectGroup(g)}
+            onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
+            onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
+            onPointerDown={e => ts[0] && start(e, ts[0].id, true)}
+            onAuxClick={e => e.button === 1 && closeTabs(ts)}
+            data-tip={[...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag onto a pane to split', 'right click for more'].join(' · ')}
+          >
+            <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
+            <span>{ts.map(t => t.name).join(' · ')}</span>
+            {settings.timers && <TurnTime tabs={ts} />}
+            {ts.some(t => t.muted) && (
+              <span className="ws-mark">
+                <Icon name="bellOff" size={11} />
+              </span>
+            )}
+            {queued > 0 && <span className="badge">+{queued}</span>}
+            <button className="x" data-tip="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
+              ×
+            </button>
+          </div>
+        )
+      })}
+      {ws && <IconButton icon="plus" title="New tab" className="nodrag" onClick={e => openMenu(e, newTabActions)} />}
+    </>
+  )
+  const tabStrip = tabsAt !== 'top' && (
+    <div className={`tabstrip ${tabsAt}`} data-tabbar>
+      {tabList}
+    </div>
+  )
   return (
     <div className={`app ${sideOpen ? '' : 'side-closed'} ${narrow ? 'narrow' : ''} ${bridge ? 'electron' : ''} ${settings.dimPanes ? 'dim-panes' : ''}`}>
-      {sideOpen && (
-      <aside className="sidebar" style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
+      {(sideOpen || video) && ( // hidden, not gone, while a video plays
+      <aside className="sidebar" hidden={!sideOpen} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
         <div className="side-head drag">
           <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
           <span className="spacer" />
@@ -892,23 +1064,38 @@ export function App() {
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               <div className="project-ws">{/* under its project, on a guide line */}
-              {(shut ? mine.filter(w => w.id === ws?.id) : mine).map(w => wsRow(w))}{/* folded: the selected one stays */}
+              {(shut ? mine.filter(w => w.id === ws?.id) : rowsOf(p, mine)).map(x => ('path' in x ? wsRow(x) : sepRow(p, x)))}{/* folded: the selected one stays */}
               </div>
             </div>
             )
           })}
           {!view.projects.length && <div className="empty-side muted">Open a folder (⌘O) or drop one here.</div>}
         </div>
-        <div className="side-foot" ref={fitFoot}>{/* pinned under the projects */}
+        {video && (
+          <Video
+            key={video.at}
+            src={`${video.src}${video.src.includes('?') ? '&' : '?'}enablejsapi=1${video.play ? '&autoplay=1' : ''}` /* the timer pauses and plays it */}
+            min={video.min}
+            onMin={min => setVideo(v => v && { ...v, min })}
+            onChange={() => setDialog('video')}
+            onClose={() => setVideo(null)}
+          />
+        )}
+        {timers.map(t => (
+          <TimerBar key={t.id} end={t.end} label={`${span(t.ms)}${t.then === 'notify' ? '' : t.then === 'command' ? `, then ${t.cmd}` : `, then ${TIMER_THEN.find(x => x[0] === t.then)![1].toLowerCase().replace(' the video', '')}`}`} onMenu={e => openMenu(e, timerMenu(t))} onStop={() => setTimer(t.id, () => null)} />
+        ))}
+        <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
           <IconButton
             icon="clock"
             title={nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'}
             on={schedulesFor !== undefined}
             className={runFailed ? 'dot' : ''}
-            label={labels ? 'Scheduled tasks' : undefined}
+            label={labels ? 'Scheduled' : undefined}
             onClick={() => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))}
           />
           <IconButton icon="board" title="Board: every workspace by where it is, and to-dos" label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={() => setDialog(d => (d === 'board' ? null : 'board'))} />
+          <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
+          <IconButton icon="timer" title="Timers: a countdown, then a notification (and the video paused, played or closed, if you like)" label={labels ? 'Timer' : undefined} on={timers.length > 0} onClick={e => openMenu(e, startMenu())} />
           <span className="spacer" />
           <IconButton icon="gear" title="Settings (⌘,)" label={labels ? 'Settings' : undefined} on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
@@ -919,37 +1106,7 @@ export function App() {
       <main className="main">
         <div className="tabbar drag" data-tabbar>
           {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
-          {groups.map(g => {
-            const ts = tabsOf(g).map(byId).filter((t): t is TabView => !!t)
-            const queued = ts.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
-            return (
-              <div
-                key={ts[0]?.id}
-                className={`tab nodrag ${g === group ? 'sel' : ''}`}
-                style={colorVar(colorOf(ts[0]))}
-                onClick={() => selectGroup(g)}
-                onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
-                onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
-                onPointerDown={e => ts[0] && start(e, ts[0].id, true)}
-                onAuxClick={e => e.button === 1 && closeTabs(ts)}
-                data-tip={[...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag onto a pane to split', 'right click for more'].join(' · ')}
-              >
-                <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
-                <span>{ts.map(t => t.name).join(' · ')}</span>
-                {settings.timers && <TurnTime tabs={ts} />}
-                {ts.some(t => t.muted) && (
-                  <span className="ws-mark">
-                    <Icon name="bellOff" size={11} />
-                  </span>
-                )}
-                {queued > 0 && <span className="badge">+{queued}</span>}
-                <button className="x" data-tip="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
-                  ×
-                </button>
-              </div>
-            )
-          })}
-          {ws && <IconButton icon="plus" title="New tab" className="nodrag" onClick={e => openMenu(e, newTabActions)} />}
+          {tabsAt === 'top' && tabList}
           <span className="spacer" />
           {settings.fun !== false && <IconButton className="nodrag" icon="smile" title="Fun: a random meme from Reddit, for a break (Settings › General)" onClick={() => setDialog('fun')} />}
           {ws && (
@@ -975,6 +1132,7 @@ export function App() {
           )}
         </div>
         <div className="body">
+          {tabsAt === 'left' && tabStrip}
           <div className="term-wrap">
             {group ? (
               <Panes
@@ -1000,6 +1158,7 @@ export function App() {
                   />
                 )}
                 onFocus={id => id !== tab?.id && selectTab(id)}
+                hoverFocus={!!settings.hoverFocus}
                 onClose={id => byId(id) && closeTabs([byId(id)!])}
                 onResize={(path, at) => setGroups(groups.map(g => (g === group ? resize(g, path, at) : g)))}
                 startDrag={(e, id) => start(e, id, false)}
@@ -1024,6 +1183,7 @@ export function App() {
               </div>
             )}
           </div>
+          {tabsAt === 'right' && tabStrip}
           {previewed && ws && (
             <FilePreview
               key={previewed.n}
@@ -1031,7 +1191,10 @@ export function App() {
               line={previewed.line}
               load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path })}
               onOpen={() => panelApi(ws).openFile(previewed.path)}
-              onClose={() => setPreview(null)}
+              onClose={closePreview}
+              edit={previewed.edit}
+              onEdit={edit => setPreview(x => x && { ...x, edit })}
+              save={(text, was, force) => api.call('fileWrite', { ws: ws.id, path: previewed.path, text, was, force })}
             />
           )}
           {panelOpen && ws && (
@@ -1076,6 +1239,7 @@ export function App() {
         {touch && tab && !(narrow && (panelOpen || info || previewed)) /* not under a panel */ && (
           <KeyBar onKey={data => api.send('input', { tab: tab.id, data: xterms.get(tab.id)?.modes.applicationCursorKeysMode ? data.replace(/^\x1b\[([ABCD])$/, '\x1bO$1') : data })} />
         )}
+        {tabsAt === 'bottom' && tabStrip}
         {(dialog === 'settings' || settingsFor || section) && (
           <SettingsPage
             key={settingsKey}
@@ -1281,6 +1445,55 @@ export function App() {
           }}
         />
       )}
+      {dialog === 'video' && (
+        <Prompt
+          title="Watch a YouTube video"
+          placeholder="https://www.youtube.com/watch?v=…"
+          hint="It plays at the bottom of the sidebar, beside your work; × closes it."
+          onClose={() => setDialog(null)}
+          onSubmit={async link => {
+            const src = youtubeEmbed(link)
+            if (!src) {
+              toast('Not a YouTube link: a video, a short or a playlist')
+              throw new Error('not YouTube') // the dialog stays open
+            }
+            setVideo({ src, play: true, at: Date.now() })
+            setSideOpen(true) // asked for from ⌘K with the sidebar hidden: shown, not just heard
+            setDialog(null)
+          }}
+        />
+      )}
+      {dialog && typeof dialog === 'object' && 'timerCmd' in dialog && ws && (
+        <Prompt
+          title="When it ends, run"
+          placeholder="say 'time is up' · npm test · open https://…"
+          hint={`Runs through your login shell in ${wsName(ws)}, in a tab of its own (it closes when the command succeeds).`}
+          initial={timers.find(t => t.id === dialog.timerCmd)?.cmd}
+          onClose={() => setDialog(null)}
+          onSubmit={async cmd => {
+            setTimer(dialog.timerCmd, x => ({ ...x, then: 'command', cmd, ws: ws.id }))
+            setDialog(null)
+          }}
+        />
+      )}
+      {(dialog === 'timer' || (typeof dialog === 'object' && dialog && 'timer' in dialog)) && (
+        <Prompt
+          title={dialog === 'timer' ? 'Timer: how long?' : 'Start this timer over with'}
+          placeholder="25 · 1h 30m · 90s"
+          hint="Minutes, or with units (h, m, s); up to a day. It starts at once."
+          onClose={() => setDialog(null)}
+          onSubmit={async typed => {
+            const ms = parseDuration(typed)
+            if (!ms) {
+              toast('A length like 25, 1h 30m or 90s, up to 24 hours')
+              throw new Error('no length') // the dialog stays open
+            }
+            if (dialog === 'timer') addTimer(ms)
+            else setTimer(dialog.timer, x => ({ ...x, end: Date.now() + ms, ms }))
+            setDialog(null)
+          }}
+        />
+      )}
       {dialog === 'custom' && ws && (
         <Prompt
           title="New tab: command"
@@ -1300,6 +1513,18 @@ export function App() {
           onClose={() => setDialog(null)}
           onSubmit={async name => {
             await call('tabSet', { id: dialog.rename, name })
+            setDialog(null)
+          }}
+        />
+      )}
+      {dialog && typeof dialog === 'object' && 'sep' in dialog && (
+        <Prompt
+          title={dialog.id ? 'Rename separator' : 'New separator'}
+          hint={dialog.id ? undefined : 'A named line between workspaces. Drag it, or them, to sort.'}
+          initial={view.projects.find(p => p.id === dialog.sep)?.seps?.find(x => x.id === dialog.id)?.name}
+          onClose={() => setDialog(null)}
+          onSubmit={async name => {
+            await sepName(dialog, name)
             setDialog(null)
           }}
         />

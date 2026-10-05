@@ -7,14 +7,18 @@ import { highlight } from './highlight'
 import { type Block, type Inline, markdown } from './markdown'
 import { type AutoKey, type FixWhat, PRSection, type WsInfo } from './Info'
 import { type actionsFor, type RunAction } from './text'
-import { Icon, IconButton, type IconName, type MenuItem } from './ui'
+import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
 
 export type PanelTab = 'files' | 'changes' | 'review' | 'preview'
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
 export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string }[] }
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
-export type FileContent = { size: number; text?: string; image?: string; cut?: boolean }
+export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean } // lossy: not UTF-8
+// an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
+// keeps it: a workspace switch doesn't lose it)
+export type Edit = { text: string; was: string }
+export const edited = (e?: Edit | null) => !!e && e.text !== e.was.replace(/\r\n/g, '\n')
 export type PanelApi = {
   files: () => Promise<FileList>
   newFile: (path: string, dir: boolean) => Promise<string> // the path made
@@ -804,11 +808,23 @@ export function actionMenu({ agent, terminal }: ReturnType<typeof actionsFor>, t
 const sizeText = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 
 // a file in the app, next to the panel: text with line numbers, an image, or what it is
-export function FilePreview(p: { path: string; line?: number; load: () => Promise<FileContent>; onOpen: () => void; onClose: () => void }) {
+export function FilePreview(p: {
+  path: string
+  line?: number
+  load: () => Promise<FileContent>
+  onOpen: () => void
+  onClose: () => void
+  edit?: Edit // being edited (the pencil): a textarea instead of the lines
+  onEdit: (e?: Edit) => void
+  save: (text: string, was: string, force?: boolean) => Promise<unknown> // over the file, unless it changed since was
+}) {
   const [f, setF] = useState<FileContent | null>(null)
   const [err, setErr] = useState('')
   const [n, setN] = useState(0)
+  const [saving, setSaving] = useState(false)
   const body = useRef<HTMLDivElement>(null)
+  const area = useRef<HTMLTextAreaElement>(null)
+  const top = useRef(0) // where the lines were scrolled, kept into the edit and back
   const load = useRef(p.load)
   load.current = p.load
   useEffect(() => {
@@ -818,15 +834,49 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
     return () => void (alive = false)
   }, [p.path, n])
   useLayoutEffect(() => {
-    if (p.line) body.current?.querySelector('.pv-line.at')?.scrollIntoView({ block: 'center' })
-    else body.current?.scrollTo(0, 0)
+    if (p.line && !top.current) body.current?.querySelector('.pv-line.at')?.scrollIntoView({ block: 'center' })
+    else body.current?.scrollTo(0, top.current)
   }, [f, p.line])
+  useLayoutEffect(() => void (p.edit ? area.current?.scrollTo(0, top.current) : body.current?.scrollTo(0, top.current)), [!!p.edit])
+  const name = p.path.slice(p.path.lastIndexOf('/') + 1)
+  // edit: small tweaks, no more (no completion); only what the preview shows whole and as its bytes
+  const editable = f?.text !== undefined && !f.cut && !f.lossy && !(f.text.includes('\r\n') && /(^|[^\r])\n/.test(f.text)) // mixed line ends: one kind would replace both
+  const startEdit = () => {
+    top.current = body.current?.scrollTop ?? 0
+    p.onEdit({ text: f!.text!.replace(/\r\n/g, '\n'), was: f!.text! })
+  }
+  const stopEdit = () => {
+    top.current = area.current?.scrollTop ?? top.current
+    p.onEdit(undefined)
+  }
+  const cancel = async () => (!edited(p.edit) || (await ask(`Discard your changes to ${name}?`, { ok: 'Discard', danger: true }))) && stopEdit()
+  const save = async () => {
+    const e = p.edit
+    if (!e || saving) return
+    if (!edited(e)) return stopEdit()
+    const text = e.was.includes('\r\n') ? e.text.replace(/\n/g, '\r\n') : e.text // its line ends kept
+    setSaving(true)
+    setErr('')
+    try {
+      await p.save(text, e.was).catch(async (x: Error) => {
+        // an agent (or anyone) changed it meanwhile: theirs goes only if you say so
+        if (!/changed since/.test(x.message) || !(await ask(`${name} changed since you opened it`, { text: 'Save yours over it? What changed there is lost.', ok: 'Save over it', danger: true }))) throw x
+        return p.save(text, e.was, true)
+      })
+      stopEdit()
+      setN(x => x + 1)
+    } catch (x) {
+      setErr(String((x as Error)?.message ?? x))
+    } finally {
+      setSaving(false)
+    }
+  }
   // Markdown: Rendered or Raw (the last one picked; a jump to a line: Raw)
   const md = /\.(md|markdown|mdx)$/i.test(p.path)
   const [mode, setMode] = useState<'raw' | 'rendered'>(() => (p.line ? 'raw' : (localStore('laki.md') as 'raw') || 'rendered'))
   const rendered = md && mode === 'rendered' && f?.text !== undefined
   const pickMode = (m: typeof mode) => (setMode(m), localStore('laki.md', m))
-  const lines = useMemo(() => (f?.text === undefined || rendered ? [] : highlight(p.path, f.text)), [f, p.path, rendered]) // colored up to 50 KB
+  const lines = useMemo(() => (f?.text === undefined || rendered || p.edit ? [] : highlight(p.path, f.text)), [f, p.path, rendered, !!p.edit]) // colored up to 50 KB
   const cut = p.path.lastIndexOf('/') + 1
   return (
     <div className="preview">
@@ -836,6 +886,17 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
           {p.path.slice(cut)} <span className="muted">{p.path.slice(0, cut)}</span>
         </span>
         {f && <span className="muted small pv-wide">{sizeText(f.size)}</span>}
+        {p.edit ? (
+          <>
+            <button className="small" disabled={saving} onClick={cancel}>
+              Cancel
+            </button>
+            <button className="small primary" disabled={saving} data-tip="⌘S" onClick={save}>
+              {saving ? 'Saving…' : 'Save'}
+            </button>
+          </>
+        ) : (
+          <>
         {md && f?.text !== undefined && (
           <div className="seg small">
             <button className={mode === 'rendered' ? 'on' : ''} onClick={() => pickMode('rendered')}>
@@ -846,13 +907,32 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
             </button>
           </div>
         )}
+        {editable && <IconButton icon="pencil" title="Edit here: small changes, ⌘S saves" onClick={startEdit} />}
         <IconButton icon="refresh" title="Reload" onClick={() => setN(x => x + 1)} />
         <button className="small" data-tip="Open in editor" onClick={p.onOpen}>
           <Icon name="code" />
           <span className="pv-wide"> Open in editor</span>
         </button>
+          </>
+        )}
         <IconButton icon="x" title="Close (⌘W)" onClick={p.onClose} />
       </div>
+      {err && p.edit && <div className="warn small pad">{err}</div>}
+      {p.edit ? (
+        <textarea
+          ref={area}
+          className="pv-edit"
+          value={p.edit.text}
+          wrap="off"
+          spellCheck={false}
+          autoFocus
+          onChange={e => p.onEdit({ ...p.edit!, text: e.target.value })}
+          onKeyDown={e => {
+            if (e.key === 's' && (e.metaKey || e.ctrlKey)) (e.preventDefault(), save())
+            else if (e.key === 'Escape') (e.preventDefault(), cancel())
+          }}
+        />
+      ) : (
       <div className="pv-body" ref={body}>
         {err && <div className="warn small pad">{err}</div>}
         {f?.image && (
@@ -871,6 +951,7 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
         {f?.cut && <div className="muted small pad">Showing the start of the file. Open it in the editor for the rest.</div>}
         {f && f.text === undefined && !f.image && <div className="muted small pad">Not shown here ({sizeText(f.size)}): open it in the editor or Finder.</div>}
       </div>
+      )}
     </div>
   )
 }

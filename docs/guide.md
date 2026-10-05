@@ -53,14 +53,21 @@ changing it: [AGENTS.md](../AGENTS.md).
   run script in its tab, ■ stops it; listening ports you click to open, name (`.laki.json`), stop (✕), or expose to
   the world (a public trycloudflare.com link and its QR code, optionally only for some email addresses).
 - **Look**: 86 themes, including Warp-style gradients and sixty-eight that also change shapes, borders and type;
-  glass (a see-through window, as see-through as you set, with a color glow); Inter and six terminal fonts
-  built in (JetBrains Mono, Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist Mono); tab and
+  glass (a see-through window, as see-through as you set, with a color glow); Inter and eleven terminal fonts
+  built in (JetBrains Mono, Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist Mono, Hack, Iosevka,
+  Inconsolata, Roboto Mono, Victor Mono); tab and
   workspace colors.
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
   tunnel that lets in one email address, for 1 to 24 hours or until you stop it; a QR code to open it.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
-- **A break**: the smiley in the tab bar shows a random meme from r/memes; *Next* (→, N) for another, *Copy image* to paste it somewhere. Settings › General
-  hides it.
+- **A break**: the smiley in the tab bar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
+  one you've seen); *Next* (→, N) for another, *Copy image* to paste it somewhere, a right click to copy, download or
+  open it. Settings › General hides it.
+- **Timers**: the stopwatch at the bottom of the sidebar starts a countdown, 5 minutes to an hour (or any length), as
+  many as you like; each shows as a bar over the bottom buttons and then notifies you, and pauses, plays or closes the
+  video, or runs a command, if you like.
+- **A video while you work**: the play button at the bottom of the sidebar asks for a YouTube link (a video, a
+  short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
 ## Install
 
@@ -123,6 +130,16 @@ selected workspace's PR is in the status bar.
 - Click a project to fold its workspaces away (its busiest status and their count stay), again to unfold;
   *Collapse all projects* and *Expand all projects* are in ⌘K.
 - ＋ on a project creates a new workspace in it.
+- *Video* at its bottom: a YouTube video under the projects, as wide as the sidebar (*YouTube* above it: the chevron
+  minimizes it to that bar, playing on, and shows it again; the pencil asks for another, ✕ closes it; these are in ⌘K
+  too). Hiding the sidebar (⌘B) keeps it playing; it's back, paused, after a restart.
+- *Timer* at its bottom starts a countdown (5, 10, 15, 25, 30, 45 minutes, 1 hour, or *Other length…*: 25, 1h 30m,
+  90s); start as many as you like. Each is a bar above the bottom buttons, like the minimized video, with its time left;
+  its pencil (or a right click) adds 5 minutes, starts it over with another length and picks what happens as it ends: a
+  notification always (with your sound), and the video paused, played or closed, or a command run (*Run a command…*:
+  through your login shell, in a tab of the workspace selected then, not focused; it closes when the command succeeds),
+  if you like; ✕ stops it. *Start a
+  timer…* and *Stop all timers* are in ⌘K. They're kept when Laki quits; one that ends while it's closed is dropped, its action not run.
 - ⋯ on a project opens its menu:
   - *New workspace*;
   - *Collapse* / *Expand*;
@@ -139,6 +156,8 @@ selected workspace's PR is in the status bar.
   *Open in*, fork, archive and delete. A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it) and *Copy link* too.
 - Drag projects, and workspaces within a project, to reorder them.
+- Separators: a project's ⋯ › *Add a separator*, or a workspace's *Add a separator below*, puts a named line
+  between its workspaces. Drag it like a workspace; double click to rename; right click to delete.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
 - ＋ in the tab bar opens a new tab: shell (⌘T), one of your agent presets (claude, codex, gemini, …) or a command.
@@ -169,8 +188,9 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
-- smiley: a random meme from r/memes, for a break (*Next*, → or N; *Copy image*; Esc closes it). Fetched only when you click: Reddit's own, or
-  meme-api.com when Reddit turns the request away;
+- smiley: a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes, pictures only, for a break (*Next*, → or N;
+  *Copy image*; a right click: copy, download, open on Reddit; Esc closes it); one you've seen comes again only when
+  nothing new is left. Fetched only when you click: Reddit's own, or meme-api.com when Reddit turns the request away;
 - info (⌘I): the workspace info panel (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
@@ -265,7 +285,11 @@ until the agent's next run renews it. Settings › General turns each agent off 
   the like). Search filters by path. New file and new folder go in the selected folder; a new file opens in
   your editor. A click on a file previews it next to the terminal (text with line numbers, code in color up
   to 50 KB, or an image),
-  with *Open in editor*; a double-click opens it in the editor. A right click opens it elsewhere: its default
+  with *Open in editor*; a double-click opens it in the editor. The pencil edits a text file right there, for small
+  changes (no completion): ⌘S or *Save* writes it, Esc or *Cancel* drops the edit (asked first when you changed
+  something; closing the preview, ⌘W, or opening another file asks too). If the file changed since you started (an
+  agent at work), saving asks before writing yours over it. Line ends (CRLF) stay as they were; files over 512 KB or
+  not UTF-8 open in your editor instead. A right click opens it elsewhere: its default
   app, a browser (HTML, SVG, PDF, images, JSON, XML), any editor, Finder (shows it), a terminal (in its folder);
   or copies its path. Changed files are colored (modified, new, deleted) and their
   folders get a dot. Refresh, collapse all.
@@ -411,6 +435,7 @@ settings) and shows a server icon; the status bar shows `devbox:` before the pat
 | ⌥⌘B | side panel: files, changes, review, preview |
 | ⌘I | workspace info |
 | ⌘F | find in the terminal |
+| ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it) |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
@@ -433,10 +458,14 @@ lit for a moment.
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
   reads it back (projects and their own settings don't move).
-- *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Project names in the sidebar* (font,
-  case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line, the
-  line between projects, the indent and row height, each the theme's unless you pick one; *Button labels*: words
-  beside Tasks (scheduled), Board and Settings at its bottom; hidden when the sidebar is too narrow for them), *Glass* (a see-through
+- *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Accent color* (over the theme's: the
+  selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
+  over the theme's), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
+  keeps them on top), *Project names in the sidebar* (font,
+  case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line: thin,
+  thick, dashed, dotted, big dots, accent, accent dots or none; the line between projects: a line, dashed, dotted,
+  double or nothing; the indent, row height and text size, each the theme's unless you pick one; *Button labels*: words
+  beside Scheduled, Board, Video, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked, in sight as the page opens; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds
@@ -485,11 +514,12 @@ lit for a moment.
   shift lights), Mission Control (1969 consoles, label plates, an amber lamp), Grimoire (a dungeon inventory's gold
   frames), Cockpit (an orange flight HUD with target brackets) and Islander (light: an island phone app).
   Terminals take its 16 colors.
-- *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono and Geist
-  Mono are built in too; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
+- *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist
+  Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
   cursor style (block, bar, underline) and blinking, copy selected text to the clipboard (on by default) and
-  *Dim other panes* (in a split, the panes without the keyboard fade back; off by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
+  *Dim other panes* (in a split, the panes without the keyboard fade back; off by default) and *Focus the pane under
+  the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; off by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
 - *Agent presets*: how agents start. A preset is an agent (Claude Code, Codex, Gemini, Grok, OpenCode) with extra
   arguments (e.g. `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each
@@ -677,7 +707,8 @@ agents find their conversations by those paths. It holds:
 `~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok` and `~/.config/opencode` are left alone, except the skill folders *Settings → Agent skill* writes when you click Install.
 
 No telemetry. Laki goes online only for what you use: `gh` (PRs, issues), the agents' plan limits, cloudflared
-(tunnels, remote access), your phone-push webhook, and a meme when you click the smiley.
+(tunnels, remote access), your phone-push webhook, a meme when you click the smiley, and the YouTube video you ask the
+sidebar for (youtube-nocookie.com).
 
 ## Updating
 

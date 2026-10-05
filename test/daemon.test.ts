@@ -305,6 +305,36 @@ test('diff: committed and uncommitted changes since the base, new files too', as
   assert.match(d.diff, /\+brand new/)
 })
 
+test("file preview edits: saved with the file's mode, refused over a change unless forced, only whole UTF-8 text inside", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const file = join(ws.path, 'run.sh')
+  writeFileSync(file, 'echo hi\n', { mode: 0o755 })
+  const save = (o: object) => rig.rpc('fileWrite', { ws: ws.id, path: 'run.sh', ...o })
+  assert.deepEqual(await save({ text: 'echo hello\n', was: 'echo hi\n' }), { size: 11 })
+  assert.equal(readFileSync(file, 'utf8'), 'echo hello\n')
+  assert.equal(statSync(file).mode & 0o777, 0o755)
+  // an agent changed it meanwhile: refused, unless asked to save over it
+  writeFileSync(file, 'echo agent\n')
+  await assert.rejects(save({ text: 'mine\n', was: 'echo hello\n' }), /run\.sh changed since you opened it/)
+  assert.equal(readFileSync(file, 'utf8'), 'echo agent\n')
+  await save({ text: 'mine\n', was: 'echo hello\n', force: true })
+  assert.equal(readFileSync(file, 'utf8'), 'mine\n')
+  // what the preview can't show whole, or as its bytes, isn't saved over
+  writeFileSync(join(ws.path, 'latin1.txt'), Buffer.from([0x63, 0x61, 0x66, 0xe9, 0x0a]))
+  assert.equal((await rig.rpc('fileRead', { ws: ws.id, path: 'latin1.txt' })).lossy, true)
+  await assert.rejects(rig.rpc('fileWrite', { ws: ws.id, path: 'latin1.txt', text: 'x', force: true }), /can't be edited here/)
+  writeFileSync(join(ws.path, 'big.txt'), 'x'.repeat((512 << 10) + 1))
+  await assert.rejects(rig.rpc('fileWrite', { ws: ws.id, path: 'big.txt', text: 'x', force: true }), /can't be edited here/)
+  await assert.rejects(save({ text: 'x'.repeat((512 << 10) + 1), force: true }), /over 512 KB/)
+  writeFileSync(join(ws.path, 'bin'), Buffer.from([0, 1, 2]))
+  await assert.rejects(rig.rpc('fileWrite', { ws: ws.id, path: 'bin', text: 'x', force: true }), /can't be edited here/)
+  await assert.rejects(rig.rpc('fileWrite', { ws: ws.id, path: '../escape.txt', text: 'x', force: true }), /inside the workspace/)
+  await assert.rejects(rig.rpc('fileWrite', { ws: ws.id, path: 'nope.txt', text: 'x', force: true }), /isn't a file|ENOENT/)
+  assert.ok(!existsSync(join(ws.path, 'nope.txt')))
+})
+
 test('side panel: files with their changes, new files and folders, only inside the workspace', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -592,6 +622,20 @@ test('presets: args and env on top of the project env; Esc ends a turn; reorder;
   assert.equal(v.workspaces[0].run, false)
   await rig.rpc('wsSet', { id: ws2.id, pinned: false }) // unpinned: the field goes
   assert.equal((await rig.rpc('state')).workspaces[0].pinned, undefined)
+
+  // seps: named lines between a project's workspaces; a bad one is dropped, a drag keeps the whole order
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: '  Later  ' }, { id: 'bad id', name: 'x' }, { id: 'sep-b2', name: ' ' }, { id: 'sep-a1', name: 'again' }], rows: [ws2.id, 'sep-a1', ws.id, 7] })
+  let pr = (await rig.rpc('state')).projects[0]
+  assert.deepEqual(pr.seps, [{ id: 'sep-a1', name: 'Later' }])
+  assert.deepEqual(pr.rows, [ws2.id, 'sep-a1', ws.id])
+  await rig.rpc('reorder', { workspaces: ['sep-a1', ws.id, ws2.id] })
+  const v2 = await rig.rpc('state')
+  assert.deepEqual(v2.projects[0].rows, ['sep-a1', ws.id, ws2.id])
+  assert.deepEqual(v2.workspaces.map((w: any) => w.id), [ws.id, ws2.id])
+  await rig.rpc('projectSet', { id: p.id, seps: [] }) // the last one gone: so is the order
+  pr = (await rig.rpc('state')).projects[0]
+  assert.equal(pr.seps, undefined)
+  assert.equal(pr.rows, undefined)
 })
 
 test('PR: failing CI and new review comments go to the agent once; global env; images; workspace name; a silent turn ends', async t => {

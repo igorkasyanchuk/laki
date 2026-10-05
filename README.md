@@ -19,7 +19,9 @@ worktree. Agents keep running when the window is closed.
   drive a browser of their own on it (`laki browser`).
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only.
-- **Looks**: 86 themes, 68 of which change shapes and type too (some after films' and games' screens); glass.
+- **Looks**: 86 themes, 68 of which change shapes and type too (some after films' and games' screens); glass; your
+  accent, corners and sidebar lines; tabs on top, bottom, left or right.
+- **A video while you work**: a YouTube link plays at the bottom of the sidebar.
 - **Keyboard and CLI**: ⌘K for everything; `laki` (also an MCP server) drives it all, agents included.
 
 ## Install

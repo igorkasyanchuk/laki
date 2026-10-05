@@ -54,3 +54,45 @@ export function actionsFor(global: RunAction[] = [], project: RunAction[] = [], 
   }
   return { agent, terminal }
 }
+
+// a YouTube link (watch, youtu.be, shorts, live, embed, a playlist; t= or start=; or a bare video id) as the
+// sidebar player's embed URL, else null. youtube-nocookie: no cookies until you play
+export function youtubeEmbed(link: string): string | null {
+  const s = link.trim()
+  let u: URL
+  try {
+    u = new URL(/^[\w-]{11}$/.test(s) ? `https://youtu.be/${s}` : /^https?:\/\//i.test(s) ? s : `https://${s}`)
+  } catch {
+    return null
+  }
+  const host = u.hostname.replace(/^(www|m|music)\./, '')
+  const [first, second] = u.pathname.split('/').filter(Boolean)
+  const vid = (x?: string | null) => (x && /^[\w-]{11}$/.test(x) ? x : null)
+  const id = host === 'youtu.be' ? vid(first) : host === 'youtube.com' || host === 'youtube-nocookie.com' ? vid(first === 'watch' ? u.searchParams.get('v') : ['shorts', 'live', 'embed', 'v'].includes(first) ? second : null) : undefined
+  const list = u.searchParams.get('list')?.match(/^[\w-]+$/)?.[0]
+  if (id === undefined || (!id && !list)) return null // not YouTube, or no video in it
+  const out = new URL(`https://www.youtube-nocookie.com/embed/${id ?? 'videoseries'}`)
+  if (list) out.searchParams.set('list', list)
+  // t=90, 90s, 1h2m3s; start=90
+  const t = /^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+)s?)?$/.exec(u.searchParams.get('t') ?? u.searchParams.get('start') ?? '')
+  const start = t ? Number(t[1] ?? 0) * 3600 + Number(t[2] ?? 0) * 60 + Number(t[3] ?? 0) : 0
+  if (start) out.searchParams.set('start', String(start))
+  return out.href
+}
+
+// a timer's length as typed: minutes (25, 2.5), or with units (1h 30m, 90s, 45 min); in ms, up to a day, else null
+export function parseDuration(typed: string): number | null {
+  const s = typed.trim().toLowerCase()
+  const UNIT: Record<string, number> = { h: 3600000, m: 60000, s: 1000 }
+  const parts = /^\d+(\.\d+)?$/.test(s) ? [[s, 'm']] : /^(\s*\d+(\.\d+)?\s*(h|hrs?|hours?|m|mins?|minutes?|s|secs?|seconds?)(?![a-z]))+$/.test(s) ? [...s.matchAll(/(\d+(?:\.\d+)?)\s*([hms])/g)].map(m => [m[1], m[2]]) : []
+  const ms = Math.round(parts.reduce((n, [v, u]) => n + Number(v) * UNIT[u], 0))
+  return ms >= 1000 && ms <= 86400000 ? ms : null
+}
+
+// time left as a clock: 4:05, 1:02:03
+export function clock(ms: number) {
+  const t = Math.max(0, Math.ceil(ms / 1000))
+  const [h, m, sec] = [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60]
+  const two = (n: number) => String(n).padStart(2, '0')
+  return h ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`
+}

@@ -921,8 +921,8 @@ export const preview = (t: Theme) => {
 
 // what paints the window (Settings → Appearance): the theme, the interface's font ('system': the Mac's), glass
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
-export type Paint = { theme?: string; uiFont?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean }
-const PAINT = ['theme', 'uiFont', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow'] as const
+export type Paint = { theme?: string; uiFont?: string; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean }
+const PAINT = ['theme', 'uiFont', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow'] as const
 export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
@@ -932,6 +932,12 @@ function alpha(c: string, pct: number) {
   if (!m) return `color-mix(in srgb, ${c} ${pct}%, transparent)`
   const a = m[2] ? parseInt(m[2], 16) : 255
   return m[1] + Math.round((pct / 100) * a).toString(16).padStart(2, '0')
+}
+// text on an accent: black or white, whichever reads better (WCAG's relative luminance)
+export function onAccent(hex: string) {
+  const l = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255).map(c => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4))
+  const y = 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]
+  return (y + 0.05) / 0.05 >= 1.05 / (y + 0.05) ? '#000000' : '#ffffff'
 }
 export const UI_FALLBACK = '-apple-system, BlinkMacSystemFont, system-ui, sans-serif'
 export const UI_FONTS = ['Inter', 'system', 'JetBrains Mono', 'Avenir Next', 'Helvetica Neue', 'Futura', 'Gill Sans', 'Optima', 'Menlo']
@@ -954,6 +960,9 @@ export function applyTheme(p: string | Paint = '') {
   seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad
   const font = o.uiFont?.trim()
   if (font) st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
+  // Settings › Appearance's accent and corners, over the theme's (and its look's --radius)
+  if (o.accent && /^#[\da-f]{6}$/i.test(o.accent)) st.setProperty('--accent', o.accent), st.setProperty('--accent-fg', onAccent(o.accent))
+  if (o.radius) st.setProperty('--radius', o.radius)
   if (o.glass) {
     // the window's blur shows through: backgrounds at part strength (the default theme's from the stylesheet)
     const v = (k: keyof Colors, css: string) => t.c?.[k] ?? rootVar(css)
@@ -976,8 +985,7 @@ export function applyTheme(p: string | Paint = '') {
     '--tc-red': a[1], '--tc-orange': c.orange, '--tc-yellow': a[3], '--tc-green': a[2], '--tc-teal': a[6], '--tc-blue': a[4], '--tc-purple': c.purple, '--tc-pink': c.pink,
   }
   a.forEach((x, i) => (vars[`--ansi-${i}`] = x))
-  if (o.glass) for (const k of ['--app-bg', '--term-bg', '--side', '--tab-sel']) delete vars[k] // glass's, set above
-  for (const [k, v] of Object.entries(vars)) st.setProperty(k, v)
+  for (const [k, v] of Object.entries(vars)) if (!st.getPropertyValue(k)) st.setProperty(k, v) // not what glass or the accent set above
   st.colorScheme = t.light ? 'light' : 'dark'
 }
 

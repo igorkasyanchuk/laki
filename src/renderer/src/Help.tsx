@@ -14,6 +14,7 @@ const KEYS: [string, string][] = [
   ['⌘K', 'the palette: every workspace, tab and action'],
   ['⌘P', 'find a file in the workspace'],
   ['⌘F', 'find in the terminal'],
+  ['⌘S', "save the file you're editing in the preview"],
   ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt"],
   ['⌘D', 'changes against the base branch'],
   ['⌥⌘B', 'side panel: files, changes, review, preview'],

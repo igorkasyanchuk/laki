@@ -1,12 +1,12 @@
-import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
 import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, MODELS, type View } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { type Img, PromptInput, TemplatePick, withImages } from './PromptInput'
-import { nameOf, templated, templatesFor } from './text'
-import { Icon, type IconName, Page } from './ui'
+import { clock, nameOf, templated, templatesFor } from './text'
+import { Icon, IconButton, type IconName, Page, useMenu } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
@@ -26,13 +26,66 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 
 const SITE = 'https://laki.igorkasyanchuk.com'
 
-// the header's fun button: a meme from r/memes (the daemon fetches it, fun.ts), Next for another, Esc back to work
-export type Meme = { title: string; link: string; image: string; by?: string }
+// the sidebar's video, to watch while you work: a YouTube embed with its own controls (main gives it a Referer: a
+// file:// page has none, and YouTube refuses to play without one). Sandboxed: it can't take the window anywhere.
+// Minimized: only its bar, the video playing on
+export function Video({ src, min, onMin, onChange, onClose }: { src: string; min?: boolean; onMin: (min: boolean) => void; onChange: () => void; onClose: () => void }) {
+  return (
+    <div className="video">
+      <div className="video-head">
+        <Icon name="youtube" size={13} />
+        <span className="muted small">YouTube</span>
+        <span className="spacer" />
+        <IconButton icon={min ? 'chevronUp' : 'chevron'} title={min ? 'Show the video' : 'Minimize: it plays on'} onClick={() => onMin(!min)} />
+        <IconButton icon="pencil" title="Another video" onClick={onChange} />
+        <IconButton icon="x" title="Close the video" onClick={onClose} />
+      </div>
+      <iframe
+        hidden={min}
+        src={src}
+        title="YouTube video"
+        allow="autoplay; encrypted-media; picture-in-picture; fullscreen"
+        allowFullScreen
+        referrerPolicy="strict-origin-when-cross-origin"
+        sandbox="allow-scripts allow-same-origin allow-popups allow-presentation"
+      />
+    </div>
+  )
+}
+
+// a running timer, a bar over the sidebar's foot like the minimized video: the time left, ticking, and what it was set
+// for; its menu changes it (more time, a new length, what happens as it ends)
+export function TimerBar({ end, label, onMenu, onStop }: { end: number; label: string; onMenu: (e: MouseEvent<HTMLElement>) => void; onStop: () => void }) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => tick(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [])
+  return (
+    <div className="timer-bar" onContextMenu={onMenu}>
+      <Icon name="timer" size={13} />
+      <span className="timer-left">{clock(end - Date.now())}</span>
+      <span className="muted small timer-what">{label}</span>
+      <span className="spacer" />
+      <IconButton icon="pencil" title="Change it: more time, a new length, what happens as it ends" onClick={onMenu} />
+      <IconButton icon="x" title="Stop it" onClick={onStop} />
+    </div>
+  )
+}
+
+// the header's fun button: a meme from r/memes, r/ProgrammerHumor or r/wholesomememes (the daemon fetches it, fun.ts),
+// Next for another, Esc back to work; a right click on it: copy, download, open
+export type Meme = { title: string; link: string; image: string; by?: string; sub?: string }
+// the video's player told to play or pause (its embed has enablejsapi=1: it takes commands as messages)
+export const videoCommand = (func: 'playVideo' | 'pauseVideo') =>
+  document.querySelector<HTMLIFrameElement>('.video iframe')?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args: [] }), 'https://www.youtube-nocookie.com')
+
 export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () => void }) {
   const [m, setM] = useState<Meme | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [menu, openMenu] = useMenu()
   const img = useRef<HTMLImageElement>(null)
   const next = () => {
     setBusy(true)
@@ -54,6 +107,14 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
       e => setErr((e as Error).message),
     )
   }
+  // saved where the browser saves (the app asks where), named after its title
+  const download = () => {
+    if (!m) return
+    const a = document.createElement('a')
+    a.href = m.image
+    a.download = `${m.title.replace(/[^\w ,.'-]+/g, '').trim().slice(0, 60) || 'meme'}.${m.image.slice(11, m.image.indexOf(';')).replace('jpeg', 'jpg')}`
+    a.click()
+  }
   // → or N: the next one
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
@@ -72,13 +133,27 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
             <a className="fun-title" href={m.link} onClick={e => (e.preventDefault(), openExternal(m.link))} data-tip="Open it on Reddit">
               {m.title}
             </a>
-            <img ref={img} src={m.image} alt={m.title} className={busy ? 'dim' : ''} />
+            <img
+              ref={img}
+              src={m.image}
+              alt={m.title}
+              className={busy ? 'dim' : ''}
+              onContextMenu={e =>
+                openMenu(e, [
+                  { label: 'Copy image', icon: 'copy', key: 'c', run: copy },
+                  { label: 'Download image', icon: 'import', key: 'd', run: download },
+                  { label: 'Open on Reddit', icon: 'link', key: 'o', run: () => openExternal(m.link) },
+                  null,
+                  { label: 'Next', icon: 'arrowRight', key: 'n', run: next },
+                ])
+              }
+            />
           </>
         )}
         {!m && busy && <div className="muted pad">Finding one…</div>}
         {err && <div className="warn small">{err}</div>}
         <div className="buttons">
-          <span className="muted small">{m?.by ? `u/${m.by} · r/memes` : 'r/memes'}</span>
+          <span className="muted small">{[m?.by && `u/${m.by}`, `r/${m?.sub ?? 'memes'}`].filter(Boolean).join(' · ')}</span>
           <span className="spacer" />
           <button onClick={onClose}>Back to work</button>
           <button onClick={copy} disabled={busy || !m}>
@@ -89,6 +164,7 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
           </button>
         </div>
       </div>
+      {menu}
     </Modal>
   )
 }

@@ -1,7 +1,7 @@
 # Bundled fonts
 
 Inter and JetBrains Mono: Latin, Latin Extended and Cyrillic subsets; the other terminal fonts: Latin only (woff2, from
-Google Fonts). Used by `look.css`.
+Google Fonts; Iosevka from Fontsource and Hack from its own webfonts, cut to the same Latin set). Used by `look.css`.
 
 - **Inter**: Copyright 2016 The Inter Project Authors (https://github.com/rsms/inter).
 - **JetBrains Mono**: Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono).
@@ -10,6 +10,17 @@ Google Fonts). Used by `look.css`.
 - **Source Code Pro**: Copyright 2010-2020 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'.
 - **IBM Plex Mono**: Copyright 2017 IBM Corp., with Reserved Font Name "Plex".
 - **Geist Mono**: Copyright 2024 The Geist Project Authors (https://github.com/vercel/geist-font).
+- **Iosevka**: Copyright 2015-2023 Renzhi Li (aka. Belleve Invis) (https://github.com/be5invis/Iosevka); Latin subset of
+  Fontsource's build.
+- **Inconsolata**: Copyright 2006 The Inconsolata Project Authors (https://github.com/cyrealtype/Inconsolata).
+- **Roboto Mono**: Copyright 2015 The Roboto Mono Project Authors (https://github.com/googlefonts/robotomono).
+- **Victor Mono**: Copyright 2019-2023 The Victor Mono Project Authors (https://github.com/rubjo/victor-mono).
 
-All are licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org). They may be
+These are licensed under the SIL Open Font License, Version 1.1 (https://openfontlicense.org). They may be
 used, bundled and redistributed with this app; they may not be sold on their own.
+
+- **Hack** (Latin subset of its 3.003 webfonts): the Hack work is Copyright 2018 Source Foundry Authors, under the MIT
+  License; it derives from DejaVu (public domain) and Bitstream Vera Sans Mono, Copyright 2003 Bitstream Inc., under the
+  Bitstream Vera License, with Reserved Font Names "Bitstream" and "Vera"
+  (https://github.com/source-foundry/Hack/blob/master/LICENSE.md). It may be bundled and redistributed; it may not be
+  sold on its own.
