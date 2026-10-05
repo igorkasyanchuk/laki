@@ -942,8 +942,8 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
   return t
 }
 
-// a workspace's sidebar color, name, notifications, and whether CI failures and review comments go to its agent
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; muted?: boolean }) {
+// a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; muted?: boolean; pinned?: boolean }) {
   const w = findWs(o.id)
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.name !== undefined) {
@@ -958,6 +958,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.autoReview !== undefined) w.autoReview = o.autoReview || undefined
   if (o.autoMerge !== undefined) w.autoMerge = o.autoMerge || undefined
   if (o.muted !== undefined) w.muted = o.muted || undefined
+  if (o.pinned !== undefined) w.pinned = o.pinned || undefined
   save()
   changed()
   if (o.autoFix || o.autoReview || o.autoMerge) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)

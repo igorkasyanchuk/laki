@@ -133,7 +133,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
             Expose to the world: next to a port, a public trycloudflare.com link with a QR code for your phone, optionally only for some email addresses.
             Needs cloudflared (<code>brew install cloudflared</code>).
           </Row>
-          <Row k="Sidebar">Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag to reorder. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts). Archiving a clean workspace is at once, with Undo.</Row>
+          <Row k="Sidebar">Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag to reorder. Pin to top (its menu) keeps one under Pinned, above the projects. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts). Archiving a clean workspace is at once, with Undo.</Row>
           <Row k="Templates">
             Settings › Prompt templates, and each project's own: a prompt with <code>{'{{prompt}}'}</code> in it (and <code>{'{{project}}'}</code>, <code>{'{{base}}'}</code>). Pick one
             under a new workspace's prompt: the agent gets it filled in.

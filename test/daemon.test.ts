@@ -550,7 +550,7 @@ test('settings: branch prefix, tab name and color, open in a custom editor', asy
   assert.deepEqual((await rig.rpc('state')).settings.branchPrefix, 'me/')
 })
 
-test('presets: args and env on top of the project env; Esc ends a turn; reorder; workspace color', async t => {
+test('presets: args and env on top of the project env; Esc ends a turn; reorder; workspace color and pin', async t => {
   const rig = await fresh(t, { config: { env: { TEST_FILE: 'f', TEST_SHARED: 'file' } } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('projectSet', { id: p.id, config: { env: { TEST_SHARED: 'app', 'bad key': 'x' } } })
@@ -571,11 +571,14 @@ test('presets: args and env on top of the project env; Esc ends a turn; reorder;
 
   const ws2 = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'second' })
   await rig.rpc('reorder', { workspaces: [ws2.id, ws.id] })
-  await rig.rpc('wsSet', { id: ws2.id, color: 'pink' })
+  await rig.rpc('wsSet', { id: ws2.id, color: 'pink', pinned: true })
   const v = await rig.rpc('state')
   assert.deepEqual(v.workspaces.map((w: any) => w.id), [ws2.id, ws.id])
   assert.equal(v.workspaces[0].color, 'pink')
+  assert.equal(v.workspaces[0].pinned, true)
   assert.equal(v.workspaces[0].run, false)
+  await rig.rpc('wsSet', { id: ws2.id, pinned: false }) // unpinned: the field goes
+  assert.equal((await rig.rpc('state')).workspaces[0].pinned, undefined)
 })
 
 test('PR: failing CI and new review comments go to the agent once; global env; images; workspace name; a silent turn ends', async t => {

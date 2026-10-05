@@ -134,8 +134,9 @@ selected workspace's PR is in the status bar.
   and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
 - Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
-  *Info*, *Mute notifications*, *Mark as unread*, *Copy link* (`laki://ws/<id>`), *Compare the race* (a race's
-  workspace: the flag on its row), *Open in*, fork, archive and delete. A tab's menu has *Mute notifications*,
+  *Info*, *Mute notifications*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
+  *Mark as unread*, *Copy link* (`laki://ws/<id>`), *Compare the race* (a race's workspace: the flag on its row),
+  *Open in*, fork, archive and delete. A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it) and *Copy link* too.
 - Drag projects, and workspaces within a project, to reorder them.
 

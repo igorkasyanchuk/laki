@@ -731,5 +731,8 @@ button.board-card:hover { border-color: var(--muted); }
 .project-icon { margin-right: 5px; }
 .project-head .glyph { margin-left: 6px; }
 .project-count { margin-left: 6px; font-family: var(--mono); font-size: 10px; color: var(--muted); }
+.pinned .project-head { cursor: default; }
+.pinned .project-icon { margin-left: 7px; } /* where a project's is, past its chevron */
+.ws-proj { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; color: var(--muted); } /* a pinned row's project */
 .narrow .schedule { flex-wrap: wrap; }
 .narrow .schedule-run { flex-wrap: wrap; }

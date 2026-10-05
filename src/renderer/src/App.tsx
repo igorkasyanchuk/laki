@@ -128,7 +128,11 @@ export function App() {
   const mru = useRef<string[]>([]) // sessions, most recently focused first: which pane a tab focuses
 
   const live = useMemo(() => view?.workspaces.filter(w => !w.archived) ?? [], [view])
-  const ws = live.find(w => w.id === wsId) ?? live[0] ?? null
+  const byProject = (view?.projects ?? []).flatMap(p => live.filter(w => w.project === p.id))
+  const pinned = byProject.filter(w => w.pinned) // the sidebar's top
+  // the sidebar's order: Pinned, then each project's (⌘↑/⌘↓, ⌘J, the palette)
+  const order = [...pinned, ...byProject.filter(w => !w.pinned)]
+  const ws = live.find(w => w.id === wsId) ?? order[0] ?? null
   const previewed = ws && preview?.ws === ws.id ? preview : null // the file preview, when it's this workspace's
   const project = view?.projects.find(p => p.id === ws?.project)
   const git = project?.git !== false
@@ -366,9 +370,9 @@ export function App() {
   }
 
   const moveWs = (d: number) => {
-    if (!live.length) return
-    const i = Math.max(0, live.findIndex(w => w.id === ws?.id))
-    setWsId(live[(i + d + live.length) % live.length].id)
+    if (!order.length) return
+    const i = Math.max(0, order.findIndex(w => w.id === ws?.id))
+    setWsId(order[(i + d + order.length) % order.length].id)
   }
 
   const rmWs = async (w: WorkspaceView) => {
@@ -504,6 +508,7 @@ export function App() {
     { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
     { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true)) },
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
+    { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
     ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(w.id)) } as MenuItem] : []),
@@ -623,9 +628,8 @@ export function App() {
   const newTabActions = newTabIn(ws)
   // ⌘J: the next tab that needs you (waiting first, then done unseen; the Dock's count), in the sidebar's order, around
   const nextNeed = () => {
-    const sidebar = (view?.projects ?? []).flatMap(p => live.filter(w => w.project === p.id)) // its order
-    const order = sidebar.flatMap(w => view?.tabs.filter(t => t.workspace === w.id && needsYou(t)) ?? [])
-    const need = [...order.filter(t => t.status === 'waiting'), ...order.filter(t => t.status !== 'waiting')]
+    const tabs = order.flatMap(w => view?.tabs.filter(t => t.workspace === w.id && needsYou(t)) ?? [])
+    const need = [...tabs.filter(t => t.status === 'waiting'), ...tabs.filter(t => t.status !== 'waiting')]
     if (!need.length) return toast('Nothing needs you')
     setDialog(null)
     selectTab(need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])
@@ -638,6 +642,7 @@ export function App() {
           ? [{ label: 'Fork workspace', icon: 'fork', key: 'f', run: () => forkWs(ws) } as Action, { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(ws) } as Action]
           : []),
         { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
+        { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
         { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(ws) },
       ]
   const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
@@ -662,7 +667,7 @@ export function App() {
     const items: PaletteItem[] = []
     const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
     if (ws) a({ label: 'Find files…', icon: 'search', hint: '⌘P', run: () => setDialog('files') }) // first: it opens a search of its own
-    for (const w of live) items.push({ label: wsName(w), hint: `${w.branch || 'folder'} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
+    for (const w of order) items.push({ label: wsName(w), hint: `${w.branch || 'folder'} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
       if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
@@ -759,6 +764,79 @@ export function App() {
       )
     )
   }
+  // a workspace's row: under its project, or under Pinned (with its project's name; no drag there: pins keep the
+  // sidebar's order)
+  const wsRow = (w: WorkspaceView, pin = false) => {
+    const wt = view.tabs.filter(t => t.workspace === w.id)
+    const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
+    return (
+      <div
+        key={w.id}
+        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${rows.at('ws', w.id)}`}
+        style={colorVar(w.color)}
+        data-row={`ws:${w.id}`}
+        data-group={pin ? 'pinned' : w.project}
+        onPointerDown={e => !pin && rows.start(e, 'ws', w.id, w.project)}
+        onClick={() => (setWsId(w.id), narrow && setSideOpen(false))}
+        onContextMenu={e => openMenu(e, wsMenu(w))}
+        data-tip={[
+          `${w.branch || w.path} · $PORT ${w.port}`,
+          w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
+          w.muted && 'notifications muted',
+          w.race && 'in a race: ⋯ › Compare the race',
+          w.stat && settings.diffStat === true && (w.stat.add || w.stat.del) && statText(w),
+          w.pr && `PR #${w.pr.number} ${prState(w.pr)}${w.pr.checks ? `, ${ciText(w.pr)}` : ''}${w.pr.title ? `: ${w.pr.title}` : ''}`,
+        ].filter(Boolean).join(' · ') /* what the marks say too: they give way to the buttons on hover */}
+      >
+        <Glyph s={w.setup ? 'running' : rollup(wt)} />
+        <span className="ws-name">{wsName(w)}</span>
+        {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
+        {queued > 0 && <span className="badge">+{queued}</span>}
+        <span className="spacer" />
+        {settings.timers && <TurnTime tabs={wt} />}
+        {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
+          <span className="ws-stat">
+            <span className="add">+{short(w.stat.add)}</span>
+            <span className="del">−{short(w.stat.del)}</span>
+          </span>
+        )}
+        {w.muted && (
+          <span className="ws-mark">
+            <Icon name="bellOff" size={11} />
+          </span>
+        )}
+        {w.race && (
+          <span className="ws-sched">
+            <Icon name="race" size={11} />
+          </span>
+        )}
+        {w.schedule && (
+          <span className="ws-sched">
+            <Icon name="clock" size={11} />
+          </span>
+        )}
+        {w.pr?.conflict && w.pr.state === 'OPEN' && settings.prIcon !== false && (
+          <span className="ws-pr conflict" data-tip={`PR #${w.pr.number} has merge conflicts`}>
+            <Icon name="conflict" size={11} />
+          </span>
+        )}
+        {settings.archiveMerged && w.kind === 'worktree' && w.pr?.state === 'MERGED' && (
+          <span className="ws-merged" data-tip={`PR #${w.pr.number} merged; not archived: changes, an agent at work, or an Undo`}>
+            merged
+          </span>
+        )}
+        {w.pr && settings.prIcon !== false && (
+          <span className={`ws-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
+            <Icon name="github" size={11} />
+          </span>
+        )}
+        {/* on hover, over the marks: its menu */}
+        <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
+          <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
+        </span>
+      </div>
+    )
+  }
   return (
     <div className={`app ${sideOpen ? '' : 'side-closed'} ${narrow ? 'narrow' : ''} ${bridge ? 'electron' : ''} ${settings.dimPanes ? 'dim-panes' : ''}`}>
       {sideOpen && (
@@ -770,8 +848,19 @@ export function App() {
           <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
         </div>
         <div className="side-scroll">
+          {pinned.length > 0 && (
+            <div className="project pinned">
+              <div className="project-head">
+                <span className="project-icon">
+                  <Icon name="pin" size={12} />
+                </span>
+                <span className="project-name">Pinned</span>
+              </div>
+              <div className="project-ws">{pinned.map(w => wsRow(w, true))}</div>
+            </div>
+          )}
           {view.projects.map(p => {
-            const mine = live.filter(w => w.project === p.id)
+            const mine = live.filter(w => w.project === p.id && !w.pinned) // a pinned one is above, under Pinned
             const shut = folded.includes(p.id)
             // a folded project's busiest (a setup script counts as running, as on its row)
             const sum = shut ? rollup([...view.tabs.filter(t => mine.some(w => w.id === t.workspace)), ...(mine.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])]) : 'idle'
@@ -803,77 +892,7 @@ export function App() {
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               <div className="project-ws">{/* under its project, on a guide line */}
-              {(shut ? mine.filter(w => w.id === ws?.id) : mine) // folded: the selected one stays
-                .map(w => {
-                  const wt = view.tabs.filter(t => t.workspace === w.id)
-                  const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
-                  return (
-                    <div
-                      key={w.id}
-                      className={`ws ${w.id === ws?.id ? 'sel' : ''} ${rows.at('ws', w.id)}`}
-                      style={colorVar(w.color)}
-                      data-row={`ws:${w.id}`}
-                      data-group={p.id}
-                      onPointerDown={e => rows.start(e, 'ws', w.id, p.id)}
-                      onClick={() => (setWsId(w.id), narrow && setSideOpen(false))}
-                      onContextMenu={e => openMenu(e, wsMenu(w))}
-                      data-tip={[
-                        `${w.branch || w.path} · $PORT ${w.port}`,
-                        w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
-                        w.muted && 'notifications muted',
-                        w.race && 'in a race: ⋯ › Compare the race',
-                        w.stat && settings.diffStat === true && (w.stat.add || w.stat.del) && statText(w),
-                        w.pr && `PR #${w.pr.number} ${prState(w.pr)}${w.pr.checks ? `, ${ciText(w.pr)}` : ''}${w.pr.title ? `: ${w.pr.title}` : ''}`,
-                      ].filter(Boolean).join(' · ') /* what the marks say too: they give way to the buttons on hover */}
-                    >
-                      <Glyph s={w.setup ? 'running' : rollup(wt)} />
-                      <span className="ws-name">{wsName(w)}</span>
-                      {queued > 0 && <span className="badge">+{queued}</span>}
-                      <span className="spacer" />
-                      {settings.timers && <TurnTime tabs={wt} />}
-                      {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
-                        <span className="ws-stat">
-                          <span className="add">+{short(w.stat.add)}</span>
-                          <span className="del">−{short(w.stat.del)}</span>
-                        </span>
-                      )}
-                      {w.muted && (
-                        <span className="ws-mark">
-                          <Icon name="bellOff" size={11} />
-                        </span>
-                      )}
-                      {w.race && (
-                        <span className="ws-sched">
-                          <Icon name="race" size={11} />
-                        </span>
-                      )}
-                      {w.schedule && (
-                        <span className="ws-sched">
-                          <Icon name="clock" size={11} />
-                        </span>
-                      )}
-                      {w.pr?.conflict && w.pr.state === 'OPEN' && settings.prIcon !== false && (
-                        <span className="ws-pr conflict" data-tip={`PR #${w.pr.number} has merge conflicts`}>
-                          <Icon name="conflict" size={11} />
-                        </span>
-                      )}
-                      {settings.archiveMerged && w.kind === 'worktree' && w.pr?.state === 'MERGED' && (
-                        <span className="ws-merged" data-tip={`PR #${w.pr.number} merged; not archived: changes, an agent at work, or an Undo`}>
-                          merged
-                        </span>
-                      )}
-                      {w.pr && settings.prIcon !== false && (
-                        <span className={`ws-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
-                          <Icon name="github" size={11} />
-                        </span>
-                      )}
-                      {/* on hover, over the marks: its menu */}
-                      <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
-                        <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
-                      </span>
-                    </div>
-                  )
-                })}
+              {(shut ? mine.filter(w => w.id === ws?.id) : mine).map(w => wsRow(w))}{/* folded: the selected one stays */}
               </div>
             </div>
             )
