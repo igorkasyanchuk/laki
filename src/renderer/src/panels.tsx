@@ -40,6 +40,16 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
       .finally(() => setBusy(false))
   }
   useEffect(next, [])
+  // → or N: the next one
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => {
+      if (busy || e.metaKey || e.ctrlKey || e.altKey || (e.key !== 'ArrowRight' && e.key.toLowerCase() !== 'n')) return
+      e.preventDefault()
+      next()
+    }
+    window.addEventListener('keydown', f)
+    return () => window.removeEventListener('keydown', f)
+  }, [busy])
   return (
     <Modal title="A little break" onClose={onClose} wide>
       <div className="fun">
@@ -57,7 +67,7 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
           <span className="muted small">{m?.by ? `u/${m.by} · r/memes` : 'r/memes'}</span>
           <span className="spacer" />
           <button onClick={onClose}>Back to work</button>
-          <button className="primary" onClick={next} disabled={busy} autoFocus>
+          <button className="primary" onClick={next} disabled={busy} autoFocus data-tip="→ or N">
             {busy ? 'Loading…' : 'Next'}
           </button>
         </div>

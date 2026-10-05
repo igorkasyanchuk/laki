@@ -59,7 +59,8 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
   tunnel that lets in one email address, for 1 to 24 hours or until you stop it; a QR code to open it.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
-- **A break**: the smiley in the tab bar shows a random meme from r/memes; *Next* for another.
+- **A break**: the smiley in the tab bar shows a random meme from r/memes; *Next* (→, N) for another. Settings › General
+  hides it.
 
 ## Install
 
@@ -167,7 +168,7 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
-- smiley: a random meme from r/memes, for a break (*Next*, Esc). Fetched only when you click: Reddit's own, or
+- smiley: a random meme from r/memes, for a break (*Next*, → or N; Esc closes it). Fetched only when you click: Reddit's own, or
   meme-api.com when Reddit turns the request away;
 - info (⌘I): the workspace info panel (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
@@ -401,7 +402,7 @@ lit for a moment.
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
-  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Turn
+  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Fun button* (the smiley; on by default), *Turn
   timers* (off by default), *Diff size in the sidebar* (off by default), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac

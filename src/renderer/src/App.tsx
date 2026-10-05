@@ -931,7 +931,7 @@ export function App() {
           })}
           {ws && <IconButton icon="plus" title="New tab" className="nodrag" onClick={e => openMenu(e, newTabActions)} />}
           <span className="spacer" />
-          <IconButton className="nodrag" icon="smile" title="Fun: a random meme from Reddit, for a break" onClick={() => setDialog('fun')} />
+          {settings.fun !== false && <IconButton className="nodrag" icon="smile" title="Fun: a random meme from Reddit, for a break (Settings › General)" onClick={() => setDialog('fun')} />}
           {ws && (
             <div className="actions nodrag">
               {!narrow && ( // a phone: in ⌘K's palette (the search button)
