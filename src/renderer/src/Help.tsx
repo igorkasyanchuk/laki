@@ -48,6 +48,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
     [`${cli} ls`, 'projects, workspaces and tabs, with their status (--json for scripts)'],
     [`${cli} new <project> --prompt "fix the login"`, 'a workspace with an agent (--preset codex|shell, --model, --effort, --base, --name, --local)'],
     [`${cli} new <project> --issue <url>`, 'a workspace on a GitHub issue: its title and text are the prompt'],
+    [`${cli} new <project> --pr <url>`, "a workspace on a PR's branch (a fork's too), its base the PR's"],
     [`${cli} new <project> --fan claude,codex --prompt "…"`, 'a race: the same prompt to each agent, a worktree each; Compare them in the app'],
     [`${cli} browser <ws> open /login · screenshot · click "<css>" · fill "<css>" "text" · text`, 'the agent browser: the dev server in a hidden window of the app'],
     [`${cli} send <ws>[/<tab>] "run the tests"`, 'type into an agent now; --when-idle waits for its turn to end'],
@@ -140,7 +141,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           <Row k="Actions">
             Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in.
           </Row>
-          <Row k="Agents">The new workspace page picks the agent's model and effort. The Dock icon counts tabs that need you or finished unseen. Settings › General › Turn timers: how long each turn has gone.</Row>
+          <Row k="Agents">The new workspace page picks the agent's model and effort. The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › General › Turn timers: how long each turn has gone.</Row>
           <Row k="Board">The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.</Row>
           <Row k="Scheduled">
             The clock at the bottom of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a
