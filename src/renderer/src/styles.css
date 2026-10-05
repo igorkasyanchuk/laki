@@ -677,8 +677,8 @@ kbd { font-family: var(--mono); }
 .ready-tip .muted { font-size: 11.5px; line-height: 1.4; }
 .ready-star { display: inline-flex; align-items: center; gap: 6px; margin-top: 14px; padding: 6px 14px; border: 1px solid var(--line); border-radius: 999px; background: none; color: var(--muted); font-size: 12px; }
 .ready-star b { color: var(--fg); font-weight: 600; }
-.ready-star span { color: #f5c542; }
-.ready-star:hover { border-color: #f5c542; color: var(--fg); }
+.ready-star span { color: var(--waiting); }
+.ready-star:hover { border-color: var(--waiting); color: var(--fg); }
 .narrow .ready-tips { grid-template-columns: 1fr; }
 .welcome { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 440px; padding: 24px; text-align: center; }
 .welcome img { width: 56px; height: 56px; }

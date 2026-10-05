@@ -915,8 +915,11 @@ async function copyIncludes(proj: Project, ws: Workspace) {
           log(`copy into ${ws.id}: skipped ${rel} (a link out of the repo, or not a file)`)
           continue
         }
+        let up = dirname(dst) // its nearest folder there already: one the worktree links elsewhere gets nothing, not even a folder
+        while (!existsSync(up)) up = dirname(up)
+        if (!within(to, realpathSync(up))) continue
         mkdirSync(dirname(dst), { recursive: true })
-        if (!within(to, realpathSync(dirname(dst)))) continue // a folder the worktree links elsewhere
+        if (!within(to, realpathSync(dirname(dst)))) continue
         copyFileSync(src, dst)
         chmodSync(dst, statSync(src).mode & 0o7777)
         copied.push(rel)
@@ -1343,9 +1346,16 @@ export async function portKill(o: { ws: string; port: number }) {
   // and that it still listens there: the scan is up to 5 s old, and a pid may be another process's by now
   const listens = run('lsof', ['-nP', '-a', '-p', String(p.pid), `-iTCP:${Number(o.port)}`, '-sTCP:LISTEN', '-t']).then(r => !!r.stdout.trim(), () => false)
   const [was, still] = await Promise.all([who(), listens])
-  if (!still) throw (void scanPorts(), new Error(`${p.cmd} (pid ${p.pid}) no longer listens on :${o.port}`))
+  if (!still) {
+    void scanPorts()
+    throw new Error(`${p.cmd} (pid ${p.pid}) no longer listens on :${o.port}`)
+  }
   if (was.split(/\s+/)[0] !== String(process.getuid?.())) throw new Error(`${p.cmd} (pid ${p.pid}) isn't yours to stop`)
-  process.kill(p.pid, 'SIGTERM')
+  try {
+    process.kill(p.pid, 'SIGTERM')
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'ESRCH') throw e // ESRCH: it ended on its own, as asked
+  }
   setTimeout(() => void scanPorts(), 500)
   setTimeout(async () => {
     if ((await who()) === was) {
