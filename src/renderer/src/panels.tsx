@@ -26,6 +26,46 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 
 const SITE = 'https://laki.igorkasyanchuk.com'
 
+// the header's fun button: a meme from r/memes (the daemon fetches it, fun.ts), Next for another, Esc back to work
+export type Meme = { title: string; link: string; image: string; by?: string }
+export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () => void }) {
+  const [m, setM] = useState<Meme | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(true)
+  const next = () => {
+    setBusy(true)
+    setErr('')
+    load()
+      .then(setM, e => setErr((e as Error).message))
+      .finally(() => setBusy(false))
+  }
+  useEffect(next, [])
+  return (
+    <Modal title="A little break" onClose={onClose} wide>
+      <div className="fun">
+        {m && (
+          <>
+            <a className="fun-title" href={m.link} onClick={e => (e.preventDefault(), openExternal(m.link))} data-tip="Open it on Reddit">
+              {m.title}
+            </a>
+            <img src={m.image} alt={m.title} className={busy ? 'dim' : ''} />
+          </>
+        )}
+        {!m && busy && <div className="muted pad">Finding one…</div>}
+        {err && <div className="warn small">{err}</div>}
+        <div className="buttons">
+          <span className="muted small">{m?.by ? `u/${m.by} · r/memes` : 'r/memes'}</span>
+          <span className="spacer" />
+          <button onClick={onClose}>Back to work</button>
+          <button className="primary" onClick={next} disabled={busy} autoFocus>
+            {busy ? 'Loading…' : 'Next'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
 // About (the app menu's, ⌘K): the version and the website
 export function About({ onClose }: { onClose: () => void }) {
   return (

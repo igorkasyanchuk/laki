@@ -215,4 +215,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 16
+export const API = 17

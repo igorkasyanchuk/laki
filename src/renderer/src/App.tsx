@@ -3,7 +3,7 @@ import { API, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, ty
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, ciText, type FixWhat, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
-import { About, AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, StarLaki, Welcome } from './panels'
+import { About, AddProject, Fun, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, StarLaki, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
 import { ComparePage } from './Compare'
@@ -22,7 +22,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | { schedules: string } | { compare: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | { schedules: string } | { compare: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -922,6 +922,7 @@ export function App() {
           })}
           {ws && <IconButton icon="plus" title="New tab" className="nodrag" onClick={e => openMenu(e, newTabActions)} />}
           <span className="spacer" />
+          <IconButton className="nodrag" icon="smile" title="Fun: a random meme from Reddit, for a break" onClick={() => setDialog('fun')} />
           {ws && (
             <div className="actions nodrag">
               {!narrow && ( // a phone: in ⌘K's palette (the search button)
@@ -1067,6 +1068,7 @@ export function App() {
         )}
         {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
+        {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
         {dialog === 'board' && (
           <BoardPage
             view={view}

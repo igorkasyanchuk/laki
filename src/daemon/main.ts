@@ -8,6 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
+import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { skills, skillSet } from './skill.ts'
 import { usage } from './usage.ts'
@@ -127,6 +128,7 @@ const api: Record<string, Handler> = {
   prFix: p => core.prFix(p),
   webhookTest: p => core.webhookTest(p),
   portKill: p => core.portKill(p),
+  meme: () => meme(),
   send: p => core.send(p),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),
