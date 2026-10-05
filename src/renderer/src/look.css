@@ -15,6 +15,19 @@
   unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF; }
 @font-face { font-family: 'JetBrains Mono'; font-style: normal; font-weight: 100 800; font-display: swap; src: url(./fonts/jetbrains-mono-cyrillic.woff2) format('woff2');
   unicode-range: U+0301, U+0400-045F, U+0490-0491, U+04B0-04B1, U+2116; }
+/* more terminal fonts (Settings › Terminal), Latin only */
+@font-face { font-family: 'Fira Code'; font-style: normal; font-weight: 300 700; font-display: swap; src: url(./fonts/fira-code-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Cascadia Code'; font-style: normal; font-weight: 200 700; font-display: swap; src: url(./fonts/cascadia-code-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Source Code Pro'; font-style: normal; font-weight: 200 900; font-display: swap; src: url(./fonts/source-code-pro-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 400; font-display: swap; src: url(./fonts/ibm-plex-mono-latin-400.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'IBM Plex Mono'; font-style: normal; font-weight: 700; font-display: swap; src: url(./fonts/ibm-plex-mono-latin-700.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
+@font-face { font-family: 'Geist Mono'; font-style: normal; font-weight: 100 900; font-display: swap; src: url(./fonts/geist-mono-latin.woff2) format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD; }
 
 /* syntax colors (highlight.ts), from the theme's tab colors */
 .hl-c { color: var(--muted); font-style: italic; }
@@ -283,7 +296,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
   background: linear-gradient(90deg, #3a82e0, #a9d4ff 35%, #64b0f8 60%, #2f78d8); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
 
 /* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
-:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
 
 /* Clay: soft UI. One color everywhere, shapes raised out of it or pressed into it by light from the top left */
 [data-look='clay'] { --radius: 12px;
@@ -1667,3 +1680,280 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='tiki'] .toggle.on .toggle-track { background: var(--accent); }
 [data-look='tiki'] .theme { border-color: #6a4a20; }
 @media (prefers-reduced-motion: reduce) { [data-look='sakura'] .term-wrap::before, [data-look='magma'] .term-wrap::before, [data-look='shibuya'] .term-wrap::before, [data-look='tiki'] .term-wrap::after { animation: none; } }
+
+/* Lightcycle: a light-cycle arena. Everything drawn in glowing cyan lines on black, the arena's grid on the floor of
+   the sidebar and faintly across the terminals, an orange line for the main button */
+[data-look='lightcycle'] { --radius: 3px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --glow: 0 0 6px rgba(54, 243, 255, 0.6);
+  --grid: linear-gradient(rgba(54, 243, 255, 0.1) 1px, transparent 1px) 0 0 / 100% 28px, linear-gradient(90deg, rgba(54, 243, 255, 0.1) 1px, transparent 1px) 0 0 / 28px 100%; }
+[data-look='lightcycle'] :is(.sidebar, .settings-nav) { border-right: 1px solid #36f3ff; box-shadow: var(--glow); background: linear-gradient(var(--side), var(--side)) top / 100% 72% no-repeat, linear-gradient(180deg, transparent 72%, rgba(54, 243, 255, 0.08)), var(--grid), var(--side); }
+[data-look='lightcycle'] :is(.settings-main h2, .tunnel-head b) { text-transform: uppercase; letter-spacing: 5px; font-weight: 500; color: #d8fbff; text-shadow: 0 0 8px rgba(54, 243, 255, 0.8); }
+[data-look='lightcycle'] .project-head { color: #36f3ff; letter-spacing: 2.5px; text-shadow: var(--glow); }
+[data-look='lightcycle'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(54, 243, 255, 0.55); background: transparent; color: #bff9ff; }
+[data-look='lightcycle'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='lightcycle'] .seg button.on { border-color: #36f3ff; box-shadow: var(--glow), inset var(--glow); }
+[data-look='lightcycle'] button.primary { border: 1px solid #ff9d2e; background: rgba(255, 157, 46, 0.12); color: #ffd9a8; letter-spacing: 1px; box-shadow: 0 0 8px rgba(255, 157, 46, 0.6), inset 0 0 6px rgba(255, 157, 46, 0.3); }
+[data-look='lightcycle'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #0f3a4a; background: #010407; }
+[data-look='lightcycle'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #36f3ff; background: #03080c; box-shadow: 0 0 14px rgba(54, 243, 255, 0.35), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='lightcycle'] .menu-item:hover { background: rgba(54, 243, 255, 0.12); }
+[data-look='lightcycle'] .ws.sel { background: linear-gradient(90deg, rgba(54, 243, 255, 0.2), transparent); border-left-color: #36f3ff; }
+[data-look='lightcycle'] .settings-nav button.on { background: rgba(54, 243, 255, 0.14); color: #d8fbff; box-shadow: inset 2px 0 0 #36f3ff; }
+[data-look='lightcycle'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #36f3ff), 0 6px 10px -8px #36f3ff; }
+[data-look='lightcycle'] .status { border-top-color: #36f3ff; box-shadow: var(--glow); }
+[data-look='lightcycle'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; opacity: 0.35; background: var(--grid); }
+[data-look='lightcycle'] :is(.board-col, .board-card) { border-color: #0f3a4a; }
+[data-look='lightcycle'] button.board-card:hover { border-color: #36f3ff; box-shadow: var(--glow); }
+[data-look='lightcycle'] .toggle.on .toggle-track { background: #36f3ff; box-shadow: var(--glow); }
+[data-look='lightcycle'] .theme { border-color: #0f3a4a; }
+
+/* Phantom: a heist crew's menus. Black, white and one red, slanted slabs, headings in white on black boxes knocked
+   off level with a red shadow, red slashes down the sidebar, halftone dots in the terminals' corner */
+[data-look='phantom'] { --radius: 0px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --slant: polygon(7px 0, 100% 0, calc(100% - 7px) 100%, 0 100%); }
+[data-look='phantom'] :is(.sidebar, .settings-nav) { border-right: 3px solid #ff1a2d; background: repeating-linear-gradient(115deg, transparent 0 26px, rgba(255, 26, 45, 0.08) 26px 30px), var(--side); }
+[data-look='phantom'] :is(.settings-main h2, .tunnel-head b) { width: fit-content; padding: 2px 14px; background: #000; color: #fff; font-family: Futura, 'Arial Black', sans-serif; font-style: italic; font-weight: 800;
+  text-transform: uppercase; letter-spacing: 1px; transform: rotate(-2deg); box-shadow: 4px 4px 0 #ff1a2d; }
+[data-look='phantom'] .project-head { color: #fff; font-family: Futura, 'Arial Black', sans-serif; font-style: italic; font-weight: 800; letter-spacing: 1.5px; text-shadow: 2px 2px 0 #ff1a2d; }
+[data-look='phantom'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: none; background: #1e1e1e; clip-path: var(--slant); font-style: italic; }
+[data-look='phantom'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='phantom'] .seg button.on { background: #f5f5f5; color: #0d0d0d; }
+[data-look='phantom'] button.primary { border: none; background: #ff1a2d; color: #fff; font-style: italic; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; clip-path: var(--slant); }
+[data-look='phantom'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #3a3a3a; background: #080808; }
+[data-look='phantom'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #f5f5f5; background: #0d0d0d; box-shadow: 6px 6px 0 #ff1a2d, 0 20px 50px rgba(0, 0, 0, 0.7); }
+[data-look='phantom'] .menu-item:hover { background: #ff1a2d; color: #fff; }
+[data-look='phantom'] .ws.sel { background: #f5f5f5; color: #0d0d0d; border-left-color: #ff1a2d; font-weight: 700; clip-path: polygon(0 0, 100% 0, calc(100% - 10px) 100%, 0 100%); }
+[data-look='phantom'] .settings-nav button.on { background: #ff1a2d; color: #fff; clip-path: var(--slant); }
+[data-look='phantom'] .tab.sel { box-shadow: inset 0 -3px 0 var(--tab-c, #ff1a2d); font-style: italic; }
+[data-look='phantom'] .status { border-top: 3px solid #ff1a2d; }
+[data-look='phantom'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle, rgba(255, 26, 45, 0.22) 1.3px, transparent 1.7px) 0 0 / 9px 9px; mask-image: radial-gradient(circle at 100% 100%, #000, transparent 32%); }
+[data-look='phantom'] .board-card { border-color: #3a3a3a; }
+[data-look='phantom'] button.board-card:hover { border-color: #ff1a2d; box-shadow: 4px 4px 0 #ff1a2d; }
+[data-look='phantom'] .toggle.on .toggle-track { background: #ff1a2d; }
+[data-look='phantom'] .theme { border-color: #3a3a3a; }
+
+/* Test Chamber: a testing lab. White wall panels on a tile grid, round-cornered and clean, the two portals (blue and
+   orange) before each heading, along the status bar and glowing in the terminals' lower corners */
+[data-look='chamber'] { --radius: 10px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --tiles: linear-gradient(#d9dfe3 1px, transparent 1px) 0 0 / 100% 46px, linear-gradient(90deg, #d9dfe3 1px, transparent 1px) 0 0 / 46px 100%; }
+[data-look='chamber'] :is(.sidebar, .settings-nav) { background: var(--tiles), var(--side); }
+[data-look='chamber'] :is(.settings-main h2, .tunnel-head b) { font-weight: 300; font-size: 22px; letter-spacing: 0.5px; }
+[data-look='chamber'] .settings-main h2::before { content: ''; display: inline-block; width: 15px; height: 15px; margin-right: 10px; vertical-align: -1px; border-radius: 50%;
+  background: linear-gradient(90deg, #1f9bff 0 50%, #ff8a1f 50% 100%); }
+[data-look='chamber'] .project-head { color: var(--fg); letter-spacing: 2px; }
+[data-look='chamber'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); background: #fff; box-shadow: 0 1px 0 var(--line); }
+[data-look='chamber'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='chamber'] .seg button.on { border-color: #1f9bff; color: #1f6fb8; }
+[data-look='chamber'] button.primary { border: none; background: #ff8a1f; color: var(--accent-fg); font-weight: 600; box-shadow: 0 0 0 3px rgba(255, 138, 31, 0.2); }
+[data-look='chamber'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--line); border-radius: 12px; box-shadow: 0 16px 40px rgba(42, 49, 54, 0.16); }
+[data-look='chamber'] .menu-item:hover { background: #dff0fb; }
+[data-look='chamber'] .ws.sel { background: #fff; border-left-color: #1f9bff; box-shadow: inset 0 0 0 1px var(--line); }
+[data-look='chamber'] .settings-nav button.on { background: #fff; box-shadow: inset 0 0 0 1px var(--line); }
+[data-look='chamber'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #1f9bff); }
+[data-look='chamber'] .status { border-top: 3px solid; border-image: linear-gradient(90deg, #1f9bff 0 50%, #ff8a1f 50% 100%) 1; }
+[data-look='chamber'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at 0 100%, rgba(31, 155, 255, 0.1), transparent 28%), radial-gradient(circle at 100% 100%, rgba(255, 138, 31, 0.1), transparent 28%); }
+[data-look='chamber'] :is(.board-col, .board-card) { border-radius: 12px; }
+[data-look='chamber'] .board-col { background: var(--tiles), var(--side); }
+[data-look='chamber'] .toggle.on .toggle-track { background: #1f9bff; }
+
+/* Monolith: the ship's computer. Black and white in wide-spaced Futura, nothing else but its red eye: before each
+   heading (slowly breathing), in the status bar, and on what's selected */
+[data-look='monolith'] { --radius: 0px; --ui-font: Futura, 'Gill Sans', 'Avenir Next', sans-serif;
+  --eye: radial-gradient(circle at 38% 36%, #ffd0c0 0 8%, #ff2a1a 30%, #6a0800 70%, #1a0000 100%); }
+[data-look='monolith'] :is(.sidebar, .settings-nav) { border-right: 1px solid #1a1a1a; }
+[data-look='monolith'] :is(.settings-main h2, .tunnel-head b) { font-weight: 500; text-transform: uppercase; letter-spacing: 6px; color: #fff; }
+[data-look='monolith'] .settings-main h2::before { content: ''; display: inline-block; width: 15px; height: 15px; margin-right: 14px; vertical-align: -1px; border-radius: 50%;
+  background: var(--eye); box-shadow: 0 0 10px rgba(255, 42, 26, 0.7); animation: mono-eye 4s ease-in-out infinite alternate; }
+@keyframes mono-eye { to { box-shadow: 0 0 18px 2px rgba(255, 42, 26, 0.9); } }
+[data-look='monolith'] .project-head { color: #f2f2f2; letter-spacing: 4px; font-weight: 500; }
+[data-look='monolith'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #333; background: #000; text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='monolith'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='monolith'] .seg button.on { border-color: #f2f2f2; color: #fff; }
+[data-look='monolith'] button.primary { border: none; background: #f2f2f2; color: #000; text-transform: uppercase; letter-spacing: 2px; font-weight: 500; }
+[data-look='monolith'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #333; background: #000; }
+[data-look='monolith'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #333; background: #050505; box-shadow: 0 30px 70px rgba(0, 0, 0, 0.9); }
+[data-look='monolith'] .menu-item:hover { background: #1a1a1a; }
+[data-look='monolith'] .ws.sel { background: linear-gradient(90deg, rgba(255, 42, 26, 0.16), transparent 70%); border-left-color: #ff2a1a; color: #fff; }
+[data-look='monolith'] .settings-nav button.on { background: #141414; box-shadow: inset 2px 0 0 #ff2a1a; }
+[data-look='monolith'] .tab.sel { box-shadow: inset 0 -1px 0 var(--tab-c, #ff2a1a); }
+[data-look='monolith'] .status { border-top-color: #1a1a1a; background: #000; }
+[data-look='monolith'] .status::after { content: ''; flex: none; order: 99; width: 9px; height: 9px; border-radius: 50%; background: var(--eye); box-shadow: 0 0 7px rgba(255, 42, 26, 0.8); }
+[data-look='monolith'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 120%, rgba(255, 42, 26, 0.07), transparent 60%); }
+[data-look='monolith'] :is(.board-col, .board-card) { border-color: #262626; }
+[data-look='monolith'] .toggle.on .toggle-track { background: #ff2a1a; }
+[data-look='monolith'] .theme { border-color: #262626; }
+
+/* Macrodata: a severed office's terminal. Deep sea-blue and pale cyan, softly glowing type, rounded boxes, the
+   terminals curved like an old monitor's glass with a dark edge */
+[data-look='macrodata'] { --radius: 6px; --ui-font: 'Helvetica Neue', 'Avenir Next', sans-serif; --bloom: 0 0 10px rgba(127, 224, 255, 0.45); }
+[data-look='macrodata'] :is(.sidebar, .settings-nav) { border-right: 1px solid var(--line); background: linear-gradient(180deg, #0a2232, #05121b); }
+[data-look='macrodata'] :is(.settings-main h2, .tunnel-head b) { font-weight: 500; letter-spacing: 1px; color: #c8f1ff; text-shadow: var(--bloom); }
+[data-look='macrodata'] .settings-main h2::after { content: ''; display: inline-block; width: 22px; height: 12px; margin-left: 12px; vertical-align: 1px; border: 2px solid #7fe0ff; border-top-width: 5px; border-radius: 3px; opacity: 0.7; }
+[data-look='macrodata'] .project-head { color: #7fe0ff; letter-spacing: 2px; text-shadow: var(--bloom); }
+[data-look='macrodata'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2a5068; background: #0a1e2b; }
+[data-look='macrodata'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='macrodata'] .seg button.on { border-color: #7fe0ff; color: #e6faff; text-shadow: var(--bloom); }
+[data-look='macrodata'] button.primary { border: none; background: #c8f1ff; color: #04121a; font-weight: 600; box-shadow: var(--bloom); }
+[data-look='macrodata'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #2a5068; background: #05121b; }
+[data-look='macrodata'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #2a5068; border-radius: 10px; box-shadow: 0 0 24px rgba(127, 224, 255, 0.12), 0 20px 50px rgba(0, 0, 0, 0.6); }
+[data-look='macrodata'] .menu-item:hover { background: #10324a; }
+[data-look='macrodata'] .ws.sel { background: #10324a; border-left-color: #7fe0ff; border-radius: 0 6px 6px 0; }
+[data-look='macrodata'] .settings-nav button.on { background: #10324a; color: #e6faff; }
+[data-look='macrodata'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #7fe0ff); }
+[data-look='macrodata'] .status { background: #05121b; }
+[data-look='macrodata'] .term-wrap { border-radius: 16px; overflow: hidden; }
+[data-look='macrodata'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; border-radius: 16px;
+  background: radial-gradient(ellipse 80% 70% at 50% 45%, transparent 62%, rgba(0, 0, 0, 0.45) 100%); box-shadow: inset 0 0 30px rgba(127, 224, 255, 0.08); }
+[data-look='macrodata'] :is(.board-col, .board-card) { border-color: #2a5068; border-radius: 8px; }
+[data-look='macrodata'] .toggle.on .toggle-track { background: #7fe0ff; }
+[data-look='macrodata'] .theme { border-color: #2a5068; }
+
+/* Redline: a racing game's HUD. Carbon fibre, condensed italic capitals, red racing stripes after the headings, shift
+   lights (green, yellow, red) along the top of the status bar, a rev counter's red arc in the terminals' corner */
+[data-look='redline'] { --radius: 2px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --race: 'Avenir Next Condensed', 'DIN Condensed', 'Helvetica Neue', sans-serif;
+  --carbon: repeating-linear-gradient(45deg, rgba(255, 255, 255, 0.025) 0 3px, transparent 3px 6px), repeating-linear-gradient(-45deg, rgba(0, 0, 0, 0.35) 0 3px, transparent 3px 6px); }
+[data-look='redline'] :is(.sidebar, .settings-nav) { border-right: 2px solid #ff2b2b; background: var(--carbon), var(--side); }
+[data-look='redline'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--race); font-style: italic; font-weight: 800; font-size: 24px; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='redline'] .settings-main h2::after { content: ''; display: inline-block; width: 54px; height: 11px; margin-left: 12px; vertical-align: 2px; background: repeating-linear-gradient(115deg, #ff2b2b 0 6px, transparent 6px 11px); }
+[data-look='redline'] .project-head { font-family: var(--race); font-style: italic; font-weight: 700; font-size: 12px; letter-spacing: 1px; color: #fff; }
+[data-look='redline'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid var(--line); border-bottom: 2px solid #ff2b2b; background: var(--carbon), #16161a; font-style: italic; }
+[data-look='redline'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='redline'] .seg button.on { background: #2a1214; color: #fff; }
+[data-look='redline'] button.primary { border: none; background: linear-gradient(180deg, #ff4a4a, #c80000); color: #fff; font-family: var(--race); font-style: italic; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; }
+[data-look='redline'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: var(--line); background: #08080a; }
+[data-look='redline'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--line); border-top: 2px solid #ff2b2b; background: var(--carbon), var(--panel); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75); }
+[data-look='redline'] .menu-item:hover { background: #2a1214; }
+[data-look='redline'] .ws.sel { background: linear-gradient(90deg, rgba(255, 43, 43, 0.3), transparent); border-left-color: #ff2b2b; font-style: italic; }
+[data-look='redline'] .settings-nav button.on { background: linear-gradient(90deg, rgba(255, 43, 43, 0.3), transparent); color: #fff; }
+[data-look='redline'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #ff2b2b); font-style: italic; }
+[data-look='redline'] .status { border-top: none; background: repeating-linear-gradient(90deg, transparent 0 16px, #08080a 16px 19px) top / 100% 3px no-repeat,
+  linear-gradient(90deg, #4cff7a 0 45%, #ffcc00 45% 75%, #ff2b2b 75%) top / 100% 3px no-repeat, var(--carbon), var(--side); padding-top: 3px; }
+[data-look='redline'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: radial-gradient(circle at 100% 100%, transparent 0 74px, rgba(255, 43, 43, 0.22) 75px 78px, transparent 79px); }
+[data-look='redline'] .board-card { border-bottom: 2px solid #ff2b2b; }
+[data-look='redline'] .toggle.on .toggle-track { background: #ff2b2b; }
+[data-look='redline'] .theme { border-color: var(--line); }
+
+/* Mission Control: a 1969 control room. Grey-green consoles in brushed metal, engraved label plates for the projects
+   and headings, push buttons, an amber lamp for the main one and beside what's selected, riveted popups, CRT lines */
+[data-look='mission'] { --radius: 3px; --ui-font: 'Helvetica Neue', Helvetica, sans-serif;
+  --metal: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.018) 0 1px, transparent 1px 3px), linear-gradient(180deg, #283028, #1e231e);
+  --rivet: #6a7464; }
+[data-look='mission'] :is(.sidebar, .settings-nav) { border-right: 3px ridge #3d453b; background: var(--metal); }
+[data-look='mission'] :is(.settings-main h2, .tunnel-head b) { width: fit-content; padding: 3px 12px; font-size: 14px; font-weight: 600; text-transform: uppercase; letter-spacing: 3px;
+  background: #10130f; border: 1px solid #4a5446; border-radius: 2px; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6); }
+[data-look='mission'] .project-head { margin: 4px 8px 2px; padding-left: 14px; color: #e8eadf; letter-spacing: 2px; background: #10130f; border: 1px solid #4a5446; border-radius: 2px; box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.6); }
+[data-look='mission'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #11140f; background: linear-gradient(180deg, #3a4238, #2a3028); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 1px 0 #000; }
+[data-look='mission'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='mission'] .seg button.on { background: linear-gradient(180deg, #2a3028, #3a4238); color: #ffd27a; }
+[data-look='mission'] button.primary { border: 1px solid #7a5000; background: radial-gradient(circle at 50% 30%, #ffe08a, #ffb000 60%, #c07a00); color: #1b1f1c; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 10px rgba(255, 176, 0, 0.45); }
+[data-look='mission'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a5446; background: #10130f; }
+[data-look='mission'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #4a5446; box-shadow: inset 0 0 0 1px #10130f, 0 18px 40px rgba(0, 0, 0, 0.6);
+  background: radial-gradient(circle at 7px 7px, var(--rivet) 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) 7px, var(--rivet) 0 2px, transparent 2.5px),
+    radial-gradient(circle at 7px calc(100% - 7px), var(--rivet) 0 2px, transparent 2.5px), radial-gradient(circle at calc(100% - 7px) calc(100% - 7px), var(--rivet) 0 2px, transparent 2.5px), var(--panel); }
+[data-look='mission'] .menu-item:hover { background: #353d33; }
+[data-look='mission'] .ws.sel { background: #2f382d; border-left-color: #ffb000; }
+[data-look='mission'] .ws.sel::after { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: #ffb000; box-shadow: 0 0 6px #ffb000; }
+[data-look='mission'] .settings-nav button.on { background: #10130f; color: #ffd27a; }
+[data-look='mission'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, #ffb000); }
+[data-look='mission'] .status { background: #10130f; border-top: 2px solid #3d453b; }
+[data-look='mission'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgba(0, 0, 0, 0.12) 0 1px, transparent 1px 3px), radial-gradient(ellipse at center, transparent 60%, rgba(0, 0, 0, 0.35)); }
+[data-look='mission'] :is(.board-col, .board-card) { border-color: #4a5446; }
+[data-look='mission'] .board-card { background: #10130f; }
+[data-look='mission'] .toggle.on .toggle-track { background: #ffb000; }
+[data-look='mission'] .theme { border-color: #4a5446; }
+
+/* Grimoire: a dungeon game's inventory. Dark leather, gold frames with a second line around the popups, the titles in
+   Luminari after a ❖, buttons like worn plates, inventory-slot cards, candlelight at the terminals' edges */
+[data-look='grimoire'] { --radius: 3px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --rune: Luminari, Trattatello, Papyrus, fantasy; --gold: #d4a64a;
+  --leather: radial-gradient(ellipse at 30% 20%, rgba(212, 166, 74, 0.06), transparent 60%), repeating-radial-gradient(circle at 0 0, rgba(0, 0, 0, 0.1) 0 1px, transparent 1px 3px); }
+[data-look='grimoire'] :is(.sidebar, .settings-nav) { border-right: 2px solid #6a4e22; box-shadow: inset -1px 0 0 rgba(212, 166, 74, 0.3); background: var(--leather), var(--side); }
+[data-look='grimoire'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--rune); font-size: 22px; font-weight: 400; color: var(--gold); text-shadow: 0 1px 0 #000, 0 0 12px rgba(212, 166, 74, 0.35); }
+[data-look='grimoire'] .settings-main h2::before { content: '\2756  '; font-size: 16px; }
+[data-look='grimoire'] .project-head { font-family: var(--rune); font-size: 13px; text-transform: none; letter-spacing: 1px; color: var(--gold); }
+[data-look='grimoire'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #6a4e22; background: linear-gradient(180deg, #2e2216, #1c1510); box-shadow: inset 0 1px 0 rgba(212, 166, 74, 0.15); }
+[data-look='grimoire'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='grimoire'] .seg button.on { border-color: var(--gold); color: #ffe9b0; }
+[data-look='grimoire'] button.primary { border: 1px solid #6a4e22; background: linear-gradient(180deg, #e8c06a, #b8862e); color: #140f0b; font-weight: 700; box-shadow: 0 0 0 1px #3a2a14, 0 0 12px rgba(212, 166, 74, 0.35); }
+[data-look='grimoire'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #6a4e22; background: #0f0b08; }
+[data-look='grimoire'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--gold); outline: 1px solid #6a4e22; outline-offset: 3px; background: var(--leather), var(--panel); box-shadow: 0 20px 50px rgba(0, 0, 0, 0.75); }
+[data-look='grimoire'] .menu-item:hover { background: rgba(212, 166, 74, 0.16); color: #ffe9b0; }
+[data-look='grimoire'] .ws.sel { background: linear-gradient(90deg, rgba(212, 166, 74, 0.24), transparent); border-left-color: var(--gold); color: #ffe9b0; }
+[data-look='grimoire'] .settings-nav button.on { background: rgba(212, 166, 74, 0.18); color: #ffe9b0; }
+[data-look='grimoire'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--gold)); }
+[data-look='grimoire'] .status { border-top: 2px solid #6a4e22; box-shadow: inset 0 1px 0 rgba(212, 166, 74, 0.3); }
+[data-look='grimoire'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at center, transparent 58%, rgba(0, 0, 0, 0.4)); }
+[data-look='grimoire'] .board-card { border-color: #6a4e22; box-shadow: inset 0 0 14px rgba(0, 0, 0, 0.6); }
+[data-look='grimoire'] button.board-card:hover { border-color: var(--gold); }
+[data-look='grimoire'] .toggle.on .toggle-track { background: var(--gold); }
+[data-look='grimoire'] .theme { border-color: #6a4e22; }
+
+/* Cockpit: a starship's flight HUD. Orange holographic lines on black, a dot grid on the sidebar, target brackets in
+   the corners of the popups, cards and terminals, cut corners on the buttons */
+[data-look='cockpit'] { --radius: 0px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --hud: #ff8c1a; --cut: polygon(7px 0, 100% 0, 100% 100%, 0 100%, 0 7px);
+  --brackets: linear-gradient(var(--hud), var(--hud)) 0 0 / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 0 0 / 2px 12px no-repeat,
+    linear-gradient(var(--hud), var(--hud)) 100% 0 / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 100% 0 / 2px 12px no-repeat,
+    linear-gradient(var(--hud), var(--hud)) 0 100% / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 0 100% / 2px 12px no-repeat,
+    linear-gradient(var(--hud), var(--hud)) 100% 100% / 12px 2px no-repeat, linear-gradient(var(--hud), var(--hud)) 100% 100% / 2px 12px no-repeat; }
+[data-look='cockpit'] :is(.sidebar, .settings-nav) { border-right: 1px solid rgba(255, 140, 26, 0.5); background: radial-gradient(rgba(255, 140, 26, 0.13) 1px, transparent 1.5px) 0 0 / 11px 11px, var(--side); }
+[data-look='cockpit'] :is(.settings-main h2, .tunnel-head b) { text-transform: uppercase; letter-spacing: 3px; font-weight: 600; color: #ffb35a; text-shadow: 0 0 8px rgba(255, 140, 26, 0.6); }
+[data-look='cockpit'] .settings-main h2::before { content: '\25C6  '; color: var(--hud); }
+[data-look='cockpit'] .project-head { color: var(--hud); letter-spacing: 2px; }
+[data-look='cockpit'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(255, 140, 26, 0.45); background: rgba(255, 140, 26, 0.06); clip-path: var(--cut); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='cockpit'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='cockpit'] .seg button.on { background: rgba(255, 140, 26, 0.2); color: #fff2e0; }
+[data-look='cockpit'] button.primary { border: none; background: rgba(255, 140, 26, 0.9); color: #05070a; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; clip-path: var(--cut); }
+[data-look='cockpit'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: rgba(255, 140, 26, 0.35); background: #040508; }
+[data-look='cockpit'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(255, 140, 26, 0.3); background: var(--brackets), #080b10; box-shadow: 0 0 18px rgba(255, 140, 26, 0.15), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='cockpit'] .menu-item:hover { background: rgba(255, 140, 26, 0.16); }
+[data-look='cockpit'] .ws.sel { background: linear-gradient(90deg, rgba(255, 140, 26, 0.24), transparent); border-left-color: var(--hud); }
+[data-look='cockpit'] .settings-nav button.on { background: rgba(255, 140, 26, 0.16); color: #fff2e0; }
+[data-look='cockpit'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--hud)); }
+[data-look='cockpit'] .status { border-top-color: rgba(255, 140, 26, 0.45); background: linear-gradient(180deg, rgba(255, 140, 26, 0.06), transparent), var(--side); }
+[data-look='cockpit'] .term-wrap::after { content: ''; position: absolute; inset: 6px; z-index: 2; pointer-events: none; opacity: 0.45; background: var(--brackets); }
+[data-look='cockpit'] .board-card { border-color: rgba(255, 140, 26, 0.25); background: var(--brackets), var(--panel); }
+[data-look='cockpit'] .toggle.on .toggle-track { background: var(--hud); }
+[data-look='cockpit'] .theme { border-color: rgba(255, 140, 26, 0.3); }
+
+/* Islander: an island's phone app. Cream and leaf green, sand dots on the sidebar, round fat buttons that sit on a
+   lip, the projects as pill tags, a leaf before the headings, popups like rounded speech panels */
+[data-look='islander'] { --radius: 14px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --round: 'Arial Rounded MT Bold', 'Avenir Next', sans-serif; }
+[data-look='islander'] :is(.sidebar, .settings-nav) { border-right: none; background: radial-gradient(rgba(154, 134, 104, 0.2) 1px, transparent 1.6px) 0 0 / 14px 14px, var(--side); }
+[data-look='islander'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--round); font-size: 20px; font-weight: 400; color: #5a4632; }
+[data-look='islander'] .settings-main h2::before { content: ''; display: inline-block; width: 14px; height: 14px; margin-right: 10px; vertical-align: -1px; border-radius: 0 70% 0 70%; background: #3cb88a; box-shadow: inset -2px 2px 0 rgba(255, 255, 255, 0.35); }
+[data-look='islander'] .project-head { margin: 6px 8px 2px; font-family: var(--round); font-weight: 400; text-transform: none; font-size: 12.5px; letter-spacing: 0.3px; color: #7a5a3a; background: #efe4c4; border-radius: 999px; box-shadow: 0 2px 0 #e2d3a8; }
+[data-look='islander'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: none; border-radius: 999px; background: #efe4c4; box-shadow: 0 2px 0 #d8c89a; color: #5a4632; font-weight: 600; }
+[data-look='islander'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='islander'] .seg button.on { background: #dff3e2; color: #2a6a4e; }
+[data-look='islander'] button.primary { border: none; border-radius: 999px; background: #3cb88a; color: var(--accent-fg); font-weight: 700; box-shadow: 0 3px 0 #2a8a66; }
+[data-look='islander'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid #e2d3a8; border-radius: 12px; background: #fffdf6; }
+[data-look='islander'] :is(.menu, .modal, .tunnel-pop, .toast) { border: none; border-radius: 18px; background: #fffaf0; box-shadow: 0 3px 0 #e2d3a8, 0 16px 36px rgba(90, 70, 50, 0.18); }
+[data-look='islander'] .menu-item { border-radius: 10px; }
+[data-look='islander'] .menu-item:hover { background: #dff3e2; }
+[data-look='islander'] .ws.sel { margin: 1px 8px 1px 0; border-left-color: transparent; border-radius: 12px; background: #dff3e2; color: #2a6a4e; font-weight: 600; }
+[data-look='islander'] .settings-nav button.on { border-radius: 12px; background: #dff3e2; color: #2a6a4e; }
+[data-look='islander'] .tab { border-radius: 12px 12px 0 0; }
+[data-look='islander'] .tab.sel { box-shadow: inset 0 -3px 0 var(--tab-c, #3cb88a); }
+[data-look='islander'] .status { border-top: 2px dashed #e2d3a8; }
+[data-look='islander'] .board-col { border: none; border-radius: 18px; }
+[data-look='islander'] .board-card { border: none; border-radius: 14px; box-shadow: 0 2px 0 #e2d3a8; }
+[data-look='islander'] .toggle.on .toggle-track { background: #3cb88a; }
+[data-look='islander'] .theme { border-radius: 14px; }
+@media (prefers-reduced-motion: reduce) { [data-look='monolith'] .settings-main h2::before { animation: none; } }
+
+/* each look's sidebar: the guide line under a project (--ws-guide), the line between projects (--proj-divider), the
+   indent (--ws-indent) and the row height (--ws-h); unset: a thin line, 11px, 26px. Settings › Appearance › The
+   sidebar sets them nearer, on .sidebar */
+:is([data-look='luna'], [data-look='starship']) { --ws-guide: none; --ws-indent: 0px; --proj-divider: none; } /* cards, pills */
+:is([data-look='bubble'], [data-look='clay'], [data-look='groovy']) { --ws-guide: none; --ws-indent: 4px; --proj-divider: none; }
+:is([data-look='brutal']) { --ws-guide: 2px solid var(--fg); --proj-divider: 2px solid var(--fg); }
+[data-look='comic'] { --ws-guide: 2px solid var(--ink); --proj-divider: 2px solid var(--ink); }
+[data-look='pocket'] { --ws-guide: 2px solid var(--ink); --proj-divider: none; }
+[data-look='notebook'] { --ws-guide: none; --ws-indent: 12px; } /* the page's red margin is the line */
+:is([data-look='blueprint'], [data-look='kraft']) { --ws-guide: 1px dashed color-mix(in srgb, var(--fg) 35%, transparent); --proj-divider: 1px dashed color-mix(in srgb, var(--fg) 25%, transparent); }
+[data-look='denim'] { --ws-guide: 2px dashed var(--stitch); --proj-divider: 1px dashed var(--stitch); }
+[data-look='receipt'] { --ws-guide: none; --proj-divider: 1px dashed var(--muted); --ws-h: 22px; }
+:is([data-look='greenbar'], [data-look='zeroday']) { --ws-h: 22px; }
+[data-look='gazette'] { --ws-guide: none; --ws-indent: 0px; --proj-divider: 3px double color-mix(in srgb, var(--fg) 40%, transparent); }
+[data-look='deco'] { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); --proj-divider: 3px double color-mix(in srgb, var(--accent) 50%, transparent); }
+[data-look='classic'] { --ws-guide: 1px dotted #808080; --proj-divider: none; } /* a tree view's dotted lines */
+:is([data-look='circuit'], [data-look='topo'], [data-look='cosmos']) { --ws-guide: 1px dotted color-mix(in srgb, var(--accent) 70%, transparent); }
+:is([data-look='neon'], [data-look='cyber'], [data-look='outrun'], [data-look='lightcycle'], [data-look='sonar'], [data-look='glitch'], [data-look='abyss'], [data-look='holo'])
+  { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 55%, transparent); --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
+[data-look='washi'] { --ws-guide: none; --ws-indent: 16px; --proj-divider: none; }
+[data-look='mission'] { --ws-guide: 2px solid #4a5446; --proj-divider: none; } /* the heads are panels already */
+[data-look='grimoire'] { --ws-guide: 1px solid color-mix(in srgb, var(--gold) 45%, transparent); --proj-divider: 1px solid #6a4e22; }
+[data-look='cockpit'] { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); --ws-indent: 14px; }
+[data-look='chamber'] { --ws-guide: 2px solid #1f9bff; }
+:is([data-look='monolith'], [data-look='islander']) { --ws-guide: none; --proj-divider: none; --ws-h: 30px; } /* bare, roomy */

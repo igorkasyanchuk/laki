@@ -5,14 +5,16 @@ import { Glyph } from './Glyph'
 import { Icon, Page } from './ui'
 
 const KEYS: [string, string][] = [
-  ['⌘O', 'open a project folder (or drop one on the window), then a new workspace in it'],
+  ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
   ['⌘N', 'new workspace'],
   ['⌘T / ⌘W', 'new shell tab / close the tab (or the file preview)'],
   ['⌘1…⌘9', 'go to a tab'],
   ['⌘↑ / ⌘↓', 'previous / next workspace'],
+  ['⌘J', 'the next tab that needs you, in any workspace'],
   ['⌘K', 'the palette: every workspace, tab and action'],
   ['⌘P', 'find a file in the workspace'],
   ['⌘F', 'find in the terminal'],
+  ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt"],
   ['⌘D', 'changes against the base branch'],
   ['⌥⌘B', 'side panel: files, changes, review, preview'],
   ['⌘I', 'workspace info: PR, checks, what each agent said last'],
@@ -44,7 +46,10 @@ const Row = ({ k, children }: { k: ReactNode; children: ReactNode }) => (
 export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; onClose: () => void }) {
   const cmds: [string, string][] = [
     [`${cli} ls`, 'projects, workspaces and tabs, with their status (--json for scripts)'],
-    [`${cli} new <project> --prompt "fix the login"`, 'a workspace with an agent (--preset codex|shell, --base, --name, --local)'],
+    [`${cli} new <project> --prompt "fix the login"`, 'a workspace with an agent (--preset codex|shell, --model, --effort, --base, --name, --local)'],
+    [`${cli} new <project> --issue <url>`, 'a workspace on a GitHub issue: its title and text are the prompt'],
+    [`${cli} new <project> --fan claude,codex --prompt "…"`, 'a race: the same prompt to each agent, a worktree each; Compare them in the app'],
+    [`${cli} browser <ws> open /login · screenshot · click "<css>" · fill "<css>" "text" · text`, 'the agent browser: the dev server in a hidden window of the app'],
     [`${cli} send <ws>[/<tab>] "run the tests"`, 'type into an agent now; --when-idle waits for its turn to end'],
     [`${cli} screen <ws>[/<tab>]`, 'the bottom of a tab’s screen'],
     [`${cli} tab <ws> --preset codex`, 'a new tab (a shell by default)'],
@@ -89,7 +94,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
         <section>
           <h2>Start</h2>
           <ol>
-            <li>Open a project: ⌘O, the folder icon at the top of the sidebar, or drop a folder on the window.</li>
+            <li>Open a project: ⌘O, the folder icon at the top of the sidebar, or drop a folder on the sidebar.</li>
             <li>New workspace (⌘N): a git worktree and branch of its own (or the repo itself, with Local), an agent and a first prompt.</li>
             <li>Watch the sidebar: each workspace shows its most urgent tab. Click one to step in; ⌘K jumps anywhere.</li>
             <li>When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.</li>
@@ -114,18 +119,20 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
         </section>
         <section>
           <h2>Around the window</h2>
-          <Row k="Tabs">Drag a tab onto a pane to split it; double click to rename; right click for colors, split, restart.</Row>
+          <Row k="Tabs">Drag a tab onto a pane to split it; double click to rename; right click for colors, split, restart, Mark as unread. Drop files on a terminal to type their paths.</Row>
+          <Row k="Asks">An agent's numbered choices (a permission prompt) show as buttons under its terminal; a permission prompt's notification has Allow and Deny.</Row>
+          <Row k={<Icon name="race" />}>A race: the new workspace page's Race adds agents that each get a worktree on the same prompt. Compare (the workspace's menu, ⌘K) puts them side by side; Keep this one archives the rest.</Row>
           <Row k="▷ Run">The project’s run script in a dev tab, with $PORT; ■ stops it.</Row>
           <Row k="Status bar">
             The plan-limits ring (the 5-hour limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT
-            (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review switches. <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in
+            (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review / fix conflicts switches. <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in
             progress is cut off).
           </Row>
           <Row k={<Icon name="globe" />}>
             Expose to the world: next to a port, a public trycloudflare.com link with a QR code for your phone, optionally only for some email addresses.
             Needs cloudflared (<code>brew install cloudflared</code>).
           </Row>
-          <Row k="Sidebar">Click a project to fold its workspaces away; right click a workspace to rename, color, fork or archive it; drag to reorder. GitHub's mark: the workspace has a PR (red: failing checks).</Row>
+          <Row k="Sidebar">Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag to reorder. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts). Archiving a clean workspace is at once, with Undo.</Row>
           <Row k="Templates">
             Settings › Prompt templates, and each project's own: a prompt with <code>{'{{prompt}}'}</code> in it (and <code>{'{{project}}'}</code>, <code>{'{{base}}'}</code>). Pick one
             under a new workspace's prompt: the agent gets it filled in.
@@ -134,15 +141,15 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
             Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in.
           </Row>
           <Row k="Agents">The new workspace page picks the agent's model and effort. The Dock icon counts tabs that need you or finished unseen. Settings › General › Turn timers: how long each turn has gone.</Row>
-          <Row k="Board">The columns icon at the top of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.</Row>
+          <Row k="Board">The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.</Row>
           <Row k="Scheduled">
-            The clock at the top of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a
+            The clock at the bottom of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a
             new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {'{{DD-MM-YY}}'} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.
           </Row>
-          <Row k="Look">Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow) and the interface font.</Row>
-          <Row k="Files">The side panel's preview colors code up to 50 KB; right-click a file to open it in a browser or another app. The status bar's path has a copy button.</Row>
+          <Row k="Look">Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow), the interface font, how project names look and the sidebar's lines, rows and button labels. Settings › General exports every setting to a file, to import on another Mac.</Row>
+          <Row k="Files">The side panel's preview colors code up to 50 KB and shows Markdown rendered or raw; right-click a file to open it in a browser or another app. The status bar's path has a copy button.</Row>
           <Row k="Changes">Click a line of a diff to comment on it: on the PR (GitHub), or to the agent.</Row>
-          <Row k="Preview">The toolbar's globe opens the side panel's Preview at localhost:$PORT (the menu has the other listening ports); the camera sends a screenshot to the agent; the crosshair puts a clicked element's CSS selector in its prompt.</Row>
+          <Row k="Preview">The toolbar's globe opens the side panel's Preview at localhost:$PORT (the menu has the other listening ports); the camera sends a screenshot to the agent; the crosshair puts a clicked element's selector, HTML, CSS and a screenshot of it in its prompt.</Row>
           <Row k="Links">
             <code>laki://ws/&lt;id&gt;</code> opens a workspace (a workspace's or tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one,
             <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://board</code>, <code>laki://help</code>, <code>laki://about</code> open pages.

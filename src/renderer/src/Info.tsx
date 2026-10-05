@@ -17,6 +17,7 @@ export type PRInfo = {
   author?: string
   draft?: boolean
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
+  conflict?: boolean // merge conflicts with its base branch
   additions?: number
   deletions?: number
   body?: string
@@ -35,12 +36,14 @@ export type WsInfo = {
   pr?: PRInfo
   autoFix?: boolean
   autoReview?: boolean
+  autoMerge?: boolean
   fixTries?: number // failing CI sent this many times in a row for the current PR
   tunnels?: Tunnel[] // ports exposed to the world
   agents: { id: string; name: string; glyph: string; last?: string }[]
 }
-export type AutoKey = 'autoFix' | 'autoReview'
-const MAX_CI_FIXES = 3 // the daemon's: failing CI goes to the agent this many times in a row
+export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge'
+export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
+const MAX_FIXES = 3 // the daemon's: failing CI or conflicts go to the agent this many times in a row
 
 // CI in a few characters: ✓ 5/5, ✗ 2 failing, … 3 running
 export function ciText(pr: PRInfo) {
@@ -66,11 +69,14 @@ const ago = (t?: string | number) => {
 export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
   return (
     <>
-      <Switch on={w.autoFix} tip={`Failing CI goes to the agent, once per commit (${MAX_CI_FIXES} tries in a row)`} onChange={v => onToggle('autoFix', v)}>
+      <Switch on={w.autoFix} tip={`Failing CI goes to the agent, once per commit (${MAX_FIXES} tries in a row)`} onChange={v => onToggle('autoFix', v)}>
         fix CI
       </Switch>
       <Switch on={w.autoReview} tip="New review comments on the PR go to the agent" onChange={v => onToggle('autoReview', v)}>
         review
+      </Switch>
+      <Switch on={w.autoMerge} tip={`Merge conflicts with the base branch go to the agent: it merges the base in and pushes (${MAX_FIXES} tries in a row)`} onChange={v => onToggle('autoMerge', v)}>
+        fix conflicts
       </Switch>
     </>
   )
@@ -90,6 +96,11 @@ export function PRStatus({ w, onOpen, onToggle }: { w: WsInfo; onOpen: (url: str
           <button className={`pr pr-${pr.checks || 'none'}`} data-tip="Checks on GitHub" onClick={() => onOpen(`${pr.url}/checks`)}>
             {ciText(pr)}
           </button>
+          {pr.conflict && (
+            <button className="pr pr-conflict" data-tip="Merge conflicts with its base branch: merge or rebase it" onClick={() => onOpen(pr.url)}>
+              ⚠ conflicts
+            </button>
+          )}
           <AutoToggles w={w} onToggle={onToggle} />
         </>
       )}
@@ -107,7 +118,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
 }
 
 // the PR: title, state, checks, the auto switches and what to send the agent (info panel, side panel)
-export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: 'ci' | 'review') => void }) {
+export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void }) {
   const pr = w.pr
   return (
     <section>
@@ -124,6 +135,7 @@ export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (
           <div className="info-tags">
             <span className={`tag tag-${prState(pr)}`}>{prState(pr)}</span>
             {pr.review && <span className={`tag tag-${pr.review.toLowerCase()}`}>{REVIEW[pr.review] ?? pr.review.toLowerCase()}</span>}
+            {pr.conflict && pr.state === 'OPEN' && <span className="tag tag-conflict">merge conflicts</span>}
             {pr.author && <span className="muted">by {pr.author}</span>}
             {!!(pr.additions || pr.deletions) && (
               <span className="mono small">
@@ -145,13 +157,16 @@ export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (
               </div>
               <div className="info-auto">
                 <AutoToggles w={w} onToggle={onToggle} />
-                {w.autoFix && (w.fixTries ?? 0) > MAX_CI_FIXES && <span className="warn small">gave up after {MAX_CI_FIXES} fixes; push to try again</span>}
+                {w.autoFix && (w.fixTries ?? 0) > MAX_FIXES && <span className="warn small">gave up after {MAX_FIXES} fixes; push to try again</span>}
               </div>
               <div className="row">
                 <button onClick={() => onFix('ci')} disabled={pr.checks !== 'fail'}>
                   Send failing CI to the agent
                 </button>
                 <button onClick={() => onFix('review')}>Send review comments</button>
+                <button onClick={() => onFix('conflict')} disabled={!pr.conflict}>
+                  Send merge conflicts
+                </button>
               </div>
             </>
           )}
@@ -167,7 +182,7 @@ export function InfoPanel(p: {
   onClose: () => void
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
-  onFix: (what: 'ci' | 'review') => void
+  onFix: (what: FixWhat) => void
   onRename: () => void
   onAgent: (tab: string) => void
   onCopy: (text: string) => void

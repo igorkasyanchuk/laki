@@ -93,8 +93,9 @@ test('cli: every command, as text', async t => {
   await rig.cli('project', 'add', plain)
   r = await rig.cli('project')
   assert.match(r.out, /^repo {2}\S+\/repo\nnotes {2}\S+\/notes\n$/)
-  r = await rig.cli('new', 'repo', '--name', 'one', 'first', 'task')
+  r = await rig.cli('new', 'repo', '--name', 'one', '--model', 'opus', '--effort', 'high', 'first', 'task')
   assert.match(r.out, /^one {2}\S+\/one {2}\(branch laki\/one, PORT 3100\)\n$/)
+  assert.deepEqual([(await rig.tab('one')).model, (await rig.tab('one')).effort], ['opus', 'high'])
   const path = r.out.split('  ')[1]
   r = await rig.cli('new', 'notes', '--preset', 'none')
   assert.match(r.out, /^notes {2}\S+\/notes {2}\(folder, PORT 3110\)\n$/)
@@ -186,6 +187,27 @@ test('cli: schedule add, ls, run, log, off, rm; the defaults a new one takes', a
   assert.match(r.err, /usage: laki schedule/)
 })
 
+test('cli: new --fan, --issue, browser', async t => {
+  const rig = await fresh(t)
+  const proj = JSON.parse((await rig.cli('project', 'add', rig.repo, '--json')).out)
+  let r = await rig.cli('new', proj.id, '--fan', 'claude,codex', '--name', 'race', 'make', 'it', 'fast')
+  assert.equal(r.code, 0, r.err)
+  assert.match(r.out, /^race-claude .*\nrace-codex /)
+  mkdirSync(join(rig.home, 'gh'), { recursive: true })
+  writeFileSync(join(rig.home, 'gh', 'issue.json'), JSON.stringify({ number: 12, title: 'Dark mode', url: 'https://github.com/o/r/issues/12' }))
+  r = await rig.cli('new', proj.id, '--issue', '12', '--preset', 'shell')
+  assert.equal(r.code, 0, r.err)
+  assert.match(r.out, /^issue-12-dark-mode /)
+  r = await rig.cli('browser', 'race-claude', 'text')
+  assert.equal(r.code, 1)
+  assert.match(r.err, /needs Laki's window/)
+  rig.env.LAKI_WORKSPACE = 'race-codex' // in a tab: its workspace
+  r = await rig.cli('browser', 'open', 'https://example.com')
+  assert.match(r.err, /localhost only/)
+  r = await rig.cli('browser', 'race-codex', 'nope')
+  assert.match(r.err, /usage: laki browser/)
+})
+
 test('laki mcp: initialize, tools, a call, errors', async t => {
   const rig = await fresh(t)
   const proj = JSON.parse((await rig.cli('project', 'add', rig.repo, '--json')).out)
@@ -204,7 +226,7 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
   assert.equal(got[1].result.protocolVersion, '2025-03-26')
   assert.equal(got[1].result.serverInfo.name, 'laki')
   const names = got[2].result.tools.map((t: any) => t.name)
-  assert.ok(names.includes('laki_state') && names.includes('laki_send'))
+  assert.ok(names.includes('laki_state') && names.includes('laki_send') && names.includes('laki_browser'))
   assert.ok(!names.some((n: string) => /rm|archive|ship/.test(n)))
   assert.ok(!got[3].result.isError, got[3].result.content[0].text)
   assert.equal(JSON.parse(got[3].result.content[0].text).id, 'mcp-ws')

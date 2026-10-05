@@ -12,7 +12,8 @@ from it (limits, hooks).
 npm install
 npm run typecheck                 # tsc --noEmit
 npm test                          # node:test, ~25s
-npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app
+npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
+npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
 npm run dev                       # Electron + renderer dev server on :5199
 ```
 
@@ -30,7 +31,7 @@ npm run dev                       # Electron + renderer dev server on :5199
   2. `npm run dev:web` serves the renderer on :5199; open that URL.
   3. Afterwards stop it: `LAKI_HOME=/tmp/laki-x/data node out/main/cli.js stop`, then stop vite.
 - `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
-  window screenshot). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
+  window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
 - The user runs their own daemon with real agents in it, in `~/.laki-electron` (from when the app was called
   Laki Electron; `dataDir` in `src/shared/conn.ts` keeps an existing one). Never stop it and never point tests
   at it.
@@ -62,13 +63,22 @@ Bump `API` when the renderer starts relying on a new method or daemon behavior (
 project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a project's `actions`, kept by `projectSet`;
 4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever; 7: `prComment`, `muted`; 8: a project's
 `templates`, kept by `projectSet`; 9: browsers in `apps`, `openIn` `default`; 10: `send` `enter: false`; 11: a tab's `runAt`, `model` and `effort`, the
-board's `todoAdd`/`todoRm`). A
+board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `stat`; 13: a tab's `ask`, `answer`,
+`unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `reorder` (projects or workspaces by id), `wsSet` (color, `muted`), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
+- `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns `{ dirty }`;
+  `doctor` (the first-run screen's: git, `gh auth status`, which agents are on PATH);
 - tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color, `muted`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something), `queueClear`;
+  `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below), `unread` (its ● again: `done`, until a look clears it);
+- a race (`wsFan`: the `NewWs` fields and 2–6 `presets`, agents only, worktrees only): `wsNew` per preset, one after
+  another, named `<name>-<preset>`, sharing a random `race` id (the sidebar's flag; the renderer's `Compare.tsx`);
+- an issue (`wsNew`/`wsFan` `issue`: a URL or number): `fromIssue` runs `gh issue view <ref> --json number,title,body,url`
+  in the project; the prompt is "Work on GitHub issue #n: title", the URL, the body (8,000 characters at most) and the
+  prompt given, the name `issue-<n>-<slug>`; the workspace keeps `issue`;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from), `tunnelStart`
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
@@ -84,16 +94,32 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`: resolves once there's a link),
   `remoteStop`, `remoteTick` (`now`: tests move the clock);
-- terminals: `screen`, `input`, `resize`, `view`, `detach`.
+- terminals: `screen`, `input`, `resize`, `view`, `detach`;
+- the agent browser: `browse` (`ws`, `op`: open, screenshot, click, fill, text; `url` (a path: the workspace's
+  `$PORT`; localhost only), `selector`, `text`) goes to the newest client whose `view` says `browse` as a `browse`
+  event (`req`: its id; an `id` would make it a reply), and waits up to 30 s for its `browseDone` (`id`, `ok`, `result` or `error`); a screenshot's PNG is saved
+  (`imageSave`) and its path returned. The CLI's `laki browser`, MCP's `laki_browser`.
 
 WebSocket events:
 - `state`: the whole view, debounced 30 ms;
 - `data` and `responder`: per tab;
 - `turn`: waiting, done or limit, for notifications;
+- `browse`: an agent browser op, for the app (above);
 - `open` / `close`: the connection's own status.
 
-`view` carries `tab` (the pane with the keyboard), `tabs` (every pane on screen) and `focused`. Tabs
-on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
+`view` carries `tab` (the pane with the keyboard), `tabs` (every pane on screen), `focused` and `browse` (the app's
+window: it can run the agent browser). Tabs on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
+
+### Asks
+
+A waiting tab's view has `ask` (`shared/ask.ts` `askOf`, over the bottom 16 lines of its screen): numbered options
+(`1.`, `2)`…), consecutive, at least two, one of them marked (❯ › > ▶ ● →), box borders stripped; the last such menu
+wins (tested in `test/ask.test.ts`). `answer` reads it again, then sends ↑/↓ one at a time, 40 ms apart (a TUI reads
+a burst as one key; `Session.appCursor` picks `ESC O` or `ESC [`), then ⏎. The renderer's ask bar (App.tsx) shows
+them as buttons for the tab with the keyboard; a permission prompt's notification gets *Allow* / *Deny* (main's
+`Notification` `actions`; main calls `answer` itself, `pick` first / last, so a closed window doesn't matter). `answer`
+needs the tab waiting and takes one at a time (a second after its Enter too). A waiting tab's output has its menu read
+again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't the ask the last pushed view gave (`askKey`, set in `changed`).
 
 ### Sessions
 
@@ -187,13 +213,24 @@ they work).
 
 ### Scans
 
-- Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN`, every 5s.
-- PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, review
-  decision, size, body), every 60s; one scan at a time (`scanPRs`), so `autoPR` never sends twice.
-- `autoPR` (workspace `autoFix` / `autoReview`, ported from wb's `review.go`): failing CI on a new head
+- Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN`, every 5s. First,
+  `syncBranches`: each workspace's `branch` follows its folder's HEAD (`headOf` reads the file, no git run; detached
+  stays), so an agent's `git checkout -b` moves the PR lookup, status bar, ship and restore with it, and scans PRs now.
+  A turn's end scans PRs 2 s later too (`prSoon`, at most every 20 s): `gh pr create` shows up without the minute's wait.
+- Diff size (`scanStats`, every 10 s, `LAKI_STAT_SCAN_MS`; with `settings.diffStat === true`, off by default, and a race's
+  always, for Compare): each live git
+  workspace's `git diff --numstat` against `diff`'s base, new files' lines (the first 100, up to 1 MB) and `git status`'s
+  count as `stat` (`WorkspaceView.stat`: add, del, files, dirty); one scan at a time.
+- PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, base
+  branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, size, body), every 60s; one scan at a time (`scanPRs`), so `autoPR` never sends twice.
+- `autoPR` (workspace `autoFix` / `autoReview` / `autoMerge`, ported from wb's `review.go`): failing CI on a new head
   commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`), at most 3 in a row
-  (`MAX_CI_FIXES`), then status waiting and a notification; new review threads → `reviewMessage`
-  (GraphQL `reviewThreads`; `reviewKey` counts only others' comments). What was sent is `workspace.fix`.
+  (`MAX_FIXES`), then status waiting and a notification (`overToYou`); conflicts on a new head commit →
+  `prFix('conflict')` (merge the base in, push), `fix.merge`/`fix.merges`, the same 3 (mergeable UNKNOWN, as after a
+  push, keeps the count); new review threads → `reviewMessage`
+  (GraphQL `reviewThreads`; `reviewKey` counts yours too, but not the agent's: it comments as you, so yours made while a
+  tab of the workspace was running, `busy`/`agentSaid` from `changed()`, ±`SKEW`, are its, their ids kept as `fix.mine`).
+  What was sent is `workspace.fix`.
   Messages go to the first live claude/codex tab with `send({ whenIdle })`.
 - Images pasted into a prompt: `imageSave` writes them to `<data>/images/`; the prompt gets their paths.
 
@@ -259,14 +296,23 @@ isn't `http://localhost` or `127.0.0.1`, or a partition other than `persist:prev
 asking window by its `webContentsId` and returns a PNG (base64); `ShotBox` saves it (`imageSave`) and sends its path to
 the agent. The crosshair (`pick`, the app only) runs `pickElement`'s source in the page (`executeJavaScript`): it
 outlines what's under the mouse and resolves the clicked element (a short unique CSS selector, its opening tag, text,
-size, the URL), or null on Esc (`window.__lakiPick(null)` cancels it from outside); `PanelApi.toPrompt` types that into
-the focused agent tab, else the first live one (`send` `enter: false`: no Enter, no turn). In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
+size, its outerHTML up to 1,500 characters, the computed CSS of `CSS_KEYS` that isn't a default, its rect and the
+page's width, the URL), or null on Esc (`window.__lakiPick(null)` cancels it from outside); the app then captures the
+webview and `crop`s it to the element (a canvas, scaled by the image's width over the page's), saves it, and
+`PanelApi.toPrompt` types all of it, with the screenshot's path, into the focused agent tab, else the first live one
+(`send` `enter: false`: no Enter, no turn). In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
+
+The agent browser (`browse` above) is main's: a hidden `BrowserWindow` per workspace (1280×800, the preview's
+partition, sandboxed, no popups, navigation and redirects kept to local URLs), destroyed after 10 idle minutes;
+click and fill run in the page (`pageJs`: the first match, scrolled into view; fill sets the value through the
+native setter and fires input and change), then wait 300 ms.
 
 ### Notifications
 
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
 `settings.notifyOn[waiting|done|limit] === false`, or a muted workspace or tab (`muted`, ⋯ and right-click menus).
-`settings.notifySound` (a macOS sound's name, `none`, unset: the default) goes to main's `Notification`.
+`settings.notifySound` (a macOS sound's name, `none`, unset: the default) goes to main's `Notification`. A waiting
+turn whose text says "permission" gets *Allow* / *Deny* actions (Asks, above).
 
 ### Usage
 
@@ -296,6 +342,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel;
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
+    - `laki.recent`: the palette's last 30 picks, by label: first in it, and ahead of a close match.
+    - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
     `settings.timers`.
@@ -304,16 +352,28 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one.
   - A workspace with a PR gets GitHub's mark in the sidebar (`.ws-pr`, its `prState` and failing checks as colors),
     unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`).
+  - A project's workspaces are in `.project-ws` (indented on a guide line; a line between projects). A row shows
+    `stat` (`.ws-stat`, with `settings.diffStat`) and, on hover, `.ws-acts` (its ⋯ menu) over its marks. The PR mark is red
+    for an open PR's failing checks only: a merged one stays purple.
+  - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
+  - `toast(text, undo?)`: one message at a time (a newer one restarts the timer); `archive` asks `wsArchive` with
+    `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is).
+  - No project: `Welcome` (panels.tsx) with `doctor`'s checks. `settings.dimPanes`: `.dim-panes` on `.app`.
+  - `.side-head` (top): hide, open a project, help; `.side-foot` (pinned at the bottom): Scheduled tasks, Board, Settings,
+    with words (`IconButton` `label`: Tasks, Board, Settings) unless `settings.sideLook.labels === false`, or the sidebar
+    (a `side` container) is under 225px.
   - The project and workspace order is the daemon's (`reorder`).
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
   xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only.
-- **`Term.tsx`**: one xterm per pane. It attaches on mount and detaches on unmount, and swallows terminal
+- **`Term.tsx`**: one xterm per pane. In an agent's (`newline`), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
+  codex's and opencode's prompt, where xterm would send ⏎. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a
   dialog (and so focused the terminal) would type a stray ⏎. On window focus or a page turning visible it sends
-  its size again, so a look is enough to get it back after a phone.
+  its size again, so a look is enough to get it back after a phone. Files dropped on it (`bridge.pathOf`) are
+  pasted as their paths, shell-quoted when they need it; its `preventDefault` keeps the window's folder drop out.
 - **`layout.ts`**: tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
   session is in exactly one tab and nothing nests. Pure functions: `groupsOf` (stored tabs minus ended
   sessions, plus one tab per unplaced session), `move` (a pane or a whole tab next to a pane, or out to the
@@ -340,6 +400,10 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   before the first render: a terminal measures its cells once.
 - **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB);
   tokens become React text, never HTML.
+- **`markdown.ts`**: `markdown` (blocks) and `inline`: a Markdown file as a tree (GitHub's common subset), which
+  `SidePanel.tsx`'s `Markdown` renders as React nodes (code blocks through `highlight`; links open in the browser,
+  images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
+  line opens Raw). Tested in `test/markdown.test.ts`.
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,
   which replace a global one of the same name and target; an agent's only with a live tab of it, the focused one
   first; a shell's to the focused shell, any, or none: each app's `runAction` opens one), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and
@@ -356,15 +420,25 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   `switch-row`), popup and right-click menus (`useMenu`, color swatches;
   each item has a key: its own `key` or a free initial, `menuKeys`),
   tooltips (`Tips`: any element with `data-tip`), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
-  sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), and `Page`
-  (a page over the main area, like Settings: the new-workspace form).
+  sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
+  (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
+  `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
 - **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size (its preview cancels
   that); presets, `EnvField` (KEY=value lines), fonts,
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
-  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, scrolled into view; interface font, glass: `paint` applies
+  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, scrolled into view, a name filter that stays in sight;
+  `PROJECT_LOOK`: the sidebar's project names over the theme, `settings.projectLook`, App's `phAttrs`/`phVars` put them
+  on `.sidebar` as `data-ph-*` and `--ph-*`, styles.css overrides any look with `!important`; `SIDE_LOOK`,
+  `settings.sideLook`: the sidebar's lines and rows as CSS values, App's `sideVars` sets `--ws-guide`, `--proj-divider`,
+  `--ws-indent`, `--ws-h` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of look.css;
+  `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
   them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…24h, then the QR code and link), and `ScriptsField` (a project's
-  setup/teardown/run scripts, Import from a file). A
+  setup/teardown/run scripts, Import from a file), and General's Export/Import (`laki-settings.json`: `{ laki:
+  'settings', version: 1, settings }`; an import goes through `paint`, so it's painted and autosaved like typing, after
+  `KINDS` refuses a field of the wrong kind: add a new list, object or number setting there). *Find a setting* (`FIND`: section, the title as the page writes it, more
+  words; add new settings there) opens a section and lights (`.spot`) the first label, row or heading that starts with
+  the title. Hovering a theme paints it (`applyTheme`), the chosen one again as the mouse leaves `.themes` or the page closes. A
   setting back at its default is saved as that value: an unset key wouldn't replace the saved one. Projects
   are sections of it (`ProjectSection`: name, scripts, env; saved 400 ms after typing and on leaving).
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Files (tree from the daemon's file list, search, new
@@ -377,10 +451,14 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
   or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
   as SVG, also Remote access's.
-- **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar header's columns icon, ⌘K, `laki://board`): the
+- **`Compare.tsx`**: a race's page (`Page` `wide`; dialog `{ compare: <race> }`: a race workspace's menu, ⌘K, and
+  right after the new-workspace page's *Race* makes one): a column per live workspace of the race with its status,
+  diff size, the agent's last answer and the files `diff` lists (again as `stat` moves); *Keep this one* archives
+  the others (`wsArchive`, after a confirm) with *Undo* (`wsRestore`). App.tsx passes a `CompareApi`.
+- **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar foot's columns icon, ⌘K, `laki://board`): the
   workspaces in columns by `columnOf` (`rollup` from `Glyph.tsx`, then the PR's state), cards that open one, and To
   do (`view.todos`): ▷ or an HTML5 drag onto a column runs `wsNew` with the default agent, then `todoRm`.
-- **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar header's clock, ⌘K, a project's ⋯ menu:
+- **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar foot's clock, ⌘K, a project's ⋯ menu:
   App's `schedulesOf`, the dialog `{ schedules: <project> }`): a project filter (`only`, starting at `project`), the form with `parseWhen`'s reading, the next runs and the dated names (*Another folder…*: `pick`, the
   folder picker, or a typed path in a browser, then `projectAdd`), the tasks (switch, Run now, edit, delete), the runs' log (a click goes to
   the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
@@ -408,8 +486,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound), the Dock badge (`badge` IPC), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
-| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge (`badge` IPC), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
+| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/skill.ts` | the agent skill: SKILL.md and a CLI launcher in each agent's `skills/laki` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
@@ -423,7 +501,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift` |
 
 ## Conventions
@@ -438,6 +516,9 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
   origin of its own that end with it; only the page's static files skip the checks.
 - **Colors** come from CSS variables in `styles.css` (`:root`). The terminal theme reads them through `css('--…')`.
 - **`asar` is off**, because node-pty's helper must be a real file. The packaged daemon runs on Electron's node.
+- **Intel**: node-pty is `@lydell/node-pty`, a prebuilt binary per platform in an optional package; npm installs only
+  this Mac's, so `pack:x64` adds `@lydell/node-pty-darwin-x64` (`--no-save --force`) before `electron-builder --x64`.
+  Nothing else is native. The CLI's `open` and the scripts pick `dist/mac-arm64` or `dist/mac` by architecture.
 - **User-facing text** is short and plain. When adding commands or keys, update `docs/guide.md` (keys, CLI),
   `README.md` when it's a main one, and the CLI's usage (`src/shared/usage.ts`, which the agent skill quotes).
 - **Commits** end with the `Co-Authored-By` trailer. Never push.

@@ -3,7 +3,8 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
-  notify: (title: string, body: string, tab: string, sound?: string) => ipcRenderer.send('notify', title, body, tab, sound),
+  notify: (title: string, body: string, tab: string, sound?: string, actions?: string[]) => ipcRenderer.send('notify', title, body, tab, sound, actions),
+  browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
   onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder

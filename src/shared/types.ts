@@ -39,11 +39,16 @@ export type Workspace = {
   muted?: boolean // no notifications from its tabs
   autoFix?: boolean // failing CI goes to the agent
   autoReview?: boolean // new PR review comments go to the agent
-  fix?: PRFix // what autoFix/autoReview sent already
+  autoMerge?: boolean // merge conflicts with the PR's base go to the agent
+  fix?: PRFix // what autoFix/autoReview/autoMerge sent already
+  race?: string // one prompt fanned out to several agents: the workspaces of one race share it (Compare)
+  issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
 }
 
-// for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent
-export type PRFix = { pr: number; ci?: string; tries?: number; review?: string }
+// for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
+// merge conflicts were sent, how many times in a row
+export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number } // mine: the agent's comments (it comments as you)
+export type FixWhat = 'ci' | 'review' | 'conflict'
 
 export type TabKind = 'agent' | 'shell' | 'setup' | 'dev' | 'ship'
 
@@ -98,7 +103,17 @@ export type Settings = {
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   remoteMail?: string // the one email remote access lets in
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
+  projectLook?: ProjectLook // the sidebar's project names, over the theme's
+  sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
+  diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
+  dimPanes?: boolean // a split's other panes dimmed (unset: off)
 }
+
+// how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
+export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
+// the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
+// labels: words beside its bottom buttons (unset: shown)
+export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; labels?: boolean }
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
 export type Todo = { id: string; project: string; text: string; at: number }
@@ -138,6 +153,8 @@ export type PR = {
   draft?: boolean
   head?: string
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
+  conflict?: boolean // merge conflicts with its base branch
+  base?: string // its base branch
   additions?: number
   deletions?: number
   body?: string
@@ -145,13 +162,20 @@ export type PR = {
 }
 
 // runAt: when its turn began (the daemon's clock), while it runs or waits
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number }
+// ask: a waiting agent's numbered menu on its screen (a permission prompt, a question): the choices and the highlighted one
+export type Ask = { options: { n: number; label: string }[]; at: number }
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask }
 
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
 export type Tunnel = { port: number; url?: string; mails?: string[] }
 
 // run: the project has a dev command
-export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; tunnels: Tunnel[]; pr?: PR; run: boolean }
+// stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
+// (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's)
+export type Stat = { add: number; del: number; files: number; dirty: number }
+export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat }
+// the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
+export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; agents: { id: Agent; found: boolean }[] }
 
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
@@ -161,4 +185,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 11
+export const API = 13

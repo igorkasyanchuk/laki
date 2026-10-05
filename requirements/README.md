@@ -90,6 +90,11 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
   codex, `-m` for the others), kept for restarts and forks.
 - A board: workspaces in columns by where they are (running, needs you, done, PR open, merged), and to-dos (a
   prompt for a project) that start a workspace.
+- A race: one prompt to 2–6 agents, a worktree each; Compare shows them side by side (status, diff size, last
+  answer, changed files) and Keep this one archives the rest, with Undo.
+- A waiting agent's numbered menu (a permission prompt) as buttons under its terminal, and Allow / Deny on its
+  notification. Mark as unread on a tab or workspace.
+- Files dropped on a terminal type their paths. A workspace from a GitHub issue (`laki new --issue`).
 - Esc / ⌃C interrupt goes back to idle. Usage limits: wait for the reset, then type `continue`.
 - Resume after a daemon restart: `claude --resume`, `codex resume`, `gemini --resume`, `grok --resume` (Laki picks
   its chat id), `opencode --session`. The app menu's *Quit … Completely*
@@ -110,7 +115,10 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - A diff line's comment: posted on the PR at that line (`gh api`), or sent to the agent with the file and line.
 - Preview: the dev server in the side panel (a webview kept to localhost; the toolbar's globe opens it at $PORT),
   back, forward, a port picker; a
-  screenshot goes to the agent with a note; a picked element's CSS selector goes into its prompt.
+  screenshot goes to the agent with a note; a picked element's selector, HTML, computed CSS and a screenshot of
+  it go into its prompt. Markdown files preview rendered or raw.
+- The agent browser: `laki browser` / MCP's `laki_browser` open the workspace's dev server in a hidden window of the
+  app's (localhost only), screenshot, click, fill and read it.
 - ⌘P / "Find files…" in ⌘K: fuzzy file search; preview text and images in the app; ⌘W closes the preview.
 - Open in any installed editor or terminal (⌘E for the default).
 
@@ -125,7 +133,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - Scheduled tasks: a prompt for an agent (claude, codex, gemini, grok, opencode or a preset of theirs) in a project (or any folder), in a new workspace
   each run, the folder itself (no worktree) or one workspace's agent, at times written in English (`every day at 2am except weekends`, `every
   2 hours from 9am to 6pm`, `tomorrow at 7am`); `{{DD-MM-YY}}`-style dates in the name and prompt, so each run's workspace is
-  told apart (and has a clock in the sidebar); a log of runs (missed ones too); a clock in the sidebar's header.
+  told apart (and has a clock in the sidebar); a log of runs (missed ones too); a clock at the bottom of the sidebar.
 - Remote access: the whole app in a browser elsewhere (a phone, another computer), through a cloudflared
   tunnel to the daemon for one email address (Cloudflare's one-time code) plus a key in the link; 1, 2, 4, 8
   or 24 hours, then it stops, or forever (until stopped); a QR code; a new key each time; also from ⌘K. A phone gets its own layout: a
@@ -140,13 +148,17 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - About (the app menu, ⌘K): the version and a link to the website, laki.igorkasyanchuk.com.
 
 **Look**
-- 76 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; fifty-eight of
+- 86 themes (solid and Warp-style gradients, dark and light), theme colors in the terminal palette; sixty-eight of
   them also change shapes, borders and type (a CRT, Win95-style bevels, Aqua gel, soft clay, a handheld's LCD, a
   ship's console, a broadsheet, holographic foil, Bauhaus, a chalkboard, steampunk brass, stained glass, a comic, a radar, a hacker's terminal, a darkroom,
-  cherry blossoms, a lava field, Lisbon's tiles, a diner, an e-reader, neon in the rain, folded paper…).
+  cherry blossoms, a lava field, Lisbon's tiles, a diner, an e-reader, neon in the rain, folded paper, and screens
+  from films and games: a light-cycle grid, a racing HUD, a 1969 control room, a flight HUD…).
+- The sidebar's project names tuned over the theme (font, case, spacing, size, weight); all settings exported to a
+  file and imported on another Mac.
   Glass (a see-through, blurred window, with
   sliders for the window, sidebar and terminals, and a color glow); Inter and
-  JetBrains Mono bundled as the default interface and terminal fonts; an interface font setting.
+  JetBrains Mono bundled as the default interface and terminal fonts, with Fira Code, Cascadia Code, Source Code
+  Pro, IBM Plex Mono and Geist Mono bundled too; an interface font setting.
 - Prompt templates (`{{prompt}}`, `{{project}}`, `{{base}}`) picked under a new workspace's prompt: global ones and a
   project's own (listed first; one of a global one's name replaces it).
 - File preview with syntax colors (up to 50 KB); the status bar's path short, with a copy button.
@@ -156,14 +168,14 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 
 **CLI**
 - `ls [--json]`, `project add|ls|rm`, `new`, `tab`, `send [--when-idle]`, `screen`, `diff`, `run`, `rm`,
-  `archive`, `restore`, `fork`, `open`, `daemon`, `stop`, `ship`, `schedule`, `mcp` (an MCP server: state, new
-  workspace, send, screen, diff, schedules; nothing destructive). Agents' hooks call the same CLI.
+  `archive`, `restore`, `fork`, `open`, `daemon`, `stop`, `ship`, `schedule`, `browser`, `mcp` (an MCP server: state,
+  new workspace (an issue, a race), send, screen, diff, browser, schedules; nothing destructive). `new --issue`, `--fan`. Agents' hooks call the same CLI.
 - `laki://` links: a workspace or tab (Copy link in their menus), the new-workspace page filled in, Scheduled
   tasks, Settings, Help. They never start anything.
 
 ## Quality bar
 
-- macOS on Apple silicon first.
+- macOS on Apple silicon first; Intel builds too (`npm run pack:x64`).
 - End-to-end tests with fake `claude`, `codex`, `gemini`, `grok`, `opencode` and `gh`, temp homes and their own daemons; never the real
   data folders. Coverage of daemon and CLI code: 90%+.
 - Typing latency and screen replay fidelity are the main risks for a terminal app; both are checked by hand

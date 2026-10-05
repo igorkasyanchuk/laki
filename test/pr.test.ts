@@ -21,7 +21,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'ci' }), /has no PR/)
   writeFileSync(
     join(gh, 'pr.json'),
-    JSON.stringify({ number: 7, state: 'OPEN', url: 'https://example.invalid/pr/7', headRefOid: 'abc', statusCheckRollup: [
+    JSON.stringify({ number: 7, state: 'OPEN', url: 'https://example.invalid/pr/7', headRefOid: 'abc', mergeable: 'CONFLICTING', statusCheckRollup: [
       { __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: job(1) },
       { __typename: 'CheckRun', name: 'lint', status: 'COMPLETED', conclusion: 'NEUTRAL' },
       { __typename: 'StatusContext', context: 'deploy', state: 'PENDING', targetUrl: 'https://ci.invalid/1' },
@@ -30,6 +30,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   )
   const pr = await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
   assert.equal(pr.checks, 'fail')
+  assert.equal(pr.conflict, true)
   assert.deepEqual(pr.list, [
     { name: 'test', state: 'fail', url: job(1) },
     { name: 'lint', state: 'skip' },
@@ -66,7 +67,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   await until(async () => (await last()).startsWith('answer: Address'), 'review sent')
   assert.equal(
     await last(),
-    "answer: Address the open review comments on PR #7 (https://example.invalid/pr/7). Fix what you agree with; then commit and push the fix, then say what you changed, and what you didn't and why.\n\n1. b.ts (outdated: the code moved since)\n   @lint-bot: unused import\n   @?: ghost here\n   second line",
+    "answer: Address the open review comments on PR #7 (https://example.invalid/pr/7). Fix what you agree with; then commit and push the fix, then say what you changed, and what you didn't and why. Answer here, not on GitHub.\n\n1. b.ts (outdated: the code moved since)\n   @lint-bot: unused import\n   @?: ghost here\n   second line",
   )
 
   // gh no longer finds it: no PR
@@ -117,7 +118,50 @@ test('autoFix and autoReview: they wait for an agent; CI goes over to you after 
   assert.equal((await rig.tab(ws.id)).status, 'waiting')
   pr('c4', 'SUCCESS')
   await until(async () => (await fix())?.tries === 0, 'a pass starts over')
+
+  // your own comment counts, the agent's doesn't: it comments as you, and yours made while it worked are its own
+  const mine = (id: string, body: string, at: number) => ({ id, ...said('me', body, 'User', 'OWNER'), createdAt: new Date(at).toISOString() })
+  const bob = thread('t1', [said('bob', 'rename this', 'User', 'OWNER')])
+  await rig.rpc('input', { tab: tab.id, data: 'slow\r' })
+  await until(async () => (await rig.tab(ws.id)).status === 'running', 'the agent works')
+  graphql(gh, [bob, thread('t2', [mine('c1', 'renamed it', Date.now())])])
+  await until(async () => (await fix())?.mine?.includes('c1'), "the agent's reply seen")
+  assert.equal((await fix()).review, 't1:1')
+  await rig.rpc('input', { tab: tab.id, data: '\x1b' })
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'interrupted')
+  graphql(gh, [bob, thread('t2', [mine('c1', 'renamed it', Date.now() - 60_000)]), thread('t3', [mine('c2', 'and this one', Date.now() + 60_000)])])
+  await until(async () => (await fix())?.review === 't1:1 t3:1', 'yours sent')
+  await until(async () => (await rig.screen(tab.id)).includes('@me: and this one'), 'to the agent')
   c.close()
+})
+
+test('autoMerge: merge conflicts go to the agent once per head commit; unknown keeps the count, none starts it over', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const pr = (head: string, mergeable = 'CONFLICTING') =>
+    writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 5, state: 'OPEN', url: 'https://example.invalid/pr/5', headRefOid: head, baseRefName: 'dev', mergeable, statusCheckRollup: [] }))
+  pr('h1', 'MERGEABLE')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const fix = async () => (await rig.rpc('state')).workspaces[0].fix
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'conflict' }), /PR #5 has no merge conflicts/)
+  await until(async () => (await rig.screen((await rig.tab(ws.id)).id)).includes('>'), 'claude up')
+  pr('h1')
+  await rig.rpc('wsSet', { id: ws.id, autoMerge: true })
+  await until(async () => (await fix())?.merge === 'h1', 'conflicts sent')
+  assert.equal((await fix()).merges, 1)
+  await until(async () => /has merge conflicts with dev\. Merge it in \(git fetch origin dev, then git merge origin\/dev/.test((await rig.tab(ws.id)).last ?? ''), 'to the agent')
+  pr('h2') // its push still conflicts: again
+  await until(async () => (await fix())?.merges === 2, 'sent again')
+  pr('h3', 'UNKNOWN') // GitHub right after a push
+  const n = readFileSync(rig.env.FAKE_LOG, 'utf8').split('gh pr view').length
+  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').split('gh pr view').length > n + 1, 'scanned')
+  assert.equal((await fix()).merges, 2)
+  pr('h3', 'MERGEABLE')
+  await until(async () => (await fix())?.merges === 0, 'resolved: the count starts over')
+  assert.equal((await fix()).merge, 'h2')
 })
 
 test('a diff line comment on the PR: gh api with the head commit, a line not in the PR, checks', async t => {

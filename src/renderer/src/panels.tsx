@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { EFFORTS, isAgent, MODELS, type View } from '../../shared/types'
+import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, MODELS, type View } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -43,7 +43,8 @@ export function About({ onClose }: { onClose: () => void }) {
   )
 }
 
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string }
+// fan: a race, the presets that each get a worktree on the same prompt (the preset first)
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[] }
 
 // initial: a laki://new link's prompt, preset and name
 export function NewWorkspace({ view, project, agent, initial, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
@@ -58,6 +59,10 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
   const filled = templated(tpl ? templates[Number(tpl)] : undefined, p.prompt ?? '', { project: view.projects.find(x => x.id === p.project)?.name, base: p.base })
   const plain = view.projects.find(x => x.id === p.project)?.git === false // a folder without git: local only
   const starts = view.presets.find(x => x.name === p.preset)?.agent // what the preset starts: its model and effort flags
+  const [rivals, setRivals] = useState<string[]>([]) // a race: the other presets on the same prompt
+  const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command').map(x => x.name)
+  const racing = !p.local && !plain && isAgent(starts) && rivals.some(r => racers.includes(r))
+  const fan = racing ? [p.preset, ...rivals.filter(r => racers.includes(r))] : undefined
   useEffect(() => {
     setTpl('') // another project, other templates
     if (!p.project) return
@@ -75,7 +80,8 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
     setBusy(true)
     try {
       const prompt = withImages(filled, images) || undefined
-      await onCreate({ ...p, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: isAgent(starts) ? p.model?.trim() || undefined : undefined, effort: isAgent(starts) ? p.effort || undefined : undefined })
+      const own = isAgent(starts) && !fan // a race's agents keep their own models
+      await onCreate({ ...p, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
     } catch {
       setBusy(false)
     }
@@ -135,7 +141,21 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
             ))}
           </div>
         </label>
-        {isAgent(starts) && (
+        {!p.local && !plain && isAgent(starts) && racers.length > 0 && (
+          <div className="field">
+            <span>
+              Race <span className="muted">· the same prompt to more agents, each in a worktree of its own; Compare keeps the best</span>
+            </span>
+            <div className="seg">
+              {racers.map(x => (
+                <button type="button" key={x} className={rivals.includes(x) ? 'on' : ''} disabled={!rivals.includes(x) && rivals.filter(r => racers.includes(r)).length >= 5 /* six agents at most */} onClick={() => setRivals(r => (r.includes(x) ? r.filter(y => y !== x) : [...r, x]))}>
+                  + {x}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        {isAgent(starts) && !racing && (
           <div className="row">
             <label>
               <span>
@@ -196,7 +216,7 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
             Cancel
           </button>
           <button type="submit" className="primary" disabled={busy || saving || !p.project}>
-            {busy ? 'Creating…' : saving ? 'Saving image…' : 'Create'}
+            {busy ? 'Creating…' : saving ? 'Saving image…' : fan ? `Create ${fan.length} workspaces` : 'Create'}
           </button>
         </div>
       </form>
@@ -279,22 +299,36 @@ export function fuzzy(q: string, s: string): number {
   return j === q.length ? score - s.length * 0.01 : 0
 }
 
+// what the palette ran last (labels, newest first; localStorage laki.recent): first in it, and ahead when they match
+const RECENT = 30
+const recent = (): string[] => {
+  try {
+    return JSON.parse(localStorage.getItem('laki.recent') ?? '[]')
+  } catch {
+    return []
+  }
+}
+
 export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [i, setI] = useState(0)
-  const list = useMemo(
-    () =>
-      items
-        .map(x => ({ x, s: fuzzy(q, `${x.label} ${x.hint ?? ''}`) && fuzzy(q, x.label) + 0.5 * fuzzy(q, `${x.label} ${x.hint ?? ''}`) }))
-        .filter(r => r.s > 0)
-        .sort((a, b) => (q ? b.s - a.s : 0))
-        .map(r => r.x),
-    [items, q],
-  )
+  const ran = useMemo(recent, [])
+  const list = useMemo(() => {
+    const rank = (x: PaletteItem) => (r => (r < 0 ? 0 : RECENT - r))(ran.indexOf(x.label)) // 30 for the last one, 0: never
+    return items
+      .map(x => ({ x, r: rank(x), s: fuzzy(q, `${x.label} ${x.hint ?? ''}`) && fuzzy(q, x.label) + 0.5 * fuzzy(q, `${x.label} ${x.hint ?? ''}`) }))
+      .filter(r => r.s > 0)
+      .map(r => ({ ...r, s: r.s + r.r * 0.1 })) // a recent one wins a close call, not a much better match
+      .sort((a, b) => (q ? b.s - a.s : b.r - a.r))
+      .map(r => r.x)
+  }, [items, q, ran])
   const ref = useRef<HTMLDivElement>(null)
   useEffect(() => void ref.current?.querySelector('.sel')?.scrollIntoView({ block: 'nearest' }), [i])
   const pick = (x?: PaletteItem) => {
     if (!x) return
+    try {
+      localStorage.setItem('laki.recent', JSON.stringify([x.label, ...recent().filter(l => l !== x.label)].slice(0, RECENT)))
+    } catch {}
     onClose()
     x.run()
   }
@@ -328,5 +362,40 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
         {!list.length && <div className="muted pad">Nothing matches.</div>}
       </div>
     </Modal>
+  )
+}
+
+// no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target)
+export function Welcome({ onOpen, check }: { onOpen: () => void; check: () => Promise<Doctor> }) {
+  const [d, setD] = useState<Doctor | null>(null)
+  useEffect(() => void check().then(setD, () => {}), [])
+  const row = (ok: boolean, name: string, hint: string) => (
+    <div className="check" key={name}>
+      <Glyph s={ok ? 'ok' : 'exited'} />
+      <b>{name}</b>
+      <span className="muted">{hint}</span>
+    </div>
+  )
+  const found = d?.agents.filter(a => a.found) ?? []
+  const missing = d?.agents.filter(a => !a.found) ?? []
+  return (
+    <div className="welcome">
+      <img src={icon} alt="" />
+      <h1>Welcome to Laki</h1>
+      <p className="muted">Agents side by side, each task in its own git worktree.</p>
+      <button className="welcome-drop" onClick={onOpen}>
+        <Icon name="folderPlus" size={22} />
+        <b>Open a project folder</b>
+        <span className="muted">or drop one on the window · ⌘O</span>
+      </button>
+      {d && (
+        <div className="welcome-checks">
+          {row(d.git, 'git', d.git ? 'found' : 'needed for worktrees: xcode-select --install')}
+          {row(d.gh === 'in', 'gh', d.gh === 'in' ? 'signed in: PRs, checks and Ship work' : d.gh === 'out' ? 'not signed in, for PRs: gh auth login' : 'not found, for PRs: brew install gh')}
+          {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install Claude Code or Codex, then restart Laki')}
+          {missing.length > 0 && found.length > 0 && <div className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</div>}
+        </div>
+      )}
+    </div>
   )
 }

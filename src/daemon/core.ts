@@ -2,13 +2,15 @@
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { randomBytes, randomUUID } from 'node:crypto'
+import { readFile, stat } from 'node:fs/promises'
+import { askOf } from '../shared/ask.ts'
 import { closeSync, type Dirent, existsSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, userInfo } from 'node:os'
 import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, EFFORTS, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, type FixWhat, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
@@ -35,11 +37,11 @@ const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number }
+type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; askKey?: string } // askKey: the ask the last pushed view gave
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const prs = new Map<string, PR>()
-export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean } }
+export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean } } // browse: the app's window, which has the agent browser
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
 
@@ -181,12 +183,13 @@ export function view(): View {
     // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
     if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
     else r.runAt = undefined
-    return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt }
+    const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
+    return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask }
   })
   return {
     projects: state.projects,
     // ponytail: run reads .laki.json per workspace on every view; cache by mtime if many workspaces
-    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!projectConfig(w).run })),
+    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!projectConfig(w).run, stat: stats.get(w.id) })),
     tabs,
     presets: presets(),
     settings: state.settings ?? {},
@@ -204,17 +207,34 @@ export function changed() {
   pending = setTimeout(() => {
     pending = null
     const v = view()
+    for (const t of v.tabs) rtOf(t.id).askKey = JSON.stringify(t.ask ?? null) // what the clients were given
+    for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running'))
     for (const c of clients) c.send({ ev: 'state', view: v })
   }, 30)
 }
 
 const broadcast = (msg: unknown) => clients.forEach(c => c.send(msg))
 
+// when each workspace's agents worked (the last 50 stretches): comments under your name made then are the agent's
+// ponytail: in memory, so a daemon restart forgets them; a comment the agent left just before one may start a round
+const busy = new Map<string, { from: number; to?: number }[]>()
+function worked(ws: string, on: boolean) {
+  const w = busy.get(ws) ?? []
+  const open = w.length > 0 && w.at(-1)!.to === undefined
+  if (on && !open) busy.set(ws, [...w.slice(-49), { from: Date.now() }])
+  else if (!on && open) w.at(-1)!.to = Date.now()
+}
+const SKEW = 10_000 // GitHub's clock and ours, and a gh call that ends as a permission prompt's wait does
+const agentSaid = (ws: string, at: string) => {
+  const t = Date.parse(at)
+  return (busy.get(ws) ?? []).some(b => t >= b.from - SKEW && t <= (b.to ?? Infinity) + SKEW)
+}
+
 // tabs: every pane on screen; tab: the focused one (older clients send only that)
 const shown = (v: { tab: string | null; tabs?: string[] }) => v.tabs ?? (v.tab ? [v.tab] : [])
 const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(c.view).includes(tab))
 
-export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean }) {
+export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean }) {
   c.view = v
   if (!v.focused) return
   for (const id of shown(v)) {
@@ -487,6 +507,16 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const s = new Session(tab.id, shell, args, { cwd: ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
   sessions.set(tab.id, s)
   const r = rtOf(tab.id)
+  // a waiting tab's ask is read off its screen: what it prints (the menu drawn late, moved, answered from the keyboard)
+  // is read again 300 ms later, and a view goes out only when the ask isn't the one the last view gave
+  let asking: ReturnType<typeof setTimeout> | undefined
+  s.onOutput = () => {
+    if (r.status !== 'waiting' || asking) return
+    asking = setTimeout(() => {
+      asking = undefined
+      if (r.status === 'waiting' && JSON.stringify(askOf(s.screenText(16)) ?? null) !== r.askKey) changed()
+    }, 300)
+  }
   r.status = o.prompt && !o.resume ? 'running' : 'idle'
   r.since = undefined // a turn started by a prompt, not by Enter (input): it always notifies
   r.done = false
@@ -552,6 +582,41 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   return tab
 }
 
+// answer: a choice of the menu a waiting agent shows (n, or the first or last), as its arrows and Enter would pick it;
+// one at a time per tab, and not again for a second after (a double click, Allow and a click: the menu isn't redrawn yet)
+const answering = new Set<string>()
+export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'last' }) {
+  const t = findTab(p.tab)
+  const s = sessions.get(t.id)
+  if (!s || s.exited) throw new Error(`${t.name} isn't running`)
+  if (rtOf(t.id).status !== 'waiting') throw new Error(`${t.name} isn't asking anything now`)
+  if (answering.has(t.id)) throw new Error(`${t.name} is being answered`)
+  answering.add(t.id)
+  try {
+    await s.flushed()
+    const a = askOf(s.screenText(16))
+    if (!a) throw new Error(`${t.name} isn't asking anything with choices now`)
+    const n = p.n ?? (p.pick === 'last' ? a.options.at(-1)!.n : a.options[0].n)
+    if (!a.options.some(o => o.n === n)) throw new Error(`${t.name} has no choice ${n}`)
+    const key = `\x1b${s.appCursor ? 'O' : '['}${n > a.at ? 'B' : 'A'}`
+    // one key at a time: a TUI reads a burst as one unknown key
+    for (let i = 0; i < Math.abs(n - a.at); i++) input(t.id, key), await new Promise(r => setTimeout(r, 40))
+    input(t.id, '\r')
+    setTimeout(() => answering.delete(t.id), 1000)
+    return { picked: a.options.find(o => o.n === n)!.label }
+  } catch (e) {
+    answering.delete(t.id)
+    throw e
+  }
+}
+
+// mark a tab unread: its ● again, until it's looked at
+export function unread(id: string) {
+  findTab(id)
+  rtOf(id).done = true
+  changed()
+}
+
 // rename a tab, or color it
 export function tabSet(o: { id: string; name?: string; color?: string; muted?: boolean }) {
   const t = findTab(o.id)
@@ -564,7 +629,7 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 }
 
 // a workspace's sidebar color, name, notifications, and whether CI failures and review comments go to its agent
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; muted?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; muted?: boolean }) {
   const w = findWs(o.id)
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.name !== undefined) {
@@ -573,10 +638,11 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   }
   if (o.autoFix !== undefined) w.autoFix = o.autoFix || undefined
   if (o.autoReview !== undefined) w.autoReview = o.autoReview || undefined
+  if (o.autoMerge !== undefined) w.autoMerge = o.autoMerge || undefined
   if (o.muted !== undefined) w.muted = o.muted || undefined
   save()
   changed()
-  if (o.autoFix || o.autoReview) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
+  if (o.autoFix || o.autoReview || o.autoMerge) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
   return w
 }
 
@@ -611,6 +677,7 @@ export function settingsSet(o: Settings) {
   state.settings = { ...state.settings, ...o }
   save()
   changed()
+  if ('diffStat' in o) void scanStats() // its numbers now, not at the next scan
   return state.settings
 }
 
@@ -685,7 +752,42 @@ export function closeTab(id: string) {
 // ---------- workspaces
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue'] }
+
+// --issue: a GitHub issue (its URL, or its number in the project's repo) through gh: the workspace's name, and its
+// title, body and link ahead of the prompt
+async function fromIssue(proj: Project, o: NewWs): Promise<NewWs> {
+  if (!o.issue?.trim() || o.issued) return o
+  const { stdout } = await run('gh', ['issue', 'view', '--json', 'number,title,body,url', '--', o.issue.trim()], { cwd: proj.path, timeout: 20000 }).catch(e => {
+    throw new Error(`gh issue view ${o.issue}: ${String(e.stderr || e.message).trim().split('\n')[0]}`)
+  })
+  const i = JSON.parse(stdout) as { number: number; title: string; body?: string; url: string }
+  const body = (i.body ?? '').trim()
+  const prompt = [`Work on GitHub issue #${i.number}: ${i.title}`, i.url, body.length > 8000 ? `${body.slice(0, 8000)}\n… (cut: the rest is on GitHub)` : body, o.prompt?.trim()].filter(Boolean).join('\n\n')
+  return { ...o, prompt, name: o.name || `issue-${i.number}-${slug(i.title).slice(0, 24)}`.replace(/-+$/, ''), issued: { number: i.number, url: i.url, title: i.title } }
+}
+
+// a race: one prompt to several agents, each in a worktree of its own (named <name>-<preset>), one after another (git
+// takes one worktree add at a time); Compare in the app lays them side by side
+export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace[]> {
+  const proj = findProject(o.project)
+  const presets = [...new Set((Array.isArray(o.presets) ? o.presets : []).map(p => String(p).trim()).filter(Boolean))]
+  if (presets.length < 2) throw new Error('a race needs two agents or more')
+  if (presets.length > 6) throw new Error('six agents at most')
+  if (o.local || proj.git === false) throw new Error('a race needs worktrees: a git project, not Local')
+  for (const p of presets) {
+    if (p === 'none' || p === 'shell') throw new Error(`${p} isn't an agent`)
+    presetCheck(p)
+    const agent = presetNamed(p)?.agent ?? p
+    if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree
+  }
+  const base = await fromIssue(proj, o)
+  const name = slug(base.name || (base.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')) || 'race'
+  const race = randomUUID().slice(0, 8)
+  const made: Workspace[] = []
+  for (const p of presets) made.push(await wsNew({ ...base, preset: p, name: `${name.slice(0, Math.max(8, 39 - p.length)).replace(/-+$/, '')}-${p}`, race }))
+  return made
+}
 
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const proj = findProject(o.project)
@@ -693,6 +795,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // before the worktree: a wrong one makes nothing
+  o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
   const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
   let ws: Workspace
   if (o.local || proj.git === false) {
@@ -712,6 +815,8 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     })
     ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now() }
   }
+  if (o.race) ws.race = o.race
+  if (o.issued) ws.issue = o.issued
   state.workspaces.push(ws)
   save()
   const cfg = projectConfig(ws)
@@ -770,9 +875,14 @@ export async function wsRm(ref: string) {
 }
 
 // wsArchive is wsRm that keeps the workspace's record (branch, agents' resume ids) for wsRestore.
-export async function wsArchive(ref: string) {
+// ifClean: only with nothing uncommitted (archiving removes the worktree, and that with it), else how many paths are
+export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('only worktree workspaces can be archived')
+  if (o.ifClean && existsSync(ws.path)) {
+    const dirty = (await git(ws.path, '--no-optional-locks', 'status', '--porcelain')).split('\n').filter(Boolean).length
+    if (dirty) return { dirty }
+  }
   await teardown(ws)
   ws.archived = true
   ws.port = 0
@@ -889,6 +999,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '' })
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
+      prSoon()
       break
     }
     case 'interrupted':
@@ -1040,7 +1151,38 @@ export function watchLimits(now = Date.now()) {
 
 // ---------- ports (lsof over each workspace's process trees) and PRs (gh)
 
+// the branch a workspace's folder is on now (HEAD's file, no git run): an agent may switch it (git checkout -b …), and
+// the PR, the status bar, ship and restore follow; detached (a rebase): as it was
+function headOf(path: string): string | undefined {
+  try {
+    let g = join(path, '.git')
+    if (statSync(g).isFile()) g = resolve(path, readFileSync(g, 'utf8').match(/^gitdir: (.+)$/m)![1].trim()) // a worktree's
+    return readFileSync(join(g, 'HEAD'), 'utf8').match(/^ref: refs\/heads\/(.+)$/m)?.[1].trim()
+  } catch {}
+}
+function syncBranches() {
+  let moved = false
+  for (const w of state.workspaces) {
+    if (w.archived || state.projects.find(p => p.id === w.project)?.git === false) continue
+    const b = headOf(w.path)
+    if (!b || b === w.branch) continue
+    w.branch = b
+    prs.delete(w.id) // the old branch's PR isn't this one's
+    moved = true
+  }
+  if (moved) save(), changed(), void scanPRs() // its PR now, not in a minute
+}
+
+// a turn's end may have opened a PR (gh pr create): a scan soon, at most every 20 s
+let prSoonAt = 0
+function prSoon() {
+  if (Date.now() - prSoonAt < 20000) return
+  prSoonAt = Date.now()
+  setTimeout(() => void scanPRs(), 2000)
+}
+
 export async function scanPorts() {
+  syncBranches()
   const root = new Map<number, string>()
   for (const [id, s] of sessions) {
     const t = state.tabs.find(t => t.id === id)
@@ -1293,7 +1435,7 @@ export function scanPRs(): Promise<void> {
   return prScan
 }
 
-const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,reviewDecision,additions,deletions,body,updatedAt,statusCheckRollup'
+const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,mergeable,additions,deletions,body,updatedAt,statusCheckRollup'
 
 async function scanPR(ws: Workspace) {
   let pr: PR
@@ -1312,6 +1454,8 @@ async function scanPR(ws: Workspace) {
       draft: j.isDraft,
       head: j.headRefOid,
       review: j.reviewDecision || undefined,
+      conflict: j.mergeable === 'CONFLICTING' ? true : j.mergeable === 'MERGEABLE' ? false : undefined, // UNKNOWN for a while after a push
+      base: j.baseRefName,
       additions: j.additions,
       deletions: j.deletions,
       body: typeof j.body === 'string' ? j.body.slice(0, 4000) : undefined,
@@ -1330,31 +1474,44 @@ async function scanPR(ws: Workspace) {
 
 // ---------- PR feedback to the agent: failing CI, review comments (from wb's fix-ci / fix-review)
 
-const MAX_CI_FIXES = 3 // in a row, one per pushed commit; then it's over to you
+const MAX_FIXES = 3 // failing CI or conflicts, in a row, one per pushed commit; then it's over to you
 
 // autoPR, after each scan of an open PR: with autoFix, failing CI goes to the agent once per commit (3
-// times in a row at most); with autoReview, new review comments do. Either way it's asked to push.
+// times in a row at most); with autoReview, new review comments do; with autoMerge, merge conflicts do, the same
+// way. It's asked to push.
 async function autoPR(ws: Workspace, pr: PR) {
-  if (pr.state !== 'OPEN' || !(ws.autoFix || ws.autoReview)) return
+  if (pr.state !== 'OPEN' || !(ws.autoFix || ws.autoReview || ws.autoMerge)) return
   const f: PRFix = ws.fix?.pr === pr.number ? { ...ws.fix } : { pr: pr.number }
   if (ws.autoFix) {
     if (pr.checks === 'pass') f.tries = 0
     else if (pr.checks === 'fail' && pr.head && pr.head !== f.ci) {
       const tries = (f.tries ?? 0) + 1
-      if (tries > MAX_CI_FIXES) {
-        const tab = agentOf(ws)
-        if (tab && tries === MAX_CI_FIXES + 1) {
-          rtOf(tab.id).status = 'waiting' // ◆: over to you, once
-          broadcast({ ev: 'turn', tab: tab.id, ws: ws.id, kind: 'waiting', text: `CI still fails after ${MAX_CI_FIXES} fixes` })
-        }
+      if (tries > MAX_FIXES) {
+        if (tries === MAX_FIXES + 1) overToYou(ws, `CI still fails after ${MAX_FIXES} fixes`)
         Object.assign(f, { ci: pr.head, tries })
       } else if (await prFix({ ws: ws.id, what: 'ci', push: true }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), false)))
         Object.assign(f, { ci: pr.head, tries }) // recorded once sent: no agent yet means the next scan tries again
     }
   }
+  if (ws.autoMerge) {
+    // ponytail: once per head commit, so a base that moves while the agent merges doesn't queue another; one that
+    // conflicts again with the same head waits for a push (or Send merge conflicts)
+    const merges = (f.merges ?? 0) + 1
+    if (pr.conflict === false) f.merges = 0 // not unknown: that comes after every push, and would undo the limit
+    else if (pr.conflict && pr.head && pr.head !== f.merge) {
+      if (merges > MAX_FIXES) {
+        if (merges === MAX_FIXES + 1) overToYou(ws, `Merge conflicts remain after ${MAX_FIXES} tries`)
+        Object.assign(f, { merge: pr.head, merges })
+      } else if (await prFix({ ws: ws.id, what: 'conflict', push: true }).then(() => true, e => (log(`fix conflicts ${ws.id}: ${e.message}`), false)))
+        Object.assign(f, { merge: pr.head, merges })
+    }
+  }
   if (ws.autoReview) {
     const t = await reviewThreads(ws.path, pr.number).catch(() => null)
-    const k = t && reviewKey(t.threads, t.me)
+    const ids = new Set(f.mine)
+    const mine = (c: Comment) => !!c.id && (ids.has(c.id) || (!!c.createdAt && agentSaid(ws.id, c.createdAt) && !!ids.add(c.id)))
+    const k = t && reviewKey(t.threads, t.me, mine)
+    if (ids.size) f.mine = [...ids].slice(-200)
     if (t && k !== null && newReview(k, f.review))
       try {
         tellAgent(ws, reviewMessage(pr, t.threads, true))
@@ -1371,6 +1528,14 @@ async function autoPR(ws: Workspace, pr: PR) {
   }
 }
 
+// ◆ on the workspace's agent: over to you
+function overToYou(ws: Workspace, text: string) {
+  const tab = agentOf(ws)
+  if (!tab) return
+  rtOf(tab.id).status = 'waiting'
+  broadcast({ ev: 'turn', tab: tab.id, ws: ws.id, kind: 'waiting', text })
+}
+
 // the workspace's agent: its first live agent tab
 const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && sessions.get(t.id) && !sessions.get(t.id)!.exited)
 
@@ -1385,10 +1550,15 @@ const pushAsk = (push: boolean) => (push ? 'commit and push the fix, then say wh
 
 // prFix sends the PR's failing CI (with the end of the failed GitHub Actions logs) or its open review
 // comments to the workspace's agent
-export async function prFix(o: { ws: string; what: 'ci' | 'review'; push?: boolean }) {
+export async function prFix(o: { ws: string; what: FixWhat; push?: boolean }) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
+  if (o.what === 'conflict') {
+    if (!pr.conflict) throw new Error(`PR #${pr.number} has no merge conflicts`)
+    const b = pr.base ?? 'main'
+    return tellAgent(ws, `PR #${pr.number} (${pr.url}) has merge conflicts with ${b}. Merge it in (git fetch origin ${b}, then git merge origin/${b}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, then ${o.push ? 'commit and push the merge' : 'commit the merge'}, then say what you changed.`)
+  }
   if (o.what === 'review') {
     const { threads } = await reviewThreads(ws.path, pr.number)
     const msg = reviewMessage(pr, threads, !!o.push)
@@ -1422,7 +1592,7 @@ export async function prFix(o: { ws: string; what: 'ci' | 'review'; push?: boole
   return tellAgent(ws, `CI fails on PR #${pr.number} (${pr.url}). Find the cause and fix it, run what you can locally, then ${pushAsk(!!o.push)}.\n${body}`)
 }
 
-type Comment = { author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string }
+type Comment = { id?: string; author: { login: string; __typename?: string } | null; authorAssociation?: string; body: string; createdAt?: string }
 type Thread = { id: string; isResolved: boolean; isOutdated: boolean; path: string; line: number | null; comments: { nodes: Comment[] } }
 
 // comments an agent may act on: from people with write access to the repo, or bots (review tools). Anyone
@@ -1433,7 +1603,7 @@ const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
   viewer { login }
   repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { reviewThreads(first: 100) { nodes {
     id isResolved isOutdated path line
-    comments(first: 30) { nodes { author { login __typename } authorAssociation body } }
+    comments(first: 30) { nodes { id author { login __typename } authorAssociation body createdAt } }
   } } } }
 }`
 
@@ -1448,11 +1618,11 @@ async function reviewThreads(cwd: string, pr: number): Promise<{ threads: Thread
   return { threads: threads.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(trusted) } })), me: d.viewer.login }
 }
 
-// the open threads with how many comments others left on each ("id:n id:n"); your own comments don't
-// count: the agent comments as you, and its replies must not start another round
-export const reviewKey = (threads: Thread[], me: string) =>
+// the open threads with how many comments count on each ("id:n id:n"): everyone's but the agent's. It comments as you,
+// and its replies must not start another round: yours made while it worked are its own (mine: their ids, kept)
+export const reviewKey = (threads: Thread[], me: string, mine: (c: Comment) => boolean) =>
   threads
-    .map(t => [t, t.comments.nodes.filter(c => c.author?.login !== me).length] as const)
+    .map(t => [t, t.comments.nodes.filter(c => c.author?.login !== me || !mine(c)).length] as const)
     .filter(([t, n]) => !t.isResolved && n > 0)
     .map(([t, n]) => `${t.id}:${n}`)
     .join(' ')
@@ -1469,7 +1639,7 @@ function reviewMessage(pr: PR, threads: Thread[], push: boolean) {
     const said = t.comments.nodes.map(c => `   @${c.author?.login ?? '?'}: ${c.body.trim().replace(/\n/g, '\n   ')}`).join('\n')
     return `\n${i + 1}. ${where}\n${said}`
   })
-  return `Address the open review comments on PR #${pr.number} (${pr.url}). Fix what you agree with; then ${pushAsk(push)}, and what you didn't and why.\n${items.join('\n')}`
+  return `Address the open review comments on PR #${pr.number} (${pr.url}). Fix what you agree with; then ${pushAsk(push)}, and what you didn't and why. Answer here, not on GitHub.\n${items.join('\n')}`
 }
 
 // a turn that ended without a hook (an interrupt, a resumed chat's recap): running, no output for a
@@ -1533,6 +1703,94 @@ export async function diff(ref: string) {
   }
   const MAX = 4 << 20
   return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + '\n… (cut)' : out }
+}
+
+// the sidebar's +/-: diff's numbers without its text, for each live git workspace; one scan at a time
+const stats = new Map<string, Stat>()
+let statting = false
+let restat = false // asked for while one ran: again after it
+async function statOf(w: Workspace): Promise<Stat> {
+  // --no-optional-locks: a scan never holds index.lock while an agent or you commit
+  const from = w.kind === 'worktree' ? await git(w.path, 'merge-base', w.base, 'HEAD').catch(() => 'HEAD') : 'HEAD'
+  const [numstat, untracked, status] = await Promise.all([
+    git(w.path, '--no-optional-locks', 'diff', '--numstat', '-M', from),
+    git(w.path, '--no-optional-locks', 'ls-files', '--others', '--exclude-standard'),
+    git(w.path, '--no-optional-locks', 'status', '--porcelain'),
+  ])
+  const st: Stat = { add: 0, del: 0, files: 0, dirty: status.split('\n').filter(Boolean).length }
+  for (const l of numstat.split('\n').filter(Boolean)) {
+    const [a, d] = l.split('\t')
+    st.add += Number(a) || 0 // a binary file: -
+    st.del += Number(d) || 0
+    st.files++
+  }
+  // ponytail: new files' lines read here (async: the loop streams terminals), the first 100 up to 1 MB each; a text
+  // file's newlines, a binary's none
+  const fresh = untracked.split('\n').filter(Boolean)
+  st.files += fresh.length
+  for (const f of fresh.slice(0, 100)) {
+    try {
+      const p = join(w.path, f)
+      if ((await stat(p)).size > 1 << 20) continue
+      const b = await readFile(p)
+      if (!b.subarray(0, 8000).includes(0)) st.add += b.length && b.toString('utf8').split('\n').length - (b[b.length - 1] === 10 ? 1 : 0)
+    } catch {}
+  }
+  return st
+}
+export async function scanStats(): Promise<void> {
+  if (statting) return void (restat = true)
+  statting = true
+  try {
+    // the sidebar's (settings.diffStat, off by default), and a race's always: Compare shows them
+    const on = state.settings?.diffStat === true
+    const wanted = (w: Workspace) => !w.archived && (on || !!w.race) && state.projects.find(p => p.id === w.project)?.git !== false
+    for (const id of stats.keys()) if (!state.workspaces.some(w => w.id === id && wanted(w))) (stats.delete(id), changed())
+    for (const w of state.workspaces) {
+      if (!wanted(w) || !existsSync(w.path)) continue
+      const s = await statOf(w).catch(() => undefined)
+      if (JSON.stringify(s) === JSON.stringify(stats.get(w.id))) continue
+      s ? stats.set(w.id, s) : stats.delete(w.id)
+      changed()
+    }
+  } finally {
+    statting = false
+  }
+  if (restat) (restat = false), await scanStats()
+}
+
+// the agent browser (laki browser, MCP's laki_browser): a hidden window of the app's per workspace (main's), asked
+// through the newest connected app window; a page on this Mac only (main checks too). screenshot: a PNG in images/
+const BROWSE_OPS = ['open', 'screenshot', 'click', 'fill', 'text']
+const browsing = new Map<string, { done: (r: { ok: boolean; result?: any; error?: string }) => void }>()
+export async function browse(p: { ws: string; op: string; url?: string; selector?: string; text?: string }) {
+  const ws = findWs(p.ws)
+  if (!BROWSE_OPS.includes(p.op)) throw new Error(`browser: ${p.op}? one of ${BROWSE_OPS.join(', ')}`)
+  if ((p.op === 'click' || p.op === 'fill') && !p.selector?.trim()) throw new Error(`browser ${p.op}: which element? a CSS selector`)
+  // a path is on the workspace's $PORT, localhost:3000 gets its http://
+  const u = p.url?.trim()
+  const url = !u ? undefined : u.startsWith('/') ? `http://localhost:${ws.port}${u}` : /^https?:\/\//.test(u) ? u : `http://${u}`
+  if (url && !/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(url)) throw new Error(`the agent browser opens this Mac's localhost only, not ${url}`)
+  const host = [...clients].reverse().find(c => c.view?.browse)
+  if (!host) throw new Error("the agent browser needs Laki's window: open the app on this Mac")
+  const id = randomUUID()
+  const r = await new Promise<{ ok: boolean; result?: any; error?: string }>(done => {
+    const t = setTimeout(() => (browsing.delete(id), done({ ok: false, error: "the agent browser didn't answer in 30 s" })), 30000)
+    browsing.set(id, { done: r => (clearTimeout(t), browsing.delete(id), done(r)) })
+    host.send({ ev: 'browse', req: id, ws: ws.id, home: `http://localhost:${ws.port}/`, op: p.op, url, selector: p.selector, text: p.text })
+  })
+  if (!r.ok) throw new Error(r.error || 'the agent browser failed')
+  if (p.op !== 'screenshot') return r.result
+  return { url: r.result.url, path: imageSave({ data: r.result.png, ext: 'png' }) }
+}
+export function browseDone(p: { id: string; ok: boolean; result?: any; error?: string }) {
+  browsing.get(p.id)?.done(p)
+}
+
+// the first-run screen's checks
+export async function doctor(): Promise<Doctor> {
+  const gh = !onPath('gh') ? 'missing' : await run('gh', ['auth', 'status'], { timeout: 8000 }).then(() => 'in' as const, () => 'out' as const)
+  return { git: onPath('git'), gh, agents: AGENTS.map(id => ({ id, found: onPath(id) })) }
 }
 
 function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<string, string>) {

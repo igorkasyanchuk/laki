@@ -154,6 +154,11 @@ export class Session {
     return out.slice(-lines).join('\n')
   }
 
+  // the keys arrows send now (a TUI may have asked for application cursor keys)
+  get appCursor(): boolean {
+    return !!this.term.modes.applicationCursorKeysMode
+  }
+
   // lineCount: the line after the last one with text (scrollback included)
   lineCount(): number {
     const b = this.term.buffer.active

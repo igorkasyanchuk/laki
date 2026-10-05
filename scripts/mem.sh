@@ -2,7 +2,7 @@
 # Memory with 3 workspaces x 2 tabs (fake claude + shell): the packaged app starts its daemon itself.
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-APP="$ROOT/dist/mac-arm64/Laki.app"
+APP=${APP:-$ROOT/dist/$([ "$(uname -m)" = arm64 ] && echo mac-arm64 || echo mac)/Laki.app} # APP=…/dist/mac/Laki.app: the Intel build, under Rosetta
 BIN="$APP/Contents/MacOS/Laki"
 NODE_DIR=$(dirname "$(node -p process.execPath)")
 H=${1:-/tmp/laki-mem}

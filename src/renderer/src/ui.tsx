@@ -52,6 +52,9 @@ const paths = {
   bell: 'M4 11V7a4 4 0 018 0v4l1.5 1.5h-11zM6.5 13.5a1.5 1.5 0 003 0',
   bellOff: 'M4 11V7a4 4 0 018 0v4l1.5 1.5h-11zM6.5 13.5a1.5 1.5 0 003 0M2.5 2.5l11 11',
   clock: 'M8 14a6 6 0 100-12 6 6 0 000 12zM8 4.7V8l2.3 1.5',
+  unread: 'M8 11a3 3 0 100-6 3 3 0 000 6z',
+  race: 'M3.5 14V2.5M3.5 3h8.5l-2 2.75 2 2.75H3.5',
+  conflict: 'M8 2.2l6.2 11H1.8zM8 6.6v3.2M8 11.6v.01',
   help: 'M8 14a6 6 0 100-12 6 6 0 000 12zM6.2 6.3a1.9 1.9 0 113 1.5c-.7.5-1.2.9-1.2 1.7M8 11.2v.01',
   // GitHub's mark (Octicons, MIT), filled
   github:
@@ -68,10 +71,12 @@ export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
   )
 }
 
-export function IconButton({ icon, title, onClick, on, className = '' }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string }) {
+// label: words beside the icon (the sidebar's foot)
+export function IconButton({ icon, title, onClick, on, className = '', label }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string }) {
   return (
-    <button className={`ib ${on ? 'on' : ''} ${className}`} data-tip={title} aria-label={title} onClick={onClick}>
+    <button className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={title} aria-label={title} onClick={onClick}>
       <Icon name={icon} />
+      {label && <span className="ib-label">{label}</span>}
     </button>
   )
 }
@@ -102,6 +107,68 @@ export function Switch({ on, onChange, tip, className = '', children }: { on?: b
       </span>
       {children}
     </button>
+  )
+}
+
+// ask: a yes/no question in the app's own dialog (confirm() is the OS's sheet), true on OK. AskHost, mounted once
+// in App, shows it; a newer question answers the one before with no. Esc or a click outside: no; Enter: the focused
+// button (OK at first); its keys never reach what's under it, ⌘ shortcuts aside.
+type Asking = { title: string; text?: string; ok: string; danger?: boolean; done: (yes: boolean) => void }
+let asker: ((a: Asking) => void) | null = null
+export const ask = (title: string, o: { text?: string; ok?: string; danger?: boolean } = {}) =>
+  new Promise<boolean>(done => (asker ? asker({ title, ok: 'OK', ...o, done }) : done(confirm([title, o.text].filter(Boolean).join(' ')))))
+
+export function AskHost() {
+  const [a, setA] = useState<Asking | null>(null)
+  const cur = useRef<{ a: Asking; back: Element | null } | null>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const close = (yes: boolean) => {
+    const c = cur.current
+    if (!c) return
+    cur.current = null
+    setA(null)
+    c.a.done(yes)
+    if (c.back instanceof HTMLElement) c.back.focus() // the terminal it came from
+  }
+  const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
+  onKey.current = e => {
+    if (!cur.current || e.metaKey || e.ctrlKey || e.altKey) return
+    e.preventDefault()
+    e.stopPropagation()
+    const btns = [...(box.current?.querySelectorAll('button') ?? [])]
+    const at = btns.indexOf(document.activeElement as HTMLButtonElement)
+    if (e.key === 'Escape') close(false)
+    else if (e.key === 'Enter') close(at !== 0)
+    else if (['Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) btns[at === 0 ? 1 : 0]?.focus()
+  }
+  useEffect(() => {
+    asker = next => {
+      cur.current?.a.done(false)
+      cur.current = { a: next, back: cur.current?.back ?? document.activeElement }
+      setA(next)
+    }
+    const f = (e: KeyboardEvent) => onKey.current(e)
+    window.addEventListener('keydown', f, true) // before the terminal and the page under it
+    return () => {
+      asker = null
+      window.removeEventListener('keydown', f, true)
+    }
+  }, [])
+  useEffect(() => box.current?.querySelector<HTMLButtonElement>('button.primary')?.focus(), [a])
+  if (!a) return null
+  return (
+    <div className="overlay ask-overlay" onMouseDown={e => e.target === e.currentTarget && close(false)}>
+      <div className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
+        <div className="ask-title">{a.title}</div>
+        {a.text && <p className="ask-text">{a.text}</p>}
+        <div className="ask-buttons">
+          <button onClick={() => close(false)}>Cancel</button>
+          <button className={`primary ${a.danger ? 'danger' : ''}`} onClick={() => close(true)}>
+            {a.ok}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

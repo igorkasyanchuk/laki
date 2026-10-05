@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import type { Schedule, ScheduleRun, View } from '../shared/types.ts'
+import type { Schedule, ScheduleRun, View, Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { describe } from '../shared/when.ts'
@@ -13,7 +13,7 @@ import { describe } from '../shared/when.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'fan'])
 const BOOL = new Set(['json', 'local', 'when-idle'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -60,13 +60,15 @@ async function main() {
     case 'help':
       return console.log(USAGE)
     case 'open': {
-      // the app this CLI ships in, else this checkout's build, else whatever LaunchServices knows as laki
+      // the app this CLI ships in, else this checkout's build (dist/mac-arm64: Apple silicon, dist/mac: Intel), else
+      // whatever LaunchServices knows as laki
       const here = dirname(fileURLToPath(import.meta.url))
-      const app = [process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, ''), resolve(here, '../../dist/mac-arm64/Laki.app'), resolve(here, '../../../dist/mac-arm64/Laki.app')].find(p => p.endsWith('.app') && existsSync(p))
+      const dist = `dist/${process.arch === 'arm64' ? 'mac-arm64' : 'mac'}/Laki.app`
+      const app = [process.execPath.replace(/\/Contents\/MacOS\/[^/]+$/, ''), resolve(here, '../..', dist), resolve(here, '../../..', dist)].find(p => p.endsWith('.app') && existsSync(p))
       try {
         execFileSync('open', app ? [app] : ['-b', 'dev.laki.app'], { stdio: 'ignore' })
       } catch {
-        throw new Error('Laki.app not found: build it with `npm run pack` (dist/mac-arm64/Laki.app), or copy it to /Applications')
+        throw new Error(`Laki.app not found: build it with \`npm run pack\` (${dist}), or copy it to /Applications`)
       }
       return
     }
@@ -99,8 +101,8 @@ async function main() {
       return out(v.projects, v.projects.map(p => `${p.id}  ${p.path}`).join('\n'))
     }
     case 'new': {
-      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--prompt text]')
-      const ws = await rpc('wsNew', {
+      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--fan claude,codex] [--prompt text]')
+      const o = {
         project: rest[0],
         base: flags.base,
         preset: flags.preset,
@@ -108,8 +110,28 @@ async function main() {
         prompt: flags.prompt || rest.slice(1).join(' ') || undefined,
         name: flags.name,
         local: !!flags.local,
-      })
-      return out(ws, `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : "folder"}, PORT ${ws.port})`)
+        model: flags.model,
+        effort: flags.effort,
+        issue: flags.issue || undefined,
+      }
+      const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
+      // a race: the same prompt to each preset, a worktree each
+      if (flags.fan) {
+        const presets = String(flags.fan).split(',').map(p => p.trim()).filter(Boolean)
+        const made: Workspace[] = await rpc('wsFan', { ...o, presets }, 120000 * Math.max(1, presets.length))
+        return out(made, made.map(line).join('\n'))
+      }
+      const ws: Workspace = await rpc('wsNew', o, 120000)
+      return out(ws, line(ws))
+    }
+    case 'browser': {
+      // laki browser [ws] open [url] | screenshot | click <selector> | fill <selector> <text> | text; in a tab, its workspace
+      const ops = ['open', 'screenshot', 'click', 'fill', 'text']
+      const [ws, op, ...more] = ops.includes(rest[0]) && process.env.LAKI_WORKSPACE ? [process.env.LAKI_WORKSPACE, ...rest] : rest
+      if (!ws || !ops.includes(op)) throw new Error('usage: laki browser [ws] open [url|/path] | screenshot | click <selector> | fill <selector> <text> | text')
+      const p = op === 'open' ? { url: more[0] } : op === 'click' ? { selector: more.join(' ') } : op === 'fill' ? { selector: more[0], text: more.slice(1).join(' ') } : {}
+      const r = await rpc('browse', { ws, op, ...p }, 45000)
+      return out(r, op === 'text' ? r.text : op === 'screenshot' ? r.path : op === 'open' ? `${r.url}${r.title ? `  ${r.title}` : ''}` : 'ok')
     }
     case 'rm':
     case 'archive':

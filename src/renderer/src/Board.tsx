@@ -130,9 +130,10 @@ export function BoardPage({ view, timers, api, onClose }: { view: View; timers?:
                     </div>
                     {last && <div className="board-last">{last}</div>}
                     {w.pr && (
-                      <div className={`ws-pr board-pr ${prState(w.pr)} ${w.pr.checks === 'fail' ? 'fail' : ''}`}>
+                      <div className={`ws-pr board-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
                         <Icon name="github" size={11} /> #{w.pr.number}
                         {w.pr.checks ? ` · ${ciText(w.pr)}` : ''}
+                        {w.pr.conflict && w.pr.state === 'OPEN' ? ' · conflicts' : ''}
                       </div>
                     )}
                   </button>

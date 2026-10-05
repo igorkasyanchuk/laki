@@ -10,6 +10,8 @@ vv?.addEventListener('resize', () => document.documentElement.style.setProperty(
 
 // the bundled fonts first, every subset (Latin, Latin Extended, Cyrillic): a terminal measures its cells and
 // caches its glyphs as it opens
-Promise.all(['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter'].map(f => document.fonts.load(f, 'aĀЖ')))
+// the other terminal fonts too (small, Latin only): one picked in Settings is drawn at once, measured right
+const MORE = ['Fira Code', 'Cascadia Code', 'Source Code Pro', 'IBM Plex Mono', 'Geist Mono'].flatMap(f => [`13px "${f}"`, `bold 13px "${f}"`])
+Promise.all(['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter', ...MORE].map(f => document.fonts.load(f, 'aĀЖ')))
   .catch(() => {})
   .finally(() => createRoot(document.getElementById('root')!).render(<App />))

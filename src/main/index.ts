@@ -122,13 +122,87 @@ ipcMain.handle('conn', async () => {
   const { port, token } = await daemon()
   return { port, token }
 })
-// sound: a macOS sound's name (Settings › General), 'none', or unset: the default
-ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string) => {
-  if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab, sound }) + '\n') // smoke tests
+// sound: a macOS sound's name (Settings › General), 'none', or unset: the default. actions: buttons (a permission
+// prompt's Allow and Deny; macOS shows them with the Alerts style, under Options with Banners): Allow picks the menu's
+// first choice, Deny its last, straight through the daemon (the window may be closed by then). Kept until used or
+// closed: a collected Notification's events never come
+const notes = new Set<Notification>()
+ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string, actions?: string[]) => {
+  if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
-  const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }) })
-  n.on('click', () => show(tab))
+  const buttons = Array.isArray(actions) ? actions.filter(a => typeof a === 'string').slice(0, 2) : []
+  const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(text => ({ type: 'button' as const, text })) })
+  const done = () => notes.delete(n)
+  n.on('click', () => (done(), show(tab)))
+  n.on('action', (_ev, i) => (done(), rpc('answer', { tab, pick: i === 0 ? 'first' : 'last' }).catch(() => show(tab)))) // it moved on: look
+  n.on('close', done)
+  notes.add(n)
+  if (notes.size > 50) notes.delete(notes.values().next().value!) // ponytail: the oldest go; Notification Center keeps them for days
   n.show()
+})
+
+// the agent browser (laki browser, MCP's laki_browser): a hidden window per workspace in the preview's session, kept
+// to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the daemon through the renderer
+type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string }
+const agentWins = new Map<string, { w: BrowserWindow; idle?: ReturnType<typeof setTimeout> }>()
+const pageJs = (f: string, ...args: unknown[]) => `(${f})(${args.map(a => JSON.stringify(a)).join(',')})`
+ipcMain.handle('browse', async (e, r: Browse) => {
+  if (e.sender !== win?.webContents) throw new Error('not the app window')
+  let a = agentWins.get(r.ws)
+  if (!a || a.w.isDestroyed()) {
+    const w = new BrowserWindow({ show: false, width: 1280, height: 800, webPreferences: { partition: PREVIEW, sandbox: true, contextIsolation: true, nodeIntegration: false, backgroundThrottling: false } }) // hidden: its timers at full speed
+    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    w.webContents.on('will-navigate', (ev, u) => !local(u) && ev.preventDefault())
+    w.webContents.on('will-redirect', (ev, u) => !local(u) && ev.preventDefault())
+    agentWins.set(r.ws, (a = { w }))
+  }
+  const entry = a
+  clearTimeout(entry.idle)
+  entry.idle = setTimeout(() => {
+    if (agentWins.get(r.ws) === entry) agentWins.delete(r.ws)
+    if (!entry.w.isDestroyed()) entry.w.destroy()
+  }, 10 * 60e3)
+  const wc = entry.w.webContents
+  const settle = () => new Promise(ok => setTimeout(ok, 300)) // what a click starts gets a moment
+  if (r.op === 'open' || !wc.getURL()) {
+    const u = r.url ?? r.home
+    if (!local(u)) throw new Error(`only this Mac's localhost: ${u}`)
+    await wc.loadURL(u).catch(err => {
+      throw new Error(/ERR_CONNECTION_REFUSED/.test(String(err)) ? `nothing listens on ${new URL(u).host}: start the dev server (laki run)` : String(err.message ?? err))
+    })
+  }
+  const page = { url: wc.getURL(), title: wc.getTitle() }
+  if (r.op === 'open') return page
+  if (r.op === 'screenshot') {
+    const img = await wc.capturePage()
+    if (img.isEmpty()) throw new Error('nothing painted yet: try again')
+    return { url: page.url, png: img.toPNG().toString('base64') }
+  }
+  if (r.op === 'text') return { ...page, text: await wc.executeJavaScript(`(document.body?.innerText ?? '').slice(0, 20000)`) }
+  // click, fill: the first element the selector finds, scrolled into sight; fill types as a user would (input events)
+  const found = await wc.executeJavaScript(
+    pageJs(
+      String((sel: string, op: string, text: string) => {
+        const el = document.querySelector(sel) as HTMLElement | null
+        if (!el) return `no element matches ${sel}`
+        el.scrollIntoView({ block: 'center' })
+        if (op === 'click') return el.click(), ''
+        const f = el as HTMLInputElement
+        if (!('value' in f)) return `${sel} isn't a field`
+        f.focus()
+        Object.getOwnPropertyDescriptor(Object.getPrototypeOf(f), 'value')?.set?.call(f, text)
+        f.dispatchEvent(new Event('input', { bubbles: true }))
+        f.dispatchEvent(new Event('change', { bubbles: true }))
+        return ''
+      }),
+      r.selector ?? '',
+      r.op,
+      r.text ?? '',
+    ),
+  )
+  if (found) throw new Error(found)
+  await settle()
+  return { url: wc.getURL(), title: wc.getTitle() }
 })
 ipcMain.handle('pick-folder', async () => {
   const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] }) // createDirectory: macOS's New Folder button

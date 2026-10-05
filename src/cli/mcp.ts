@@ -38,10 +38,34 @@ const TOOLS: Tool[] = [
         name: str('a short name for the workspace and its branch'),
         base: str('the branch to start from (default: the repo’s current one)'),
         local: { type: 'boolean', description: 'work in the project’s own folder instead of a new worktree' },
+        model: str("the agent's model (opus, sonnet, a full name; provider/model for opencode); default: the agent's own"),
+        effort: str('how hard it thinks: claude low…max, codex minimal…xhigh; default: the agent’s own'),
+        issue: str('a GitHub issue (its URL or number) to work on: its title and text become the prompt, with the prompt above after them'),
+        presets: { type: 'array', items: { type: 'string' }, description: 'a race: 2–6 presets (claude, codex…) that each get a worktree on the same prompt, for the user to compare and keep one' },
       },
-      ['project', 'prompt'],
+      ['project'],
     ),
-    run: a => rpc('wsNew', { project: a.project, prompt: a.prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local }, 120000),
+    run: a => {
+      const o = { project: a.project, prompt: a.prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue }
+      if (!a.prompt && !a.issue) throw new Error('a prompt or an issue')
+      return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
+    },
+  },
+  {
+    name: 'laki_browser',
+    description:
+      "Drive a browser on the workspace's dev server (this Mac's localhost only; needs the Laki app open): open a URL or path (default: http://localhost:$PORT/), screenshot (a PNG's path, to read), click or fill an element by CSS selector, or read the page's text.",
+    inputSchema: obj(
+      {
+        ws: str('a workspace id'),
+        op: { type: 'string', enum: ['open', 'screenshot', 'click', 'fill', 'text'] },
+        url: str('for open: a URL on localhost, or a path like /login'),
+        selector: str('for click and fill: a CSS selector'),
+        text: str('for fill: what to type'),
+      },
+      ['ws', 'op'],
+    ),
+    run: a => rpc('browse', { ws: a.ws, op: a.op, url: a.url, selector: a.selector, text: a.text }, 45000),
   },
   {
     name: 'laki_send',

@@ -65,13 +65,25 @@ ${USAGE}
 1. \`laki ls --json\`: the projects (ids), workspaces (id, branch, path) and tabs with their status.
 2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode] [--name short-name] [--base <branch>]\`:
    a new worktree on a new branch, set up by the project's setup script, with the agent started on the
-   prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent.
+   prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent; \`--model\` and
+   \`--effort\` pick the agent's (blank: its own).
 3. Check on it: \`laki screen <ws>\` (the agent's screen), \`laki ls --json\` (running, waiting for a
    permission, idle).
 4. Follow up: \`laki send <ws> "<text>"\`, or \`--when-idle\` to queue it for when the agent's turn ends.
 
 Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
 workspace each, so they run in parallel.
+
+- From a GitHub issue: \`laki new <project> --issue <url|number>\` (its title and text become the prompt; a
+  \`--prompt\` adds to it).
+- Two agents on the same task, to keep the better result: \`laki new <project> --fan claude,codex --prompt "…"\`
+  (the user compares them in the app).
+
+## Check the UI
+
+\`laki browser open /\` loads the workspace's dev server (\`$PORT\`; start it with \`laki run <ws>\`) in a hidden
+browser of the app's; then \`screenshot\` (a PNG's path: read it), \`click "<css>"\`, \`fill "<css>" "<text>"\`,
+\`text\` (the page's text). This Mac's localhost only, and only while the Laki app is open.
 
 ## Schedule work
 

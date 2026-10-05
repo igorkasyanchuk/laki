@@ -434,3 +434,96 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   await rig.stop()
   await until(() => stops() === n + 1, 'the daemon takes remote access')
 })
+
+test('diff size, archive only when clean, the first-run checks', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const stat = async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.stat
+  await new Promise(r => setTimeout(r, 700))
+  assert.equal(await stat(), undefined) // off by default
+  await rig.rpc('settingsSet', { diffStat: true })
+  await until(async () => (await stat())?.files === 0, 'a clean stat')
+  writeFileSync(join(ws.path, 'README.md'), 'hello\nmore\n') // +1 against the base
+  writeFileSync(join(ws.path, 'new.txt'), 'a\nb\nc') // a new file: 3 lines
+  writeFileSync(join(ws.path, 'blob.bin'), Buffer.from([0, 1, 2, 10, 10])) // binary: no lines
+  assert.deepEqual(await until(async () => ((s => s?.files === 3 && s)(await stat())), 'the stat'), { add: 4, del: 0, files: 3, dirty: 3 })
+  assert.deepEqual(await rig.rpc('wsArchive', { id: ws.id, ifClean: true }), { dirty: 3 }) // not archived: it'd lose them
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived, undefined)
+  execFileSync('git', ['add', '-A'], { cwd: ws.path })
+  execFileSync('git', ['commit', '-qm', 'work'], { cwd: ws.path })
+  await until(async () => (await stat())?.dirty === 0, 'committed') // still +4 against the base
+  assert.deepEqual(await stat(), { add: 4, del: 0, files: 3, dirty: 0 })
+  assert.equal(await rig.rpc('wsArchive', { id: ws.id, ifClean: true }), null)
+  await until(async () => (await stat()) === undefined, 'no stat once archived')
+  await rig.rpc('settingsSet', { diffStat: false })
+  await rig.rpc('wsRestore', { id: ws.id })
+  await new Promise(r => setTimeout(r, 700))
+  assert.equal(await stat(), undefined) // turned off
+  // an agent switches the worktree to a branch of its own: the workspace follows it, and its PR is that branch's
+  execFileSync('git', ['checkout', '-qb', 'agent-made'], { cwd: ws.path })
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.branch === 'agent-made', 'the new branch')
+  await until(() => /gh pr view agent-made /.test(readFileSync(join(rig.home, 'fake.log'), 'utf8')), "its PR looked up")
+  // doctor: git and the fake agents on PATH, gh signed out until it says otherwise
+  let d = await rig.rpc('doctor')
+  assert.deepEqual([d.git, d.gh, d.agents.find((a: any) => a.id === 'claude').found], [true, 'out', true])
+  mkdirSync(join(rig.home, 'gh'), { recursive: true })
+  writeFileSync(join(rig.home, 'gh', 'auth'), 'Logged in to github.com\n')
+  d = await rig.rpc('doctor')
+  assert.equal(d.gh, 'in')
+})
+
+test('answer a menu, unread, a race, an issue, the agent browser', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  // a permission menu (the fake claude's), highlighted on 1: choice 3 is two ↓ and Enter; the view has it as ask
+  const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1 }), /isn't asking anything now/)
+  await until(async () => /> $/m.test(await rig.rpc('screen', { target: tab.id })), 'the fake claude up') // before it, the tty makes ⏎ a newline
+  await rig.rpc('send', { target: tab.id, text: 'menu' })
+  const asked = await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.ask, 'the ask')
+  assert.deepEqual(asked.options.map((o: any) => o.n), [1, 2, 3])
+  const first = rig.rpc('answer', { tab: tab.id, n: 3 })
+  await new Promise(r => setTimeout(r, 100)) // it holds the tab for a second after its Enter
+  await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 1 }), /being answered/) // a double click answers once
+  assert.deepEqual(await first, { picked: 'No, and tell Claude what to do differently (esc)' })
+  await until(async () => /picked: No, and tell Claude/.test(await rig.rpc('screen', { target: tab.id })), 'two down arrows then Enter')
+  await assert.rejects(rig.rpc('answer', { tab: tab.id, n: 9 }), /isn't asking anything now|being answered/)
+  // unread: ● again
+  await rig.rpc('unread', { tab: tab.id })
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === tab.id)?.done, true)
+  // a race: one workspace per agent, named for it, one race id
+  await assert.rejects(rig.rpc('wsFan', { project: p.id, presets: ['claude'], prompt: 'x' }), /two agents or more/)
+  await assert.rejects(rig.rpc('wsFan', { project: p.id, presets: ['claude', 'codex'], prompt: 'x', local: true }), /needs worktrees/)
+  const race = await rig.rpc('wsFan', { project: p.id, presets: ['claude', 'codex'], prompt: 'add a footer' })
+  assert.deepEqual(race.map((w: any) => w.id), ['add-a-footer-claude', 'add-a-footer-codex'])
+  assert.equal(new Set(race.map((w: any) => w.race)).size, 1)
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === race[0].id)?.stat, "a race's diff size, for Compare")
+  // an issue: its title and body ahead of the prompt, the name from it
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, issue: '7', preset: 'none' }), /gh issue view 7: GraphQL: Could not resolve/)
+  mkdirSync(join(rig.home, 'gh'), { recursive: true })
+  writeFileSync(join(rig.home, 'gh', 'issue.json'), JSON.stringify({ number: 7, title: 'Login redirect loops', body: 'Steps: sign in twice.', url: 'https://github.com/o/r/issues/7' }))
+  const iw = await rig.rpc('wsNew', { project: p.id, issue: 'https://github.com/o/r/issues/7', prompt: 'keep it small' })
+  assert.equal(iw.id, 'issue-7-login-redirect-loops')
+  assert.deepEqual(iw.issue, { number: 7, url: 'https://github.com/o/r/issues/7', title: 'Login redirect loops' })
+  const agent = (await rig.rpc('state')).tabs.find((x: any) => x.workspace === iw.id && x.kind === 'agent')
+  // the fake claude says its argv: the prompt, its lines joined
+  await until(async () => /Work on GitHub issue #7: Login redirect loops\s+https:\/\/github.com\/o\/r\/issues\/7\s+Steps: sign in twice\.\s+keep it small/.test((await rig.rpc('screen', { target: agent.id, lines: 60 })).replace(/\n/g, ' ')), 'the issue in the prompt')
+  // the agent browser: only localhost, and only with the app's window
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'open', url: 'https://example.com' }), /localhost only/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'click' }), /a CSS selector/)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'text' }), /needs Laki's window/)
+  // with an app window that can: the op goes to it, its answer comes back (a path: on the workspace's port)
+  const app = await connect(rig)
+  t.after(() => app.close())
+  app.notify('view', { tab: null, tabs: [], focused: false, browse: true })
+  // through the client's events, as the renderer's: a message with an id would be a reply
+  const relay = setInterval(() => {
+    for (const m of app.events.splice(0)) if (m.ev === 'browse') app.call('browseDone', m.op === 'text' ? { id: m.req, ok: true, result: { url: m.url ?? m.home, text: 'Hello' } } : { id: m.req, ok: false, error: `no element matches ${m.selector}` })
+  }, 20)
+  t.after(() => clearInterval(relay))
+  await until(async () => (await rig.rpc('browse', { ws: ws.id, op: 'text', url: '/about' }).catch(() => null))?.text === 'Hello', 'the app answers')
+  assert.equal((await rig.rpc('browse', { ws: ws.id, op: 'text', url: '/about' })).url, `http://localhost:${ws.port}/about`)
+  await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'click', selector: '#nope' }), /no element matches #nope/)
+})

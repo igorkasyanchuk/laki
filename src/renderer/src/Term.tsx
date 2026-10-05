@@ -7,7 +7,7 @@ import { WebglAddon } from '@xterm/addon-webgl'
 import { Terminal } from '@xterm/xterm'
 import '@xterm/xterm/css/xterm.css'
 import { useEffect, useRef, useState } from 'react'
-import { api, openExternal } from './api'
+import { api, bridge, openExternal } from './api'
 import { FindBar } from './Find'
 import { FONT_SIZE, fontStack, termLook } from './Settings'
 import { termTheme, transparent } from './themes'
@@ -23,6 +23,7 @@ export function Term({
   copyOnSelect = true,
   theme = '',
   look = termLook({}),
+  newline = false,
 }: {
   tab: string
   active?: boolean
@@ -32,7 +33,10 @@ export function Term({
   copyOnSelect?: boolean
   theme?: string // the app's (themes.ts): the colors come from its CSS
   look?: ReturnType<typeof termLook> // line height, weight, cursor… (Settings)
+  newline?: boolean // an agent's: ⌘⏎ and ⇧⏎ make a new line in its prompt
 }) {
+  const nl = useRef(newline)
+  nl.current = newline
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
   const box = useRef<HTMLDivElement>(null)
@@ -49,6 +53,8 @@ export function Term({
       allowTransparency: transparent(),
       macOptionIsMeta: true,
       theme: termTheme(),
+      // OSC 8 links (claude's PR links): opened at once, as plain URLs are; xterm's own asks first. Main opens http(s) only
+      linkHandler: { activate: (_e, uri) => openExternal(uri) },
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
@@ -99,7 +105,14 @@ export function Term({
     // a keypress whose keydown went elsewhere isn't ours: Enter that closed a dialog and so focused this
     let down = false
     term.textarea?.addEventListener('focus', () => (down = false))
-    term.attachCustomKeyEventHandler(e => (e.type === 'keydown' ? (down = true) : e.type === 'keyup' ? !(down = false) : down))
+    term.attachCustomKeyEventHandler(e => {
+      // ⌘⏎ / ⇧⏎ in an agent: ⌃J, a new line in claude's, codex's and opencode's prompt (xterm would send ⏎: submit)
+      if (nl.current && e.key === 'Enter' && (e.metaKey || e.shiftKey) && !e.ctrlKey && !e.altKey) {
+        if (e.type === 'keydown') api.send('input', { tab, data: '\n' })
+        return false
+      }
+      return e.type === 'keydown' ? (down = true) : e.type === 'keyup' ? !(down = false) : down
+    })
     term.onData(d => api.send('input', { tab, data: d }))
     term.onBinary(d => api.send('input', { tab, data: d }))
     term.onResize(({ cols, rows }) => api.send('resize', { tab, cols, rows }))
@@ -158,8 +171,22 @@ export function Term({
   }, [theme, xt])
   return (
     <>
-      <div className="term" ref={box} />
+      <div
+        className="term"
+        ref={box}
+        // files dropped on it: their paths, typed in (quoted for a shell), as Finder's drop does in Terminal; the window's
+        // own drop (a folder becomes a project) then leaves it
+        onDragOver={e => bridge?.pathOf && e.dataTransfer.types.includes('Files') && e.preventDefault()}
+        onDrop={e => {
+          if (!bridge?.pathOf || !e.dataTransfer.files.length || !xt) return
+          e.preventDefault()
+          xt.term.paste(`${[...e.dataTransfer.files].map(f => quote(bridge!.pathOf!(f))).join(' ')} `)
+          xt.term.focus()
+        }}
+      />
       {find && xt && <FindBar term={xt.term} search={xt.search} seq={findSeq} onClose={() => setClosedAt(findSeq)} />}
     </>
   )
 }
+
+const quote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`)

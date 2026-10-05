@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type NotifyKind, type Preset } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, type NotifyKind, type Preset, type ProjectLook, type SideLook } from '../../shared/types'
 import { MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
@@ -19,6 +19,25 @@ const Says = ({ title, hint }: { title: ReactNode; hint?: ReactNode }) => (
 )
 
 export type { Preset }
+
+// the sidebar's project names (ProjectLook): each option over the theme's; App.tsx puts them on the sidebar as data-ph-*
+// what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+
+const PROJECT_LOOK: [keyof ProjectLook, string, [string, string][]][] = [
+  ['font', 'Font', [['theme', "Theme's"], ['ui', 'Interface'], ['mono', 'Monospace']]],
+  ['case', 'Case', [['theme', "Theme's"], ['upper', 'UPPERCASE'], ['none', 'As named']]],
+  ['spacing', 'Letter spacing', [['theme', "Theme's"], ['0', 'None'], ['0.4px', 'Tight'], ['1px', 'Normal'], ['2px', 'Wide']]],
+  ['size', 'Size', [['theme', "Theme's"], ['10px', '10'], ['11px', '11'], ['12px', '12'], ['13px', '13'], ['14px', '14']]],
+  ['weight', 'Weight', [['theme', "Theme's"], ['400', 'Regular'], ['600', 'Semibold'], ['800', 'Bold']]],
+]
+// the sidebar's lines and rows (SideLook): CSS values, App.tsx puts them on the sidebar as the variables looks set
+const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]][] = [
+  ['guide', 'Guide line', [['theme', "Theme's"], ['1px solid var(--line)', 'Thin'], ['1px dashed var(--line)', 'Dashed'], ['2px solid color-mix(in srgb, var(--accent) 60%, transparent)', 'Accent'], ['none', 'None']]],
+  ['divider', 'Between projects', [['theme', "Theme's"], ['1px solid var(--line)', 'A line'], ['none', 'Nothing']]],
+  ['indent', 'Indent', [['theme', "Theme's"], ['0px', 'None'], ['11px', 'Small'], ['20px', 'Large']]],
+  ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Normal'], ['32px', 'Roomy']]],
+]
 
 export type AppSettings = Paint & {
   editor?: string // an app id from the daemon's list, or 'custom' (editorCmd)
@@ -40,6 +59,10 @@ export type AppSettings = Paint & {
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
   timers?: boolean // a turn's time on its tab and row (unset: off)
+  diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
+  dimPanes?: boolean // a split's other panes faded (unset: off)
+  projectLook?: ProjectLook // the sidebar's project names
+  sideLook?: SideLook // the sidebar's lines, rows and button labels
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
@@ -357,6 +380,46 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
 const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' }
 const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
 
+// Find a setting (the nav's search box): each setting's title as the page writes it, its section, words it goes by.
+// A result opens the section and shows the first label, row or heading starting with the title. Add new settings here.
+const FIND: [string, string, string?][] = [
+  ['general', 'New workspaces start', 'default agent preset'],
+  ['general', 'Branch prefix', 'git worktree'],
+  ['general', 'macOS notifications', 'notify waiting done limit mute'],
+  ['general', 'Sound', 'notification'],
+  ['general', 'Pull requests in the sidebar', 'pr github icon'],
+  ['general', 'Turn timers', 'elapsed time'],
+  ['general', 'Diff size in the sidebar', 'lines added removed changes stat'],
+  ['general', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
+  ['general', 'Codex plan limits', 'usage ring 5-hour weekly'],
+  ['general', 'Environment', 'env variables'],
+  ['general', 'Move to another Mac', 'export import backup file'],
+  ['appearance', 'Interface font', 'ui type'],
+  ['appearance', 'Project names in the sidebar', 'font case letter spacing size weight'],
+  ['appearance', 'The sidebar', 'guide line divider indent row height'],
+  ['appearance', 'Button labels', 'sidebar scheduled board settings words'],
+  ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
+  ['appearance', 'Glow', 'glass colors'],
+  ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
+  ['terminal', 'Font', 'monospace family'],
+  ['terminal', 'Font size', 'zoom bigger smaller'],
+  ['terminal', 'Line height', ''],
+  ['terminal', 'Letter spacing', ''],
+  ['terminal', 'Font weight', 'bold light'],
+  ['terminal', 'Minimum contrast', 'readable'],
+  ['terminal', 'Cursor style', 'block bar underline'],
+  ['terminal', 'Blinking cursor', 'blink'],
+  ['terminal', 'Copy selected text', 'clipboard selection'],
+  ['terminal', 'Dim other panes', 'split focus fade'],
+  ['open', 'Default', 'editor cursor vs code open in'],
+  ['open', 'Custom command', 'editor'],
+  ['presets', 'Agent presets', 'claude codex gemini args env model'],
+  ['templates', 'Prompt templates', 'prompt'],
+  ['actions', 'Actions', 'run menu prompt command'],
+  ['skill', 'Agent skill', 'mcp server laki cli'],
+  ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
+]
+
 const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'general', label: 'General', icon: 'settings' },
   { id: 'appearance', label: 'Appearance', icon: 'palette' },
@@ -550,13 +613,75 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   const [sec, setSec] = useState(p.section ?? 'general')
-  // Appearance opens with the current theme in sight (66 of them)
+  const [themeQ, setThemeQ] = useState('') // the themes' name filter
+  const [findQ, setFindQ] = useState('') // Find a setting
+  const findRef = useRef(findQ)
+  findRef.current = findQ
+  const [spot, setSpot] = useState<{ title: string; n: number }>() // the setting a result goes to
+  const shownThemes = [...THEMES].reverse().filter(t => t.name.toLowerCase().includes(themeQ.trim().toLowerCase())) // the newest first
+  // Appearance opens with the current theme in sight (there are many)
   useEffect(() => {
     if (sec === 'appearance') document.querySelector('.themes .theme.on')?.scrollIntoView({ block: 'nearest' })
   }, [sec])
   const set = (k: Partial<AppSettings>) => setS(x => ({ ...x, ...k }))
+  // a theme under the mouse is painted, the chosen one again as it leaves the grid or the page closes
+  const latest = useRef(s)
+  latest.current = s
+  useEffect(() => () => applyTheme(latest.current), [])
+  // a result's setting, once its section is on: in sight and lit for a moment
+  useEffect(() => {
+    if (!spot) return
+    const t = spot.title.toLowerCase()
+    const el = [...document.querySelectorAll<HTMLElement>('.settings-main :is(h2, h3, label, .field, .switch-row, .switch-text, .muted.small)')].find(e => e.textContent?.trim().toLowerCase().startsWith(t))
+    el?.scrollIntoView({ block: 'center' })
+    el?.classList.add('spot')
+    const off = setTimeout(() => el?.classList.remove('spot'), 1600)
+    return () => clearTimeout(off)
+  }, [spot]) // set with its section: rendered by now
+  // a row of selects over one of the sidebar's looks: 'theme' is the theme's own
+  const lookGrid = (key: 'projectLook' | 'sideLook', rows: [string, string, [string, string][]][]) => (
+    <div className="grid5">
+      {rows.map(([k, label, opts]) => (
+        <label key={k}>
+          {label}
+          <select value={String((s[key] as Record<string, unknown> | undefined)?.[k] ?? 'theme')} onChange={e => set({ [key]: { ...s[key], [k]: e.target.value } })}>
+            {opts.map(([v, name]) => (
+              <option key={v} value={v}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      ))}
+    </div>
+  )
   // theme, glass, interface font: painted now (the app paints again once saved)
   const paint = (k: Partial<AppSettings>) => (applyTheme({ ...s, ...k }), set(k))
+  // Export / Import (General): every setting in a file, for another Mac; an import goes through the page, so it's
+  // painted and saved as if typed
+  const [moved, setMoved] = useState('') // what the last export or import did
+  const file = useRef<HTMLInputElement>(null)
+  const exportAll = () => {
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ laki: 'settings', version: 1, settings: s }, null, 2)], { type: 'application/json' }))
+    a.download = 'laki-settings.json'
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 60000)
+    setMoved('Exported as laki-settings.json')
+  }
+  const importAll = (f?: File) =>
+    f?.text()
+      .then(t => {
+        const j = JSON.parse(t)
+        const v = j?.laki === 'settings' ? j.settings : undefined
+        if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error("it isn't a file Export made")
+        // a field of the wrong kind would be saved and break the pages that read it; ponytail: top level only
+        const bad = Object.entries(v).filter(([k, x]) => KINDS[k] && x !== undefined && !KINDS[k].split(' ').includes(x === null ? 'null' : Array.isArray(x) ? 'array' : typeof x))
+        if (bad.length) throw new Error(`${bad.map(([k]) => k).join(', ')}: not what Laki keeps there`)
+        paint(v)
+        setMoved(`Imported ${f.name}`)
+      })
+      .catch(e => setMoved(`Couldn't import ${f.name}: ${e.message}`))
   // ⌘+ / ⌘− while the page is open change the size behind its back
   useEffect(() => setS(x => (x.fontSize === settings.fontSize ? x : { ...x, fontSize: settings.fontSize })), [settings.fontSize])
   useEffect(() => setS(x => (x.notify === settings.notify ? x : { ...x, notify: settings.notify })), [settings.notify]) // ⌘K's switch
@@ -579,7 +704,7 @@ export function SettingsPage(p: {
   }, [s])
   useEffect(() => () => void (unsaved.current && save.current(unsaved.current)), [])
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && (findRef.current ? (e.stopPropagation(), setFindQ('')) : onClose()) // Esc clears a search first
     window.addEventListener('keydown', f, true) // before the preview terminal takes it
     return () => window.removeEventListener('keydown', f, true)
   }, [onClose])
@@ -615,6 +740,20 @@ export function SettingsPage(p: {
       </label>
     )
   }
+  // Find a setting: every word typed in a setting's title, words or section (and projects by name)
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote))
+  const words = findQ.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  const hits = (text: string) => words.every(w => text.toLowerCase().includes(w))
+  const found = !words.length
+    ? []
+    : [
+        ...FIND.flatMap(([sec, title, more]) => {
+          const where = sections.find(x => x.id === sec)?.label
+          return where && hits(`${title} ${more ?? ''} ${where}`) ? [{ sec, title, where }] : []
+        }),
+        ...(p.projects ?? []).filter(x => hits(`${x.name} project`)).map(x => ({ sec: `project:${x.id}`, title: x.name, where: 'Project' })),
+      ].slice(0, 12)
+  const go = (r: { sec: string; title: string }) => (setSec(r.sec), setFindQ(''), setSpot({ title: r.title, n: Date.now() }))
   return (
     <div className="settings-page" style={{ zoom: scale }}>
       <div className="settings-head">
@@ -624,13 +763,35 @@ export function SettingsPage(p: {
       </div>
       <div className="settings-body">
         <nav className="settings-nav">
-          {SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote)).map(x => (
+          <input
+            type="search"
+            className="settings-find"
+            value={findQ}
+            placeholder="Find a setting"
+            spellCheck={false}
+            onChange={e => setFindQ(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && found[0] && go(found[0])}
+          />
+          {findQ.trim() && (
+            <>
+              {found.map(r => (
+                <button key={r.sec + r.title} onClick={() => go(r)}>
+                  <span className="find-hit">
+                    {r.title}
+                    <span className="muted small">{r.where}</span>
+                  </span>
+                </button>
+              ))}
+              {!found.length && <div className="muted small pad">Nothing called that.</div>}
+            </>
+          )}
+          {!findQ.trim() && SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote)).map(x => (
             <button key={x.id} className={sec === x.id ? 'on' : ''} onClick={() => setSec(x.id)}>
               <Icon name={x.icon} /> {x.label}
             </button>
           ))}
-          {!!p.projects?.length && <div className="settings-nav-head">Projects</div>}
-          {p.projects?.map(x => (
+          {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Projects</div>}
+          {!findQ.trim() && p.projects?.map(x => (
             <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => setSec(`project:${x.id}`)} data-tip={x.path}>
               <Icon name={x.git === false ? 'folder' : 'fork'} /> <span>{x.name}</span>
             </button>
@@ -695,6 +856,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
+                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
+                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
+                </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
                   <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
                     <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
@@ -707,6 +871,21 @@ export function SettingsPage(p: {
                 </span>
                 <EnvField value={s.env} onChange={env => set({ env })} />
               </label>
+              <div className="field">
+                <span>
+                  Move to another Mac <span className="muted">· every setting on these pages in a file (it holds your env: keep it private); projects and their own settings stay here</span>
+                </span>
+                <div className="row-buttons">
+                  <button type="button" onClick={exportAll}>
+                    Export…
+                  </button>
+                  <button type="button" onClick={() => file.current?.click()}>
+                    Import…
+                  </button>
+                  <input ref={file} type="file" accept=".json,application/json" hidden onChange={e => (importAll(e.target.files?.[0]), (e.target.value = ''))} />
+                  {moved && <span className="muted small">{moved}</span>}
+                </div>
+              </div>
             </>
           )}
           {sec === 'appearance' && (
@@ -728,6 +907,21 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
+              </div>
+              <div className="field">
+                <span>
+                  Project names in the sidebar <span className="muted">· over the theme's</span>
+                </span>
+                {lookGrid('projectLook', PROJECT_LOOK)}
+              </div>
+              <div className="field">
+                <span>
+                  The sidebar <span className="muted">· over the theme's</span>
+                </span>
+                {lookGrid('sideLook', SIDE_LOOK)}
+                <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
+                  <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Tasks, Board, Settings" />
+                </Switch>
               </div>
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.glass} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
@@ -770,8 +964,10 @@ export function SettingsPage(p: {
                 )}
               </div>
               <div className="muted small">Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.</div>
-              <div className="themes">
-                {[...THEMES].reverse().map(t => { /* the newest first */
+              <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
+              {!shownThemes.length && <div className="muted small">No theme called “{themeQ.trim()}”.</div>}
+              <div className="themes" onMouseLeave={() => applyTheme(s)}>
+                {shownThemes.map(t => {
                   const [bg, panel, fg, accent, ...ansi] = preview(t)
                   const on = (s.theme || 'default') === t.id
                   return (
@@ -781,6 +977,7 @@ export function SettingsPage(p: {
                       aria-pressed={on}
                       style={{ background: bg, color: fg }}
                       onClick={() => paint({ theme: t.id })}
+                      onMouseEnter={() => applyTheme({ ...s, theme: t.id }) /* a look before choosing */}
                     >
                       <span className="theme-bar" style={{ background: panel }}>
                         <span style={{ background: accent }} />
@@ -854,6 +1051,9 @@ export function SettingsPage(p: {
                   </Switch>
                   <Switch className="switch-row" on={s.copyOnSelect !== false} onChange={v => set({ copyOnSelect: v })}>
                     Copy selected text
+                  </Switch>
+                  <Switch className="switch-row" on={!!s.dimPanes} onChange={v => set({ dimPanes: v })}>
+                    Dim other panes
                   </Switch>
                 </div>
               </div>

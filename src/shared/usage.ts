@@ -5,11 +5,17 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki ls [--json]                            projects, workspaces, tabs and their status
   laki project add <path> | ls | rm <id>
   laki new <project> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] [--cmd c] [--prompt text] [--name n] [--local]
+            [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
+            [--issue <url|number>]  a GitHub issue's title and text as the prompt (and the name)
+            [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
   laki rm <ws> | archive <ws> | restore <ws> | fork <ws>
   laki tab <ws> [--preset p] [--cmd c]        a new tab
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
   laki diff <ws> | run <ws> | ship <ws> -m <message>
+  laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
+                                              a hidden browser on the workspace's localhost (the app must be open);
+                                              screenshot prints a PNG's path; in a tab, <ws> is its own
   laki schedule [ls] | log                    scheduled tasks and their next runs | the last runs
   laki schedule add <project> --when "weekdays at 9am" [--preset p] [--where new|folder|folder-new|<ws>] [--name n] <prompt>
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or

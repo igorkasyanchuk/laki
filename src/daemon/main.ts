@@ -104,7 +104,13 @@ const api: Record<string, Handler> = {
   branches: p => core.branches(p.project),
   wsNew: p => core.wsNew(p),
   wsRm: p => core.wsRm(p.id),
-  wsArchive: p => core.wsArchive(p.id),
+  wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean }),
+  doctor: () => core.doctor(),
+  wsFan: p => core.wsFan(p),
+  answer: p => core.answer(p),
+  unread: p => core.unread(p.tab),
+  browse: p => core.browse(p),
+  browseDone: p => core.browseDone(p),
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
   tabNew: p => core.addTab(p.ws, p),
@@ -245,6 +251,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(Number(process.env.LAKI_PORT_SCAN_MS || 5000), core.scanPorts)
   every(Number(process.env.LAKI_PR_SCAN_MS || 60000), core.scanPRs)
   every(2000, core.sweepRunning)
+  every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
   every(30000, () => core.watchLimits())
   every(15000, () => core.remoteTick())
   every(30000, () => core.scheduleTick())

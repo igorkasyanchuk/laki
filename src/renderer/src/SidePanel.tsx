@@ -2,9 +2,10 @@
 // checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
 // passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { bridge } from './api'
+import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
-import { type AutoKey, PRSection, type WsInfo } from './Info'
+import { type Block, type Inline, markdown } from './markdown'
+import { type AutoKey, type FixWhat, PRSection, type WsInfo } from './Info'
 import { type actionsFor, type RunAction } from './text'
 import { Icon, IconButton, type IconName, type MenuItem } from './ui'
 
@@ -345,7 +346,7 @@ function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number })
   )
 }
 
-function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: 'ci' | 'review') => void }) {
+function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void }) {
   const pr = p.w.pr
   const [threads, err, reload] = useLoad(p.api.threads, `${p.w.id}#${pr?.number ?? ''}`, 60000)
   const open = (threads ?? []).filter(t => !t.resolved && t.comments.length)
@@ -396,7 +397,7 @@ export function SidePanel(p: {
   onClose: () => void
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
-  onFix: (what: 'ci' | 'review') => void
+  onFix: (what: FixWhat) => void
 }) {
   const tabs = TABS.filter(t => p.git || t.id === 'files' || t.id === 'preview')
   const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
@@ -495,7 +496,14 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
     if (!r) return setErr('The page isn’t ready yet')
     setPicking(id)
     on(v => v.focus()) // for Esc
-    r.then(p => (end(), p && api.toPrompt(pickedText(p)).catch(e => setErr(String(e?.message ?? e)))), end)
+    r.then(async p => {
+      end()
+      if (!p) return
+      // and a screenshot of just that element, when the app can take one
+      const id = on(v => v.getWebContentsId())
+      const path = bridge?.capture && id ? await bridge.capture(id).then(png => crop(png, p)).then(api.saveImage).catch(() => '') : ''
+      await api.toPrompt(pickedText(p, path)).catch(e => setErr(String(e?.message ?? e)))
+    }, end)
   }
   if (!bridge && !canFrame) return <div className="muted small pad">The preview shows this Mac's localhost: open {w.name || w.id} in the app there. To open a port from here, share it with the globe in the status bar.</div>
   return (
@@ -533,9 +541,38 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   )
 }
 
-// an element the picker returned: its selector, opening tag, text, size, and the page
-type Picked = { selector: string; tag: string; text: string; size: string; url: string }
-const pickedText = (p: Picked) => `In the preview (${p.url}), the element \`${p.selector}\` (${[p.tag, p.text && `"${p.text}"`, p.size].filter(Boolean).join(', ')}): `
+// an element the picker returned: its selector, opening tag, text, size, its HTML (cut) and computed CSS (what isn't a
+// default), where it is on the page (CSS pixels, vw: the page's width), and the page
+type Picked = { selector: string; tag: string; text: string; size: string; url: string; html?: string; css?: string; rect?: { x: number; y: number; w: number; h: number }; vw?: number }
+const pickedText = (p: Picked, shot?: string) =>
+  [
+    `In the preview (${p.url}), the element \`${p.selector}\` (${[p.text && `"${p.text}"`, p.size].filter(Boolean).join(', ')}):`,
+    p.html ? `HTML: ${p.html}` : p.tag,
+    p.css && `CSS: ${p.css}`,
+    shot && `A screenshot of it: ${shot}`,
+  ]
+    .filter(Boolean)
+    .join('\n') + '\n'
+
+// the element's part of the page's screenshot (its CSS pixels scaled to the image's, a little around it, inside the
+// page), as base64 PNG
+async function crop(png: string, p: Picked) {
+  if (!p.rect || !p.vw) throw new Error('where?')
+  const img = new Image()
+  img.src = `data:image/png;base64,${png}`
+  await img.decode()
+  const k = img.naturalWidth / p.vw
+  const x = Math.max(0, p.rect.x - 4)
+  const y = Math.max(0, p.rect.y - 4)
+  const w = Math.min(p.vw, p.rect.x + p.rect.w + 4) - x
+  const h = Math.min(img.naturalHeight / k, p.rect.y + p.rect.h + 4) - y
+  if (w < 2 || h < 2) throw new Error('off screen')
+  const c = document.createElement('canvas')
+  c.width = Math.round(w * k)
+  c.height = Math.round(h * k)
+  c.getContext('2d')!.drawImage(img, x * k, y * k, w * k, h * k, 0, 0, c.width, c.height)
+  return c.toDataURL('image/png').split(',')[1]
+}
 
 // runs in the preview's page (executeJavaScript, as its source: it uses nothing from here): outlines what's under the
 // mouse with its selector, and resolves with the one clicked, or null on Esc or window.__lakiPick(null) (the app's)
@@ -605,7 +642,8 @@ function pickElement(): Promise<Picked | null> {
       box.remove()
       label.remove()
       delete w.__lakiPick
-      done(v)
+      if (v) requestAnimationFrame(() => requestAnimationFrame(() => done(v))) // painted without the outline: the app's screenshot of it is clean
+      else done(v)
     }
     const click = (e: globalThis.MouseEvent) => {
       stop(e)
@@ -613,9 +651,27 @@ function pickElement(): Promise<Picked | null> {
       const r = el.getBoundingClientRect()
       const tag = (el.cloneNode(false) as Element).outerHTML.replace(/<\/[^>]+>$/, '').replace(/\s+/g, ' ')
       const text = ((el as HTMLElement).innerText ?? el.textContent ?? '').trim().replace(/\s+/g, ' ')
-      finish({ selector: selector(el), tag: tag.length > 200 ? `${tag.slice(0, 199)}…` : tag, text: text.length > 120 ? `${text.slice(0, 119)}…` : text, size: `${Math.round(r.width)}×${Math.round(r.height)}`, url: location.href })
+      const html = el.outerHTML.replace(/\s+/g, ' ')
+      const cs = getComputedStyle(el)
+      const css = CSS_KEYS.map(k => [k, cs.getPropertyValue(k)])
+        .filter(([, v]) => v && !/^(none|normal|auto|static|visible|0px|1|rgba\(0, 0, 0, 0\)|0px none .*)$/.test(v))
+        .map(([k, v]) => `${k}: ${v}`)
+        .join('; ')
+      finish({
+        selector: selector(el),
+        tag: tag.length > 200 ? `${tag.slice(0, 199)}…` : tag,
+        text: text.length > 120 ? `${text.slice(0, 119)}…` : text,
+        size: `${Math.round(r.width)}×${Math.round(r.height)}`,
+        url: location.href,
+        html: html.length > 1500 ? `${html.slice(0, 1499)}…` : html,
+        css,
+        rect: { x: r.left, y: r.top, w: r.width, h: r.height },
+        vw: innerWidth,
+      })
     }
     const key = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && (stop(e), finish(null))
+    // the computed styles worth telling an agent (in here: the function goes to the page as its source)
+    const CSS_KEYS = ['display', 'position', 'width', 'height', 'margin', 'padding', 'color', 'background-color', 'font-family', 'font-size', 'font-weight', 'line-height', 'text-align', 'border', 'border-radius', 'box-shadow', 'gap', 'flex-direction', 'justify-content', 'align-items', 'grid-template-columns', 'overflow', 'opacity', 'z-index']
     addEventListener('mousemove', move, true)
     addEventListener('scroll', place, true) // the box follows what it outlines
     for (const t of ['mousedown', 'mouseup', 'pointerdown', 'pointerup']) addEventListener(t, stop, true)
@@ -706,7 +762,12 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
     if (p.line) body.current?.querySelector('.pv-line.at')?.scrollIntoView({ block: 'center' })
     else body.current?.scrollTo(0, 0)
   }, [f, p.line])
-  const lines = useMemo(() => (f?.text === undefined ? [] : highlight(p.path, f.text)), [f, p.path]) // colored up to 50 KB
+  // Markdown: Rendered or Raw (the last one picked; a jump to a line: Raw)
+  const md = /\.(md|markdown|mdx)$/i.test(p.path)
+  const [mode, setMode] = useState<'raw' | 'rendered'>(() => (p.line ? 'raw' : (localStore('laki.md') as 'raw') || 'rendered'))
+  const rendered = md && mode === 'rendered' && f?.text !== undefined
+  const pickMode = (m: typeof mode) => (setMode(m), localStore('laki.md', m))
+  const lines = useMemo(() => (f?.text === undefined || rendered ? [] : highlight(p.path, f.text)), [f, p.path, rendered]) // colored up to 50 KB
   const cut = p.path.lastIndexOf('/') + 1
   return (
     <div className="preview">
@@ -715,10 +776,21 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
         <span className="pv-path" data-tip={p.path}>
           {p.path.slice(cut)} <span className="muted">{p.path.slice(0, cut)}</span>
         </span>
-        {f && <span className="muted small">{sizeText(f.size)}</span>}
+        {f && <span className="muted small pv-wide">{sizeText(f.size)}</span>}
+        {md && f?.text !== undefined && (
+          <div className="seg small">
+            <button className={mode === 'rendered' ? 'on' : ''} onClick={() => pickMode('rendered')}>
+              Rendered
+            </button>
+            <button className={mode === 'raw' ? 'on' : ''} onClick={() => pickMode('raw')}>
+              Raw
+            </button>
+          </div>
+        )}
         <IconButton icon="refresh" title="Reload" onClick={() => setN(x => x + 1)} />
-        <button className="small" onClick={p.onOpen}>
-          Open in editor
+        <button className="small" data-tip="Open in editor" onClick={p.onOpen}>
+          <Icon name="code" />
+          <span className="pv-wide"> Open in editor</span>
         </button>
         <IconButton icon="x" title="Close (⌘W)" onClick={p.onClose} />
       </div>
@@ -729,6 +801,7 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
             <img src={f.image} alt={p.path} />
           </div>
         )}
+        {rendered && <Markdown src={f.text!} />}
         {f?.text !== undefined &&
           lines.map((l, i) => (
             <div key={i} className={`pv-line ${p.line === i + 1 ? 'at' : ''}`}>
@@ -741,6 +814,133 @@ export function FilePreview(p: { path: string; line?: number; load: () => Promis
       </div>
     </div>
   )
+}
+
+// localStorage, or nothing (a private window, blocked storage)
+function localStore(k: string, v?: string) {
+  try {
+    if (v === undefined) return localStorage.getItem(k)
+    localStorage.setItem(k, v)
+  } catch {}
+  return null
+}
+
+// a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
+// open in the browser, images show as links (a preview fetches nothing)
+function Markdown({ src }: { src: string }) {
+  const tree = useMemo(() => markdown(src), [src])
+  return <div className="md">{tree.map(mdBlock)}</div>
+}
+function mdBlock(b: Block, k: number): React.ReactNode {
+  switch (b.t) {
+    case 'h': {
+      const H = `h${b.level}` as 'h1'
+      return <H key={k}>{b.inl.map(mdInline)}</H>
+    }
+    case 'p':
+      return <p key={k}>{b.inl.map(mdInline)}</p>
+    case 'hr':
+      return <hr key={k} />
+    case 'quote':
+      return <blockquote key={k}>{b.blocks.map(mdBlock)}</blockquote>
+    case 'code':
+      return (
+        <pre key={k}>
+          <code>
+            {highlight(`x.${b.lang || 'txt'}`, b.text).map((l, i) => (
+              <Fragment key={i}>
+                {i > 0 && '\n'}
+                {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
+              </Fragment>
+            ))}
+          </code>
+        </pre>
+      )
+    case 'list': {
+      const items = b.items.map((it, i) => {
+        const box = it.task !== undefined && <input key="box" type="checkbox" checked={it.task} readOnly />
+        const [first, ...more] = it.blocks
+        return (
+          <li key={i} className={it.task !== undefined ? 'task' : undefined}>
+            {/* one paragraph: a tight list's line, no paragraph's margins; a task's box goes in its first line */}
+            {first?.t !== 'p' ? (
+              [box, ...it.blocks.map(mdBlock)]
+            ) : more.length ? (
+              <>
+                <p>
+                  {box}
+                  {first.inl.map(mdInline)}
+                </p>
+                {more.map(mdBlock)}
+              </>
+            ) : (
+              [box, ...first.inl.map(mdInline)]
+            )}
+          </li>
+        )
+      })
+      return b.ordered ? (
+        <ol key={k} start={b.start}>
+          {items}
+        </ol>
+      ) : (
+        <ul key={k}>{items}</ul>
+      )
+    }
+    case 'table':
+      return (
+        <div key={k} className="md-table">
+          <table>
+            <thead>
+              <tr>
+                {b.head.map((c, i) => (
+                  <th key={i} style={{ textAlign: b.align[i] || undefined }}>
+                    {c.map(mdInline)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {b.rows.map((r, i) => (
+                <tr key={i}>
+                  {b.head.map((_, j) => (
+                    <td key={j} style={{ textAlign: b.align[j] || undefined }}>
+                      {(r[j] ?? []).map(mdInline)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+  }
+}
+function mdInline(x: Inline, k: number): React.ReactNode {
+  if (typeof x === 'string') return x
+  switch (x.t) {
+    case 'code':
+      return <code key={k}>{x.text}</code>
+    case 'b':
+      return <strong key={k}>{x.kids.map(mdInline)}</strong>
+    case 'i':
+      return <em key={k}>{x.kids.map(mdInline)}</em>
+    case 's':
+      return <del key={k}>{x.kids.map(mdInline)}</del>
+    case 'br':
+      return <br key={k} />
+    case 'a':
+    case 'img': {
+      const href = x.t === 'a' ? x.href : x.src
+      const web = /^(https?:|mailto:)/i.test(href) // a relative one is a file of the repo: shown, not followed
+      const kids = x.t === 'a' ? x.kids.map(mdInline) : `🖼 ${x.alt || 'image'}`
+      return (
+        <a key={k} href={web ? href : undefined} data-tip={href} onClick={e => (e.preventDefault(), web && openExternal(href))}>
+          {kids}
+        </a>
+      )
+    }
+  }
 }
 
 // q's characters in order in s, case aside: a score (contiguous runs and word starts count more) and

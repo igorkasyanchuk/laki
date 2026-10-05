@@ -1,10 +1,10 @@
-// Scheduled tasks (the clock at the top of the sidebar, or ⌘K): a prompt for an agent at the times a line of English
+// Scheduled tasks (the clock at the bottom of the sidebar, or ⌘K): a prompt for an agent at the times a line of English
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
 import { useEffect, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
-import { Icon, IconButton, Page, Switch } from './ui'
+import { ask, Icon, IconButton, Page, Switch } from './ui'
 
 export type SchedulesApi = {
   set(s: Partial<Schedule>): Promise<Schedule>
@@ -65,7 +65,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     setErr('')
     setForm({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when })
   }
-  const rm = (s: Schedule) => confirm(`Delete the scheduled task ${s.name || s.prompt.slice(0, 40)}?`) && api.rm(s.id).catch(fail)
+  const rm = (s: Schedule) => ask(`Delete the scheduled task ${s.name || s.prompt.slice(0, 40)}?`, { ok: 'Delete', danger: true }).then(y => y && api.rm(s.id).catch(fail))
   const where = (s: Schedule) =>
     ({ new: 'a new workspace each run', 'local-new': 'in its folder, a new session each run', local: 'in its folder, one session' })[s.ws] ?? `in ${view.workspaces.find(w => w.id === s.ws)?.name || s.ws}`
   const pickProject = async (id: string) => {

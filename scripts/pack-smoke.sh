@@ -4,7 +4,7 @@
 # connects (file:// origin) and captures a screenshot. Temp home; nothing real is touched.
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-APP="$ROOT/dist/mac-arm64/Laki.app"
+APP=${APP:-$ROOT/dist/$([ "$(uname -m)" = arm64 ] && echo mac-arm64 || echo mac)/Laki.app} # APP=…/dist/mac/Laki.app: the Intel build, under Rosetta
 BIN="$APP/Contents/MacOS/Laki"
 RES="$APP/Contents/Resources/app/out/main"
 H=${1:-/tmp/laki-pack}
