@@ -69,11 +69,11 @@ const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN ? process.en
 // remote access (core.ts) adds its page's origin and its own token while it runs
 const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === core.remoteOrigin())
 const same = (t: string, want: string | undefined) => !!want && t.length === want.length && timingSafeEqual(Buffer.from(t), Buffer.from(want))
-const tokenOk = (t: string | null | undefined) => !!t && (same(t, token) || same(t, core.remoteToken()))
+// remote access's token only from its page: a client with no Origin (curl past Cloudflare's sign-in) needs ours
+const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (same(t, token) || (!!o && o === core.remoteOrigin() && same(t, core.remoteToken())))
 
 // the app's page, for remote access: the built renderer (out/renderer, next to the built daemon; from source, after a
-// build; LAKI_PAGE: that folder instead, as tests do). Its files hold no secrets: the token comes in the
-// link's #, which never reaches a server.
+// build; LAKI_PAGE: that folder instead, as tests do). Its files hold no secrets: the token comes in the link.
 const here = dirname(fileURLToPath(import.meta.url))
 const pageDir = process.env.LAKI_PAGE || [join(here, '../renderer'), join(here, '../../out/renderer')].find(d => existsSync(join(d, 'index.html')))
 const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' }
@@ -177,7 +177,7 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET') return page(new URL(req.url ?? '/', 'http://x').pathname, res) // no secrets: any origin
   if (!originOk(req.headers.origin)) return reply(403, { error: 'origin not allowed' })
   if (req.method !== 'POST' || req.url !== '/rpc') return reply(404, { error: 'not found' })
-  if (!tokenOk(req.headers.authorization?.replace(/^Bearer /, ''))) return reply(401, { error: 'bad token' })
+  if (!tokenOk(req.headers.authorization?.replace(/^Bearer /, ''), req.headers.origin)) return reply(401, { error: 'bad token' })
   let body = ''
   for await (const chunk of req) {
     body += chunk
@@ -195,7 +195,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 32 << 20 }) // a p
 let clientSeq = 0
 server.on('upgrade', (req: IncomingMessage, socket, head) => {
   const url = new URL(req.url ?? '', 'http://x')
-  if (url.pathname !== '/ws' || !originOk(req.headers.origin) || !tokenOk(url.searchParams.get('token'))) {
+  if (url.pathname !== '/ws' || !originOk(req.headers.origin) || !tokenOk(url.searchParams.get('token'), req.headers.origin)) {
     log('refused websocket', req.headers.origin ?? '(no origin)')
     socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n')
     return

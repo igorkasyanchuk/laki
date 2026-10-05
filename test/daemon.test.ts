@@ -326,6 +326,17 @@ test('side panel: files with their changes, new files and folders, only inside t
   await assert.rejects(rig.rpc('fileNew', { ws: ws.id, path: 'src/lib/a.ts' }), /there already/)
   await assert.rejects(rig.rpc('fileNew', { ws: ws.id, path: '../escape.txt' }), /inside the workspace/)
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'finder', file: '/etc/passwd' }), /inside the workspace/)
+  // links: one pointing out (a file, a folder, nothing) is out; one pointing in is fine
+  symlinkSync('/etc/hosts', join(ws.path, 'hosts'))
+  symlinkSync(rig.home, join(ws.path, 'home'))
+  symlinkSync(join(rig.home, 'nope'), join(ws.path, 'gone'))
+  symlinkSync('README.md', join(ws.path, 'readme'))
+  await assert.rejects(rig.rpc('fileRead', { ws: ws.id, path: 'hosts' }), /inside the workspace/)
+  await assert.rejects(rig.rpc('fileNew', { ws: ws.id, path: 'home/escape.txt' }), /inside the workspace/)
+  await assert.rejects(rig.rpc('fileNew', { ws: ws.id, path: 'gone' }), /inside the workspace/)
+  await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'finder', file: 'home' }), /inside the workspace/)
+  assert.ok(!existsSync(join(rig.home, 'escape.txt')))
+  assert.equal((await rig.rpc('fileRead', { ws: ws.id, path: 'readme' })).text, 'changed\n')
   f = await rig.rpc('files', { ws: ws.id })
   assert.ok(f.files.includes('src/lib/a.ts'))
   assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), []) // no PR

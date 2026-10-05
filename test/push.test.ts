@@ -71,5 +71,6 @@ test('pushes: one per state change of a tab, done only when on, none when muted;
   status = 500
   await assert.rejects(rig.rpc('webhookTest', { url }), /the webhook answered 500/)
   await assert.rejects(rig.rpc('webhookTest', { url: 'ftp://example.com/x' }), /must start with https/)
+  await assert.rejects(rig.rpc('webhookTest', { url: 'http://example.com/x' }), /must start with https/) // the question in the clear
   await assert.rejects(rig.rpc('webhookTest', {}), /needs a URL/)
 })

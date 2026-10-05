@@ -8,15 +8,16 @@ type Tool = { name: string; description: string; inputSchema: object; run: (a: a
 const str = (description: string) => ({ type: 'string', description })
 const obj = (properties: Record<string, object>, required: string[] = []) => ({ type: 'object', properties, required })
 
-// the view, without what an agent doesn't need (settings, scans' details)
-async function state() {
+// the view, without what an agent doesn't need (scans' details) or must not see: settings (env, presets' env and cmd,
+// the webhook's URL), projects' config (env), queued prompts, remote access's link (its token). `laki ls --json` too
+export async function state() {
   const v: View = await rpc('state')
   return {
-    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, git: p.git !== false })),
+    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false })),
     workspaces: v.workspaces
       .filter(w => !w.archived)
-      .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url } })),
-    tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
+      .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url } })),
+    tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
 }
 

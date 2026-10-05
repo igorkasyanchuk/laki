@@ -1,7 +1,7 @@
 // Pushes to your phone (Settings › Notifications webhook): an agent waiting for you or done, posted to the URL you give
 // as ntfy, Slack, Telegram (its whole sendMessage URL, chat_id included) or plain JSON wants it. Only to that URL: no
 // telemetry. Fire and forget, 5 s at most; the caller logs a failure.
-import type { Webhook } from '../shared/types.ts'
+import { type Webhook, webhookUrl } from '../shared/types.ts'
 
 export type Push = { event: 'waiting' | 'done' | 'test'; workspace: string; tab: string; agent: string; question?: string }
 
@@ -24,17 +24,6 @@ export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit 
     default:
       return json({ event: p.event, workspace: p.workspace, tab: p.tab, agent: p.agent, message: text, ts: now })
   }
-}
-
-export function webhookUrl(url?: string) {
-  let u: URL
-  try {
-    u = new URL(String(url ?? '').trim())
-  } catch {
-    throw new Error('the webhook needs a URL')
-  }
-  if (u.protocol !== 'https:' && u.protocol !== 'http:') throw new Error('the webhook URL must start with https://')
-  return u.href
 }
 
 export async function pushTo(w: Webhook, p: Push) {

@@ -71,6 +71,19 @@ export const PR_PROMPTS: Record<FixWhat, string> = {
 }
 // {{name}} (spaces inside allowed) as vars say; an unknown one stays as it is (not {{constructor}}): prompt templates', PR_PROMPTS'
 export const fillTemplate = (text: string, vars: Record<string, string | undefined>) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
+// a webhook's URL as pushes take it (push.ts; Settings says why not as you type)
+export function webhookUrl(url?: string) {
+  let u: URL
+  try {
+    u = new URL(String(url ?? '').trim())
+  } catch {
+    throw new Error('the webhook needs a URL')
+  }
+  // what's pushed holds the agent's question: plain http only to this Mac (a relay of yours, tests' server)
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname))) throw new Error('the webhook URL must start with https://')
+  return u.href
+}
+
 export const PR_SCAN = 1 // minutes between PR checks (settings.prScan)
 export const PR_TRIES = 3 // failing CI or conflicts go to the agent this many times in a row (settings.prTries), then over to you
 

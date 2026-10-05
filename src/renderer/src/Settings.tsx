@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook, type Webhook } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook, type Webhook, webhookUrl } from '../../shared/types'
 import { MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
@@ -103,6 +103,12 @@ const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
 function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webhook) => void; test?: (w: Webhook) => Promise<unknown> }) {
   const [said, setSaid] = useState('') // the last Send test's outcome
   const format = w.format ?? 'ntfy'
+  let bad = '' // the daemon's own check, as you type
+  try {
+    if (w.url?.trim()) webhookUrl(w.url)
+  } catch (e) {
+    bad = (e as Error).message
+  }
   return (
     <>
       <h2>Notifications webhook</h2>
@@ -127,6 +133,7 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
         URL
         <input className="mono" value={w.url ?? ''} placeholder={FORMATS.find(f => f[0] === format)?.[2]} spellCheck={false} onChange={e => onChange({ ...w, url: e.target.value })} />
       </label>
+      {bad && <p className="muted small">{bad}</p>}
       <div className="setting-box">
         <Switch className="switch-row" on={w.waiting !== false} onChange={v => onChange({ ...w, waiting: v })}>
           <Says title="Waiting for you" hint="A permission prompt or a question, with what it asks; once per wait" />

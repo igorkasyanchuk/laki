@@ -99,7 +99,7 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
 - worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `prThreads`, `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
-  workspace: `inside`);
+  workspace: `inside`, links followed, by `realpath`);
 - the agent skill (Settings): `skills` (each with `mcp`: the agent's `mcp add` command, shown, never run; for
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
   (claude, codex, gemini, grok, opencode: `skill.ts` `AGENTS`, each one's home and `mcp add`) and `on`;
@@ -304,8 +304,11 @@ cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. T
 (`http://127.0.0.1:<daemon port>`), always with one `--allowed-mail` (`ONE_MAIL`: an address, never a
 `*@domain`; kept as `settings.remoteMail`), for `REMOTE_HOURS` (1, 2, 4, 8, 24, or 0: forever, no `until`). Each start makes a
 `remoteToken`; `remoteView` (`view.remote`) gives the link, `<url>/?token=<token>` (a query: Cloudflare's email sign-in drops a
-hash), which the renderer (`api.ts`: no port) uses on the page's own origin. While it runs, `main.ts` takes that token as
-well as its own and the tunnel's URL as an Origin; `remoteStop` drops both, so an old link is dead. It ends by
+hash), which the renderer (`api.ts`: no port) uses on the page's own origin, then takes out of the address bar
+(`pageToken`: `replaceState`, kept in the tab's `sessionStorage` `laki.token` for reconnects; Cloudflare's sign-in page,
+an earlier history entry, still holds the link). While it runs, `main.ts`
+takes the tunnel's URL as an Origin, and that token only with it (a client with no Origin needs the daemon's own);
+`remoteStop` drops both, so an old link is dead. It ends by
 `remoteStop`, at `until` (`remoteTick`, every 15 s), when cloudflared exits, or at shutdown.
 
 `main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`, or `LAKI_PAGE`) whatever the
@@ -332,7 +335,8 @@ gone or archived workspace is a failed run.
 
 `src/cli/mcp.ts`, `laki mcp`: JSON-RPC 2.0 over stdio, a message per line (`initialize` echoes the client's
 protocol version; `tools/list`, `tools/call`, `ping`; notifications get no answer, other methods -32601). Each tool is
-one or two `rpc` calls; none deletes, archives or ships. stdout is the protocol's, so the daemon starts at the first
+one or two `rpc` calls; none deletes, archives or ships. Its `state` (also `laki ls --json`, which the skill has agents
+run) leaves out settings, projects' config, queued prompts and remote access's link: an agent's transcript keeps them. stdout is the protocol's, so the daemon starts at the first
 tool call (`ensureDaemon`), never before. Tested in `test/cli.test.ts`.
 
 ### Links
@@ -374,7 +378,7 @@ Phone pushes are the daemon's (`push.ts`, `core.ts` `phone`), so they go with th
 `format` ntfy/slack/telegram/json, `waiting` unset on, `done` unset off) on a `turn` that waits or is done, and on
 `overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. ntfy gets a
 `Title` header (RFC 2047 past ASCII) and the question as the body; Slack its text escaped; JSON `{event, workspace, tab,
-agent, message, ts}`. 5 s timeout, a failure logged. `webhookTest` is Settings' *Send test* (answered, not logged).
+agent, message, ts}`. `https://` only (plain `http://` to localhost: tests' server; Settings flags another). 5 s timeout, a failure logged. `webhookTest` is Settings' *Send test* (answered, not logged).
 
 Archive on merge (`archiveMerged`, after `autoPR` in `scanPR`; `settings.archiveMerged`, off by default): a worktree
 whose PR is MERGED, with no tracked tab other than idle, `rev-list <head>..HEAD` 0 and `wsArchive` `ifClean`; once per

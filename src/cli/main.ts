@@ -7,7 +7,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
 import { REMOTE, type Schedule, type ScheduleRun, type View, type Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
-import { mcp } from './mcp.ts'
+import { mcp, state } from './mcp.ts'
 import { describe } from '../shared/when.ts'
 
 const argv = process.argv.slice(2)
@@ -80,8 +80,8 @@ async function main() {
   await ensureDaemon()
   switch (cmd) {
     case 'ls': {
+      if (json) return out(await state()) // agents read it: no secrets
       const v: View = await rpc('state')
-      if (json) return out(v)
       for (const p of v.projects) {
         console.log(`${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`)
         for (const w of v.workspaces.filter(w => w.project === p.id)) {
@@ -95,10 +95,13 @@ async function main() {
     }
     case 'project': {
       const [sub, arg] = rest
-      if (sub === 'add') return out(await rpc('projectAdd', { path: REMOTE.test(arg ?? '') && !existsSync(arg!) ? arg : resolve(arg ?? '.') }), `added ${arg}`) // host:path is the host's
+      if (sub === 'add') {
+        const { config: _, ...p } = await rpc('projectAdd', { path: REMOTE.test(arg ?? '') && !existsSync(arg!) ? arg : resolve(arg ?? '.') }) // host:path is the host's; config: its env
+        return out(p, `added ${arg}`)
+      }
       if (sub === 'rm') return out(await rpc('projectRm', { id: arg }), `removed ${arg}`)
-      const v: View = await rpc('state')
-      return out(v.projects, v.projects.map(p => `${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`).join('\n'))
+      const { projects } = await state()
+      return out(projects, projects.map(p => `${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`).join('\n'))
     }
     case 'new': {
       if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--fan claude,codex] [--prompt text]')

@@ -498,7 +498,7 @@ lit for a moment.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
   Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
   workspace, tab, agent, message, ts}`). Once per wait or turn; muted workspaces and tabs don't push. It goes to that
-  URL only, and *Send test* sends one now.
+  URL only (`https://`: it holds what the agent asks), and *Send test* sends one now.
 - *Pull requests*: how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
   conflicts* get (3), *Archive workspace when its PR merges* (off), and the prompts the PR switches send (above, in
   *PRs*).
@@ -636,7 +636,7 @@ laki send fix-login --when-idle "now add tests and run them"
 laki send fix-login --when-idle "then update the README"
 
 # the same message to every idle Claude
-laki ls --json | jq -r '.tabs[] | select(.preset == "claude" and .status == "idle") | "\(.workspace)/\(.name)"' |
+laki ls --json | jq -r '.tabs[] | select(.agent == "claude" and .status == "idle") | "\(.workspace)/\(.name)"' |
   while read -r t; do laki send "$t" "rebase on main and fix any conflicts"; done
 
 # watch an agent from another terminal

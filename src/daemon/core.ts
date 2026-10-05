@@ -1207,6 +1207,9 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   return ws
 }
 
+// a real path (realpathSync's) in a real folder, or the folder itself
+const within = (root: string, p: string) => p === root || p.startsWith(root + sep)
+
 // files git doesn't keep (.env…) that a new worktree needs: what .worktreeinclude (gitignore-style, at the repo's root)
 // and .laki.json's copy match in the main checkout (git ls-files does the matching), with their modes, before setup
 // and the agent start. One already in the worktree stays; a symlink counts only when it points inside the repo. A
@@ -1217,7 +1220,6 @@ async function copyIncludes(proj: Project, ws: Workspace) {
   const file = join(proj.path, '.worktreeinclude')
   if (existsSync(file)) pats.push(`--exclude-from=${file}`)
   if (!pats.length) return
-  const within = (root: string, p: string) => p === root || p.startsWith(root + sep)
   const copied: string[] = []
   try {
     const root = realpathSync(proj.path)
@@ -2383,11 +2385,18 @@ export function ship(ref: string, message: string) {
 
 // ---------- files: the side panel's tree, changed files marked
 
-// a path in the workspace; ponytail: by name only, a symlink inside may still point out
+// a path in the workspace, links followed: a tracked link (or a linked folder) may point anywhere. A new file's
+// nearest folder there already is what's checked; a dangling link is out. ponytail: on an SSH host by name only
 function inside(ws: Workspace, rel: string) {
   const abs = resolve(ws.path, rel)
-  if (!rel.trim() || !abs.startsWith(ws.path + '/')) throw new Error(`${rel}: not a path inside the workspace`)
-  return abs
+  if (rel.trim() && abs.startsWith(ws.path + '/'))
+    try {
+      if (ws.host) return abs
+      let up = abs
+      while (!lstatSync(up, { throwIfNoEntry: false })) up = dirname(up)
+      if (within(realpathSync(ws.path), realpathSync(up))) return abs
+    } catch {} // a dangling link, a file as a folder, the workspace gone
+  throw new Error(`${rel}: not a path inside the workspace`)
 }
 
 const MAX_FILES = 50000

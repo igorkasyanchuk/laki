@@ -388,6 +388,8 @@ test('remote access: the page, one email for some hours, a token of its own; gon
     fetch(`${at}/rpc`, { method: 'POST', headers: { authorization: `Bearer ${token}`, ...(origin && { origin }) }, body: JSON.stringify({ method: 'ping' }) }).then(r => r.status)
   assert.equal(await ping(key, url), 200)
   assert.equal(await ping(key, 'https://evil.example'), 403)
+  assert.equal(await ping(key), 401) // no Origin: not its page
+  await assert.rejects(connect(rig, undefined, key))
   const c = await connect(rig, url, key)
   assert.equal(await c.call('ping'), 'pong')
   c.close()

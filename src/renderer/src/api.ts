@@ -21,8 +21,30 @@ export const bridge: Bridge | undefined = (window as any).laki
 
 export type Msg = { ev: string; [k: string]: any }
 
+// remote access's token, taken out of the address bar (and this page's history entry: Cloudflare's sign-in page, an
+// entry before it, keeps the link) once read; the tab keeps it for its reconnects and reloads
+let kept = ''
+function pageToken() {
+  const q = new URLSearchParams(location.search)
+  const t = q.get('token')
+  if (t) {
+    kept = t
+    try {
+      sessionStorage.setItem('laki.token', t)
+    } catch {}
+    q.delete('token')
+    const rest = q.toString()
+    history.replaceState(history.state, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`)
+  }
+  if (!kept)
+    try {
+      kept = sessionStorage.getItem('laki.token') ?? ''
+    } catch {}
+  return kept
+}
+
 async function wsURL() {
-  const { port, token } = bridge ? await bridge.conn() : (h => ({ port: h.get('port'), token: h.get('token') ?? new URLSearchParams(location.search).get('token') ?? '' }))(new URLSearchParams(location.hash.slice(1)))
+  const { port, token } = bridge ? await bridge.conn() : (h => ({ port: h.get('port'), token: h.get('token') ?? pageToken() }))(new URLSearchParams(location.hash.slice(1)))
   const at = port ? `ws://127.0.0.1:${port}` : `${location.protocol === 'https:' ? 'wss' : 'ws'}://${location.host}` // no port: the page's own daemon
   return `${at}/ws?token=${encodeURIComponent(token)}`
 }
