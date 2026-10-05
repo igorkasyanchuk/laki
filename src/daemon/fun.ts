@@ -1,8 +1,9 @@
 // The header's fun button: a random meme from r/memes, for a break. Reddit's random.json first, else meme-api.com, which
-// serves the same subreddit (Reddit turns JSON away from many networks without OAuth). Only on a click; nothing NSFW or
-// spoilered; the picture comes back as a data: URL (the page's CSP loads nothing from the web), 8 MB at most.
+// serves the same subreddit (Reddit's bot wall, "blocked by network security", turns requests away now and then, more so
+// from some networks). Only on a click; nothing NSFW or spoilered; the picture comes back as a data: URL (the page's CSP
+// loads nothing from the web), 8 MB at most.
 // LAKI_MEME_API: tests' fake server for both, on this Mac only.
-const UA = 'web:laki:v1 (coding-agent app; its fun button)'
+const UA = 'web:laki:v1.0.0 (by /u/laki-app)' // Reddit's format: <platform>:<app>:<version> (by /u/<user>)
 const MAX = 8 << 20
 const fake = () => (/^http:\/\/(127\.0\.0\.1|localhost)(:\d+)?$/.test(process.env.LAKI_MEME_API ?? '') ? process.env.LAKI_MEME_API! : '')
 
