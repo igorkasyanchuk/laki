@@ -7,6 +7,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki new <project> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] [--cmd c] [--prompt text] [--name n] [--local]
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
             [--issue <url|number>]  a GitHub issue's title and text as the prompt (and the name)
+            [--pr <url|number>]     a GitHub PR's branch (gh pr checkout, forks too), named pr-<n>-<title>
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
   laki rm <ws> | archive <ws> | restore <ws> | fork <ws>
   laki tab <ws> [--preset p] [--cmd c]        a new tab

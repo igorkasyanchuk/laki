@@ -1,6 +1,7 @@
 // PR feedback to the agent (by hand and automatic) and the side panel's review threads, against the fake gh.
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { execFileSync } from 'node:child_process'
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -192,4 +193,27 @@ test('a diff line comment on the PR: gh api with the head commit, a line not in 
   writeFileSync(join(gh, 'comment.json'), JSON.stringify({ html_url: 'https://example.invalid/pr/9#c1' }))
   assert.deepEqual(await rig.rpc('prComment', { ...c, side: 'LEFT' }), { url: 'https://example.invalid/pr/9#c1' })
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/comments -f body=why "this"\? -f commit_id=beef -f path=a\.ts -F line=3 -f side=LEFT/)
+})
+
+test('a workspace from a PR: gh pr checkout on its branch, named after it, its PR by number; gh and branch errors', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const fromPR = (pr: string) => rig.rpc('wsNew', { project: p.id, pr, preset: 'none' })
+  await assert.rejects(fromPR('99'), /PR 99 not found/)
+  writeFileSync(join(gh, 'noauth'), '')
+  await assert.rejects(fromPR('99'), /gh isn't signed in: run gh auth login/)
+  rmSync(join(gh, 'noauth'))
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 123, title: 'Fix the login page!', url: 'https://github.com/o/r/pull/123', headRefName: 'fix-login', baseRefName: 'main', isCrossRepository: false }))
+  writeFileSync(join(gh, 'checkout'), 'fix-login')
+  const ws = await fromPR('https://github.com/o/r/pull/123')
+  assert.deepEqual([ws.id, ws.branch, ws.base, ws.prNumber], ['pr-123-fix-the-login-page', 'fix-login', 'main', 123])
+  assert.equal(execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: ws.path, encoding: 'utf8' }).trim(), 'fix-login')
+  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').includes('gh pr view 123 --json number,state'), 'its PR, by number')
+  await assert.rejects(fromPR('123'), new RegExp(`already checked out in workspace ${ws.id}$`))
+  await assert.rejects(rig.rpc('wsFan', { project: p.id, pr: '123', presets: ['claude', 'codex'] }), /can't start from a PR/)
+  await rig.rpc('wsRm', { id: ws.id }) // the branch stays: gh checks it out again
+  const r = await rig.cli('new', p.id, '--pr', '123', '--preset', 'none')
+  assert.match(r.out, /^pr-123-fix-the-login-page .*\(branch fix-login,/)
 })

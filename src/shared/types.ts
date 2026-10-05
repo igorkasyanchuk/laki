@@ -44,6 +44,7 @@ export type Workspace = {
   fix?: PRFix // what autoFix/autoReview/autoMerge sent already
   race?: string // one prompt fanned out to several agents: the workspaces of one race share it (Compare)
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
+  prNumber?: number // the GitHub PR it was started from (laki new --pr): its PR by number, a fork's too, until the branch moves
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose

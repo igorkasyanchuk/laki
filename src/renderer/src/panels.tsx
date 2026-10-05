@@ -44,7 +44,8 @@ export function About({ onClose }: { onClose: () => void }) {
 }
 
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[] }
+// pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[]; pr?: string }
 
 // initial: a laki://new link's prompt, preset and name
 export function NewWorkspace({ view, project, agent, initial, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
@@ -61,7 +62,7 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
   const starts = view.presets.find(x => x.name === p.preset)?.agent // what the preset starts: its model and effort flags
   const [rivals, setRivals] = useState<string[]>([]) // a race: the other presets on the same prompt
   const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command').map(x => x.name)
-  const racing = !p.local && !plain && isAgent(starts) && rivals.some(r => racers.includes(r))
+  const racing = !p.local && !plain && !p.pr?.trim() && isAgent(starts) && rivals.some(r => racers.includes(r)) // a PR's branch is checked out once
   const fan = racing ? [p.preset, ...rivals.filter(r => racers.includes(r))] : undefined
   useEffect(() => {
     setTpl('') // another project, other templates
@@ -81,7 +82,7 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
     try {
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
-      await onCreate({ ...p, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
+      await onCreate({ ...p, pr: p.local || plain ? undefined : p.pr?.trim() || undefined, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
     } catch {
       setBusy(false)
     }
@@ -115,8 +116,14 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
         {!p.local && !plain && (
           <div className="row">
             <label>
+              <span>
+                Pull request <span className="muted">(optional)</span>
+              </span>
+              <input value={p.pr ?? ''} placeholder="#123 or its URL" spellCheck={false} onChange={e => set({ pr: e.target.value.replace(/^#/, '') })} />
+            </label>
+            <label>
               Base branch
-              <input list="branches" value={p.base} onChange={e => set({ base: e.target.value })} />
+              <input list="branches" value={p.pr?.trim() ? "the PR's" : p.base} disabled={!!p.pr?.trim()} onChange={e => set({ base: e.target.value })} />
               <datalist id="branches">
                 {branches.map(b => (
                   <option key={b} value={b} />
@@ -127,7 +134,7 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
               <span>
                 Name <span className="muted">(optional)</span>
               </span>
-              <input value={p.name ?? ''} placeholder="from the prompt" onChange={e => set({ name: e.target.value })} />
+              <input value={p.name ?? ''} placeholder={p.pr?.trim() ? 'pr-<number>-<title>' : 'from the prompt'} onChange={e => set({ name: e.target.value })} />
             </label>
           </div>
         )}
@@ -141,7 +148,7 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
             ))}
           </div>
         </label>
-        {!p.local && !plain && isAgent(starts) && racers.length > 0 && (
+        {!p.local && !plain && !p.pr?.trim() && isAgent(starts) && racers.length > 0 && (
           <div className="field">
             <span>
               Race <span className="muted">· the same prompt to more agents, each in a worktree of its own; Compare keeps the best</span>

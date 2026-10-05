@@ -13,7 +13,7 @@ import { describe } from '../shared/when.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'fan'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan'])
 const BOOL = new Set(['json', 'local', 'when-idle'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -101,7 +101,7 @@ async function main() {
       return out(v.projects, v.projects.map(p => `${p.id}  ${p.path}`).join('\n'))
     }
     case 'new': {
-      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--fan claude,codex] [--prompt text]')
+      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--fan claude,codex] [--prompt text]')
       const o = {
         project: rest[0],
         base: flags.base,
@@ -113,6 +113,7 @@ async function main() {
         model: flags.model,
         effort: flags.effort,
         issue: flags.issue || undefined,
+        pr: flags.pr || undefined,
       }
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
       // a race: the same prompt to each preset, a worktree each

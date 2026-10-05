@@ -759,7 +759,25 @@ export function closeTab(id: string) {
 // ---------- workspaces
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue'] }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string }
+
+// gh's failure as a line you can act on: not installed, not signed in, not found
+function ghSays(e: any, what: string) {
+  const err = String(e.stderr || e.message)
+  if (e.code === 'ENOENT') return "gh isn't installed: brew install gh, then gh auth login"
+  if (/gh auth login|not logged in|authenticat/i.test(err)) return "gh isn't signed in: run gh auth login"
+  if (/could not resolve to a pull ?request|no pull requests found|not found/i.test(err)) return `${what} not found`
+  return `gh: ${err.trim().split('\n')[0]}`
+}
+
+// --pr: a GitHub PR (its URL, or its number in the project's repo), through your gh
+type PRHead = { number: number; title: string; url: string; headRefName: string; baseRefName: string; isCrossRepository: boolean; headRepositoryOwner?: { login: string } }
+async function prHead(proj: Project, ref: string): Promise<PRHead> {
+  const { stdout } = await run('gh', ['pr', 'view', '--json', 'number,title,url,headRefName,baseRefName,isCrossRepository,headRepositoryOwner', '--', ref], { cwd: proj.path, timeout: 20000 }).catch(e => {
+    throw new Error(ghSays(e, `PR ${ref}`))
+  })
+  return JSON.parse(stdout)
+}
 
 // --issue: a GitHub issue (its URL, or its number in the project's repo) through gh: the workspace's name, and its
 // title, body and link ahead of the prompt
@@ -782,6 +800,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
   if (presets.length < 2) throw new Error('a race needs two agents or more')
   if (presets.length > 6) throw new Error('six agents at most')
   if (o.local || proj.git === false) throw new Error('a race needs worktrees: a git project, not Local')
+  if (o.pr?.trim()) throw new Error("a race can't start from a PR: its branch is checked out once")
   for (const p of presets) {
     if (p === 'none' || p === 'shell') throw new Error(`${p} isn't an agent`)
     presetCheck(p)
@@ -804,6 +823,15 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // before the worktree: a wrong one makes nothing
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
   const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
+  // a PR: the worktree on its head branch, named after it, its base the PR's, linked to it for the PR status
+  const pr = o.pr?.trim() ? await prHead(proj, o.pr.trim()) : undefined
+  if (pr) {
+    if (o.local || proj.git === false) throw new Error('a PR needs a worktree: a git project, not Local')
+    const have = state.workspaces.find(w => w.project === proj.id && !w.archived && w.kind === 'worktree' && w.branch === pr.headRefName)
+    if (have) throw new Error(`PR #${pr.number}'s branch ${pr.headRefName} is already checked out in workspace ${have.id}`)
+    if (current === pr.headRefName) throw new Error(`PR #${pr.number}'s branch ${pr.headRefName} is checked out in ${proj.path}: switch it to another branch first`)
+    o = { ...o, name: o.name || `pr-${pr.number}-${slug(pr.title).slice(0, 24)}`.replace(/-+$/, '') }
+  }
   let ws: Workspace
   if (o.local || proj.git === false) {
     const have = state.workspaces.find(w => w.project === proj.id && w.kind === 'local' && !w.schedule) // the folder's own, not a scheduled run's session
@@ -814,13 +842,23 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     const want = slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' '))
     const id = await uniqueWsId(want, proj)
     const path = join(dir, 'worktrees', proj.id, id)
-    const base = o.base || current
-    const branch = `${branchPrefix()}${id}`
+    let base = o.base || current
+    let branch = `${branchPrefix()}${id}`
     mkdirSync(dirname(path), { recursive: true })
-    await git(proj.path, 'worktree', 'add', path, '-b', branch, base).catch(e => {
+    const add = pr ? ['--detach', path] : [path, '-b', branch, base]
+    await git(proj.path, 'worktree', 'add', ...add).catch(e => {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
     })
-    ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now() }
+    if (pr) {
+      // gh pr checkout makes the branch (from a fork too, with its remote) where the worktree is
+      await run('gh', ['pr', 'checkout', String(pr.number)], { cwd: path, timeout: 120000 }).catch(async e => {
+        await git(proj.path, 'worktree', 'remove', '--force', path).catch(() => {})
+        throw new Error(`gh pr checkout ${pr.number}: ${ghSays(e, `PR ${pr.number}`)}`)
+      })
+      branch = await git(path, 'rev-parse', '--abbrev-ref', 'HEAD')
+      base = pr.baseRefName
+    }
+    ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prNumber: pr.number }) }
     await copyIncludes(proj, ws) // before setup and the agent: they may read .env
   }
   if (o.race) ws.race = o.race
@@ -1218,6 +1256,7 @@ function syncBranches() {
     const b = headOf(w.path)
     if (!b || b === w.branch) continue
     w.branch = b
+    w.prNumber = undefined // nor the PR it started from
     prs.delete(w.id) // the old branch's PR isn't this one's
     moved = true
   }
@@ -1499,7 +1538,7 @@ const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,
 async function scanPR(ws: Workspace) {
   let pr: PR
   try {
-    const { stdout } = await run('gh', ['pr', 'view', ws.branch, '--json', PR_FIELDS], { cwd: ws.path, timeout: 20000 })
+    const { stdout } = await run('gh', ['pr', 'view', String(ws.prNumber ?? ws.branch), '--json', PR_FIELDS], { cwd: ws.path, timeout: 20000 })
     const j = JSON.parse(stdout)
     const list: Check[] = (j.statusCheckRollup ?? []).map(checkOf)
     pr = {

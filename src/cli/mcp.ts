@@ -41,13 +41,14 @@ const TOOLS: Tool[] = [
         model: str("the agent's model (opus, sonnet, a full name; provider/model for opencode); default: the agent's own"),
         effort: str('how hard it thinks: claude low…max, codex minimal…xhigh; default: the agent’s own'),
         issue: str('a GitHub issue (its URL or number) to work on: its title and text become the prompt, with the prompt above after them'),
+        pr: str("a GitHub PR (its URL or number) to work on: the workspace is a worktree on its branch (forks too), named after it"),
         presets: { type: 'array', items: { type: 'string' }, description: 'a race: 2–6 presets (claude, codex…) that each get a worktree on the same prompt, for the user to compare and keep one' },
       },
       ['project'],
     ),
     run: a => {
-      const o = { project: a.project, prompt: a.prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue }
-      if (!a.prompt && !a.issue) throw new Error('a prompt or an issue')
+      const o = { project: a.project, prompt: a.prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr }
+      if (!a.prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },
   },

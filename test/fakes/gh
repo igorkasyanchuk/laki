@@ -2,6 +2,13 @@
 # fake gh: a PR for every branch, CI pending; files in $FAKE_GH answer instead when there
 echo "gh $*" >> "${FAKE_LOG:-/dev/null}"
 f() { [ -n "$FAKE_GH" ] && [ -f "$FAKE_GH/$1" ] && cat "$FAKE_GH/$1"; }
+case "$*" in
+  "pr view --json number,title,url,headRefName"*) # starting a workspace from a PR (--pr)
+    [ -n "$FAKE_GH" ] && [ -f "$FAKE_GH/noauth" ] && { echo 'To get started with GitHub CLI, please run:  gh auth login' >&2; exit 4; }
+    f prhead.json || { echo 'GraphQL: Could not resolve to a PullRequest with the number of 99. (repository.pullRequest)' >&2; exit 1; }
+    exit 0 ;;
+  "pr checkout "*) b=$(f checkout) || exit 1; git checkout -q "$b" 2>/dev/null || git checkout -q -b "$b"; exit $? ;;
+esac
 case "$1 $2" in
   "pr view") f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;
   "pr checks") f checks.json || echo '[]'; exit 8 ;;

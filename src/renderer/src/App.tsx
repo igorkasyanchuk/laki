@@ -118,7 +118,7 @@ export function App() {
   const [folded, setFolded] = useState<string[]>(() => load('laki.folded', [])) // projects whose workspaces are hidden
   const [runsSeen, setRunsSeen] = useState<string>(() => load('laki.runsSeen', '')) // the newest scheduled run read
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
-  const [note, setNote] = useState<{ text: string; undo?: () => void } | null>(null) // the toast, maybe with Undo
+  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string } | null>(null) // the toast, maybe with Undo (or another action: label)
   const [menu, openMenu] = useMenu()
   const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
@@ -191,9 +191,9 @@ export function App() {
     fit()
     return () => ro.disconnect()
   }, [])
-  const toast = (text: string, undo?: () => void) => {
+  const toast = (text: string, undo?: () => void, label?: string) => {
     clearTimeout(noteTimer.current) // an older toast's timer would cut this one short
-    setNote({ text, undo })
+    setNote({ text, undo, label })
     noteTimer.current = setTimeout(() => setNote(null), undo ? 8000 : 6000)
   }
   const fail = (e: unknown) => toast((e as Error).message)
@@ -1112,7 +1112,16 @@ export function App() {
             }}
             onCreate={async p => {
               // a race: a workspace per agent, then Compare
-              const made = p.fan ? await call<WorkspaceView[]>('wsFan', { ...p, presets: p.fan }) : [await call<WorkspaceView>('wsNew', p)]
+              // a PR whose branch a workspace has already: that one, a click away
+              const made = p.fan
+                ? await call<WorkspaceView[]>('wsFan', { ...p, presets: p.fan })
+                : [
+                    await api.call<WorkspaceView>('wsNew', p).catch(e => {
+                      const there = (e as Error).message.match(/checked out in workspace (\S+)$/)?.[1]
+                      toast((e as Error).message, there ? () => (setWsId(there), setDialog(null)) : undefined, 'Open it')
+                      throw e
+                    }),
+                  ]
               setWsId(made[0].id)
               setDialog(p.fan && made[0].race ? { compare: made[0].race } : null)
               setNewFor(undefined)
@@ -1184,7 +1193,7 @@ export function App() {
           {note.text}
           {note.undo && (
             <button className="toast-undo" onClick={() => (setNote(null), note.undo!())}>
-              Undo
+              {note.label ?? 'Undo'}
             </button>
           )}
         </div>
