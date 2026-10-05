@@ -125,6 +125,7 @@ const api: Record<string, Handler> = {
   reorder: p => core.reorder(p),
   imageSave: p => core.imageSave(p),
   prFix: p => core.prFix(p),
+  webhookTest: p => core.webhookTest(p),
   send: p => core.send(p),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),

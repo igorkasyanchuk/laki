@@ -1034,6 +1034,7 @@ export function App() {
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             renameProjects
             skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on) => api.call<SkillInfo[]>('skillSet', { agent, on }) }}
+            webhookTest={w => api.call('webhookTest', w)}
             remote={{ state: view.remote, start: (hours, mail) => api.call('remoteStart', { hours, mail }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             section={settingsFor ? `project:${settingsFor.id}` : section}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}

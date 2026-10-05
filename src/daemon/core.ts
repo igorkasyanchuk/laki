@@ -10,9 +10,10 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
+import { pushTo } from './push.ts'
 import { type Client, Session } from './session.ts'
 
 const run = promisify(execFile)
@@ -183,6 +184,7 @@ export function view(): View {
     // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
     if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
     else r.runAt = undefined
+    if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
     return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask }
   })
@@ -1025,6 +1027,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       r.status = 'waiting'
       r.limit = undefined
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text: pl.message ?? '' })
+      phone(tab, 'waiting', pl.message ?? '')
       break
     case 'idle':
     case 'done': // codex notify: {"type":"agent-turn-complete","thread-id":…,"last-assistant-message":…}
@@ -1045,6 +1048,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       if (p.state === 'failed' || tab.preset === 'codex') checkLimit(tab, p.state === 'failed' ? `${last ?? ''}\n${typeof err === 'string' ? err : JSON.stringify(err)}` : '')
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '' })
+      if (!r.limit) phone(tab, 'done', r.last ?? '')
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
       prSoon()
       break
@@ -1592,7 +1596,25 @@ function overToYou(ws: Workspace, text: string) {
   if (!tab) return
   rtOf(tab.id).status = 'waiting'
   broadcast({ ev: 'turn', tab: tab.id, ws: ws.id, kind: 'waiting', text })
+  phone(tab, 'waiting', text)
 }
+
+// a push to your phone (push.ts) for a turn that waits or is done: once per state change of a tab (pushed: what went
+// since it last ran; view() clears it), never for a muted tab or workspace. ponytail: a turn that starts and ends
+// within the 30 ms before a view is built looks like the same one, and its end isn't pushed
+const pushed = new Map<string, string>()
+function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
+  const w = state.settings?.webhook
+  const ws = state.workspaces.find(x => x.id === tab.workspace)
+  if (!w?.url?.trim() || (kind === 'waiting' ? w.waiting === false : w.done !== true) || pushed.get(tab.id) === kind || tab.muted || ws?.muted) return
+  pushed.set(tab.id, kind)
+  // a wait's message; a done turn's last line that asks something
+  const question = (kind === 'waiting' ? text : text.split('\n').reverse().find(l => l.trim().endsWith('?')) ?? '').trim().slice(0, 500)
+  pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined }).catch(e => log(`push ${tab.id}: ${e.message}`))
+}
+
+// Settings' Send test: the webhook as the page has it, answered (not fired and forgotten)
+export const webhookTest = (w: Webhook) => pushTo(w ?? {}, { event: 'test', workspace: '', tab: '', agent: 'Laki' }).then(() => true)
 
 // the workspace's agent: its first live agent tab
 const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && sessions.get(t.id) && !sessions.get(t.id)!.exited)

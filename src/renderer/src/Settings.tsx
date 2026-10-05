@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook, type Webhook } from '../../shared/types'
 import { MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
@@ -22,7 +22,7 @@ export type { Preset }
 
 // the sidebar's project names (ProjectLook): each option over the theme's; App.tsx puts them on the sidebar as data-ph-*
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', prPrompts: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
 
 const PROJECT_LOOK: [keyof ProjectLook, string, [string, string][]][] = [
   ['font', 'Font', [['theme', "Theme's"], ['ui', 'Interface'], ['mono', 'Monospace']]],
@@ -71,6 +71,7 @@ export type AppSettings = Paint & {
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
   prTries?: number // fix CI's and fix conflicts' tries in a row
+  webhook?: Webhook // pushes to your phone
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -87,6 +88,61 @@ const PR_KINDS: [FixWhat, string, string][] = [
   ['review', 'Review', 'the open review threads go after it'],
   ['conflict', 'Fix conflicts', ''],
 ]
+
+// the webhook's formats (Settings › Notifications webhook): id, name, an example URL
+const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
+  ['ntfy', 'ntfy', 'https://ntfy.sh/a-topic-only-you-know'],
+  ['slack', 'Slack', 'https://hooks.slack.com/services/…'],
+  ['telegram', 'Telegram', 'https://api.telegram.org/bot<token>/sendMessage?chat_id=<id>'],
+  ['json', 'Generic JSON', 'https://example.com/hook'],
+]
+
+function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webhook) => void; test?: (w: Webhook) => Promise<unknown> }) {
+  const [said, setSaid] = useState('') // the last Send test's outcome
+  const format = w.format ?? 'ntfy'
+  return (
+    <>
+      <h2>Notifications webhook</h2>
+      <p className="muted small">
+        Pushes to your phone when an agent waits for you or finishes, posted to this URL and nowhere else. ntfy: a topic's URL, which the ntfy app
+        subscribes to; Slack: an incoming webhook; Telegram: your bot's whole sendMessage URL, chat_id included; generic JSON gets{' '}
+        <code>{'{event, workspace, tab, agent, message, ts}'}</code>. Muted workspaces and tabs don't push.
+      </p>
+      <div className="grid2">
+        <label>
+          Format
+          <select value={format} onChange={e => onChange({ ...w, format: e.target.value as Webhook['format'] })}>
+            {FORMATS.map(([id, name]) => (
+              <option key={id} value={id}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </div>
+      <label>
+        URL
+        <input className="mono" value={w.url ?? ''} placeholder={FORMATS.find(f => f[0] === format)?.[2]} spellCheck={false} onChange={e => onChange({ ...w, url: e.target.value })} />
+      </label>
+      <div className="setting-box">
+        <Switch className="switch-row" on={w.waiting !== false} onChange={v => onChange({ ...w, waiting: v })}>
+          <Says title="Waiting for you" hint="A permission prompt or a question, with what it asks; once per wait" />
+        </Switch>
+        <Switch className="switch-row" on={w.done === true} onChange={v => onChange({ ...w, done: v })}>
+          <Says title="Finished" hint="The end of a turn, with its last question if it asks one" />
+        </Switch>
+      </div>
+      {test && (
+        <div className="row-buttons">
+          <button type="button" disabled={!w.url?.trim()} onClick={() => (setSaid('Sending…'), test(w).then(() => setSaid('Sent: check your phone'), e => setSaid(`Didn't go: ${e.message}`)))}>
+            Send test
+          </button>
+          {said && <span className="muted small">{said}</span>}
+        </div>
+      )}
+    </>
+  )
+}
 
 const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
   ['waiting', 'Waiting for you', 'A permission prompt, or CI that keeps failing'],
@@ -397,6 +453,8 @@ const FIND: [string, string, string?][] = [
   ['general', 'Branch prefix', 'git worktree'],
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
+  ['webhook', 'Notifications webhook', 'phone push ntfy slack telegram json notify waiting done'],
+  ['webhook', 'Send test', 'webhook phone push'],
   ['general', 'Pull requests in the sidebar', 'pr github icon'],
   ['general', 'Turn timers', 'elapsed time'],
   ['general', 'Diff size in the sidebar', 'lines added removed changes stat'],
@@ -441,6 +499,7 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'terminal', label: 'Terminal', icon: 'terminal' },
   { id: 'open', label: 'Open in', icon: 'code' },
   { id: 'presets', label: 'Agent presets', icon: 'agent' },
+  { id: 'webhook', label: 'Phone pushes', icon: 'bell' },
   { id: 'pr', label: 'Pull requests', icon: 'pr' },
   { id: 'templates', label: 'Prompt templates', icon: 'pencil' },
   { id: 'actions', label: 'Actions', icon: 'run' },
@@ -624,6 +683,7 @@ export function SettingsPage(p: {
   script?: keyof Scripts // a project's script tab to show
   skill?: SkillApi
   remote?: RemoteApi
+  webhookTest?: (w: Webhook) => Promise<unknown> // Notifications webhook's Send test
   presets: Preset[] // the daemon's: the settings', or its defaults
 }) {
   const { settings, apps, onSave, onClose } = p
@@ -1115,6 +1175,7 @@ export function SettingsPage(p: {
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'remote' && p.remote && <RemoteSection api={p.remote} mail={s.remoteMail ?? ''} onMail={remoteMail => set({ remoteMail })} />}
+          {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (
             <>
               <h2>Pull requests</h2>

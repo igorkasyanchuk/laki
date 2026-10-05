@@ -126,7 +126,11 @@ export type Settings = {
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
+  webhook?: Webhook // pushes to your phone
 }
+
+// Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
+export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean }
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
@@ -204,4 +208,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 14
+export const API = 15
