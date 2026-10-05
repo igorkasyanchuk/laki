@@ -3,13 +3,16 @@
 Run Claude Code, Codex, Gemini, Grok, OpenCode or any command side by side on macOS, each task in its own git
 worktree. Agents keep running when the window is closed.
 
-- **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts. Plain folders work too.
+- **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts and your `.env` copied in.
+  Start one from a prompt, a GitHub issue or a PR. Plain folders work too.
 - **Status**: running, needs you, done, on every tab and row; notifications (Allow / Deny on a permission prompt),
-  a Dock count, a follow-up queue. Agents resume after a restart or a usage limit.
+  a Dock and menu bar count, pushes to your phone (ntfy, Slack, Telegram), a follow-up queue. Agents resume after a
+  restart or a usage limit.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon.
-- **PRs**: CI and reviews in the status bar, sent to the agent if you like; ship (commit, push, PR) in one step.
-- **Side panel**: files (Markdown rendered), the diff (comment on a line), review threads, and a preview of the dev
+- **PRs**: CI and reviews in the status bar, sent to the agent if you like; ship (commit, push, PR) in one step;
+  archived once merged, if you like.
+- **Side panel**: files (Markdown rendered), the diff (comment on a line; images before and after), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`).
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.

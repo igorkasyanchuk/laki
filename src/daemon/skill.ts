@@ -76,6 +76,8 @@ workspace each, so they run in parallel.
 
 - From a GitHub issue: \`laki new <project> --issue <url|number>\` (its title and text become the prompt; a
   \`--prompt\` adds to it).
+- On a GitHub PR: \`laki new <project> --pr <url|number> --prompt "…"\` (a worktree on the PR's branch, a fork's
+  too, named after it).
 - Two agents on the same task, to keep the better result: \`laki new <project> --fan claude,codex --prompt "…"\`
   (the user compares them in the app).
 

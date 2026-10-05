@@ -65,7 +65,8 @@ project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a pro
 `templates`, kept by `projectSet`; 9: browsers in `apps`, `openIn` `default`; 10: `send` `enter: false`; 11: a tab's `runAt`, `model` and `effort`, the
 board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `stat`; 13: a tab's `ask`, `answer`,
 `unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`; 14: settings' `prPrompts`, `prScan`,
-`prTries`, which the PR switches' tooltips quote). A
+`prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
+workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -80,10 +81,19 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
 - an issue (`wsNew`/`wsFan` `issue`: a URL or number): `fromIssue` runs `gh issue view <ref> --json number,title,body,url`
   in the project; the prompt is "Work on GitHub issue #n: title", the URL, the body (8,000 characters at most) and the
   prompt given, the name `issue-<n>-<slug>`; the workspace keeps `issue`;
+- a PR (`wsNew` `pr`: a URL or number; not local, not a race): `prHead` (`gh pr view <ref> --json …`; `ghSays` turns gh's
+  failures into a line: not installed, signed out, not found), then `worktree add --detach` and `gh pr checkout <url>
+  --branch <b>` in it (`b`: the head branch, a fork's `<owner>/<branch>`; refused when a workspace or the repo has it
+  checked out: "already checked out in workspace <id>", which the app offers to open). The base is the PR's, the name
+  `pr-<n>-<slug>`; the workspace keeps `prUrl`, which `scanPR` asks for until `syncBranches` sees another branch;
+- files git ignores (`copyIncludes`, after `worktree add` in `wsNew` and `wsRestore`): `.worktreeinclude` (the repo's
+  root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
+  their mode; one already there stays, a source outside the repo (a link) or a destination outside the worktree is
+  skipped; failures go to `daemon.log`, never fail the workspace;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from), `tunnelStart`
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
-- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only), `prThreads`, `prComment` (`path`,
+- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `prThreads`, `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`);
@@ -214,7 +224,10 @@ they work).
 
 ### Scans
 
-- Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN`, every 5s. First,
+- Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN -Fpcn`, every 5s
+  (`procs`: each port's pid and command, `WorkspaceView.procs`; `.laki.json` `ports`, strings only, as `portNames`).
+  `portKill` (the status bar's ✕, after `ask`): that pid, if it still listens there and is yours (uid), gets SIGTERM,
+  and SIGKILL 3 s later if `ps`'s uid and start time are the same. First,
   `syncBranches`: each workspace's `branch` follows its folder's HEAD (`headOf` reads the file, no git run; detached
   stays), so an agent's `git checkout -b` moves the PR lookup, status bar, ship and restore with it, and scans PRs now.
   A turn's end scans PRs 2 s later too (`prSoon`, at most every 20 s): `gh pr create` shows up without the minute's wait.
@@ -319,6 +332,17 @@ The renderer posts them (`turn` events, App.tsx): off when `settings.notify === 
 `settings.notifySound` (a macOS sound's name, `none`, unset: the default) goes to main's `Notification`. A waiting
 turn whose text says "permission" gets *Allow* / *Deny* actions (Asks, above).
 
+Phone pushes are the daemon's (`push.ts`, `core.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
+`format` ntfy/slack/telegram/json, `waiting` unset on, `done` unset off) on a `turn` that waits or is done, and on
+`overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. ntfy gets a
+`Title` header (RFC 2047 past ASCII) and the question as the body; Slack its text escaped; JSON `{event, workspace, tab,
+agent, message, ts}`. 5 s timeout, a failure logged. `webhookTest` is Settings' *Send test* (answered, not logged).
+
+Archive on merge (`archiveMerged`, after `autoPR` in `scanPR`; `settings.archiveMerged`, off by default): a worktree
+whose PR is MERGED, with no tracked tab other than idle, `rev-list <head>..HEAD` 0 and `wsArchive` `ifClean`; once per
+PR (`autoArchived`: an Undo stays). It broadcasts `archived`, which App toasts with Undo (`wsRestore`); a merged PR's
+row says *merged* while the setting is on.
+
 ### Usage
 
 Plan limits (`usage.ts`, the renderer's `Usage.tsx`): `usage` reads Claude's `GET api.anthropic.com/api/oauth/usage`
@@ -350,7 +374,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.recent`: the palette's last 30 picks, by label: first in it, and ahead of a close match.
     - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
-    muted and archived workspaces. `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
+    muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
+    `Tray`, `trayIcon` drawn in code as a template image; the count as its title, a menu of those tabs, waiting first
+    with what they ask from `turn` events, `show(tab)` on a click; `settings.menuBar === false` destroys it). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
     `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
@@ -449,7 +475,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   are sections of it (`ProjectSection`: name, scripts, env; saved 400 ms after typing and on leaving).
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Files (tree from the daemon's file list, search, new
   file/folder, changed files marked), Changes (the diff by file, each line with its old and new numbers from the
-  hunks; a click opens `CommentBox`: the PR, or the agent), Review (`PRSection` from `Info.tsx`, review
+  hunks; a click opens `CommentBox`: the PR, or the agent; an image, `IMAGE`, is `ImageDiff`: `PanelApi.read` with `base`
+  for before, as `<img>`, SVG too, a click for full size), Review (`PRSection` from `Info.tsx`, review
   threads), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line), `FileFinder` (⌘P, `findFiles`: a
   basename match first); a right click in Files is App's `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Terminal actions). App.tsx passes a `PanelApi` over the daemon. One right panel at a time: it or
   the info panel.
@@ -479,7 +506,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   compares a code with macOS CoreImage's (`test/qr.test.ts`).
 - **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings), the palette,
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
-  (`SITE`, the version from `package.json`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`).
+  (`SITE`, the version from `package.json`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
+  `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the tab bar's
+  smiley: `meme`, Next). The new-workspace page's *Pull request* sends `pr` (no Base, no race with it).
 - **`links.ts`**: `parseLink` and `wsLink` (laki:// links, above).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
@@ -492,7 +521,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge (`badge` IPC), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
@@ -500,6 +529,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
 | `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 5 minutes |
+| `src/daemon/push.ts` | phone pushes: each format's request (`pushRequest`), the URL's check, `pushTo` |
+| `src/daemon/fun.ts` | `meme`: r/memes' `random.json`, else meme-api.com (Reddit's bot wall), no NSFW or spoilers, the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` and `wsTitle` (a run's dated names) |
@@ -507,7 +538,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift` |
 
 ## Conventions

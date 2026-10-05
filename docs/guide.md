@@ -17,16 +17,16 @@ changing it: [AGENTS.md](../AGENTS.md).
 
 - **Workspaces**: one git worktree and branch per task (or the repo or a plain folder itself), with setup and
   teardown scripts (worktrees only: a folder's own workspace never runs them), env, a `$PORT` of its own, and a
-  name you can change.
+  name you can change. Files git ignores that a worktree needs (`.env`…) are copied in (`.worktreeinclude`).
 - **Agents**: Claude Code, Codex, Gemini, Grok, OpenCode or any command, started from presets (args, env). Live status per tab and
-  workspace; notifications and a count on the Dock icon; a follow-up queue; resume after a restart; usage limits wait
+  workspace; notifications and a count on the Dock icon and in the menu bar; pushes to your phone; a follow-up queue; resume after a restart; usage limits wait
   and continue; a model and effort per workspace; turn timers (off by default); ⌘J jumps to the next tab that
   needs you. A permission prompt's choices are buttons under the terminal, and *Allow* / *Deny* on its
   notification. *Mark as unread* puts a tab's ● back.
 - **Race**: one prompt to several agents (claude, codex…), each in its own worktree; *Compare* lays them side by
   side (status, diff size, what each said last, the files it changed) and *Keep this one* archives the rest.
-- **Issues**: `laki new <project> --issue <url>` starts a workspace on a GitHub issue (its title and text as the
-  prompt).
+- **Issues and PRs**: `laki new <project> --issue <url>` starts a workspace on a GitHub issue (its title and text as
+  the prompt); `--pr <url>` (or the new-workspace page's *Pull request*) on a PR's branch, a fork's too.
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
   closed. ⌘F finds with every match in yellow; copy on select; drop files on one to type their paths; font,
   size, line height, weight, cursor and zoom, with a live preview.
@@ -35,11 +35,13 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans; click
   it for each one (5-hour, weekly, per model) and when it resets.
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI, new review
-  comments or merge conflicts to the agent on their own; an info panel with the PR, its checks and what the agents said last.
+  comments or merge conflicts to the agent on their own; an info panel with the PR, its checks and what the agents said last;
+  a workspace archived once its PR merges (off by default).
 - **Side panel** (⌥⌘B): the workspace's files (search, preview, new file or folder, changed files marked),
   its changes against the base branch (click a line to comment on the PR or tell the agent), its PR's checks
   and review comments, and a browser preview of its dev server (a screenshot, or a picked element's selector,
-  HTML, CSS and screenshot, goes to the agent). Markdown files preview rendered or raw. ⌘P finds a file by name.
+  HTML, CSS and screenshot, goes to the agent). Markdown files preview rendered or raw; changed images show
+  before and after. ⌘P finds a file by name.
 - **Agent browser**: `laki browser` (and MCP's `laki_browser`) lets an agent open its dev server in a hidden
   browser of the app's, take screenshots, click, fill in fields and read the page.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
@@ -48,8 +50,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   that start a workspace.
 - **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
-  run script in its tab, ■ stops it; listening ports you click to open, or expose to the world (a public
-  trycloudflare.com link and its QR code, optionally only for some email addresses).
+  run script in its tab, ■ stops it; listening ports you click to open, name (`.laki.json`), stop (✕), or expose to
+  the world (a public trycloudflare.com link and its QR code, optionally only for some email addresses).
 - **Look**: 86 themes, including Warp-style gradients and sixty-eight that also change shapes, borders and type;
   glass (a see-through window, as see-through as you set, with a color glow); Inter and six terminal fonts
   built in (JetBrains Mono, Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist Mono); tab and
@@ -57,6 +59,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
   tunnel that lets in one email address, for 1 to 24 hours or until you stop it; a QR code to open it.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
+- **A break**: the smiley in the tab bar shows a random meme from r/memes; *Next* for another.
 
 ## Install
 
@@ -164,6 +167,8 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
+- smiley: a random meme from r/memes, for a break (*Next*, Esc). Fetched only when you click: Reddit's own, or
+  meme-api.com when Reddit turns the request away;
 - info (⌘I): the workspace info panel (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
@@ -179,7 +184,9 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
   - *Terminal actions*: a command, typed into the focused shell, else the workspace's first, else a new one.
 
 **Status bar** (bottom): branch ← base, `$PORT` (green while something listens on it) and the other
-listening ports (click one to open it in the browser), the PR (click to open it), its CI (`✓ 4/4`,
+listening ports (click one to open it in the browser; a name from `.laki.json`'s `ports` beside it; ✕ stops what
+listens there, after you confirm: SIGTERM, then SIGKILL 3 seconds later if it's still there; only your own processes
+of that workspace), the PR (click to open it), its CI (`✓ 4/4`,
 `✗ 1 failing`, `… 2 running`; click for the checks), *⚠ conflicts* when it has merge conflicts, the *fix CI*, *review* and *fix conflicts*
 switches (see PRs below), and
 the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a button that copies the whole path.
@@ -264,7 +271,9 @@ until the agent's next run renews it. Settings › General turns each agent off 
   for its diff, with links to preview the file or open it in the editor. Click a line of a diff to write a
   comment on it: *Comment on PR #n* posts it on GitHub at that line (`gh`; the line must be in the PR's diff,
   so commit and push first), *Send to the agent* gives it to the workspace's agent with the file and line
-  (when its turn ends). ⌘⏎ does the first that applies, Esc closes it.
+  (when its turn ends). ⌘⏎ does the first that applies, Esc closes it. A changed image (PNG, JPEG, GIF, WebP, SVG)
+  shows before and after side by side, each with its size in pixels and bytes (one side when it's new or deleted);
+  click one for full size.
 - *Review*: the PR with its checks, the *fix CI* / *review* / *fix conflicts* switches and the send buttons, and the open
   review threads (from reviewers with write access and bots: what the agent would get). Click a thread's
   file to preview it at that line.
@@ -311,12 +320,18 @@ with no agent running nothing is sent, and the next check tries again.
   you. Right after a push GitHub doesn't know yet whether it conflicts: that keeps the count; no conflicts, or the
   switch turned off and on, starts it over.
 
+*Archive workspace when its PR merges* (Settings › *Pull requests*, off by default): the next check after a merge
+archives the workspace, if it's clean: nothing uncommitted, no commit the PR doesn't have, no agent at work. Once per
+PR: *Undo* in the message brings it back for good. One that can't go says *merged* in the sidebar.
+
 What each sends is a prompt in Settings › *Pull requests*, which you can change: `{{pr}}` is the PR's number, `{{url}}`
 its link, `{{base}}` its base branch; the failing checks or the review threads go after it. *Reset* puts the default
 back. The info panel's *Send failing CI*, *Send review comments* and *Send merge conflicts* buttons send the same
 prompts once, switches or not.
 
-**New workspace** (a page, like Settings; Esc closes it): pick the project, base branch, name and agent (for an
+**New workspace** (a page, like Settings; Esc closes it): pick the project, *Pull request* (optional: a PR's number
+or URL; the worktree is on its branch through `gh pr checkout`, a fork's as `<owner>/<branch>`, its base the PR's,
+named `pr-<n>-<title>`; when a workspace has that branch already, the message offers *Open it*), base branch, name and agent (for an
 agent, its model, like `opus` or a full name, and for Claude Code and Codex its effort; both blank: the agent's
 default, kept for its restarts and forks), then the prompt:
 - paste a screenshot (⌘V), drop image files on it, or pick them with the image icon; each shows as a
@@ -347,7 +362,8 @@ default, kept for its restarts and forks), then the prompt:
 A workspace shows its most urgent tab. A terminal that waits or finishes while off screen sends a macOS
 notification; click it to jump there. Settings › General picks which (waiting, finished, usage limit) and the
 sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock icon counts the tabs that wait
-for you or finished while you looked away (muted ones aside). With *Turn timers* on (Settings › General), a
+for you or finished while you looked away (muted ones aside); so does Laki's mark in the menu bar, whose menu lists
+those tabs (waiting first, with what they ask): a click opens one. With *Turn timers* on (Settings › General), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 
 ### Keys
@@ -384,8 +400,8 @@ lit for a moment.
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
-  mark on a workspace with a PR; on by default), *Turn timers* (off by default), *Diff size in the sidebar* (off by
-  default), and environment
+  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Turn
+  timers* (off by default), *Diff size in the sidebar* (off by default), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
   reads it back (projects and their own settings don't move).
@@ -451,8 +467,14 @@ lit for a moment.
   arguments (e.g. `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each
   one is in the new-tab menu and the new-workspace page. The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them). Edit `claude` or `codex` to change how every new one starts; a tab started from a preset uses its current settings when it restarts or resumes.
+- *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
+  *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
+  Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
+  workspace, tab, agent, message, ts}`). Once per wait or turn; muted workspaces and tabs don't push. It goes to that
+  URL only, and *Send test* sends one now.
 - *Pull requests*: how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
-  conflicts* get (3), and the prompts the PR switches send (above, in *PRs*).
+  conflicts* get (3), *Archive workspace when its PR merges* (off), and the prompts the PR switches send (above, in
+  *PRs*).
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
   `{{base}}` the workspace's project and base branch; a template without `{{prompt}}` gets the prompt after
   it. *Add template* starts from an example. A project can have its own (its settings, below).
@@ -494,8 +516,15 @@ These are saved in the app. A field left empty falls back to a `.laki.json` in t
 commit. The page shows that file's values as placeholders:
 
 ```json
-{ "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT", "expose": "*@team.com", "env": { "NODE_ENV": "development" } }
+{ "setup": "npm install", "teardown": "docker compose down", "run": "npm run dev -- --port $PORT", "expose": "*@team.com", "env": { "NODE_ENV": "development" }, "copy": [".env*", "config/master.key"], "ports": { "3000": "web", "5432": "db" } }
 ```
+
+Two of them live only there:
+- `copy`: files git doesn't keep that a new worktree needs, as gitignore patterns. A `.worktreeinclude` at the repo's
+  root (one pattern a line) does the same; both add up. They're copied from the repo's own
+  checkout into each new or restored worktree, with their permissions, before setup and the agent start; one already
+  there stays, and links that lead out of the repo are skipped (`daemon.log` lists what was copied).
+- `ports`: names for the status bar's ports.
 
 Env from the app and from `.laki.json` merge, key by key (the app's wins), then a preset's env goes on top.
 
@@ -509,6 +538,7 @@ laki new app --prompt "fix the login redirect"          # worktree + claude with
 laki new app --preset codex --base develop --name dark
 laki new app --model opus --effort high --prompt "…"   # the agent's model and effort
 laki new app --issue https://github.com/o/app/issues/12 # a GitHub issue as the prompt (gh)
+laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's branch (gh pr checkout, forks too)
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app
 laki ls [--json]
 laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
@@ -529,7 +559,7 @@ laki daemon                                             # run the daemon in the 
 ### MCP
 
 `laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. Its tools: `laki_state`
-(projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue, or a race with
+(projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
 `presets`), `laki_send`, `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
 `laki_schedule_add`. None deletes, archives or ships. Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
@@ -616,6 +646,9 @@ agents find their conversations by those paths. It holds:
 - `worktrees/` and `run/`.
 
 `~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok` and `~/.config/opencode` are left alone, except the skill folders *Settings → Agent skill* writes when you click Install.
+
+No telemetry. Laki goes online only for what you use: `gh` (PRs, issues), the agents' plan limits, cloudflared
+(tunnels, remote access), your phone-push webhook, and a meme when you click the smiley.
 
 ## Updating
 
