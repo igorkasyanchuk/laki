@@ -37,6 +37,8 @@ const paths = {
   refresh: 'M13 8a5 5 0 11-1.6-3.7M13.2 2v2.8h-2.8',
   back: 'M10 3.5L5.5 8l4.5 4.5',
   forward: 'M6 3.5L10.5 8 6 12.5',
+  board: 'M2.5 2.5h3v8h-3zM6.5 2.5h3v11h-3zM10.5 2.5h3v5h-3z',
+  pick: 'M8 13.5a5.5 5.5 0 100-11 5.5 5.5 0 000 11zM8 1v3M8 12v3M1 8h3M12 8h3M8 8h.01',
   camera: 'M2.5 5h2.7l1.2-1.8h3.2L10.8 5h2.7v7.5h-11zM8 10.6a1.9 1.9 0 100-3.8 1.9 1.9 0 000 3.8z',
   collapse: 'M8 1.5v4M5.5 3.5L8 6l2.5-2.5M8 14.5v-4M5.5 12.5L8 10l2.5 2.5M2.5 8h11',
   changes: 'M4.5 5.6a1.3 1.3 0 100-2.6 1.3 1.3 0 000 2.6zM11.5 13a1.3 1.3 0 100-2.6 1.3 1.3 0 000 2.6zM4.5 5.6V10a2 2 0 002 2H9M11.5 10.4V6a2 2 0 00-2-2H7M8 10.5l1.5 1.5L8 13.5M8 2.5L6.5 4 8 5.5',
@@ -74,6 +76,23 @@ export function IconButton({ icon, title, onClick, on, className = '' }: { icon:
   )
 }
 
+// how long a turn has been going (since: the daemon's clock, a phone's may differ a little): 42s, 12m, 1h 5m
+export function Elapsed({ since }: { since: number }) {
+  const [now, setNow] = useState(Date.now)
+  useEffect(() => {
+    const t = setInterval(() => setNow(Date.now()), 1000)
+    return () => clearInterval(t)
+  }, [])
+  const s = Math.max(0, Math.round((now - since) / 1000))
+  return <span className="elapsed">{s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m` : `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m`}</span>
+}
+
+// the turn timer (settings.timers): since the earliest turn going among these tabs
+export function TurnTime({ tabs }: { tabs: { runAt?: number }[] }) {
+  const since = Math.min(...tabs.map(t => t.runAt ?? Infinity))
+  return since < Infinity ? <Elapsed since={since} /> : null
+}
+
 // an on/off switch: the status bar's auto toggles, Settings' options (a row: className="switch-row")
 export function Switch({ on, onChange, tip, className = '', children }: { on?: boolean; onChange: (v: boolean) => void; tip?: string; className?: string; children?: ReactNode }) {
   return (
@@ -87,7 +106,7 @@ export function Switch({ on, onChange, tip, className = '', children }: { on?: b
 }
 
 // a page over the main area, as Settings is (the new-workspace form): its title, ✕ and Esc close it
-export function Page({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
+export function Page({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
     window.addEventListener('keydown', f)
@@ -100,7 +119,7 @@ export function Page({ title, onClose, children }: { title: string; onClose: () 
         <span className="grow" />
         <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
       </div>
-      <div className="page-body">{children}</div>
+      <div className={`page-body ${wide ? 'wide' : ''}`}>{children}</div>
     </div>
   )
 }

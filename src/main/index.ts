@@ -92,7 +92,7 @@ function create() {
     e.preventDefault()
     win?.hide()
   })
-  win.on('closed', () => ((win = null), (linkReady = false)))
+  win.on('closed', () => ((win = null), (linkReady = false), app.dock?.setBadge(''))) // the badge's count came from the window
   win.webContents.on('did-start-navigation', e => e.isMainFrame && !e.isSameDocument && (linkReady = false)) // a reload: links wait for the new page
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
@@ -142,6 +142,8 @@ ipcMain.on('glass', (_e, on: boolean) => {
   win?.setVibrancy(on ? 'under-window' : null)
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
 })
+// the Dock icon's count: agents waiting for you or done while you looked away (none: no badge)
+ipcMain.on('badge', (_e, n: number) => app.dock?.setBadge(Number.isInteger(n) && n > 0 ? String(n) : ''))
 // the preview pane's screenshot: a webview of this window's, as a PNG in base64
 ipcMain.handle('capture', async (e, id: number) => {
   const wc = webContents.fromId(id)

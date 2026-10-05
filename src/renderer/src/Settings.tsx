@@ -39,6 +39,7 @@ export type AppSettings = Paint & {
   env?: Record<string, string> // every session's
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
+  timers?: boolean // a turn's time on its tab and row (unset: off)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound, 'none', or unset: the default
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
@@ -690,6 +691,9 @@ export function SettingsPage(p: {
                 )}
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
+                </Switch>
+                <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
+                  <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
                   <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>

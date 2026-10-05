@@ -19,7 +19,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   teardown scripts (worktrees only: a folder's own workspace never runs them), env, a `$PORT` of its own, and a
   name you can change.
 - **Agents**: Claude Code, Codex, Gemini, Grok, OpenCode or any command, started from presets (args, env). Live status per tab and
-  workspace; notifications; a follow-up queue; resume after a restart; usage limits wait and continue.
+  workspace; notifications and a count on the Dock icon; a follow-up queue; resume after a restart; usage limits wait
+  and continue; a model and effort per workspace; turn timers (off by default).
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
   closed. ⌘F finds with every match in yellow; copy on select; font, size, line height, weight, cursor
   and zoom, with a live preview.
@@ -31,10 +32,12 @@ changing it: [AGENTS.md](../AGENTS.md).
   comments to the agent on their own; an info panel with the PR, its checks and what the agents said last.
 - **Side panel** (⌥⌘B): the workspace's files (search, preview, new file or folder, changed files marked),
   its changes against the base branch (click a line to comment on the PR or tell the agent), its PR's checks
-  and review comments, and a browser preview of its dev server (a screenshot goes to the agent). ⌘P finds a
+  and review comments, and a browser preview of its dev server (a screenshot, or a picked element's CSS selector, goes to the agent). ⌘P finds a
   file by name.
 - **MCP and links**: `laki mcp` gives any MCP client (Claude Code, Codex…) Laki's tools; `laki://` links open
   a workspace, a tab or a page of the app.
+- **Board**: every workspace in a column by where it is (running, needs you, done, PR open, merged), and to-dos
+  that start a workspace.
 - **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
   run script in its tab, ■ stops it; listening ports you click to open, or expose to the world (a public
@@ -186,6 +189,12 @@ email address only.
 - It stops on its own when the time is up, when you stop it, or with the daemon. Each start makes a new key, so
   an old link never works again.
 
+**Board** (the columns icon at the top of the sidebar, *Board* in ⌘K, `laki://board`): every workspace as a card in
+the column of where it is: *Running* (a usage limit too: it resumes by itself), *Needs you*, *Done*, *PR open*,
+*Merged*; with its last answer, its PR and checks, and its turn's time when timers are on. Click a card to open the
+workspace. *To do* holds prompts for later: write one (⌘⏎ adds it) for a project, then ▷ (or drag it onto another
+column) starts a workspace on it with the default agent, and the to-do goes.
+
 **Scheduled tasks** (the clock at the top of the sidebar, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
 times you write in plain English.
 - Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
@@ -233,7 +242,9 @@ until the agent's next run renews it. Settings › General turns each agent off 
   file to preview it at that line.
 - *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first, or a listening port (the menu), a path, back,
   forward, reload, open in your browser. The camera takes a screenshot of the page and sends it to the agent
-  with what you write. It opens pages on this Mac (`localhost`, `127.0.0.1`; links may lead elsewhere), without
+  with what you write. The crosshair picks an element: hover outlines it, a click types its CSS selector (with its
+  tag, text and size) into the agent's prompt, without Enter, for you to say what to do with it; Esc stops (in the
+  app only). It opens pages on this Mac (`localhost`, `127.0.0.1`; links may lead elsewhere), without
   popups, the camera, the microphone or clipboard reads. Its cookies are its own and kept. While the page has the focus, ⌘ keys go to it:
   click outside it first. In a browser (remote access), it works only on the Mac itself.
 
@@ -252,8 +263,9 @@ the open review comments to the agent now; and what each agent said last.
 - *review*: new review comments from others (unresolved inline threads) go to the agent, asking it to
   address them and push. Its own replies don't start another round.
 
-**New workspace** (a page, like Settings; Esc closes it): pick the project, base branch, name and agent, then
-the prompt:
+**New workspace** (a page, like Settings; Esc closes it): pick the project, base branch, name and agent (for an
+agent, its model, like `opus` or a full name, and for Claude Code and Codex its effort; both blank: the agent's
+default, kept for its restarts and forks), then the prompt:
 - paste a screenshot (⌘V), drop image files on it, or pick them with the image icon; each shows as a
   thumbnail, and its path goes after your text;
 - the mic starts macOS dictation (or press Fn twice). *mic & language…* opens System Settings → Keyboard →
@@ -277,7 +289,9 @@ the prompt:
 
 A workspace shows its most urgent tab. A terminal that waits or finishes while off screen sends a macOS
 notification; click it to jump there. Settings › General picks which (waiting, finished, usage limit) and the
-sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups queued with `laki send --when-idle` show as `+n`.
+sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock icon counts the tabs that wait
+for you or finished while you looked away (muted ones aside). With *Turn timers* on (Settings › General), a
+working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 
 ### Keys
 
@@ -309,7 +323,7 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. Follow-ups 
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
-  mark on a workspace with a PR; on by default), and environment
+  mark on a workspace with a PR; on by default), *Turn timers* (off by default), and environment
   variables for every session (a project's or preset's env wins over them).
 - *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
@@ -458,6 +472,7 @@ OpenCode's `mcp add` only asks questions: put `"mcp": { "laki": { "type": "local
 | `laki://new?project=<id>&prompt=…&preset=…&name=…` | the new-workspace page, filled in |
 | `laki://schedules[/<project>]` | Scheduled tasks, filtered to a project |
 | `laki://settings[/<section>]` | Settings (`general`, `appearance`, `remote`…) |
+| `laki://board` | the Board |
 | `laki://help` | Help |
 | `laki://about` | About (the version and the website) |
 

@@ -495,6 +495,8 @@ kbd { font-family: var(--mono); }
 .narrow .settings-nav button { flex: none; }
 .narrow .settings-nav-head { display: none; }
 .narrow .settings-main, .narrow .page-body { padding: 16px 14px 40px; }
+.narrow .board { flex-direction: column; align-items: stretch; } /* the board's columns one under another */
+.narrow .board-col { max-width: none; flex: none; }
 .narrow .grid2 { grid-template-columns: 1fr; }
 .narrow .help-row { grid-template-columns: 1fr; gap: 2px; }
 .narrow .overlay { padding-top: 8px; }
@@ -543,6 +545,27 @@ kbd { font-family: var(--mono); }
 .ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
 /* a workspace's PR (Settings › General): open, draft, merged, closed; failing checks win */
 .ws-pr { display: inline-flex; flex: none; color: var(--done); }
+.elapsed { flex: none; font: 10.5px var(--mono); color: var(--muted); } /* a turn's time (settings.timers) */
+
+/* the board (Board.tsx): a column per place, cards of workspaces and to-dos */
+.page-body.wide > * { max-width: none; margin: 0; }
+.page-body.wide { padding: 20px 20px 32px; }
+.board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; flex: 1; min-height: 0; }
+.board-col { flex: 1 0 210px; max-width: 320px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--radius); background: var(--side); border: 1px solid var(--line); }
+.board-col.over { border-color: var(--accent); }
+.board-col h3 { margin: 0 2px 2px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; gap: 6px; }
+.board-count { font-weight: 400; }
+.board-card { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 9px 10px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); color: var(--fg); font: inherit; min-width: 0; }
+button.board-card:hover { border-color: var(--muted); }
+.board-card.todo { cursor: grab; }
+.board-card.busy { opacity: 0.6; }
+.board-foot { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.board-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.board-text { white-space: pre-wrap; overflow-wrap: anywhere; max-height: 9em; overflow: hidden; }
+.board-last { font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.board-pr { display: flex; align-items: center; gap: 4px; font-size: 11.5px; } /* with .ws-pr: its colors */
+.board-add { display: flex; flex-direction: column; gap: 6px; }
+.board-add textarea { resize: vertical; font: inherit; }
 .ws-pr.draft, .ws-pr.closed { color: var(--muted); }
 .ws-pr.merged { color: var(--tc-purple); }
 .ws-pr.fail { color: var(--error); }

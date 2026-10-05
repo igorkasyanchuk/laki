@@ -6,6 +6,10 @@ export const AGENTS = ['claude', 'codex', 'gemini', 'grok', 'opencode'] as const
 export type Agent = (typeof AGENTS)[number]
 export const AGENT_NAMES: Record<Agent, string> = { claude: 'Claude Code', codex: 'Codex', gemini: 'Gemini', grok: 'Grok', opencode: 'OpenCode' }
 export const isAgent = (s?: string): s is Agent => (AGENTS as readonly string[]).includes(s ?? '')
+// how hard an agent thinks, for those that take it (claude --effort, codex model_reasoning_effort); models: names to
+// suggest (any other goes too: a full name, provider/model for opencode)
+export const EFFORTS: Partial<Record<Agent, string[]>> = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'] }
+export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opus', 'sonnet', 'haiku'] }
 
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
 // each field overrides .laki.json's (env key by key)
@@ -56,6 +60,8 @@ export type Tab = {
   queue?: string[] // follow-ups for when the agent is idle
   color?: string // a tab color's name (red, blue, …); 'none' turns the agent's default off
   muted?: boolean // no notifications from it
+  model?: string // the agent's --model (unset: its own default), kept for restarts
+  effort?: string // and its effort (EFFORTS)
 }
 
 // how an agent starts: one of AGENTS with extra args, or any command; env on top of the project's
@@ -91,7 +97,11 @@ export type Settings = {
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   remoteMail?: string // the one email remote access lets in
+  timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
 }
+
+// a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
+export type Todo = { id: string; project: string; text: string; at: number }
 
 // remote access (core.ts): who may open it, until when (ms; none: until stopped), and once cloudflared has one, its URL and the link
 // with the token
@@ -110,7 +120,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[] }
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[] }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -134,7 +144,8 @@ export type PR = {
   updated?: string
 }
 
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string }
+// runAt: when its turn began (the daemon's clock), while it runs or waits
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number }
 
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
 export type Tunnel = { port: number; url?: string; mails?: string[] }
@@ -145,9 +156,9 @@ export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; tunne
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; api?: number }
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; api?: number }
 
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 9
+export const API = 11

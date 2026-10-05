@@ -8,7 +8,7 @@ import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Check, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type State, type Status, type Tab, type TabView, type Template, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, EFFORTS, type PR, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { type Client, Session } from './session.ts'
@@ -35,7 +35,7 @@ const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean }
+type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number }
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const prs = new Map<string, PR>()
@@ -55,6 +55,7 @@ export function load() {
   state.tabs ??= []
   state.schedules ??= []
   state.runs ??= []
+  state.todos ??= []
 }
 
 export function save() {
@@ -177,7 +178,10 @@ export function view(): View {
     const s = sessions.get(t.id)
     const r = rtOf(t.id)
     const status: Status = !s || s.exited ? 'exited' : tracked(t) ? r.status : 'idle'
-    return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last }
+    // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
+    if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
+    else r.runAt = undefined
+    return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt }
   })
   return {
     projects: state.projects,
@@ -189,6 +193,7 @@ export function view(): View {
     remote: remoteView(),
     schedules: state.schedules,
     runs: state.runs?.slice(0, RUNS_SHOWN),
+    todos: state.todos,
     api: API,
   }
 }
@@ -398,6 +403,7 @@ export function projectRm(ref: string) {
   for (const w of state.workspaces.filter(w => w.project === p.id)) dropWs(w)
   state.projects = state.projects.filter(x => x !== p)
   state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
+  state.todos = state.todos?.filter(t => t.project !== p.id) // and its board's to-dos
   save()
   changed()
 }
@@ -456,8 +462,11 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean): string
   } else {
     return (pr?.agent === 'command' && pr.cmd?.trim()) || tab.cmd || 'true'
   }
+  // the tab's model and effort (only claude and codex take one: EFFORTS), after the preset's args: picked for this
+  // workspace, they win over a preset's own
+  const flags = [...(tab.model ? [tab.preset === 'claude' ? '--model' : '-m', tab.model] : []), ...(tab.effort ? (tab.preset === 'claude' ? ['--effort', tab.effort] : ['-c', `model_reasoning_effort=${JSON.stringify(tab.effort)}`]) : [])]
   // a preset's args go in as written (a shell runs the line), before the prompt
-  return [argv.map(q).join(' '), pr?.args?.trim(), ask.map(q).join(' ')].filter(Boolean).join(' ')
+  return [argv.map(q).join(' '), pr?.args?.trim(), flags.map(q).join(' '), ask.map(q).join(' ')].filter(Boolean).join(' ')
 }
 
 type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string> }
@@ -511,17 +520,26 @@ function presetCheck(preset?: string, cmd?: string) {
     throw new Error(`unknown preset ${preset} (see Settings: Agent presets)`)
 }
 
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string }): Tab {
+// a model and effort for an agent's flags: a name (it goes on the command line, quoted), an effort it takes
+function modelCheck(agent: string, model?: string, effort?: string) {
+  if (model && !/^(?!-)[\w.:/@[\]-]{1,120}$/.test(model)) throw new Error(`model ${model}? a name like opus, or provider/model`) // not a flag either
+  if (effort && !EFFORTS[agent as Agent]?.includes(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
+}
+
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string }): Tab {
   const ws = findWs(wsRef)
   if (!o.kind) presetCheck(o.preset, o.cmd)
   const pr = o.kind ? undefined : presetNamed(o.preset)
   if (pr?.agent === 'command') o = { ...o, cmd: pr.cmd || 'true' }
   const preset = pr ? (pr.agent === 'command' ? 'custom' : pr.agent) : o.preset || (o.cmd ? 'custom' : 'shell')
   const kind = o.kind ?? (preset === 'shell' && !o.cmd ? 'shell' : 'agent')
+  const model = isAgent(preset) && kind === 'agent' ? o.model?.trim() || undefined : undefined // a shell or a command has no model
+  const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
+  modelCheck(preset, model, effort)
   let name = o.name || pr?.name || (kind === 'agent' ? (preset === 'custom' ? basename(o.cmd!.split(/\s/)[0]) : preset) : kind)
   const base = name
   for (let n = 2; tabsOf(ws.id).some(t => t.name === name); n++) name = `${base} ${n}`
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}) }
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }) }
   state.tabs.push(tab)
   save()
   try {
@@ -667,12 +685,14 @@ export function closeTab(id: string) {
 // ---------- workspaces
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string }
 
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const proj = findProject(o.project)
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
+  const agent = presetNamed(preset)?.agent ?? preset
+  if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // before the worktree: a wrong one makes nothing
   const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
   let ws: Workspace
   if (o.local || proj.git === false) {
@@ -700,7 +720,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
   }
   try {
-    if (preset !== 'none') addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf })
+    if (preset !== 'none') addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort })
   } finally {
     changed() // the workspace is made, even when its agent didn't start
   }
@@ -777,11 +797,30 @@ export async function wsRestore(ref: string) {
   return ws
 }
 
+// ---------- the board's to-dos (Board.tsx): prompts waiting for a workspace; starting one is wsNew, then todoRm
+
+export function todoAdd(o: { project: string; text: string }) {
+  const p = findProject(o.project)
+  const text = o.text?.trim()
+  if (!text) throw new Error('a to-do needs its text')
+  const t: Todo = { id: randomUUID().slice(0, 8), project: p.id, text, at: Date.now() }
+  state.todos!.push(t)
+  save()
+  changed()
+  return t
+}
+
+export function todoRm(o: { id: string }) {
+  state.todos = state.todos!.filter(t => t.id !== o.id)
+  save()
+  changed()
+}
+
 // wsFork: a new workspace from this one's branch, its Claude chat forked (--fork-session).
 export async function wsFork(ref: string) {
   const src = findWs(ref)
   const agent = tabsOf(src.id).find(t => t.preset === 'claude' && t.resumeId)
-  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId })
+  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort })
 }
 
 // restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat.
@@ -861,14 +900,16 @@ function turn(p: { tab: string; state: string; payload?: any }) {
 
 // ---------- typing into agents, queue
 
-// typeInto pastes text and presses Enter. One message at a time per tab: a queued delivery and a send
-// at the same moment must not interleave their text and Enters.
+// typeInto pastes text and presses Enter (enter: false leaves it in the prompt). One message at a time per tab: a
+// queued delivery and a send at the same moment must not interleave their text and Enters.
 const typing = new WeakMap<Session, Promise<void>>()
-export function typeInto(s: Session, text: string) {
+export function typeInto(s: Session, text: string, enter = true) {
   const next = (typing.get(s) ?? Promise.resolve()).then(
     () =>
       new Promise<void>(done => {
-        s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${text}\x1b[201~` : text)
+        const t = text.replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '') // no escapes: a \x1b[201~ in it would end the paste and type the rest as keys
+        s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${t}\x1b[201~` : enter ? t : t.replace(/[\r\n]+/g, ' '))
+        if (!enter) return done()
         setTimeout(() => {
           s.write('\r') // as a separate key, so it isn't part of the paste
           setTimeout(done, 50)
@@ -879,11 +920,16 @@ export function typeInto(s: Session, text: string) {
   return next
 }
 
-export function send(p: { target: string; text: string; whenIdle?: boolean }) {
+// enter: false types it into the prompt for the user to finish (the preview's picked element): no turn starts
+export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean }) {
   const tab = resolveTarget(p.target)
   const s = sessions.get(tab.id)
   if (!s || s.exited) throw new Error(`${tab.name} isn't running`)
   const r = rtOf(tab.id)
+  if (p.enter === false) {
+    if (r.status === 'waiting') throw new Error(`${tab.name} is asking you something: answer it first`) // the text would be keys to its question
+    return typeInto(s, p.text, false), { tab: tab.id, sent: true }
+  }
   if (p.whenIdle) {
     if (!tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
     if (r.status !== 'idle' || r.limit || tab.queue?.length) {

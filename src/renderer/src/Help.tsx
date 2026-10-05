@@ -133,6 +133,8 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           <Row k="Actions">
             Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in.
           </Row>
+          <Row k="Agents">The new workspace page picks the agent's model and effort. The Dock icon counts tabs that need you or finished unseen. Settings › General › Turn timers: how long each turn has gone.</Row>
+          <Row k="Board">The columns icon at the top of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.</Row>
           <Row k="Scheduled">
             The clock at the top of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a
             new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {'{{DD-MM-YY}}'} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.
@@ -140,10 +142,10 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           <Row k="Look">Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow) and the interface font.</Row>
           <Row k="Files">The side panel's preview colors code up to 50 KB; right-click a file to open it in a browser or another app. The status bar's path has a copy button.</Row>
           <Row k="Changes">Click a line of a diff to comment on it: on the PR (GitHub), or to the agent.</Row>
-          <Row k="Preview">The toolbar's globe opens the side panel's Preview at localhost:$PORT (the menu has the other listening ports); the camera sends a screenshot to the agent.</Row>
+          <Row k="Preview">The toolbar's globe opens the side panel's Preview at localhost:$PORT (the menu has the other listening ports); the camera sends a screenshot to the agent; the crosshair puts a clicked element's CSS selector in its prompt.</Row>
           <Row k="Links">
             <code>laki://ws/&lt;id&gt;</code> opens a workspace (a workspace's or tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one,
-            <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://help</code>, <code>laki://about</code> open pages.
+            <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://board</code>, <code>laki://help</code>, <code>laki://about</code> open pages.
           </Row>
           <Row k="Quit">⌘Q quits the app: agents keep running in the daemon. Quit … Completely (the app menu) stops the daemon too; agents resume next time.</Row>
         </section>

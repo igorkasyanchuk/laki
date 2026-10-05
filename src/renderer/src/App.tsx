@@ -5,7 +5,8 @@ import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, ciText, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
 import { About, AddProject, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
-import { Glyph } from './Glyph'
+import { BoardPage } from './Board'
+import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
 import { Term, xterms } from './Term'
@@ -14,30 +15,16 @@ import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, type RunAction, shortPath } from './text'
+import { actionsFor, nameOf, type RunAction, shortPath } from './text'
 import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, useMenu, useRowDrag } from './ui'
+import { colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'schedules' | { schedules: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | { schedules: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
-
-const STATUS_RANK = { waiting: 4, running: 3, done: 2, idle: 1, exited: 0 } as const
-
-// a workspace's (or tab's) glyph: ◆ needs you, spinner running, ● finished while you looked away, ◷ limit
-function rollup(tabs: TabView[]) {
-  let best: keyof typeof STATUS_RANK = 'exited'
-  let limit = false
-  for (const t of tabs) {
-    limit ||= !!t.limit
-    const s = t.done && t.status === 'idle' ? 'done' : t.status
-    if (STATUS_RANK[s] > STATUS_RANK[best]) best = s
-  }
-  return limit && best !== 'waiting' && best !== 'running' ? 'limit' : best
-}
 
 // a tab's color: its own, else its agent's ('none' turns that off)
 const AGENT_COLORS: Record<string, string> = { claude: 'orange', codex: 'teal', gemini: 'blue', grok: 'purple', opencode: 'green' }
@@ -148,6 +135,10 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
   useEffect(() => void localStorage.setItem('laki.info', JSON.stringify(info)), [info])
+  // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
+  const quiet = new Set(view?.workspaces.filter(w => w.muted || w.archived).map(w => w.id))
+  const attention = view?.tabs.filter(t => (t.status === 'waiting' || (t.done && t.status === 'idle')) && !t.muted && !quiet.has(t.workspace)).length ?? 0
+  useEffect(() => bridge?.badge?.(attention), [attention])
   useEffect(() => void (narrow && dialog && setSideOpen(false)), [narrow, dialog]) // a page the drawer opened goes on top
   // the phone's tab strip scrolls: the selected tab first in it (scroll-padding clears the sidebar button)
   useEffect(() => void (narrow && document.querySelector('.tab.sel')?.scrollIntoView({ block: 'nearest', inline: 'start' })), [narrow, tab?.id])
@@ -237,6 +228,7 @@ export function App() {
     } else if (l?.to === 'schedules') setDialog({ schedules: proj(l.project) ?? '' })
     else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section } : 'settings')
     else if (l?.to === 'help') setDialog('help')
+    else if (l?.to === 'board') setDialog('board')
     else if (l?.to === 'about') setDialog('about')
     else toast(`Laki can't open ${link.slice(0, 80)}`)
   }, [link, view])
@@ -369,6 +361,13 @@ export function App() {
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
     toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent')),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
+    // the focused agent if it's this workspace's, else its first live one; then its pane gets the keys
+    toPrompt: text => {
+      const live = view?.tabs.filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited') ?? []
+      const to = live.find(t => t.id === tab?.id) ?? live[0]
+      if (!to) return Promise.reject(new Error('No agent runs here: start one (＋ in the tab bar)'))
+      return api.call('send', { target: to.id, text, enter: false }).then(() => (selectTab(to.id), xterms.get(to.id)?.focus(), toast(`In ${to.name}'s prompt: say what to do with it`)))
+    },
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
   })
   const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast('Copied'), fail)
@@ -578,6 +577,7 @@ export function App() {
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
+    a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
     a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
     a({ label: 'About Laki', icon: 'info', run: () => setDialog('about') })
     a({ label: 'Collapse all projects', icon: 'chevronRight', run: () => setFolded(view?.projects.map(p => p.id) ?? []) })
@@ -659,6 +659,7 @@ export function App() {
             className={runFailed ? 'dot' : ''}
             onClick={() => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))}
           />
+          <IconButton icon="board" title="Board: every workspace by where it is, and to-dos" on={dialog === 'board'} onClick={() => setDialog(d => (d === 'board' ? null : 'board'))} />
           <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
           <IconButton icon="gear" title="Settings (⌘,)" on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
@@ -715,6 +716,7 @@ export function App() {
                       <span className="ws-name">{wsName(w)}</span>
                       {queued > 0 && <span className="badge">+{queued}</span>}
                       <span className="spacer" />
+                      {settings.timers && <TurnTime tabs={wt} />}
                       {w.muted && (
                         <span className="ws-mark">
                           <Icon name="bellOff" size={11} />
@@ -758,10 +760,11 @@ export function App() {
                 onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
                 onPointerDown={e => ts[0] && start(e, ts[0].id, true)}
                 onAuxClick={e => e.button === 1 && closeTabs(ts)}
-                data-tip={`⌘${groups.indexOf(g) + 1} · double click to rename · drag onto a pane to split · right click for more`}
+                data-tip={[...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag onto a pane to split', 'right click for more'].join(' · ')}
               >
                 <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
                 <span>{ts.map(t => t.name).join(' · ')}</span>
+                {settings.timers && <TurnTime tabs={ts} />}
                 {ts.some(t => t.muted) && (
                   <span className="ws-mark">
                     <Icon name="bellOff" size={11} />
@@ -910,6 +913,23 @@ export function App() {
         )}
         {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
+        {dialog === 'board' && (
+          <BoardPage
+            view={view}
+            timers={settings.timers}
+            onClose={() => setDialog(null)}
+            api={{
+              open: id => (setWsId(id), setDialog(null)),
+              start: t => {
+                // a folder's own workspace has its session already: another one beside it, for this prompt
+                const plain = view.projects.find(p => p.id === t.project)?.git === false
+                return call('wsNew', { project: t.project, prompt: t.text, ...(plain && { local: true, another: true, name: nameOf(t.text) }) }).then(() => call('todoRm', { id: t.id }))
+              },
+              add: (project, text) => call('todoAdd', { project, text }),
+              rm: id => call('todoRm', { id }),
+            }}
+          />
+        )}
         {schedulesFor !== undefined && (
           <SchedulesPage
             key={schedulesFor /* another project's menu: its filter */}

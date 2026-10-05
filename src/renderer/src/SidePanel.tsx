@@ -24,6 +24,7 @@ export type PanelApi = {
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
   toAgent: (text: string) => Promise<unknown> // to the workspace's agent, when its turn ends
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
+  toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
 }
 
@@ -439,6 +440,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   const [n, setN] = useState(0) // the iframe's reloads
   const [err, setErr] = useState('')
   const [shot, setShot] = useState<{ data: string; url: string } | null>(null)
+  const [picking, setPicking] = useState(0) // a pick in progress (its number: a later one wins)
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<any>(null) // the webview element
   // its methods throw until it's attached and ready
@@ -470,6 +472,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
       setAddr(u.pathname + u.search + u.hash)
     }
     v.addEventListener('did-navigate', at)
+    v.addEventListener('did-start-navigation', (e: any) => e.isMainFrame && !e.isInPlace && setPicking(0)) // the page's picker goes with it
     v.addEventListener('did-navigate-in-page', (e: any) => e.isMainFrame && at(e))
     v.addEventListener('did-fail-load', (e: any) => e.isMainFrame && e.errorCode !== -3 && setErr(e.errorCode === -102 ? `Nothing listens on ${new URL(e.validatedURL).host} yet: ▷ Run starts the dev server` : e.errorDescription || 'It didn’t load'))
     host.current.appendChild(v)
@@ -482,6 +485,17 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   const capture = () => {
     const id = on(v => v.getWebContentsId())
     if (bridge?.capture && id) bridge.capture(id).then(data => setShot({ data, url: on(v => v.getURL()) || url }), e => setErr(String(e?.message ?? e)))
+  }
+  // an element of the page, picked with the mouse, into the agent's prompt: what it is and where
+  const pick = () => {
+    if (picking) return setPicking(0), on(v => v.executeJavaScript('window.__lakiPick?.(null)').catch(() => {}))
+    const id = Date.now()
+    const end = () => setPicking(p => (p === id ? 0 : p))
+    const r = on(v => v.executeJavaScript(`(${pickElement})()`, true)) as Promise<Picked | null> | undefined
+    if (!r) return setErr('The page isn’t ready yet')
+    setPicking(id)
+    on(v => v.focus()) // for Esc
+    r.then(p => (end(), p && api.toPrompt(pickedText(p)).catch(e => setErr(String(e?.message ?? e)))), end)
   }
   if (!bridge && !canFrame) return <div className="muted small pad">The preview shows this Mac's localhost: open {w.name || w.id} in the app there. To open a port from here, share it with the globe in the status bar.</div>
   return (
@@ -506,6 +520,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
           ))}
         </select>
         <input value={addr} spellCheck={false} onChange={e => setAddr(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} />
+        {bridge && <IconButton icon="pick" title={picking ? 'Picking: click an element (Esc stops)' : "Pick an element: its CSS selector into the agent's prompt"} on={!!picking} onClick={pick} />}
         {bridge?.capture && <IconButton icon="camera" title="Screenshot to the agent" onClick={capture} />}
         <IconButton icon="link" title="Open in the browser" onClick={() => onOpen(url)} />
       </div>
@@ -516,6 +531,98 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
       </div>
     </>
   )
+}
+
+// an element the picker returned: its selector, opening tag, text, size, and the page
+type Picked = { selector: string; tag: string; text: string; size: string; url: string }
+const pickedText = (p: Picked) => `In the preview (${p.url}), the element \`${p.selector}\` (${[p.tag, p.text && `"${p.text}"`, p.size].filter(Boolean).join(', ')}): `
+
+// runs in the preview's page (executeJavaScript, as its source: it uses nothing from here): outlines what's under the
+// mouse with its selector, and resolves with the one clicked, or null on Esc or window.__lakiPick(null) (the app's)
+// ponytail: a selector made of ids, test ids, classes (generated-looking ones skipped) and :nth-of-type, short of a
+// unique one; frames and shadow roots aren't entered
+function pickElement(): Promise<Picked | null> {
+  return new Promise(done => {
+    const w = window as any
+    w.__lakiPick?.(null)
+    const box = document.createElement('div')
+    const label = document.createElement('div')
+    box.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;border:2px solid #4c8dff;background:rgba(76,141,255,.14);border-radius:2px'
+    label.style.cssText = 'position:fixed;z-index:2147483647;pointer-events:none;font:11px/1.5 ui-monospace,Menlo,monospace;background:#4c8dff;color:#fff;padding:0 6px;border-radius:3px;white-space:nowrap;max-width:70vw;overflow:hidden;text-overflow:ellipsis'
+    document.documentElement.append(box, label)
+    const esc = (s: string) => CSS.escape(s)
+    const one = (s: string) => {
+      try {
+        return document.querySelectorAll(s).length === 1
+      } catch {
+        return false
+      }
+    }
+    const fine = (c: string) => /^[a-zA-Z_-][\w-]*$/.test(c) && c.length < 32 && !/\d{3}|^(css|sc|jsx|svelte|emotion|chakra)-/.test(c) // not generated
+    const selector = (el: Element) => {
+      if (el.id && one(`#${esc(el.id)}`)) return `#${esc(el.id)}`
+      for (const a of ['data-testid', 'data-test', 'data-cy', 'aria-label', 'name']) {
+        const v = el.getAttribute(a)
+        const s = v && `${esc(el.localName)}[${a}="${v.replace(/["\\]/g, '\\$&')}"]`
+        if (s && one(s)) return s
+      }
+      const parts: string[] = []
+      for (let e: Element | null = el; e; e = e.parentElement) {
+        if (e !== el && e.id && one(`#${esc(e.id)}`)) {
+          parts.unshift(`#${esc(e.id)}`)
+          break
+        }
+        let p = esc(e.localName) + [...e.classList].filter(fine).slice(0, 2).map(c => `.${esc(c)}`).join('')
+        const kin = e.parentElement ? [...e.parentElement.children] : []
+        if (kin.filter(x => x.matches(p)).length > 1) p += `:nth-of-type(${kin.filter(x => x.localName === e!.localName).indexOf(e) + 1})`
+        parts.unshift(p)
+        if (one(parts.join(' > '))) break
+      }
+      return parts.join(' > ')
+    }
+    let cur: Element | null = null
+    let sel = ''
+    const place = () => {
+      if (!cur) return
+      const r = cur.getBoundingClientRect()
+      Object.assign(box.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` })
+      label.textContent = `${sel}  ${Math.round(r.width)}×${Math.round(r.height)}`
+      Object.assign(label.style, { left: `${Math.max(0, r.left)}px`, top: `${r.top > 22 ? r.top - 20 : r.bottom + 2}px` })
+    }
+    const move = (e: globalThis.MouseEvent) => {
+      const el = e.target
+      if (!(el instanceof Element)) return
+      if (el !== cur) (cur = el), (sel = selector(el)) // the selector only when it changes: it queries the page
+      place()
+    }
+    const stop = (e: Event) => (e.preventDefault(), e.stopPropagation()) // the page's own handlers don't see it
+    const finish = (v: Picked | null) => {
+      removeEventListener('mousemove', move, true)
+      removeEventListener('scroll', place, true)
+      for (const t of ['mousedown', 'mouseup', 'pointerdown', 'pointerup']) removeEventListener(t, stop, true)
+      removeEventListener('click', click, true)
+      removeEventListener('keydown', key, true)
+      box.remove()
+      label.remove()
+      delete w.__lakiPick
+      done(v)
+    }
+    const click = (e: globalThis.MouseEvent) => {
+      stop(e)
+      const el = e.target as Element
+      const r = el.getBoundingClientRect()
+      const tag = (el.cloneNode(false) as Element).outerHTML.replace(/<\/[^>]+>$/, '').replace(/\s+/g, ' ')
+      const text = ((el as HTMLElement).innerText ?? el.textContent ?? '').trim().replace(/\s+/g, ' ')
+      finish({ selector: selector(el), tag: tag.length > 200 ? `${tag.slice(0, 199)}…` : tag, text: text.length > 120 ? `${text.slice(0, 119)}…` : text, size: `${Math.round(r.width)}×${Math.round(r.height)}`, url: location.href })
+    }
+    const key = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && (stop(e), finish(null))
+    addEventListener('mousemove', move, true)
+    addEventListener('scroll', place, true) // the box follows what it outlines
+    for (const t of ['mousedown', 'mouseup', 'pointerdown', 'pointerup']) addEventListener(t, stop, true)
+    addEventListener('click', click, true)
+    addEventListener('keydown', key, true)
+    w.__lakiPick = finish
+  })
 }
 
 // a preview's screenshot on its way to the agent, with what to say about it

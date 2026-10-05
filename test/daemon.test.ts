@@ -154,6 +154,15 @@ test('hooks drive status; queue delivered on Stop; done until viewed', async t =
   // idle and empty queue: --when-idle sends right away
   const now = await rig.rpc('send', { target: ws.id, text: 'fourth', whenIdle: true })
   assert.equal(now.sent, true)
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: fourth', 'fourth answered')
+  // enter: false types into the prompt and leaves it there (the preview's picked element); an escape in the text
+  // (one that would end the paste) is dropped
+  await rig.rpc('send', { target: ws.id, text: 'the button main > a.cta \x1b[201~x', enter: false })
+  await until(async () => (await rig.screen(tab.id)).includes('the button main > a.cta x'), 'in the prompt')
+  await new Promise(r => setTimeout(r, 600))
+  tv = await rig.tab(ws.id)
+  assert.equal(tv.status, 'idle')
+  assert.equal(tv.last, 'answer: fourth') // no Enter, no turn
   watcher.close()
 })
 
@@ -611,4 +620,55 @@ test('a command without a preset runs as the custom preset, for a new workspace 
   const tab = (await rig.rpc('state')).tabs.find((x: { workspace: string }) => x.workspace === ws.id)
   assert.equal(tab.preset, 'custom')
   await until(async () => (await rig.screen(tab.id)).includes('from-new'), 'the command ran')
+})
+
+test('a model and effort go into the agent\'s flags (a wrong one makes nothing); a turn\'s start; the board\'s to-dos', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'claude', model: 'opus; rm -rf ~' }), /model opus; rm -rf ~\?/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'claude', effort: 'huge' }), /effort huge\? low, medium, high, xhigh, max/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'gemini', effort: 'high' }), /gemini takes no effort/)
+  assert.equal(execFileSync('git', ['branch', '--list', 'laki/m'], { cwd: rig.repo, encoding: 'utf8' }), '')
+
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', model: ' opus ', effort: 'high' })
+  const tab = await rig.tab(ws.id)
+  assert.deepEqual([tab.model, tab.effort, tab.runAt], ['opus', 'high', undefined])
+  await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().some(l => l.bin === 'claude'), 'claude')
+  assert.deepEqual(rig.fakeLog().find(l => l.bin === 'claude').args.slice(-4), ['--model', 'opus', '--effort', 'high'])
+  // runAt: while a turn goes, from its start
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'prompt')
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'settled') // the fake's first turn (an Enter at start)
+  const before = Date.now()
+  await rig.rpc('input', { tab: tab.id, data: 'slow work\r' })
+  const at = await until(async () => (await rig.tab(ws.id)).runAt, 'a turn started')
+  assert.ok(at >= before && at <= Date.now())
+  await new Promise(r => setTimeout(r, 100))
+  assert.equal((await rig.tab(ws.id)).runAt, at) // the same turn: the same start
+  await rig.rpc('input', { tab: tab.id, data: '\x1b' })
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'idle after Esc')
+  assert.equal((await rig.tab(ws.id)).runAt, undefined)
+  // a fork keeps them
+  const fork = await rig.rpc('wsFork', { id: ws.id })
+  assert.deepEqual([(await rig.tab(fork.id)).model, (await rig.tab(fork.id)).effort], ['opus', 'high'])
+
+  const cx = await rig.rpc('wsNew', { project: p.id, preset: 'codex', model: 'gpt-x', effort: 'low' })
+  await until(() => rig.fakeLog().some(l => l.bin === 'codex'), 'codex')
+  assert.deepEqual(rig.fakeLog().find(l => l.bin === 'codex').args.slice(-4), ['-m', 'gpt-x', '-c', 'model_reasoning_effort="low"'])
+  assert.equal((await rig.tab(cx.id)).effort, 'low')
+
+  // to-dos: a project's prompts, waiting
+  await assert.rejects(rig.rpc('todoAdd', { project: p.id, text: ' ' }), /needs its text/)
+  await assert.rejects(rig.rpc('todoAdd', { project: 'nope', text: 'x' }))
+  const todo = await rig.rpc('todoAdd', { project: p.id, text: ' fix the footer ' })
+  assert.deepEqual((await rig.rpc('state')).todos, [{ ...todo, text: 'fix the footer' }])
+  await rig.rpc('todoRm', { id: todo.id })
+  assert.deepEqual((await rig.rpc('state')).todos, [])
+
+  // a model isn't a flag; one picked comes after a preset's own args, so it wins
+  await assert.rejects(rig.rpc('tabNew', { ws: ws.id, preset: 'claude', model: '-p' }), /model -p\?/)
+  await rig.rpc('settingsSet', { presets: [{ name: 'fast', agent: 'claude', args: '--model sonnet' }] })
+  const n = rig.fakeLog().filter(l => l.bin === 'claude').length
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'fast', model: 'haiku' })
+  await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length > n, 'the preset\'s claude')
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[n].args.slice(-4), ['--model', 'sonnet', '--model', 'haiku'])
 })

@@ -84,7 +84,12 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - A shell tab closes when it exits; an agent tab when it ends cleanly (exit 0). A failed one stays to read,
   and Enter starts it again.
 - Live status per tab and workspace, macOS notifications when an off-screen tab waits or finishes: which kinds
-  (waiting, finished, usage limit) and the sound in Settings, a workspace or tab muted from its menu.
+  (waiting, finished, usage limit) and the sound in Settings, a workspace or tab muted from its menu; the Dock
+  icon counts what needs a look; turn timers on tabs and rows (Settings, off by default).
+- A model and effort per new workspace (`--model`/`--effort` for claude, `-m` and `model_reasoning_effort` for
+  codex, `-m` for the others), kept for restarts and forks.
+- A board: workspaces in columns by where they are (running, needs you, done, PR open, merged), and to-dos (a
+  prompt for a project) that start a workspace.
 - Esc / ⌃C interrupt goes back to idle. Usage limits: wait for the reset, then type `continue`.
 - Resume after a daemon restart: `claude --resume`, `codex resume`, `gemini --resume`, `grok --resume` (Laki picks
   its chat id), `opencode --session`. The app menu's *Quit … Completely*
@@ -105,7 +110,7 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - A diff line's comment: posted on the PR at that line (`gh api`), or sent to the agent with the file and line.
 - Preview: the dev server in the side panel (a webview kept to localhost; the toolbar's globe opens it at $PORT),
   back, forward, a port picker; a
-  screenshot goes to the agent with a note.
+  screenshot goes to the agent with a note; a picked element's CSS selector goes into its prompt.
 - ⌘P / "Find files…" in ⌘K: fuzzy file search; preview text and images in the app; ⌘W closes the preview.
 - Open in any installed editor or terminal (⌘E for the default).
 

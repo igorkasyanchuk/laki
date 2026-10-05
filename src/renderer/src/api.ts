@@ -12,6 +12,7 @@ type Bridge = {
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void
+  badge?(n: number): void
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
 }

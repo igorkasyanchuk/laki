@@ -1,6 +1,6 @@
 import { type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import type { View } from '../../shared/types'
+import { EFFORTS, isAgent, MODELS, type View } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -43,7 +43,7 @@ export function About({ onClose }: { onClose: () => void }) {
   )
 }
 
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean }
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string }
 
 // initial: a laki://new link's prompt, preset and name
 export function NewWorkspace({ view, project, agent, initial, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
@@ -57,6 +57,7 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
   const templates = templatesFor(view.settings.templates, view.projects.find(x => x.id === p.project)?.config?.templates)
   const filled = templated(tpl ? templates[Number(tpl)] : undefined, p.prompt ?? '', { project: view.projects.find(x => x.id === p.project)?.name, base: p.base })
   const plain = view.projects.find(x => x.id === p.project)?.git === false // a folder without git: local only
+  const starts = view.presets.find(x => x.name === p.preset)?.agent // what the preset starts: its model and effort flags
   useEffect(() => {
     setTpl('') // another project, other templates
     if (!p.project) return
@@ -74,7 +75,7 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
     setBusy(true)
     try {
       const prompt = withImages(filled, images) || undefined
-      await onCreate({ ...p, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined })
+      await onCreate({ ...p, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: isAgent(starts) ? p.model?.trim() || undefined : undefined, effort: isAgent(starts) ? p.effort || undefined : undefined })
     } catch {
       setBusy(false)
     }
@@ -128,12 +129,40 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
           Agent
           <div className="seg">
             {[...view.presets.map(x => x.name), 'shell', 'custom', 'none'].map(x => (
-              <button type="button" key={x} className={p.preset === x ? 'on' : ''} onClick={() => set({ preset: x })}>
+              <button type="button" key={x} className={p.preset === x ? 'on' : ''} onClick={() => set({ preset: x, model: undefined, effort: undefined }) /* another agent's names */}>
                 {x}
               </button>
             ))}
           </div>
         </label>
+        {isAgent(starts) && (
+          <div className="row">
+            <label>
+              <span>
+                Model <span className="muted">(optional)</span>
+              </span>
+              <input list="models" value={p.model ?? ''} spellCheck={false} placeholder={starts === 'opencode' ? 'provider/model' : "the agent's default"} onChange={e => set({ model: e.target.value })} />
+              <datalist id="models">
+                {(MODELS[starts] ?? []).map(m => (
+                  <option key={m} value={m} />
+                ))}
+              </datalist>
+            </label>
+            {EFFORTS[starts] && (
+              <label>
+                Effort
+                <select value={p.effort ?? ''} onChange={e => set({ effort: e.target.value })}>
+                  <option value="">the agent's default</option>
+                  {EFFORTS[starts]!.map(x => (
+                    <option key={x} value={x}>
+                      {x}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+          </div>
+        )}
         {p.preset === 'custom' && (
           <label>
             Command

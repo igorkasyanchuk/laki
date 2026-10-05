@@ -11,17 +11,20 @@ running when you close the window.
 - **Parallel agents.** One worktree and branch per task, with setup and teardown scripts and a `$PORT` of its
   own. A plain folder works too.
 - **Live status.** Each agent shows as running, waiting for you or done, with notifications and a follow-up
-  queue. Agents resume after a restart and pick up again after a usage limit.
+  queue, and a count on the Dock icon. Agents resume after a restart and pick up again after a usage limit. Pick
+  a model and effort per workspace; turn timers if you like.
 - **Real terminals.** Tabs and panes, tmux style: drag a tab to split. The daemon keeps them alive while the
   app is closed. ⌘F finds text in a terminal.
 - **Scheduled tasks.** Give an agent a prompt to run at times you write in plain English, like *every day at
   2am except weekends*. Each run uses a new worktree, the project's own folder, or an agent already running.
   Names can carry the run's date (`Nightly {{DD-MM}}`), and a log lists every run.
+- **Board.** Every workspace as a card by where it is: running, needs you, done, PR open, merged. To-dos wait
+  there until you start a workspace on one.
 - **PRs and git.** The status bar shows the workspace's PR and its CI. Switches send failing CI or new review
   comments to the agent. Ship commits, pushes and opens a PR in one step. You can fork a workspace, archive
   it and restore it.
 - **Side panel.** Files, changes against the base branch (click a line to comment on the PR or tell the
-  agent), review threads, and a browser preview of the dev server that sends screenshots to the agent. ⌘P
+  agent), review threads, and a browser preview of the dev server that sends screenshots, or the CSS selector of an element you click, to the agent. ⌘P
   finds a file.
 - **Dev servers and ports.** ▷ Run starts the project's run script. Laki lists the ports that are listening:
   click one to open it, or share it with a public link and QR code.

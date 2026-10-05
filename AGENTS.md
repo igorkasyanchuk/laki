@@ -61,12 +61,14 @@ the app · restart* in the status bar (`StaleDaemon` in `ui.tsx`: `shutdown`, th
 Bump `API` when the renderer starts relying on a new method or daemon behavior (1: the tunnel methods; 2: a
 project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a project's `actions`, kept by `projectSet`;
 4: `usage`; 5: remote access; 6: scheduled tasks, remote access forever; 7: `prComment`, `muted`; 8: a project's
-`templates`, kept by `projectSet`; 9: browsers in `apps`, `openIn` `default`). A
+`templates`, kept by `projectSet`; 9: browsers in `apps`, `openIn` `default`; 10: `send` `enter: false`; 11: a tab's `runAt`, `model` and `effort`, the
+board's `todoAdd`/`todoRm`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config), `reorder` (projects or workspaces by id), `wsSet` (color, `muted`), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
-- tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color, `muted`), `send`, `queueClear`;
+- the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
+- tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color, `muted`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something), `queueClear`;
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from), `tunnelStart`
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
@@ -165,6 +167,11 @@ command), `args` (appended raw before the prompt), `cmd`, `env`. A tab keeps `pr
 apply on restart. Env order: process < `settings.env` (global) < project (`.laki.json`, then the app's) <
 preset < Laki's own vars.
 
+A tab's `model` and `effort` (`wsNew`, `tabNew`, kept by `wsFork`; `modelCheck` before a worktree is made: a name, an
+effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/`--effort`, codex `-m` and `-c
+model_reasoning_effort="…"`, the others `-m`. `view` gives a running or waiting tab `runAt`, its turn's start (set
+there: each change of status comes with `changed()`), for the turn timers (`settings.timers`).
+
 ### Interrupts
 
 Esc or ⌃C ends a Claude/Codex turn without any hook. `input` sees the key and `interrupted` checks the
@@ -240,7 +247,7 @@ tool call (`ensureDaemon`), never before. Tested in `test/cli.test.ts`.
 `laki://` (electron-builder's `protocols`, `setAsDefaultProtocolClient` when packaged): main's `open-url` queues a
 link until the renderer says `deep-link-ready` (preload's `onDeepLink`; a main-frame navigation resets it), then
 sends `deep-link`. `links.ts` `parseLink` (tested in `test/links.test.ts`), App routes it once the view is in: a
-workspace or tab, the new-workspace page filled in (`initial`), Scheduled tasks, Settings, Help, About. Links select and fill
+workspace or tab, the new-workspace page filled in (`initial`), Scheduled tasks, the Board, Settings, Help, About. Links select and fill
 in; they never create or run anything.
 
 ### Preview
@@ -250,7 +257,10 @@ The side panel's Preview: a `<webview>` (`webviewTag`) made by hand in `SidePane
 isn't `http://localhost` or `127.0.0.1`, or a partition other than `persist:preview`, whose session grants only
 `PREVIEW_OK` permissions (Electron grants all by default). No `allowpopups`: its popups are blocked. `capture` (IPC) takes a webview of the
 asking window by its `webContentsId` and returns a PNG (base64); `ShotBox` saves it (`imageSave`) and sends its path to
-the agent. In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
+the agent. The crosshair (`pick`, the app only) runs `pickElement`'s source in the page (`executeJavaScript`): it
+outlines what's under the mouse and resolves the clicked element (a short unique CSS selector, its opening tag, text,
+size, the URL), or null on Esc (`window.__lakiPick(null)` cancels it from outside); `PanelApi.toPrompt` types that into
+the focused agent tab, else the first live one (`send` `enter: false`: no Enter, no turn). In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
 
 ### Notifications
 
@@ -286,6 +296,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel;
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
+  - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
+    muted and archived workspaces. `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
+    `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
   - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one.
@@ -364,6 +377,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
   or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
   as SVG, also Remote access's.
+- **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar header's columns icon, ⌘K, `laki://board`): the
+  workspaces in columns by `columnOf` (`rollup` from `Glyph.tsx`, then the PR's state), cards that open one, and To
+  do (`view.todos`): ▷ or an HTML5 drag onto a column runs `wsNew` with the default agent, then `todoRm`.
 - **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar header's clock, ⌘K, a project's ⋯ menu:
   App's `schedulesOf`, the dialog `{ schedules: <project> }`): a project filter (`only`, starting at `project`), the form with `parseWhen`'s reading, the next runs and the dated names (*Another folder…*: `pick`, the
   folder picker, or a typed path in a browser, then `projectAdd`), the tasks (switch, Run now, edit, delete), the runs' log (a click goes to
@@ -392,8 +408,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
-| `src/preload/index.ts` | `bridge`: conn info, notify, glass, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound), the Dock badge (`badge` IPC), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
+| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/skill.ts` | the agent skill: SKILL.md and a CLI launcher in each agent's `skills/laki` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
