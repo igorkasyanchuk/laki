@@ -43,7 +43,7 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
   // → or N: the next one
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
-      if (busy || e.metaKey || e.ctrlKey || e.altKey || (e.key !== 'ArrowRight' && e.key.toLowerCase() !== 'n')) return
+      if (busy || e.repeat || e.metaKey || e.ctrlKey || e.altKey || (e.key !== 'ArrowRight' && e.key.toLowerCase() !== 'n')) return
       e.preventDefault()
       next()
     }
