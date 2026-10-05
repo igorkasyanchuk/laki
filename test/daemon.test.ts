@@ -390,9 +390,14 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key
 })
 
-test('ports of the workspace process tree, PR from gh, dev server', async t => {
-  // listens on a free port (3100+ may be taken on this machine) and says which, and what $PORT was
-  const rig = await fresh(t, { config: { run: `exec node -e 'const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port + " PORT=" + process.env.PORT))'` } })
+test('ports of the workspace process tree, their names, stopping one; PR from gh, dev server', async t => {
+  // listens on a free port (3100+ may be taken on this machine) and says which, and what $PORT was; shrugs off SIGTERM
+  const rig = await fresh(t, {
+    config: {
+      run: `exec node -e 'process.on("SIGTERM", () => {}); const s = require("http").createServer().listen(0, "127.0.0.1", () => console.log("listening " + s.address().port + " PORT=" + process.env.PORT))'`,
+      ports: { '3100': 'web' },
+    },
+  })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const dev = await rig.rpc('run', { ws: ws.id })
@@ -402,6 +407,15 @@ test('ports of the workspace process tree, PR from gh, dev server', async t => {
   await until(async () => (await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'port scanned')
   const pr = await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
   assert.deepEqual({ ...pr, list: undefined }, { number: 42, state: 'OPEN', url: 'https://example.invalid/pr/42', checks: 'pending', list: undefined })
+  // what listens, by name; the ✕: SIGTERM, then SIGKILL as it's ignored
+  const w = (await rig.rpc('state')).workspaces[0]
+  assert.deepEqual(w.portNames, { '3100': 'web' })
+  assert.equal(w.procs[m[1]].cmd, 'node')
+  await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 1 }), /nothing of \S+ listens on :1/)
+  assert.equal((await rig.rpc('portKill', { ws: ws.id, port: Number(m[1]) })).pid, w.procs[m[1]].pid)
+  await sleep(1500)
+  assert.ok((await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'SIGTERM shrugged off')
+  await until(async () => !(await rig.rpc('state')).workspaces[0].ports.includes(Number(m[1])), 'killed, gone from the list', 6000)
 })
 
 test('archive keeps the branch and resume ids; restore brings them back', async t => {

@@ -630,6 +630,9 @@ kbd { font-family: var(--mono); }
 /* a workspace's PR (Settings › General): open, draft (gray), merged (purple), closed (red); an open one's failing checks red */
 .ws-pr { display: inline-flex; flex: none; color: var(--done); }
 /* a row's diff size; on hover its buttons take the marks' place */
+.port-name { margin-left: 4px; color: var(--muted); }
+.port-stop { background: none; border: none; padding: 0 2px; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
+.port-stop:hover { color: var(--error); }
 .ws-merged { flex: none; font-size: 10px; color: var(--tc-purple); opacity: 0.85; }
 .ws-stat { display: inline-flex; gap: 3px; flex: none; font-family: var(--mono); font-size: 10px; opacity: 0.85; }
 .ws-stat .add { color: var(--done); }

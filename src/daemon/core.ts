@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
@@ -41,6 +41,7 @@ export const sessions = new Map<string, Session>()
 type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; askKey?: string } // askKey: the ask the last pushed view gave
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
+const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
 const prs = new Map<string, PR>()
 export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean } } // browse: the app's window, which has the agent browser
 export const clients = new Set<Conn>()
@@ -190,8 +191,12 @@ export function view(): View {
   })
   return {
     projects: state.projects,
-    // ponytail: run reads .laki.json per workspace on every view; cache by mtime if many workspaces
-    workspaces: state.workspaces.map(w => ({ ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!projectConfig(w).run, stat: stats.get(w.id) })),
+    // ponytail: run and portNames read .laki.json per workspace on every view; cache by mtime if many workspaces
+    workspaces: state.workspaces.map(w => {
+      const c = projectConfig(w)
+      const portNames = c.ports && typeof c.ports === 'object' ? c.ports : undefined
+      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, stat: stats.get(w.id) }
+    }),
     tabs,
     presets: presets(),
     settings: state.settings ?? {},
@@ -1279,6 +1284,7 @@ export async function scanPorts() {
     if (t && !s.exited) root.set(s.pty.pid, t.workspace)
   }
   const next = new Map<string, number[]>()
+  const nextProcs = new Map<string, Record<number, Proc>>()
   if (root.size) {
     const kids = new Map<number, number[]>()
     const { stdout: ps } = await run('ps', ['-axo', 'pid=,ppid=']).catch(() => ({ stdout: '' }))
@@ -1292,25 +1298,55 @@ export async function scanPorts() {
       for (const k of kids.get(pid) ?? []) if (!owner.has(k)) walk(k, ws)
     }
     for (const [pid, ws] of root) walk(pid, ws)
-    const out = await run('lsof', ['-nP', '-a', '-p', [...owner.keys()].join(','), '-iTCP', '-sTCP:LISTEN', '-Fpn']).then(
+    const out = await run('lsof', ['-nP', '-a', '-p', [...owner.keys()].join(','), '-iTCP', '-sTCP:LISTEN', '-Fpcn']).then(
       r => r.stdout,
       e => String(e.stdout ?? ''),
     )
     let pid = 0
+    let cmd = ''
     for (const l of out.split('\n')) {
       if (l[0] === 'p') pid = Number(l.slice(1))
+      else if (l[0] === 'c') cmd = l.slice(1)
       else if (l[0] === 'n') {
         const port = Number(l.slice(l.lastIndexOf(':') + 1))
         const ws = owner.get(pid)
-        if (ws && port && !next.get(ws)?.includes(port)) next.set(ws, [...(next.get(ws) ?? []), port].sort((a, b) => a - b))
+        if (!ws || !port) continue
+        if (!next.get(ws)?.includes(port)) next.set(ws, [...(next.get(ws) ?? []), port].sort((a, b) => a - b))
+        nextProcs.set(ws, { ...nextProcs.get(ws), [port]: { pid, cmd } })
       }
     }
   }
-  if (JSON.stringify([...next]) !== JSON.stringify([...ports])) {
+  if (JSON.stringify([...next, ...nextProcs]) !== JSON.stringify([...ports, ...procs])) {
     ports.clear()
+    procs.clear()
     for (const [k, v] of next) ports.set(k, v)
+    for (const [k, v] of nextProcs) procs.set(k, v)
     changed()
   }
+}
+
+// the status bar's ✕ on a port: what listens there, found by the last scan in the workspace's own processes and yours
+// (uid), gets SIGTERM, then SIGKILL 3 s later if it's still there; the ports are scanned again after each
+export async function portKill(o: { ws: string; port: number }) {
+  const ws = findWs(o.ws)
+  const p = procs.get(ws.id)?.[Number(o.port)]
+  if (!p) throw new Error(`nothing of ${ws.id}'s listens on :${o.port}`)
+  // its owner and start time: the SIGKILL goes only to the same process, not one that took its pid since
+  const who = () => run('ps', ['-o', 'uid=,lstart=', '-p', String(p.pid)]).then(r => r.stdout.trim(), () => '')
+  const was = await who()
+  if (was.split(/\s+/)[0] !== String(process.getuid?.())) throw new Error(`${p.cmd} (pid ${p.pid}) isn't yours to stop`)
+  process.kill(p.pid, 'SIGTERM')
+  setTimeout(() => void scanPorts(), 500)
+  setTimeout(async () => {
+    if ((await who()) === was) {
+      try {
+        process.kill(p.pid, 'SIGKILL')
+        log(`port ${o.port}: ${p.cmd} (pid ${p.pid}) outlived SIGTERM, killed`)
+      } catch {}
+    }
+    void scanPorts()
+  }, 3000)
+  return p
 }
 
 // ---------- tunnels: a port exposed at a trycloudflare.com URL by cloudflared (Cloudflare Quick Tunnels).

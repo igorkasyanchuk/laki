@@ -19,7 +19,8 @@ export type RunAction = { name: string; target: Agent | 'shell'; text: string }
 // a prompt template: {{prompt}} (what's typed), {{project}}, {{base}}; settings.templates and a project's own
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[] }
+// ports: names for the status bar's ports ({"3000": "web"})
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string> }
 
 // git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)
 export type Project = { id: string; name: string; path: string; git?: boolean; config?: ProjectConfig }
@@ -199,7 +200,9 @@ export type Tunnel = { port: number; url?: string; mails?: string[] }
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
 // (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's)
 export type Stat = { add: number; del: number; files: number; dirty: number }
-export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat }
+// procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports
+export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat }
+export type Proc = { pid: number; cmd: string }
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; agents: { id: Agent; found: boolean }[] }
 
@@ -211,4 +214,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 15
+export const API = 16

@@ -126,6 +126,7 @@ const api: Record<string, Handler> = {
   imageSave: p => core.imageSave(p),
   prFix: p => core.prFix(p),
   webhookTest: p => core.webhookTest(p),
+  portKill: p => core.portKill(p),
   send: p => core.send(p),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),

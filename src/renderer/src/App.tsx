@@ -708,6 +708,20 @@ export function App() {
   const section = dialog && typeof dialog === 'object' && 'section' in dialog ? dialog.section : undefined // a Settings section asked for
   const schedulesFor = schedulesOf(dialog)
   const ports = ws ? portsOf(ws.ports, ws.tunnels).filter(p => p !== ws.port) : [] // $PORT has its own, always
+  // ✕ beside a port something of the workspace listens on: stops it, once you say so
+  const portStop = (ws: WorkspaceView, port: number) => {
+    const p = ws.procs?.[port]
+    if (!p) return null
+    const stop = async () => {
+      if (!(await ask(`Stop ${p.cmd} (pid ${p.pid}) on :${port}?`, { text: 'SIGTERM first, SIGKILL after 3 seconds if it is still running.', ok: 'Stop', danger: true }))) return
+      call('portKill', { ws: ws.id, port }).catch(() => {})
+    }
+    return (
+      <button className="port-stop" data-tip={`stop ${p.cmd} (pid ${p.pid})`} aria-label={`stop ${p.cmd} on port ${port}`} onClick={stop}>
+        ×
+      </button>
+    )
+  }
   const nextTask = (view.schedules ?? []).filter(s => s.on && s.next).sort((a, b) => a.next! - b.next!)[0]
   const runs = view.runs ?? [] // newest first: the ones above the last read
   const seen = runs.findIndex(r => r.id === runsSeen)
@@ -1153,15 +1167,19 @@ export function App() {
                   onClick={() => openPort(ws.port)}
                 >
                   $PORT {ws.port}
+                  {ws.portNames?.[ws.port] && <span className="port-name">{ws.portNames[ws.port]}</span>}
                 </button>
                 <TunnelButton key={ws.id} port={ws.port} tunnel={ws.tunnels?.find(t => t.port === ws.port)} api={tunnelApi(ws)} />
+                {portStop(ws, ws.port)}
               </span>
               {ports.map(port => (
                 <span key={`${ws.id}:${port}`} className="port-item">
                   <button className="listen" data-tip={ws.ports.includes(port) ? `listening · open http://localhost:${port}` : 'not listening now'} onClick={() => openPort(port)}>
                     ↗{port}
+                    {ws.portNames?.[port] && <span className="port-name">{ws.portNames[port]}</span>}
                   </button>
                   <TunnelButton port={port} tunnel={ws.tunnels?.find(t => t.port === port) /* an older daemon has none */} api={tunnelApi(ws)} />
+                  {portStop(ws, port)}
                 </span>
               ))}
               <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} />
