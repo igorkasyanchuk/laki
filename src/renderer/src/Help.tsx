@@ -95,7 +95,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
         <section>
           <h2>Start</h2>
           <ol>
-            <li>Open a project: ⌘O, the folder icon at the top of the sidebar, or drop a folder on the sidebar.</li>
+            <li>Open a project: ⌘O, the folder icon at the top of the sidebar, or drop a folder on the sidebar. One on another machine: ⌘K › Open a project over SSH… (host:path).</li>
             <li>New workspace (⌘N): a git worktree and branch of its own (or the repo itself, with Local), an agent and a first prompt.</li>
             <li>Watch the sidebar: each workspace shows its most urgent tab. Click one to step in; ⌘K jumps anywhere.</li>
             <li>When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.</li>

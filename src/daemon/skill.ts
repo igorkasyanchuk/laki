@@ -74,6 +74,10 @@ ${USAGE}
 Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
 workspace each, so they run in parallel.
 
+A project can be on an SSH host (\`laki project add devbox:~/code/app\`; \`laki ls\` shows \`host:path\`): its
+workspaces' paths are on that machine, not this one, so read their work with \`laki diff\` and \`laki screen\`, not
+from the disk here. Its agents run there and have no \`laki\`.
+
 - From a GitHub issue: \`laki new <project> --issue <url|number>\` (its title and text become the prompt; a
   \`--prompt\` adds to it).
 - On a GitHub PR: \`laki new <project> --pr <url|number> --prompt "…"\` (a worktree on the PR's branch, a fork's

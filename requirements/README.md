@@ -53,7 +53,8 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 
 ## Concepts
 
-- **Project**: a git repo, or any folder, added to Laki (⌘O, or drop it on the window).
+- **Project**: a git repo, or any folder, added to Laki (⌘O, or drop it on the window), on this Mac or on an SSH
+  host (`host:path`).
 - **Workspace**: one task. A git worktree on branch `<prefix><id>` (default `laki/`), or the repo itself
   (*local*), or the folder (*plain*). Has a `$PORT`, a color, a name, and maybe a PR.
 - **Tab**: holds one terminal or several panes (split, stacked). Kinds: agent, shell, setup, dev (Run), ship.
@@ -71,6 +72,12 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 ## What it does today
 
 **Workspaces and projects**
+- Projects over SSH (`host:path`, a `~/.ssh/config` name or `user@host`): worktrees, git, gh, scripts and agents run
+  on the host through ssh (a ControlMaster per host for git and gh, a connection per tab; your keys or agent, no prompts); nothing is installed there
+  but a hook script, which reports turns as an escape code on the tab's own terminal. `$PORT` is forwarded to this
+  Mac's localhost; pasted images are copied there; VS Code, Cursor and Windsurf open its folders (Remote - SSH). A
+  dropped connection ends its tabs (Enter resumes them). Like Supacode's; Orca and Superset keep a program of theirs
+  on the host so terminals outlive a drop: next, maybe, with tmux there.
 - Add a repo or folder; new workspace (a page of its own) from a base branch with a name, an agent and a
   first prompt (text, dictation, pasted or dropped images).
 - Setup script per new worktree (agents and Run wait for it), teardown when a worktree is deleted or archived, env per project
@@ -209,3 +216,5 @@ preview, diagrams, drawing in the title bar, Linux/Windows) are easiest there, a
 - **2026-10-04**: picked Electron. Laki Electron became **Laki** (CLI `laki`, data `~/.laki`; an existing
   `~/.laki-electron` stays in use), its code moved to the repository's root, with an icon of its own. Laki Go
   moved to its own repository (`igorkasyanchuk/laki-go`). Remote access added.
+- **2026-10-05**: projects on SSH hosts, after looking at Orca, BridgeMind, Superset and Supacode: the system's ssh
+  and nothing to install on the host, as Supacode does.

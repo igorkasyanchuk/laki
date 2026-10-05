@@ -59,7 +59,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
   tunnel that lets in one email address, for 1 to 24 hours or until you stop it; a QR code to open it.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
-- **A break**: the smiley in the tab bar shows a random meme from r/memes; *Next* (→, N) for another. Settings › General
+- **A break**: the smiley in the tab bar shows a random meme from r/memes; *Next* (→, N) for another, *Copy image* to paste it somewhere. Settings › General
   hides it.
 
 ## Install
@@ -168,7 +168,7 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
-- smiley: a random meme from r/memes, for a break (*Next*, → or N; Esc closes it). Fetched only when you click: Reddit's own, or
+- smiley: a random meme from r/memes, for a break (*Next*, → or N; *Copy image*; Esc closes it). Fetched only when you click: Reddit's own, or
   meme-api.com when Reddit turns the request away;
 - info (⌘I): the workspace info panel (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
@@ -368,6 +368,31 @@ for you or finished while you looked away (muted ones aside); so does Laki's mar
 those tabs (waiting first, with what they ask): a click opens one. With *Turn timers* on (Settings › General), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 
+### Projects over SSH
+
+A project can be a folder on another machine: ⌘K › *Open a project over SSH…* (*Open a folder over SSH…* on the first
+screen, or `laki project add devbox:~/code/app`), then `host:path`. The host is a name from `~/.ssh/config` or
+`user@host`; a relative path or `~` is from its home. The project is named `app (devbox)` (rename it in its
+settings) and shows a server icon; the status bar shows `devbox:` before the path.
+
+- Laki signs in with your SSH keys or agent, never a password or a 2FA prompt: `ssh devbox` must work in a terminal
+  without asking anything (the host's key known too). One connection per host carries git and gh; each tab has its own
+  (they open a moment apart: sshd turns away many at once).
+- Worktrees go to `~/.laki-host/<this Mac>/worktrees` on the host. git, gh, the setup and teardown scripts and the
+  agents run there, from its login shell: install the agents (and `gh`, for PRs) there and sign in to them there.
+- Agents report their turns through their own terminal (a hook prints an escape code Laki reads and hides), so
+  nothing listens on the host or calls back to your Mac.
+- The workspace's `$PORT` on your Mac reaches the same port on the host: the preview, the toolbar's globe and Expose
+  to the world work as they do here. Ports a dev server picks itself aren't forwarded, and the status bar lists none
+  of a host's listening ports.
+- Pasted images and the preview's screenshots are copied to the host for its agent.
+- *Open in*: VS Code, Cursor or Windsurf open the folder there (their Remote - SSH).
+- If the connection drops, the host's tabs end; Enter starts each again (agents resume their chat).
+- Archiving a workspace needs the host reachable (its worktree is removed there); deleting one doesn't.
+- Not on a host yet: ignored files copied into a new worktree (`.worktreeinclude`; a setup script can do it:
+  `cp "$LAKI_PROJECT_PATH/.env" .`), new files' lines in the diff size, and the agent skill (agents there have no
+  `laki`).
+
 ### Keys
 
 | key | |
@@ -536,6 +561,7 @@ Every workspace gets its own `$PORT` (3100, 3110, …).
 
 ```bash
 laki project add ~/code/app
+laki project add devbox:~/code/app                      # a folder over SSH (below: Projects over SSH)
 laki new app --prompt "fix the login redirect"          # worktree + claude with that prompt
 laki new app --preset codex --base develop --name dark
 laki new app --model opus --effort high --prompt "…"   # the agent's model and effort
@@ -670,6 +696,8 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
 - **The app shows "connecting to the daemon…"**: check `~/.laki/daemon.log`. To restart the daemon, run `laki stop`, then reopen the app.
 - **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude`, `codex` and the others must be on the PATH your `~/.zshrc` sets.
 - **No PR badge**: run `gh auth status`. PRs are checked once a minute.
+- **A host won't connect**: run `ssh <host>` in a terminal; it must sign in without asking anything (keys or agent, a
+  known host key). Laki's error is in `~/.laki/daemon.log` and in the tab.
 
 ## Known limits
 
@@ -684,3 +712,5 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
   quiet seconds end it and notify (a turn you started with Enter only after 8 seconds: a shorter one is likely a menu). Gemini without hooks works the same way. Laki never writes `~/.gemini`, `~/.grok` or `~/.config/opencode`.
 - **Snapshots** keep 5,000 lines of scrollback.
 - **Fork** copies commits only; uncommitted changes stay behind.
+- **SSH hosts**: a dropped connection (the Mac asleep) ends the host's tabs, as nothing holds them there; Enter
+  resumes each. Keys or an agent only, no password prompts.

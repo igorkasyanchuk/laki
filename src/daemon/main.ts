@@ -268,6 +268,7 @@ function shutdown() {
   timers.forEach(clearInterval)
   core.stopTunnels()
   core.remoteStop()
+  core.stopHosts()
   for (const s of core.sessions.values()) s.kill()
   core.sessions.clear() // their exits aren't ones to act on (onExit)
   rmSync(join(dir, 'daemon.json'), { force: true })

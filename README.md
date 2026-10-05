@@ -10,6 +10,8 @@ worktree. Agents keep running when the window is closed.
   restart or a usage limit.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon.
+- **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
+  ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
 - **PRs**: CI and reviews in the status bar, sent to the agent if you like; ship (commit, push, PR) in one step;
   archived once merged, if you like.
 - **Side panel**: files (Markdown rendered), the diff (comment on a line; images before and after), review threads, and a preview of the dev
@@ -33,7 +35,7 @@ npm link                          # optional: the laki CLI
 
 ## Use
 
-1. **⌘O** (or drop a folder) adds a project.
+1. **⌘O** (or drop a folder) adds a project; one on another machine: ⌘K › *Open a project over SSH…* (`host:path`).
 2. Pick an agent, write the task, **Create**: Laki makes the worktree, runs setup, starts the agent.
 3. **⌘N** for more; the sidebar shows each one's status. Review in the side panel (**⌥⌘B**), then **Ship**.
 

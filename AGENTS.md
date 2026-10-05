@@ -19,8 +19,8 @@ npm run dev                       # Electron + renderer dev server on :5199
 
 - **Tests** are `node --test` with type stripping (`test/*.test.ts`), no framework.
   - `test/helpers.ts` `fresh()` gives each test a temp `LAKI_HOME` and `HOME`, its own daemon, and the
-    fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), a shell `tsh`, and
-    `da-probe` (counts terminal query replies). No network.
+    fakes in `test/fakes` first on PATH: `claude`, `codex`, `gh`, `open` (records what it would open), a shell `tsh`,
+    `ssh` (every host is this machine) and `da-probe` (counts terminal query replies). No network.
   - `test/cloudflared` is a fake that's off PATH: a test links it into `$HOME/bin` (first on PATH) to install it.
   - Never let a test touch the real `~/.laki` (or `~/.laki-electron`), `~/.claude` or `~/.codex`. The rig also
     sets `LAKI_PAGE` to a folder of the test's own, so remote access never serves the build.
@@ -66,7 +66,8 @@ project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a pro
 board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `stat`; 13: a tab's `ask`, `answer`,
 `unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`; 14: settings' `prPrompts`, `prScan`,
 `prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
-workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`). A
+workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
+workspace's `host`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -197,6 +198,41 @@ those on PATH):
 A project is a git repository (its top level) or any other folder (`git: false`: local workspaces only,
 no branches, diff, PRs or ship). `config` (setup, run, teardown, expose), set in the app, wins field by field over
 the repo's `.laki.json` (`projectConfig`).
+
+### SSH hosts
+
+A project with `host` (`projectAdd` `host:path`, `REMOTE` in `shared/types.ts`: a `~/.ssh/config` name or
+`user@host`; `hostProjectAdd`) is a folder on that machine; its workspaces copy `host`. `core.ts`' SSH hosts section:
+
+- One connection per host (`hostUp`, `connect`): a ControlMaster the daemon spawns (`-M -N`, socket at
+  `<data>/ssh/<hash>`, `BatchMode`: keys or agent, no prompts; a failure stands 10 s), then `$HOME` and the login
+  shell's PATH there, then `hostFiles` (heredocs over `sh -s`) puts `~/.laki-host/<mac>/` (`mac()`: the hostname when
+  first asked, kept in `<data>/ssh/mac`, since macOS's changes with the network): the `hook` script
+  and the agents' hook files (`hookFiles`, as here, their command `<dir>/hook <state>`). Its `exit` drops it: the next
+  use connects again. `stopHosts` at shutdown.
+- `exec(at, cmd, args)` / `git(at, …)`: here, or `ssh host 'export PATH=…; cd <path> && exec <cmd>'` through the
+  master. Every git and gh call takes an `At` (a project or workspace). `sshIn` sends a script or a file on stdin
+  (never on a command line: `ps` there shows those). Both go 8 at a time per host (`slot`): sshd takes 10 sessions
+  per connection (MaxSessions).
+- A tab (`spawnTab` → `hostTab`): its PTY here runs a `/bin/sh` that waits for `<run>/<key>.go` (or prints
+  `<key>.err`), then `ssh -tt … 'exec sh ~/.laki-host/<mac>/run/<key>.sh'` on a connection of its own (`TAB_SSH`:
+  not the master's sessions; `spaced`: 300 ms apart per host, sshd's MaxStartups drops handshakes past 10). Meanwhile the daemon puts that script
+  there: `rm -f "$0"`, `LAKI_TTY=$(tty)`, the folder, `lakiEnv` exported (with `LAKI_HOOK`, a key per start), then
+  `exec "$SHELL" -lic <cmd>`. A shell that loses its connection (255) stays; Enter starts it again, like an agent.
+- Hooks: the host's `hook` prints `OSC 7717 ; <key> ; <state> ; <base64 JSON> BEL` to `$LAKI_TTY`; the Session's
+  headless terminal (`onHook`) hands it to `hook()` when the key is this start's (`running` sends `{}`: PreToolUse's
+  payload holds whole files). Nothing listens on the host, and nothing there reaches the daemon.
+- `forward`: each live workspace's `$PORT` (`ssh -O forward -L port:localhost:port`) when the host connects and in
+  `wsNew`/`wsRestore`; cancelled in `teardown`.
+- `.laki.json` there: `hostCfg` (null: none), read by `readHostCfg`/`readHostCfgs` (project add, `wsNew`, `wsRestore`,
+  a tab's start when not read yet, each PR scan: `hostSync`, which also follows the branch); `projectConfig` reads the
+  cache. `wsArchive` needs the host up (teardown there would fail quietly); `diff` gets new files' diffs in one call.
+- `toHost` copies the images a prompt or `send` names (`<data>/images/…`) to the host and rewrites their paths
+  (`textFor`, `typeInto` takes a promise). `files`, `fileRead` (`hostFileRead`: base64), `fileNew`, `diff`, stats run
+  there; `openIn` opens `vscode|cursor|windsurf://vscode-remote/ssh-remote+<host><path>`, other apps refuse.
+- Not there (ponytail): `copyIncludes`, port scans (`scanPorts` sees none), new files' lines in `stat`, a local
+  workspace's branch sync, the agent skill. Tested with `test/fakes/ssh` (every host is this machine; `nohost`
+  refuses) in `test/ssh.test.ts`.
 
 ### Presets
 
@@ -393,7 +429,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is).
   - No project: `Welcome` (panels.tsx) with `doctor`'s checks. `settings.dimPanes`: `.dim-panes` on `.app`.
   - `.side-head` (top): hide, open a project, help; `.side-foot` (pinned at the bottom): Scheduled tasks, Board, Settings,
-    with words (`IconButton` `label`: Tasks, Board, Settings) unless `settings.sideLook.labels === false`, or the sidebar
+    with words (`IconButton` `label`: Scheduled tasks, Board, Settings) unless `settings.sideLook.labels === false`, or the sidebar
     (a `side` container) is under 225px.
   - The project and workspace order is the daemon's (`reorder`).
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
@@ -510,7 +546,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
   (`SITE`, the version from `package.json`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
   `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the tab bar's
-  smiley: `meme`, Next). The new-workspace page's *Pull request* sends `pr` (no Base, no race with it).
+  smiley: `meme`, Next, Copy image: a PNG drawn on a canvas, the clipboard takes no other). The new-workspace page's *Pull request* sends `pr` (no Base, no race with it).
 - **`links.ts`**: `parseLink` and `wsLink` (laki:// links, above).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
   from the URL hash.
@@ -540,7 +576,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift` |
 
 ## Conventions

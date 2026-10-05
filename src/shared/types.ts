@@ -23,12 +23,16 @@ export type Template = { name: string; text: string }
 export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string> }
 
 // git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)
-export type Project = { id: string; name: string; path: string; git?: boolean; config?: ProjectConfig }
+// host: an SSH host (a ~/.ssh/config name or user@host): the folder is there, and so are git, gh and its tabs' programs
+export type Project = { id: string; name: string; path: string; git?: boolean; host?: string; config?: ProjectConfig }
+// a folder over SSH, as scp writes it: host:path (the host never an option, -…)
+export const REMOTE = /^([A-Za-z0-9_][\w.@-]*):(.+)$/
 
 export type Workspace = {
   id: string
   project: string
   path: string
+  host?: string // its project's SSH host: path is there
   branch: string
   base: string
   kind: 'worktree' | 'local'
@@ -217,4 +221,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 17
+export const API = 18

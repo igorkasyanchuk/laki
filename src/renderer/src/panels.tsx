@@ -32,6 +32,8 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
   const [m, setM] = useState<Meme | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(true)
+  const [copied, setCopied] = useState(false)
+  const img = useRef<HTMLImageElement>(null)
   const next = () => {
     setBusy(true)
     setErr('')
@@ -40,6 +42,18 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
       .finally(() => setBusy(false))
   }
   useEffect(next, [])
+  // the clipboard takes PNG only: a JPEG (or a GIF's first frame) drawn again as one
+  const copy = () => {
+    const i = img.current!
+    const c = document.createElement('canvas')
+    ;[c.width, c.height] = [i.naturalWidth, i.naturalHeight]
+    c.getContext('2d')!.drawImage(i, 0, 0)
+    const png = new Promise<Blob>((ok, no) => c.toBlob(b => (b ? ok(b) : no(new Error("couldn't copy it"))), 'image/png'))
+    navigator.clipboard.write([new ClipboardItem({ 'image/png': png })]).then(
+      () => (setCopied(true), setTimeout(() => setCopied(false), 1500)),
+      e => setErr((e as Error).message),
+    )
+  }
   // → or N: the next one
   useEffect(() => {
     const f = (e: KeyboardEvent) => {
@@ -58,7 +72,7 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
             <a className="fun-title" href={m.link} onClick={e => (e.preventDefault(), openExternal(m.link))} data-tip="Open it on Reddit">
               {m.title}
             </a>
-            <img src={m.image} alt={m.title} className={busy ? 'dim' : ''} />
+            <img ref={img} src={m.image} alt={m.title} className={busy ? 'dim' : ''} />
           </>
         )}
         {!m && busy && <div className="muted pad">Finding one…</div>}
@@ -67,8 +81,11 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
           <span className="muted small">{m?.by ? `u/${m.by} · r/memes` : 'r/memes'}</span>
           <span className="spacer" />
           <button onClick={onClose}>Back to work</button>
+          <button onClick={copy} disabled={busy || !m}>
+            <Icon name="copy" /> {copied ? 'Copied' : 'Copy image'}
+          </button>
           <button className="primary" onClick={next} disabled={busy} autoFocus data-tip="→ or N">
-            {busy ? 'Loading…' : 'Next'}
+            {busy ? 'Loading…' : 'Next'} <Icon name="arrowRight" />
           </button>
         </div>
       </div>
@@ -281,28 +298,36 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
   )
 }
 
+// a folder's path here, or host:path over SSH (a ~/.ssh/config name or user@host)
 export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (path: string) => Promise<void> }) {
   const [path, setPath] = useState('')
+  const [busy, setBusy] = useState(false)
   return (
     <Modal title="Add project" onClose={onClose}>
       <form
         className="form"
         onSubmit={e => {
           e.preventDefault()
-          onAdd(path.trim()).catch(() => {})
+          setBusy(true)
+          onAdd(path.trim())
+            .catch(() => {})
+            .finally(() => setBusy(false))
         }}
       >
         <label>
           Folder
-          <input value={path} autoFocus placeholder="/Users/you/code/app" onChange={e => setPath(e.target.value)} />
+          <input value={path} autoFocus placeholder="/Users/you/code/app or devbox:~/code/app" onChange={e => setPath(e.target.value)} />
         </label>
+        <div className="muted small">
+          Over SSH: <code>host:path</code>, a host from ~/.ssh/config or user@host. Laki signs in with your SSH keys or agent; git, gh and the agents run there.
+        </div>
         <div className="buttons">
           <span className="spacer" />
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="primary" disabled={!path.trim()}>
-            Add
+          <button type="submit" className="primary" disabled={!path.trim() || busy}>
+            {busy ? 'Connecting…' : 'Add'}
           </button>
         </div>
       </form>
@@ -469,7 +494,7 @@ export function Ready({ name, branch, actions }: { name: string; branch?: string
 }
 
 // no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target)
-export function Welcome({ onOpen, check }: { onOpen: () => void; check: () => Promise<Doctor> }) {
+export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: () => void; check: () => Promise<Doctor> }) {
   const [d, setD] = useState<Doctor | null>(null)
   useEffect(() => void check().then(setD, () => {}), [])
   const row = (ok: boolean, name: string, hint: string) => (
@@ -490,6 +515,9 @@ export function Welcome({ onOpen, check }: { onOpen: () => void; check: () => Pr
         <Icon name="folderPlus" size={22} />
         <b>Open a project folder</b>
         <span className="muted">or drop one on the window · ⌘O</span>
+      </button>
+      <button className="welcome-ssh" onClick={onSsh}>
+        <Icon name="server" /> Open a folder over SSH…
       </button>
       {d && (
         <div className="welcome-checks">

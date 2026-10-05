@@ -1,16 +1,16 @@
 // The daemon's model: projects, workspaces (git worktrees), tabs (PTY sessions), agent status from hooks,
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomUUID } from 'node:crypto'
 import { readFile, stat } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
 import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { homedir, userInfo } from 'node:os'
+import { homedir, hostname, userInfo } from 'node:os'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
@@ -21,9 +21,6 @@ const run = promisify(execFile)
 export const dir = dataDir()
 const statePath = join(dir, 'state.json')
 const runDir = join(dir, 'run')
-export const settingsPath = join(dir, 'claude-settings.json')
-const opencodeDir = join(dir, 'opencode') // OPENCODE_CONFIG_DIR for its tabs: Laki's plugin, on top of the user's config
-const geminiSettings = join(dir, 'gemini-settings.json') // GEMINI_CLI_SYSTEM_DEFAULTS_PATH for its tabs: Laki's hooks, added to the user's
 export const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
@@ -75,30 +72,44 @@ const cliPath = [join(here, 'cli.js'), join(here, '../cli/main.ts')].find(p => e
 export const cliArgv = [process.execPath, ...process.execArgv.filter(a => a.startsWith('--experimental') || a === '--no-warnings'), cliPath]
 export const cliEnv = process.versions.electron ? ['ELECTRON_RUN_AS_NODE=1'] : []
 export const q = (s: string) => `'${s.replace(/'/g, `'\\''`)}'`
+const ENV_KEY = /^[A-Za-z_][A-Za-z0-9_]*$/ // what an env var's name may be (settings, projects, a host's script)
 const hookCmd = (st: string) => [...cliEnv, ...cliArgv.map(q), 'hook', st].join(' ')
 
-// how an agent's hooks reach `laki hook`: claude's settings file, gemini's, opencode's plugin
-export function writeHooks() {
-  const h = (st: string, matcher?: string) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: hookCmd(st), timeout: 5 }] }]
+// where an agent's hook files are, and the command its hooks run (`<argv> hook <state>`): this Mac's `laki hook`, or
+// an SSH host's script (hostHooks)
+type Hooks = { dir: string; argv: string[]; cmd: (st: string) => string }
+const localHooks: Hooks = { dir, argv: ['/usr/bin/env', ...cliEnv, ...cliArgv], cmd: hookCmd }
+
+// how an agent's hooks reach `laki hook`: claude's settings file, gemini's, opencode's plugin (by their path in h.dir)
+function hookFiles(h: Hooks): Record<string, string> {
+  const c = (st: string, matcher?: string) => [{ ...(matcher ? { matcher } : {}), hooks: [{ type: 'command', command: h.cmd(st), timeout: 5 }] }]
   const settings = {
     hooks: {
-      SessionStart: h('start'),
-      UserPromptSubmit: h('running'),
-      PreToolUse: h('running', '*'),
-      PostToolUse: h('running', '*'),
+      SessionStart: c('start'),
+      UserPromptSubmit: c('running'),
+      PreToolUse: c('running', '*'),
+      PostToolUse: c('running', '*'),
       // permission prompts and questions, not the 60s idle reminder
-      Notification: h('waiting', 'permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input'),
-      Stop: h('idle'),
-      StopFailure: h('failed'),
+      Notification: c('waiting', 'permission_prompt|elicitation_dialog|elicitation_url_dialog|agent_needs_input'),
+      Stop: c('idle'),
+      StopFailure: c('failed'),
     },
   }
-  writeFileSync(settingsPath, JSON.stringify(settings, null, 2))
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
-  const g = (st: string) => [{ hooks: [{ type: 'command', command: `${hookCmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
+  const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
   const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
-  writeFileSync(geminiSettings, JSON.stringify(gemini, null, 2))
-  mkdirSync(join(opencodeDir, 'plugin'), { recursive: true })
-  writeFileSync(join(opencodeDir, 'plugin', 'laki.js'), OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(['/usr/bin/env', ...cliEnv, ...cliArgv])))
+  return {
+    'claude-settings.json': JSON.stringify(settings, null, 2),
+    'gemini-settings.json': JSON.stringify(gemini, null, 2),
+    'opencode/plugin/laki.js': OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(h.argv)),
+  }
+}
+
+export function writeHooks() {
+  for (const [f, text] of Object.entries(hookFiles(localHooks))) {
+    mkdirSync(dirname(join(dir, f)), { recursive: true })
+    writeFileSync(join(dir, f), text)
+  }
 }
 
 // opencode's events as claude's hooks: a session (not a subagent's) made, busy, asking, idle
@@ -257,7 +268,7 @@ export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focus
 
 export function findProject(ref: string): Project {
   const abs = resolve(ref)
-  const p = state.projects.find(p => p.id === ref || p.name === ref || p.path === abs)
+  const p = state.projects.find(p => p.id === ref || p.name === ref || (p.host ? `${p.host}:${p.path}` === ref : p.path === abs))
   if (!p) throw new Error(`no project ${ref}`)
   return p
 }
@@ -295,15 +306,24 @@ export function resolveTarget(ref: string): Tab {
 
 // ---------- git
 
-async function git(cwd: string, ...args: string[]): Promise<string> {
-  const { stdout } = await run('git', args, { cwd, maxBuffer: 64 << 20 })
+type At = { path: string; host?: string } // a folder on this Mac, or on an SSH host
+
+async function git(at: At, ...args: string[]): Promise<string> {
+  const { stdout } = await exec(at, 'git', args)
   return stdout.trim()
+}
+
+// a command in a folder: here, or on its SSH host (with the PATH its login shell has)
+async function exec(at: At, cmd: string, args: string[], o: { timeout?: number; maxBuffer?: number } = {}) {
+  if (!at.host) return run(cmd, args, { cwd: at.path, maxBuffer: 64 << 20, ...o })
+  const h = await hostUp(at.host)
+  return slot(at.host, () => run('ssh', [...sshOpts(at.host!), at.host!, `export PATH=${q(h.path)}; cd ${q(at.path)} && exec ${[cmd, ...args].map(q).join(' ')}`], { maxBuffer: 64 << 20, ...o }))
 }
 
 export async function branches(projectRef: string) {
   const p = findProject(projectRef)
   if (p.git === false) return { current: '', branches: [] }
-  const [current, list] = await Promise.all([git(p.path, 'rev-parse', '--abbrev-ref', 'HEAD'), git(p.path, 'branch', '--format=%(refname:short)')])
+  const [current, list] = await Promise.all([git(p, 'rev-parse', '--abbrev-ref', 'HEAD'), git(p, 'branch', '--format=%(refname:short)')])
   return { current, branches: list.split('\n').filter(Boolean) }
 }
 
@@ -325,8 +345,8 @@ async function uniqueWsId(want: string, proj?: Project) {
   const taken = async (id: string) =>
     state.workspaces.some(w => w.id === id) ||
     (!!proj &&
-      (existsSync(join(dir, 'worktrees', proj.id, id)) ||
-        (await git(proj.path, 'rev-parse', '--verify', '--quiet', `refs/heads/${branchPrefix()}${id}`).then(
+      ((await hasDir(proj, id)) ||
+        (await git(proj, 'rev-parse', '--verify', '--quiet', `refs/heads/${branchPrefix()}${id}`).then(
           () => true,
           () => false,
         ))))
@@ -334,6 +354,12 @@ async function uniqueWsId(want: string, proj?: Project) {
   while (await taken(id)) id = `${base}-${tail()}`
   return id
 }
+
+// a worktree's folder there already (one an earlier Laki left)
+const hasDir = async (proj: Project, id: string) =>
+  proj.host
+    ? exec({ host: proj.host, path: '/' }, 'test', ['-e', `${(await hostUp(proj.host)).dir}/worktrees/${proj.id}/${id}`]).then(() => true, () => false)
+    : existsSync(join(dir, 'worktrees', proj.id, id))
 
 // allocPort: 3100 + n*10, the first not taken by another live workspace
 export function allocPort() {
@@ -351,6 +377,14 @@ export function projectConfig(ws: Workspace): ProjectConfig {
   let file: ProjectConfig = {}
   for (const d of [ws.fork ? undefined : ws.path, proj?.path]) {
     if (!d) continue
+    if (ws.host) {
+      const c = hostCfg.get(`${ws.host}:${d}`) // read there (readHostCfg): views ask often
+      if (c) {
+        file = c
+        break
+      }
+      continue
+    }
     try {
       file = JSON.parse(readFileSync(join(d, '.laki.json'), 'utf8'))
       break
@@ -362,9 +396,11 @@ export function projectConfig(ws: Workspace): ProjectConfig {
 }
 
 // the .laki.json a project's root has, for the settings dialog's placeholders
-export function projectFileConfig(ref: string): ProjectConfig {
+export async function projectFileConfig(ref: string): Promise<ProjectConfig> {
+  const p = findProject(ref)
+  if (p.host) return (await readHostCfg(p), hostCfg.get(`${p.host}:${p.path}`) ?? {})
   try {
-    return JSON.parse(readFileSync(join(findProject(ref).path, '.laki.json'), 'utf8'))
+    return JSON.parse(readFileSync(join(p.path, '.laki.json'), 'utf8'))
   } catch {
     return {}
   }
@@ -386,7 +422,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   const p = findProject(ref)
   if (o.name?.trim()) p.name = o.name.trim()
   if (o.config) {
-    const env = Object.fromEntries(Object.entries(o.config.env ?? {}).filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k)))
+    const env = Object.fromEntries(Object.entries(o.config.env ?? {}).filter(([k]) => ENV_KEY.test(k)))
     p.config = {
       setup: o.config.setup?.trim() || undefined,
       teardown: o.config.teardown?.trim() || undefined,
@@ -408,15 +444,39 @@ const setupMarker = (ws: Workspace) => join(runDir, `${ws.id}.setup`)
 
 // a git repository (its top level), or any other folder (git: false)
 export async function projectAdd(path: string): Promise<Project> {
+  const remote = REMOTE.exec(path.trim())
+  if (remote && !existsSync(path)) return hostProjectAdd(remote[1], remote[2])
   const abs = resolve(path)
   if (!statSync(abs, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${path} is not a folder`)
-  const top = await git(abs, 'rev-parse', '--show-toplevel').catch(() => '')
+  const top = await git({ path: abs }, 'rev-parse', '--show-toplevel').catch(() => '')
   const root = top || realpathSync(abs)
-  const existing = state.projects.find(p => p.path === root)
+  const existing = state.projects.find(p => !p.host && p.path === root)
   if (existing) return existing
-  let id = slug(basename(root)) || 'project'
-  for (let n = 2; state.projects.some(p => p.id === id); n++) id = `${slug(basename(root))}-${n}`
-  const p: Project = { id, name: basename(root), path: root, git: !!top }
+  return projectPush({ id: '', name: basename(root), path: root, git: !!top })
+}
+
+// a folder on an SSH host (host:path; a relative path or ~ is from its home): a repository's top level, or the folder
+async function hostProjectAdd(host: string, path: string): Promise<Project> {
+  const h = await hostUp(host)
+  const want = path.startsWith('/') ? path : `${h.home}/${path.replace(/^~(\/|$)/, '')}`
+  const where = 'cd "$1" 2>/dev/null || { echo "no folder $1" >&2; exit 1; }; echo "$(git rev-parse --show-toplevel 2>/dev/null)"; pwd -P'
+  const { stdout } = await exec({ host, path: '/' }, 'sh', ['-c', where, 'sh', want], { timeout: 30000 }).catch(e => {
+    throw new Error(`${host}:${path}: ${String(e.stderr || e.message).trim().split('\n').at(-1)}`)
+  })
+  const [top, real] = stdout.split('\n')
+  const root = top || real
+  if (!root?.startsWith('/')) throw new Error(`${host}:${path} is not a folder`)
+  const existing = state.projects.find(p => p.host === host && p.path === root)
+  if (existing) return existing
+  const p = projectPush({ id: '', name: `${basename(root)} (${host})`, path: root, git: !!top, host }) // told apart from one here in every list
+  void readHostCfg(p).then(changed)
+  return p
+}
+
+function projectPush(p: Project) {
+  const base = slug(p.name) || 'project'
+  p.id = base
+  for (let n = 2; state.projects.some(x => x.id === p.id); n++) p.id = `${base}-${n}`
   state.projects.push(p)
   save()
   changed()
@@ -432,9 +492,238 @@ export function projectRm(ref: string) {
   state.projects = state.projects.filter(x => x !== p)
   state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
   state.todos = state.todos?.filter(t => t.project !== p.id) // and its board's to-dos
+  if (p.host && !state.projects.some(x => x.host === p.host)) void hosts.get(p.host)?.then(h => h.master.kill(), () => {}) // its host's last
   save()
   changed()
 }
+
+// ---------- SSH hosts: a project on another machine (host:path, as scp writes it). One ssh connection per host (a
+// ControlMaster the daemon keeps) carries git and gh; each tab has its own (ssh -tt). Nothing of Laki's runs there but a hook
+// script, which reports a turn as an escape code on the tab's own terminal (spawnTab's onHook): no way back into this
+// Mac. Sign-in is ssh's own (keys, agent, ~/.ssh/config), never a prompt (BatchMode). A workspace's $PORT here reaches
+// its $PORT there (forward).
+
+type HostRun = { dir: string; home: string; path: string; master: ChildProcess } // dir: this Mac's folder there; path: its login PATH
+const hosts = new Map<string, Promise<HostRun>>()
+// this Mac's folder on hosts (two Macs on one host keep apart): named once and kept, since macOS's hostname changes
+// with the network
+let macName: string | undefined
+function mac() {
+  if (macName) return macName
+  const f = join(dir, 'ssh', 'mac')
+  try {
+    macName = readFileSync(f, 'utf8').trim()
+  } catch {}
+  if (!macName) {
+    macName = slug(hostname().replace(/\.local$/, '')) || 'mac'
+    mkdirSync(dirname(f), { recursive: true, mode: 0o700 })
+    writeFileSync(f, macName)
+  }
+  return macName
+}
+const ctlOf = (host: string) => join(dir, 'ssh', createHash('sha1').update(host).digest('hex').slice(0, 16)) // a socket's path: short
+// ServerAlive: one that connects by itself (the master just gone) still ends when the network does
+const sshOpts = (host: string) => ['-S', ctlOf(host), '-o', 'ControlMaster=no', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4']
+// a tab's own connection: sshd takes 10 sessions per connection (MaxSessions), which tabs on the master would use up
+const TAB_SSH = ['-o', 'ControlPath=none', '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4', '-o', 'LogLevel=ERROR', '-tt'] // LogLevel: no "Connection … closed."
+
+// a host's commands through its connection, 8 at a time (MaxSessions: 10); a finished one hands its slot over
+const SLOTS = 8
+const slots = new Map<string, { n: number; queue: (() => void)[] }>()
+async function slot<T>(host: string, f: () => Promise<T>): Promise<T> {
+  let b = slots.get(host)
+  if (!b) slots.set(host, (b = { n: 0, queue: [] }))
+  if (b.n < SLOTS) b.n++
+  else await new Promise<void>(r => b!.queue.push(r))
+  try {
+    return await f()
+  } finally {
+    const next = b.queue.shift()
+    if (next) next()
+    else b.n--
+  }
+}
+
+// ssh's failure as a line you can act on
+function sshSays(host: string, err: string) {
+  const last = err.trim().split('\n').filter(l => l.trim() && !/^warning:/i.test(l)).at(-1) ?? ''
+  if (/host key verification failed|remote host identification/i.test(err)) return `ssh ${host}: its host key isn't known (or changed): ssh ${host} once in a terminal`
+  if (/permission denied/i.test(last)) return `ssh ${host}: ${last}. Laki signs in with your SSH keys or agent, never a password`
+  return `ssh ${host}: ${last || "can't connect"}`
+}
+
+// the host's connection, made once (a failure stands 10 s: the tabs that asked at once get one answer, and a host
+// that's down isn't tried at every scan)
+export function hostUp(host: string): Promise<HostRun> {
+  let p = hosts.get(host)
+  if (!p) {
+    hosts.set(host, (p = connect(host)))
+    p.catch(() => setTimeout(() => hosts.get(host) === p && hosts.delete(host), 10_000))
+  }
+  return p
+}
+
+async function connect(host: string): Promise<HostRun> {
+  const ctl = ctlOf(host)
+  mkdirSync(dirname(ctl), { recursive: true, mode: 0o700 })
+  await run('ssh', ['-S', ctl, '-O', 'exit', host], { timeout: 5000 }).catch(() => {}) // one a crashed daemon left
+  const mine = hosts.get(host) // this connection's (hostUp set it before the first await)
+  let up = false
+  const master = spawn('ssh', ['-M', '-N', '-S', ctl, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4', host], { stdio: ['ignore', 'ignore', 'pipe'] })
+  let err = ''
+  let gone = false
+  master.stderr!.on('data', d => (err = (err + d).slice(-4000)))
+  master.on('error', e => ((err += e.message), (gone = true)))
+  master.on('close', () => (gone = true))
+  master.on('exit', () => {
+    if (!up) return // connect's own failure: hostUp keeps it 10 s
+    log(`ssh ${host}: disconnected`)
+    if (hosts.get(host) === mine) hosts.delete(host) // the next use connects again
+  })
+  try {
+    for (let i = 0; !(await run('ssh', ['-S', ctl, '-O', 'check', host], { timeout: 5000 }).then(() => true, () => false)); i++) {
+      if (gone || i > 120) throw new Error(sshSays(host, err))
+      await new Promise(r => setTimeout(r, 250))
+    }
+    const sh = (cmd: string, timeout = 20000) => run('ssh', [...sshOpts(host), host, cmd], { timeout }).then(r => r.stdout)
+    const home = (await sh('printf %s "$HOME"')).trim()
+    if (!home.startsWith('/')) throw new Error(`ssh ${host}: no home folder there`)
+    // its login shell's PATH (gh and agents may be where only a profile says), as adoptLoginPath does here
+    const login = await sh(`"$SHELL" -lic 'printf "__LAKI__%s__LAKI__" "$PATH"' </dev/null 2>/dev/null`, 10000).catch(() => '')
+    const h: HostRun = { dir: `${home}/.laki-host/${mac()}`, home, path: login.match(/__LAKI__(.*)__LAKI__/)?.[1] || '/usr/local/bin:/usr/bin:/bin', master }
+    await sshIn(host, 'sh -s', hostFiles(h.dir))
+    if (master.exitCode !== null || master.signalCode !== null) throw new Error(sshSays(host, err || 'disconnected'))
+    up = true
+    for (const w of state.workspaces) if (w.host === host && !w.archived) forward(w)
+    log(`ssh ${host}: connected (${h.dir})`)
+    return h
+  } catch (e) {
+    master.kill()
+    throw e
+  }
+}
+
+export function stopHosts() {
+  for (const p of hosts.values()) void p.then(h => h.master.kill(), () => {})
+}
+
+// a command on the host with input on its stdin (a script, a file: never on a command line, which ps there shows)
+function sshIn(host: string, cmd: string, input: string | Buffer, timeout = 60000): Promise<string> {
+  return slot(
+    host,
+    () =>
+      new Promise((resolve, reject) => {
+        const p = execFile('ssh', [...sshOpts(host), host, cmd], { timeout, maxBuffer: 16 << 20 }, (e, out, err) => (e ? reject(new Error(sshSays(host, String(err || e.message)))) : resolve(String(out))))
+        p.stdin!.on('error', () => {}) // ssh gone early: its exit says why
+        p.stdin!.end(input)
+      }),
+  )
+}
+
+// the hook on a host: a turn's state as OSC 7717 on its tab's terminal (LAKI_TTY, LAKI_HOOK: hostTab's), which the
+// daemon reads off the stream; as `laki hook`, the payload is an argument (codex, opencode) or stdin (claude, gemini)
+const HOST_HOOK = `#!/bin/sh
+# Laki's hook (Laki on your Mac writes it): an agent's turn, as an escape code on its tab's terminal, where Laki reads it
+[ "$1" = hook ] && shift
+[ -n "$LAKI_TTY" ] && [ -n "$LAKI_HOOK" ] || exit 0
+# running needs no payload (PreToolUse's holds whole files: too much for a terminal); else stdin read for 1 s at most,
+# so a hook never holds the agent up
+if [ "$1" = running ]; then p={}; elif [ -n "$2" ]; then p=$2; elif [ ! -t 0 ]; then exec 3<&0; p=$(cat <&3 & c=$!; (sleep 1; kill $c) >/dev/null 2>&1 & wait $c); fi
+[ -n "$p" ] || p={}
+printf '\\033]7717;%s;%s;%s\\007' "$LAKI_HOOK" "$1" "$(printf %s "$p" | base64 | tr -d '\\n')" >"$LAKI_TTY" 2>/dev/null
+exit 0
+`
+const hostHooks = (d: string): Hooks => ({ dir: d, argv: [`${d}/hook`], cmd: st => `${q(`${d}/hook`)} ${st}` })
+
+// a script that puts the hook and the agents' files that run it in d (heredocs: the files' text never on a command line)
+function hostFiles(d: string) {
+  const files = { hook: HOST_HOOK, ...hookFiles(hostHooks(d)) }
+  const put = Object.entries(files).flatMap(([f, text]) => [`mkdir -p ${q(dirname(`${d}/${f}`))}`, `cat > ${q(`${d}/${f}`)} <<'LAKI_EOF'`, text.replace(/\n$/, ''), 'LAKI_EOF'])
+  // tab scripts no tab ran (closed first): they hold env values
+  return ['set -e', 'umask 077', ...put, `chmod 700 ${q(`${d}/hook`)}`, `rm -f ${q(`${d}/run`)}/*.sh`, ''].join('\n')
+}
+
+// a script for the host's sh: the workspace's folder, Laki's env (exported: its values stay off command lines), then cmd
+const hostScript = (ws: Workspace, env: Record<string, string>, cmd: string, pre: string[] = []) =>
+  [...pre, `cd ${q(ws.path)} || exit 1`, ...Object.entries(env).filter(([k]) => ENV_KEY.test(k)).map(([k, v]) => `export ${k}=${q(v)}`), cmd, ''].join('\n')
+
+// a tab on an SSH host: what its PTY runs here. Meanwhile the host's connection comes up and the tab's script goes
+// there (its folder, env and command); the PTY waits for that (<run>/<key>.go), then runs it with ssh -tt on a
+// connection of its own (TAB_SSH), or prints why it can't (<key>.err)
+function hostTab(ws: Workspace, tab: Tab, o: SpawnOpts, hookKey: string) {
+  const key = `${tab.id}-${randomUUID().slice(0, 6)}`
+  const f = join(runDir, key)
+  void (async () => {
+    const h = await hostUp(ws.host!)
+    await readHostCfgs(ws, false) // after a daemon restart: its env and setup
+    const prompt = await toHost(ws.host!, h, o.prompt)
+    const cmd = tab.kind === 'shell' ? undefined : (o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, prompt, !!o.resume, hostHooks(h.dir)) : tab.cmd || 'true'))
+    const env = { ...lakiEnv(ws, tab, o.env, h.dir), LAKI_HOOK: hookKey }
+    const script = hostScript(ws, env, cmd === undefined ? 'exec "$SHELL" -l' : `exec "$SHELL" -lic ${q(cmd)}`, ['rm -f "$0"', 'LAKI_TTY=$(tty) && export LAKI_TTY'])
+    await sshIn(ws.host!, `umask 077 && mkdir -p ${q(`${h.dir}/run`)} && cat > ${q(`${h.dir}/run/${key}.sh`)}`, script)
+    await spaced(ws.host!)
+    writeFileSync(`${f}.go`, '')
+  })().catch(e => writeFileSync(`${f}.err`, `\x1b[31m${(e as Error).message}\x1b[0m\r\n`))
+  return [
+    `f=${q(f)}`,
+    'while [ ! -e "$f.go" ]; do [ -e "$f.err" ] && { cat "$f.err"; rm -f "$f.err"; exit 255; }; sleep 0.1; done',
+    'rm -f "$f.go"',
+    `exec ssh ${[...TAB_SSH, ws.host!, `exec sh "$HOME/.laki-host/${mac()}/run/${key}.sh"`].map(q).join(' ')}`,
+  ].join('\n')
+}
+
+// tabs' own connections start 300 ms apart per host: sshd drops handshakes past 10 at once (MaxStartups), as a daemon
+// restart with many tabs would make. ponytail: a fixed pace, not a count of handshakes under way
+const opened = new Map<string, Promise<void>>()
+function spaced(host: string) {
+  const turn = opened.get(host) ?? Promise.resolve()
+  opened.set(host, turn.then(() => new Promise(r => setTimeout(r, 300))))
+  return turn
+}
+
+// pasted images and the preview's screenshots are files on this Mac: a host's agent gets copies there, by their paths
+async function toHost(host: string, h: HostRun, text?: string) {
+  const images = `${join(dir, 'images')}/`.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  for (const p of new Set(text?.match(new RegExp(`${images}[\\w-]+\\.[A-Za-z]+`, 'g')) ?? [])) {
+    const there = `${h.dir}/images/${basename(p)}`
+    try {
+      await sshIn(host, `umask 077 && mkdir -p ${q(`${h.dir}/images`)} && cat > ${q(there)}`, readFileSync(p))
+      text = text!.split(p).join(there)
+    } catch (e) {
+      log(`ssh ${host}: ${p}: ${(e as Error).message}`)
+    }
+  }
+  return text
+}
+
+// a host's workspace's $PORT here reaches its $PORT there, through the connection: its preview, Open in browser,
+// Expose to the world and the agent browser work as they do here. ponytail: $PORT only, not ports a dev server picks
+// itself (the status bar lists none of a host's)
+function forward(ws: Workspace, on = true) {
+  if (!ws.host || !ws.port || !hosts.has(ws.host)) return
+  const L = `${ws.port}:localhost:${ws.port}`
+  run('ssh', ['-S', ctlOf(ws.host), '-O', on ? 'forward' : 'cancel', '-L', L, ws.host], { timeout: 10000 }).catch(e => log(`ssh ${ws.host}: ${on ? 'forward' : 'cancel'} -L ${L}: ${String(e.stderr || e.message).trim()}`))
+}
+
+// .laki.json of folders on SSH hosts, read there when a project or workspace comes, a tab starts (once) and at each PR
+// scan: projectConfig runs in every view. null: none there (or not JSON)
+const hostCfg = new Map<string, ProjectConfig | null>() // by host:path
+async function readHostCfg(at: At) {
+  const text = await exec(at, 'sh', ['-c', 'cat .laki.json 2>/dev/null; true'], { timeout: 20000 }).then(r => r.stdout, () => undefined)
+  if (text === undefined) return // the host unreachable: what was read last stays
+  try {
+    hostCfg.set(`${at.host}:${at.path}`, text.trim() ? JSON.parse(text) : null)
+  } catch {
+    hostCfg.set(`${at.host}:${at.path}`, null)
+  }
+}
+// a host workspace's: its folder's and its project's (fresh: again, else only those not read yet)
+const readHostCfgs = (ws: Workspace, fresh = true) =>
+  Promise.all(
+    [...new Set([ws.path, state.projects.find(p => p.id === ws.project)?.path ?? ws.path])]
+      .filter(path => fresh || !hostCfg.has(`${ws.host}:${path}`))
+      .map(path => readHostCfg({ host: ws.host, path })),
+  )
 
 // ---------- tabs
 
@@ -444,8 +733,13 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
     if (v === undefined || k.startsWith('ELECTRON_') || k.startsWith('LAKI_') || k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_')) continue
     env[k] = v
   }
+  return { ...env, ...lakiEnv(ws, tab, extra) }
+}
+
+// what Laki adds to a tab's environment: over this Mac's (childEnv), or all of it on an SSH host (hostScript); hooks:
+// where its agents' hook files are
+function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, hooks = dir): Record<string, string> {
   return {
-    ...env,
     ...state.settings?.env, // Settings → General: every session's
     ...projectConfig(ws).env,
     ...presetOf(tab)?.env,
@@ -455,28 +749,28 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
     LAKI_WORKSPACE: ws.id,
     LAKI_TAB: tab.id,
     PORT: String(ws.port),
-    LAKI_HOME: dir,
+    ...(!ws.host && { LAKI_HOME: dir }), // the laki CLI's: there's none on a host
     LAKI_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
     // ponytail: these replace one the user set
-    ...(tab.preset === 'opencode' && { OPENCODE_CONFIG_DIR: opencodeDir }),
-    ...(tab.preset === 'gemini' && { GEMINI_CLI_SYSTEM_DEFAULTS_PATH: geminiSettings }), // the lowest layer; hooks add up
+    ...(tab.preset === 'opencode' && { OPENCODE_CONFIG_DIR: join(hooks, 'opencode') }), // Laki's plugin, on top of the user's config
+    ...(tab.preset === 'gemini' && { GEMINI_CLI_SYSTEM_DEFAULTS_PATH: join(hooks, 'gemini-settings.json') }), // the lowest layer; hooks add up
     ...extra,
   }
 }
 
-function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean): string {
+function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = localHooks): string {
   const pr = presetOf(tab)
   const again = resume && tab.resumeId // its chat, again
   let argv: string[]
   let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
   if (tab.preset === 'claude') {
-    argv = ['claude', '--settings', settingsPath]
+    argv = ['claude', '--settings', join(h.dir, 'claude-settings.json')]
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
   } else if (tab.preset === 'codex') {
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
-    argv.push('-c', 'notify=' + JSON.stringify(['/usr/bin/env', ...cliEnv, ...cliArgv, 'hook', 'done']))
+    argv.push('-c', 'notify=' + JSON.stringify([...h.argv, 'hook', 'done']))
   } else if (tab.preset === 'gemini') {
     argv = again ? ['gemini', '--resume', again] : ['gemini']
     if (ask.length) ask = ['-i', ...ask] // a bare prompt would answer it and exit
@@ -501,20 +795,31 @@ type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record
 
 export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const ws = findWs(tab.workspace)
-  if (!existsSync(ws.path)) throw new Error(`${ws.path} is gone`)
+  if (!ws.host && !existsSync(ws.path)) throw new Error(`${ws.path} is gone`)
+  const marker = setupMarker(ws)
+  const wait = tab.kind === 'agent' && existsSync(marker) ? `printf '\\033[2mwaiting for the setup script (see the setup tab)…\\033[0m\\r\\n'; while [ -e ${q(marker)} ]; do sleep 0.3; done; ` : ''
+  let file = shell
   let args: string[]
-  if (tab.kind === 'shell') args = ['-l']
-  else {
-    let cmd = o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, o.prompt, !!o.resume) : tab.cmd || 'true')
-    const marker = setupMarker(ws)
-    if (tab.kind === 'agent' && existsSync(marker))
-      cmd = `printf '\\033[2mwaiting for the setup script (see the setup tab)…\\033[0m\\r\\n'; while [ -e ${q(marker)} ]; do sleep 0.3; done; ${cmd}`
-    args = ['-lic', cmd]
-  }
+  const hookKey = ws.host ? randomBytes(12).toString('hex') : undefined // what its hooks' escape codes carry (hostTab)
+  if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey!)]]
+  else if (tab.kind === 'shell') args = ['-l']
+  else args = ['-lic', wait + (o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, o.prompt, !!o.resume) : tab.cmd || 'true'))]
   sessions.get(tab.id)?.kill()
-  const s = new Session(tab.id, shell, args, { cwd: ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
   sessions.set(tab.id, s)
   const r = rtOf(tab.id)
+  // a hook on the host: OSC 7717 ; key ; state ; base64 JSON. Only with this start's key: a file shown in the tab
+  // can't make one up
+  if (hookKey)
+    s.onHook = d => {
+      const [key, st, b64 = ''] = d.split(';')
+      if (key !== hookKey || !st) return
+      let payload = {}
+      try {
+        payload = JSON.parse(Buffer.from(b64, 'base64').toString('utf8') || '{}')
+      } catch {}
+      hook({ tab: tab.id, state: st, payload })
+    }
   // a waiting tab's ask is read off its screen: what it prints (the menu drawn late, moved, answered from the keyboard)
   // is read again 300 ms later, and a view goes out only when the ask isn't the one the last view gave
   let asking: ReturnType<typeof setTimeout> | undefined
@@ -530,10 +835,11 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   r.done = false
   s.onExit = code => {
     if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true })
-    // `exit` closes a shell's tab, a clean exit an agent's; one we ended (close, restart, archive, shutdown) is no longer in sessions
-    if ((tab.kind === 'shell' || (tab.kind === 'agent' && code === 0)) && sessions.get(tab.id) === s && state.tabs.includes(tab)) return closeTab(tab.id)
+    // `exit` closes a shell's tab, a clean exit an agent's; one we ended (close, restart, archive, shutdown) is no longer in
+    // sessions. A host's shell that lost its connection (ssh's 255) stays: Enter starts it again
+    if (((tab.kind === 'shell' && (!ws.host || code !== 255)) || (tab.kind === 'agent' && code === 0)) && sessions.get(tab.id) === s && state.tabs.includes(tab)) return closeTab(tab.id)
     changed()
-    if (tab.kind !== 'agent' && tab.kind !== 'dev') return
+    if (tab.kind !== 'agent' && tab.kind !== 'dev' && !(ws.host && tab.kind === 'shell')) return
     s.term.write('', () => {
       // a chat id claude/codex don't have (e.g. one with no message was never saved): Enter starts a new one
       if (tab.resumeId && code !== 0 && CHAT_GONE.test(s.screenText(8))) {
@@ -685,7 +991,7 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 }
 
 export function settingsSet(o: Settings) {
-  if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => /^[A-Za-z_][A-Za-z0-9_]*$/.test(k))) }
+  if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
   state.settings = { ...state.settings, ...o }
   save()
   changed()
@@ -742,6 +1048,13 @@ export async function openIn(o: { ws?: string; project?: string; app: string; fi
   const fail = (e: any) => {
     throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
   }
+  const host = o.ws ? findWs(o.ws).host : findProject(o.project ?? '').host
+  if (host) {
+    // a folder or file on an SSH host: the editors with Remote - SSH open it there
+    const scheme = ({ vscode: 'vscode', cursor: 'cursor', windsurf: 'windsurf' } as Record<string, string>)[app]
+    if (!scheme) throw new Error(`${APPS[app] ?? BROWSERS[app] ?? 'That app'} can't open a folder on ${host}: Cursor, VS Code or Windsurf can (Remote - SSH)`)
+    return void (await run('open', [`${scheme}://vscode-remote/ssh-remote+${host}${path.split('/').map(encodeURIComponent).join('/')}`]).catch(fail))
+  }
   if (app === 'custom') {
     if (!s.editorCmd?.trim()) throw new Error('set the editor command in Settings (⌘,)')
     return void (await run(shell, ['-lc', `${s.editorCmd} "$1"`, 'editor', path], { timeout: 20000 }).catch(fail))
@@ -771,6 +1084,7 @@ export type NewWs = { project: string; base?: string; preset?: string; cmd?: str
 function ghSays(e: any, what: string) {
   const err = String(e.stderr || e.message)
   if (e.code === 'ENOENT') return "gh isn't installed: brew install gh, then gh auth login"
+  if (/exec: gh: not found|gh: command not found|command not found: gh/.test(err)) return "gh isn't installed on the SSH host: install it there, then gh auth login" // exec's
   if (/gh auth login|not logged in|authenticat/i.test(err)) return "gh isn't signed in: run gh auth login"
   if (/could not resolve to a pull ?request|no pull requests found|not found/i.test(err)) return `${what} not found`
   return `gh: ${err.trim().split('\n')[0]}`
@@ -779,7 +1093,7 @@ function ghSays(e: any, what: string) {
 // --pr: a GitHub PR (its URL, or its number in the project's repo), through your gh
 type PRHead = { number: number; title: string; url: string; headRefName: string; baseRefName: string; isCrossRepository: boolean; headRepositoryOwner?: { login: string } }
 async function prHead(proj: Project, ref: string): Promise<PRHead> {
-  const { stdout } = await run('gh', ['pr', 'view', '--json', 'number,title,url,headRefName,baseRefName,isCrossRepository,headRepositoryOwner', '--', ref], { cwd: proj.path, timeout: 20000 }).catch(e => {
+  const { stdout } = await exec(proj, 'gh', ['pr', 'view', '--json', 'number,title,url,headRefName,baseRefName,isCrossRepository,headRepositoryOwner', '--', ref], { timeout: 20000 }).catch(e => {
     throw new Error(ghSays(e, `PR ${ref}`))
   })
   return JSON.parse(stdout)
@@ -789,7 +1103,7 @@ async function prHead(proj: Project, ref: string): Promise<PRHead> {
 // title, body and link ahead of the prompt
 async function fromIssue(proj: Project, o: NewWs): Promise<NewWs> {
   if (!o.issue?.trim() || o.issued) return o
-  const { stdout } = await run('gh', ['issue', 'view', '--json', 'number,title,body,url', '--', o.issue.trim()], { cwd: proj.path, timeout: 20000 }).catch(e => {
+  const { stdout } = await exec(proj, 'gh', ['issue', 'view', '--json', 'number,title,body,url', '--', o.issue.trim()], { timeout: 20000 }).catch(e => {
     throw new Error(`gh issue view ${o.issue}: ${String(e.stderr || e.message).trim().split('\n')[0]}`)
   })
   const i = JSON.parse(stdout) as { number: number; title: string; body?: string; url: string }
@@ -828,7 +1142,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // before the worktree: a wrong one makes nothing
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
-  const current = proj.git === false ? '' : await git(proj.path, 'rev-parse', '--abbrev-ref', 'HEAD')
+  const current = proj.git === false ? '' : await git(proj, 'rev-parse', '--abbrev-ref', 'HEAD')
   // a PR: the worktree on its head branch, named after it, its base the PR's, linked to it (by URL) for the PR status
   if (o.pr?.trim() && (o.local || proj.git === false)) throw new Error('a PR needs a worktree: a git project, not Local')
   const pr = o.pr?.trim() ? await prHead(proj, o.pr.trim()) : undefined
@@ -845,38 +1159,41 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
     const have = state.workspaces.find(w => w.project === proj.id && w.kind === 'local' && !w.schedule) // the folder's own, not a scheduled run's session
     if (have && !o.another) return have
     const id = await uniqueWsId(o.another ? slug(o.name || '') || proj.id : proj.id)
-    ws = { id, project: proj.id, path: proj.path, branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
+    ws = { id, project: proj.id, path: proj.path, ...(proj.host && { host: proj.host }), branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
   } else {
     const want = slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' '))
     const id = await uniqueWsId(want, proj)
-    const path = join(dir, 'worktrees', proj.id, id)
+    const path = proj.host ? `${(await hostUp(proj.host)).dir}/worktrees/${proj.id}/${id}` : join(dir, 'worktrees', proj.id, id)
+    const at: At = { path, host: proj.host }
     let base = o.base || current
     let branch = `${branchPrefix()}${id}`
-    mkdirSync(dirname(path), { recursive: true })
+    if (!proj.host) mkdirSync(dirname(path), { recursive: true }) // git makes a host's
     const add = pr ? ['--detach', path] : [path, '-b', branch, base]
-    await git(proj.path, 'worktree', 'add', ...add).catch(e => {
+    await git(proj, 'worktree', 'add', ...add).catch(e => {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
     })
     if (pr) {
       // gh pr checkout makes the branch (from a fork too, with its remote) where the worktree is; by URL: a number
       // would be gh's default repo's
-      await run('gh', ['pr', 'checkout', pr.url, '--branch', local!], { cwd: path, timeout: 120000 }).catch(async e => {
-        await git(proj.path, 'worktree', 'remove', '--force', path).catch(() => {})
+      await exec(at, 'gh', ['pr', 'checkout', pr.url, '--branch', local!], { timeout: 120000 }).catch(async e => {
+        await git(proj, 'worktree', 'remove', '--force', path).catch(() => {})
         throw new Error(`gh pr checkout ${pr.number}: ${ghSays(e, `PR ${pr.number}`)}`)
       })
-      branch = headOf(path) ?? local! // as syncBranches reads it (rev-parse may say heads/<b> beside a remote's <b>)
+      branch = (proj.host ? await git(at, 'symbolic-ref', '--short', '-q', 'HEAD').catch(() => '') : headOf(path)) || local! // as syncBranches reads it (rev-parse may say heads/<b> beside a remote's <b>)
       base = pr.baseRefName
       // a base you have no branch of (a release branch): origin's, for the diff
-      const has = (ref: string) => git(path, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
+      const has = (ref: string) => git(at, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
       if (!(await has(`refs/heads/${base}`)) && (await has(`refs/remotes/origin/${base}`))) base = `origin/${base}`
     }
-    ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }) }
-    await copyIncludes(proj, ws) // before setup and the agent: they may read .env
+    ws = { id, project: proj.id, path, ...(proj.host && { host: proj.host }), branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }) }
+    if (!proj.host) await copyIncludes(proj, ws) // before setup and the agent: they may read .env. ponytail: not on a host (setup can copy them from $LAKI_PROJECT_PATH)
   }
+  if (proj.host) await readHostCfgs(ws) // its setup, env and ports
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
   state.workspaces.push(ws)
   save()
+  forward(ws)
   const cfg = projectConfig(ws)
   if (cfg.setup && ws.kind === 'worktree') {
     writeFileSync(setupMarker(ws), String(Date.now()))
@@ -905,7 +1222,7 @@ async function copyIncludes(proj: Project, ws: Workspace) {
   try {
     const root = realpathSync(proj.path)
     const to = realpathSync(ws.path)
-    const out = await git(proj.path, 'ls-files', '-z', '--others', '--ignored', ...pats)
+    const out = await git(proj, 'ls-files', '-z', '--others', '--ignored', ...pats)
     for (const rel of out.split('\0').filter(Boolean)) {
       const dst = join(ws.path, rel)
       try {
@@ -935,26 +1252,34 @@ async function copyIncludes(proj: Project, ws: Workspace) {
 
 async function teardown(ws: Workspace) {
   stopTunnels(ws.id)
+  forward(ws, false)
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
     sessions.delete(t.id)
   }
   const cfg = projectConfig(ws)
+  const none: Tab = { id: '', workspace: ws.id, name: '', kind: 'shell' }
   // a worktree's, as setup is: a local workspace is the project's own folder, which other sessions (and you) still use
-  if (cfg.teardown && ws.kind === 'worktree' && existsSync(ws.path))
-    await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, { id: '', workspace: ws.id, name: '', kind: 'shell' }), timeout: 60000 }).catch(() => {})
+  if (cfg.teardown && ws.kind === 'worktree' && ws.host)
+    await hostUp(ws.host)
+      .then(h => sshIn(ws.host!, 'sh -s', hostScript(ws, lakiEnv(ws, none, {}, h.dir), `exec "$SHELL" -lc ${q(cfg.teardown!)}`)))
+      .catch(() => {})
+  else if (cfg.teardown && ws.kind === 'worktree' && existsSync(ws.path))
+    await run(shell, ['-lc', cfg.teardown], { cwd: ws.path, env: childEnv(ws, none), timeout: 60000 }).catch(() => {})
   if (ws.kind === 'worktree') {
     const proj = state.projects.find(p => p.id === ws.project)
-    if (proj) await git(proj.path, 'worktree', 'remove', '--force', ws.path).catch(() => {})
-    rmSync(ws.path, { recursive: true, force: true })
+    if (proj) await git(proj, 'worktree', 'remove', '--force', ws.path).catch(() => {})
+    if (!ws.host) rmSync(ws.path, { recursive: true, force: true })
+    else if (ws.path.includes(`/.laki-host/${mac()}/worktrees/`)) await exec({ host: ws.host, path: '/' }, 'rm', ['-rf', '--', ws.path]).catch(() => {}) // only one Laki made
     // after the dir is gone: drops the registration a failed remove left, which would block re-adding the branch
-    if (proj) await git(proj.path, 'worktree', 'prune').catch(() => {})
+    if (proj) await git(proj, 'worktree', 'prune').catch(() => {})
   }
   rmSync(setupMarker(ws), { force: true })
 }
 
 function dropWs(ws: Workspace) {
   stopTunnels(ws.id)
+  forward(ws, false)
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
     sessions.delete(t.id)
@@ -980,8 +1305,9 @@ export async function wsRm(ref: string) {
 export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('only worktree workspaces can be archived')
-  if (o.ifClean && existsSync(ws.path)) {
-    const dirty = (await git(ws.path, '--no-optional-locks', 'status', '--porcelain')).split('\n').filter(Boolean).length
+  if (ws.host) await hostUp(ws.host) // else teardown leaves the worktree there, and Restore fails on it
+  if (o.ifClean && (ws.host || existsSync(ws.path))) {
+    const dirty = (await git(ws, '--no-optional-locks', 'status', '--porcelain')).split('\n').filter(Boolean).length
     if (dirty) return { dirty }
   }
   await teardown(ws)
@@ -997,13 +1323,15 @@ export async function wsRestore(ref: string) {
   const ws = findWs(ref)
   if (!ws.archived) return ws
   const proj = findProject(ws.project)
-  await git(proj.path, 'worktree', 'add', ws.path, ws.branch).catch(e => {
+  await git(proj, 'worktree', 'add', ws.path, ws.branch).catch(e => {
     throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
   })
-  await copyIncludes(proj, ws) // archiving took them with the worktree
+  if (ws.host) await readHostCfgs(ws)
+  else await copyIncludes(proj, ws) // archiving took them with the worktree
   ws.archived = false
   ws.port = allocPort()
   save()
+  forward(ws)
   for (const t of tabsOf(ws.id)) spawnTab(t, { resume: true })
   changed()
   return ws
@@ -1037,7 +1365,7 @@ export async function wsFork(ref: string) {
 
 // restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat.
 export function restoreAll() {
-  for (const f of readdirSync(runDir)) if (f.endsWith('.setup')) rmSync(join(runDir, f), { force: true })
+  for (const f of readdirSync(runDir)) if (/\.(setup|go|err)$/.test(f)) rmSync(join(runDir, f), { force: true }) // hostTab's too
   state.tabs = state.tabs.filter(t => t.kind === 'agent' || t.kind === 'shell')
   for (const ws of state.workspaces) {
     if (ws.archived) continue
@@ -1118,21 +1446,27 @@ function turn(p: { tab: string; state: string; payload?: any }) {
 // typeInto pastes text and presses Enter (enter: false leaves it in the prompt). One message at a time per tab: a
 // queued delivery and a send at the same moment must not interleave their text and Enters.
 const typing = new WeakMap<Session, Promise<void>>()
-export function typeInto(s: Session, text: string, enter = true) {
-  const next = (typing.get(s) ?? Promise.resolve()).then(
-    () =>
-      new Promise<void>(done => {
-        const t = text.replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '') // no escapes: a \x1b[201~ in it would end the paste and type the rest as keys
-        s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${t}\x1b[201~` : enter ? t : t.replace(/[\r\n]+/g, ' '))
-        if (!enter) return done()
-        setTimeout(() => {
-          s.write('\r') // as a separate key, so it isn't part of the paste
-          setTimeout(done, 50)
-        }, 150)
-      }),
-  )
+export function typeInto(s: Session, text: string | Promise<string>, enter = true) {
+  const next = (typing.get(s) ?? Promise.resolve()).then(async () => {
+    const t = (await text).replace(/\x1b(\[[0-?]*[ -/]*[@-~])?/g, '') // no escapes: a \x1b[201~ in it would end the paste and type the rest as keys
+    await new Promise<void>(done => {
+      s.write(s.term.modes.bracketedPasteMode ? `\x1b[200~${t}\x1b[201~` : enter ? t : t.replace(/[\r\n]+/g, ' '))
+      if (!enter) return done()
+      setTimeout(() => {
+        s.write('\r') // as a separate key, so it isn't part of the paste
+        setTimeout(done, 50)
+      }, 150)
+    })
+  })
   typing.set(s, next)
   return next
+}
+
+// what's typed into a tab: on an SSH host, with the images it names copied there (toHost); never fails
+function textFor(tab: Tab, text: string): string | Promise<string> {
+  const host = state.workspaces.find(w => w.id === tab.workspace)?.host
+  if (!host || !text.includes(join(dir, 'images'))) return text
+  return hostUp(host).then(h => toHost(host, h, text).then(t => t ?? text), () => text)
 }
 
 // enter: false types it into the prompt for the user to finish (the preview's picked element): no turn starts
@@ -1143,7 +1477,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
   const r = rtOf(tab.id)
   if (p.enter === false) {
     if (r.status === 'waiting') throw new Error(`${tab.name} is asking you something: answer it first`) // the text would be keys to its question
-    return typeInto(s, p.text, false), { tab: tab.id, sent: true }
+    return typeInto(s, textFor(tab, p.text), false), { tab: tab.id, sent: true }
   }
   if (p.whenIdle) {
     if (!tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
@@ -1154,7 +1488,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
       return { tab: tab.id, queued: tab.queue.length }
     }
   }
-  typeInto(s, p.text)
+  typeInto(s, textFor(tab, p.text))
   if (tracked(tab)) r.status = 'running'
   changed()
   return { tab: tab.id, sent: true }
@@ -1168,7 +1502,7 @@ function deliver(id: string) {
   const msg = tab.queue.shift()!
   if (!tab.queue.length) delete tab.queue
   save()
-  typeInto(s, msg)
+  typeInto(s, textFor(tab, msg))
   r.status = 'running'
   changed()
 }
@@ -1186,8 +1520,8 @@ export function input(id: string, data: string, c?: Client) {
   if (!s) return
   if (c) s.follow(c)
   const tab = state.tabs.find(t => t.id === id)
-  if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev') && data.includes('\r')) {
-    spawnTab(tab, { resume: true }) // Enter on an ended agent or dev server starts it again
+  if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev' || (tab.kind === 'shell' && state.workspaces.find(w => w.id === tab.workspace)?.host)) && data.includes('\r')) {
+    spawnTab(tab, { resume: true }) // Enter on an ended agent or dev server (or a host's shell) starts it again
     return
   }
   s.write(data)
@@ -1267,15 +1601,28 @@ function headOf(path: string): string | undefined {
 function syncBranches() {
   let moved = false
   for (const w of state.workspaces) {
-    if (w.archived || state.projects.find(p => p.id === w.project)?.git === false) continue
+    if (w.archived || w.host || state.projects.find(p => p.id === w.project)?.git === false) continue // a host's: hostSync
     const b = headOf(w.path)
     if (!b || b === w.branch) continue
-    w.branch = b
-    w.prUrl = undefined // nor the PR it started from
-    prs.delete(w.id) // the old branch's PR isn't this one's
+    moveBranch(w, b)
     moved = true
   }
   if (moved) save(), changed(), void scanPRs() // its PR now, not in a minute
+}
+function moveBranch(w: Workspace, b: string) {
+  w.branch = b
+  w.prUrl = undefined // nor the PR it started from
+  prs.delete(w.id) // the old branch's PR isn't this one's
+}
+
+// a host's worktree at each PR scan: its branch (git there; syncBranches reads a HEAD file here) and its .laki.json.
+// ponytail: a minute behind, not 5 s; a host's local workspace never moves
+async function hostSync(ws: Workspace) {
+  const [b] = await Promise.all([git(ws, 'symbolic-ref', '--short', '-q', 'HEAD').catch(() => ''), readHostCfg(ws)])
+  if (!b || b === ws.branch) return
+  moveBranch(ws, b)
+  save()
+  changed()
 }
 
 // a turn's end may have opened a PR (gh pr create): a scan soon, at most every 20 s
@@ -1578,7 +1925,7 @@ export function scanPRs(): Promise<void> {
     return prScan
   }
   // workspaces in parallel: each gh call may take seconds
-  const live = state.workspaces.filter(ws => !ws.archived && ws.kind === 'worktree' && existsSync(ws.path))
+  const live = state.workspaces.filter(ws => !ws.archived && ws.kind === 'worktree' && (ws.host || existsSync(ws.path)))
   prScan = Promise.all(live.map(scanPR)).then(() => {
     prScan = null
     if (prAgain) {
@@ -1592,9 +1939,10 @@ export function scanPRs(): Promise<void> {
 const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,mergeable,additions,deletions,body,updatedAt,statusCheckRollup'
 
 async function scanPR(ws: Workspace) {
+  if (ws.host) await hostSync(ws)
   let pr: PR
   try {
-    const { stdout } = await run('gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { cwd: ws.path, timeout: 20000 })
+    const { stdout } = await exec(ws, 'gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { timeout: 20000 })
     const j = JSON.parse(stdout)
     const list: Check[] = (j.statusCheckRollup ?? []).map(checkOf)
     pr = {
@@ -1633,7 +1981,7 @@ async function scanPR(ws: Workspace) {
 async function archiveMerged(ws: Workspace, pr: PR) {
   if (!state.settings?.archiveMerged || ws.kind !== 'worktree' || ws.archived || ws.autoArchived === pr.number || !pr.head) return
   if (tabsOf(ws.id).some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return
-  if ((await git(ws.path, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return // unpushed (or git can't tell)
+  if ((await git(ws, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return // unpushed (or git can't tell)
   ws.autoArchived = pr.number // before: wsArchive saves it
   const r = await wsArchive(ws.id, { ifClean: true }).catch(e => {
     ws.autoArchived = undefined // failed: the next scan tries again
@@ -1682,7 +2030,7 @@ async function autoPR(ws: Workspace, pr: PR) {
     }
   }
   if (ws.autoReview) {
-    const t = await reviewThreads(ws.path, pr.number).catch(() => null)
+    const t = await reviewThreads(ws, pr.number).catch(() => null)
     const ids = new Set(f.mine)
     const mine = (c: Comment) => !!c.id && (ids.has(c.id) || (!!c.createdAt && agentSaid(ws.id, c.createdAt) && !!ids.add(c.id)))
     const k = t && reviewKey(t.threads, t.me, mine)
@@ -1756,13 +2104,13 @@ export async function prFix(o: { ws: string; what: FixWhat }) {
     return tellAgent(ws, prPrompt('conflict', pr))
   }
   if (o.what === 'review') {
-    const { threads } = await reviewThreads(ws.path, pr.number)
+    const { threads } = await reviewThreads(ws, pr.number)
     const msg = reviewMessage(pr, threads)
     if (!msg) throw new Error(`no open review comments on PR #${pr.number}`)
     return tellAgent(ws, msg)
   }
   // gh exits non-zero while checks fail
-  const { stdout } = await run('gh', ['pr', 'checks', String(pr.number), '--json', 'name,bucket,link'], { cwd: ws.path, timeout: 20000 }).catch(e => ({ stdout: String(e.stdout ?? '') }))
+  const { stdout } = await exec(ws, 'gh', ['pr', 'checks', String(pr.number), '--json', 'name,bucket,link'], { timeout: 20000 }).catch(e => ({ stdout: String(e.stdout ?? '') }))
   const failing = (JSON.parse(stdout.trim() || '[]') as { name: string; bucket: string; link: string }[]).filter(c => c.bucket === 'fail')
   if (!failing.length) throw new Error(`no failing checks on PR #${pr.number}`)
   let body = ''
@@ -1771,7 +2119,7 @@ export async function prFix(o: { ws: string; what: FixWhat }) {
     body += `\n## ${c.name}\n${c.link}\n`
     const job = c.link?.match(/\/actions\/runs\/\d+\/job\/(\d+)/)?.[1]
     if (job && logs < 3) {
-      const out = await run('gh', ['run', 'view', '--job', job, '--log-failed'], { cwd: ws.path, timeout: 30000, maxBuffer: 32 << 20 }).then(r => r.stdout, () => '')
+      const out = await exec(ws, 'gh', ['run', 'view', '--job', job, '--log-failed'], { timeout: 30000, maxBuffer: 32 << 20 }).then(r => r.stdout, () => '')
       const tail = out
         .trimEnd()
         .split('\n')
@@ -1804,8 +2152,8 @@ const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
 }`
 
 // a PR's review threads, and who you are on GitHub
-async function reviewThreads(cwd: string, pr: number): Promise<{ threads: Thread[]; me: string }> {
-  const { stdout } = await run('gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { cwd, timeout: 20000 }).catch(e => {
+async function reviewThreads(at: At, pr: number): Promise<{ threads: Thread[]; me: string }> {
+  const { stdout } = await exec(at, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { timeout: 20000 }).catch(e => {
     throw new Error(`gh couldn't read the review comments: ${String(e.stderr || '').trim().split('\n')[0] || 'it failed'}`)
   })
   const d = JSON.parse(stdout).data
@@ -1867,15 +2215,15 @@ export function sweepRunning(now = Date.now()) {
 // ---------- diff, dev server, ship
 
 // what a workspace's changes are against: a worktree's merge base with its base branch, else HEAD
-const diffBase = (ws: Workspace) => (ws.kind === 'worktree' ? git(ws.path, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : Promise.resolve('HEAD'))
+const diffBase = (ws: Workspace) => (ws.kind === 'worktree' ? git(ws, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : Promise.resolve('HEAD'))
 
 export async function diff(ref: string) {
   const ws = findWs(ref)
   const from = await diffBase(ws)
   const [text, numstat, untracked] = await Promise.all([
-    git(ws.path, 'diff', '--no-color', '--no-ext-diff', '-M', from),
-    git(ws.path, 'diff', '--numstat', '-M', from),
-    git(ws.path, 'ls-files', '--others', '--exclude-standard'),
+    git(ws, 'diff', '--no-color', '--no-ext-diff', '-M', from),
+    git(ws, 'diff', '--numstat', '-M', from),
+    git(ws, 'ls-files', '--others', '--exclude-standard'),
   ])
   const files = numstat
     .split('\n')
@@ -1886,16 +2234,22 @@ export async function diff(ref: string) {
     })
   let out = text
   const newFiles = untracked.split('\n').filter(Boolean).slice(0, 100)
-  const diffs = await Promise.all(
-    newFiles.map(f =>
-      run('git', ['diff', '--no-color', '--no-index', '--', '/dev/null', f], { cwd: ws.path, maxBuffer: 16 << 20 }).then(
-        r => r.stdout,
-        e => String(e.stdout ?? ''), // exit 1: there are differences
-      ),
-    ),
-  )
+  // a host's in one go, each after a NUL (git's diff of a file with one says Binary files … differ)
+  const each = 'for f; do printf "\\000"; git diff --no-color --no-index -- /dev/null "$f"; done; true'
+  const diffs = !ws.host
+    ? await Promise.all(
+        newFiles.map(f =>
+          run('git', ['diff', '--no-color', '--no-index', '--', '/dev/null', f], { cwd: ws.path, maxBuffer: 16 << 20 }).then(
+            r => r.stdout,
+            e => String(e.stdout ?? ''), // exit 1: there are differences
+          ),
+        ),
+      )
+    : newFiles.length
+      ? await exec(ws, 'sh', ['-c', each, 'sh', ...newFiles]).then(r => r.stdout.split('\0').slice(1), () => [])
+      : []
   for (const [i, f] of newFiles.entries()) {
-    const d = diffs[i]
+    const d = diffs[i] ?? ''
     out += (out ? '\n' : '') + d.trimEnd()
     files.push({ path: f, add: d.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).length, del: 0, status: 'A' })
   }
@@ -1911,9 +2265,9 @@ async function statOf(w: Workspace): Promise<Stat> {
   // --no-optional-locks: a scan never holds index.lock while an agent or you commit
   const from = await diffBase(w)
   const [numstat, untracked, status] = await Promise.all([
-    git(w.path, '--no-optional-locks', 'diff', '--numstat', '-M', from),
-    git(w.path, '--no-optional-locks', 'ls-files', '--others', '--exclude-standard'),
-    git(w.path, '--no-optional-locks', 'status', '--porcelain'),
+    git(w, '--no-optional-locks', 'diff', '--numstat', '-M', from),
+    git(w, '--no-optional-locks', 'ls-files', '--others', '--exclude-standard'),
+    git(w, '--no-optional-locks', 'status', '--porcelain'),
   ])
   const st: Stat = { add: 0, del: 0, files: 0, dirty: status.split('\n').filter(Boolean).length }
   for (const l of numstat.split('\n').filter(Boolean)) {
@@ -1926,7 +2280,7 @@ async function statOf(w: Workspace): Promise<Stat> {
   // file's newlines, a binary's none
   const fresh = untracked.split('\n').filter(Boolean)
   st.files += fresh.length
-  for (const f of fresh.slice(0, 100)) {
+  for (const f of w.host ? [] : fresh.slice(0, 100)) { // ponytail: a host's new files count, not their lines
     try {
       const p = join(w.path, f)
       if ((await stat(p)).size > 1 << 20) continue
@@ -1945,7 +2299,7 @@ export async function scanStats(): Promise<void> {
     const wanted = (w: Workspace) => !w.archived && (on || !!w.race) && state.projects.find(p => p.id === w.project)?.git !== false
     for (const id of stats.keys()) if (!state.workspaces.some(w => w.id === id && wanted(w))) (stats.delete(id), changed())
     for (const w of state.workspaces) {
-      if (!wanted(w) || !existsSync(w.path)) continue
+      if (!wanted(w) || (!w.host && !existsSync(w.path))) continue
       const s = await statOf(w).catch(() => undefined)
       if (JSON.stringify(s) === JSON.stringify(stats.get(w.id))) continue
       s ? stats.set(w.id, s) : stats.delete(w.id)
@@ -2042,7 +2396,13 @@ const MAX_FILES = 50000
 // but dependencies), and how the changed ones changed: M, A (new), D, R
 export async function files(ref: string) {
   const ws = findWs(ref)
-  if (!existsSync(join(ws.path, '.git'))) {
+  if (ws.host && state.projects.find(p => p.id === ws.project)?.git === false) {
+    const skip = [...SKIP_DIRS].flatMap((d, i) => [...(i ? ['-o'] : []), '-name', d])
+    const { stdout } = await exec(ws, 'find', ['.', '(', ...skip, ')', '-prune', '-o', '-type', 'f', '-print'])
+    const out = stdout.split('\n').filter(Boolean).map(l => l.slice(2))
+    return { files: out.slice(0, MAX_FILES), changed: {}, cut: out.length > MAX_FILES }
+  }
+  if (!ws.host && !existsSync(join(ws.path, '.git'))) {
     const out: string[] = []
     const walk = (dir: string) => {
       let es: Dirent[]
@@ -2061,7 +2421,7 @@ export async function files(ref: string) {
     walk('')
     return { files: out, changed: {}, cut: out.length >= MAX_FILES }
   }
-  const z = (args: string[]) => run('git', args, { cwd: ws.path, maxBuffer: 64 << 20 }).then(r => r.stdout.split('\0'))
+  const z = (args: string[]) => exec(ws, 'git', args).then(r => r.stdout.split('\0'))
   const [list, st] = await Promise.all([z(['ls-files', '-z', '--cached', '--others', '--exclude-standard']), z(['status', '--porcelain', '-z', '--untracked-files=all'])])
   const changed: Record<string, string> = {}
   for (let i = 0; i < st.length; i++) {
@@ -2075,9 +2435,16 @@ export async function files(ref: string) {
 }
 const SKIP_DIRS = new Set(['node_modules', '.git', 'vendor', 'target', 'dist', 'build', '.venv', '__pycache__'])
 
-export function fileNew(o: { ws: string; path: string; dir?: boolean }) {
+export async function fileNew(o: { ws: string; path: string; dir?: boolean }) {
   const ws = findWs(o.ws)
   const abs = inside(ws, o.path)
+  if (ws.host) {
+    const make = '[ ! -e "$1" ] || { echo "$3 is there already" >&2; exit 1; }; if [ "$2" = dir ]; then mkdir -p "$1"; else mkdir -p "$(dirname "$1")" && : > "$1"; fi'
+    await exec(ws, 'sh', ['-c', make, 'sh', abs, o.dir ? 'dir' : 'file', o.path]).catch(e => {
+      throw new Error(String(e.stderr || e.message).trim().split('\n').at(-1))
+    })
+    return { path: abs.slice(ws.path.length + 1) }
+  }
   if (existsSync(abs)) throw new Error(`${o.path} is there already`)
   mkdirSync(o.dir ? abs : dirname(abs), { recursive: true })
   if (!o.dir) writeFileSync(abs, '', { flag: 'wx' })
@@ -2096,11 +2463,19 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean }) 
     const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
     if (!mime) throw new Error(`${o.path} isn't an image`)
     const rel = abs.slice(ws.path.length + 1)
-    const { stdout } = await run('git', ['show', `${await diffBase(ws)}:${rel}`], { cwd: ws.path, encoding: 'buffer', maxBuffer: 10 << 20 }).catch(e => {
-      throw new Error(/maxBuffer/i.test(String(e.message)) ? 'over 10 MB' : `not in ${ws.base}`)
-    })
+    const show = `${await diffBase(ws)}:${rel}`
+    const stdout = ws.host
+      ? Buffer.from((await exec(ws, 'sh', ['-c', 'git show "$1" | head -c 10485761 | base64', 'sh', show])).stdout, 'base64') // base64: text over ssh
+      : (
+          await run('git', ['show', show], { cwd: ws.path, encoding: 'buffer', maxBuffer: 10 << 20 }).catch(e => {
+            throw new Error(/maxBuffer/i.test(String(e.message)) ? 'over 10 MB' : `not in ${ws.base}`)
+          })
+        ).stdout
+    if (ws.host && !stdout.length) throw new Error(`not in ${ws.base}`)
+    if (stdout.length > 10 << 20) throw new Error('over 10 MB')
     return { size: stdout.length, image: `data:${mime};base64,${stdout.toString('base64')}` }
   }
+  if (ws.host) return hostFileRead(ws, abs, o.path)
   const st = statSync(abs)
   if (!st.isFile()) throw new Error(`${o.path} isn't a file`)
   const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
@@ -2116,6 +2491,22 @@ export async function fileRead(o: { ws: string; path: string; base?: boolean }) 
   return { size: st.size, text: buf.toString('utf8'), cut: st.size > MAX_TEXT || undefined }
 }
 
+// fileRead on an SSH host: the same answers, read there (base64: text over ssh)
+async function hostFileRead(ws: Workspace, abs: string, rel: string) {
+  const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
+  const max = mime ? 10 << 20 : MAX_TEXT
+  const read = `[ -f "$1" ] || { echo "$3 isn't a file" >&2; exit 3; }; n=$(wc -c < "$1"); echo $n; if [ "$2" = text ] || [ "$n" -le "$4" ]; then head -c "$4" "$1" | base64; fi`
+  const { stdout } = await exec(ws, 'sh', ['-c', read, 'sh', abs, mime ? 'image' : 'text', rel, String(max)]).catch(e => {
+    throw new Error(String(e.stderr || e.message).trim().split('\n').at(-1))
+  })
+  const nl = stdout.indexOf('\n')
+  const size = Number(stdout.slice(0, nl).trim())
+  const buf = Buffer.from(stdout.slice(nl + 1), 'base64')
+  if (mime) return size > max ? { size } : { size, image: `data:${mime};base64,${buf.toString('base64')}` }
+  if (buf.subarray(0, 8000).includes(0)) return { size } // binary
+  return { size, text: buf.toString('utf8'), cut: size > MAX_TEXT || undefined }
+}
+
 // prComment: a review comment on a line of the PR's diff (the side panel's Changes); side LEFT is the old file's line
 export async function prComment(o: { ws: string; path: string; line: number; side?: 'LEFT' | 'RIGHT'; body: string }) {
   const ws = findWs(o.ws)
@@ -2127,7 +2518,7 @@ export async function prComment(o: { ws: string; path: string; line: number; sid
   if (!o.body?.trim()) throw new Error('the comment is empty')
   const side = o.side === 'LEFT' ? 'LEFT' : 'RIGHT'
   const args = ['api', `repos/{owner}/{repo}/pulls/${pr.number}/comments`, '-f', `body=${o.body}`, '-f', `commit_id=${pr.head}`, '-f', `path=${o.path}`, '-F', `line=${o.line}`, '-f', `side=${side}`]
-  const { stdout } = await run('gh', args, { cwd: ws.path, timeout: 20000 }).catch(e => {
+  const { stdout } = await exec(ws, 'gh', args, { timeout: 20000 }).catch(e => {
     const why = String(e.stderr || e.stdout || '').trim()
     throw new Error(/422|Unprocessable|could not be resolved|pull_request_review_thread\.line/i.test(why) ? "that line isn't in the PR's diff: commit and push it first" : `gh couldn't comment: ${why.split('\n')[0] || 'it failed'}`)
   })
@@ -2140,7 +2531,7 @@ export async function prThreads(ref: string) {
   const ws = findWs(ref)
   const pr = prs.get(ws.id)
   if (!pr) return []
-  const { threads } = await reviewThreads(ws.path, pr.number)
+  const { threads } = await reviewThreads(ws, pr.number)
   return threads.map(t => ({
     path: t.path,
     line: t.line ?? undefined,

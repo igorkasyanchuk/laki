@@ -303,7 +303,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
 }
 
 export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string> } // expose: emails, *@domains
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; config?: ProjectConfig }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
 const TARGETS: [RunAction['target'], string][] = [...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Terminal']]
@@ -875,7 +875,7 @@ export function SettingsPage(p: {
           {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Projects</div>}
           {!findQ.trim() && p.projects?.map(x => (
             <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => setSec(`project:${x.id}`)} data-tip={x.path}>
-              <Icon name={x.git === false ? 'folder' : 'fork'} /> <span>{x.name}</span>
+              <Icon name={x.host ? 'server' : x.git === false ? 'folder' : 'fork'} /> <span>{x.name}</span>
             </button>
           ))}
         </nav>
@@ -1008,7 +1008,7 @@ export function SettingsPage(p: {
                 </span>
                 {lookGrid('sideLook', SIDE_LOOK)}
                 <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
-                  <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Tasks, Board, Settings" />
+                  <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled tasks, Board, Settings" />
                 </Switch>
               </div>
               <div className="setting-box">

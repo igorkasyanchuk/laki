@@ -3,7 +3,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
 
   laki open                                   open the app
   laki ls [--json]                            projects, workspaces, tabs and their status
-  laki project add <path> | ls | rm <id>
+  laki project add <path|host:path> | ls | rm <id>   host:path: a folder over SSH (a ~/.ssh/config name or user@host)
   laki new <project> [--base b] [--preset claude|codex|gemini|grok|opencode|shell|none] [--cmd c] [--prompt text] [--name n] [--local]
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
             [--issue <url|number>]  a GitHub issue's title and text as the prompt (and the name)

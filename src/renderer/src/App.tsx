@@ -674,6 +674,7 @@ export function App() {
     }
     a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
+    a({ label: 'Open a project over SSH…', icon: 'server', run: () => setDialog('project') })
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
@@ -778,7 +779,7 @@ export function App() {
             <div key={p.id} className="project">
               <div
                 className={`project-head ${rows.at('project', p.id)}`}
-                data-tip={`${p.path} · click to ${shut ? 'expand' : 'collapse'}`}
+                data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · click to ${shut ? 'expand' : 'collapse'}`}
                 data-row={`project:${p.id}`}
                 onPointerDown={e => rows.start(e, 'project', p.id)}
                 onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(p.id)}
@@ -788,7 +789,7 @@ export function App() {
                   <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
                 </span>
                 <span className="project-icon">
-                  <Icon name={p.git === false ? 'folder' : 'fork'} size={12} />
+                  <Icon name={p.host ? 'server' : p.git === false ? 'folder' : 'fork'} size={12} />
                 </span>
                 <span className="project-name">{p.name}</span>
                 {shut && mine.length > 0 && (
@@ -885,7 +886,7 @@ export function App() {
             title={nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'}
             on={schedulesFor !== undefined}
             className={runFailed ? 'dot' : ''}
-            label={labels ? 'Tasks' : undefined}
+            label={labels ? 'Scheduled tasks' : undefined}
             onClick={() => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))}
           />
           <IconButton icon="board" title="Board: every workspace by where it is, and to-dos" label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={() => setDialog(d => (d === 'board' ? null : 'board'))} />
@@ -998,7 +999,7 @@ export function App() {
                       <StarLaki />
                     </>
                   ) : (
-                    <Welcome onOpen={openProject} check={() => api.call<Doctor>('doctor')} />
+                    <Welcome onOpen={openProject} onSsh={() => setDialog('project')} check={() => api.call<Doctor>('doctor')} />
                   )
                 )}
               </div>
@@ -1213,10 +1214,10 @@ export function App() {
           )}
           {ws && (
             <>
-              <span className="path" data-tip={ws.path}>
-                {'\u200e' + shortPath(ws.path) /* keeps the leading ~ in the right-to-left truncation */}
+              <span className="path" data-tip={(ws.host ? `${ws.host}:` : '') + ws.path}>
+                {'\u200e' + (ws.host ? `${ws.host}:` : '') + shortPath(ws.path) /* keeps the leading ~ in the right-to-left truncation */}
               </span>
-              <IconButton icon="copy" title="Copy the path" className="path-copy" onClick={() => copy(ws.path)} />
+              <IconButton icon="copy" title="Copy the path" className="path-copy" onClick={() => copy((ws.host ? `${ws.host}:` : '') + ws.path)} />
             </>
           )}
           {connected && (view.api ?? 0) < API && <StaleDaemon restart={() => api.call('shutdown')} />}
@@ -1242,8 +1243,8 @@ export function App() {
         <AddProject
           onClose={() => setDialog(null)}
           onAdd={async path => {
-            await call('projectAdd', { path })
-            setDialog(null)
+            const p = await call<Project>('projectAdd', { path })
+            newWs(p.id) // as a picked folder goes
           }}
         />
       )}

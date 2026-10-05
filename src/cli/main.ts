@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import type { Schedule, ScheduleRun, View, Workspace } from '../shared/types.ts'
+import { REMOTE, type Schedule, type ScheduleRun, type View, type Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
 import { mcp } from './mcp.ts'
 import { describe } from '../shared/when.ts'
@@ -83,7 +83,7 @@ async function main() {
       const v: View = await rpc('state')
       if (json) return out(v)
       for (const p of v.projects) {
-        console.log(`${p.id}  ${p.path}`)
+        console.log(`${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`)
         for (const w of v.workspaces.filter(w => w.project === p.id)) {
           const tabs = v.tabs.filter(t => t.workspace === w.id)
           const extra = [w.archived ? 'archived' : `:${w.port}`, w.pr ? `PR #${w.pr.number} ${w.pr.state}` : '', w.ports.length ? `listening ${w.ports.join(',')}` : '']
@@ -95,10 +95,10 @@ async function main() {
     }
     case 'project': {
       const [sub, arg] = rest
-      if (sub === 'add') return out(await rpc('projectAdd', { path: resolve(arg ?? '.') }), `added ${arg}`)
+      if (sub === 'add') return out(await rpc('projectAdd', { path: REMOTE.test(arg ?? '') && !existsSync(arg!) ? arg : resolve(arg ?? '.') }), `added ${arg}`) // host:path is the host's
       if (sub === 'rm') return out(await rpc('projectRm', { id: arg }), `removed ${arg}`)
       const v: View = await rpc('state')
-      return out(v.projects, v.projects.map(p => `${p.id}  ${p.path}`).join('\n'))
+      return out(v.projects, v.projects.map(p => `${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`).join('\n'))
     }
     case 'new': {
       if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--fan claude,codex] [--prompt text]')

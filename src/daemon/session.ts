@@ -28,6 +28,7 @@ export class Session {
   title = '' // the window title it set (OSC 0/2): gemini's and grok's say whether they work or ask
   onExit: (code: number) => void = () => {}
   onOutput: (data: string) => void = () => {}
+  onHook: (data: string) => void = () => {} // OSC 7717: a hook on an SSH host reports through the tab's own terminal (core.ts)
 
   constructor(tab: string, file: string, args: string[], opts: { cwd: string; env: Record<string, string>; cols?: number; rows?: number }) {
     this.tab = tab
@@ -36,6 +37,7 @@ export class Session {
     this.term = new headless.Terminal({ cols, rows, scrollback: SCROLLBACK, allowProposedApi: true })
     this.term.loadAddon(this.ser as any)
     this.term.onTitleChange(t => (this.title = t))
+    this.term.parser.registerOscHandler(7717, d => (this.onHook(d), true))
     // headless replies go to the PTY only while no client answers instead
     this.term.onData(d => {
       if (!this.responder && !this.exited) this.pty.write(d)
