@@ -218,7 +218,11 @@ test('a workspace from a PR: gh pr checkout on its branch, named after it, its P
   assert.match(r.out, /^pr-123-fix-the-login-page .*\(branch fix-login,/)
   // a fork's PR from its main (the repo's own branch here): <owner>/main, not "checked out in the repo"
   writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 7, title: 'Typo', url: 'https://github.com/o/r/pull/7', headRefName: 'main', baseRefName: 'main', isCrossRepository: true, headRepositoryOwner: { login: 'alice' } }))
-  assert.equal((await fromPR('7')).branch, 'alice/main')
+  const fork = await fromPR('7')
+  assert.equal(fork.branch, 'alice/main')
+  // a fork's .laki.json isn't read (its setup would run a stranger's code): the repo's is
+  writeFileSync(join(fork.path, '.laki.json'), JSON.stringify({ run: 'echo pwned' }))
+  assert.deepEqual(((await rig.rpc('state')).workspaces as { id: string; run: boolean; fork?: boolean }[]).filter(w => w.id === fork.id).map(w => [w.fork, w.run]), [[true, false]])
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh pr checkout https:\/\/github.com\/o\/r\/pull\/7 --branch alice\/main/)
 })
 

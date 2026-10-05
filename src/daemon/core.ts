@@ -343,12 +343,13 @@ export function allocPort() {
   return port
 }
 
-// .laki.json from the workspace (as checked out), else from the project root (works before it's committed);
-// the project's own config (set in the app) wins field by field
+// .laki.json from the workspace (as checked out), else from the project root (works before it's committed); a fork's
+// PR's never (its setup would run a stranger's code): the root's. The project's own config (set in the app) wins field
+// by field
 export function projectConfig(ws: Workspace): ProjectConfig {
   const proj = state.projects.find(p => p.id === ws.project)
   let file: ProjectConfig = {}
-  for (const d of [ws.path, proj?.path]) {
+  for (const d of [ws.fork ? undefined : ws.path, proj?.path]) {
     if (!d) continue
     try {
       file = JSON.parse(readFileSync(join(d, '.laki.json'), 'utf8'))
@@ -764,7 +765,7 @@ export function closeTab(id: string) {
 // ---------- workspaces
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean }
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -863,10 +864,13 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
         await git(proj.path, 'worktree', 'remove', '--force', path).catch(() => {})
         throw new Error(`gh pr checkout ${pr.number}: ${ghSays(e, `PR ${pr.number}`)}`)
       })
-      branch = await git(path, 'rev-parse', '--abbrev-ref', 'HEAD')
+      branch = headOf(path) ?? local! // as syncBranches reads it (rev-parse may say heads/<b> beside a remote's <b>)
       base = pr.baseRefName
+      // a base you have no branch of (a release branch): origin's, for the diff
+      const has = (ref: string) => git(path, 'rev-parse', '--verify', '--quiet', ref).then(Boolean, () => false)
+      if (!(await has(`refs/heads/${base}`)) && (await has(`refs/remotes/origin/${base}`))) base = `origin/${base}`
     }
-    ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }) }
+    ws = { id, project: proj.id, path, branch, base, kind: 'worktree', port: allocPort(), created: Date.now(), ...(pr && { prUrl: pr.url }), ...((pr?.isCrossRepository || o.fork) && { fork: true }) }
     await copyIncludes(proj, ws) // before setup and the agent: they may read .env
   }
   if (o.race) ws.race = o.race
@@ -1025,7 +1029,7 @@ export function todoRm(o: { id: string }) {
 export async function wsFork(ref: string) {
   const src = findWs(ref)
   const agent = tabsOf(src.id).find(t => t.preset === 'claude' && t.resumeId)
-  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort })
+  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort, fork: src.fork })
 }
 
 // restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat.
@@ -1895,7 +1899,7 @@ let statting = false
 let restat = false // asked for while one ran: again after it
 async function statOf(w: Workspace): Promise<Stat> {
   // --no-optional-locks: a scan never holds index.lock while an agent or you commit
-  const from = w.kind === 'worktree' ? await git(w.path, 'merge-base', w.base, 'HEAD').catch(() => 'HEAD') : 'HEAD'
+  const from = await diffBase(w)
   const [numstat, untracked, status] = await Promise.all([
     git(w.path, '--no-optional-locks', 'diff', '--numstat', '-M', from),
     git(w.path, '--no-optional-locks', 'ls-files', '--others', '--exclude-standard'),

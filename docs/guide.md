@@ -331,7 +331,8 @@ prompts once, switches or not.
 
 **New workspace** (a page, like Settings; Esc closes it): pick the project, *Pull request* (optional: a PR's number
 or URL; the worktree is on its branch through `gh pr checkout`, a fork's as `<owner>/<branch>`, its base the PR's,
-named `pr-<n>-<title>`; when a workspace has that branch already, the message offers *Open it*), base branch, name and agent (for an
+named `pr-<n>-<title>`; a fork's own `.laki.json` is ignored, so its setup never runs a stranger's code: the repo's
+is used; when a workspace has that branch already, the message offers *Open it*), base branch, name and agent (for an
 agent, its model, like `opus` or a full name, and for Claude Code and Codex its effort; both blank: the agent's
 default, kept for its restarts and forks), then the prompt:
 - paste a screenshot (⌘V), drop image files on it, or pick them with the image icon; each shows as a

@@ -182,6 +182,8 @@ export function App() {
   }
 
   const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const archived = useRef<string[]>([]) // workspaces archived for a merged PR, while their toast shows
+  const archivedTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   // the sidebar's foot: its words while they fit, else icons only; measured as the sidebar resizes and the theme
   // (its font) changes
   const footRef = useRef<HTMLDivElement | null>(null)
@@ -239,7 +241,14 @@ export function App() {
         const asks = m.kind === 'waiting' && /permission/i.test(m.text ?? '')
         notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, asks ? ['Allow', 'Deny'] : undefined)
       } else if (m.ev === 'archived') {
-        toast(`Archived ${m.name}: PR #${m.pr} merged`, () => call('wsRestore', { id: m.ws }).catch(() => {}))
+        // several at once (the setting just turned on): one message, whose Undo brings them all back
+        const all = (archived.current = [...archived.current, m.ws])
+        clearTimeout(archivedTimer.current)
+        archivedTimer.current = setTimeout(() => (archived.current = []), 8000)
+        toast(all.length > 1 ? `Archived ${all.length} workspaces: their PRs merged` : `Archived ${m.name}: PR #${m.pr} merged`, () => {
+          archived.current = []
+          for (const id of all) call('wsRestore', { id }).catch(() => {})
+        })
       } else if (m.ev === 'browse' && bridge?.browse) {
         // the agent browser (laki browser): main drives a hidden window; its answer goes back to the daemon
         const { req: id, ev: _, ...r } = m // req: an event with an id would be taken for a reply
@@ -847,8 +856,8 @@ export function App() {
                           <Icon name="conflict" size={11} />
                         </span>
                       )}
-                      {settings.archiveMerged && w.pr?.state === 'MERGED' && (
-                        <span className="ws-merged" data-tip={`PR #${w.pr.number} merged; kept: it has changes, or an agent at work`}>
+                      {settings.archiveMerged && w.kind === 'worktree' && w.pr?.state === 'MERGED' && (
+                        <span className="ws-merged" data-tip={`PR #${w.pr.number} merged; not archived: changes, an agent at work, or an Undo`}>
                           merged
                         </span>
                       )}

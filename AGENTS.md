@@ -85,7 +85,9 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   failures into a line: not installed, signed out, not found), then `worktree add --detach` and `gh pr checkout <url>
   --branch <b>` in it (`b`: the head branch, a fork's `<owner>/<branch>`; refused when a workspace or the repo has it
   checked out: "already checked out in workspace <id>", which the app offers to open). The base is the PR's, the name
-  `pr-<n>-<slug>`; the workspace keeps `prUrl`, which `scanPR` asks for until `syncBranches` sees another branch;
+  `pr-<n>-<slug>`; the workspace keeps `prUrl`, which `scanPR` asks for until `syncBranches` sees another branch, and a
+  fork's `fork` (kept by `wsFork`): `projectConfig` reads the repo's `.laki.json`, never the fork's (its setup would run);
+  a base with no local branch is `origin/<base>`;
 - files git ignores (`copyIncludes`, after `worktree add` in `wsNew` and `wsRestore`): `.worktreeinclude` (the repo's
   root) and `.laki.json` `copy` as gitignore patterns to `git ls-files -z --others --ignored`, copied from the repo with
   their mode; one already there stays, a source outside the repo (a link) or a destination outside the worktree is

@@ -27,7 +27,8 @@ async function fromReddit(): Promise<Post | undefined> {
 
 async function fromMirror(): Promise<Post | undefined> {
   const p = await json(`${fake() || 'https://meme-api.com'}/gimme/memes`)
-  return p && !p.nsfw && !p.spoiler && picture(p.url) ? { title: String(p.title ?? ''), link: String(p.postLink ?? ''), url: p.url, by: p.author } : undefined
+  const link = /^https:\/\//.test(p?.postLink) ? p.postLink : 'https://www.reddit.com/r/memes' // a link it gives: only https
+  return p && !p.nsfw && !p.spoiler && picture(p.url) ? { title: String(p.title ?? ''), link, url: p.url, by: p.author } : undefined
 }
 
 export async function meme(): Promise<Meme> {

@@ -19,8 +19,8 @@ export function pushRequest(w: Webhook, p: Push, now = Date.now()): RequestInit 
       return { method: 'POST', headers: { title: /^[\x20-\x7e]*$/.test(title) ? title : `=?UTF-8?B?${Buffer.from(title).toString('base64')}?=` }, body: p.question || title }
     case 'slack': // Slack reads <…> as links and mentions (<!channel>)
       return json({ text: text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') })
-    case 'telegram':
-      return json({ text })
+    case 'telegram': // chat_id from the URL in the body too: Telegram reads either
+      return json({ chat_id: URL.canParse(w.url ?? '') ? new URL(w.url!).searchParams.get('chat_id') ?? undefined : undefined, text })
     default:
       return json({ event: p.event, workspace: p.workspace, tab: p.tab, agent: p.agent, message: text, ts: now })
   }

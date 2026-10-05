@@ -14,6 +14,7 @@ test('push formats: ntfy text with a Title, Slack and Telegram text, generic JSO
   assert.match((pushRequest({}, { ...p, workspace: 'café ☕' }).headers as Record<string, string>).title, /^=\?UTF-8\?B\?.+\?=$/) // ntfy by default; past ASCII: RFC 2047
   for (const format of ['slack', 'telegram'] as const) assert.deepEqual(JSON.parse(String(pushRequest({ format }, p).body)), { text: 'claude in fix-login is waiting for you\nRun rm -rf build?' })
   assert.equal(JSON.parse(String(pushRequest({ format: 'slack' }, { ...p, question: 'Overwrite <dir> & <!channel>?' }).body)).text.split('\n')[1], 'Overwrite &lt;dir&gt; &amp; &lt;!channel&gt;?')
+  assert.equal(JSON.parse(String(pushRequest({ format: 'telegram', url: 'https://api.telegram.org/botT/sendMessage?chat_id=42' }, p).body)).chat_id, '42')
   assert.deepEqual(JSON.parse(String(pushRequest({ format: 'json' }, { ...p, event: 'done', question: undefined }, 5).body)), {
     event: 'done',
     workspace: 'fix-login',
