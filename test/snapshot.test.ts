@@ -55,6 +55,55 @@ test('normal screen: colors, scrollback, cursor, modes', async t => {
   assert.equal(again.snapshot(), s.snapshot())
 })
 
+// each link's text and URL, in order (OSC 8: xterm keeps the URL beside the cells)
+function links(t: Term) {
+  const core = (t as any)._core
+  const out: [string, string][] = []
+  const b = t.buffer.active
+  let last = ''
+  for (let y = 0; y < b.length; y++) {
+    const line = b.getLine(y)!
+    for (let x = 0; x < line.length; x++) {
+      const c: any = line.getCell(x)
+      const uri = c.hasExtendedAttrs() && c.extended.urlId ? core._oscLinkService.getLinkData(c.extended.urlId)?.uri : ''
+      if (uri && uri === last) out[out.length - 1][0] += c.getChars()
+      else if (uri) out.push([c.getChars(), uri])
+      last = uri && c.getChars() ? uri : ''
+    }
+    last = ''
+  }
+  return out
+}
+
+test('links (OSC 8) come back with their URLs, and the text after them is plain', async t => {
+  const link = (uri: string, text: string, id = '') => `\\033]8;${id};${uri}\\033\\\\${text}\\033]8;;\\033\\\\`
+  const s = session(`PR ${link('https://github.com/o/r/pull/12', '#12')} and \\033[1m${link('https://e.com/x', 'bold link', 'id=a')}\\033[0m after\\r\\n${link('https://e.com/y', 'last')}`)
+  t.after(() => s.kill())
+  await until(async () => (await s.flushed(), links(s.term).length === 3), 'output')
+  const want = [['#12', 'https://github.com/o/r/pull/12'], ['bold link', 'https://e.com/x'], ['last', 'https://e.com/y']]
+  assert.deepEqual(links(s.term), want)
+  const fresh = await replay(s)
+  assert.deepEqual(links(fresh), want)
+  assert.deepEqual(state(fresh), state(s.term))
+  // the snapshot ends outside a link: what's written next isn't one
+  fresh.write(' more')
+  await new Promise<void>(r => fresh.write('', r))
+  assert.deepEqual(links(fresh), want)
+})
+
+test('links across a soft wrap: one ending at the edge, one going over it, plain text after each', async t => {
+  const link = (uri: string, text: string) => `\\033]8;;${uri}\\033\\\\${text}\\033]8;;\\033\\\\`
+  // 60 columns: the first link ends at the edge, "after" goes on in the wrapped row; the second crosses the edge
+  const s = session(`${'a'.repeat(54)}${link('https://e.com/1', 'edge12')}after${' '.repeat(50)}${link('https://e.com/2', 'acrossTheWrap')} plain\\r\\n`)
+  t.after(() => s.kill())
+  await until(async () => (await s.flushed(), links(s.term).length >= 3), 'output')
+  const live = links(s.term)
+  assert.deepEqual(live, [['edge12', 'https://e.com/1'], ['acros', 'https://e.com/2'], ['sTheWrap', 'https://e.com/2']])
+  const fresh = await replay(s)
+  assert.deepEqual(links(fresh), live)
+  assert.deepEqual(state(fresh), state(s.term))
+})
+
 test('alternate screen with a TUI on it', async t => {
   const s = session(`before alt\\r\\n\\033[?1049h\\033[H\\033[2J\\033[44m TUI \\033[0m\\033[10;3Hstatus \\033[1;31mred\\033[0m\\033[?2004h\\033[4;4H`)
   t.after(() => s.kill())

@@ -68,7 +68,7 @@ board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `
 `unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`; 14: settings' `prPrompts`, `prScan`,
 `prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
 workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
-workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`). A
+workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -89,7 +89,10 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
 - a PR (`wsNew` `pr`: a URL or number; not local, not a race): `prHead` (`gh pr view <ref> --json …`; `ghSays` turns gh's
   failures into a line: not installed, signed out, not found), then `worktree add --detach` and `gh pr checkout <url>
   --branch <b>` in it (`b`: the head branch, a fork's `<owner>/<branch>`; refused when a workspace or the repo has it
-  checked out: "already checked out in workspace <id>", which the app offers to open). The base is the PR's, the name
+  checked out: "already checked out in workspace <id>", which the app offers to open). A prompt that names a PR
+  (`prIn`, no `pr`: `fromPRLink`) only links it: the workspace keeps `linked` as `prUrl` and `prLinked` (`autoPR` skips it, the app shows no
+  switches: its branch isn't the PR's; a local one too: `scanPRs` takes any workspace with a `prUrl`) and, unnamed, is `pr-<n>-<slug>` (gh failing: `pr-<n>`); the renderer sends no
+  template name for one. The base is the PR's, the name
   `pr-<n>-<slug>`; the workspace keeps `prUrl`, which `scanPR` asks for until `syncBranches` sees another branch, and a
   fork's `fork` (kept by `wsFork`): `projectConfig` reads the repo's `.laki.json`, never the fork's (its setup would run);
   a base with no local branch is `origin/<base>`;
@@ -102,7 +105,8 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
 - worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads`, `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
-  PR's diff"), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
+  PR's diff"), `prAct` (`act` approve or close: `gh pr review --approve` / `gh pr close` by the PR's URL, after the
+  app's confirm; an open PR only), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`, links followed, by `realpath`);
 - the agent skill (Settings): `skills` (each with `mcp`: the agent's `mcp add` command, shown, never run; for
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
@@ -163,7 +167,9 @@ Queries (DA, DSR/CPR, DECRQM, DECRQSS, XTVERSION, OSC color) are answered exactl
 ### Agents and hooks
 
 Commands run as `$SHELL -lic '<cmd>'`. The environment adds:
-- `TERM=xterm-256color`, `COLORTERM=truecolor`;
+- `TERM=xterm-256color`, `COLORTERM=truecolor`, `LAKI_APP=true`;
+- an agent's `FORCE_HYPERLINK=1` (claude's links as OSC 8; an env may say 0; not shells': piped output would get
+  them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
 - `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`.
 
 Claude gets `--settings <data>/claude-settings.json`. Its hooks run `laki hook <state>`, using an absolute
@@ -527,8 +533,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
   line opens Raw). Tested in `test/markdown.test.ts`.
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,
-  which replace a global one of the same name and target; an agent's only with a live tab of it, the focused one
-  first; a shell's to the focused shell, any, or none: each app's `runAction` opens one), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and
+  which replace a global one of the same name and target; an agent's only with a live tab of it (`any`: any
+  agent's), the focused one first; a shell's to the focused shell, any, or none: each app's `runAction` opens one), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and
   `MAIL_OK` (what the daemons take: kept in step with their `MAIL`/`mailRe`); prompt templates (`templated`, `fillTemplate`, from `shared/types.ts`: the daemon's `prPrompt` uses it too; `{{prompt}}`, `{{project}}`, `{{base}}`;
   `settings.templates` and a project's `config.templates`, merged by `templatesFor`: the project's first, replacing a
   global one of the same name; filled in by the new-workspace page; `nameOf`: a templated workspace's name from the typed
@@ -550,7 +556,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   a new one); `VarChips` under a template (`TEMPLATE_VARS`) and a preset's args or command (`ENV_VARS`) put a variable
   in at the cursor of the field just before them; presets, `EnvField` (KEY=value lines), fonts,
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
-  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, a name filter that stays in sight;
+  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section: a duplicate button, a *Show* filter by target), Appearance (themes, the current one outlined and checked, a name filter that stays in sight;
   accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's,
   `--accent-fg` by `onAccent`; `tabsAt`;
   `PROJECT_LOOK`: the sidebar's project names over the theme, `settings.projectLook`, App's `phAttrs`/`phVars` put them

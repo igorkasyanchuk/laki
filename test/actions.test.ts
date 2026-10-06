@@ -27,6 +27,11 @@ test("Run ▾ actions: the project's replace global ones by name; agents only wh
     terminal: [{ action: global[2], tab: undefined }],
   })
   assert.deepEqual(actionsFor(), { agent: [], terminal: [] })
+  // any agent: whichever runs, the focused one first; none running, left out
+  const any: RunAction = { name: 'review', target: 'any', text: 'review it' }
+  assert.deepEqual(actionsFor([any], [], tabs).agent, [{ action: any, tab: 'c1' }])
+  assert.deepEqual(actionsFor([any], [], [{ id: 'x', agent: 'codex' }, { id: 'y', agent: 'gemini' }], 'y').agent, [{ action: any, tab: 'y' }])
+  assert.deepEqual(actionsFor([any], [], [{ id: 's', shell: true }]).agent, [])
   // a hand-edited state.json's action without a name is skipped, not a crash
   assert.deepEqual(actionsFor([{ target: 'shell', text: 'ls' } as RunAction], [{ name: 'x', target: 'shell', text: 'pwd' }], []).terminal.length, 1)
 })

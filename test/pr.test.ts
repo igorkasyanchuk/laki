@@ -215,6 +215,32 @@ test('a diff line comment on the PR: gh api with the head commit, a line not in 
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/comments -f body=why "this"\? -f commit_id=beef -f path=a\.ts -F line=3 -f side=LEFT/)
 })
 
+test('approve or close the PR: gh as you, by its URL; refused with none, when not open, or as gh says', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), 'no pull requests found')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const act = (act: string) => rig.rpc('prAct', { ws: ws.id, act })
+  await assert.rejects(act('approve'), /has no PR/)
+  const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', statusCheckRollup: [] }
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  await assert.rejects(act('merge'), /approve or close/)
+  await act('approve')
+  writeFileSync(join(gh, 'refuse'), 'failed to create review: GraphQL: Can not approve your own pull request (addPullRequestReview)')
+  await assert.rejects(act('approve'), /^Error: gh: failed to create review: GraphQL: Can not approve your own pull request/)
+  rmSync(join(gh, 'refuse'))
+  await act('close')
+  const log = readFileSync(rig.env.FAKE_LOG, 'utf8')
+  assert.match(log, /gh pr review --approve -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+  assert.match(log, /gh pr close -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, state: 'CLOSED' }))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr?.state === 'CLOSED', 'closed, scanned')
+  await assert.rejects(act('close'), /PR #9 is closed/)
+})
+
 test('a workspace from a PR: gh pr checkout on its branch, named after it, its PR by URL, a fork’s as <owner>/<branch>; gh and branch errors', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH
@@ -244,6 +270,37 @@ test('a workspace from a PR: gh pr checkout on its branch, named after it, its P
   writeFileSync(join(fork.path, '.laki.json'), JSON.stringify({ run: 'echo pwned' }))
   assert.deepEqual(((await rig.rpc('state')).workspaces as { id: string; run: boolean; fork?: boolean }[]).filter(w => w.id === fork.id).map(w => [w.fork, w.run]), [[true, false]])
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh pr checkout https:\/\/github.com\/o\/r\/pull\/7 --branch alice\/main/)
+})
+
+test('a prompt naming a PR: the workspace named after it and linked to it (gh failing: by its number); a name given, a race, a local session', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const url = 'https://github.com/o/r/pull/14080'
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: `Run advanced code review for ${url}` })
+  assert.deepEqual([a.id, a.prUrl], ['pr-14080', url]) // no prhead.json: gh fails
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 14080, title: 'Lazy-load gift frames', url, headRefName: 'gifts', baseRefName: 'main', isCrossRepository: false }))
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: `review ${url}, then fix what you find` })
+  assert.deepEqual([b.id, b.prUrl, b.prLinked], ['pr-14080-lazy-load-gift-frames', url, true])
+  assert.notEqual(b.branch, 'gifts') // linked, not checked out (that's --pr)
+  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').includes(`gh pr view ${url} --json number,state`), 'its PR, by URL')
+  const c = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: url, name: 'mine' })
+  assert.deepEqual([c.id, c.prUrl], ['mine', url])
+  const plain = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: 'https://github.com/o/r/issues/3 and pull/4' })
+  assert.deepEqual([plain.id.startsWith('https-github-com'), plain.prUrl], [true, undefined])
+  const race = await rig.rpc('wsFan', { project: p.id, prompt: `review ${url}`, presets: ['claude', 'codex'] })
+  assert.deepEqual(race.map((w: any) => [w.id, w.prUrl]), [['pr-14080-lazy-load-gift-f-claude', url], ['pr-14080-lazy-load-gift-fr-codex', url]]) // the agent's name kept whole
+  // linked, not checked out: failing CI doesn't go to the agent (its push wouldn't reach the PR)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 14080, state: 'OPEN', url, headRefOid: 'beef', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE' }] }))
+  await rig.rpc('wsSet', { id: b.id, autoFix: true })
+  const views = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split(`gh pr view ${url}`).length
+  const n = views()
+  await until(() => views() > n + 2, 'scans')
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === b.id).fix, undefined)
+  const local = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true, another: true, prompt: `look at ${url}` })
+  assert.equal(local.prUrl, url)
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === local.id)?.pr, "a local session's PR too")
 })
 
 test('a merged PR archives its workspace once it is clean (archiveMerged), not with changes or unpushed commits; Undo stays', async t => {

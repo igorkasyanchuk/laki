@@ -20,7 +20,7 @@ export function TemplatePick(p: { templates: Template[]; value: string; onChange
         <option value="">No template: the prompt as typed</option>
         {p.templates.map((t, i) => (
           <option key={i} value={String(i)}>
-            Template: {t.name || '(no name)'}
+            {t.name || '(no name)'}
           </option>
         ))}
       </select>

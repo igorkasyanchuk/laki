@@ -37,7 +37,7 @@ export type { RunAction }
 export type ActionTab = { id: string; agent?: string; shell?: boolean } // a workspace's live tab: its agent, or a shell
 
 // Run ▾'s actions, worked out as it opens: the global ones, then the project's (one with a global one's name and
-// target replaces it). An agent's only while the workspace runs that agent (its focused tab first); a terminal's
+// target replaces it). An agent's only while the workspace runs that agent (its focused tab first; any: any agent); a terminal's
 // always (the focused shell, else any; none: a new one)
 export function actionsFor(global: RunAction[] = [], project: RunAction[] = [], tabs: ActionTab[] = [], focused?: string) {
   const same = (a: RunAction, b: RunAction) => a.target === b.target && (a.name ?? '').trim() === (b.name ?? '').trim() // a hand-edited one may lack a name
@@ -48,7 +48,7 @@ export function actionsFor(global: RunAction[] = [], project: RunAction[] = [], 
     if (!a.name?.trim() || !a.text?.trim()) continue
     if (a.target === 'shell') terminal.push({ action: a, tab: pick(t => !!t.shell)?.id })
     else {
-      const t = pick(t => t.agent === a.target)
+      const t = pick(t => (a.target === 'any' ? !!t.agent : t.agent === a.target))
       if (t) agent.push({ action: a, tab: t.id })
     }
   }
@@ -95,4 +95,14 @@ export function clock(ms: number) {
   const [h, m, sec] = [Math.floor(t / 3600), Math.floor((t % 3600) / 60), t % 60]
   const two = (n: number) => String(n).padStart(2, '0')
   return h ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`
+}
+
+// what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+// an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
+// left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
+export function importable(v: Record<string, unknown>) {
+  const kind = (x: unknown) => (x === null ? 'null' : Array.isArray(x) ? 'array' : typeof x)
+  const bad = Object.keys(v).filter(k => KINDS[k] && v[k] !== undefined && !KINDS[k].split(' ').includes(kind(v[k])))
+  return { ok: Object.fromEntries(Object.entries(v).filter(([k]) => !bad.includes(k))), bad }
 }

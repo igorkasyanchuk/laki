@@ -15,6 +15,50 @@ type IPty = ReturnType<typeof pty.spawn>
 
 const SCROLLBACK = 5000
 
+// The serialize addon drops OSC 8 links (claude's [#12](url), with FORCE_HYPERLINK): a reattached terminal would show
+// #12 and lose the URL. Its row writer gets a buffer whose cells carry the link's open and close in their text: a
+// link's first character opens it, the next character outside it closes it. The writer reads the cells in order, and
+// peeks around a soft wrap (a row's last cells, the next row's first) and back (the cursor style's): only a cell past
+// the furthest one read moves the link on. ponytail: the addon's private _serializeBufferByRange and xterm's cell
+// internals (extended.urlId, the link service); test/snapshot.test.ts fails when either moves
+const CLOSE = '\x1b]8;;\x1b\\'
+function keepLinks(ser: any, core: any) {
+  const byRange = ser._serializeBufferByRange
+  if (typeof byRange !== 'function') return
+  ser._serializeBufferByRange = (term: unknown, buf: any, range: unknown, excl: unknown) => {
+    let open = 0 // the link the text written so far is in
+    let at = -1 // the furthest cell read (row * 65536 + column), and what its text starts with
+    let seq = ''
+    const mark = (cell: any, y: number, x: number) => {
+      const pos = y * 65536 + x
+      if (pos > at) {
+        at = pos
+        seq = ''
+        if (cell && cell.getWidth() > 0 && cell.getChars() !== '') {
+          // blanks are cursor moves: no text to carry it
+          const id = cell.hasExtendedAttrs() ? cell.extended?.urlId || 0 : 0
+          if (id !== open) {
+            const data = id ? core._oscLinkService?.getLinkData(id) : undefined
+            seq = (open ? CLOSE : '') + (data?.uri ? `\x1b]8;${data.id ? `id=${data.id}` : ''};${data.uri}\x1b\\` : '')
+            open = data?.uri ? id : 0
+          }
+        }
+      }
+      if (pos < at || !seq) return cell
+      const chars = seq + cell.getChars()
+      return Object.create(cell, { getChars: { value: () => chars } }) // the cell as it is, its text with the link's
+    }
+    let last: { y: number; line: any } | undefined // the writer asks for a row again at each style change
+    const getLine = (y: number) => {
+      if (last?.y === y) return last.line
+      const line = buf.getLine(y)
+      last = { y, line: line && Object.create(line, { getCell: { value: (x: number, c?: unknown) => mark(line.getCell(x, c), y, x) } }) }
+      return last.line
+    }
+    return byRange.call(ser, term, Object.create(buf, { getLine: { value: getLine } }), range, excl) + (open ? CLOSE : '')
+  }
+}
+
 export class Session {
   readonly tab: string
   readonly pty: IPty
@@ -36,6 +80,7 @@ export class Session {
     const rows = opts.rows || 32
     this.term = new headless.Terminal({ cols, rows, scrollback: SCROLLBACK, allowProposedApi: true })
     this.term.loadAddon(this.ser as any)
+    keepLinks(this.ser, (this.term as any)._core)
     this.term.onTitleChange(t => (this.title = t))
     this.term.parser.registerOscHandler(7717, d => (this.onHook(d), true))
     // headless replies go to the PTY only while no client answers instead

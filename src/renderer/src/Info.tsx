@@ -37,6 +37,7 @@ export type WsInfo = {
   autoFix?: boolean
   autoReview?: boolean
   autoMerge?: boolean
+  prLinked?: boolean // the PR a prompt named, not checked out: no auto switches
   fixTries?: number // failing CI sent this many times in a row for the current PR
   mergeTries?: number // and its merge conflicts
   prScan: number // minutes between PR checks (Settings › Pull requests)
@@ -46,6 +47,7 @@ export type WsInfo = {
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
+export type PRAct = 'approve' | 'close' // prAct: gh as you, after a confirm
 
 // CI in a few characters: ✓ 5/5, ✗ 2 failing, … 3 running
 export function ciText(pr: PRInfo) {
@@ -69,6 +71,12 @@ const ago = (t?: string | number) => {
 
 // the auto switches, in the status bar and the panel
 export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
+  if (w.prLinked)
+    return (
+      <span className="muted small" data-tip="The prompt named this PR; its branch isn't checked out here, so the agent couldn't push to it. A workspace from the PR (Pull request on the new-workspace page, laki new --pr) has the switches.">
+        linked, not checked out
+      </span>
+    )
   const when = `Checked every ${w.prScan === 1 ? 'minute' : `${w.prScan} minutes`} and after each turn; the prompt and pace: Settings › Pull requests.`
   return (
     <>
@@ -122,7 +130,7 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
 }
 
 // the PR: title, state, checks, the auto switches and what to send the agent (info panel, side panel)
-export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void }) {
+export function PRSection({ w, onOpen, onToggle, onFix, onAct }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct) => void }) {
   const pr = w.pr
   return (
     <section>
@@ -173,6 +181,14 @@ export function PRSection({ w, onOpen, onToggle, onFix }: { w: WsInfo; onOpen: (
                   Send merge conflicts
                 </button>
               </div>
+              <div className="row">
+                <button onClick={() => onAct('approve')} data-tip="An approving review, as you (gh pr review --approve)">
+                  <Icon name="check" /> Approve…
+                </button>
+                <button onClick={() => onAct('close')} data-tip="Closes it without merging (gh pr close); it can be reopened on GitHub">
+                  <Icon name="x" /> Close PR…
+                </button>
+              </div>
             </>
           )}
           {pr.body?.trim() && <div className="info-pr-body">{pr.body.trim()}</div>}
@@ -188,6 +204,7 @@ export function InfoPanel(p: {
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: FixWhat) => void
+  onAct: (act: PRAct) => void
   onRename: () => void
   onAgent: (tab: string) => void
   onCopy: (text: string) => void
@@ -237,7 +254,7 @@ export function InfoPanel(p: {
           {w.created ? <Row k="created">{ago(w.created)}</Row> : null}
         </section>
 
-        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} />
+        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />
 
         <section>
           <h3>

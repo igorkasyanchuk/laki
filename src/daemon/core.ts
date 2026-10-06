@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
@@ -444,7 +444,7 @@ const templatesOk = (l: unknown): Template[] | undefined => {
 
 // a project's actions as kept: for an agent or a shell (an unfinished one too, as Settings has it: Run ▾ skips it)
 function actionsOk(l: unknown): RunAction[] | undefined {
-  const ok = (Array.isArray(l) ? l : []).filter((a): a is RunAction => typeof a?.name === 'string' && typeof a.text === 'string' && (a.target === 'shell' || isAgent(a.target)))
+  const ok = (Array.isArray(l) ? l : []).filter((a): a is RunAction => typeof a?.name === 'string' && typeof a.text === 'string' && (a.target === 'shell' || a.target === 'any' || isAgent(a.target)))
   return ok.length ? ok.map(a => ({ name: a.name, target: a.target, text: a.text })) : undefined
 }
 
@@ -776,12 +776,16 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
 // where its agents' hook files are
 function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, hooks = dir): Record<string, string> {
   return {
+    // an agent's links as links (OSC 8: claude's [#12](url) shows #12, xterm opens it); an env below may say 0. Not
+    // in shells: tools that honor it put the escapes in piped output too
+    ...(tab.kind === 'agent' && { FORCE_HYPERLINK: '1' }),
     ...state.settings?.env, // Settings → General: every session's
     ...projectConfig(ws).env,
     ...presetOf(tab)?.env,
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
     TERM_PROGRAM: 'laki',
+    LAKI_APP: 'true', // an agent (or its skill) can tell it runs in Laki
     LAKI_WORKSPACE: ws.id,
     LAKI_TAB: tab.id,
     PORT: String(ws.port),
@@ -1137,7 +1141,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string }
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1171,6 +1175,16 @@ async function fromIssue(proj: Project, o: NewWs): Promise<NewWs> {
   return { ...o, prompt, name: o.name || `issue-${i.number}-${slug(i.title).slice(0, 24)}`.replace(/-+$/, ''), issued: { number: i.number, url: i.url, title: i.title } }
 }
 
+// a prompt that names a GitHub PR (prIn: "review https://github.com/o/r/pull/12"; not --pr, which checks it out): the
+// workspace is named after it (pr-<n>-<title>; gh failing: pr-<n>) and linked to it (prUrl) for the PR status
+async function fromPRLink(proj: Project, o: NewWs): Promise<NewWs> {
+  const url = o.pr?.trim() || o.linked || o.issued ? undefined : prIn(o.prompt) // an issue's: its text may name any PR
+  if (!url) return o
+  const pr = await prHead(proj, url).catch(() => undefined)
+  const n = pr?.number ?? Number(url.split('/').pop())
+  return { ...o, linked: pr?.url ?? url, name: o.name || (pr ? `pr-${n}-${slug(pr.title).slice(0, 24)}`.replace(/-+$/, '') : `pr-${n}`) }
+}
+
 // a race: one prompt to several agents, each in a worktree of its own (named <name>-<preset>), one after another (git
 // takes one worktree add at a time); Compare in the app lays them side by side
 export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace[]> {
@@ -1186,12 +1200,12 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     const agent = presetNamed(p)?.agent ?? p
     if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree
   }
-  const base = await fromIssue(proj, o)
+  const base = await fromPRLink(proj, await fromIssue(proj, o))
   const name = slug(base.name || (base.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')) || 'race'
   const race = randomUUID().slice(0, 8)
   const made: Workspace[] = []
   for (const p of presets) {
-    made.push(await wsNew({ ...base, preset: p, name: `${name.slice(0, Math.max(8, 39 - p.length)).replace(/-+$/, '')}-${p}`, race, place: undefined }))
+    made.push(await wsNew({ ...base, preset: p, name: `${name.slice(0, Math.max(8, 31 - p.length)).replace(/-+$/, '')}-${p}` /* slug keeps 32 */, race, place: undefined }))
     for (const w of [...made].reverse()) placeWs(w, o.place) // each first, the last one first: in place as it comes, in the race's order
     save()
     changed()
@@ -1206,6 +1220,10 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   const agent = presetNamed(preset)?.agent ?? preset
   if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // before the worktree: a wrong one makes nothing
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
+  // the folder's own workspace (not a scheduled run's session): Local again is that one, as it is (asked again below:
+  // another wsNew may make it meanwhile)
+  const own = () => (o.local || proj.git === false ? state.workspaces.find(w => w.project === proj.id && w.kind === 'local' && !w.schedule) : undefined)
+  if (!own() || o.another) o = await fromPRLink(proj, o)
   const current = proj.git === false ? '' : await git(proj, 'rev-parse', '--abbrev-ref', 'HEAD')
   // a PR: the worktree on its head branch, named after it, its base the PR's, linked to it (by URL) for the PR status
   if (o.pr?.trim() && (o.local || proj.git === false)) throw new Error('a PR needs a worktree: a git project, not Local')
@@ -1220,7 +1238,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   }
   let ws: Workspace
   if (o.local || proj.git === false) {
-    const have = state.workspaces.find(w => w.project === proj.id && w.kind === 'local' && !w.schedule) // the folder's own, not a scheduled run's session
+    const have = own()
     if (have && !o.another) return have
     const id = await uniqueWsId(o.another ? slug(o.name || '') || proj.id : proj.id)
     ws = { id, project: proj.id, path: proj.path, ...(proj.host && { host: proj.host }), branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
@@ -1255,6 +1273,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   if (proj.host) await readHostCfgs(ws) // its setup, env and ports
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
+  if (o.linked && !ws.prUrl) Object.assign(ws, { prUrl: o.linked, prLinked: true })
   state.workspaces.push(ws)
   placeWs(ws, o.place)
   save()
@@ -1680,7 +1699,7 @@ function syncBranches() {
 }
 function moveBranch(w: Workspace, b: string) {
   w.branch = b
-  w.prUrl = undefined // nor the PR it started from
+  w.prUrl = w.prLinked = undefined // nor the PR it started from
   prs.delete(w.id) // the old branch's PR isn't this one's
 }
 
@@ -2007,7 +2026,7 @@ export function scanPRs(): Promise<void> {
     return prScan
   }
   // workspaces in parallel: each gh call may take seconds
-  const live = state.workspaces.filter(ws => !ws.archived && ws.kind === 'worktree' && (ws.host || existsSync(ws.path)))
+  const live = state.workspaces.filter(ws => !ws.archived && (ws.kind === 'worktree' || ws.prUrl) && (ws.host || existsSync(ws.path)))
   prScan = Promise.all(live.map(scanPR)).then(() => {
     prScan = null
     if (prAgain) {
@@ -2082,7 +2101,8 @@ async function archiveMerged(ws: Workspace, pr: PR) {
 const retry = new Set<string>() // `<ws>:ci`, `<ws>:merge`: a switch turned on again (wsSet)
 
 async function autoPR(ws: Workspace, pr: PR) {
-  if (pr.state !== 'OPEN' || !(ws.autoFix || ws.autoReview || ws.autoMerge)) return
+  // a PR only linked (prLinked): its branch isn't this workspace's, so the agent's push wouldn't reach it
+  if (pr.state !== 'OPEN' || ws.prLinked || !(ws.autoFix || ws.autoReview || ws.autoMerge)) return
   const f: PRFix = ws.fix?.pr === pr.number ? { ...ws.fix } : { pr: pr.number }
   if (retry.delete(`${ws.id}:ci`)) Object.assign(f, { ci: undefined, tries: 0 }) // and the current commit's failure goes again
   if (retry.delete(`${ws.id}:merge`)) Object.assign(f, { merge: undefined, merges: 0 })
@@ -2637,6 +2657,22 @@ export async function prComment(o: { ws: string; path: string; line: number; sid
   })
   const c = JSON.parse(stdout || '{}')
   return { url: c.html_url as string | undefined }
+}
+
+// prAct: the PR approved or closed (the side panel's buttons, the status bar's menu, after a confirm), by gh as you;
+// then a scan, for its new state
+export async function prAct(o: { ws: string; act: 'approve' | 'close' }) {
+  const ws = findWs(o.ws)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  if (o.act !== 'approve' && o.act !== 'close') throw new Error('approve or close?')
+  if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
+  const args = o.act === 'approve' ? ['pr', 'review', '--approve', '--', pr.url] : ['pr', 'close', '--', pr.url]
+  await exec(ws, 'gh', args, { timeout: 30000 }).catch(e => {
+    throw new Error(ghSays(e, `PR #${pr.number}`))
+  })
+  void scanPRs()
+  return {}
 }
 
 // prThreads: the PR's review threads, for the side panel

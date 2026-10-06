@@ -1,8 +1,8 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, rowsOf, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, rowsOf, type Doctor, PR_SCAN, PR_TRIES, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
-import { type AutoKey, ciText, type FixWhat, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
+import { type AutoKey, ciText, type FixWhat, InfoPanel, type PRAct, prState, PRStatus, type WsInfo } from './Info'
 import { About, AddProject, Fun, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, StarLaki, TimerBar, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
@@ -689,9 +689,18 @@ export function App() {
   // GitHub asked again now, not at the next scan (every settings.prScan minutes)
   const refreshPR = () => call('prRefresh').then(() => done('PR status: fresh from GitHub'), () => {})
   // right click on the status bar's PR
+  // Approve / Close: gh as you, once you say so
+  const prAct = async (w: WorkspaceView, act: PRAct) => {
+    const pr = w.pr
+    if (!pr) return
+    const close = act === 'close'
+    if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, close && 'Without merging; GitHub can reopen it.'].filter(Boolean).join(' · '), ok: close ? 'Close PR' : 'Approve', danger: close }))) return
+    call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed PR #${pr.number}` : `Approved PR #${pr.number}`, undefined, undefined, true), () => {})
+  }
   const prMenu = (w: WorkspaceView): MenuItem[] => [
     { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', run: refreshPR },
     ...(w.pr ? [{ label: 'Open the PR', icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem, { label: 'Open its checks', icon: 'link', key: 'c', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem] : []),
+    ...(w.pr?.state === 'OPEN' ? [null, { label: 'Approve…', icon: 'check', key: 'a', run: () => prAct(w, 'approve') } as MenuItem, { label: 'Close PR…', icon: 'x', danger: true, run: () => prAct(w, 'close') } as MenuItem] : []),
   ]
 
   // right click on a tab (or a pane header: one session)
@@ -1309,6 +1318,7 @@ export function App() {
               onOpen={openExternal}
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
+              onAct={act => prAct(ws, act)}
             />
           )}
           {info && ws && (
@@ -1318,6 +1328,7 @@ export function App() {
               onOpen={openExternal}
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
+              onAct={act => prAct(ws, act)}
               onRename={() => setDialog({ renameWs: ws.id })}
               onAgent={selectTab}
               onCopy={copy}
@@ -1438,7 +1449,8 @@ export function App() {
               // a row in the sidebar meanwhile (it stays when Esc closes the page: the workspace is still coming)
               const key = ++made.current.key
               const page = made.current.page
-              const name = p.name?.trim() || (p.pr ? `PR #${p.pr.replace(/.*\/pull\//, '')}` : nameOf(p.prompt ?? '')) || 'new workspace'
+              const pr = p.pr || prIn(p.prompt)
+              const name = p.name?.trim() || (pr ? `PR #${pr.replace(/.*\/pull\//, '')}` : nameOf(p.prompt ?? '')) || 'new workspace'
               setMaking(m => [...m, { key, project: p.project, place: p.place, name: p.fan ? `${name} ×${p.fan.length}` : name }])
               const gone = () => setMaking(m => m.filter(x => x.key !== key))
               // a race: a workspace per agent, then Compare

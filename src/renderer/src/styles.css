@@ -205,6 +205,7 @@ textarea { resize: vertical; font-family: inherit; }
 .tabbar > .side-show { margin: 0 6px 0 0; }
 .tab .x { background: none; border: none; padding: 0 4px; color: var(--muted); visibility: hidden; }
 .tab:hover .x, .tab.sel .x { visibility: visible; }
+.tab:is(:hover, .sel) .x { color: color-mix(in srgb, currentColor 75%, transparent); } /* the tab's own text color: a look's bright or dark tab keeps it readable */
 .tabbar > .ib { align-self: center; margin-left: 2px; }
 .actions { display: flex; gap: 1px; align-self: center; }
 /* the tabs elsewhere (Settings › Appearance › Tabs): a strip under the terminals, or a column beside them; the
@@ -293,8 +294,10 @@ textarea { resize: vertical; font-family: inherit; }
 .row { display: flex; gap: 8px; }
 .row > * { flex: 1; }
 .row > button { flex: none; }
-.seg { display: flex; gap: 0; }
-.seg button { border-radius: 0; margin-left: -1px; }
+.actions-only { display: flex; align-items: center; gap: 8px; } /* Settings › Actions' filter */
+.actions-only select { flex: none; width: auto; min-width: 160px; }
+.seg { display: flex; gap: var(--seg-gap, 0px); } /* a look's rounded buttons stand apart (look.css) */
+.seg button { border-radius: 0; margin-left: var(--seg-overlap, -1px); }
 .seg button:first-child { border-radius: var(--radius) 0 0 var(--radius); margin-left: 0; }
 .seg button:last-child { border-radius: 0 var(--radius) var(--radius) 0; }
 .seg button.on { background: var(--sel); position: relative; }

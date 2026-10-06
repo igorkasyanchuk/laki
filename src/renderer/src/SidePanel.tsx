@@ -5,7 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type M
 import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { type Block, type Inline, markdown } from './markdown'
-import { type AutoKey, type FixWhat, PRSection, type WsInfo } from './Info'
+import { type AutoKey, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, type RunAction } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
 
@@ -409,14 +409,14 @@ function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number })
   )
 }
 
-function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void }) {
+function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct) => void }) {
   const pr = p.w.pr
   const [threads, err, reload] = useLoad(p.api.threads, `${p.w.id}#${pr?.number ?? ''}`, 60000)
   const open = (threads ?? []).filter(t => !t.resolved && t.comments.length)
   const resolved = (threads ?? []).filter(t => t.resolved).length
   return (
     <div className="sp-body info-body">
-      <PRSection w={p.w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} />
+      <PRSection w={p.w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />
       {pr && (
         <section>
           <h3>
@@ -461,6 +461,7 @@ export function SidePanel(p: {
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: FixWhat) => void
+  onAct: (act: PRAct) => void
 }) {
   const tabs = TABS.filter(t => p.git || t.id === 'files' || t.id === 'preview')
   const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
@@ -484,7 +485,7 @@ export function SidePanel(p: {
       </div>
       {tab === 'files' && <Files api={p.api} ws={p.w.id} />}
       {tab === 'changes' && <ChangesTab api={p.api} ws={p.w.id} pr={p.w.pr?.number} />}
-      {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} />}
+      {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
     </div>
   )

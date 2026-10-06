@@ -26,7 +26,10 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Race**: one prompt to several agents (claude, codex…), each in its own worktree; *Compare* lays them side by
   side (status, diff size, what each said last, the files it changed) and *Keep this one* archives the rest.
 - **Issues and PRs**: `laki new <project> --issue <url>` starts a workspace on a GitHub issue (its title and text as
-  the prompt); `--pr <url>` (or the new-workspace page's *Pull request*) on a PR's branch, a fork's too.
+  the prompt); `--pr <url>` (or the new-workspace page's *Pull request*) on a PR's branch, a fork's too. A prompt
+  that names a PR (`review https://github.com/o/r/pull/12`) names the workspace after it (`pr-12-<title>`) and links
+  it to that PR: its status and checks, without checking it out (so no fix/review switches: the agent couldn't push
+  to it; `--pr` gives those).
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
   closed. ⌘F finds with every match in yellow; copy on select; drop files on one to type their paths; font,
   size, line height, weight, cursor and zoom, with a live preview.
@@ -205,7 +208,7 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,
   opens `localhost:$PORT` or edits the script. With no run script, Run opens the project's scripts.
   ▾ also lists your actions (Settings → *Actions*, and the project's), worked out as it opens:
-  - *Agent actions*: a prompt for an agent (Claude Code, Codex, Gemini, Grok, OpenCode), listed while the workspace runs that agent. It goes to
+  - *Agent actions*: a prompt for an agent (Claude Code, Codex, Gemini, Grok, OpenCode, or *Any agent*), listed while the workspace runs that agent. It goes to
     the focused tab if it's that agent, else its first tab, now or (while it works) when its turn ends.
   - *Terminal actions*: a command, typed into the focused shell, else the workspace's first, else a new one.
 
@@ -354,6 +357,9 @@ with no agent running nothing is sent, and the next check tries again.
   you. Right after a push GitHub doesn't know yet whether it conflicts: that keeps the count; no conflicts, or the
   switch turned off and on, starts it over.
 
+*Approve…* and *Close PR…* (the side panel's *Review*, the info panel, and the status bar PR's right click) approve or
+close the open PR with `gh`, as you, after you confirm. GitHub refuses to approve your own PR; Laki says so.
+
 *Archive workspace when its PR merges* (Settings › *Pull requests*, off by default): the next check after a merge
 archives the workspace, if it's clean: nothing uncommitted, no commit the PR doesn't have, no agent at work. Once per
 PR: *Undo* in the message brings it back for good. One that can't go says *merged* in the sidebar.
@@ -478,7 +484,8 @@ lit for a moment.
   timers* (off by default), *Diff size in the sidebar* (off by default), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
-  reads it back (projects and their own settings don't move).
+  reads it back (projects and their own settings don't move). A file from another version comes in too: a setting
+  this one keeps in another shape is left out (Import names it), the rest applies.
 - *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
   over the theme's), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
@@ -547,7 +554,9 @@ lit for a moment.
   one is in the new-tab menu and the new-workspace page. The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them). Edit `claude` or `codex` to change how every new one starts; a tab started from a preset uses its current settings when it restarts or resumes.
   The chips under the arguments (`$PORT`, `$LAKI_WORKSPACE`, `$LAKI_TAB`, `$LAKI_PROJECT_PATH`) put a variable in at the
-  cursor: the line goes through the shell, so they work there.
+  cursor: the line goes through the shell, so they work there. Every tab also gets `LAKI_APP=true` (a program or
+  skill can tell it runs in Laki), and an agent's `FORCE_HYPERLINK=1` (Claude Code's links show as their text, a click
+  opens them; set it to 0 in an env to see the URLs).
 - *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
   Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
@@ -560,9 +569,10 @@ lit for a moment.
   `{{base}}` the workspace's project and base branch; a template without `{{prompt}}` gets the prompt after
   it. *Add template* starts from an example; the chips under each one put a variable in at the cursor. A project can
   have its own (its settings, below).
-- *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent or a terminal) and the prompt
+- *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent, *Any agent*: whichever runs, or a terminal) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
-  findings` for Codex, `bundle exec rails db:migrate` for a terminal.
+  findings` for Codex, `bundle exec rails db:migrate` for a terminal. The copy button duplicates one (to make the
+  same for another agent); *Show* lists one agent's.
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

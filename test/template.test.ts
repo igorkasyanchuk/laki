@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { fillTemplate, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock } from '../src/renderer/src/text.ts'
+import { fillTemplate, importable, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -135,4 +135,11 @@ test("the sidebar's timer: lengths as typed, its clock", () => {
   for (const bad of ['', 'soon', '0', '25 x', '25 parsecs', '-5', '25h', 'm', '1h 2'])
     assert.equal(parseDuration(bad), null, bad)
   assert.deepEqual([clock(0), clock(999), clock(65000), clock(3723000), clock(-5)], ['0:00', '0:01', '1:05', '1:02:03', '0:00'])
+})
+
+test('a settings file from another version: fields of the wrong kind left out, the rest (unknown ones too) in', () => {
+  assert.deepEqual(importable({ theme: 'starship', fontSize: '14', actions: {}, presets: null, gone: 1, env: { A: '1' } }), {
+    ok: { theme: 'starship', presets: null, gone: 1, env: { A: '1' } },
+    bad: ['fontSize', 'actions'],
+  })
 })

@@ -1946,6 +1946,26 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='islander'] .theme { border-radius: 14px; }
 @media (prefers-reduced-motion: reduce) { [data-look='monolith'] .settings-main h2::before { animation: none; } }
 
+/* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
+   run together */
+:is([data-look='abyss'], [data-look='aqua'], [data-look='aquarelle'], [data-look='azulejo'], [data-look='brass'],
+  [data-look='bricks'], [data-look='bubble'], [data-look='cassette'], [data-look='cathedral'], [data-look='chalk'],
+  [data-look='circuit'], [data-look='circus'], [data-look='clay'], [data-look='comic'], [data-look='cosmos'],
+  [data-look='darkroom'], [data-look='denim'], [data-look='diner'], [data-look='eink'], [data-look='groovy'],
+  [data-look='holo'], [data-look='islander'], [data-look='kraft'], [data-look='luna'], [data-look='magma'],
+  [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
+  [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
+  [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
+  [data-look='workshop'])
+  { --seg-gap: 4px; --seg-overlap: 0px; }
+
+/* an icon on a bar a look colors its own way (starship's black on its light heads, a status bar of another color):
+   hovered, a tint of its own color, not the theme's hover (dark on dark, white on light) */
+[data-look='starship'] :is(.tab.sel, .project-head, .ws.sel) .ib:hover, [data-look='luna'] :is(.tabbar, .settings-head, .side-head, .project-head) .ib:hover,
+  [data-look='classic'] .tunnel-head .ib:hover, :is([data-look='pocket'], [data-look='transit'], [data-look='workshop']) .status .ib:hover
+  { background: color-mix(in srgb, currentColor 16%, transparent); }
+[data-look='starship'] .ws.sel .ib { color: #000; }
+
 /* each look's sidebar: the guide line under a project (--ws-guide), the line between projects (--proj-divider), the
    indent (--ws-indent) and the row height (--ws-h); unset: a thin line, 11px, 26px. Settings › Appearance › The
    sidebar sets them nearer, on .sidebar */

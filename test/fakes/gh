@@ -12,6 +12,7 @@ esac
 case "$1 $2" in
   "pr view") f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;
   "pr checks") f checks.json || echo '[]'; exit 8 ;;
+  "pr review"|"pr close") f refuse >&2 && exit 1; exit 0 ;;
   "run view") f run.log ;;
   "api graphql") f graphql.json || exit 1 ;;
   "auth status") f auth || exit 1 ;;

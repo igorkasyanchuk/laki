@@ -4,7 +4,7 @@ import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook, type Webhook, webhookUrl } from '../../shared/types'
-import { MAIL_OK, parseMails, type RunAction, type Template } from './text'
+import { importable, MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
 import { QR } from './Tunnel'
@@ -32,8 +32,6 @@ const Group = ({ title, hint, children }: { title: string; hint?: ReactNode; chi
 export type { Preset }
 
 // the sidebar's project names (ProjectLook): each option over the theme's; App.tsx puts them on the sidebar as data-ph-*
-// what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
 
 const PROJECT_LOOK: [keyof ProjectLook, string, [string, string][]][] = [
   ['font', 'Font', [['theme', "Theme's"], ['ui', 'Interface'], ['mono', 'Monospace']]],
@@ -334,8 +332,9 @@ export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; 
 export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
-const TARGETS: [RunAction['target'], string][] = [...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Terminal']]
+const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Terminal']]
 const ACTION_EG: Record<RunAction['target'], string> = {
+  any: 'Review the changes and fix what you find',
   claude: 'Run a code review twice and fix what it finds',
   codex: 'Run $code-review and fix the findings',
   gemini: 'Review the changes and fix what you find',
@@ -418,28 +417,49 @@ function TemplatesField({ value = [], onChange }: { value?: Template[]; onChange
 function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange: (v: RunAction[]) => void }) {
   const keys = useRef<number[]>([]) // like keys, for the cards
   while (keys.current.length < value.length) keys.current.push(Math.random())
+  const [only, setOnly] = useState<RunAction['target'] | ''>('') // the filter: one target's, or all
   const setAt = (i: number, a: Partial<RunAction>) => onChange(value.map((x, j) => (j === i ? { ...x, ...a } : x)))
   const drop = (i: number) => (keys.current.splice(i, 1), onChange(value.filter((_, j) => j !== i)))
+  // a copy right under it, for another agent: the filter would hide it, so it goes
+  const clone = (i: number) => (keys.current.splice(i + 1, 0, Math.random()), setOnly(''), onChange([...value.slice(0, i + 1), { ...value[i] }, ...value.slice(i + 1)]))
+  const used = TARGETS.filter(([v]) => value.some(a => a.target === v))
+  const show = used.length > 1 && used.some(([v]) => v === only) ? only : '' // the last of a target gone: all again
   return (
     <>
-      {value.map((a, i) => (
-        <div key={keys.current[i]} className="preset">
-          <div className="row">
-            <input value={a.name} placeholder="name, as Run ▾ shows it" onChange={e => setAt(i, { name: e.target.value })} />
-            <select value={a.target} onChange={e => setAt(i, { target: e.target.value as RunAction['target'] })}>
-              {TARGETS.map(([v, label]) => (
-                <option key={v} value={v}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <IconButton icon="trash" title="Remove action" onClick={() => drop(i)} />
-          </div>
-          <textarea className="mono" rows={2} spellCheck={false} value={a.text} placeholder={ACTION_EG[a.target]} onChange={e => setAt(i, { text: e.target.value })} />
+      {used.length > 1 && (
+        <div className="actions-only">
+          <span className="muted small">Show</span>
+          <select value={show} aria-label="Show actions for" onChange={e => setOnly(e.target.value as RunAction['target'] | '')}>
+            <option value="">All</option>
+            {used.map(([v, label]) => (
+              <option key={v} value={v}>
+                {label}
+              </option>
+            ))}
+          </select>
         </div>
-      ))}
+      )}
+      {value.map((a, i) =>
+        show && a.target !== show ? null : (
+          <div key={keys.current[i]} className="preset">
+            <div className="row">
+              <input value={a.name} placeholder="name, as Run ▾ shows it" onChange={e => setAt(i, { name: e.target.value })} />
+              <select value={a.target} onChange={e => setAt(i, { target: e.target.value as RunAction['target'] })}>
+                {TARGETS.map(([v, label]) => (
+                  <option key={v} value={v}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <IconButton icon="copy" title="Duplicate (for another agent)" onClick={() => clone(i)} />
+              <IconButton icon="trash" title="Remove action" onClick={() => drop(i)} />
+            </div>
+            <textarea className="mono" rows={2} spellCheck={false} value={a.text} placeholder={ACTION_EG[a.target]} onChange={e => setAt(i, { text: e.target.value })} />
+          </div>
+        ),
+      )}
       <div className="row">
-        <button type="button" onClick={() => onChange([...value, { name: '', target: 'claude', text: '' }])}>
+        <button type="button" onClick={() => onChange([...value, { name: '', target: show || 'claude', text: '' }])}>
           <Icon name="plus" /> Add action
         </button>
       </div>
@@ -809,11 +829,9 @@ export function SettingsPage(p: {
         const j = JSON.parse(t)
         const v = j?.laki === 'settings' ? j.settings : undefined
         if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error("it isn't a file Export made")
-        // a field of the wrong kind would be saved and break the pages that read it; ponytail: top level only
-        const bad = Object.entries(v).filter(([k, x]) => KINDS[k] && x !== undefined && !KINDS[k].split(' ').includes(x === null ? 'null' : Array.isArray(x) ? 'array' : typeof x))
-        if (bad.length) throw new Error(`${bad.map(([k]) => k).join(', ')}: not what Laki keeps there`)
-        paint(v)
-        setMoved(`Imported ${f.name}`)
+        const { ok, bad } = importable(v)
+        paint(ok)
+        setMoved(`Imported ${f.name}${bad.length ? `, without ${bad.join(', ')}: not what Laki keeps there now` : ''}`)
       })
       .catch(e => setMoved(`Couldn't import ${f.name}: ${e.message}`))
   // ⌘+ / ⌘− while the page is open change the size behind its back
@@ -1343,8 +1361,9 @@ export function SettingsPage(p: {
               <h2>Actions</h2>
               <p className="muted small">
                 Run ▾ lists them for the workspace you're in. A prompt goes to its agent's tab (the focused one first), queued while the agent works; it's
-                listed only while that agent runs there. A command goes to a terminal: the focused one, any other, or a new one. Projects add their own
-                (Settings › the project), and one with the same name and kind replaces a global one.
+                listed only while that agent runs there (Any agent: whichever runs). A command goes to a terminal: the focused one, any other, or a new one.
+                The copy button makes the same for another agent. Projects add their own (Settings › the project), and one with the same name and kind
+                replaces a global one.
               </p>
               <ActionsField value={s.actions} onChange={actions => set({ actions })} />
             </>

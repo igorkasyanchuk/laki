@@ -14,8 +14,9 @@ export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opu
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
 // each field overrides .laki.json's (env key by key)
 // expose: who Expose to the world lets in by default (emails, *@domains; empty: anyone with the link)
-// actions: Run ▾'s for the project's workspaces, after the global ones (one of the same name and target replaces it)
-export type RunAction = { name: string; target: Agent | 'shell'; text: string }
+// actions: Run ▾'s for the project's workspaces, after the global ones (one of the same name and target replaces it);
+// target any: whichever agent runs (the focused one first)
+export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: string }
 // a prompt template: {{prompt}} (what's typed), {{project}}, {{base}}; settings.templates and a project's own
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
@@ -67,7 +68,8 @@ export type Workspace = {
   fix?: PRFix // what autoFix/autoReview/autoMerge sent already
   race?: string // one prompt fanned out to several agents: the workspaces of one race share it (Compare)
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
-  prUrl?: string // the GitHub PR it was started from (laki new --pr): its PR by URL (a fork's, another repo's), until the branch moves
+  prUrl?: string // the GitHub PR it was started from (laki new --pr, or a prompt naming one): its PR by URL (a fork's, another repo's), until the branch moves
+  prLinked?: boolean // prUrl from a prompt: the PR isn't checked out here, so the auto switches (fix and push) stay off
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
 }
@@ -88,6 +90,10 @@ export const PR_PROMPTS: Record<FixWhat, string> = {
     'PR #{{pr}} ({{url}}) has merge conflicts with {{base}}. Merge it in (git fetch origin {{base}}, then git merge origin/{{base}}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, then commit and push the merge, then say what you changed.',
 }
 // {{name}} (spaces inside allowed) as vars say; an unknown one stays as it is (not {{constructor}}): prompt templates', PR_PROMPTS'
+// the first GitHub PR a prompt names ("review https://github.com/o/r/pull/12"): the new workspace is named after it
+// and linked to it
+export const prIn = (text = '') => /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/.exec(text)?.[0]
+
 export const fillTemplate = (text: string, vars: Record<string, string | undefined>) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
 // a webhook's URL as pushes take it (push.ts; Settings says why not as you type)
 export function webhookUrl(url?: string) {
@@ -256,4 +262,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 23
+export const API = 24
