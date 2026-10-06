@@ -19,4 +19,9 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.send('deep-link-ready') // then main sends one that came first
   },
   capture: (webContentsId: number): Promise<string> => ipcRenderer.invoke('capture', webContentsId), // the preview's PNG, base64
+  // the menu bar's screenshot (a PNG, base64): to a new workspace's prompt
+  onShot: (cb: (png: string) => void) => {
+    ipcRenderer.on('shot', (_e, png: string) => cb(png))
+    ipcRenderer.send('shot-ready') // then main sends one taken before
+  },
 })

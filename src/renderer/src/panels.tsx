@@ -188,44 +188,111 @@ export function About({ onClose }: { onClose: () => void }) {
 
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[]; pr?: string }
+// place: the sidebar's place, 'top' of the project or a sep's id (first under it)
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[]; pr?: string; place?: string }
 
-// initial: a laki://new link's prompt, preset and name
-export function NewWorkspace({ view, project, agent, initial, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
-  const [p, setP] = useState<NewWsParams>({ project: project ?? view.projects[0]?.id ?? '', preset: agent || 'claude', base: '', ...initial })
+// the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
+// kept would make several worktrees from a folded Advanced)
+type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'base' | 'place'>> & { tpl?: string; agent?: string }
+const LAST_NEW = 'laki.newWs'
+const ADV_OPEN = 'laki.newAdv'
+function load<T>(key: string, or: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? 'null') ?? or
+  } catch {
+    return or
+  }
+}
+const keep = (key: string, v: unknown) => {
+  try {
+    localStorage.setItem(key, JSON.stringify(v))
+  } catch {}
+}
+
+// initial: a laki://new link's prompt, preset and name; project and initial win over the last choices; images: the menu
+// bar's screenshots
+export function NewWorkspace({ view, project, agent, initial, images: shots, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Img[]; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
+  const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
+  const [p, setP] = useState<NewWsParams>(() => {
+    const names = [...view.presets.map(x => x.name), 'shell', 'custom', 'none']
+    // the last agent, unless Settings › New workspaces start changed since: then that one
+    const preset = initial?.preset ?? (last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent || 'claude')
+    const same = preset === last.preset // the model and effort are that agent's
+    const proj = project ?? (view.projects.some(x => x.id === last.project) ? last.project! : view.projects[0]?.id ?? '')
+    return {
+      project: proj,
+      place: proj === last.project ? last.place : undefined, // that project's sep, if it's still there (submit checks)
+      preset,
+      cmd: last.cmd,
+      local: last.local,
+      model: same ? last.model : undefined,
+      effort: same ? last.effort : undefined,
+      base: '',
+      ...initial,
+    }
+  })
   const [branches, setBranches] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [images, setImages] = useState<Img[]>([])
+  const [images, setImages] = useState<Img[]>(shots ?? [])
+  const had = useRef(new Set((shots ?? []).map(s => s.path))) // screenshots given so far: one taken out stays out
+  useEffect(() => {
+    const more = (shots ?? []).filter(s => !had.current.has(s.path))
+    for (const s of more) had.current.add(s.path)
+    if (more.length) setImages(i => [...i, ...more]) // another screenshot, the prompt kept
+  }, [shots])
   const [saving, setSaving] = useState(false) // an image isn't saved yet
-  const [tpl, setTpl] = useState('') // a prompt template's index ('' none)
+  const [tplName, setTplName] = useState(last.tpl ?? '') // a prompt template's name ('' none): another project's of the same name too
+  const [adv, setAdv] = useState(() => load(ADV_OPEN, false) || !!initial?.name || !!initial?.pr)
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
-  const templates = templatesFor(view.settings.templates, view.projects.find(x => x.id === p.project)?.config?.templates)
-  const filled = templated(tpl ? templates[Number(tpl)] : undefined, p.prompt ?? '', { project: view.projects.find(x => x.id === p.project)?.name, base: p.base })
-  const plain = view.projects.find(x => x.id === p.project)?.git === false // a folder without git: local only
+  const proj = view.projects.find(x => x.id === p.project)
+  const templates = templatesFor(view.settings.templates, proj?.config?.templates)
+  const ti = templates.findIndex(t => t.name === tplName)
+  const tpl = ti < 0 ? '' : String(ti)
+  const filled = templated(templates[ti], p.prompt ?? '', { project: proj?.name, base: p.base })
+  const plain = proj?.git === false // a folder without git: local only
   const starts = view.presets.find(x => x.name === p.preset)?.agent // what the preset starts: its model and effort flags
   const [rivals, setRivals] = useState<string[]>([]) // a race: the other presets on the same prompt
   const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command').map(x => x.name)
   const racing = !p.local && !plain && !p.pr?.trim() && isAgent(starts) && rivals.some(r => racers.includes(r)) // a PR's branch is checked out once
   const fan = racing ? [p.preset, ...rivals.filter(r => racers.includes(r))] : undefined
   useEffect(() => {
-    setTpl('') // another project, other templates
     if (!p.project) return
     api.call('branches', { project: p.project }).then(
       r => {
         setBranches(r.branches)
-        setP(x => ({ ...x, base: r.current }))
+        setP(x => ({ ...x, base: x.project === last.project && last.base && r.branches.includes(last.base) ? last.base : r.current }))
       },
       () => setBranches([]),
     )
   }, [p.project])
+  // while it's made: how long so far, for the progress line (a worktree, copied files, an agent: seconds, more in a big repo)
+  const [secs, setSecs] = useState(0)
+  const strip = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!busy) return
+    setSecs(0)
+    strip.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) // in sight under an open Advanced
+    const t = setInterval(() => setSecs(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [busy])
+  const doing = fan
+    ? `Making ${fan.length} worktrees, one after another`
+    : p.pr?.trim() && !p.local && !plain
+      ? `Checking out PR #${p.pr.trim().replace(/.*\/pull\//, '')} into a worktree`
+      : p.local || plain
+        ? `Opening ${proj?.name ?? 'the folder'}`
+        : `Making a worktree off ${p.base || 'the current branch'}`
+  const then = p.local || plain ? 'then its tabs start' : secs < 12 ? 'then the files git ignores (.env…) are copied and the agent starts' : 'still going: a big repo takes a while'
   const submit = async (e?: React.FormEvent) => {
     e?.preventDefault()
     if (busy || saving) return
     setBusy(true)
+    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, base: p.base, place: p.place, tpl: tplName, agent } satisfies LastNew)
     try {
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
-      await onCreate({ ...p, pr: p.local || plain ? undefined : p.pr?.trim() || undefined, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
+      const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
+      await onCreate({ ...p, place, pr: p.local || plain ? undefined : p.pr?.trim() || undefined, prompt, name: p.name || (tpl ? nameOf(p.prompt ?? '') : undefined), local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
     } catch {
       setBusy(false)
     }
@@ -236,137 +303,192 @@ export function NewWorkspace({ view, project, agent, initial, onClose, onCreate 
         <p className="muted">Open a folder first (⌘O), or drop one on the window.</p>
       </Page>
     )
+  const prompting = view.presets.some(x => x.name === p.preset && x.agent !== 'command')
+  // what Advanced holds, in words, so a closed one still says it
+  const where = plain || p.local ? 'in the folder itself' : p.pr?.trim() ? `on PR #${p.pr.trim().replace(/.*\/pull\//, '')}` : `a worktree off ${p.base || '…'}`
+  const said = [where, p.name?.trim() && `named ${p.name.trim()}`, fan && `race of ${fan.length}`, isAgent(starts) && !racing && p.model?.trim(), isAgent(starts) && !racing && p.effort && `${p.effort} effort`].filter(Boolean).join(' · ')
+  const toggle = () => setAdv(o => (keep(ADV_OPEN, !o), !o))
   return (
     <Page title="New workspace" onClose={onClose}>
-      <form onSubmit={submit} className="form">
-        <label>
-          Project
-          <select value={p.project} onChange={e => set({ project: e.target.value })}>
-            {view.projects.map(x => (
-              <option key={x.id} value={x.id}>
-                {x.name}
-              </option>
-            ))}
-          </select>
-        </label>
-        {plain ? (
-          <div className="muted small">A folder without git: the workspace runs in the folder itself.</div>
-        ) : (
-          <label className="check">
-            <input type="checkbox" checked={!!p.local} onChange={e => set({ local: e.target.checked })} /> Local: work in the repo itself (no worktree)
-          </label>
-        )}
-        {!p.local && !plain && (
+      <form onSubmit={submit} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy}>
+        <div className="nw-card">
           <div className="row">
             <label>
-              <span>
-                Pull request <span className="muted">(optional)</span>
-              </span>
-              <input value={p.pr ?? ''} placeholder="#123 or its URL" spellCheck={false} onChange={e => set({ pr: e.target.value.replace(/^#/, '') })} />
-            </label>
-            <label>
-              Base branch
-              <input list="branches" value={p.pr?.trim() ? "the PR's" : p.base} disabled={!!p.pr?.trim()} onChange={e => set({ base: e.target.value })} />
-              <datalist id="branches">
-                {branches.map(b => (
-                  <option key={b} value={b} />
+              Project
+              <select value={p.project} onChange={e => set({ project: e.target.value, place: undefined })}>
+                {view.projects.map(x => (
+                  <option key={x.id} value={x.id}>
+                    {x.name}
+                  </option>
                 ))}
-              </datalist>
+              </select>
             </label>
-            <label>
-              <span>
-                Name <span className="muted">(optional)</span>
-              </span>
-              <input value={p.name ?? ''} placeholder={p.pr?.trim() ? 'pr-<number>-<title>' : 'from the prompt'} onChange={e => set({ name: e.target.value })} />
-            </label>
-          </div>
-        )}
-        <label>
-          Agent
-          <div className="seg">
-            {[...view.presets.map(x => x.name), 'shell', 'custom', 'none'].map(x => (
-              <button type="button" key={x} className={p.preset === x ? 'on' : ''} onClick={() => set({ preset: x, model: undefined, effort: undefined }) /* another agent's names */}>
-                {x}
-              </button>
-            ))}
-          </div>
-        </label>
-        {!p.local && !plain && !p.pr?.trim() && isAgent(starts) && racers.length > 0 && (
-          <div className="field">
-            <span>
-              Race <span className="muted">· the same prompt to more agents, each in a worktree of its own; Compare keeps the best</span>
-            </span>
-            <div className="seg">
-              {racers.map(x => (
-                <button type="button" key={x} className={rivals.includes(x) ? 'on' : ''} disabled={!rivals.includes(x) && rivals.filter(r => racers.includes(r)).length >= 5 /* six agents at most */} onClick={() => setRivals(r => (r.includes(x) ? r.filter(y => y !== x) : [...r, x]))}>
-                  + {x}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        {isAgent(starts) && !racing && (
-          <div className="row">
-            <label>
-              <span>
-                Model <span className="muted">(optional)</span>
-              </span>
-              <input list="models" value={p.model ?? ''} spellCheck={false} placeholder={starts === 'opencode' ? 'provider/model' : "the agent's default"} onChange={e => set({ model: e.target.value })} />
-              <datalist id="models">
-                {(MODELS[starts] ?? []).map(m => (
-                  <option key={m} value={m} />
-                ))}
-              </datalist>
-            </label>
-            {EFFORTS[starts] && (
+            {!!proj?.seps?.length && (
               <label>
-                Effort
-                <select value={p.effort ?? ''} onChange={e => set({ effort: e.target.value })}>
-                  <option value="">the agent's default</option>
-                  {EFFORTS[starts]!.map(x => (
-                    <option key={x} value={x}>
-                      {x}
+                In the sidebar
+                <select value={p.place ?? ''} onChange={e => set({ place: e.target.value || undefined })}>
+                  <option value="">First in {proj.name}</option>
+                  {proj.seps.map(s => (
+                    <option key={s.id} value={s.id}>
+                      Under {s.name}
                     </option>
                   ))}
                 </select>
               </label>
             )}
           </div>
-        )}
-        {p.preset === 'custom' && (
-          <label>
-            Command
-            <input value={p.cmd ?? ''} placeholder="aider --model …" onChange={e => set({ cmd: e.target.value })} autoFocus />
-          </label>
-        )}
-        {view.presets.some(x => x.name === p.preset && x.agent !== 'command') && (
           <div className="field">
-            <span>
-              Prompt <span className="muted">(optional)</span>
+            <span>Agent</span>
+            <div className="seg wrap">
+              {[...view.presets.map(x => x.name), 'shell', 'custom', 'none'].map(x => (
+                <button type="button" key={x} className={p.preset === x ? 'on' : ''} onClick={() => set({ preset: x, model: undefined, effort: undefined }) /* another agent's names */}>
+                  {x}
+                </button>
+              ))}
+            </div>
+          </div>
+          {p.preset === 'custom' && (
+            <label>
+              Command
+              <input value={p.cmd ?? ''} placeholder="aider --model …" onChange={e => set({ cmd: e.target.value })} autoFocus />
+            </label>
+          )}
+          {prompting && (
+            <div className="field">
+              <span>
+                Prompt <span className="muted">(optional)</span>
+              </span>
+              <PromptInput
+                value={p.prompt ?? ''}
+                onChange={prompt => set({ prompt })}
+                images={images}
+                onImages={setImages}
+                save={(data, ext) => api.call<string>('imageSave', { data, ext })}
+                dictate={bridge?.dictate}
+                dictationSettings={bridge?.dictationSettings}
+                onSubmit={submit}
+                onBusy={setSaving}
+                rows={10}
+              />
+              <TemplatePick templates={templates} value={tpl} onChange={i => setTplName(i ? templates[Number(i)].name : '')} preview={filled} />
+            </div>
+          )}
+        </div>
+        <div className={`nw-card nw-adv ${adv ? 'open' : ''}`}>
+          <button type="button" className="nw-adv-head" aria-expanded={adv} onClick={toggle}>
+            <Icon name={adv ? 'chevron' : 'chevronRight'} />
+            <b>Advanced</b>
+            <span className="muted">{said}</span>
+          </button>
+          {adv && (
+            <>
+              {plain ? (
+                <div className="muted small">A folder without git: the workspace runs in the folder itself.</div>
+              ) : (
+                <label className="check">
+                  <input type="checkbox" checked={!!p.local} onChange={e => set({ local: e.target.checked })} /> Local: work in the repo itself (no worktree)
+                </label>
+              )}
+              {!p.local && !plain && (
+                <div className="row">
+                  <label>
+                    <span>
+                      Pull request <span className="muted">(optional)</span>
+                    </span>
+                    <input value={p.pr ?? ''} placeholder="#123 or its URL" spellCheck={false} onChange={e => set({ pr: e.target.value.replace(/^#/, '') })} />
+                  </label>
+                  <label>
+                    Base branch
+                    <input list="branches" value={p.pr?.trim() ? "the PR's" : p.base} disabled={!!p.pr?.trim()} onChange={e => set({ base: e.target.value })} />
+                    <datalist id="branches">
+                      {branches.map(b => (
+                        <option key={b} value={b} />
+                      ))}
+                    </datalist>
+                  </label>
+                  <label>
+                    <span>
+                      Name <span className="muted">(optional)</span>
+                    </span>
+                    <input value={p.name ?? ''} placeholder={p.pr?.trim() ? 'pr-<number>-<title>' : 'from the prompt'} onChange={e => set({ name: e.target.value })} />
+                  </label>
+                </div>
+              )}
+              {isAgent(starts) && !racing && (
+                <div className="row">
+                  <label>
+                    <span>
+                      Model <span className="muted">(optional)</span>
+                    </span>
+                    <input list="models" value={p.model ?? ''} spellCheck={false} placeholder={starts === 'opencode' ? 'provider/model' : "the agent's default"} onChange={e => set({ model: e.target.value })} />
+                    <datalist id="models">
+                      {(MODELS[starts] ?? []).map(m => (
+                        <option key={m} value={m} />
+                      ))}
+                    </datalist>
+                  </label>
+                  {EFFORTS[starts] && (
+                    <label>
+                      Effort
+                      <select value={p.effort ?? ''} onChange={e => set({ effort: e.target.value })}>
+                        <option value="">the agent's default</option>
+                        {EFFORTS[starts]!.map(x => (
+                          <option key={x} value={x}>
+                            {x}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  )}
+                </div>
+              )}
+              {!p.local && !plain && !p.pr?.trim() && isAgent(starts) && racers.length > 0 && (
+                <div className="field">
+                  <span>
+                    Race <span className="muted">· the same prompt to more agents, each in a worktree of its own; Compare keeps the best</span>
+                  </span>
+                  <div className="seg wrap">
+                    {racers.map(x => (
+                      <button type="button" key={x} className={rivals.includes(x) ? 'on' : ''} disabled={!rivals.includes(x) && rivals.filter(r => racers.includes(r)).length >= 5 /* six agents at most */} onClick={() => setRivals(r => (r.includes(x) ? r.filter(y => y !== x) : [...r, x]))}>
+                        + {x}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {busy && (
+          <div className="nw-making" role="status" ref={strip}>
+            <span className="glyph spin" />
+            <span className="nw-making-text">
+              <b>{doing}…</b>
+              <span className="muted small">
+                {then} · {secs}s · Esc closes this page, it goes on in the sidebar
+              </span>
             </span>
-            <PromptInput
-              value={p.prompt ?? ''}
-              onChange={prompt => set({ prompt })}
-              images={images}
-              onImages={setImages}
-              save={(data, ext) => api.call<string>('imageSave', { data, ext })}
-              dictate={bridge?.dictate}
-              dictationSettings={bridge?.dictationSettings}
-              onSubmit={submit}
-              onBusy={setSaving}
-              rows={12}
-            />
-            <TemplatePick templates={templates} value={tpl} onChange={setTpl} preview={filled} />
+            <span className="nw-bar" />
           </div>
         )}
         <div className="buttons">
           <span className="muted">⌘⏎ create · esc cancel</span>
           <span className="spacer" />
           <button type="button" onClick={onClose}>
-            Cancel
+            {busy ? 'Close' : 'Cancel'}
           </button>
           <button type="submit" className="primary" disabled={busy || saving || !p.project}>
-            {busy ? 'Creating…' : saving ? 'Saving image…' : fan ? `Create ${fan.length} workspaces` : 'Create'}
+            {busy ? (
+              <>
+                <span className="btn-spin" /> Creating…
+              </>
+            ) : saving ? (
+              'Saving image…'
+            ) : fan ? (
+              `Create ${fan.length} workspaces`
+            ) : (
+              'Create'
+            )}
           </button>
         </div>
       </form>
@@ -569,14 +691,22 @@ export function Ready({ name, branch, actions }: { name: string; branch?: string
   )
 }
 
+const CLOUDFLARED_WHY =
+  "Cloudflare's free tunnel, no account needed. Laki uses it for public links: share a workspace's dev server (the globe next to a port in the status bar), and open Laki itself from your phone (Settings › Remote access)."
+
 // no project yet: a drop target and what's installed (the daemon's doctor; an older one has none: just the target)
 export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: () => void; check: () => Promise<Doctor> }) {
   const [d, setD] = useState<Doctor | null>(null)
   useEffect(() => void check().then(setD, () => {}), [])
-  const row = (ok: boolean, name: string, hint: string) => (
+  const row = (ok: boolean, name: string, hint: string, why?: string) => (
     <div className="check" key={name}>
-      <Glyph s={ok ? 'ok' : 'exited'} />
+      <Glyph s={ok ? 'ok' : why ? 'idle' : 'exited'} />{/* why: optional, so missing it is no failure */}
       <b>{name}</b>
+      {why && (
+        <span className="check-why" data-tip={why} aria-label={why} tabIndex={0}>
+          <Icon name="help" size={13} />
+        </span>
+      )}
       <span className="muted">{hint}</span>
     </div>
   )
@@ -599,6 +729,8 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
         <div className="welcome-checks">
           {row(d.git, 'git', d.git ? 'found' : 'needed for worktrees: xcode-select --install')}
           {row(d.gh === 'in', 'gh', d.gh === 'in' ? 'signed in: PRs, checks and Ship work' : d.gh === 'out' ? 'not signed in, for PRs: gh auth login' : 'not found, for PRs: brew install gh')}
+          {d.cloudflared !== undefined &&
+            row(d.cloudflared, 'cloudflared', d.cloudflared ? 'found: public links work' : 'optional: brew install cloudflared', CLOUDFLARED_WHY)}
           {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install Claude Code or Codex, then restart Laki')}
           {missing.length > 0 && found.length > 0 && <div className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</div>}
         </div>

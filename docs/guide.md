@@ -105,7 +105,8 @@ npm link
 ## First run
 
 1. Open the app. It starts its background daemon if one isn't running. With no project yet it says what it found:
-   git, whether `gh` is signed in (for PRs), and which agents are on your PATH.
+   git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
+   links and remote access) and which agents are on your PATH.
 2. Add a project: **⌘O**, the folder icon at the top of the sidebar, or drag a folder from Finder onto the
    window. It can be a git repository or any other folder.
 3. The new-workspace page opens. Pick an agent (claude, codex, gemini, grok, opencode, shell, or a custom command) and,
@@ -152,9 +153,10 @@ selected workspace's PR is in the status bar.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
 - Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
   *Info*, *Mute notifications*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
-  *Mark as unread*, *Copy link* (`laki://ws/<id>`), *Compare the race* (a race's workspace: the flag on its row),
-  *Open in*, fork, archive and delete. A tab's menu has *Mute notifications*,
-  *Mark as unread* (its ● again, until you look at it) and *Copy link* too.
+  *Mark as unread*, *Copy branch name*, *Refresh PR status* (asks GitHub now, not at the next check), *Compare the race* (a race's
+  workspace: the flag on its row), *Open in*, fork, archive and delete. While a workspace is archived or deleted its row
+  shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
+  *Mark as unread* (its ● again, until you look at it) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
 - Drag projects, and workspaces within a project, to reorder them.
 - Separators: a project's ⋯ › *Add a separator*, or a workspace's *Add a separator below*, puts a named line
   between its workspaces. A click folds it: the workspaces under it, up to the next one, hide (their count and the
@@ -211,7 +213,8 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 listening ports (click one to open it in the browser; a name from `.laki.json`'s `ports` beside it; ✕ stops what
 listens there, after you confirm: SIGTERM, then SIGKILL 3 seconds later if it's still there; only your own processes
 of that workspace), the PR (click to open it), its CI (`✓ 4/4`,
-`✗ 1 failing`, `… 2 running`; click for the checks), *⚠ conflicts* when it has merge conflicts, the *fix CI*, *review* and *fix conflicts*
+`✗ 1 failing`, `… 2 running`, each check by its newest run, so a re-run that passed counts; click for the checks,
+right click for *Refresh from GitHub*), *⚠ conflicts* when it has merge conflicts, the *fix CI*, *review* and *fix conflicts*
 switches (see PRs below), and
 the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a button that copies the whole path.
 
@@ -241,6 +244,8 @@ email address only.
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.
+- When the page can't reach Laki it says why: Cloudflare's sign-in ran out (it reloads, to sign in again), the
+  link ended (remote access stopped or started again: open the newest one), or the Mac is out of reach.
 - On a phone the app has its own layout: the sidebar slides over, one pane at a time (split tabs show as
   separate tabs), the panels and Settings take the whole screen, and a row of keys a phone keyboard lacks
   (⌨ to show it, Esc, Tab, ⇧Tab, ⌃C, arrows, Enter) sits above the status bar. A terminal takes the size of the
@@ -305,7 +310,8 @@ until the agent's next run renews it. Settings › General turns each agent off 
 - *Review*: the PR with its checks, the *fix CI* / *review* / *fix conflicts* switches and the send buttons, and the open
   review threads (from reviewers with write access and bots: what the agent would get). Click a thread's
   file to preview it at that line.
-- *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first, or a listening port (the menu), a path, back,
+- *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first, or a listening port (the menu), a path, any website
+  (type `example.com` or a whole URL; in the app, not in a browser elsewhere), back,
   forward, reload, open in your browser. The camera takes a screenshot of the page and sends it to the agent
   with what you write. The crosshair picks an element: hover outlines it, a click types its CSS selector, text,
   size, HTML (cut at 1,500 characters), its computed CSS (what isn't a default) and the path of a screenshot of
@@ -357,12 +363,18 @@ its link, `{{base}}` its base branch; the failing checks or the review threads g
 back. The info panel's *Send failing CI*, *Send review comments* and *Send merge conflicts* buttons send the same
 prompts once, switches or not.
 
-**New workspace** (a page, like Settings; Esc closes it): pick the project, *Pull request* (optional: a PR's number
+**New workspace** (a page, like Settings; Esc closes it): pick the project and the agent, then write the prompt.
+It goes first in its project in the sidebar or, when the project has separators, first under the one you pick in
+*In the sidebar*.
+It starts from your last choices (project, its separator, agent, template, and what's under *Advanced*), never the last prompt.
+*Advanced* (folded; its line says what it holds, like *a worktree off main · high effort*) has *Local* (the repo itself,
+no worktree), *Pull request* (optional: a PR's number
 or URL; the worktree is on its branch through `gh pr checkout`, a fork's as `<owner>/<branch>`, its base the PR's,
 named `pr-<n>-<title>`; a fork's own `.laki.json` is ignored, so its setup never runs a stranger's code: the repo's
-is used; when a workspace has that branch already, the message offers *Open it*), base branch, name and agent (for an
-agent, its model, like `opus` or a full name, and for Claude Code and Codex its effort; both blank: the agent's
-default, kept for its restarts and forks), then the prompt:
+is used; when a workspace has that branch already, the message offers *Open it*), base branch, name, the agent's
+model (like `opus` or a full name) and, for Claude Code and Codex, its effort (both blank: the agent's
+default, kept for its restarts and forks), and *Race* (below). A new workspace is never hidden: a folded project or
+separator holding it, or the one you were on, opens. The prompt:
 - paste a screenshot (⌘V), drop image files on it, or pick them with the image icon; each shows as a
   thumbnail, and its path goes after your text;
 - the mic starts macOS dictation (or press Fn twice). *mic & language…* opens System Settings → Keyboard →
@@ -373,7 +385,14 @@ default, kept for its restarts and forks), then the prompt:
   `<name>-<preset>`) on the same prompt, and Compare opens (also in a race workspace's menu and ⌘K). Compare shows
   each one's status, diff size, last answer and changed files; *Open* goes to it, *Keep this one* archives the
   others (*Undo* in the message brings them back);
-- ⌘⏎ creates it.
+- ⌘⏎ creates it. Meanwhile a line under the page says what's happening (the worktree, then the files and the agent)
+  and for how long, *Create* spins, and the sidebar shows its row, *creating…*, where it will be. Esc closes the
+  page; it goes on there.
+
+**A screenshot to an agent**: Laki's mark in the menu bar has *Screenshot a part to an agent…* (drag over what you
+want, or Space and a click for a window; Esc cancels) and *Screenshot the screen to an agent* (the main display). The
+new-workspace page opens with the picture in the prompt: pick the project and agent, add a line, ⌘⏎. macOS asks
+once for Screen Recording for Laki.
 
 **⌘K palette:** jump to any workspace or tab, or run any action.
 
@@ -527,6 +546,8 @@ lit for a moment.
   arguments (e.g. `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each
   one is in the new-tab menu and the new-workspace page. The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them). Edit `claude` or `codex` to change how every new one starts; a tab started from a preset uses its current settings when it restarts or resumes.
+  The chips under the arguments (`$PORT`, `$LAKI_WORKSPACE`, `$LAKI_TAB`, `$LAKI_PROJECT_PATH`) put a variable in at the
+  cursor: the line goes through the shell, so they work there.
 - *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
   Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
@@ -537,7 +558,8 @@ lit for a moment.
   *PRs*).
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
   `{{base}}` the workspace's project and base branch; a template without `{{prompt}}` gets the prompt after
-  it. *Add template* starts from an example. A project can have its own (its settings, below).
+  it. *Add template* starts from an example; the chips under each one put a variable in at the cursor. A project can
+  have its own (its settings, below).
 - *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent or a terminal) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
   findings` for Codex, `bundle exec rails db:migrate` for a terminal.
@@ -641,7 +663,7 @@ OpenCode's `mcp add` only asks questions: put `"mcp": { "laki": { "type": "local
 
 | link | opens |
 |---|---|
-| `laki://ws/<id>[?tab=<tab>]` | a workspace, or one of its tabs (*Copy link* in their menus) |
+| `laki://ws/<id>[?tab=<tab>]` | a workspace, or one of its tabs (a tab's *Copy link*) |
 | `laki://new?project=<id>&prompt=…&preset=…&name=…` | the new-workspace page, filled in |
 | `laki://schedules[/<project>]` | Scheduled tasks, filtered to a project |
 | `laki://settings[/<section>]` | Settings (`general`, `appearance`, `remote`…) |

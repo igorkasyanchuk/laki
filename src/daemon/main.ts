@@ -75,7 +75,7 @@ const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && 
 // the app's page, for remote access: the built renderer (out/renderer, next to the built daemon; from source, after a
 // build; LAKI_PAGE: that folder instead, as tests do). Its files hold no secrets: the token comes in the link.
 const here = dirname(fileURLToPath(import.meta.url))
-const pageDir = process.env.LAKI_PAGE || [join(here, '../renderer'), join(here, '../../out/renderer')].find(d => existsSync(join(d, 'index.html')))
+const pageDir = process.env.LAKI_PAGE || [join(here, '../renderer'), join(here, '../../out/renderer')].find(d => existsSync(join(d, 'assets'))) // built: from source, ../renderer is the dev page
 const TYPES: Record<string, string> = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.woff2': 'font/woff2', '.svg': 'image/svg+xml', '.png': 'image/png', '.ico': 'image/x-icon', '.json': 'application/json' }
 function page(path: string, res: ServerResponse) {
   let file = ''
@@ -88,7 +88,10 @@ function page(path: string, res: ServerResponse) {
     res.writeHead(404, { 'content-type': 'text/plain' })
     return res.end(pageDir ? 'not found' : 'no app page here: build it (npm run build)')
   }
-  res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': 'no-cache', 'x-content-type-options': 'nosniff' })
+  // the page itself never from the cache (a tab brought back, Back): it goes through Cloudflare's sign-in again, and
+  // doesn't load without one, its every other request turned away
+  const html = extname(file) === '.html'
+  res.writeHead(200, { 'content-type': TYPES[extname(file)] ?? 'application/octet-stream', 'cache-control': html ? 'no-store' : 'no-cache', 'x-content-type-options': 'nosniff' })
   res.end(body)
 }
 
@@ -126,6 +129,7 @@ const api: Record<string, Handler> = {
   reorder: p => core.reorder(p),
   imageSave: p => core.imageSave(p),
   prFix: p => core.prFix(p),
+  prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
   webhookTest: p => core.webhookTest(p),
   portKill: p => core.portKill(p),
   meme: () => meme(),

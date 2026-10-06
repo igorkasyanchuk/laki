@@ -974,7 +974,9 @@ export function applyTheme(p: string | Paint = '') {
     st.setProperty('--app-bg', o.glassGlow === false ? base : `${glow('0% 0%', '--accent')}, ${glow('100% 100%', '--tc-purple')}, ${base}`)
     st.setProperty('--term-bg', alpha(v('bg', '--bg'), solid('glassTerm')))
     st.setProperty('--side', alpha(v('side', '--side'), solid('glassSide')))
-    st.setProperty('--tab-sel', alpha(v('fg', '--fg'), 10))
+    // the selected tab as the terminal, joined to it; a see-through terminal: a lift instead, the bar's tint is under it
+    // ponytail: the bar's tint stays under the tab, so it matches the terminal only when that's mostly solid
+    st.setProperty('--tab-sel', solid('glassTerm') >= 50 ? alpha(v('bg', '--bg'), solid('glassTerm')) : alpha(v('fg', '--fg'), 10))
   }
   if (!t.c || !t.ansi) return
   const { c, ansi: a } = t

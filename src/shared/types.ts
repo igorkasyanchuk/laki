@@ -35,6 +35,13 @@ export type Project = {
   rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
 }
 export type Sep = { id: string; name: string }
+// a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others
+// after, seps first); the app's sidebar and the daemon's placeWs
+export const rowsOf = <W extends { id: string; project: string }>(p: Pick<Project, 'id' | 'seps' | 'rows'>, ws: W[]): (W | Sep)[] => {
+  const at = new Map((p.rows ?? []).map((id, i) => [id, i]))
+  const end = at.size
+  return [...(p.seps ?? []), ...ws.filter(w => w.project === p.id)].sort((a, b) => (at.get(a.id) ?? end) - (at.get(b.id) ?? end)) // stable
+}
 // a folder over SSH, as scp writes it: host:path (the host never an option, -…)
 export const REMOTE = /^([A-Za-z0-9_][\w.@-]*):(.+)$/
 
@@ -239,7 +246,7 @@ export type Stat = { add: number; del: number; files: number; dirty: number }
 export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat }
 export type Proc = { pid: number; cmd: string }
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
-export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; agents: { id: Agent; found: boolean }[] }
+export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; agents: { id: Agent; found: boolean }[] }
 
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
@@ -249,4 +256,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 21
+export const API = 23

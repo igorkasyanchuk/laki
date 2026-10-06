@@ -68,15 +68,17 @@ board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `
 `unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`; 14: settings' `prPrompts`, `prScan`,
 `prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
 workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
-workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`). A
+workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `seps`: the sidebar's named lines between its
   workspaces, and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+- `wsNew`/`wsFan` `place` (`placeWs`, as a drag would: `top`, first in the project, or a sep's id, first under it; a
+  race in its order; none: last, as the CLI's and scheduled runs are);
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
 - `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns `{ dirty }`;
-  `doctor` (the first-run screen's: git, `gh auth status`, which agents are on PATH);
+  `doctor` (the first-run screen's: git, `gh auth status`, `cloudflared` (optional; Welcome's ? says what for), which agents are on PATH);
 - tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color, `muted`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something), `queueClear`;
   `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below), `unread` (its ● again: `done`, until a look clears it);
 - a race (`wsFan`: the `NewWs` fields and 2–6 `presets`, agents only, worktrees only): `wsNew` per preset, one after
@@ -280,6 +282,9 @@ empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon sta
 - PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, base
   branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, size, body), every `settings.prScan` minutes
   (`PR_SCAN`, 1; `prTick`, each minute; `LAKI_PR_SCAN_MS`: tests' pace instead); one scan at a time (`scanPRs`), so `autoPR` never sends twice.
+  `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now. The checks are
+  `newest`'s: statusCheckRollup keeps a re-run's old run, so each check (workflow and name) counts by its latest
+  `startedAt` (none, or Go's zero time: queued, the newest), as `gh pr checks` does.
 - `autoPR` (workspace `autoFix` / `autoReview` / `autoMerge`, ported from wb's `review.go`): failing CI on a new head
   commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`), at most `settings.prTries` in a row
   (`PR_TRIES`, 3), then status waiting and a notification (`overToYou`, once, as the count goes over); conflicts on a new head commit →
@@ -312,10 +317,15 @@ hash), which the renderer (`api.ts`: no port) uses on the page's own origin, the
 (`pageToken`: `replaceState`, kept in the tab's `sessionStorage` `laki.token` for reconnects; Cloudflare's sign-in page,
 an earlier history entry, still holds the link). While it runs, `main.ts`
 takes the tunnel's URL as an Origin, and that token only with it (a client with no Origin needs the daemon's own);
-`remoteStop` drops both, so an old link is dead. It ends by
+`remoteStop` drops both, so an old link is dead. The page (`api.ts` `whyNot`), when its socket won't open twice: a
+`fetch` of itself that redirects is Cloudflare's sign-in run out (a reload signs in again, once per 30 s), a 401/403 from
+`/rpc` is a dead link, no answer or a 5xx is the Mac out of reach; App shows it on the splash and in the status bar
+(the `problem` event). Retries back off to 10 s. `page` serves the HTML `no-store`, so a tab brought back or Back
+goes through the sign-in instead of loading from the cache with every other request turned away. It ends by
 `remoteStop`, at `until` (`remoteTick`, every 15 s), when cloudflared exits, or at shutdown.
 
-`main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`, or `LAKI_PAGE`) whatever the
+`main.ts` `page`: any GET serves a file of the built renderer (`out/renderer`: the folder with `assets`, never the dev
+`src/renderer`; or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's
 `connect-src 'self'` lets the page reach its own daemon over `wss://`.
 
@@ -355,7 +365,8 @@ in; they never create or run anything.
 
 The side panel's Preview: a `<webview>` (`webviewTag`) made by hand in `SidePanel.tsx` `PreviewTab`. Main's
 `will-attach-webview` drops any preload, forces no node, sandbox and context isolation, and refuses a `src` that
-isn't `http://localhost` or `127.0.0.1`, or a partition other than `persist:preview`, whose session grants only
+isn't `http://localhost` or `127.0.0.1` (the first page; after it, the address bar and links go to any website: `go`'s
+`SITE`, a bare `example.com`, is https), or a partition other than `persist:preview`, whose session grants only
 `PREVIEW_OK` permissions (Electron grants all by default). No `allowpopups`: its popups are blocked. `capture` (IPC) takes a webview of the
 asking window by its `webContentsId` and returns a PNG (base64); `ShotBox` saves it (`imageSave`) and sends its path to
 the agent. The crosshair (`pick`, the app only) runs `pickElement`'s source in the page (`executeJavaScript`): it
@@ -421,6 +432,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
     - `laki.video`: the sidebar's video (an embed URL), back after a reload without autoplay.
     - `laki.timers`: the sidebar's timers (`id`, `end`, `ms`, `then`); ones that ended while the app was closed are dropped.
+    - `laki.newWs`: the new-workspace page's last choices (`LastNew`: project, preset, cmd, local, model, effort,
+      base, place (that project's), template name, and Settings' default agent then: a new default wins; never the prompt, name, PR or a race); `laki.newAdv`: its Advanced open.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
     `Tray`, `trayIcon` drawn in code as a template image; the count as its title, a menu of those tabs, waiting first
@@ -431,12 +444,23 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one.
   - A workspace with a PR gets GitHub's mark in the sidebar (`.ws-pr`, its `prState` and failing checks as colors),
     unless `settings.prIcon === false`. Projects show `fork` (a repo) or `folder` (`git: false`).
-  - A project's workspaces are in `.project-ws` (indented on a guide line; a line between projects). A row shows
+  - A project's workspaces are in `.project-ws` (indented on a guide line; a line between projects). Rows are inset and
+    rounded (hover and selection one item each), the selected one with a short bar (`--ws-bar`: its color or the accent; a
+    look's `.ws.sel` background replaces it), `.needs` (a tab of `needsYou`) a bold name; a project with none shows
+    *New workspace* (`.ws-new`). A row shows
     `stat` (`.ws-stat`, with `settings.diffStat`) and, on hover, `.ws-acts` (its ⋯ menu) over its marks. The PR mark is red
     for an open PR's failing checks only: a merged one stays purple.
   - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
-  - `toast(text, undo?)`: one message at a time (a newer one restarts the timer); `archive` asks `wsArchive` with
-    `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is).
+  - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
+    and no red); `archive` asks `wsArchive` with
+    `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is). Deleting a
+    workspace and removing a project say so too. `busyWith` puts `going` on the rows meanwhile (a spinner and
+    *archiving…* / *deleting…*), Compare's *Keep this one* too.
+  - A new workspace stays in sight (`showNew`, from the new-workspace page, a fork, a restore): `reveal` unfolds the
+    project and sep holding it, and the one selected before it, once the view has them.
+  - The menu bar's screenshot (`bridge.onShot`): `imageSave`, then the new-workspace page with it (`newImages`).
+  - `making`: workspaces the new-workspace page is making, a row each (`makingRows`, a spinner, *creating…*) where
+    `place` puts them; Esc closes the page and they stay until `wsNew`/`wsFan` answers (a dialog opened meanwhile stays).
   - No project: `Welcome` (panels.tsx) with `doctor`'s checks. `settings.dimPanes`: `.dim-panes` on `.app`.
   - While a video plays, a closed sidebar is hidden (`hidden`), not unmounted, so it plays on. The video (`Video` in
     panels.tsx, the foot's play button and ⌘K, the `video` dialog): `text.ts` `youtubeEmbed` turns a link into a `youtube-nocookie.com/embed` URL
@@ -484,7 +508,10 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   Go used; `default` leaves the
   stylesheet's), `termTheme` (xterm colors from `--ansi-0…15`). Gradient themes set `--app-bg` and a
   transparent `--term-bg` (xterm runs with `allowTransparency`).
-- **`look.css`**: the bundled fonts (Inter, JetBrains Mono; `fonts/NOTICE.md`), syntax colors (`.hl-*`), glass
+- **`look.css`**: the bundled fonts (Inter, JetBrains Mono; `fonts/NOTICE.md`), syntax colors (`.hl-*`), a look's tab bar
+  line as `--tab-line` (a gradient across it as `--tab-line-bg` and `--tab-line-w`, one down it as `--tab-line-img`):
+  styles.css' real tab draws it beside the selected tab (the bar's `::before`/`::after`, CSS anchor positioning on the
+  tab's `--laki-tab`) and as the tab's border, never under it; not on a phone or the pill looks), glass
   (`html.glass`) and the creative themes' looks (`[data-look=…]`, from a theme's `look`), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
   `glassTerm` and `glassGlow`; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
@@ -519,7 +546,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
   `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
 - **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size (its preview cancels
-  that); presets, `EnvField` (KEY=value lines), fonts,
+  that); each section's settings in `Group`s (a titled card, `.set-group`: a new block of settings goes in one, or
+  a new one); `VarChips` under a template (`TEMPLATE_VARS`) and a preset's args or command (`ENV_VARS`) put a variable
+  in at the cursor of the field just before them; presets, `EnvField` (KEY=value lines), fonts,
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
   (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section), Appearance (themes, the current one outlined and checked, a name filter that stays in sight;
   accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's,
@@ -570,7 +599,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   the guide's keys and CLI recipes.
 - **`qr.ts`**: a QR encoder (byte mode, level M, versions 1–40, best mask), for the tunnel's link. Its test
   compares a code with macOS CoreImage's (`test/qr.test.ts`).
-- **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings), the palette,
+- **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings: project, agent and
+  prompt in a card, with *In the sidebar* (`place`: first in the project, or under one of its seps) when it has seps;
+  local, PR, base, name, model, effort and race under *Advanced*, its line saying what they hold;
+  the last choices, `laki.newWs`; `images`: the menu bar's screenshots; while it's made, `.busy` fades the cards and
+  `.nw-making` says what's happening and the seconds so far), the palette,
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
   (`SITE`, the version from `package.json`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
   `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the tab bar's
@@ -588,8 +621,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
-| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, capture, browse |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m`, sent as `shot` once the renderer says `shot-ready`), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
+| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/skill.ts` | the agent skill: SKILL.md and a CLI launcher in each agent's `skills/laki` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |

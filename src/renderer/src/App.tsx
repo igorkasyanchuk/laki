@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, rowsOf, type Doctor, PR_SCAN, PR_TRIES, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, ciText, type FixWhat, InfoPanel, prState, PRStatus, type WsInfo } from './Info'
@@ -14,6 +14,7 @@ import { Term, xterms } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
+import { type Img } from './PromptInput'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, nameOf, parseDuration, type RunAction, shortPath, youtubeEmbed } from './text'
@@ -109,22 +110,21 @@ function KeyBar({ onKey }: { onKey: (data: string) => void }) {
   )
 }
 
-// a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others after)
-const rowsOf = (p: Project, ws: WorkspaceView[]): (WorkspaceView | Sep)[] => {
-  const at = new Map((p.rows ?? []).map((id, i) => [id, i]))
-  const end = at.size
-  return [...(p.seps ?? []), ...ws.filter(w => w.project === p.id)].sort((a, b) => (at.get(a.id) ?? end) - (at.get(b.id) ?? end)) // stable
-}
 
 export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
+  const [problem, setProblem] = useState<string | undefined>() // the remote page: why it can't connect
+  const [going, setGoing] = useState<Record<string, string>>({}) // workspaces being archived or deleted: a spinner on their rows
+  const [making, setMaking] = useState<{ key: number; project: string; place?: string; name: string }[]>([]) // new ones on their way: a row each
+  const made = useRef({ key: 0, page: 0 }) // making's keys; page: the new-workspace page's closes (one closed mid-create isn't the one open now)
   const [wsId, setWsId] = useState<string | null>(() => load('laki.ws', null))
   const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('laki.tabs', {})) // the focused pane's session
   const [dialog, setDialog] = useState<Dialog>(null)
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [newInit, setNewInit] = useState<Partial<NewWsParams>>() // a laki://new link's prompt, preset, name
+  const [newImages, setNewImages] = useState<Img[]>([]) // the menu bar's screenshots, in the new workspace's prompt
   const [link, setLink] = useState<string>() // a laki:// link, routed once the view is in
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review
   const [panelTab, setPanelTab] = useState<PanelTab>(() => load('laki.panelTab', 'files'))
@@ -145,7 +145,7 @@ export function App() {
     return src ? { src } : null
   })
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
-  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string } | null>(null) // the toast, maybe with Undo (or another action: label)
+  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure
   const [menu, openMenu] = useMenu()
   const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
@@ -177,6 +177,23 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.side', JSON.stringify(sideW)), [sideW])
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
+  // a new workspace, and the one selected before it, stay in sight: their projects and seps unfold once the view has them
+  const [reveal, setReveal] = useState<string[]>([])
+  useEffect(() => {
+    if (!view || !reveal.length) return
+    const here = reveal.filter(id => view.workspaces.some(w => w.id === id))
+    if (!here.length) return
+    const open = new Set<string>()
+    for (const p of view.projects) {
+      let sep = ''
+      for (const x of rowsOf(p, view.workspaces)) {
+        if (!('path' in x)) sep = x.id
+        else if (here.includes(x.id)) open.add(p.id).add(sep)
+      }
+    }
+    setFolded(f => (f.some(x => open.has(x)) ? f.filter(x => !open.has(x)) : f))
+    setReveal(r => r.filter(id => !here.includes(id)))
+  }, [view, reveal])
   useEffect(() => void localStorage.setItem('laki.info', JSON.stringify(info)), [info])
   useEffect(() => void localStorage.setItem('laki.video', JSON.stringify(video?.src ?? null)), [video?.src])
   // the sidebar's timers, each a bar over its foot: when it ends, how long it was set for, and what happens then (ones
@@ -272,11 +289,12 @@ export function App() {
     fit()
     return () => ro.disconnect()
   }, [])
-  const toast = (text: string, undo?: () => void, label?: string) => {
+  const toast = (text: string, undo?: () => void, label?: string, ok?: boolean) => {
     clearTimeout(noteTimer.current) // an older toast's timer would cut this one short
-    setNote({ text, undo, label })
+    setNote({ text, undo, label, ok })
     noteTimer.current = setTimeout(() => setNote(null), undo ? 8000 : 6000)
   }
+  const done = (text: string, undo?: () => void) => toast(text, undo, undefined, true) // a success, with a check
   const fail = (e: unknown) => toast((e as Error).message)
   const call = useCallback(<T,>(method: string, params: object = {}) => api.call<T>(method, params).catch(e => (fail(e), Promise.reject(e))), [])
 
@@ -295,8 +313,10 @@ export function App() {
   useEffect(() => {
     const off = api.on(m => {
       if (m.ev === 'state') setView(m.view)
+      else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'open') {
         setConnected(true)
+        setProblem(undefined)
         api.call<AppInfo[]>('apps').then(setApps, () => {})
       }
       else if (m.ev === 'close') setConnected(false)
@@ -332,6 +352,13 @@ export function App() {
     api.connect()
     bridge?.onFocusTab(id => (setDialog(null), selectTab(id))) // a notification's or the menu bar's: over any page, as ⌘J
     bridge?.onDeepLink?.(setLink)
+    // the menu bar's screenshot: saved where pasted images go, then the new-workspace page with it (another one adds to it)
+    bridge?.onShot?.(png =>
+      api.call<string>('imageSave', { data: png, ext: 'png' }).then(
+        path => (setNewImages(i => [...i, { path, url: `data:image/png;base64,${png}` }]), setDialog('new')),
+        e => toast(`The screenshot wasn't saved: ${(e as Error).message}`),
+      ),
+    )
     return off
   }, [selectTab])
 
@@ -442,27 +469,38 @@ export function App() {
     setWsId(order[(i + d + order.length) % order.length].id)
   }
 
+  // while f runs, the rows of ids say what's happening (archiving, deleting: a worktree takes a moment to go)
+  const busyWith = async <T,>(ids: string[], what: string, f: () => Promise<T>) => {
+    setGoing(g => ({ ...g, ...Object.fromEntries(ids.map(id => [id, what])) }))
+    try {
+      return await f()
+    } finally {
+      setGoing(g => Object.fromEntries(Object.entries(g).filter(([id]) => !ids.includes(id))))
+    }
+  }
   const rmWs = async (w: WorkspaceView) => {
     if (!(await ask(`Delete ${wsName(w)}?`, { text: `Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`, ok: 'Delete', danger: true }))) return
-    await call('wsRm', { id: w.id })
+    if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return // the toast says why
+    done(`Deleted ${wsName(w)}${w.kind === 'worktree' && w.branch ? `: its branch ${w.branch} stays` : ''}`)
   }
   // archive: at once when nothing is uncommitted (Undo brings it back), else asked first: the worktree goes, with them
   const archive = async (w: WorkspaceView) => {
     const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there: ask
-    const r = old ? { dirty: -1 } : await call<{ dirty?: number } | null>('wsArchive', { id: w.id, ifClean: true }).catch(() => undefined)
+    const r = old ? { dirty: -1 } : await busyWith([w.id], 'archiving', () => call<{ dirty?: number } | null>('wsArchive', { id: w.id, ifClean: true }).catch(() => undefined))
     if (r === undefined) return // the toast says why
     if (r?.dirty) {
       const lost = r.dirty > 0 ? `${r.dirty} uncommitted ${r.dirty === 1 ? 'change goes' : 'changes go'} with the worktree` : 'the worktree is removed'
       if (!(await ask(`Archive ${wsName(w)}?`, { text: `Its tabs stop and ${lost} (the branch stays).`, ok: 'Archive', danger: true }))) return
-      if (!(await call('wsArchive', { id: w.id }).then(() => true, () => false))) return
+      if (!(await busyWith([w.id], 'archiving', () => call('wsArchive', { id: w.id }).then(() => true, () => false)))) return
     }
-    toast(`Archived ${wsName(w)}`, () => restore(w.id))
+    done(`Archived ${wsName(w)}`, () => restore(w.id))
   }
   const statText = (w: WorkspaceView) => w.stat && `+${w.stat.add} −${w.stat.del} in ${w.stat.files} ${w.stat.files === 1 ? 'file' : 'files'} against ${w.kind === 'worktree' ? w.base : 'the last commit'}${w.stat.dirty ? `, ${w.stat.dirty} not committed` : ''}`
   // a workspace's first agent tab; ● again on a tab, as if its turn ended unseen (until it's looked at again)
   const agentTab = (id: string) => view?.tabs.find(t => t.workspace === id && t.kind === 'agent')
   const markUnread = (id: string) => call('unread', { tab: id }).catch(() => {})
-  const forkWs = (w: WorkspaceView) => call<WorkspaceView>('wsFork', { id: w.id }).then(x => setWsId(x.id), () => {})
+  const showNew = (id: string, ...more: string[]) => (setReveal(r => [...r, ...(wsId ? [wsId] : []), id, ...more]), setWsId(id))
+  const forkWs = (w: WorkspaceView) => call<WorkspaceView>('wsFork', { id: w.id }).then(x => showNew(x.id), () => {})
 
   const run = async () => ws && selectTab(await call<TabView>('run', { ws: ws.id }))
   // one panel on the right: the side panel (on a tab) or the info panel
@@ -522,7 +560,7 @@ export function App() {
     },
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
   })
-  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => toast('Copied'), fail)
+  const copy = (text: string) => navigator.clipboard.writeText(text).then(() => done('Copied'), fail)
   const tunnelApi = (w: WorkspaceView): TunnelApi => ({
     check: () => api.call<Cloudflared>('cloudflared', { ws: w.id }),
     start: (port, mails) => api.call('tunnelStart', { ws: w.id, port, mails }),
@@ -623,7 +661,8 @@ export function App() {
     ...(w.pinned ? [] : [{ label: 'Add a separator below', icon: 'sep', key: 's', run: () => setDialog({ sep: w.project, after: w.id }) } as MenuItem]),
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
-    ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(w.id)) } as MenuItem] : []),
+    ...(w.branch ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
+    ...(w.kind === 'worktree' ? [{ label: w.pr ? 'Refresh PR status' : 'Look for a PR', icon: 'refresh', key: 'e', run: refreshPR } as MenuItem] : []),
     null,
     { head: 'Open in' },
     ...openInItems({ ws: w.id }),
@@ -647,6 +686,13 @@ export function App() {
   })
   const setAuto = (w: WorkspaceView, k: AutoKey, v: boolean) => call('wsSet', { id: w.id, [k]: v }).catch(() => {})
   const prFix = (w: WorkspaceView, what: FixWhat) => call('prFix', { ws: w.id, what }).then(() => toast('Sent to the agent'), () => {})
+  // GitHub asked again now, not at the next scan (every settings.prScan minutes)
+  const refreshPR = () => call('prRefresh').then(() => done('PR status: fresh from GitHub'), () => {})
+  // right click on the status bar's PR
+  const prMenu = (w: WorkspaceView): MenuItem[] => [
+    { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', run: refreshPR },
+    ...(w.pr ? [{ label: 'Open the PR', icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem, { label: 'Open its checks', icon: 'link', key: 'c', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem] : []),
+  ]
 
   // right click on a tab (or a pane header: one session)
   const tabMenu = (ids: string[]): MenuItem[] => {
@@ -674,7 +720,7 @@ export function App() {
       ...(ids.length > 1 || !g || tabsOf(g).length === 1 ? (others.length ? [{ label: 'Close other tabs', icon: 'x', danger: true, run: () => closeTabs(others) } as MenuItem] : []) : []),
     ]
   }
-  const restore = (id: string) => call('wsRestore', { id }).then(() => setWsId(id))
+  const restore = (id: string) => call('wsRestore', { id }).then(() => showNew(id))
   const newWs = (projectId?: string) => {
     setNewFor(projectId)
     setDialog('new')
@@ -768,7 +814,7 @@ export function App() {
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
-      { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => y && call('projectRm', { id: p.id })) },
+      { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => void (y && call('projectRm', { id: p.id }).then(() => done(`Removed project ${p.name}`), () => {}))) },
       null,
       { head: 'Open in' },
       ...openInItems({ project: p.id }),
@@ -843,6 +889,7 @@ export function App() {
           <span className="wordmark">Laki</span>
         </div>
         <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>
+        {problem && !connected && <div className="splash-problem">{problem}</div>}
       </div>
     )
 
@@ -891,7 +938,7 @@ export function App() {
     return (
       <div
         key={w.id}
-        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${rows.at('ws', w.id)}`}
+        className={`ws ${w.id === ws?.id ? 'sel' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${rows.at('ws', w.id)}`}
         style={colorVar(w.color)}
         data-row={`ws:${w.id}`}
         data-group={pin ? 'pinned' : w.project}
@@ -907,8 +954,9 @@ export function App() {
           w.pr && `PR #${w.pr.number} ${prState(w.pr)}${w.pr.checks ? `, ${ciText(w.pr)}` : ''}${w.pr.title ? `: ${w.pr.title}` : ''}`,
         ].filter(Boolean).join(' · ') /* what the marks say too: they give way to the buttons on hover */}
       >
-        <Glyph s={w.setup ? 'running' : rollup(wt)} />
+        <Glyph s={w.setup || going[w.id] ? 'running' : rollup(wt)} />
         <span className="ws-name">{wsName(w)}</span>
+        {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
         {queued > 0 && <span className="badge">+{queued}</span>}
         <span className="spacer" />
@@ -989,6 +1037,17 @@ export function App() {
     </div>
     )
   }
+  // a workspace on its way (the new-workspace page's Create): where it will be, with a spinner
+  const makingRows = (p: Project, at: string) =>
+    making
+      .filter(m => m.project === p.id && (p.seps?.some(s => s.id === m.place) ? m.place : '') === at)
+      .map(m => (
+        <div key={`making-${m.key}`} className="ws making" aria-busy="true" data-tip="being made: the worktree, then its agent">
+          <Glyph s="running" />
+          <span className="ws-name">{m.name}</span>
+          <span className="ws-going">creating…</span>
+        </div>
+      ))
   // a project's rows as shown: under a folded sep, only the selected workspace (each folded sep's others in hidden)
   const shownRows = (p: Project, mine: WorkspaceView[]) => {
     const hidden = new Map<string, WorkspaceView[]>()
@@ -999,7 +1058,7 @@ export function App() {
       hidden.get(under)?.push(x) ?? hidden.set(under, [x])
       return false
     })
-    return shown.map(x => ('path' in x ? wsRow(x) : sepRow(p, x, hidden.get(x.id))))
+    return [...makingRows(p, ''), ...shown.flatMap(x => ('path' in x ? [wsRow(x)] : [sepRow(p, x, hidden.get(x.id)), ...makingRows(p, x.id)]))]
   }
   // the tabs: in the top bar (the default), or a strip of their own under the terminals or beside them (Settings ›
   // Appearance; a phone keeps them on top)
@@ -1098,7 +1157,13 @@ export function App() {
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               <div className="project-ws">{/* under its project, on a guide line */}
-              {shut ? mine.filter(w => w.id === ws?.id).map(w => wsRow(w)) : shownRows(p, mine)}{/* folded: the selected one stays */}
+              {shut ? [...makingRows(p, ''), ...(p.seps ?? []).flatMap(s => makingRows(p, s.id)), ...mine.filter(w => w.id === ws?.id).map(w => wsRow(w))] : shownRows(p, mine)}{/* folded: the selected one, and one on its way, stay */}
+              {!shut && !live.some(w => w.project === p.id) && !making.some(m => m.project === p.id) && ( // nothing here yet (none pinned either): the way to start
+                <div className="ws ws-new" onClick={() => newWs(p.id)}>
+                  <Icon name="plus" size={12} />
+                  <span className="ws-name">New workspace</span>
+                </div>
+              )}
               </div>
             </div>
             )
@@ -1306,7 +1371,7 @@ export function App() {
               start: t => {
                 // a folder's own workspace has its session already: another one beside it, for this prompt
                 const plain = view.projects.find(p => p.id === t.project)?.git === false
-                return call('wsNew', { project: t.project, prompt: t.text, ...(plain && { local: true, another: true, name: nameOf(t.text) }) }).then(() => call('todoRm', { id: t.id }))
+                return call('wsNew', { project: t.project, prompt: t.text, place: 'top', ...(plain && { local: true, another: true, name: nameOf(t.text) }) }).then(() => call('todoRm', { id: t.id }))
               },
               add: (project, text) => call('todoAdd', { project, text }),
               rm: id => call('todoRm', { id }),
@@ -1325,7 +1390,9 @@ export function App() {
               keep: async (winner, losers) => {
                 if (!(await ask(`Keep ${wsName(winner)}?`, { text: `${losers.map(wsName).join(', ')} ${losers.length === 1 ? 'is' : 'are'} archived: tabs stop and worktrees go (the branches stay).`, ok: 'Archive the others', danger: true }))) return
                 const gone: string[] = []
-                for (const w of losers) if (await call('wsArchive', { id: w.id }).then(() => true, () => false)) gone.push(w.id)
+                await busyWith(losers.map(w => w.id), 'archiving', async () => {
+                  for (const w of losers) if (await call('wsArchive', { id: w.id }).then(() => true, () => false)) gone.push(w.id)
+                })
                 setWsId(winner.id)
                 setDialog(null)
                 toast(`Kept ${wsName(winner)}, archived ${gone.length}`, () => gone.reduce((p, id) => p.then(() => call('wsRestore', { id })), Promise.resolve<unknown>(undefined)).then(() => setWsId(winner.id), () => {}))
@@ -1359,27 +1426,40 @@ export function App() {
             project={newFor ?? ws?.project}
             agent={settings.agent}
             initial={newInit}
+            images={newImages}
             onClose={() => {
+              made.current.page++
               setDialog(null)
               setNewFor(undefined)
               setNewInit(undefined)
+              setNewImages([])
             }}
             onCreate={async p => {
+              // a row in the sidebar meanwhile (it stays when Esc closes the page: the workspace is still coming)
+              const key = ++made.current.key
+              const page = made.current.page
+              const name = p.name?.trim() || (p.pr ? `PR #${p.pr.replace(/.*\/pull\//, '')}` : nameOf(p.prompt ?? '')) || 'new workspace'
+              setMaking(m => [...m, { key, project: p.project, place: p.place, name: p.fan ? `${name} ×${p.fan.length}` : name }])
+              const gone = () => setMaking(m => m.filter(x => x.key !== key))
               // a race: a workspace per agent, then Compare
               // a PR whose branch a workspace has already: that one, a click away
-              const made = p.fan
-                ? await call<WorkspaceView[]>('wsFan', { ...p, presets: p.fan })
-                : [
-                    await api.call<WorkspaceView>('wsNew', p).catch(e => {
+              const got = await (p.fan
+                ? call<WorkspaceView[]>('wsFan', { ...p, presets: p.fan })
+                : api.call<WorkspaceView>('wsNew', p).then(
+                    w => [w],
+                    e => {
                       const there = (e as Error).message.match(/checked out in workspace (\S+)$/)?.[1]
                       toast((e as Error).message, there ? () => (setWsId(there), setDialog(null)) : undefined, 'Open it')
                       throw e
-                    }),
-                  ]
-              setWsId(made[0].id)
-              setDialog(p.fan && made[0].race ? { compare: made[0].race } : null)
+                    },
+                  )
+              ).finally(gone)
+              showNew(got[0].id, ...got.slice(1).map(w => w.id))
+              if (page !== made.current.page) return // closed meanwhile: whatever is open now (another new page too) stays
+              setDialog(d => (d !== 'new' ? d : p.fan && got[0].race ? { compare: got[0].race } : null))
               setNewFor(undefined)
               setNewInit(undefined)
+              setNewImages([])
             }}
           />
         )}
@@ -1415,7 +1495,7 @@ export function App() {
                   {portStop(ws, port)}
                 </span>
               ))}
-              <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} />
+              <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
               {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
           )}
@@ -1438,7 +1518,7 @@ export function App() {
             </>
           )}
           {connected && (view.api ?? 0) < API && <StaleDaemon restart={() => api.call('shutdown')} />}
-          {!connected && <span className="warn">reconnecting…</span>}
+          {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
         </div>
       </main>
 
@@ -1447,8 +1527,9 @@ export function App() {
       <AskHost />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {note && (
-        <div className={`toast ${note.undo ? 'has-undo' : ''}`}>
-          {note.text}
+        <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok ? 'ok' : ''}`} role="status">
+          {note.ok && <Icon name="check" size={14} />}
+          <span>{note.text}</span>
           {note.undo && (
             <button className="toast-undo" onClick={() => (setNote(null), note.undo!())}>
               {note.label ?? 'Undo'}

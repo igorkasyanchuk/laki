@@ -18,6 +18,17 @@ const Says = ({ title, hint }: { title: ReactNode; hint?: ReactNode }) => (
   </span>
 )
 
+// a block of settings that belong together, set apart from the next: a title, what it's for, then them
+const Group = ({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) => (
+  <section className="set-group">
+    <div className="set-head">
+      <h3>{title}</h3>
+      {hint && <p className="muted small">{hint}</p>}
+    </div>
+    {children}
+  </section>
+)
+
 export type { Preset }
 
 // the sidebar's project names (ProjectLook): each option over the theme's; App.tsx puts them on the sidebar as data-ph-*
@@ -36,7 +47,7 @@ const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]]
   ['guide', 'Guide line', [['theme', "Theme's"], ['1px solid var(--line)', 'Thin'], ['2px solid var(--line)', 'Thick'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['2px dotted var(--muted)', 'Big dots'], ['2px solid color-mix(in srgb, var(--accent) 60%, transparent)', 'Accent'], ['2px dotted var(--accent)', 'Accent dots'], ['none', 'None']]],
   ['divider', 'Between projects', [['theme', "Theme's"], ['1px solid var(--line)', 'A line'], ['1px dashed var(--line)', 'Dashed'], ['1px dotted var(--muted)', 'Dotted'], ['3px double var(--line)', 'Double'], ['none', 'Nothing']]],
   ['indent', 'Indent', [['theme', "Theme's"], ['0px', 'None'], ['11px', 'Small'], ['20px', 'Large']]],
-  ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Normal'], ['32px', 'Roomy']]],
+  ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Snug'], ['28px', 'Normal'], ['32px', 'Roomy']]],
   ['text', 'Text size', [['theme', "Theme's"], ['11px', '11'], ['12px', '12'], ['13px', '13'], ['14px', '14'], ['15px', '15']]],
 ]
 // Appearance's corners (--radius) and where the tabs go
@@ -123,6 +134,7 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
         subscribes to; Slack: an incoming webhook; Telegram: your bot's whole sendMessage URL, chat_id included; generic JSON gets{' '}
         <code>{'{event, workspace, tab, agent, message, ts}'}</code>. Muted workspaces and tabs don't push.
       </p>
+      <Group title="Where to">
       <div className="grid2">
         <label>
           Format
@@ -140,6 +152,8 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
         <input className="mono" value={w.url ?? ''} placeholder={FORMATS.find(f => f[0] === format)?.[2]} spellCheck={false} onChange={e => onChange({ ...w, url: e.target.value })} />
       </label>
       {bad && <p className="muted small">{bad}</p>}
+      </Group>
+      <Group title="When">
       <div className="setting-box">
         <Switch className="switch-row" on={w.waiting !== false} onChange={v => onChange({ ...w, waiting: v })}>
           <Says title="Waiting for you" hint="A permission prompt or a question, with what it asks; once per wait" />
@@ -148,6 +162,7 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
           <Says title="Finished" hint="The end of a turn, with its last question if it asks one" />
         </Switch>
       </div>
+      </Group>
       {test && (
         <div className="row-buttons">
           <button type="button" disabled={!w.url?.trim()} onClick={() => (setSaid('Sending…'), test(w).then(() => setSaid('Sent: check your phone'), e => setSaid(`Didn't go: ${e.message}`)))}>
@@ -339,6 +354,41 @@ const ARGS_EG: Record<Agent, string> = {
 
 // actions (Settings › Actions, a project's): a name, who it's for, and the prompt or command
 // prompt templates (Settings › Prompt templates, and a project's own): a name and a text with {{prompt}}
+// what a template and a preset's command line can use, shown as chips under the field
+const TEMPLATE_VARS: [string, string][] = [
+  ['{{prompt}}', 'what you type on the new-workspace page (without it, the typed text goes after the template)'],
+  ['{{project}}', "the project's name"],
+  ['{{base}}', 'the base branch'],
+]
+const ENV_VARS: [string, string][] = [
+  ['$PORT', "the workspace's port, for a dev server"],
+  ['$LAKI_WORKSPACE', "the workspace's id"],
+  ['$LAKI_TAB', "the tab's id"],
+  ['$LAKI_PROJECT_PATH', 'the repo itself, not the worktree'],
+]
+
+// a click puts the variable in the field just before the chips, at its cursor
+function VarChips({ vars, value, onChange }: { vars: [string, string][]; value: string; onChange: (v: string) => void }) {
+  const put = (el: Element | null | undefined, v: string) => {
+    const f = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? el : null
+    const a = f?.selectionStart ?? value.length
+    const b = f?.selectionEnd ?? a
+    const text = /[^\s("'=/:]$/.test(value.slice(0, a)) ? ` ${v}` : v // a word apart from the one before it
+    onChange(value.slice(0, a) + text + value.slice(b))
+    requestAnimationFrame(() => f && (f.focus(), f.setSelectionRange(a + text.length, a + text.length)))
+  }
+  return (
+    <div className="vars">
+      <span className="muted small">Variables</span>
+      {vars.map(([v, tip]) => (
+        <button type="button" key={v} className="var mono" data-tip={tip} onMouseDown={e => e.preventDefault()} onClick={e => put(e.currentTarget.parentElement?.previousElementSibling, v)}>
+          {v}
+        </button>
+      ))}
+    </div>
+  )
+}
+
 function TemplatesField({ value = [], onChange }: { value?: Template[]; onChange: (v: Template[]) => void }) {
   const keys = useRef<number[]>([]) // like ActionsField's
   while (keys.current.length < value.length) keys.current.push(Math.random())
@@ -353,6 +403,7 @@ function TemplatesField({ value = [], onChange }: { value?: Template[]; onChange
             <IconButton icon="trash" title="Remove template" onClick={() => drop(i)} />
           </div>
           <textarea className="mono" rows={5} spellCheck={false} value={t.text} placeholder="Fix this: {{prompt}}" onChange={e => setAt(i, { text: e.target.value })} />
+          <VarChips vars={TEMPLATE_VARS} value={t.text} onChange={text => setAt(i, { text })} />
         </div>
       ))}
       <div className="row">
@@ -414,47 +465,33 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
   const badMails = parseMails(c.expose ?? '').filter(m => !MAIL_OK.test(m))
   return (
     <>
-      <h2>{p.project.name}</h2>
-      <div className="muted small mono">
-        {p.project.path} · {p.project.git ? 'git' : 'folder (no git)'}
+      <div className="set-title">
+        <h2>{p.project.name}</h2>
+        <div className="muted small mono">
+          {p.project.path} · {p.project.git ? 'git' : 'folder (no git)'}
+        </div>
       </div>
       {p.rename && (
-        <label>
-          Name
-          <input value={name} onChange={e => setName(e.target.value)} />
-        </label>
+        <Group title="Name" hint="As the sidebar shows it">
+          <input value={name} aria-label="Name" onChange={e => setName(e.target.value)} />
+        </Group>
       )}
-      <div className="field">
-        <span>
-          Scripts <span className="muted">· for workspace setup, teardown and the Run button; empty: the repo's .laki.json</span>
-        </span>
+      <Group title="Scripts" hint="For workspace setup, teardown and the Run button; empty: the repo's .laki.json">
         <ScriptsField value={c} file={file} git={p.project.git} tab={p.script} onChange={x => setC(y => ({ ...y, ...x }))} />
-      </div>
-      <label>
-        <span>
-          Env <span className="muted">· for every tab, setup and teardown{file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}</span>
-        </span>
+      </Group>
+      <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
         <EnvField value={c.env} onChange={env => setC(y => ({ ...y, env }))} />
-      </label>
-      <label>
-        <span>
-          Expose to the world <span className="muted">· who can open a tunnel: the popup starts from it every time; emails and *@domains, or empty for anyone with the link</span>
-        </span>
-        <input value={c.expose ?? ''} placeholder={file.expose ? `${file.expose} (.laki.json)` : 'anyone with the link'} onChange={e => setC(y => ({ ...y, expose: e.target.value }))} />
+      </Group>
+      <Group title="Expose to the world" hint="Who can open a tunnel: the popup starts from it every time; emails and *@domains, or empty for anyone with the link">
+        <input value={c.expose ?? ''} aria-label="Expose to the world" placeholder={file.expose ? `${file.expose} (.laki.json)` : 'anyone with the link'} onChange={e => setC(y => ({ ...y, expose: e.target.value }))} />
         {badMails.length > 0 && <span className="field-err">Not an address or *@domain: {badMails.join(', ')}</span>}
-      </label>
-      <div className="field">
-        <span>
-          Actions <span className="muted">· in Run ▾ after the global ones (Settings › Actions); one with a global one's name replaces it here</span>
-        </span>
+      </Group>
+      <Group title="Actions" hint="In Run ▾ after the global ones (Settings › Actions); one with a global one's name replaces it here">
         <ActionsField value={c.actions} onChange={actions => setC(y => ({ ...y, actions }))} />
-      </div>
-      <div className="field">
-        <span>
-          Prompt templates <span className="muted">· a new workspace here lists them first, then the global ones (Settings › Prompt templates); one with a global one's name replaces it</span>
-        </span>
+      </Group>
+      <Group title="Prompt templates" hint="A new workspace here lists them first, then the global ones (Settings › Prompt templates); one with a global one's name replaces it">
         <TemplatesField value={c.templates} onChange={templates => setC(y => ({ ...y, templates }))} />
-      </div>
+      </Group>
     </>
   )
 }
@@ -908,6 +945,7 @@ export function SettingsPage(p: {
           {sec === 'general' && (
             <>
               <h2>General</h2>
+              <Group title="New workspaces">
               <label>
                 New workspaces start
                 <select value={s.agent || 'claude'} onChange={e => set({ agent: e.target.value })}>
@@ -924,6 +962,8 @@ export function SettingsPage(p: {
                 </span>
                 <input className="mono" value={s.branchPrefix ?? ''} placeholder="laki/" onChange={e => set({ branchPrefix: e.target.value })} />
               </label>
+              </Group>
+              <Group title="Notifications" hint="Phone pushes are in their own section">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.notify !== false} onChange={v => set({ notify: v })}>
                   <Says title="macOS notifications" hint="When an agent off screen waits or finishes, or CI keeps failing. A workspace's or tab's menu mutes just it." />
@@ -947,6 +987,10 @@ export function SettingsPage(p: {
                     </label>
                   </>
                 )}
+              </div>
+              </Group>
+              <Group title="What the window shows">
+              <div className="setting-box">
                 <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
                   <Says title="Fun button" hint="The smiley in the tab bar: a random meme from r/memes for a break (→ or N for another)" />
                 </Switch>
@@ -968,16 +1012,11 @@ export function SettingsPage(p: {
                   </Switch>
                 ))}
               </div>
-              <label>
-                <span>
-                  Environment <span className="muted">· every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.</span>
-                </span>
+              </Group>
+              <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
                 <EnvField value={s.env} onChange={env => set({ env })} />
-              </label>
-              <div className="field">
-                <span>
-                  Move to another Mac <span className="muted">· every setting on these pages in a file (it holds your env: keep it private); projects and their own settings stay here</span>
-                </span>
+              </Group>
+              <Group title="Move to another Mac" hint="Every setting on these pages in a file (it holds your env: keep it private); projects and their own settings stay here">
                 <div className="row-buttons">
                   <button type="button" onClick={exportAll}>
                     Export…
@@ -988,12 +1027,13 @@ export function SettingsPage(p: {
                   <input ref={file} type="file" accept=".json,application/json" hidden onChange={e => (importAll(e.target.files?.[0]), (e.target.value = ''))} />
                   {moved && <span className="muted small">{moved}</span>}
                 </div>
-              </div>
+              </Group>
             </>
           )}
           {sec === 'appearance' && (
             <>
               <h2>Appearance</h2>
+              <Group title="Interface">
               <div className="grid2">
                 <label>
                   Interface font
@@ -1042,6 +1082,8 @@ export function SettingsPage(p: {
                   </select>
                 </label>
               </div>
+              </Group>
+              <Group title="Sidebar" hint="Over the theme's">
               <div className="field">
                 <span>
                   Project names in the sidebar <span className="muted">· over the theme's</span>
@@ -1057,6 +1099,8 @@ export function SettingsPage(p: {
                   <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled, Board, Video, Timer, Settings; the last ones drop theirs when the row is too narrow" />
                 </Switch>
               </div>
+              </Group>
+              <Group title="Window">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.glass} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
                   <Says title="Glass" hint="A see-through window: the desktop shows through, blurred" />
@@ -1097,7 +1141,8 @@ export function SettingsPage(p: {
                   </>
                 )}
               </div>
-              <div className="muted small">Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.</div>
+              </Group>
+              <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
               <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
               {!shownThemes.length && <div className="muted small">No theme called “{themeQ.trim()}”.</div>}
               <div className="themes" onMouseLeave={() => applyTheme(s)}>
@@ -1134,11 +1179,13 @@ export function SettingsPage(p: {
                   )
                 })}
               </div>
+              </Group>
             </>
           )}
           {sec === 'terminal' && (
             <>
               <h2>Terminal</h2>
+              <Group title="Font and cursor">
               <div className="grid2">
                 <label>
                   Font
@@ -1194,6 +1241,8 @@ export function SettingsPage(p: {
                   </Switch>
                 </div>
               </div>
+              </Group>
+              <Group title="Live preview">
               <div className="preview-head muted small">
                 <span>Live preview · click it for the cursor</span>
                 <span className="grow" />
@@ -1205,11 +1254,13 @@ export function SettingsPage(p: {
                 <TermPreview key={String(transparent())} s={s} />
               </div>
               <p className="muted small">Ligatures (=&gt; as one glyph) aren't drawn: xterm needs an add-on for them that Laki doesn't ship.</p>
+              </Group>
             </>
           )}
           {sec === 'open' && (
             <>
               <h2>Open in</h2>
+              <Group title="Editor" hint="Where a workspace's folder opens">
               <label>
                 <span>
                   Default <span className="muted">· ⌘E; the editor icon lists the rest</span>
@@ -1232,6 +1283,7 @@ export function SettingsPage(p: {
                 </span>
                 <input className="mono" value={s.editorCmd ?? ''} placeholder='idea "$1"' onChange={e => set({ editorCmd: e.target.value })} />
               </label>
+              </Group>
             </>
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
@@ -1245,6 +1297,7 @@ export function SettingsPage(p: {
                 (when it's idle), and so do the info panel's send buttons. <code>{'{{pr}}'}</code> is the PR's number, <code>{'{{url}}'}</code> its link,{' '}
                 <code>{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
               </p>
+              <Group title="Checks">
               <div className="grid2">
                 {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}
                 {pick('Tries in a row', 'prTries', PR_TRIES, [1, 2, 3, 5, 10], n => `${n} · then it's over to you`)}
@@ -1252,6 +1305,8 @@ export function SettingsPage(p: {
               <Switch className="switch-row" on={!!s.archiveMerged} onChange={v => set({ archiveMerged: v })}>
                 <Says title="Archive workspace when its PR merges" hint="Only a clean one: nothing uncommitted or unpushed, no agent at work. A toast offers Undo; one left alone says merged in the sidebar." />
               </Switch>
+              </Group>
+              <Group title="What the switches send" hint="Each prompt goes first, then the checks' logs or the review threads">
               {PR_KINDS.map(([k, title, after]) => {
                 const v = s.prPrompts?.[k]
                 return (
@@ -1269,6 +1324,7 @@ export function SettingsPage(p: {
                   </div>
                 )
               })}
+              </Group>
             </>
           )}
           {sec === 'templates' && (
@@ -1297,8 +1353,8 @@ export function SettingsPage(p: {
             <>
               <h2>Agent presets</h2>
               <p className="muted small">
-                How agents start. Each preset is in the new-tab menu and the new-workspace dialog. Args go after the command, before the prompt; env
-                goes on top of the project's.
+                How agents start. Each preset is in the new-tab menu and the new-workspace dialog. Args go after the command, before the prompt, through
+                the shell (so the variables work); env goes on top of the project's.
               </p>
               {presets.map((p, i) => (
                 <div key={keys.current[i]} className="preset">
@@ -1324,6 +1380,11 @@ export function SettingsPage(p: {
                       onChange={e => setPreset(i, { args: e.target.value })}
                     />
                   )}
+                  <VarChips
+                    vars={ENV_VARS}
+                    value={(p.agent === 'command' ? p.cmd : p.args) ?? ''}
+                    onChange={v => setPreset(i, p.agent === 'command' ? { cmd: v } : { args: v })}
+                  />
                   <EnvField value={p.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
                 </div>
               ))}

@@ -632,10 +632,19 @@ test('presets: args and env on top of the project env; Esc ends a turn; reorder;
   const v2 = await rig.rpc('state')
   assert.deepEqual(v2.projects[0].rows, ['sep-a1', ws.id, ws2.id])
   assert.deepEqual(v2.workspaces.map((w: any) => w.id), [ws.id, ws2.id])
+  // a new workspace's place: first under a sep, first in the project, or last
+  const under = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'under', place: 'sep-a1' })
+  const top = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'top', place: 'top' })
+  const last = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'last' })
+  assert.deepEqual((await rig.rpc('state')).projects[0].rows, [top.id, 'sep-a1', under.id, ws.id, ws2.id])
+  const order = () => rig.rpc('state').then((v: any) => v.workspaces.map((w: any) => w.id))
+  assert.equal((await order()).at(-1), last.id)
   await rig.rpc('projectSet', { id: p.id, seps: [] }) // the last one gone: so is the order
   pr = (await rig.rpc('state')).projects[0]
   assert.equal(pr.seps, undefined)
   assert.equal(pr.rows, undefined)
+  const first = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'first', place: 'top' }) // no seps: the workspaces' order
+  assert.equal((await order())[0], first.id)
 })
 
 test('PR: failing CI and new review comments go to the agent once; global env; images; workspace name; a silent turn ends', async t => {

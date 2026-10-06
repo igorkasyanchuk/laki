@@ -1,7 +1,7 @@
 // A workspace's info panel (the ⓘ in the tab bar) and its PR in the status bar: CI, review, and the
 // switches that send failing CI or new review comments to the agent. App.tsx maps a
 // workspace to WsInfo.
-import { type ReactNode } from 'react'
+import { type MouseEvent, type ReactNode } from 'react'
 import { Glyph } from './Glyph'
 import { type Tunnel } from './Tunnel'
 import { Icon, IconButton, Switch } from './ui'
@@ -86,17 +86,18 @@ export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey,
 }
 
 // the status bar's PR: number, CI, then the switches
-export function PRStatus({ w, onOpen, onToggle }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void }) {
+// onMenu: a right click (Refresh from GitHub)
+export function PRStatus({ w, onOpen, onToggle, onMenu }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onMenu?: (e: MouseEvent<HTMLElement>) => void }) {
   const pr = w.pr
   if (!pr) return null
   return (
-    <span className="pr-status">
+    <span className="pr-status" onContextMenu={onMenu}>
       <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} data-tip={`${pr.title ?? ''} · ${prState(pr)}`.replace(/^ · /, '')} onClick={() => onOpen(pr.url)}>
         #{pr.number}
       </button>
       {pr.state === 'OPEN' && (
         <>
-          <button className={`pr pr-${pr.checks || 'none'}`} data-tip="Checks on GitHub" onClick={() => onOpen(`${pr.url}/checks`)}>
+          <button className={`pr pr-${pr.checks || 'none'}`} data-tip="Checks on GitHub · right click to refresh" onClick={() => onOpen(`${pr.url}/checks`)}>
             {ciText(pr)}
           </button>
           {pr.conflict && (

@@ -490,11 +490,14 @@ export function SidePanel(p: {
   )
 }
 
-const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/ // main's will-attach-webview takes only these
+const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/ // main's will-attach-webview's first page; the iframe's only ones
 const canFrame = !bridge && ['localhost', '127.0.0.1'].includes(location.hostname) // a browser on this Mac: an iframe
 
-// Preview: the workspace's dev server in the panel. In the app a <webview> (no node, no preload; main keeps it to
-// localhost), with back, forward and a screenshot for the agent; in a browser on this Mac an iframe.
+const SITE = /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#]|$)/ // example.com, docs.example.com:8080/x: no spaces, a dot, no leading /. ponytail: index.html typed bare reads as a site; /index.html is the path
+
+// Preview: the workspace's dev server in the panel, or any website. In the app a <webview> (no node, no preload, its
+// own session with few permissions: main's will-attach-webview), with back, forward and a screenshot for the agent; in
+// a browser on this Mac an iframe, localhost only (the CSP's frame-src): another site opens in a tab of its own.
 // ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them)
 function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void }) {
   const ports = [...new Set([w.port, ...(w.ports ?? [])])] // $PORT first
@@ -514,13 +517,15 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
     } catch {}
   }
   const load = (u: string) => {
-    if (!LOCAL.test(u)) return /^https?:\/\//.test(u) && onOpen(u) // elsewhere: the browser
+    if (!/^https?:\/\//.test(u)) return
+    if (!bridge && !LOCAL.test(u)) return onOpen(u) // the iframe takes localhost only
     setErr('')
     setUrl(u)
     if (view.current && on(v => v.loadURL(u).catch(() => {})) === undefined) view.current.setAttribute('src', u) // a failure comes as did-fail-load
   }
-  // a path on the port, a whole URL, or localhost:5173/x without the http://
-  const go = (p = port, a = addr.trim()) => load(/^https?:\/\//.test(a) ? a : LOCAL.test(`http://${a}`) ? `http://${a}` : `http://localhost:${p}${a.startsWith('/') ? a : `/${a}`}`)
+  // a path on the port, a whole URL, localhost:5173/x without the http://, or a site's address (example.com/x: https)
+  const go = (p = port, a = addr.trim()) =>
+    load(/^https?:\/\//.test(a) ? a : LOCAL.test(`http://${a}`) ? `http://${a}` : SITE.test(a) ? `https://${a}` : `http://localhost:${p}${a.startsWith('/') ? a : `/${a}`}`)
   useEffect(() => {
     if (!bridge || !host.current) return
     const v = document.createElement('webview') as any

@@ -76,6 +76,26 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   await until(async () => !(await rig.rpc('state')).workspaces[0].pr, 'PR dropped')
 })
 
+test('a re-run check counts by its newest run (a queued one is the newest), prRefresh scans now', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const run = (name: string, conclusion: string, startedAt?: string, o: object = {}) => ({ __typename: 'CheckRun', name, workflowName: 'CI', status: conclusion ? 'COMPLETED' : 'QUEUED', conclusion, startedAt, ...o })
+  const rollup = (list: object[]) => writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 3, state: 'OPEN', url: 'https://example.invalid/pr/3', headRefOid: 'abc', statusCheckRollup: list }))
+  // test failed, then passed on a re-run; lint of another workflow keeps its own failure
+  rollup([run('test', 'SUCCESS', '2026-10-06T10:05:00Z'), run('test', 'FAILURE', '2026-10-06T10:00:00Z'), run('lint', 'SUCCESS', '2026-10-06T10:00:00Z'), run('lint', 'FAILURE', '2026-10-06T10:01:00Z', { workflowName: 'Style' })])
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const pr = await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr, 'PR scanned')
+  assert.deepEqual(pr.list.map((c: any) => `${c.name} ${c.state}`), ['test pass', 'lint pass', 'lint fail'])
+  // only the other workflow's lint failing; then a re-run of it queued (Go's zero time): running
+  rollup([run('test', 'SUCCESS', '2026-10-06T10:05:00Z'), run('lint', 'FAILURE', '2026-10-06T10:01:00Z', { workflowName: 'Style' }), run('lint', '', '0001-01-01T00:00:00Z', { workflowName: 'Style' })])
+  await rig.rpc('prRefresh')
+  const now = (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).pr
+  assert.equal(now.checks, 'pending')
+  assert.deepEqual(now.list.map((c: any) => `${c.name} ${c.state}`), ['test pass', 'lint pending'])
+})
+
 test('autoFix and autoReview: they wait for an agent; CI goes over to you after 3 fixes in a row; a pass starts over', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

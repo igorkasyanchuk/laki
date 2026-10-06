@@ -2,7 +2,10 @@
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
 import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, session, shell, Tray, webContents } from 'electron'
-import { appendFileSync, writeFileSync } from 'node:fs'
+import { execFile } from 'node:child_process'
+import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import type { View } from '../shared/types.ts'
@@ -13,6 +16,8 @@ let pendingTab: string | null = null
 let quitting = false
 let link: string | null = null // a laki:// link that came before the renderer listened
 let linkReady = false // the renderer listens for links
+let shot: string | null = null // a screenshot (a PNG, base64) from the menu bar, before the renderer listened
+let shotReady = false // the renderer listens for screenshots
 
 if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', () => show())
@@ -26,13 +31,18 @@ app.on('open-url', (e, url) => {
   e.preventDefault()
   if (url.startsWith('laki:')) openLink(url)
 })
+ipcMain.on('shot-ready', () => {
+  shotReady = true
+  if (shot) win?.webContents.send('shot', shot)
+  shot = null
+})
 ipcMain.on('deep-link-ready', () => {
   linkReady = true
   if (link) win?.webContents.send('deep-link', link)
   link = null
 })
-// the preview pane's <webview>: a page on this Mac, in its own session, without node or a preload (and, with no
-// allowpopups, without popups)
+// the preview pane's <webview>: it starts on this Mac's localhost and can go to any website (the address bar, links),
+// in its own session, without node or a preload (and, with no allowpopups, without popups)
 const PREVIEW = 'persist:preview'
 const local = (u: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)
 app.on('web-contents-created', (_e, wc) => {
@@ -79,7 +89,7 @@ function create() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
-      webviewTag: true, // the preview pane; will-attach-webview keeps it to localhost
+      webviewTag: true, // the preview pane; will-attach-webview locks it down
     },
   })
   win.once('ready-to-show', () => {
@@ -97,8 +107,8 @@ function create() {
     e.preventDefault()
     win?.hide()
   })
-  win.on('closed', () => ((win = null), (linkReady = false), app.dock?.setBadge(''), tray?.setTitle(''))) // the count came from the window
-  win.webContents.on('did-start-navigation', e => e.isMainFrame && !e.isSameDocument && (linkReady = false)) // a reload: links wait for the new page
+  win.on('closed', () => ((win = null), (linkReady = shotReady = false), app.dock?.setBadge(''), tray?.setTitle(''))) // the count came from the window
+  win.webContents.on('did-start-navigation', e => e.isMainFrame && !e.isSameDocument && (linkReady = shotReady = false)) // a reload: links wait for the new page
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
     pendingTab = null
@@ -233,8 +243,38 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
   tray.setTitle(count, { fontType: 'monospacedDigit' })
   tray.setToolTip(count ? `${app.name}: ${count} need${count === '1' ? 's' : ''} you` : app.name)
   const tabs: MenuItemConstructorOptions[] = (Array.isArray(items) ? items : []).slice(0, 30).map(i => ({ label: String(i.label).slice(0, 90), click: () => show(String(i.tab)) }))
-  tray.setContextMenu(Menu.buildFromTemplate([...tabs, ...(tabs.length ? [{ type: 'separator' as const }] : []), { label: `Open ${app.name}`, click: () => show() }, { label: 'Quit', click: () => app.quit() }]))
+  tray.setContextMenu(
+    Menu.buildFromTemplate([
+      ...tabs,
+      ...(tabs.length ? [{ type: 'separator' as const }] : []),
+      { label: 'Screenshot a part to an agent…', click: () => screenshot(true) },
+      { label: 'Screenshot the screen to an agent', click: () => screenshot(false) },
+      { type: 'separator' },
+      { label: `Open ${app.name}`, click: () => show() },
+      { label: 'Quit', click: () => app.quit() },
+    ]),
+  )
 })
+
+// the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels),
+// then the new-workspace page with the picture in its prompt. Needs Screen Recording for Laki (macOS asks once).
+// ponytail: the whole screen is the main display; screencapture takes a file per display for the others
+function screenshot(part: boolean) {
+  const file = join(tmpdir(), `laki-shot-${process.pid}-${Date.now()}.png`)
+  setTimeout(() => // the menu closes first, out of the picture
+    execFile('screencapture', [part ? '-i' : '-m', '-x', file], () => {
+      let png: string
+      try {
+        png = readFileSync(file).toString('base64')
+      } catch {
+        return // cancelled, or no permission: no file
+      }
+      rmSync(file, { force: true })
+      if (shotReady && win) win.webContents.send('shot', png)
+      else shot = png
+      show()
+    }), 250)
+}
 
 // the menu bar's icon: Laki's mark (a chevron and a dot) drawn as a 32×32 template image (@2x): macOS colors it for a
 // light or dark menu bar from its alpha alone

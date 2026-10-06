@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
@@ -1015,6 +1015,23 @@ export function imageSave(o: { data: string; ext?: string }) {
   return path
 }
 
+// a new workspace first in its project's sidebar ('top'), or first under one of its seps (its id; one gone since: the
+// top): with seps, the project's rows; and the workspaces' own order (a project without seps), it alone moved, so the
+// others (Pinned's too) keep theirs. The caller saves
+function placeWs(ws: Workspace, place?: string) {
+  if (!place) return
+  const p = findProject(ws.project)
+  const rest = state.workspaces.filter(w => w !== ws)
+  const first = rest.findIndex(w => w.project === p.id)
+  rest.splice(first < 0 ? rest.length : first, 0, ws)
+  state.workspaces = rest
+  if (!p.seps) return
+  const sep = p.seps.find(s => s.id === place)
+  const ids = rowsOf(p, rest.filter(w => w !== ws)).map(x => x.id)
+  ids.splice(sep ? ids.indexOf(sep.id) + 1 : 0, 0, ws.id)
+  p.rows = ids.slice(0, 2000)
+}
+
 // the sidebar's order: projects, or workspaces (by id; others keep their place after them)
 export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
   const by = <T extends { id: string }>(list: T[], ids: string[]) => {
@@ -1119,7 +1136,8 @@ export function closeTab(id: string) {
 // ---------- workspaces
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean }
+// place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string }
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1172,7 +1190,12 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
   const name = slug(base.name || (base.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')) || 'race'
   const race = randomUUID().slice(0, 8)
   const made: Workspace[] = []
-  for (const p of presets) made.push(await wsNew({ ...base, preset: p, name: `${name.slice(0, Math.max(8, 39 - p.length)).replace(/-+$/, '')}-${p}`, race }))
+  for (const p of presets) {
+    made.push(await wsNew({ ...base, preset: p, name: `${name.slice(0, Math.max(8, 39 - p.length)).replace(/-+$/, '')}-${p}`, race, place: undefined }))
+    for (const w of [...made].reverse()) placeWs(w, o.place) // each first, the last one first: in place as it comes, in the race's order
+    save()
+    changed()
+  }
   return made
 }
 
@@ -1233,6 +1256,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
   state.workspaces.push(ws)
+  placeWs(ws, o.place)
   save()
   forward(ws)
   const cfg = projectConfig(ws)
@@ -1950,6 +1974,19 @@ function checkOf(c: any): Check {
   return { name: c.name || c.context || '?', state, url: c.detailsUrl || c.targetUrl || undefined }
 }
 
+// the newest run of each check: a re-run leaves the old one in statusCheckRollup (gh pr checks drops it too), so a
+// fixed check would read as failing; one not started yet (no time, or Go's zero time) is the newest
+function newest(rollup: any[]): any[] {
+  const at = (c: any) => (!c.startedAt || String(c.startedAt).startsWith('0001') ? '9' : String(c.startedAt))
+  const by = new Map<string, any>()
+  for (const c of rollup) {
+    const k = `${c.workflowName ?? ''}/${c.name || c.context || ''}`
+    const had = by.get(k)
+    if (!had || at(c) >= at(had)) by.set(k, c)
+  }
+  return [...by.values()]
+}
+
 // all of a PR's checks in one word: fail if any failed, else pending if any runs, else pass
 const checksOf = (list: Check[]): PR['checks'] =>
   !list.length ? '' : list.some(c => c.state === 'fail') ? 'fail' : list.some(c => c.state === 'pending') ? 'pending' : 'pass'
@@ -1989,7 +2026,7 @@ async function scanPR(ws: Workspace) {
   try {
     const { stdout } = await exec(ws, 'gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { timeout: 20000 })
     const j = JSON.parse(stdout)
-    const list: Check[] = (j.statusCheckRollup ?? []).map(checkOf)
+    const list: Check[] = newest(j.statusCheckRollup ?? []).map(checkOf)
     pr = {
       number: j.number,
       state: j.state,
@@ -2387,7 +2424,7 @@ export function browseDone(p: { id: string; ok: boolean; result?: any; error?: s
 // the first-run screen's checks
 export async function doctor(): Promise<Doctor> {
   const gh = !onPath('gh') ? 'missing' : await run('gh', ['auth', 'status'], { timeout: 8000 }).then(() => 'in' as const, () => 'out' as const)
-  return { git: onPath('git'), gh, agents: AGENTS.map(id => ({ id, found: onPath(id) })) }
+  return { git: onPath('git'), gh, cloudflared: onPath('cloudflared'), agents: AGENTS.map(id => ({ id, found: onPath(id) })) }
 }
 
 function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<string, string>) {

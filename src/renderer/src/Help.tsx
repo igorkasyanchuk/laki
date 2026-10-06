@@ -153,7 +153,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           <Row k="Changes">Click a line of a diff to comment on it: on the PR (GitHub), or to the agent.</Row>
           <Row k="Preview">The toolbar's globe opens the side panel's Preview at localhost:$PORT (the menu has the other listening ports); the camera sends a screenshot to the agent; the crosshair puts a clicked element's selector, HTML, CSS and a screenshot of it in its prompt.</Row>
           <Row k="Links">
-            <code>laki://ws/&lt;id&gt;</code> opens a workspace (a workspace's or tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one,
+            <code>laki://ws/&lt;id&gt;</code> opens a workspace (a tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one,
             <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://board</code>, <code>laki://help</code>, <code>laki://about</code> open pages.
           </Row>
           <Row k="Quit">⌘Q quits the app: agents keep running in the daemon. Quit … Completely (the app menu) stops the daemon too; agents resume next time.</Row>
