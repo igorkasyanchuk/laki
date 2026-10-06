@@ -768,7 +768,7 @@ button.board-card:hover { border-color: var(--muted); }
 .narrow .schedule { flex-wrap: wrap; }
 .narrow .schedule-run { flex-wrap: wrap; }
 /* a sep: a project's named line between its workspaces (a project's ⋯ › Add a separator) */
-.ws-sep { display: flex; align-items: center; gap: 6px; height: 22px; min-width: 0; padding: 0 10px 0 14px; cursor: grab; color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.ws-sep { display: flex; align-items: center; gap: 6px; height: 22px; min-width: 0; padding: 0 10px 0 14px; cursor: pointer; color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
 .ws-sep:hover { color: var(--fg); }
 .ws-sep::after { content: ''; flex: 1; min-width: 12px; border-top: 1px solid var(--line); }
 .ws-sep .ws-acts { order: 1; }

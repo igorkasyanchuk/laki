@@ -413,7 +413,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.groups`: each workspace's tabs, each a split tree of sessions;
     - `laki.side`: the sidebar width; `laki.sideOpen`: whether it's shown; `laki.info`: the info panel;
     - `laki.folded`: the projects whose workspaces the sidebar hides (a click on the project's head; `rows.dragged`
-      keeps a drag's click from folding it);
+      keeps a drag's click from folding it), and the seps whose workspaces up to the next sep it hides (`shownRows`);
     - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel;
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).

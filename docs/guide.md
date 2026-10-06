@@ -157,7 +157,9 @@ selected workspace's PR is in the status bar.
   *Mark as unread* (its ● again, until you look at it) and *Copy link* too.
 - Drag projects, and workspaces within a project, to reorder them.
 - Separators: a project's ⋯ › *Add a separator*, or a workspace's *Add a separator below*, puts a named line
-  between its workspaces. Drag it like a workspace; double click to rename; right click to delete.
+  between its workspaces. A click folds it: the workspaces under it, up to the next one, hide (their count and the
+  busiest one's mark stay on it; the selected one stays) until another click. Drag it like a workspace; double click
+  to rename; right click to delete.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
 - ＋ in the tab bar opens a new tab: shell (⌘T), one of your agent presets (claude, codex, gemini, …) or a command.

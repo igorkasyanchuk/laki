@@ -265,10 +265,12 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
   return { start, at, dragged: () => dragged.current }
 }
 
-// ids with d.id moved next to d.target
-export const moveId = (ids: string[], d: RowDrop) => {
-  const rest = ids.filter(x => x !== d.id)
-  rest.splice(rest.indexOf(d.target) + (d.after ? 1 : 0), 0, d.id)
+// ids with d.id, and the n - 1 after it (a folded sep's workspaces), moved next to d.target; onto itself: as they were
+export const moveId = (ids: string[], d: RowDrop, n = 1) => {
+  const block = ids.slice(Math.max(0, ids.indexOf(d.id)), ids.indexOf(d.id) + n)
+  if (!block.length || block.includes(d.target)) return ids
+  const rest = ids.filter(x => !block.includes(x))
+  rest.splice(rest.indexOf(d.target) + (d.after ? 1 : 0), 0, ...block)
   return rest
 }
 

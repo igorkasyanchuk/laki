@@ -135,7 +135,7 @@ export function App() {
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
   const [sideW, setSideW] = useState<number>(() => load('laki.side', SIDE))
   const [sideOpen, setSideOpen] = useState<boolean>(() => load('laki.sideOpen', true))
-  const [folded, setFolded] = useState<string[]>(() => load('laki.folded', [])) // projects whose workspaces are hidden
+  const [folded, setFolded] = useState<string[]>(() => load('laki.folded', [])) // projects and seps whose workspaces are hidden
   const [runsSeen, setRunsSeen] = useState<string>(() => load('laki.runsSeen', '')) // the newest scheduled run read
   // the sidebar's video (its embed URL); play: just asked for, so it starts (one kept from before waits for a click), at:
   // when, so the same link asked for again starts over; min: only its bar shows (it plays on)
@@ -569,7 +569,12 @@ export function App() {
   const rows = useRowDrag(d => {
     if (d.kind === 'project') return void call('reorder', { projects: moveId(view!.projects.map(p => p.id), d) })
     const p = view!.projects.find(p => p.seps?.some(x => x.id === d.id) || live.some(w => w.id === d.id && w.project === p.id))
-    if (p) call('reorder', { workspaces: moveId(rowsOf(p, view!.workspaces).map(x => x.id), d) }) // archived ones too: a restore keeps its place
+    if (!p) return
+    const ids = rowsOf(p, view!.workspaces).map(x => x.id) // archived ones too: a restore keeps its place
+    // a folded sep takes the workspaces it hides along, up to the next sep
+    const at = ids.indexOf(d.id)
+    const next = ids.findIndex((x, i) => i > at && !!p.seps?.some(s => s.id === x))
+    call('reorder', { workspaces: moveId(ids, d, folded.includes(d.id) ? (next < 0 ? ids.length : next) - at : 1) })
   })
   // a sep: name it (a new one goes under after, else at the top), or rename it
   const sepName = async (o: { sep: string; id?: string; after?: string }, name: string) => {
@@ -582,6 +587,7 @@ export function App() {
     await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name }], rows: ids })
   }
   const sepMenu = (p: Project, s: Sep): MenuItem[] => [
+    { label: folded.includes(s.id) ? 'Expand' : 'Collapse', icon: folded.includes(s.id) ? 'chevron' : 'chevronRight', key: 'c', run: () => fold(s.id) },
     { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ sep: p.id, id: s.id }) },
     { label: 'Delete separator', icon: 'trash', key: 'd', danger: true, run: () => call('projectSet', { id: p.id, seps: p.seps?.filter(x => x.id !== s.id), rows: p.rows?.filter(x => x !== s.id) }) },
   ]
@@ -753,7 +759,7 @@ export function App() {
       ]
   const tasksOf = (project: string) => (n => (n ? `${n} ${n === 1 ? 'task' : 'tasks'}` : undefined))(view?.schedules?.filter(s => s.project === project).length ?? 0)
   // fold a project's workspaces away, or back; ids of removed projects go
-  const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => view?.projects.some(p => p.id === x)))
+  const fold = (id: string) => setFolded(f => (f.includes(id) ? f.filter(x => x !== id) : [...f, id]).filter(x => view?.projects.some(p => p.id === x || p.seps?.some(s => s.id === x))))
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
@@ -875,6 +881,8 @@ export function App() {
       )
     )
   }
+  // a folded project's or sep's busiest workspace state (a setup script counts as running, as on its row)
+  const busiest = (list: WorkspaceView[]) => rollup([...view.tabs.filter(t => list.some(w => w.id === t.workspace)), ...(list.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])])
   // a workspace's row: under its project, or under Pinned (with its project's name; no drag there: pins keep the
   // sidebar's order)
   const wsRow = (w: WorkspaceView, pin = false) => {
@@ -949,23 +957,50 @@ export function App() {
     )
   }
   // a sep: a named line between a project's workspaces, dragged like one
-  const sepRow = (p: Project, s: Sep) => (
+  // a folded one (a click) hides the workspaces under it, up to the next sep; hid: those, its count and their busiest
+  const sepRow = (p: Project, s: Sep, hid: WorkspaceView[] = []) => {
+    const shut = folded.includes(s.id)
+    const sum = hid.length ? busiest(hid) : 'idle'
+    return (
     <div
       key={s.id}
       className={`ws-sep ${rows.at('ws', s.id)}` /* not .ws: the looks' workspace styles stay off it */}
       data-row={`ws:${s.id}`}
       data-group={p.id}
-      data-tip="drag to move · double click to rename · right click for more"
+      data-tip={`click to ${shut ? 'expand' : 'collapse'} · drag to move · double click to rename · right click for more`}
       onPointerDown={e => rows.start(e, 'ws', s.id, p.id)}
+      onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(s.id)}
       onDoubleClick={() => setDialog({ sep: p.id, id: s.id })}
       onContextMenu={e => openMenu(e, sepMenu(p, s))}
     >
+      <span className="project-chev">
+        <Icon name={shut ? 'chevronRight' : 'chevron'} size={11} />
+      </span>
       <span className="ws-name">{s.name}</span>
+      {hid.length > 0 && (
+        <>
+          {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}
+          <span className="project-count">{hid.length}</span>
+        </>
+      )}
       <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
         <IconButton icon="more" title="Separator" onClick={e => openMenu(e, sepMenu(p, s))} />
       </span>
     </div>
-  )
+    )
+  }
+  // a project's rows as shown: under a folded sep, only the selected workspace (each folded sep's others in hidden)
+  const shownRows = (p: Project, mine: WorkspaceView[]) => {
+    const hidden = new Map<string, WorkspaceView[]>()
+    let under = '' // the folded sep above
+    const shown = rowsOf(p, mine).filter(x => {
+      if (!('path' in x)) return (under = folded.includes(x.id) ? x.id : ''), true
+      if (!under || x.id === ws?.id) return true
+      hidden.get(under)?.push(x) ?? hidden.set(under, [x])
+      return false
+    })
+    return shown.map(x => ('path' in x ? wsRow(x) : sepRow(p, x, hidden.get(x.id))))
+  }
   // the tabs: in the top bar (the default), or a strip of their own under the terminals or beside them (Settings ›
   // Appearance; a phone keeps them on top)
   const tabsAt = (!narrow && (['bottom', 'left', 'right'] as const).find(x => x === settings.tabsAt)) || 'top' // an unknown value: top
@@ -1034,8 +1069,7 @@ export function App() {
           {view.projects.map(p => {
             const mine = live.filter(w => w.project === p.id && !w.pinned) // a pinned one is above, under Pinned
             const shut = folded.includes(p.id)
-            // a folded project's busiest (a setup script counts as running, as on its row)
-            const sum = shut ? rollup([...view.tabs.filter(t => mine.some(w => w.id === t.workspace)), ...(mine.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])]) : 'idle'
+            const sum = shut ? busiest(mine) : 'idle'
             return (
             <div key={p.id} className="project">
               <div
@@ -1064,7 +1098,7 @@ export function App() {
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               <div className="project-ws">{/* under its project, on a guide line */}
-              {(shut ? mine.filter(w => w.id === ws?.id) : rowsOf(p, mine)).map(x => ('path' in x ? wsRow(x) : sepRow(p, x)))}{/* folded: the selected one stays */}
+              {shut ? mine.filter(w => w.id === ws?.id).map(w => wsRow(w)) : shownRows(p, mine)}{/* folded: the selected one stays */}
               </div>
             </div>
             )
