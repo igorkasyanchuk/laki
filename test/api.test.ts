@@ -364,7 +364,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
 
   // refusals; the email is kept (the global setting) once it is one
   await assert.rejects(rig.rpc('remoteStart', { hours: 1 }), /the email that may open it: Settings › Remote access/)
-  for (const hours of [3, null, '', '0', false]) await assert.rejects(rig.rpc('remoteStart', { hours, mail: 'me@x.dev' }), /for how long: 1, 2, 4, 8, 24 hours, or 0 \(until stopped\)/)
+  for (const hours of [3, null, '', '0', false]) await assert.rejects(rig.rpc('remoteStart', { hours, mail: 'me@x.dev' }), /for how long: 1, 2, 4, 8, 12, 24, 48, 72 hours, or 0 \(until stopped\)/)
   for (const m of ['*@x.dev', 'a@b.dev,c@d.dev', 'nope'])
     await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: m }), /not an email address/)
   await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: ' me@x.dev ' }), /cloudflared isn't installed: brew install cloudflared/)
@@ -552,4 +552,45 @@ test('an image as it was where the changes start (Changes before and after), and
   await assert.rejects(read('added.png', true), /not in main/)
   await assert.rejects(read('notes.txt', true), /isn't an image/)
   await assert.rejects(read('../x.png', true), /not a path inside/)
+})
+
+test('a folder: Create with an agent makes another session beside its own (none: its own back); the creation log in development mode', async t => {
+  const rig = await fresh(t)
+  const folder = join(rig.home, 'notes')
+  mkdirSync(folder)
+  const p = await rig.rpc('projectAdd', { path: folder })
+  assert.equal(p.git, false)
+  await rig.rpc('settingsSet', { devMode: true })
+  const own = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  assert.equal((await rig.rpc('wsNew', { project: p.id, preset: 'none' })).id, own.id, 'none: the folder’s own, as it is')
+  // the new-workspace page's Create: an agent and a prompt, a session of their own beside it, in the same folder
+  const next = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'from which app are you running' })
+  assert.notEqual(next.id, own.id)
+  assert.deepEqual([next.id, next.kind, next.path], ['from-which-app-are', 'local', own.path])
+  const tab = await until(() => rig.tab(next.id), 'its claude tab')
+  assert.equal(tab.preset, 'claude')
+  await until(() => rig.fakeLog().some(l => l.bin === 'claude' && l.args.at(-1) === 'from which app are you running'), 'claude started on the prompt')
+  // what making it ran, step by step (Settings › General › Creation log), and the tab's command in its own log
+  const said = (await rig.rpc('logs', { key: 'new' })).map((l: { text: string }) => l.text)
+  assert.ok(said.some((l: string) => l.startsWith(`${p.id}: asked: {`) && l.includes('"preset":"claude"')), said.join('\n'))
+  assert.ok(said.includes(`${p.id}: ${own.id} is the folder's own workspace: another one beside it`), said.join('\n'))
+  assert.ok(said.some((l: string) => l.startsWith(`${p.id}: agent: claude`)), said.join('\n'))
+  const mine = (await rig.rpc('logs', { key: `ws:${next.id}` })).map((l: { text: string }) => l.text)
+  assert.ok(mine.some((l: string) => l.startsWith('claude: ') && l.includes("-lic 'claude' '--settings'") && l.includes('--plugin-dir') && l.endsWith('/notes)')), mine.join('\n'))
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'nope' }))
+  assert.ok((await rig.rpc('logs', { key: 'new' })).some((l: { text: string }) => l.text.startsWith(`${p.id}: failed: `)), 'a failure says why')
+})
+
+test("project notes: projectSet keeps them, blank drops them; ls --json leaves them out", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, notes: '# Links\n- Staging: https://staging.example\n' })
+  assert.equal((await rig.rpc('state')).projects[0].notes, '# Links\n- Staging: https://staging.example\n')
+  await rig.rpc('projectSet', { id: p.id, name: 'App' }) // another field: the notes stay
+  assert.match((await rig.rpc('state')).projects[0].notes, /^# Links/)
+  const ls = await rig.cli('ls', '--json')
+  assert.equal(ls.code, 0, ls.err)
+  assert.ok(!ls.out.includes('staging.example'), 'agents never see them')
+  await rig.rpc('projectSet', { id: p.id, notes: '  \n ' })
+  assert.equal((await rig.rpc('state')).projects[0].notes, undefined)
 })

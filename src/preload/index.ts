@@ -3,7 +3,7 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 
 contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
-  notify: (title: string, body: string, tab: string, sound?: string, actions?: string[]) => ipcRenderer.send('notify', title, body, tab, sound, actions),
+  notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[]) => ipcRenderer.send('notify', title, body, tab, sound, actions),
   browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
   onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
@@ -25,10 +25,14 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.send('shot-ready') // then main sends one taken before
   },
   // the floating bubbles: the workspaces whose agent works or waits (none: no bar), in the theme's colors
-  floats: (items: object[], colors: Record<string, string>) => ipcRenderer.send('floats', items, colors),
+  floats: (items: object[], colors: Record<string, string>, style?: string) => ipcRenderer.send('floats', items, colors, style),
+  procs: (): Promise<{ pid: number; name: string; stop?: string }[]> => ipcRenderer.invoke('procs'), // Settings › Resources: what each process holds
+  procStop: (what: string) => ipcRenderer.send('proc-stop', what), // the bubbles, an agent browser
   // the bubbles' own windows (floater.html): the bar (the list in; its height, a hover and a click out) and the card
   floater: {
-    onFloats: (cb: (f: { items: object[]; colors: Record<string, string> }) => void) => ipcRenderer.on('floats', (_e, f) => cb(f)),
+    onFloats: (cb: (f: { items: object[]; colors: Record<string, string>; style: string }) => void) => ipcRenderer.on('floats', (_e, f) => cb(f)),
+    onSide: (cb: (side: 'left' | 'right') => void) => ipcRenderer.on('floater-side', (_e, side) => cb(side)),
+    drag: (phase: 'start' | 'move' | 'end', dx = 0, dy = 0) => ipcRenderer.send('floater-drag', phase, dx, dy),
     size: (h: number) => ipcRenderer.send('floater-size', h),
     hover: (tab: string, top: number) => ipcRenderer.send('floater-hover', tab, top),
     open: (tab: string) => ipcRenderer.send('floater-open', tab),

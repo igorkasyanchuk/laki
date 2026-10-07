@@ -6,27 +6,36 @@
     <style>
       :root { --bg: #161a21; --fg: #d5d9e3; --muted: #7a8294; --line: #232833; --running: #7aa2f7; --waiting: #e0af68; --font: -apple-system, system-ui, sans-serif; color-scheme: dark; }
       html, body { margin: 0; background: transparent; overflow: hidden; color: var(--fg); font: 12px/1.35 var(--font); user-select: none; -webkit-user-select: none; }
-      /* the bar: 44px wide (main's BAR); the card, in its own window (#card) */
-      #bar { width: 44px; box-sizing: border-box; padding: 0 0 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; background: var(--bg); border: 1px solid var(--line); border-radius: 22px; }
       body[data-mode='card'] #bar, body[data-mode='bar'] #card { display: none; }
-      .grip { width: 100%; height: 14px; display: flex; align-items: flex-end; justify-content: center; cursor: grab; -webkit-app-region: drag; }
-      .grip::before { content: ''; width: 14px; height: 3px; border-top: 1px solid var(--muted); border-bottom: 1px solid var(--muted); opacity: 0.7; }
-      .dot { --c: var(--running); position: relative; width: 32px; height: 32px; box-sizing: border-box; border-radius: 50%; border: 2px solid var(--c); display: grid; place-items: center; font-size: 11px; font-weight: 600; letter-spacing: 0.02em; color: var(--ink, var(--fg)); background: color-mix(in srgb, var(--c) 16%, var(--bg)); cursor: pointer; }
-      .dot:hover { background: color-mix(in srgb, var(--c) 34%, var(--bg)); }
-      .dot.waiting { --c: var(--waiting); animation: pulse 1.6s ease-in-out infinite; }
-      /* working: an arc going round */
-      .dot.running::after { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 2px solid transparent; border-top-color: var(--c); animation: spin 1.4s linear infinite; }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      @keyframes pulse { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent); } }
+      /* the drop: 44px wide (main's BAR), against the screen's edge (data-side); its shape (.shape) melts into the edge
+         at the top and bottom (the flares), wobbles a little, and is a round blob while it's dragged */
+      #bar { position: relative; isolation: isolate; width: 44px; box-sizing: border-box; padding: 20px 0 20px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: grab; touch-action: none; animation: fl-in 0.35s cubic-bezier(0.3, 1.4, 0.5, 1); }
+      body[data-side='left'] #bar { padding: 20px 6px 20px 0; animation-name: fl-in-left; }
+      body.dragging #bar { cursor: grabbing; }
+      .shape { position: absolute; z-index: -1; top: 14px; bottom: 14px; right: 0; width: 38px; background: var(--bg); border-radius: 19px 0 0 19px / 22px 0 0 22px; filter: drop-shadow(0 0 0.6px var(--muted)) drop-shadow(0 2px 5px rgb(0 0 0 / 0.3)); animation: fl-wobble 7s ease-in-out infinite; transition: border-radius 0.25s; }
+      body[data-side='left'] .shape { right: auto; left: 0; transform: scaleX(-1); }
+      /* the flares: a quarter circle cut out of a square, where the drop meets the edge */
+      .shape::before, .shape::after { content: ''; position: absolute; right: 0; width: 12px; height: 12px; transition: opacity 0.2s; }
+      .shape::before { top: -12px; background: radial-gradient(circle at 0 0, transparent 11.5px, var(--bg) 12px); }
+      .shape::after { bottom: -12px; background: radial-gradient(circle at 0 100%, transparent 11.5px, var(--bg) 12px); }
+      body.dragging .shape { animation: none; border-radius: 19px; }
+      body.dragging .shape::before, body.dragging .shape::after { opacity: 0; }
+      @keyframes fl-wobble { 0%, 100% { border-radius: 19px 0 0 19px / 22px 0 0 22px; } 33% { border-radius: 16px 0 0 21px / 19px 0 0 27px; } 66% { border-radius: 21px 0 0 17px / 26px 0 0 20px; } }
+      @keyframes fl-in { from { transform: translateX(40px); } }
+      @keyframes fl-in-left { from { transform: translateX(-40px); } }
+      .fl-dot { cursor: pointer; }
+      body.dragging .fl-dot { cursor: grabbing; }
+      .fl-dot:hover { filter: brightness(1.35); } /* over any style's background, a gradient's too */
       #card { width: 240px; box-sizing: border-box; padding: 9px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
       #card b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #card .meta { color: var(--muted); font-size: 11px; margin-top: 1px; }
       #card .meta i { font-style: normal; color: var(--c); }
       #card .last { margin-top: 6px; color: var(--fg); opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+      @media (prefers-reduced-motion: reduce) { #bar, .shape { animation: none; } }
     </style>
   </head>
-  <body>
-    <div id="bar"><div class="grip" title="Drag to move"></div></div>
+  <body data-side="right" data-fstyle="glow">
+    <div id="bar"><div class="shape"></div></div>
     <div id="card"></div>
     <script type="module" src="/src/floater.ts"></script>
   </body>

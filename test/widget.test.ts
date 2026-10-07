@@ -390,3 +390,15 @@ test('widgets that come with Laki: My PRs, Team PRs, Links', async t => {
   await rig.rpc('widgetSet', { id: 'links', on: true, config: { links: 'Lunch: https://food.example/order,https://linear.app' } })
   assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/links?key=${(await rig.rpc('state')).widgetKey}`)).text(), /"links":\["Lunch: https:\/\/food.example\/order","https:\/\/linear.app"\]/)
 })
+
+test('widget sizes: half a cell down is kept (a thin line), other fractions round; Links comes as one', async t => {
+  const rig = await fresh(t)
+  const links = async () => (await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links')
+  assert.deepEqual((await links()).size, [3, 0.5], 'Links: a line across')
+  await rig.rpc('widgetSet', { id: 'links', size: [2, 0.7] })
+  assert.deepEqual((await links()).size, [2, 1])
+  await rig.rpc('widgetSet', { id: 'links', size: [1, 0.5] })
+  assert.deepEqual((await links()).size, [1, 0.5])
+  await rig.rpc('widgetSet', { id: 'links', size: [9, 0] })
+  assert.deepEqual((await links()).size, [3, 1], 'clamped to the grid')
+})

@@ -8,6 +8,7 @@ const paths = {
   more: 'M3.5 8h.01M8 8h.01M12.5 8h.01',
   diff: 'M8 2.5v5M5.5 5h5M5.5 12h5',
   run: 'M5 3l8 5-8 5z',
+  pause: 'M5.5 3.5v9M10.5 3.5v9',
   ship: 'M8 10.5V2.5M4.5 6L8 2.5 11.5 6M3 13.5h10',
   fork: 'M5.8 3a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM12.8 3a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM9.3 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM4.5 4.3v1.2a2 2 0 002 2h3a2 2 0 002-2V4.3M8 7.5v4.2',
   archive: 'M2.5 3h11v3h-11zM3.5 6v7h9V6M6.5 9h3',
@@ -126,18 +127,20 @@ export function Switch({ on, onChange, tip, className = '', children }: { on?: b
 // ask: a yes/no question in the app's own dialog (confirm() is the OS's sheet), true on OK. AskHost, mounted once
 // in App, shows it; a newer question answers the one before with no. Esc or a click outside: no; Enter: the focused
 // button (OK at first); its keys never reach what's under it, ⌘ shortcuts aside. choose: the same dialog with any
-// buttons (a widget's modal), the index picked, -1 for none.
+// buttons (a widget's modal), the index picked, -1 for none; check: a checkbox under the text, its on as it was left.
 type Choice = { label: string; primary?: boolean; danger?: boolean }
-type Asking = { title: string; text?: string; buttons: Choice[]; done: (i: number) => void }
+type Check = { label: string; on: boolean }
+type Asking = { title: string; text?: string; buttons: Choice[]; check?: Check; done: (i: number) => void }
 let asker: ((a: Asking) => void) | null = null
 export const ask = (title: string, o: { text?: string; ok?: string; danger?: boolean } = {}) =>
   new Promise<boolean>(done =>
     asker ? asker({ title, text: o.text, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
   )
-export const choose = (title: string, text: string | undefined, buttons: Choice[]) => new Promise<number>(done => (asker ? asker({ title, text, buttons, done }) : done(-1)))
+export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check) => new Promise<number>(done => (asker ? asker({ title, text, buttons, check, done }) : done(-1)))
 
 export function AskHost() {
   const [a, setA] = useState<Asking | null>(null)
+  const [on, setOn] = useState(false) // check's
   const cur = useRef<{ a: Asking; back: Element | null } | null>(null)
   const box = useRef<HTMLDivElement>(null)
   const close = (i: number) => {
@@ -157,13 +160,19 @@ export function AskHost() {
     const at = btns.indexOf(document.activeElement as HTMLButtonElement)
     const n = btns.length
     if (e.key === 'Escape') close(-1)
+    else if (e.key === ' ' && document.activeElement?.matches('.ask-check input')) (document.activeElement as HTMLInputElement).click()
     else if (e.key === 'Enter') close(at >= 0 ? at : cur.current.a.buttons.findIndex(b => b.primary))
-    else if (['Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) btns[(at + (e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey) ? n - 1 : 1)) % n]?.focus()
+    else if (e.key === 'Tab') {
+      const all = [...(box.current?.querySelectorAll<HTMLElement>('.ask-check input, button') ?? [])] // the checkbox too (Space toggles it)
+      const i = all.indexOf(document.activeElement as HTMLElement)
+      all[(i + (e.shiftKey ? all.length - 1 : 1)) % all.length]?.focus()
+    } else if (['ArrowLeft', 'ArrowRight'].includes(e.key)) btns[(at + (e.key === 'ArrowLeft' ? n - 1 : 1)) % n]?.focus()
   }
   useEffect(() => {
     asker = next => {
       cur.current?.a.done(-1)
       cur.current = { a: next, back: cur.current?.back ?? document.activeElement }
+      setOn(!!next.check?.on)
       setA(next)
     }
     const f = (e: KeyboardEvent) => onKey.current(e)
@@ -180,6 +189,11 @@ export function AskHost() {
       <div className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
         <div className="ask-title">{a.title}</div>
         {a.text && <p className="ask-text">{a.text}</p>}
+        {a.check && (
+          <label className="ask-check">
+            <input type="checkbox" checked={on} onChange={e => setOn((a.check!.on = e.target.checked))} /> {a.check.label}
+          </label>
+        )}
         <div className="ask-buttons">
           {a.buttons.map((b, i) => (
             <button key={i} className={`${b.primary ? 'primary' : ''} ${b.danger ? 'danger' : ''}`} onClick={() => close(i)}>

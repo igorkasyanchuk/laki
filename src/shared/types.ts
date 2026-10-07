@@ -21,7 +21,14 @@ export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: s
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
 // ports: names for the status bar's ports ({"3000": "web"})
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string> }
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod } // worktrees, pr, mergeMethod: the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way
+// what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
+// off; merge when green only when turned on
+export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
+export type PRPerm = keyof PRAllow
+export const prAllows = (c: ProjectConfig | undefined, act: PRPerm) => (act === 'land' ? c?.pr?.land === true : c?.pr?.[act] !== false)
+export type MergeMethod = 'squash' | 'merge' | 'rebase'
+export const MERGE_METHODS: MergeMethod[] = ['squash', 'merge', 'rebase']
 
 // git: false for a plain folder (local workspaces only: no worktrees, branches, diff or PRs)
 // host: an SSH host (a ~/.ssh/config name or user@host): the folder is there, and so are git, gh and its tabs' programs
@@ -34,6 +41,7 @@ export type Project = {
   config?: ProjectConfig
   seps?: Sep[] // the sidebar's named lines between its workspaces
   rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
+  notes?: string // Project notes: the user's Markdown (links, how-tos), its ⋯ menu's Notes and Settings; never agents'
 }
 export type Sep = { id: string; name: string; color?: string; template?: string } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with
 // a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others
@@ -65,7 +73,8 @@ export type Workspace = {
   autoFix?: boolean // failing CI goes to the agent
   autoReview?: boolean // new PR review comments go to the agent
   autoMerge?: boolean // merge conflicts with the PR's base go to the agent
-  fix?: PRFix // what autoFix/autoReview/autoMerge sent already
+  autoLand?: boolean // merge when green: Laki merges the PR (its project's last way) once all checks pass, no conflicts, not a draft, approved if it must be
+  fix?: PRFix // what autoFix/autoReview/autoMerge/autoLand did already
   race?: string // one prompt fanned out to several agents: the workspaces of one race share it (Compare)
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
   prUrl?: string // the GitHub PR it was started from (laki new --pr, or a prompt naming one): its PR by URL (a fork's, another repo's), until the branch moves
@@ -76,7 +85,7 @@ export type Workspace = {
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
 // merge conflicts were sent, how many times in a row
-export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number } // mine: the agent's comments (it comments as you)
+export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number; land?: string } // mine: the agent's comments (it comments as you); land: the head commit merge when green tried
 export type FixWhat = 'ci' | 'review' | 'conflict'
 
 // what fix CI, review and fix conflicts (and the info panel's send buttons) tell the agent; settings.prPrompts
@@ -175,6 +184,9 @@ export type Settings = {
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
+  closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
+  pageZoom?: number // Settings and Help's size (0.9–1.5, renderer's PAGE_ZOOMS; unset: 1)
+  worktrees?: string // where new worktrees go: <it>/<project>/<workspace> (unset: <data>/worktrees; a project's own folder wins)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
@@ -184,6 +196,7 @@ export type Settings = {
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
   floater?: boolean // the floating bubbles over other apps: agents working or waiting (unset: on)
+  floaterStyle?: 'glow' | 'gradient' | 'arc' | 'still' // how a working agent's bubble looks (unset: glow)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
@@ -193,13 +206,15 @@ export type Settings = {
 }
 
 // Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
-export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean }
+// answer: Answer from the phone (Telegram's and ntfy's buttons; off: the choices as text only); replyTopic: the random
+// part of ntfy's reply topic (<topic>-<it>), made as answer turns on
+export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string }
 
 // how the sidebar writes project names (Settings › Appearance); 'theme' (or unset): as the theme does
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
-export type SideStyle = 'compact' | 'default' | 'extended' | 'cards' // Settings.tsx SIDE_STYLES
+export type SideStyle = 'compact' | 'default' | 'extended' | 'cards' | 'status' // Settings.tsx SIDE_STYLES
 // development mode's event log (core.ts devLog): n, how many times a line came again
 export type LogLine = { at: number; text: string; n?: number }
 export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; labels?: boolean }
@@ -244,6 +259,7 @@ export type PR = {
   head?: string
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
   conflict?: boolean // merge conflicts with its base branch
+  ready?: boolean // mergeStateStatus CLEAN (or HAS_HOOKS): GitHub would merge it now; false: blocked, behind, unstable…
   base?: string // its base branch
   additions?: number
   deletions?: number
@@ -295,4 +311,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 31
+export const API = 33

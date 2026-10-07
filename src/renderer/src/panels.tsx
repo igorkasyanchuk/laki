@@ -4,8 +4,9 @@ import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, type LogLine, MODELS, prIn,
 import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
+import { Markdown } from './MarkdownView'
 import { type Img, PromptInput, TemplatePick, withImages } from './PromptInput'
-import { clock, nameOf, parseDuration, prRef, templated, templatesFor } from './text'
+import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor } from './text'
 import { Icon, IconButton, type IconName, Page, Switch, useMenu } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -21,6 +22,45 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
         {children}
       </div>
     </div>
+  )
+}
+
+// a project's notes (its ⋯ menu's Notes): its Markdown rendered, Edit for the text (empty: editing from the start);
+// closing saves an edit (Settings autosaves too)
+export function ProjectNotes({ name, notes, onSave, onClose }: { name: string; notes: string; onSave: (text: string) => Promise<unknown>; onClose: () => void }) {
+  const [edit, setEdit] = useState<string | null>(notes.trim() ? null : '')
+  const save = (then: () => void) => (edit !== null && edit !== notes ? onSave(edit).then(then, () => {}) : then())
+  return (
+    <Modal title={`Notes · ${name}`} onClose={() => save(onClose)} wide>
+      {edit === null ? (
+        <div className="notes-view">
+          <Markdown src={notes} />
+        </div>
+      ) : (
+        <textarea
+          className="notes-edit mono"
+          autoFocus
+          value={edit}
+          aria-label="Notes, in Markdown"
+          placeholder={'Links, how to run it, who to ask…\n\n# Headings, - lists, [a link](https://…), `code`'}
+          onChange={e => setEdit(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), save(() => setEdit(null)))}
+        />
+      )}
+      <div className="row">
+        <span className="muted small grow">{edit === null ? 'Kept with the project in Laki; agents never see them' : 'Markdown · ⌘⏎ saves · closing saves too'}</span>
+        {edit === null ? (
+          <button onClick={() => setEdit(notes)}>
+            <Icon name="pencil" /> Edit
+          </button>
+        ) : (
+          notes.trim() && <button onClick={() => setEdit(null)}>Cancel</button>
+        )}
+        <button className="primary" onClick={() => (edit === null ? onClose() : save(() => setEdit(null)))}>
+          {edit === null ? 'Close' : 'Save'}
+        </button>
+      </div>
+    </Modal>
   )
 }
 
@@ -97,20 +137,42 @@ export function Video({ src, min, onMin, onChange, onClose }: { src: string; min
 
 // a running timer, a bar over the sidebar's foot like the minimized video: the time left, ticking, and what it was set
 // for; its menu changes it (more time, a new length, what happens as it ends)
-export function TimerBar({ end, label, onMenu, onStop }: { end: number; label: string; onMenu: (e: MouseEvent<HTMLElement>) => void; onStop: () => void }) {
+export function TimerBar({ end, label, tip, onMenu, onStop }: { end: number; label: string; tip?: string; onMenu: (e: MouseEvent<HTMLElement>) => void; onStop: () => void }) {
   const [, tick] = useState(0)
   useEffect(() => {
     const t = setInterval(() => tick(n => n + 1), 1000)
     return () => clearInterval(t)
   }, [])
   return (
-    <div className="timer-bar" onContextMenu={onMenu}>
+    <div className="timer-bar" onContextMenu={onMenu} data-tip={tip}>
       <Icon name="timer" size={13} />
       <span className="timer-left">{clock(end - Date.now())}</span>
       <span className="muted small timer-what">{label}</span>
       <span className="spacer" />
       <IconButton icon="pencil" title="Change it: more time, a new length, what happens as it ends" onClick={onMenu} />
       <IconButton icon="x" title="Stop it" onClick={onStop} />
+    </div>
+  )
+}
+
+// a stopwatch, a bar like a timer's: the time since it started (ms: what earlier runs added up to; from: running
+// since), start or pause, reset, close
+export function StopwatchBar({ ms, from, onToggle, onReset, onClose }: { ms: number; from?: number; onToggle: () => void; onReset: () => void; onClose: () => void }) {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    if (!from) return
+    const t = setInterval(() => tick(n => n + 1), 1000)
+    return () => clearInterval(t)
+  }, [from])
+  return (
+    <div className={`timer-bar ${from ? '' : 'paused'}`}>
+      <Icon name="clock" size={13} />
+      <span className="timer-left">{clock(Math.floor((ms + (from ? Date.now() - from : 0)) / 1000) * 1000)}</span>
+      <span className="muted small timer-what">{from ? 'stopwatch' : 'stopwatch, paused'}</span>
+      <span className="spacer" />
+      <IconButton icon={from ? 'pause' : 'run'} title={from ? 'Pause' : 'Start'} onClick={onToggle} />
+      <IconButton icon="refresh" title="Reset to 0:00" onClick={onReset} />
+      <IconButton icon="x" title="Close it" onClick={onClose} />
     </div>
   )
 }
@@ -195,12 +257,9 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
         {!m && busy && <div className="muted pad">Finding one…</div>}
         {err && <div className="warn small">{err}</div>}
         <div className="buttons">
-          <span className="muted small">{[m?.by && `u/${m.by}`, `r/${m?.sub ?? 'memes'}`].filter(Boolean).join(' · ')}</span>
+          <span className="muted small">{copied ? 'Copied' : [m?.by && `u/${m.by}`, `r/${m?.sub ?? 'memes'}`].filter(Boolean).join(' · ')}</span>
           <span className="spacer" />
           <button onClick={onClose}>Back to work</button>
-          <button onClick={copy} disabled={busy || !m}>
-            <Icon name="copy" /> {copied ? 'Copied' : 'Copy image'}
-          </button>
           <button className="primary" onClick={next} disabled={busy} autoFocus data-tip="→ or N">
             {busy ? 'Loading…' : 'Next'} <Icon name="arrowRight" />
           </button>
@@ -211,7 +270,8 @@ export function Fun({ load, onClose }: { load: () => Promise<Meme>; onClose: () 
   )
 }
 
-// About (the app menu's, ⌘K): the version and the website
+// About (the app menu's, ⌘K): the version, when it was built and the website
+declare const __BUILT__: string // electron.vite.config.ts' define
 export function About({ onClose }: { onClose: () => void }) {
   return (
     <Modal title="About Laki" onClose={onClose}>
@@ -219,6 +279,7 @@ export function About({ onClose }: { onClose: () => void }) {
         <img src={icon} width={72} height={72} alt="" />
         <b className="about-name">Laki</b>
         <span className="muted small">Version {version}</span>
+        {typeof __BUILT__ === 'string' /* dev:web's plain vite has none */ && <span className="muted small">Built {new Date(__BUILT__).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}</span>}
         <p>Coding agents side by side, each task in its own git worktree.</p>
         <a href={SITE} onClick={e => (e.preventDefault(), openExternal(SITE))}>
           {SITE.replace('https://', '')}
@@ -696,6 +757,62 @@ export function RemindDialog({ name, onClose, onPick }: { name: string; onClose:
           </button>
           <button type="submit" className="primary" disabled={!ms}>
             Remind me
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// Send later (the toolbar's ⋯): a message to one of the workspace's agents at a time; a timer in the sidebar until
+// then (edit: its message, agent and time again)
+export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab?: string; text?: string; at?: number; onClose: () => void; onPick: (o: { tab: string; text: string; ms: number }) => void }) {
+  const [to, setTo] = useState(p.agents.some(a => a.id === p.tab) ? p.tab! : (p.agents[0]?.id ?? ''))
+  const [text, setText] = useState(p.text ?? '')
+  const [when, setWhen] = useState(() => (p.at ? laterText(p.at) : '')) // an edit: its time again
+  const ms = parseLater(when)
+  const ok = !!(to && text.trim() && ms)
+  const time = (ms: number) => new Date(Date.now() + ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return (
+    <Modal title={p.text ? 'Change the message for later' : 'Send a message later'} onClose={p.onClose}>
+      <form className="form" onSubmit={e => (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))}>
+        <label>
+          To
+          <select value={to} onChange={e => setTo(e.target.value)}>
+            {p.agents.map(a => (
+              <option key={a.id} value={a.id}>
+                {a.name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label>
+          Message
+          <textarea rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails" onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} />
+        </label>
+        <label>
+          When
+          <input value={when} placeholder="in 10m · 2h · 1h 30m · at 15:30 · 3pm" onChange={e => setWhen(e.target.value)} />
+        </label>
+        <div className="remind-quick">
+          {['15m', '30m', '1h', '2h'].map(q => (
+            <button key={q} type="button" className={when === q ? 'on' : ''} onClick={() => setWhen(q)}>
+              In {q.replace('m', ' min').replace('h', ' h')}
+            </button>
+          ))}
+        </div>
+        <div className="muted small">
+          {when.trim() && !ms
+            ? 'A length (10m, 2h, 1h 30m) or a time (15:30, 3pm), within a day.'
+            : `${ms ? `Sends at ${time(ms)}. ` : ''}Queued if the agent is busy then. Laki must be running: one due while it was closed isn't sent.`}
+        </div>
+        <div className="buttons">
+          <span className="spacer" />
+          <button type="button" onClick={p.onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={!ok}>
+            {p.text ? 'Save' : 'Send later'}
           </button>
         </div>
       </form>

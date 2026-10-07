@@ -33,7 +33,7 @@ const KEYS: [string, string][] = [
   ['⌘E', 'open the workspace in your editor'],
   ['⌘B', 'hide / show the sidebar'],
   ['⌘,', 'settings'],
-  ['⌘+ / ⌘− / ⌘0', 'terminal font bigger / smaller / default'],
+  ['⌘+ / ⌘− / ⌘0', 'terminal font bigger / smaller / default (Settings or Help open: their size)'],
   ['⌘/', 'this page'],
   ['Esc', 'close a page, dialog or menu; in an agent, interrupt its turn'],
 ]
@@ -74,7 +74,7 @@ const Row = ({ id, k, children }: { id?: string; k: ReactNode; children: ReactNo
   </div>
 )
 
-export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; onClose: () => void }) {
+export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?: boolean; zoom?: number; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [at, setAt] = useState<{ sec?: string; row?: string }>({}) // ids in view
   const main = useRef<HTMLDivElement>(null)
@@ -82,6 +82,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
   const cmds: [string, string][] = [
     [`${cli} ls`, 'projects, workspaces and tabs, with their status (--json for scripts)'],
     [`${cli} new <project> --prompt "fix the login"`, 'a workspace with an agent (--preset codex|shell, --model, --effort, --base, --name, --local)'],
+    [`${cli} new . --preset codex --prompt "…"`, "in a Laki tab: a workspace in that tab's project (what an agent's /laki:new runs)"],
     [`${cli} new <project> --issue <url>`, 'a workspace on a GitHub issue: its title and text are the prompt'],
     [`${cli} new <project> --pr <url>`, "a workspace on a PR's branch (a fork's too), its base the PR's"],
     [`${cli} new <project> --fan claude,codex --prompt "…"`, 'a race: the same prompt to each agent, a worktree each; Compare them in the app'],
@@ -135,7 +136,10 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
       title: 'Around the window',
       items: [
         { id: 'tabs', k: 'Tabs', v: 'Drag a tab along the bar to reorder, onto a pane\'s edge to split it, onto its center to trade places (Esc cancels); a pane\'s header drags too; double click to rename; right click for colors, split, restart, Mark as unread. Drop files on a terminal to type their paths.' },
-        { id: 'asks', k: 'Asks', v: "An agent's numbered choices (a permission prompt) show as buttons under its terminal; a permission prompt's notification has Allow and Deny." },
+        { id: 'asks', k: 'Asks', v: "An agent's numbered choices (a permission prompt, a question) show as buttons under its terminal and on its notification (macOS: under Options); Settings › Phone pushes › Answer from the phone puts them on a Telegram or ntfy push too." },
+        { id: 'later', k: 'Send later', v: "The toolbar's ⋯ › Send a message later…: a message for one of the workspace's agents, in 10m, 2h, 1h 30m or at 15:30 / 3pm. A timer bar over the sidebar's bottom buttons until then (Send now, Edit, Cancel); queued if the agent is busy; not sent if Laki was closed when it was due." },
+        { id: 'prs', k: 'Pull requests', v: "The PR panel (the info panel, the side panel's Review) and a right click on the status bar's PR: Merge… (squash, a merge commit or rebase; it asks first and can delete the branch on GitHub), Approve, Close. Merge when green merges once every check passes, there are no conflicts, it's approved if the repo asks and its agent isn't working. A project's settings › Pull requests says which of these Laki may do there (merge when green: off until turned on)." },
+        { id: 'timers', k: 'Timers', v: "The timer at the bottom of the sidebar: a countdown (then a notification, and the video paused, played or closed, or a command) or a stopwatch. A workspace's Remind me… and Send later are timers too: right click one to change it." },
         { id: 'race', k: <><Icon name="race" /> Race</>, v: "A race: the new workspace page's Race adds agents that each get a worktree on the same prompt. Compare (the workspace's menu, ⌘K) puts them side by side; Keep this one archives the rest." },
         { id: 'run', k: '▷ Run', v: 'The project’s run script in a dev tab, with $PORT; ■ stops it.' },
         {
@@ -143,7 +147,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           k: 'Status bar',
           v: (
             <>
-              The plan-limits ring (the 5-hour limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review / fix conflicts switches (their prompts, how often they check and how many tries: Settings › Pull requests). <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in progress is cut off).
+              The plan-limits ring (the 5-hour limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review / fix conflicts switches (their prompts, how often they check and how many tries: Settings › Pull requests), and merge when green where the project allows it (its settings › Pull requests: merge, merge when green, approve, close). <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in progress is cut off).
             </>
           ),
         },
@@ -156,7 +160,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
             </>
           ),
         },
-        { id: 'sidebar', k: 'Sidebar', v: "Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag to reorder. Pin to top (its menu) keeps one under Pinned, above the projects. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts), with its author's picture when it isn't yours. Archiving a clean workspace is at once, with Undo. The funnel at the top filters them (words, needs you, working, with a PR); a group (a project's ⋯ › Add a group) holds the workspaces under it, folds with a click, takes a workspace dropped on its head, and its ⋯ gives it a color and makes a new workspace in it; a workspace's Remind me… notifies you about it later." },
+        { id: 'sidebar', k: 'Sidebar', v: "Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag to reorder. A project's ⋯ › Notes: your Markdown notes for it. A workspace with no PR found: ⋯ › Attach a PR… (or + PR in the status bar). Pin to top (its menu) keeps one under Pinned, above the projects. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts), with its author's picture when it isn't yours. Archiving a clean workspace is at once, with Undo. The funnel at the top filters them (words, needs you, working, with a PR); a group (a project's ⋯ › Add a group) holds the workspaces under it, folds with a click, takes a workspace dropped on its head, and its ⋯ gives it a color and makes a new workspace in it; a workspace's Remind me… notifies you about it later." },
         {
           id: 'templates',
           k: 'Templates',
@@ -167,7 +171,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           ),
         },
         { id: 'actions', k: 'Actions', v: "Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in." },
-        { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent's model and effort. The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › General › Turn timers: how long each turn has gone." },
+        { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent's model and effort. The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › General › Turn timers: how long each turn has gone. In a Claude Code tab, /laki:new <the task> with codex starts it in a new workspace of the project." },
         { id: 'widgets', k: 'Widgets', v: 'Live tiles at the bottom of the sidebar (a click opens the full view): each a folder with widget.json and widget.html, fed by a command on a schedule while the app is open. Settings › Widgets turns them on, sizes them (and their full view: small, medium, large), sets them up and opens their folders; the Widget creator skill (Settings › Agent skill) has your agent make new ones, or Make one with AI there gives a prompt for any AI chat.' },
         { id: 'board', k: 'Board', v: 'The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.' },
         {
@@ -175,7 +179,9 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
           k: 'Scheduled',
           v: "The clock at the bottom of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {{DD-MM-YY}} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.",
         },
-        { id: 'look', k: 'Look', v: "Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow), the interface font, how project names look and the sidebar's lines, rows and button labels. Settings › General exports every setting to a file, to import on another Mac." },
+        { id: 'look', k: 'Look', v: "Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow), the interface font, how project names look and the sidebar's lines, rows and button labels. Settings › General exports every setting to a file, to import on another Mac. Accent and corners go over the theme's (every corner it draws); Settings & Help size: ⌘+ / ⌘− while either is open." },
+        { id: 'resources', k: 'Resources', v: "Settings › Resources: memory and CPU, Laki's own and each tab's. Sleep an idle agent (it wakes as you look at it; Settings can sleep them after a while); Stop the video, a widget, the preview, an agent browser or the floating bubbles until they're opened again." },
+        { id: 'worktrees', k: 'Worktrees', v: "Settings › General › Worktrees: where new worktrees go, a folder per project (~ is home); a project's settings can pick its own. Ones made already stay where they are." },
         { id: 'files', k: 'Files', v: "The side panel's preview colors code up to 50 KB and shows Markdown rendered or raw; right-click a file to open it in a browser or another app. The status bar's path has a copy button." },
         { id: 'changes', k: 'Changes', v: "Click a line of a diff to comment on it: on the PR (GitHub), or to the agent. With a PR, PR #n shows all of it (gh pr diff); GitHub's mark opens its Files changed." },
         { id: 'preview', k: 'Preview', v: "The toolbar's globe opens the side panel's Preview at localhost:$PORT (type /path, :5173 or any address); the devices button lays the page out at a phone's, a tablet's or a screen's size, or yours; the camera sends a screenshot to the agent; the crosshair puts a clicked element's selector, HTML, CSS and a screenshot of it in its prompt." },
@@ -254,7 +260,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
 
   const go = (id: string) => document.getElementById(`help-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })
   return (
-    <div className="settings-page" role="dialog" aria-label="Help">
+    <div className="settings-page" role="dialog" aria-label="Help" style={{ zoom }}>
       <div className="settings-head">
         <b>Help</b>
         <span className="grow" />

@@ -2,13 +2,15 @@
 // the settings.
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
-import { type CSSProperties, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { describeHours, parseHours } from '../../shared/when'
+import { bridge } from './api'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
+import './floater.css'
 import { Icon, IconButton, type IconName, Switch } from './ui'
 import { QR } from './Tunnel'
 import { USAGE_AGENTS } from './Usage'
@@ -52,12 +54,21 @@ const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]]
   ['text', 'Text size', [['theme', "Theme's"], ['11px', '11'], ['12px', '12'], ['13px', '13'], ['14px', '14'], ['15px', '15']]],
   ['icons', 'Icon size', [['theme', 'Default (13)'], ['11px', '11'], ['12px', '12'], ['14px', '14'], ['16px', '16'], ['18px', '18']]],
 ]
+// the floating bubbles' look while an agent works (floater.css draws them, here as previews too)
+type FloaterStyle = 'glow' | 'gradient' | 'arc' | 'still'
+const FLOATER_STYLES: [FloaterStyle, string, string][] = [
+  ['glow', 'Glow', 'a soft halo, breathing'],
+  ['gradient', 'Gradient', 'its color turning slowly inside'],
+  ['arc', 'Arc', 'an arc going round'],
+  ['still', 'Still', 'a ring, nothing moving'],
+]
 // the sidebar's rows (App.tsx wsRow, styles.css [data-style]): how much each says
 export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['compact', 'Compact', 'one short line: its state and name'],
   ['default', 'Default', 'a line with its marks: PR, author, timers'],
   ['extended', 'Extended', 'a second line: branch, what the agent is doing, the PR, the diff'],
   ['cards', 'Cards', 'a card each, with the agent’s last answer'],
+  ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]
 // Appearance's corners (--radius) and where the tabs go
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
@@ -88,6 +99,9 @@ export type AppSettings = Paint & {
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: off)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
+  closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
+  pageZoom?: number // Settings and Help's size, one of PAGE_ZOOMS (unset: 1)
+  worktrees?: string // where new worktrees go, a folder per project inside (unset: <data>/worktrees)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   projectLook?: ProjectLook // the sidebar's project names
   sideLook?: SideLook // the sidebar's lines, rows and button labels
@@ -104,6 +118,7 @@ export type AppSettings = Paint & {
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   menuBar?: boolean // the menu bar's item (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
+  floaterStyle?: FloaterStyle // a working agent's bubble (unset: glow)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
@@ -181,6 +196,25 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
         </Switch>
       </div>
       </Group>
+      <Group title="Answers" hint="A waiting agent's choices always go as text. With this on, Telegram and ntfy get a button per choice (ntfy: the first 3)">
+      <div className="setting-box">
+        <Switch
+          className="switch-row"
+          on={!!w.answer}
+          onChange={v => onChange({ ...w, answer: v, replyTopic: w.replyTopic || (v ? [...crypto.getRandomValues(new Uint8Array(9))].map(b => b.toString(36).padStart(2, '0')).join('').slice(0, 14) : undefined) })}
+        >
+          <Says
+            title="Answer from the phone"
+            hint={`A tap picks that choice in the agent's menu, as a key press here would: it can allow a command or an edit. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? 'ntfy: taps come back on a reply topic; anyone who knows your topic could tap, so keep it hard to guess.' : 'Slack and JSON: the choices as text only.'}`}
+          />
+        </Switch>
+        {w.answer && format === 'ntfy' && w.replyTopic && URL.canParse(w.url?.trim() ?? '') && (
+          <p className="muted small">
+            Reply topic: <code>{(u => `${u.origin}${u.pathname.replace(/\/+$/, '')}-${w.replyTopic}`)(new URL(w.url!.trim()))}</code>
+          </p>
+        )}
+      </div>
+      </Group>
       {test && (
         <div className="row-buttons">
           <button type="button" disabled={!w.url?.trim()} onClick={() => (setSaid('Sending…'), test(w).then(() => setSaid('Sent: check your phone'), e => setSaid(`Didn't go: ${e.message}`)))}>
@@ -201,6 +235,8 @@ const NOTIFY_KINDS: readonly (readonly [NotifyKind, string, string])[] = [
 const SOUNDS = ['Basso', 'Blow', 'Bottle', 'Frog', 'Funk', 'Glass', 'Hero', 'Morse', 'Ping', 'Pop', 'Purr', 'Sosumi', 'Submarine', 'Tink']
 
 export const FONT_SIZE = 13
+// Settings and Help's own size (Appearance), over the terminal font's: ⌘± step through these while one is open
+export const PAGE_ZOOMS = [0.9, 1, 1.1, 1.25, 1.5]
 export const FONTS = ['SF Mono', 'Menlo', 'Monaco', 'Courier New', 'JetBrains Mono', 'Fira Code', 'Fira Mono', 'Cascadia Code', 'Cascadia Mono',
   'Source Code Pro', 'IBM Plex Mono', 'Hack', 'Iosevka', 'Victor Mono', 'Roboto Mono', 'Ubuntu Mono', 'Inconsolata', 'Geist Mono', 'Commit Mono',
   'Monaspace Neon', 'Berkeley Mono', 'Input Mono', 'Hasklig', 'Anonymous Pro', 'DejaVu Sans Mono', 'Meslo LG S', 'MesloLGS NF', 'MesloLGS Nerd Font',
@@ -339,7 +375,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   return (
     <textarea
       className="mono"
-      rows={Math.max(2, Math.min(8, text.split('\n').length + 1))}
+      rows={text ? Math.min(8, text.split('\n').length + 1) : 1 /* empty: one line, it grows as you type */}
       value={text}
       placeholder={placeholder}
       spellCheck={false}
@@ -351,8 +387,29 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   )
 }
 
-export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string> } // expose: emails, *@domains
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig }
+export type ProjectConfig = Scripts & { expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod } // expose: emails, *@domains; worktrees: where new ones go; pr: what the app may do to its PRs
+
+const PR_PERMS: [keyof PRAllow, string, string][] = [
+  ['merge', 'Merge', 'Merge ▾ in the PR panel and the status bar\'s PR menu: squash, merge commit or rebase'],
+  ['land', 'Merge when green', 'A switch per workspace: Laki merges the PR once every check passes, it has no conflicts and is approved if it must be. Off unless turned on here'],
+  ['approve', 'Approve', 'An approving review, as you'],
+  ['close', 'Close', 'Closes a PR without merging'],
+]
+
+// a folder typed (~ is home) or picked (the app's folder picker; a browser has none)
+function FolderField({ value, placeholder, label, onChange }: { value?: string; placeholder: string; label: string; onChange: (v: string) => void }) {
+  return (
+    <span className="row-buttons">
+      <input className="grow mono" value={value ?? ''} placeholder={placeholder} aria-label={label} spellCheck={false} onChange={e => onChange(e.target.value)} />
+      {bridge && (
+        <button type="button" onClick={() => void bridge!.pickFolder().then(f => f && onChange(f))}>
+          Choose…
+        </button>
+      )}
+    </span>
+  )
+}
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
 const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Terminal']]
@@ -492,8 +549,10 @@ function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange:
   )
 }
 
-function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promise<ProjectConfig>; rename?: boolean; script?: keyof Scripts; onSave: (o: { name?: string; config: ProjectConfig }) => unknown }) {
+function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promise<ProjectConfig>; rename?: boolean; script?: keyof Scripts; onSave: (o: { name?: string; config: ProjectConfig; notes?: string }) => unknown }) {
   const [name, setName] = useState(p.project.name)
+  const [notes, setNotes] = useState(p.project.notes ?? '')
+  const notes0 = useRef(notes) // sent only once changed here: the Notes dialog or another client may have saved since
   const [c, setC] = useState<ProjectConfig>(p.project.config ?? {})
   const [file, setFile] = useState<ProjectConfig>({})
   useEffect(() => void p.file?.(p.project.id).then(setFile, () => {}), [p.project.id])
@@ -501,11 +560,15 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
   const unsaved = useRef<(() => unknown) | null>(null)
   useEffect(() => {
     if (first.current) return void (first.current = false)
-    const save = () => p.onSave({ name: p.rename && name.trim() ? name.trim() : undefined, config: c })
+    const save = () => {
+      const changedHere = notes !== notes0.current
+      notes0.current = notes // sent once: a later save of the config leaves the Notes dialog's edits be
+      return p.onSave({ name: p.rename && name.trim() ? name.trim() : undefined, config: c, ...(changedHere && { notes }) })
+    }
     unsaved.current = save
     const t = setTimeout(() => ((unsaved.current = null), save()), 400)
     return () => clearTimeout(t)
-  }, [name, c])
+  }, [name, c, notes])
   useEffect(() => () => void unsaved.current?.(), [])
   const badMails = parseMails(c.expose ?? '').filter(m => !MAIL_OK.test(m))
   return (
@@ -519,6 +582,25 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
       {p.rename && (
         <Group title="Name" hint="As the sidebar shows it">
           <input value={name} aria-label="Name" onChange={e => setName(e.target.value)} />
+        </Group>
+      )}
+      <Group title="Notes" hint="Markdown, yours: links, how to run it, who to ask. The project's ⋯ › Notes shows them; agents never see them">
+        <textarea className="mono notes-field" rows={Math.min(16, Math.max(4, notes.split('\n').length + 1))} value={notes} aria-label="Notes" placeholder="# Links&#10;- Staging: https://…" onChange={e => setNotes(e.target.value)} />
+      </Group>
+      {p.project.git && !p.project.host && (
+        <Group title="Worktrees" hint="Where this project's new worktrees go (a path relative to the repo, ~, or a full one); empty: Settings › General's folder. Ones made already stay">
+          <FolderField value={c.worktrees} label="This project's worktrees" placeholder={`<the worktrees folder>/${p.project.id}`} onChange={v => setC(y => ({ ...y, worktrees: v }))} />
+        </Group>
+      )}
+      {p.project.git && (
+        <Group title="Pull requests" hint="What Laki may do to this project's PRs, as you on GitHub. Each asks first; merge when green asks as it's turned on for a workspace">
+          <div className="setting-box">
+            {PR_PERMS.map(([k, title, hint]) => (
+              <Switch key={k} className="switch-row" on={prAllows(c, k)} onChange={v => setC(y => ({ ...y, pr: { ...y.pr, [k]: v } }))}>
+                <Says title={title} hint={hint} />
+              </Switch>
+            ))}
+          </div>
         </Group>
       )}
       <Group title="Scripts" hint="For workspace setup, teardown and the Run button; empty: the repo's .laki.json">
@@ -553,6 +635,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Sound', 'notification'],
   ['webhook', 'Notifications webhook', 'phone push ntfy slack telegram json notify waiting done'],
   ['webhook', 'Send test', 'webhook phone push'],
+  ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['general', 'Menu bar item', 'tray status count waiting needs you'],
   ['general', 'Floating bubbles', 'floating window overlay always on top worktrees agents working waiting circles bar'],
   ['general', 'Fun button', 'meme reddit smiley break joke'],
@@ -566,9 +649,10 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Interface font', 'ui type'],
   ['appearance', 'Accent color', 'colour highlight'],
   ['appearance', 'Corners', 'radius rounded square'],
+  ['appearance', 'Settings & Help size', 'zoom text font size small bigger larger readable page'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
-  ['appearance', 'Project names in the sidebar', 'font case letter spacing size weight'],
-  ['appearance', 'The sidebar', 'guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
+  ['appearance', 'Project names', 'sidebar font case letter spacing size weight'],
+  ['appearance', 'Sidebar', 'status guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
   ['appearance', 'Button labels', 'sidebar scheduled board settings words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
   ['appearance', 'Glow', 'glass colors'],
@@ -602,27 +686,32 @@ const FIND: [string, string, string?][] = [
   ['widgets', 'Widgets', 'sidebar extensions plugins folder reload fetch schedule'],
   ['widgets', 'More folders', 'widgets extensions'],
   ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
+  ['general', 'Worktrees', 'folder directory location path where worktree workspaces disk'],
+  ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
+  ['general', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working'],
+  ['general', 'Creation log', 'new workspace create logs what ran command development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
 ]
 
-const SECTIONS: { id: string; label: string; icon: IconName }[] = [
-  { id: 'general', label: 'General', icon: 'settings' },
-  { id: 'appearance', label: 'Appearance', icon: 'palette' },
-  { id: 'terminal', label: 'Terminal', icon: 'terminal' },
-  { id: 'open', label: 'Open in', icon: 'code' },
-  { id: 'presets', label: 'Agent presets', icon: 'agent' },
-  { id: 'webhook', label: 'Phone pushes', icon: 'bell' },
-  { id: 'pr', label: 'Pull requests', icon: 'pr' },
-  { id: 'templates', label: 'Prompt templates', icon: 'pencil' },
-  { id: 'actions', label: 'Actions', icon: 'run' },
-  { id: 'skill', label: 'Agent skill', icon: 'import' },
-  { id: 'widgets', label: 'Widgets', icon: 'panel' },
-  { id: 'remote', label: 'Remote access', icon: 'globe' },
-  { id: 'resources', label: 'Resources', icon: 'memory' },
+// the nav's sections, under a head each (group): the app, its agents, what it connects to
+const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] = [
+  { id: 'general', label: 'General', icon: 'settings', group: 'Laki' },
+  { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
+  { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
+  { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
+  { id: 'presets', label: 'Agent presets', icon: 'agent', group: 'Agents' },
+  { id: 'templates', label: 'Prompt templates', icon: 'pencil', group: 'Agents' },
+  { id: 'actions', label: 'Actions', icon: 'run', group: 'Agents' },
+  { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Agents' },
+  { id: 'skill', label: 'Agent skill', icon: 'import', group: 'Agents' },
+  { id: 'open', label: 'Open in', icon: 'code', group: 'Connect' },
+  { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
+  { id: 'widgets', label: 'Widgets', icon: 'panel', group: 'Connect' },
+  { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
 ]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
 
@@ -634,6 +723,9 @@ export type ResourcesApi = {
   wsName: (id: string) => string
   sleep: (tab: string) => Promise<unknown>
   open: (tab: string) => void
+  procs?: () => Promise<{ pid: number; name: string; stop?: string }[]> // the app's: what each process holds (main's)
+  stop?: (what: string) => void // free one: the video, a widget, the preview, the bubbles, an agent browser
+  widgetName: (id: string) => string
 }
 const SLEEP: [number, string][] = [[0, 'Never'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']]
 const KIND: Record<string, string> = { main: 'Laki', renderer: 'window', 'gpu-process': 'GPU', network: 'network', daemon: 'daemon' }
@@ -658,21 +750,32 @@ function Procs({ ps }: { ps: (ProcUse & { kind?: string })[] }) {
 
 function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void }) {
   const [r, setR] = useState<Resources | null>(null)
+  const [named, setNamed] = useState<{ pid: number; name: string; stop?: string }[]>([])
   const [open, setOpen] = useState<string | null>(null) // the row whose processes show
   const [said, setSaid] = useState('') // a Sleep that was refused
   useEffect(() => {
     let on = true
-    const load = () => !document.hidden && api.load().then(x => on && setR(x), () => {}) // not while the window is hidden
+    const load = () => !document.hidden && Promise.all([api.load(), api.procs?.().catch(() => []) ?? []]).then(([x, n]) => on && (setR(x), setNamed(n)), () => {}) // not while the window is hidden
     load()
     const t = setInterval(load, 3000)
     return () => ((on = false), clearInterval(t))
   }, [])
   const tabOf = (id: string) => api.tabs.find(t => t.id === id)
-  const app = r ? [...r.app, { ...r.daemon, kind: 'daemon' }] : []
+  // the app's processes that hold something of their own (main's names, by pid): a row each, with Stop; JS widgets
+  // share one (one site), template widgets and the memes are drawn in the window's
+  const word = (n: string) => (n.startsWith('widget:') ? api.widgetName(n.slice(7)) : n.startsWith('browser:') ? `Agent browser · ${api.wsName(n.slice(8))}` : n)
+  const held = (r?.app ?? []).flatMap(p => {
+    const ns = named.filter(x => x.pid === p.pid && x.name !== 'The window')
+    if (!ns.length) return []
+    const widgets = [...new Set(ns.filter(x => x.name.startsWith('widget:')).map(x => word(x.name)))] // the grid's and a full view's: one
+    const name = [...(widgets.length ? [`${widgets.length > 1 ? 'Widgets' : 'Widget'} · ${widgets.join(', ')}`] : []), ...new Set(ns.filter(x => !x.name.startsWith('widget:')).map(x => word(x.name)))].join(' · ')
+    return [{ ...p, name, stops: [...new Set(ns.flatMap(x => (x.stop ? [x.stop] : [])))] }]
+  })
+  const app = r ? [...r.app.filter(p => !held.some(h => h.pid === p.pid)), { ...r.daemon, kind: 'daemon' }] : []
   const own = total(app)
   const live = (r?.tabs ?? []).filter(x => tabOf(x.tab))
   const rows = live.filter(x => !tabOf(x.tab)!.asleep).sort((a, b) => b.rss - a.rss) // an asleep one still exiting: its own row, below
-  const all = own + total(live)
+  const all = own + total(held) + total(live)
   const canSleep = (t: TabView) => (t.preset === 'claude' || t.preset === 'codex') && !!t.resumeId && t.status === 'idle'
   const row = (key: string, name: ReactNode, kb: number, cpu: number, acts?: ReactNode) => (
     <div className={`res-row${open === key ? ' open' : ''}`} onClick={() => setOpen(open === key ? null : key)}>
@@ -693,7 +796,8 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
       <h2>Resources</h2>
       <p className="muted small">
         Memory and CPU now, every 3 seconds while this is open. macOS counts every process Laki starts as Laki's: each agent, its MCP servers, the dev
-        servers in its tabs. An agent grows the longer it runs; sleeping it gives that back.
+        servers in its tabs. An agent grows the longer it runs; sleeping it gives that back. The video, JS widgets, the preview, the floating bubbles and
+        an agent browser each run in a process of their own: Stop frees one until it's opened again.
       </p>
       <Group title="Memory">
         {!r ? (
@@ -703,12 +807,28 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
             <div className="res-total">
               <b>{size(all)}</b>
               <span className="muted">
-                Laki itself {size(own)} · tabs {size(total(live))}
+                Laki itself {size(own + total(held))} · tabs {size(total(live))}
               </span>
             </div>
             <div className="res-rows">
               {row('laki', 'Laki itself', own, app.reduce((n, p) => n + p.cpu, 0))}
               {open === 'laki' && <Procs ps={app} />}
+              {held.map(p => (
+                <div key={p.pid}>
+                  {row(
+                    `pid:${p.pid}`,
+                    p.name,
+                    p.rss,
+                    p.cpu,
+                    !!p.stops.length && api.stop && (
+                      <button className="small" data-tip="Frees it now; it comes back when it's opened again (the bubbles: when an agent's state changes)" onClick={() => p.stops.forEach(x => api.stop!(x))}>
+                        Stop
+                      </button>
+                    ),
+                  )}
+                  {open === `pid:${p.pid}` && <Procs ps={[p]} />}
+                </div>
+              ))}
               {rows.map(x => {
                 const t = tabOf(x.tab)!
                 return (
@@ -776,7 +896,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
 // remote access: this app in a browser elsewhere, through cloudflared, for one email; no link yet: starting
 export type Remote = { mail: string; until?: number; url?: string; link?: string }
 export type RemoteApi = { state?: Remote; start: (hours: number, mail: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
-const REMOTE_HOURS = [1, 2, 4, 8, 24, 0] // the daemon's too; 0: forever
+const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; onMail: (mail: string) => void }) {
@@ -956,7 +1076,7 @@ export type WidgetsApi = {
   logs?: (id: string) => void // development mode's: its fetches and actions
 }
 
-const SIZES: [number, number][] = [1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number]))
+const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
 const VIEWS: [WidgetSize, string][] = [
   ['s', 'Small'],
   ['m', 'Medium'],
@@ -1049,7 +1169,7 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         <select className="wc-size" value={w.size.join('x')} data-tip="Size in the sidebar: cells across × down" onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
           {SIZES.map(([a, d]) => (
             <option key={`${a}x${d}`} value={`${a}x${d}`}>
-              {a}×{d}
+              {a}×{d === 0.5 ? '½' : d}
             </option>
           ))}
         </select>
@@ -1170,7 +1290,7 @@ export function SettingsPage(p: {
   onClose: () => void
   projects?: ProjectInfo[]
   projectFile?: (id: string) => Promise<ProjectConfig> // its .laki.json
-  onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig }) => unknown
+  onSaveProject?: (id: string, o: { name?: string; config: ProjectConfig; notes?: string }) => unknown
   renameProjects?: boolean
   section?: string // where it opens: a section's id, or project:<id>
   script?: keyof Scripts // a project's script tab to show
@@ -1179,6 +1299,7 @@ export function SettingsPage(p: {
   widgets?: WidgetsApi
   resources?: ResourcesApi
   webhookTest?: (w: Webhook) => Promise<unknown> // Notifications webhook's Send test
+  logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   presets: Preset[] // the daemon's: the settings', or its defaults
 }) {
   const { settings, apps, onSave, onClose } = p
@@ -1251,9 +1372,10 @@ export function SettingsPage(p: {
       .catch(e => setMoved(`Couldn't import ${f.name}: ${e.message}`))
   // ⌘+ / ⌘− while the page is open change the size behind its back
   useEffect(() => setS(x => (x.fontSize === settings.fontSize ? x : { ...x, fontSize: settings.fontSize })), [settings.fontSize])
+  useEffect(() => setS(x => (x.pageZoom === settings.pageZoom ? x : { ...x, pageZoom: settings.pageZoom })), [settings.pageZoom])
   useEffect(() => setS(x => (x.notify === settings.notify ? x : { ...x, notify: settings.notify })), [settings.notify]) // ⌘K's switch
-  // the page grows with the terminal's font size, from 13px as 100%
-  const scale = (s.fontSize ?? FONT_SIZE) / FONT_SIZE
+  // the page grows with the terminal's font size, from 13px as 100%, times its own size (Appearance)
+  const scale = ((s.fontSize ?? FONT_SIZE) / FONT_SIZE) * (PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom! : 1)
   const project = p.projects?.find(x => `project:${x.id}` === sec)
   // saved a moment after the last change, or on closing before that
   const first = useRef(true)
@@ -1352,10 +1474,13 @@ export function SettingsPage(p: {
               {!found.length && <div className="muted small pad">Nothing called that.</div>}
             </>
           )}
-          {!findQ.trim() && sections.map(x => (
-            <button key={x.id} className={sec === x.id ? 'on' : ''} onClick={() => openSec(x.id)}>
-              <Icon name={x.icon} /> {x.label}
-            </button>
+          {!findQ.trim() && sections.map((x, i) => (
+            <Fragment key={x.id}>
+              {x.group !== sections[i - 1]?.group && <div className="settings-nav-head">{x.group}</div>}
+              <button className={sec === x.id ? 'on' : ''} onClick={() => openSec(x.id)}>
+                <Icon name={x.icon} /> {x.label}
+              </button>
+            </Fragment>
           ))}
           {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Projects</div>}
           {!findQ.trim() && p.projects?.map(x => (
@@ -1422,6 +1547,16 @@ export function SettingsPage(p: {
                 )}
               </div>
               </Group>
+              <Group title="Worktrees" hint="Where new workspaces' git worktrees go, a folder per project inside it; a project can pick its own (Settings › the project). Ones made already stay where they are">
+                <FolderField value={s.worktrees} label="Folder for worktrees" placeholder="Laki's data folder: ~/.laki/worktrees" onChange={v => set({ worktrees: v })} />
+              </Group>
+              <Group title="Tabs">
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.closeNoAsk} onChange={v => set({ closeNoAsk: v })}>
+                  <Says title="Close tabs without asking" hint="No question when a tab you close still runs something (an agent, a server): it's stopped at once" />
+                </Switch>
+              </div>
+              </Group>
               <Group title="What the window shows">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
@@ -1431,8 +1566,23 @@ export function SettingsPage(p: {
                   <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
                 </Switch>
                 <Switch className="switch-row" on={s.floater !== false} onChange={v => set({ floater: v })}>
-                  <Says title="Floating bubbles" hint="While you're in another app: a small bar over every app and Space with a circle per agent working or waiting for you; hover one to see what it said, click to open it, drag the grip to move the bar" />
+                  <Says title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent working or waiting for you; hover one to see what it said, click to open it, drag it to the other edge or up and down" />
                 </Switch>
+                {s.floater !== false && (
+                  <div className="switch-row sub fl-styles" role="radiogroup" aria-label="A working agent's bubble">
+                    <span className="muted small">While working</span>
+                    {FLOATER_STYLES.map(([k, name, what]) => (
+                      <button key={k} role="radio" aria-checked={(s.floaterStyle ?? 'glow') === k} className={(s.floaterStyle ?? 'glow') === k ? 'on' : ''} data-tip={what} data-fstyle={k} onClick={() => set({ floaterStyle: k })}>
+                        <span className="fl-dot running">FC</span>
+                        {name}
+                      </button>
+                    ))}
+                    <button className="fl-wait" data-tip="Waiting for you: a pulse, in every style" disabled>
+                      <span className="fl-dot waiting">FC</span>
+                      waiting
+                    </button>
+                  </div>
+                )}
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
                 </Switch>
@@ -1455,8 +1605,16 @@ export function SettingsPage(p: {
               <Group title="Development">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.devMode} onChange={v => set({ devMode: v })}>
-                  <Says title="Development mode" hint="Keeps what happens to each workspace (PR checks, what the PR switches sent and why not, its agents' turns) and widget (fetches, actions): ⋯ › Logs, and Logs on a widget in Settings › Widgets" />
+                  <Says title="Development mode" hint="Keeps what happens to each workspace (PR checks, what the PR switches sent and why not, its agents' turns and commands) and widget (fetches, actions): ⋯ › Logs, and Logs on a widget in Settings › Widgets" />
                 </Switch>
+                {s.devMode && p.logs && (
+                  <div className="row">
+                    <span className="muted small grow">Creation log: what making a workspace ran (what was asked, git, the setup, the agent) or why it failed</span>
+                    <button onClick={() => p.logs!('new', 'Logs · new workspaces')}>
+                      <Icon name="file" /> Open
+                    </button>
+                  </div>
+                )}
               </div>
               </Group>
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
@@ -1496,6 +1654,16 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
+                <label data-tip="While Settings or Help is open, ⌘+ and ⌘− change it too (⌘0: 100%)">
+                  Settings &amp; Help size
+                  <select value={PAGE_ZOOMS.includes(s.pageZoom as number) ? s.pageZoom : 1} onChange={e => set({ pageZoom: Number(e.target.value) })}>
+                    {PAGE_ZOOMS.map(z => (
+                      <option key={z} value={z}>
+                        {Math.round(z * 100)}%{z === 1 ? ' (default)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </label>
                 <label>
                   Accent color
                   <span className="row-buttons">
@@ -1529,17 +1697,8 @@ export function SettingsPage(p: {
                 </label>
               </div>
               </Group>
-              <Group title="Sidebar" hint="Over the theme's">
+              <Group title="Sidebar" hint="How a workspace's row looks; each choice is over the theme's">
               <div className="field">
-                <span>
-                  Project names in the sidebar <span className="muted">· over the theme's</span>
-                </span>
-                {lookGrid('projectLook', PROJECT_LOOK)}
-              </div>
-              <div className="field">
-                <span>
-                  The sidebar <span className="muted">· over the theme's</span>
-                </span>
                 <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">
                   {SIDE_STYLES.map(([k, name, what]) => (
                     <button key={k} role="radio" aria-checked={(s.sideStyle ?? 'default') === k} className={(s.sideStyle ?? 'default') === k ? 'on' : ''} data-tip={what} onClick={() => set({ sideStyle: k })}>
@@ -1547,11 +1706,15 @@ export function SettingsPage(p: {
                     </button>
                   ))}
                 </div>
-                {lookGrid('sideLook', SIDE_LOOK)}
-                <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
-                  <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled, Board, Video, Timer, Settings; the last ones drop theirs when the row is too narrow" />
-                </Switch>
+                <p className="muted small">{(SIDE_STYLES.find(x => x[0] === (s.sideStyle ?? 'default')) ?? SIDE_STYLES[1])[2]}</p>
               </div>
+              {lookGrid('sideLook', SIDE_LOOK)}
+              <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
+                <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled, Board, Video, Timer, Settings; the last ones drop theirs when the row is too narrow" />
+              </Switch>
+              </Group>
+              <Group title="Project names" hint="The projects' heads in the sidebar, over the theme's">
+                {lookGrid('projectLook', PROJECT_LOOK)}
               </Group>
               <Group title="Window">
               <div className="setting-box">
@@ -1756,6 +1919,7 @@ export function SettingsPage(p: {
                 (when it's idle), and so do the info panel's send buttons. <code>{'{{pr}}'}</code> is the PR's number, <code>{'{{url}}'}</code> its link,{' '}
                 <code>{'{{base}}'}</code> its base branch. Laki checks each PR with <code>gh</code> as often as you pick here, and a moment after an agent's turn ends.
               </p>
+              <p className="muted small">Merge, merge when green, approve and close are each project's to allow: its section here, under Pull requests (merge when green is off until you turn it on).</p>
               <Group title="Checks">
               <div className="grid2">
                 {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}

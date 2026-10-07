@@ -1,13 +1,13 @@
 <style>
-  .links { height: 100%; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; gap: 6px; padding: 8px; overflow: auto; }
-  .links a { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 4px 10px 4px 4px; border: 1px solid var(--line); border-radius: 999px; color: var(--fg); background: var(--hover); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .links a:hover { border-color: var(--accent); text-decoration: none; }
-  .links i { flex: none; width: 18px; height: 18px; border-radius: 50%; display: grid; place-items: center; font: 600 10px/1 var(--ui-font); font-style: normal; color: #fff; }
+  /* the links as one bar across the tile (Laki's linkbar: a thin rule between them, wrapping when they don't fit) */
+  .links { height: 100%; display: flex; align-items: safe center; overflow: hidden auto; padding: 2px 0; }
+  .links .linkbar { width: 100%; }
+  .links .linkbar > a { font-size: 12px; border-radius: 0; }
 </style>
 <template preview>
-  <div class="links" id="links"></div>
+  <div class="links"><div class="linkbar spread" id="links"></div></div>
   <script>
-    // each chip: "Label: https://…" (or = or |), or a bare URL (its host as the label); a letter in a color of its own, no icons from the web
+    // each chip: "Label: https://…" (or = or |), or a bare URL (its host as the label)
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
     const links = (laki.config.links || []).map(x => {
       const m = /^(.*?)\s*[:=|]?\s*((?:https?:\/\/|mailto:)\S+)$/i.exec(x.trim())
@@ -16,9 +16,8 @@
       try { label ||= new URL(m[2]).hostname.replace(/^www\./, '') || m[2].replace(/^mailto:/i, '') } catch { return null }
       return { label, url: m[2] }
     }).filter(Boolean)
-    const hue = s => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) % 360, 7)
     document.getElementById('links').innerHTML = links.length
-      ? links.map(l => `<a href="${esc(l.url)}" title="${esc(l.url)}"><i style="background:hsl(${hue(l.label)} 55% 45%)">${esc([...l.label][0].toUpperCase())}</i>${esc(l.label)}</a>`).join('')
+      ? links.map(l => `<a href="${esc(l.url)}" title="${esc(l.url)}">${esc(l.label)}</a>`).join('')
       : '<span class="muted small">Add links in Settings › Widgets: Label: https://…</span>'
   </script>
 </template>

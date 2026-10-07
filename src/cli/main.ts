@@ -97,7 +97,7 @@ async function main() {
       const [sub, arg] = rest
       if (sub === 'add') {
         const { config: _, ...p } = await rpc('projectAdd', { path: REMOTE.test(arg ?? '') && !existsSync(arg!) ? arg : resolve(arg ?? '.') }) // host:path is the host's; config: its env
-        return out(p, `added ${arg}`)
+        return out(p, `added ${arg ?? p.path}`) // none: the folder it runs in
       }
       if (sub === 'rm') return out(await rpc('projectRm', { id: arg }), `removed ${arg}`)
       const { projects } = await state()
@@ -105,8 +105,11 @@ async function main() {
     }
     case 'new': {
       if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--fan claude,codex] [--prompt text]')
+      // .: the project of the workspace this tab is in (an agent's /laki:new)
+      const here = rest[0] === '.' && ((await rpc('state')) as View).workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project
+      if (rest[0] === '.' && !here) throw new Error("laki new .: only in a Laki tab ($LAKI_WORKSPACE): name the project")
       const o = {
-        project: rest[0],
+        project: here || rest[0],
         base: flags.base,
         preset: flags.preset,
         cmd: flags.cmd,

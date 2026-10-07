@@ -960,9 +960,10 @@ export function applyTheme(p: string | Paint = '') {
   seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad
   const font = o.uiFont?.trim()
   if (font) st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
-  // Settings › Appearance's accent and corners, over the theme's (and its look's --radius)
+  // Settings › Appearance's accent and corners, over the theme's (and its look's --radius). --rs: the corners picked,
+  // which every fixed radius in the stylesheets takes over its own (var(--rs, 10px)); pills and circles stay
   if (o.accent && /^#[\da-f]{6}$/i.test(o.accent)) st.setProperty('--accent', o.accent), st.setProperty('--accent-fg', onAccent(o.accent))
-  if (o.radius) st.setProperty('--radius', o.radius)
+  if (o.radius) st.setProperty('--radius', o.radius), st.setProperty('--rs', o.radius)
   if (o.glass) {
     // the window's blur shows through: backgrounds at part strength (the default theme's from the stylesheet)
     const v = (k: keyof Colors, css: string) => t.c?.[k] ?? rootVar(css)

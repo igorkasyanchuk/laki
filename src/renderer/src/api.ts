@@ -2,9 +2,11 @@
 // In Electron the preload bridge hands out the address and token; in a plain browser they come in the URL hash:
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone in the query on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
+// a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
+export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last' }
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
-  notify(title: string, body: string, tab: string, sound?: string, actions?: string[]): void
+  notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[]): void
   browse?(r: object): Promise<unknown>
   onFocusTab(cb: (tab: string) => void): void
   pickFolder(): Promise<string | null>
@@ -14,7 +16,9 @@ type Bridge = {
   dictationSettings?(): void
   glass?(on: boolean): void
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
-  floats?(items: object[], colors: Record<string, string>): void // the floating bubbles' workspaces (none: hidden)
+  floats?(items: object[], colors: Record<string, string>, style?: string): void // the floating bubbles' workspaces (none: hidden)
+  procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
+  procStop?(what: string): void
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
   onShot?(cb: (png: string, note?: string) => void): void
@@ -150,7 +154,7 @@ export const api = new Api()
 
 export const openExternal = (url: string) => (bridge ? bridge.openExternal(url) : window.open(url, '_blank', 'noopener'))
 
-export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: string[]) {
+export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[]) {
   if (bridge) return bridge.notify(title, body, tab, sound, actions)
   if (!('Notification' in window)) return
   if (Notification.permission === 'default') Notification.requestPermission()

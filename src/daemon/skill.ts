@@ -89,6 +89,14 @@ ${USAGE}
 Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
 workspace each, so they run in parallel.
 
+### A new session (/laki:new)
+
+When the user writes \`/laki:new <task>\` (or \`laki:new\`), or asks for a new session for a task "with codex" or
+"with claude": \`laki new . --preset <the agent named; none: claude> --prompt "<the task>"\`. The \`.\` is this
+tab's project; the prompt is the task for an agent that hasn't seen this conversation (what to do, the files and
+facts that matter, how to tell it's done). Don't do the task here; say the workspace id it printed. In Laki's
+Claude Code tabs, \`/laki:new\` is a command of its own.
+
 A project can be on an SSH host (\`laki project add devbox:~/code/app\`; \`laki ls\` shows \`host:path\`): its
 workspaces' paths are on that machine, not this one, so read their work with \`laki diff\` and \`laki screen\`, not
 from the disk here. Its agents run there and have no \`laki\`.

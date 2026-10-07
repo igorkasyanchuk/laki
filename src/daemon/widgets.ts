@@ -97,9 +97,10 @@ export function scanWidgets() {
 }
 
 const clamp = (n: unknown, lo: number, hi: number, def: number) => (Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Math.round(Number(n)))) : def)
+const down = (n: unknown) => (Number(n) === 0.5 ? 0.5 : clamp(n, 1, 4, 1)) // cells down: half a cell too (a line of links)
 const sizeOf = (w: Entry): [number, number] => {
   const [a, b] = w.s.size ?? w.m.size ?? [1, 1]
-  return [clamp(a, 1, 3, 1), clamp(b, 1, 4, 1)]
+  return [clamp(a, 1, 3, 1), down(b)]
 }
 const everyOf = (w: Entry) => clamp(w.s.every ?? w.m.every, 1, 1440, WIDGET_EVERY)
 const onOf = (w: Entry) => w.s.on ?? !w.builtin
@@ -213,7 +214,7 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
   const w = find(o.id)
   const s = readStore(w.id)
   if (o.on !== undefined) s.on = !!o.on
-  if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), clamp(o.size[1], 1, 4, 1)]
+  if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
   if (o.config) {

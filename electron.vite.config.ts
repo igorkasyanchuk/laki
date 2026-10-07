@@ -26,6 +26,7 @@ export default defineConfig({
           html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://avatars.githubusercontent.com; frame-src 'self' http://localhost:* http://127.0.0.1:* https://www.youtube-nocookie.com" />`),
       },
     ],
+    define: { __BUILT__: JSON.stringify(new Date().toISOString()) }, // About's build time (the dev server's: its start)
     server: { port: 5199, strictPort: true, host: '127.0.0.1' },
     build: { rollupOptions: { input: { index: resolve('src/renderer/index.html'), annotate: resolve('src/renderer/annotate.html'), floater: resolve('src/renderer/floater.html') } } }, // annotate: the menu bar screenshot's editor window; floater: the floating bubbles
   },

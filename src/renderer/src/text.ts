@@ -99,6 +99,30 @@ export function parseDuration(typed: string): number | null {
   return ms >= 1000 && ms <= 86400000 ? ms : null
 }
 
+// when to send a message later, as ms from now: in a length (parseDuration's: 10m, 2h, 1h 30m, "in 45") or at a
+// time of day (15:30, 3pm, at 9:05am, at 15): today, or tomorrow once it's past
+export function parseLater(typed: string, now = Date.now()): number | null {
+  const at = /^\s*at\s/i.test(typed)
+  const s = typed.trim().toLowerCase().replace(/^(in|at)\s+/, '')
+  const m = /^(\d{1,2})(?::(\d{2}))?\s*(am|pm)?$/.exec(s)
+  if (!m || !(at || m[2] || m[3])) return at ? null : parseDuration(s)
+  let h = Number(m[1])
+  const min = Number(m[2] ?? 0)
+  if (m[3]) {
+    if (h < 1 || h > 12) return null
+    h = (h % 12) + (m[3] === 'pm' ? 12 : 0)
+  }
+  if (h > 23 || min > 59) return null
+  const d = new Date(now)
+  d.setHours(h, min, 0, 0)
+  if (d.getTime() <= now) d.setDate(d.getDate() + 1)
+  return d.getTime() - now
+}
+
+// a message for later's When again (its edit): at H:MM, digits by hand (a locale's own, ٣:٣٠, wouldn't parse), or 1m once
+// that minute has begun (at it would mean tomorrow)
+export const laterText = (at: number, now = Date.now()) => (at - now < 120000 ? '1m' : (d => `at ${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`)(new Date(at)))
+
 // time left as a clock: 4:05, 1:02:03
 export function clock(ms: number) {
   const t = Math.max(0, Math.ceil(ms / 1000))
@@ -155,7 +179,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {

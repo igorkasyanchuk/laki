@@ -1,10 +1,10 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, rowsOf, type Doctor, type LogLine, PR_SCAN, PR_TRIES, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, rowsOf, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
-import { api, bridge, notify, openExternal } from './api'
-import { type AutoKey, Avatar, ciText, type FixWhat, InfoPanel, type PRAct, prState, PRStatus, type WsInfo } from './Info'
-import { About, AddProject, Fun, Logs, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, type Shot, StarLaki, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
-import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
+import { api, bridge, notify, type NotifyAction, openExternal } from './api'
+import { type AutoKey, Avatar, ciText, type FixWhat, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, type WsInfo } from './Info'
+import { About, AddProject, Fun, Logs, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
@@ -24,7 +24,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { remind: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string } | { logs: string; title: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -47,6 +47,7 @@ const phVars = (pl?: ProjectLook) => Object.fromEntries((['spacing', 'size', 'we
 // a workspace's state in words, for the sidebar's Extended and Cards rows
 const STATE_WORDS: Record<string, string> = { waiting: 'needs you', running: 'working', done: 'done', idle: 'idle', exited: 'stopped', limit: 'at its usage limit' }
 // a row's +/-: 1234 as 1.2k, 12345 as 12k
+const clip = (s: string, n = 60) => (t => (t.length > n ? `${t.slice(0, n - 1)}…` : t))(s.replace(/\s+/g, ' ')) // a message on one line
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
 // …and its lines and rows (SideLook): the variables looks set (styles.css .project-ws), nearer than the theme's
 const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font', icons: '--ws-icon' } as const
@@ -61,7 +62,8 @@ const TIMER_THEN = [
   ['command', 'Run a command…', 'terminal'],
 ] as const
 type Then = (typeof TIMER_THEN)[number][0]
-type Timer = { id: string; end: number; ms: number; then: Then | 'remind'; cmd?: string; ws?: string } // cmd: then's command, run in ws; remind: a notification about ws
+type Watch = { id: string; ms: number; from?: number } // a stopwatch
+type Timer = { id: string; end: number; ms: number; then: Then | 'remind' | 'send'; cmd?: string; ws?: string; tab?: string; text?: string } // cmd: then's command, run in ws; remind: a notification about ws; send: text to the agent tab (Send later)
 const MINUTES = [5, 10, 15, 25, 30, 45, 60]
 // the sidebar's filter (its funnel): words in a workspace's name, branch or PR, and at most one of these
 const ONLY = [
@@ -211,9 +213,15 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.video', JSON.stringify(video?.src ?? null)), [video?.src])
   // the sidebar's timers, each a bar over its foot: when it ends, how long it was set for, and what happens then (ones
   // that ended while Laki was closed are dropped; a reminder's comes at once)
+  const missed = useRef<Timer[]>([]) // messages for later due while Laki was closed: not sent, said so once it's up
   const [timers, setTimers] = useState<Timer[]>(() => {
     const kept = load<unknown>('laki.timers', [])
-    return (Array.isArray(kept) ? kept : []).flatMap((t: Partial<Timer>) => {
+    return (Array.isArray(kept) ? kept : []).flatMap((t: Partial<Timer>): Timer[] => {
+      if (t?.then === 'send') {
+        const ok = typeof t.id === 'string' && typeof t.end === 'number' && typeof t.ms === 'number' && typeof t.tab === 'string' && typeof t.text === 'string' && typeof t.ws === 'string'
+        if (ok && t.end! <= Date.now() && !missed.current.some(x => x.id === t.id)) missed.current.push(t as Timer)
+        return ok && t.end! > Date.now() ? [{ id: t.id!, end: t.end!, ms: t.ms!, then: 'send' as const, ws: t.ws, tab: t.tab, text: t.text }] : []
+      }
       const remind = t?.then === 'remind' && typeof t.ws === 'string'
       return typeof t?.id === 'string' && typeof t.end === 'number' && (t.end > Date.now() || remind) && typeof t.ms === 'number' && t.ms > 0
         ? [{ id: t.id, end: t.end, ms: t.ms, then: remind || (TIMER_THEN.some(x => x[0] === t.then) && (t.then !== 'command' || (typeof t.cmd === 'string' && !!t.cmd.trim() && typeof t.ws === 'string'))) ? t.then! : 'notify', cmd: t.cmd, ws: t.ws }]
@@ -221,6 +229,10 @@ export function App() {
     })
   })
   useEffect(() => void localStorage.setItem('laki.timers', JSON.stringify(timers)), [timers])
+  // stopwatches (the timer button's Stopwatch): ms counted before, from: running since; kept across a reload
+  const [watches, setWatches] = useState<Watch[]>(() => (l => (Array.isArray(l) ? l.filter((w: Watch) => typeof w?.id === 'string' && typeof w.ms === 'number' && (w.from === undefined || typeof w.from === 'number')) : []))(load<unknown>('laki.watches', [])))
+  useEffect(() => void localStorage.setItem('laki.watches', JSON.stringify(watches)), [watches])
+  const setWatch = (id: string, f: (w: Watch) => Watch | null) => setWatches(l => l.map(w => (w.id === id ? f(w) : w)).filter((w): w is Watch => !!w))
   const addTimer = (ms: number, more: Partial<Timer> = {}) => setTimers(l => [...l, { id: Math.random().toString(36).slice(2, 10), end: Date.now() + ms, ms, then: 'notify', ...more }])
   const setTimer = (id: string, f: (t: Timer) => Timer | null) => setTimers(l => l.map(t => (t.id === id ? f(t) : t)).filter((t): t is Timer => !!t)) // null: gone
   // one ends: what was picked, then a notification (it's what you asked for: muting doesn't apply) and a message
@@ -229,7 +241,17 @@ export function App() {
   const ring = (id: string) => {
     const t = timersRef.current.find(x => x.id === id)
     if (!t) return
-    if (t.then === 'remind' && !viewRef.current) return void setTimeout(() => ring(id), 1000) // one due while Laki was closed: once the workspaces are in
+    if ((t.then === 'send' || t.then === 'remind') && !viewRef.current) return void setTimeout(() => ring(id), 1000) // due as Laki opens: once the tabs are in
+    if (t.then === 'send') {
+      setTimer(id, () => null)
+      const tab = viewRef.current?.tabs.find(x => x.id === t.tab)
+      const say = (text: string, ok?: boolean) => (notify('Message for later', text, ok ? t.tab! : '', () => tab && selectTab(tab.id), viewRef.current?.settings.notifySound), toast(text, undefined, undefined, ok))
+      if (!tab) return say(`Not sent: its agent tab is gone (${clip(t.text!)})`)
+      return void api.call<{ queued?: number }>('send', { target: tab.id, text: t.text, whenIdle: true }).then(
+        r => say(`${r?.queued ? `Queued for ${tab.name}, busy now` : `Sent to ${tab.name}`}: ${clip(t.text!)}`, true),
+        e => say(`Not sent to ${tab.name}: ${e.message}`),
+      )
+    }
     setTimer(id, () => null)
     if (t.then === 'remind') {
       const w = viewRef.current?.workspaces.find(x => x.id === t.ws && !x.archived)
@@ -248,6 +270,11 @@ export function App() {
     notify('Timer', `${span(t.ms)} is up${did}`, '', () => {}, viewRef.current?.settings.notifySound)
     toast(`Timer: ${span(t.ms)} is up${did}`)
   }
+  useEffect(() => {
+    const n = missed.current.length
+    if (n) toast(n > 1 ? `${n} messages for later weren't sent: Laki was closed when they were due` : `A message for later wasn't sent: Laki was closed at ${new Date(missed.current[0].end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} (${clip(missed.current[0].text!, 40)})`)
+    missed.current = []
+  }, [])
   const ends = timers.map(t => `${t.id}:${t.end}`).join()
   useEffect(() => {
     const ts = timersRef.current.map(t => setTimeout(() => ring(t.id), t.end - Date.now()))
@@ -288,6 +315,12 @@ export function App() {
   }
   // the floating bubbles (Settings › General; main shows them while Laki isn't in front): each workspace whose agent
   // works or waits, the waiting ones first, with what it asked or last said, in the theme's colors
+  // Settings › Resources' Stop on the video: closed
+  useEffect(() => {
+    const f = (e: Event) => (e as CustomEvent).detail === 'video' && setVideo(null)
+    window.addEventListener('laki-stop', f)
+    return () => window.removeEventListener('laki-stop', f)
+  }, [])
   const floats = view?.settings.floater === false ? [] : live.flatMap(w => {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
@@ -295,8 +328,9 @@ export function App() {
     return t ? [{ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: t.status as 'running' | 'waiting', color: w.color && w.color !== 'none' ? w.color : undefined, last: last?.replace(/\s+/g, ' ').trim().slice(0, 300) }] : []
   }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatKey = JSON.stringify([floats, floatColors])
-  useEffect(() => bridge?.floats?.(floats, floatColors), [floatKey])
+  const floatStyle = view?.settings.floaterStyle ?? 'glow'
+  const floatKey = JSON.stringify([floats, floatColors, floatStyle])
+  useEffect(() => bridge?.floats?.(floats, floatColors, floatStyle), [floatKey])
 
   const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const archived = useRef<string[]>([]) // workspaces archived for a merged PR, while their toast shows
@@ -354,15 +388,21 @@ export function App() {
       else if (m.ev === 'close') setConnected(false)
       else if (m.ev === 'turn') {
         if (m.kind === 'waiting') waits.current.set(m.tab, m.text ?? '')
-        const t = viewRef.current?.tabs.find(t => t.id === m.tab)
-        const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
-        const s = viewRef.current?.settings
-        const w = viewRef.current?.workspaces.find(w => w.id === t?.workspace)
-        if (!t || shown || s?.notify === false || s?.notifyOn?.[m.kind as NotifyKind] === false || t.muted || w?.muted) return
-        const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
-        // a permission prompt: Allow and Deny on the notification pick its menu's first and last choice
-        const asks = m.kind === 'waiting' && /permission/i.test(m.text ?? '')
-        notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, asks ? ['Allow', 'Deny'] : undefined)
+        // a wait a moment later, with its menu (often drawn after the hook), unless it's over by then
+        const post = () => {
+          const t = viewRef.current?.tabs.find(t => t.id === m.tab)
+          const shown = document.hasFocus() && shownTabs.current.includes(m.tab)
+          const s = viewRef.current?.settings
+          const w = viewRef.current?.workspaces.find(w => w.id === t?.workspace)
+          if (!t || shown || s?.notify === false || s?.notifyOn?.[m.kind as NotifyKind] === false || t.muted || w?.muted || (m.kind === 'waiting' && t.status !== 'waiting')) return
+          const body = m.kind === 'waiting' ? `needs you${m.text ? `: ${m.text}` : ''}` : m.kind === 'limit' ? 'hit a usage limit' : m.text || 'finished'
+          // a button per choice of its menu; a permission prompt whose menu wasn't read: Allow and Deny, its first and last
+          const actions: NotifyAction[] | undefined =
+            m.kind !== 'waiting' ? undefined : t.ask ? t.ask.options.map(o => ({ text: `${o.n}. ${o.label}`, n: o.n, label: o.label })) : /permission/i.test(m.text ?? '') ? [{ text: 'Allow', pick: 'first' }, { text: 'Deny', pick: 'last' }] : undefined
+          notify(`${w ? wsName(w) : t.workspace} · ${t.name}`, body.slice(0, 200), t.id, () => selectTab(t.id), s?.notifySound, actions)
+        }
+        if (m.kind === 'waiting') setTimeout(post, 800)
+        else post()
       } else if (m.ev === 'archived') {
         // several at once (the setting just turned on): one message, whose Undo brings them all back
         const all = (archived.current = [...archived.current, m.ws])
@@ -499,7 +539,7 @@ export function App() {
 
   const closeTabs = async (ts: TabView[]) => {
     const running = ts.filter(t => t.status !== 'exited')
-    if (running.length && !(await ask(`Close ${ts.map(t => t.name).join(', ')}?`, { text: `${running.length > 1 ? 'Their processes' : 'Its process'} will be stopped.`, ok: 'Close', danger: true }))) return
+    if (running.length && !settings.closeNoAsk && !(await ask(`Close ${ts.map(t => t.name).join(', ')}?`, { text: `${running.length > 1 ? 'Their processes' : 'Its process'} will be stopped.`, ok: 'Close', danger: true }))) return
     for (const t of ts) await call('tabClose', { id: t.id })
   }
 
@@ -680,10 +720,18 @@ export function App() {
   const fontSize = settings.fontSize ?? FONT_SIZE
   const zoomed = useRef(fontSize) // the size asked for last: quick presses add up before the view comes back
   const zoom = (d: number) => {
+    if (pageOpen) return zoomPage(d)
     zoomed.current = d ? Math.min(32, Math.max(8, zoomed.current + d)) : FONT_SIZE
     call('settingsSet', { fontSize: zoomed.current }).catch(() => {})
   }
   useEffect(() => void (zoomed.current = fontSize), [fontSize])
+  // Settings and Help: ⌘± zoom them (Appearance's Settings & Help size), over the terminal font's size they follow
+  const pageOpen = dialog === 'settings' || dialog === 'help' || (typeof dialog === 'object' && !!dialog && ('settings' in dialog || 'section' in dialog))
+  const pageZoom = PAGE_ZOOMS.includes(settings.pageZoom as number) ? settings.pageZoom! : 1
+  const zoomPage = (d: number) => {
+    const i = PAGE_ZOOMS.indexOf(pageZoom)
+    call('settingsSet', { pageZoom: d ? PAGE_ZOOMS[Math.min(PAGE_ZOOMS.length - 1, Math.max(0, i + d))] : 1 }).catch(() => {})
+  }
 
   // the sidebar's order: projects, and workspaces and seps within their project, dragged
   const rows = useRowDrag(d => {
@@ -721,10 +769,19 @@ export function App() {
     { head: 'Start a timer' },
     ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => addTimer(m * 60000) }) as MenuItem),
     { label: 'Other length, or a command…', icon: 'pencil', key: 'o', run: () => setDialog('timer') },
+    null,
+    { label: 'Stopwatch', icon: 'clock', key: 's', run: () => setWatches(l => [...l, { id: Math.random().toString(36).slice(2, 10), ms: 0, from: Date.now() }]) },
   ]
   // a timer's own (its bar): more time, a new length, what happens as it ends, or stop it
   const reminder = (t: Timer, w = live.find(x => x.id === t.ws)) => `Remind me about ${w ? wsName(w) : 'a gone workspace'}`
-  const timerMenu = (t: Timer): MenuItem[] => t.then === 'remind' ? [
+  const sendTo = (t: Timer) => view?.tabs.find(x => x.id === t.tab)?.name ?? 'a gone tab'
+  const timerMenu = (t: Timer): MenuItem[] => t.then === 'send' ? [
+    { head: `Sends to ${sendTo(t)} at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` },
+    { label: 'Send now', icon: 'arrowRight', key: 's', run: () => ring(t.id) },
+    { label: 'Edit…', icon: 'pencil', key: 'e', run: () => t.ws && setDialog({ sendLater: t.ws, edit: t.id }) },
+    null,
+    { label: 'Cancel it', icon: 'stop', key: 'c', danger: true, run: () => setTimer(t.id, () => null) },
+  ] : t.then === 'remind' ? [
     { head: `${reminder(t)} at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` },
     { label: 'Open the workspace', icon: 'arrowRight', key: 'o', run: () => t.ws && setWsId(t.ws) },
     { label: 'Add 15 minutes', icon: 'plus', key: 'a', run: () => setTimer(t.id, x => ({ ...x, end: x.end + 900000, ms: x.ms + 900000 })) },
@@ -757,8 +814,9 @@ export function App() {
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
     ...(w.branch ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
     ...(w.kind === 'worktree' ? [{ label: w.pr ? 'Refresh PR status' : 'Look for a PR', icon: 'refresh', run: refreshPR } as MenuItem] : []),
+    ...(attachable(w) ? [{ label: 'Attach a PR…', icon: 'link', key: 'h', run: () => setDialog({ attachPr: w.id }) } as MenuItem] : []),
     ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
-    ...(w.pr?.state === 'OPEN' && !w.pr.mine ? [{ label: `Approve PR #${w.pr.number}…`, icon: 'check', run: () => prAct(w, 'approve') } as MenuItem] : []),
+    ...(w.pr?.state === 'OPEN' && !w.pr.mine && allows(w, 'approve') ? [{ label: `Approve PR #${w.pr.number}…`, icon: 'check', run: () => prAct(w, 'approve') } as MenuItem] : []),
     null,
     { head: 'Open in' },
     ...openInItems({ ws: w.id }),
@@ -772,23 +830,42 @@ export function App() {
     { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) },
   ]
 
+  // a git workspace on a branch with no PR found: one can be attached by hand (prAttach)
+  const attachable = (w: WorkspaceView) => !w.pr && !!w.branch && view?.projects.find(p => p.id === w.project)?.git !== false
   // a workspace for the info panel and the status bar's PR
-  const infoOf = (w: WorkspaceView): WsInfo => ({
+  const cfgOf = (w: WorkspaceView) => view?.projects.find(p => p.id === w.project)?.config
+  const allows = (w: WorkspaceView, k: 'approve' | 'close' | 'merge' | 'land') => prAllows(cfgOf(w), k)
+  const infoOf = (w: WorkspaceView, cfg = cfgOf(w)): WsInfo => ({
     ...w,
+    allow: { approve: prAllows(cfg, 'approve'), close: prAllows(cfg, 'close'), merge: prAllows(cfg, 'merge'), land: prAllows(cfg, 'land') },
+    method: cfg?.mergeMethod,
     ...(w.fix?.pr === w.pr?.number && { fixTries: w.fix?.tries, mergeTries: w.fix?.merges }), // this PR's counts only
     prScan: settings.prScan || PR_SCAN,
     prTries: settings.prTries || PR_TRIES,
     agents: (view?.tabs ?? []).filter(t => t.workspace === w.id && t.kind === 'agent').map(t => ({ id: t.id, name: t.name, glyph: tabGlyph(t), last: t.last })),
   })
-  const setAuto = (w: WorkspaceView, k: AutoKey, v: boolean) => call('wsSet', { id: w.id, [k]: v }).catch(() => {})
+  // merge when green: asked once, as it's turned on
+  const setAuto = async (w: WorkspaceView, k: AutoKey, v: boolean) => {
+    if (k === 'autoLand' && v && !(await ask(`Merge ${w.pr ? `PR #${w.pr.number}` : 'the PR'} when it's green?`, { text: `Laki will ${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash'].toLowerCase()} it as you and delete its branch on GitHub, once every check passes, it has no conflicts, isn't a draft, is approved if the repo asks for a review and its agent isn't working.`, ok: 'Merge when green' }))) return
+    call('wsSet', { id: w.id, [k]: v }).catch(() => {})
+  }
   const prFix = (w: WorkspaceView, what: FixWhat) => call('prFix', { ws: w.id, what }).then(() => toast('Sent to the agent'), () => {})
   // GitHub asked again now, not at the next scan (every settings.prScan minutes)
   const refreshPR = () => call('prRefresh').then(() => done('PR status: fresh from GitHub'), () => {})
   // right click on the status bar's PR
-  // Approve / Close: gh as you, once you say so
-  const prAct = async (w: WorkspaceView, act: PRAct) => {
+  // Approve / Close / Merge: gh as you, once you say so (merge: the checks and review in the question, and whether
+  // GitHub deletes the branch)
+  const prAct = async (w: WorkspaceView, act: PRAct, method: MergeMethod = cfgOf(w)?.mergeMethod ?? 'squash') => {
     const pr = w.pr
     if (!pr) return
+    if (act === 'merge') {
+      const del = { label: 'Delete the branch on GitHub', on: true }
+      const verb = { squash: 'Squash-merge', merge: 'Merge', rebase: 'Rebase-merge' }[method]
+      const review = (pr.review && REVIEW[pr.review]) || 'no review needed'
+      const text = [pr.title, `Checks: ${ciText(pr)} · ${review}${pr.conflict ? ' · merge conflicts' : ''}`].filter(Boolean).join('\n')
+      if ((await choose(`${verb} PR #${pr.number} into ${pr.base ?? 'its base'}?`, text, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del)) !== 1) return
+      return call('prAct', { ws: w.id, act, method, deleteBranch: del.on }).then(() => toast(`Merged PR #${pr.number}`, undefined, undefined, true), () => {})
+    }
     const close = act === 'close'
     if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, close && 'Without merging; GitHub can reopen it.'].filter(Boolean).join(' · '), ok: close ? 'Close PR' : 'Approve', danger: close }))) return
     call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed PR #${pr.number}` : `Approved PR #${pr.number}`, undefined, undefined, true), () => {})
@@ -796,7 +873,14 @@ export function App() {
   const prMenu = (w: WorkspaceView): MenuItem[] => [
     { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', run: refreshPR },
     ...(w.pr ? [{ label: 'Open the PR', icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem, { label: 'Open its checks', icon: 'link', key: 'c', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem] : []),
-    ...(w.pr?.state === 'OPEN' ? [null, ...(w.pr.mine ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', run: () => prAct(w, 'approve') } as MenuItem]), { label: 'Close PR…', icon: 'x', danger: true, run: () => prAct(w, 'close') } as MenuItem] : []),
+    ...(w.pr?.state === 'OPEN'
+      ? [
+          null,
+          ...(allows(w, 'merge') && !w.pr.draft ? [{ label: `${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash']}…`, icon: 'pr', key: 'm', run: () => prAct(w, 'merge') } as MenuItem] : []),
+          ...(w.pr.mine || !allows(w, 'approve') ? [] : [{ label: 'Approve…', icon: 'check', key: 'a', run: () => prAct(w, 'approve') } as MenuItem]),
+          ...(allows(w, 'close') ? [{ label: 'Close PR…', icon: 'x', danger: true, run: () => prAct(w, 'close') } as MenuItem] : []),
+        ]
+      : []),
   ]
 
   // right click on a tab (or a pane header: one session)
@@ -905,6 +989,7 @@ export function App() {
         ...(ws.kind === 'worktree'
           ? [{ label: 'Fork workspace', icon: 'fork', key: 'f', run: () => forkWs(ws) } as Action, { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(ws) } as Action]
           : []),
+        ...(tabs.some(t => t.workspace === ws.id && t.kind === 'agent' && t.status !== 'exited') ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', run: () => setDialog({ sendLater: ws.id }) } as Action] : []),
         { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
         { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
         { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(ws) },
@@ -918,6 +1003,7 @@ export function App() {
       { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
       { label: 'Add a group', icon: 'sep', run: () => setDialog({ sep: p.id }) },
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
+      { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', run: () => setDialog({ notes: p.id }) },
       { label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) },
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
       { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => void (y && call('projectRm', { id: p.id }).then(() => done(`Removed project ${p.name}`), () => {}))) },
@@ -1050,12 +1136,15 @@ export function App() {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
     const state = more ? rollup(wt) : 'idle' // the second line's
+    const status = sideStyle === 'status' // an edge in its state's color, a line that fills with its agents' progress
+    const pct = status ? Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)) : -1
     const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
     return (
       <div
         key={w.id}
         className={`ws ${w.id === ws?.id ? 'sel' : ''} ${going[w.id] ? 'going' : ''} ${wt.some(needsYou) ? 'needs' : ''} ${rows.at('ws', w.id)}`}
-        style={colorVar(w.color)}
+        style={{ ...colorVar(w.color), ...(pct >= 0 && ({ '--p': `${pct}%` } as CSSProperties)) }}
+        data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
         data-group={pin ? 'pinned' : w.project}
         onPointerDown={e => !pin && !find && rows.start(e, 'ws', w.id, w.project) /* filtered: the order isn't all there */}
@@ -1139,6 +1228,7 @@ export function App() {
           </div>
         )}
         {sideStyle === 'cards' && last && <div className="ws-last">{last}</div>}
+        {status && <span className={`ws-line ${pct >= 0 ? 'pct' : ''}`} />}
       </div>
     )
   }
@@ -1350,7 +1440,17 @@ export function App() {
           />
         )}
         {timers.map(t => (
-          <TimerBar key={t.id} end={t.end} label={t.then === 'remind' ? reminder(t) : `${span(t.ms)}${t.then === 'notify' ? '' : t.then === 'command' ? `, then ${t.cmd}` : `, then ${TIMER_THEN.find(x => x[0] === t.then)![1].toLowerCase().replace(' the video', '')}`}`} onMenu={e => openMenu(e, timerMenu(t))} onStop={() => setTimer(t.id, () => null)} />
+          <TimerBar key={t.id} end={t.end} tip={t.then === 'send' ? `To ${sendTo(t)}: ${t.text}` : undefined} label={t.then === 'send' ? `To ${sendTo(t)}: ${clip(t.text ?? '', 80)}` : t.then === 'remind' ? reminder(t) : `${span(t.ms)}${t.then === 'notify' ? '' : t.then === 'command' ? `, then ${t.cmd}` : `, then ${TIMER_THEN.find(x => x[0] === t.then)![1].toLowerCase().replace(' the video', '')}`}`} onMenu={e => openMenu(e, timerMenu(t))} onStop={() => setTimer(t.id, () => null)} />
+        ))}
+        {watches.map(w => (
+          <StopwatchBar
+            key={w.id}
+            ms={w.ms}
+            from={w.from}
+            onToggle={() => setWatch(w.id, x => (x.from ? { id: x.id, ms: x.ms + Date.now() - x.from } : { ...x, from: Date.now() }))}
+            onReset={() => setWatch(w.id, x => ({ ...x, ms: 0, from: x.from && Date.now() }))}
+            onClose={() => setWatch(w.id, () => null)}
+          />
         ))}
         <WidgetGrid widgets={view.widgets ?? []} api={widgetApi} shut={widgetsShut} onShut={setWidgetsShut} />
         <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
@@ -1365,7 +1465,7 @@ export function App() {
           <IconButton icon="board" title="Board: every workspace by where it is, and to-dos" label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={() => setDialog(d => (d === 'board' ? null : 'board'))} />
           <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › General)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
-          <IconButton icon="timer" title="Timers: a countdown, then a notification (and the video paused, played or closed, if you like)" label={labels ? 'Timer' : undefined} on={timers.length > 0} onClick={e => openMenu(e, startMenu())} />
+          <IconButton icon="timer" title="Timers: a countdown, then a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
           <span className="spacer" />
           <IconButton icon="gear" title="Settings (⌘,)" label={labels ? 'Settings' : undefined} on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
@@ -1483,7 +1583,7 @@ export function App() {
               onOpen={openExternal}
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
-              onAct={act => prAct(ws, act)}
+              onAct={(act, method) => prAct(ws, act, method)}
             />
           )}
           {info && ws && (
@@ -1493,8 +1593,9 @@ export function App() {
               onOpen={openExternal}
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
-              onAct={act => prAct(ws, act)}
+              onAct={(act, method) => prAct(ws, act, method)}
               onRename={() => setDialog({ renameWs: ws.id })}
+              onAttach={attachable(ws) ? () => setDialog({ attachPr: ws.id }) : undefined}
               onAgent={selectTab}
               onCopy={copy}
             />
@@ -1535,6 +1636,10 @@ export function App() {
               wsName: id => (w => (w ? wsName(w) : id))(view.workspaces.find(w => w.id === id)),
               sleep: tab => api.call('tabSleep', { tab }),
               open: tab => (setDialog(null), selectTab(tab), view.tabs.find(t => t.id === tab)?.asleep && call('tabWake', { tab }).catch(() => {})),
+              procs: bridge?.procs,
+              // main's (the bubbles, an agent browser), else the page's own frames (laki-stop: the video, a widget, the preview)
+              stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
+              widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
             }}
             remote={{ state: view.remote, start: (hours, mail) => api.call('remoteStart', { hours, mail }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             widgets={{
@@ -1550,14 +1655,15 @@ export function App() {
               },
               logs: settings.devMode ? id => setDialog({ logs: `widget:${id}`, title: `Logs · ${view.widgets?.find(x => x.id === id)?.name ?? id}` }) : undefined,
             }}
+            logs={(key, title) => setDialog({ logs: key, title })}
             section={settingsFor ? `project:${settingsFor.id}` : section}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
           />
         )}
         {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? view.widgets?.find(x => x.id === dialog.widget) : undefined)}
-        {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
+        {dialog === 'help' && <HelpPage cli="laki" ship zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
-        {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.logs.startsWith('widget:') ? { section: 'widgets' } : null)} />}
+        {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.logs.startsWith('widget:') ? { section: 'widgets' } : dialog.logs === 'new' ? { section: 'general' } : null)} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
         {dialog === 'board' && (
           <BoardPage
@@ -1695,6 +1801,11 @@ export function App() {
                 </span>
               ))}
               <PRStatus w={infoOf(ws)} onOpen={openExternal} onToggle={(k, v) => setAuto(ws, k, v)} onMenu={e => openMenu(e, prMenu(ws))} />
+              {attachable(ws) && ws.kind !== 'local' && (
+                <button className="pr pr-attach" data-tip={`No PR found for ${ws.branch}: attach one by its URL or number`} onClick={() => setDialog({ attachPr: ws.id })}>
+                  + PR
+                </button>
+              )}
               {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
           )}
@@ -1812,6 +1923,25 @@ export function App() {
           }}
         />
       )}
+      {dialog && typeof dialog === 'object' && 'sendLater' in dialog && (() => {
+        const old = timers.find(t => t.id === dialog.edit)
+        const agents = (view?.tabs ?? []).filter(t => t.workspace === dialog.sendLater && t.kind === 'agent' && (t.status !== 'exited' || t.id === old?.tab))
+        return (
+          <SendLaterDialog
+            agents={agents.map(t => ({ id: t.id, name: t.name }))}
+            tab={old?.tab ?? (agents.some(t => t.id === tab?.id) ? tab!.id : undefined)}
+            text={old?.text}
+            at={old?.end}
+            onClose={() => setDialog(null)}
+            onPick={o => {
+              if (old) setTimer(old.id, x => ({ ...x, tab: o.tab, text: o.text, end: Date.now() + o.ms, ms: o.ms }))
+              else addTimer(o.ms, { then: 'send', ws: dialog.sendLater, tab: o.tab, text: o.text })
+              setDialog(null)
+              done(`It goes to ${agents.find(t => t.id === o.tab)?.name ?? 'the agent'} at ${new Date(Date.now() + o.ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`)
+            }}
+          />
+        )
+      })()}
       {typeof dialog === 'object' && dialog && 'timer' in dialog && (
         <Prompt
           title="Start this timer over with"
@@ -1870,6 +2000,20 @@ export function App() {
         />
         )
       })()}
+      {dialog && typeof dialog === 'object' && 'notes' in dialog && (p => p && <ProjectNotes name={p.name} notes={p.notes ?? ''} onSave={notes => call('projectSet', { id: p.id, notes })} onClose={() => setDialog(null)} />)(view?.projects.find(p => p.id === dialog.notes))}
+      {dialog && typeof dialog === 'object' && 'attachPr' in dialog && (w => w && (
+        <Prompt
+          title="Attach a pull request"
+          placeholder="https://github.com/owner/repo/pull/12, or 12"
+          hint={`Its URL, or its number in this repo. Its status and checks show here; the PR switches work when its branch is this workspace's (${w.branch}).`}
+          onClose={() => setDialog(null)}
+          onSubmit={async pr => {
+            const r = await call<{ number: number; linked: boolean }>('prAttach', { ws: w.id, pr })
+            setDialog(null)
+            done(`PR #${r.number} attached${r.linked ? ': only linked, its branch is another one' : ''}`)
+          }}
+        />
+      ))(live.find(w => w.id === dialog.attachPr))}
       {dialog && typeof dialog === 'object' && 'renameWs' in dialog && live.some(w => w.id === dialog.renameWs) && (
         <Prompt
           title="Rename workspace"

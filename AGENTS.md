@@ -11,7 +11,7 @@ from it (limits, hooks).
 ```bash
 npm install
 npm run typecheck                 # tsc --noEmit
-npm test                          # node:test, ~25s
+npm test                          # node:test, ~95s (4 at a time)
 npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
 npm run dmg                       # minor version +1, then dist/release/Laki-<version>-arm64.dmg (the user's ask: every dmg)
@@ -37,6 +37,11 @@ npm run dev                       # Electron + renderer dev server on :5199
   Laki Electron; `dataDir` in `src/shared/conn.ts` keeps an existing one). Never stop it and never point tests
   at it.
 - Releasing: `docs/release.md` (checks, both builds, `scripts/pack-smoke.sh` once before each release).
+- Signing: the app is ad-hoc signed (`build.mac.identity: "-"`, `hardenedRuntime: false`), not notarized. Keep it:
+  with `identity: null` (unsigned) a downloaded dmg (Slack, mail, a browser) says *"Laki" is damaged* on other Macs;
+  ad-hoc, it says Apple could not verify it, and System Settings › Privacy & Security › *Open Anyway* opens it.
+  `codesign --verify --deep --strict` on the built app must pass. A plain double-click everywhere needs a Developer ID
+  and notarization.
 - The app icon is `build/icon.icns`, rendered from the mark `src/renderer/src/icon.svg` (also the splash and the
   browser tab's icon) by `swift scripts/icon.swift`: change the SVG, then run it.
 
@@ -70,20 +75,26 @@ board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `
 `prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
 workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
 workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
-`progress`; 31: a sep's `template`, kept by `projectSet`). A
+`progress`; 31: a sep's `template`, kept by `projectSet`; 32: `prAttach`, a project's `notes`, kept by `projectSet`; 33: `prAct` `merge`, a workspace's `autoLand`, a project's `pr` and
+`mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
-- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `seps`: the sidebar's groups (the app's word: a
+- projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `notes`: the user's Markdown, the
+  project's ⋯ › Notes (`ProjectNotes`, panels.tsx) and Settings, left out of MCP's and `ls --json`'s state; `seps`: the sidebar's groups (the app's word: a
   named head over the workspaces up to the next one, its count beside it; a workspace dropped on it goes first in it (its top
   third: before it), `RowDrop` `into`, from `data-head`), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it, over the last one used), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+- `wsNew` in a folder (or `local`) whose own workspace is there: an agent other than none, or a prompt, makes `another`
+  beside it (named by the prompt's first words); none gives it back as it is (scheduled tasks' `local`). In development
+  mode each step goes to `devLog('new', …)` (Settings › General › *Creation log*) and, once it has an id, the
+  workspace's own log; `spawnTab` logs each tab's command line there;
 - `wsNew`/`wsFan` `place` (`placeWs`, as a drag would: `top`, first in the project, or a sep's id, first under it; a
   race in its order; none: last, as the CLI's and scheduled runs are);
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
 - `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns `{ dirty }`;
   `doctor` (the first-run screen's: git, `gh auth status`, `cloudflared` (optional; Welcome's ? says what for), which agents are on PATH);
 - tabs and agents: `tabNew`/`tabClose`, `tabSet` (name, color, `muted`), `send` (`enter: false`: into the prompt, no Enter, escapes dropped; refused while the agent asks something), `queueClear`;
-  `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below), `unread` (its ● again: `done`, until a look clears it);
+  `answer` (`tab`, `n` or `pick` first/last: a waiting agent's menu, below; `label`: refused unless choice `n` still says that), `unread` (its ● again: `done`, until a look clears it);
 - a race (`wsFan`: the `NewWs` fields and 2–6 `presets`, agents only, worktrees only): `wsNew` per preset, one after
   another, named `<name>-<preset>`, sharing a random `race` id (the sidebar's flag; the renderer's `Compare.tsx`);
 - an issue (`wsNew`/`wsFan` `issue`: a URL or number): `fromIssue` runs `gh issue view <ref> --json number,title,body,url`
@@ -108,7 +119,13 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
 - worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads`, `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
-  PR's diff"), `prDiff` (`gh pr diff` by the PR's URL, in `diff`'s shape: `diffFiles` reads each file's status and
+  PR's diff"), `prAct` (`act` approve, close or merge, each only where the project's `prAllows` says (`config.pr`:
+  approve, close, merge on unless false, `land` off unless true; the daemon refuses, the app hides); merge: `method`
+  squash/merge/rebase, saved as the project's `mergeMethod`, `deleteBranch`: `merge()`, `gh pr merge --<method>
+  [--delete-branch] -R <host/owner/repo> -- <url>`: `-R` keeps gh off the worktree's git (no checkout, no local branch
+  deleted), then a scan a second later), `prAttach` (`ws`, `pr`: a URL or number; the app's *Attach a PR…*, the status bar's *+ PR*, the info
+  panel: a git workspace on a branch, no PR found): `prHead`, then `prUrl`, and `prLinked` when its head isn't the
+  workspace's branch; a scan follows), `prDiff` (`gh pr diff` by the PR's URL, in `diff`'s shape: `diffFiles` reads each file's status and
   lines; Changes' *PR #n*), `prAct` (`act` approve or close: `gh pr review --approve` / `gh pr close` by the PR's URL, after the
   app's confirm; an open PR only), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`, links followed, by `realpath`);
@@ -124,7 +141,12 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
 - resources and sleep (Settings › Resources): `resources` (one `ps -axo pid,ppid,rss,%cpu,command`: `app`, the app
-  bundle's processes by `--type`, none on plain node; `daemon` with its heap; `tabs`, each live session's process
+  bundle's processes by `--type`, none on plain node, which the renderer names by main's `procs` IPC (each pid's
+  holder: the window, a JS widget's or the video's frame (`framesInSubtree`: JS widgets share one process, one site),
+  the preview's webview, an agent browser, the bubbles, the editor) with a Stop each: main's `proc-stop` (the
+  bubbles' windows destroyed until `floats` changes state, `parked`; an agent browser closed) or the page's own
+  `laki-stop` event (the video closed, a widget unloaded until a click or the grid folds, the preview unloaded until
+  *Load it again*); `daemon` with its heap; `tabs`, each live session's process
   tree, the program first; RSS in KB); `tabSleep` (now: `cantSleep`'s rules: claude or codex with a `resumeId`, idle, no queue or limit, not on a host),
   `tabWake`, `sleepTick` (`now`: tests move the clock; every 60 s);
 - development mode (`settings.devMode`): `logs` (`key`: `ws:<id>` or `widget:<id>`): `core.ts` `devLog`'s lines, the
@@ -205,7 +227,10 @@ Commands run as `$SHELL -lic '<cmd>'`. The environment adds:
   them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
 - `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`.
 
-Claude gets `--settings <data>/claude-settings.json`. Its hooks run `laki hook <state>`, using an absolute
+Claude gets `--settings <data>/claude-settings.json` and, on this Mac (not a host: no laki CLI there), `--plugin-dir
+<data>/claude-plugin` (`claudePlugin`, written by `writeHooks`): a plugin named laki whose `commands/new.md` is
+`/laki:new <task> [with <agent>]`, a new workspace in this project through `laki new .` (the CLI's `.`: the project of
+`$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's SKILL.md says the same for the other agents. Its hooks run `laki hook <state>`, using an absolute
 node/Electron path and the CLI's path, and map to states:
 
 | hook | state |
@@ -239,7 +264,9 @@ those on PATH):
 ### Projects
 
 A project is a git repository (its top level) or any other folder (`git: false`: local workspaces only,
-no branches, diff, PRs or ship). `config` (setup, run, teardown, expose), set in the app, wins field by field over
+no branches, diff, PRs or ship). New worktrees go to `worktreesOf`: the project's `config.worktrees` (the app's only; relative: to the repo),
+else `settings.worktrees` (`~` is home) with a folder per project, else `<data>/worktrees/<project>`; a host's stay in
+`~/.laki-host`. Made ones keep their path. `config` (setup, run, teardown, expose), set in the app, wins field by field over
 the repo's `.laki.json` (`projectConfig`).
 
 ### SSH hosts
@@ -320,12 +347,17 @@ empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon sta
   workspace's `git diff --numstat` against `diff`'s base, new files' lines (the first 100, up to 1 MB) and `git status`'s
   count as `stat` (`WorkspaceView.stat`: add, del, files, dirty); one scan at a time.
 - PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, base
-  branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, size, body; `mine`: the author is `ghLogin`'s,
+  branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, mergeStateStatus: `PR.ready` (CLEAN or HAS_HOOKS; UNKNOWN: none), size, body; `mine`: the author is `ghLogin`'s,
   `gh api user` once per host: no avatar, no Approve), every `settings.prScan` minutes
   (`PR_SCAN`, 1; `prTick`, each minute; `LAKI_PR_SCAN_MS`: tests' pace instead); one scan at a time (`scanPRs`), so `autoPR` never sends twice.
   `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now. Each check has `took`, a finished one's seconds (`completedAt` − `startedAt`). The checks are
   `newest`'s: statusCheckRollup keeps a re-run's old run, so each check (workflow and name) counts by its latest
   `startedAt` (none, or Go's zero time: queued, the newest), as `gh pr checks` does.
+- `autoLand` (merge when green, `wsSet` refuses it where `prAllows(…, 'land')` is false): in `autoPR`, an open PR
+  that isn't a draft, `checks` pass, `conflict` false, `review` none or APPROVED, `ready` not false and no agent tab running or with a queue is merged (`merge()`, the
+  project's `mergeMethod` or squash, the branch deleted) once per head (`fix.land`; `wsSet` turning it on again clears it
+  at the next scan: `retry`);
+  a failure is `overToYou`. The app asks once as it's turned on. A project's `land` turned off clears its workspaces' `autoLand` (`projectSet`).
 - `autoPR` (workspace `autoFix` / `autoReview` / `autoMerge`, ported from wb's `review.go`): failing CI on a new head
   commit → `prFix('ci')` (`gh pr checks`, `gh run view --job <id> --log-failed`), at most `settings.prTries` in a row
   (`PR_TRIES`, 3), then status waiting and a notification (`overToYou`, once, as the count goes over); conflicts on a new head commit →
@@ -352,7 +384,7 @@ cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. T
 
 `core.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
 (`http://127.0.0.1:<daemon port>`), always with one `--allowed-mail` (`ONE_MAIL`: an address, never a
-`*@domain`; kept as `settings.remoteMail`), for `REMOTE_HOURS` (1, 2, 4, 8, 24, or 0: forever, no `until`). Each start makes a
+`*@domain`; kept as `settings.remoteMail`), for `REMOTE_HOURS` (1, 2, 4, 8, 12, 24, 48, 72, or 0: forever, no `until`). Each start makes a
 `remoteToken`; `remoteView` (`view.remote`) gives the link, `<url>/?token=<token>` (a query: Cloudflare's email sign-in drops a
 hash), which the renderer (`api.ts`: no port) uses on the page's own origin, then takes out of the address bar
 (`pageToken`: `replaceState`, kept in the tab's `sessionStorage` `laki.token` for reconnects; Cloudflare's sign-in page,
@@ -430,7 +462,8 @@ native setter and fires input and change), then wait 300 ms.
 
 ### Widgets
 
-`daemon/widgets.ts`: a widget is a folder with `widget.json` (`Manifest`: name, size in cells, `every` minutes,
+`daemon/widgets.ts`: a widget is a folder with `widget.json` (`Manifest`: name, size in cells (down 1–4 or 0.5: half a cell, `down`; the grid's
+rows are half cells, `span size*2`), `every` minutes,
 `view` (the full view's dialog: `s`, `m`, `l`, `WidgetSize`; `.modal.widget-modal.<size>`), `config` (each setting a
 default or a `Spec`: `type` text, number, bool, choice, list, `label`, `hint`, `choices`; `optionsOf` gives the view's
 `options`), `fetch` (a shell command) or `script` (a JS file run by Laki's node through `RUN_JS`: its default export
@@ -463,7 +496,8 @@ non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages 
 Settings' `WidgetsSection` (`WidgetPrompt`: `shared/widgetGuide.ts` `widgetPrompt`, the format as a prompt for any AI
 chat, which the laki-widget skill's SKILL.md shares as `widgetFormat`; `WidgetCard`: a head row, then
 `WidgetOptionField` per setting, a list's `ChipsInput`; its folder button is App's Open in menu with `widget`). The
-ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, opened in the browser; no fetch),
+ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, plain words with a rule between them, opened in the
+browser; no fetch; 3×½),
 `widgets/my-prs` (shell, gh `--jq`: an author's open PRs (`@me`, empty too) as `stats`, open,
 drafts, conflicts and `label1`–`label3`'s counts, and `groups`, each PR in the first of conflict, failing CI, changes,
 approved, in review, a draft first of all; a template) and
@@ -478,11 +512,21 @@ widget's page in Chrome (headless `--screenshot`).
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
 `settings.notifyOn[waiting|done|limit] === false`, or a muted workspace or tab (`muted`, ⋯ and right-click menus).
 `settings.notifySound` (a macOS sound's name, `none`, unset: the default) goes to main's `Notification`. A waiting
-turn whose text says "permission" gets *Allow* / *Deny* actions (Asks, above).
+turn is posted 800 ms later (its menu is often drawn after the hook; none if it isn't waiting by then), with an action
+per choice of the tab's `ask` (`NotifyAction`: `n` and `label`, main calls `answer` with both), else, when its text
+says "permission", *Allow* / *Deny* (`pick` first / last).
 
 Phone pushes are the daemon's (`push.ts`, `core.ts` `phone`), so they go with the app closed: `settings.webhook` (`url`,
 `format` ntfy/slack/telegram/json, `waiting` unset on, `done` unset off) on a `turn` that waits or is done, and on
-`overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. ntfy gets a
+`overToYou`; once per state change of a tab (`pushed`, cleared when `view()` sees it running), never muted. A wait goes 800 ms
+later with `askOf`'s choices as lines (JSON: `options`); with `webhook.answer` (Settings' *Answer from the phone*,
+off by default) a `nonce` per push: Telegram's `inline_keyboard` (`callback_data` `nonce:n`) and ntfy's JSON publish
+to the server's root with `http` actions (3 at most) posting `nonce:n` to `ntfyReplies` (`<topic URL>-<replyTopic>`,
+the random part Settings makes). `awaiting` keeps each nonce with the tab and its choices; while any is there,
+`phoneTick` (every 5 s; the API's for tests) runs `push.ts` `replies` (Telegram's `getUpdates` from `tapCursor`, only
+callback queries from the URL's `chat_id`, each acknowledged; ntfy's `/json?poll=1&since=`) and answers a tap whose
+nonce is waiting and whose tab still shows the same choices (`answer` with `label`); a nonce goes as it's used, when
+its tab stops waiting, or after a day; none left: the timer stops. ntfy gets a
 `Title` header (RFC 2047 past ASCII) and the question as the body; Slack its text escaped; JSON `{event, workspace, tab,
 agent, message, ts}`. `https://` only (plain `http://` to localhost: tests' server; Settings flags another). 5 s timeout, a failure logged. `webhookTest` is Settings' *Send test* (answered, not logged).
 
@@ -524,6 +568,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.md`: the file preview's Markdown mode, `raw` or `rendered`.
     - `laki.video`: the sidebar's video (an embed URL), back after a reload without autoplay.
     - `laki.timers`: the sidebar's timers (`id`, `end`, `ms`, `then`); ones that ended while the app was closed are dropped.
+      Send later (the toolbar's ⋯, `SendLaterDialog` in panels.tsx, `text.ts` `parseLater`: a length or a time of day)
+      is one with `then: 'send'`, `ws`, `tab`, `text`: `send` `whenIdle` as it rings (Send now, Edit, Cancel in its
+      menu); one due while the app was closed is dropped with a toast (`missed`).
+    - `laki.watches`: the stopwatches (the timer menu's *Stopwatch*, `StopwatchBar` in panels.tsx): `ms` counted before,
+      `from` running since.
       A reminder (a workspace's *Remind me…*, `RemindDialog`) is one with `then: 'remind'` and `ws`: it notifies about
       the workspace (the click: its first tab) and toasts *Open*; one due while the app was closed rings as it opens.
     - `laki.previewSize`: Preview's size (`{ w, h }`, null: the panel's).
@@ -614,11 +663,18 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   server) a stand-in picture.
 - **`floater.ts`** (`floater.html`, the third renderer entry): the floating bubbles (`settings.floater`, unset: on).
   App's `floats` (each workspace whose agent tab works or waits, waiting first: `tab`, name, project, status, its
-  color, what it asked or last said) and the theme's colors go to main (`bridge.floats`); main's `placeFloater` shows
-  the bar while Laki isn't the front app (`did-resign-active`), two `type: 'panel'` windows over every Space and
-  full-screen app: `#bar` (the circles; a click is `floater-open`: `show(tab)`; the grip drags it, `floater.json` in
-  userData keeps where) and `#card` (a hover's card, beside the bar toward the screen's middle, click-through:
-  its own window so the bar never moves under the mouse).
+  color, what it asked or last said), the theme's colors and `settings.floaterStyle` go to main (`bridge.floats`);
+  main's `placeFloater` shows the bar while Laki isn't in front (`front`: one of its own windows has the focus, not the
+  drop or its card: a press on the drop makes Laki the active app, and the drop would hide under the pointer), two `type: 'panel'` windows
+  over every Space and full-screen app: `#bar` (a drop against the screen's left or right edge, `data-side` from
+  main's `floater-side`: `.shape` with its flares, a slow wobble, a round blob while dragged; the circles; a click is
+  `floater-open`: `show(tab)`; a drag from anywhere on it past 4px is `floater-drag` start/move/end with the pointer's
+  screen offset, so its cursors (grab, pointer) work, which macOS's drag regions take away; at the end main's `snap`
+  sticks it to the nearer edge of its screen, animated, and `floater.json` in userData keeps where (`home`: a screen
+  gone puts it on the main one, `barAt`, and leaves `home` for the screen's return) and `#card` (a
+  hover's card, beside the bar toward the screen's middle, click-through: its own window so the bar never moves under
+  the mouse). `floater.css`: the circles' styles (`[data-fstyle]`: glow, the default; gradient; arc; still), also
+  Settings › General's live previews.
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
   terminal's `minimumContrastRatio` keeps their text readable.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki
@@ -639,9 +695,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   before the first render: a terminal measures its cells once.
 - **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB);
   tokens become React text, never HTML.
-- **Sidebar styles** (`settings.sideStyle`, `SIDE_STYLES` in Settings.tsx): `.sidebar[data-style]`; App's `wsRow` adds
+- **Sidebar styles** (`settings.sideStyle`, `SIDE_STYLES` in Settings.tsx): `.sidebar[data-style]`; status: `wsRow`'s
+  `data-state` (its rollup) colors the row's bar, `.ws-line` fills to `--p` (its agents' highest `progress`); App's `wsRow` adds
   `.ws-sub` (branch, `STATE_WORDS`, progress, PR, diff) for extended and cards, `.ws-last` (the agent's last answer)
-  for cards; compact is CSS only. `sideLook.icons` is `--ws-icon`, every row mark's size (avatar and GitHub's alike).
+  for cards; compact is CSS only. Extended and cards keep the ⋯'s place (`visibility`) and the marks on hover: rows as tall
+  as their first line's marks would jump. `sideLook.icons` is `--ws-icon`, every row mark's size (avatar and GitHub's alike).
 - **CSV** (`SidePanel.tsx` `CsvTable`, `text.ts` `csvSep`/`parseCsv`/`toCsv`): a `.csv`/`.tsv` preview's Table (or
   Raw, `laki.csv`); editing a cell rewrites the file through `toCsv` (`parseCsv`'s `quoted`, cell by cell: a quoted cell stays quoted, a
   new row's like the row above, a new column's like the cell before; LF only: FilePreview's save puts CRLF back), saved like the
@@ -675,13 +733,17 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
   `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
-- **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size (its preview cancels
-  that); each section's settings in `Group`s (a titled card, `.set-group`: a new block of settings goes in one, or
-  a new one); `VarChips` under a template (`TEMPLATE_VARS`) and a preset's args or command (`ENV_VARS`) put a variable
-  in at the cursor of the field just before them; presets, `EnvField` (KEY=value lines), fonts,
+- **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size times `settings.pageZoom`
+  (`PAGE_ZOOMS`, Appearance's *Settings & Help size*; ⌘± while it or Help is open; Help takes the same zoom; its
+  preview cancels that); the nav's sections under a head each (`SECTIONS` `group`: Laki, Agents, Connect); each section's settings in
+  `Group`s (a titled card, `.set-group`: a new block of settings goes in one, or a new one); `VarChips` under a
+  template (`TEMPLATE_VARS`) and a preset's args or command (`ENV_VARS`) put a variable in at the cursor of the field
+  just before them (in a `.preset` card, shown only while it has the focus); presets, `EnvField` (KEY=value lines), fonts,
   `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
   (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section: a duplicate button, a *Show* filter by target), Appearance (themes, the current one outlined and checked, a name filter that stays in sight;
-  accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's,
+  accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's (`radius`
+  also as `--rs`, which every fixed px radius in look.css and styles.css takes first, `var(--rs, 10px)`: keep new ones so;
+  pills (999px, or half their height: `.pr`, `.tag`, the switch's track) and circles (50%) stay),
   `--accent-fg` by `onAccent`; `tabsAt`;
   `PROJECT_LOOK`: the sidebar's project names over the theme, `settings.projectLook`, App's `phAttrs`/`phVars` put them
   on `.sidebar` as `data-ph-*` and `--ph-*`, styles.css overrides any look with `!important`; `SIDE_LOOK`,
@@ -689,7 +751,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of look.css;
   `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
   them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's), Remote access (`RemoteSection`, shown when App.tsx
-  passes `remote`: the email, 1h…24h, then the QR code and link), and `ScriptsField` (a project's
+  passes `remote`: the email, 1h…72h or Forever, then the QR code and link), and `ScriptsField` (a project's
   setup/teardown/run scripts, Import from a file), Resources (`ResourcesSection`: `resources` every 3 s while open,
   Laki itself and each tab by RSS with its processes, Sleep/Open/Wake, `settings.sleepAfter`; App.tsx passes a
   `ResourcesApi`), Pull requests (`PR_KINDS`: the PR switches' prompts over `PR_PROMPTS`,
@@ -743,9 +805,10 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   the last choices, `laki.newWs`; `images`: the menu bar's screenshots; while it's made, `.busy` fades the cards and
   `.nw-making` says what's happening and the seconds so far), the palette,
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
-  (`SITE`, the version from `package.json`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
+  (`SITE`, the version from `package.json`, the build's time: `__BUILT__`, electron.vite.config.ts' `define`, none
+  under `dev:web`; the app menu's *About Laki* is a `laki://about` link, main's `openLink`);
   `Ready` (a workspace without tabs: its starts, `TIPS`) and `StarLaki` (the repo, `REPO`); `Fun` (the sidebar foot's
-  smiley: `meme`, Next, Copy image: a PNG drawn on a canvas, the clipboard takes no other; a right click on it: copy,
+  smiley: `meme`, Next; a right click on it: copy (a PNG drawn on a canvas, the clipboard takes no other),
   download through an `<a download>`, open on Reddit). The new-workspace page's *Pull request* sends `pr` (no Base, no race with it).
 - **`links.ts`**: `parseLink` and `wsLink` (laki:// links, above).
 - **`api.ts`**: the WebSocket client. In Electron the address comes from the preload bridge; in a browser,
@@ -781,7 +844,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |
-| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake) tests; `helpers.ts`; `fakes/`; `cloudflared` |
+| `test/` | fakes for every agent (`claude`, `codex`, `gemini`, `grok`, `opencode`); `daemon`, `api` (errors, edge cases, daemon start, tunnels, remote access), `pr` (PR feedback), `cli`, `e2e`, `snapshot`, `limits`, `layout`, `qr`, `highlight`, `template` (text.ts; theme ids and looks), `ask` (waiting menus), `markdown`, `contrast` (every theme's text, hints and button labels: WCAG ratios), `actions` (Run ▾'s), `usage` (plan limits, a fake server), `schedule` (`when.ts`, scheduled tasks), `links` (laki:// links), `push` (phone pushes), `fun` (memes, a fake server), `ssh` (projects over SSH, `fakes/ssh`), `widget` (templates, widgets, the two that come with Laki), `resources` (memory by tab, sleep and wake), and edge cases for branch coverage: `units-more` (pure functions), `cli-more` (CLI, MCP, HTTP), `services-more` (usage, memes, widgets), `core-a` and `core-b` (core.ts by halves; their own `ssh`, `ps`, `lsof`, `cloudflared` stand-ins in the rig's `$HOME/bin`) tests; `helpers.ts`; `fakes/`; `cloudflared` |
 | `scripts/` | `demo.ts`, `pack-smoke.sh`, `mem.sh`, `icon.swift` |
 
 ## Conventions

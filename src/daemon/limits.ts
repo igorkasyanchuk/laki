@@ -70,6 +70,7 @@ export function parseReset(s: string, now: Date): Date | null {
   const at = (yy: number, mm: number, dd: number) => new Date(Date.UTC(yy, mm, dd, h, min) - off)
   let t = at(y, mo, d)
   if (!m[1] && t.getTime() < now.getTime() - 12 * 3600e3) t = at(y, mo, d + 1) // long gone today: tomorrow's
+  else if (!m[1] && t.getTime() > now.getTime() + 12 * 3600e3) t = at(y, mo, d - 1) // late last night, read past midnight: yesterday's (the caller makes a long-gone one tomorrow's)
   if (m[1] && !m[3] && t.getTime() < now.getTime() - 86400e3) t = at(y + 1, mo, d) // a date without a year: the next one
   return t
 }

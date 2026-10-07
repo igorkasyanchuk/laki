@@ -137,19 +137,25 @@ ipcMain.handle('conn', async () => {
   const { port, token } = await daemon()
   return { port, token }
 })
-// sound: a macOS sound's name (Settings › General), 'none', or unset: the default. actions: buttons (a permission
-// prompt's Allow and Deny; macOS shows them with the Alerts style, under Options with Banners): Allow picks the menu's
-// first choice, Deny its last, straight through the daemon (the window may be closed by then). Kept until used or
-// closed: a collected Notification's events never come
+// sound: a macOS sound's name (Settings › General), 'none', or unset: the default. actions: buttons (a waiting agent's
+// choices, or a permission prompt's Allow and Deny; macOS shows the first with the Alerts style and the rest under
+// Options, all under Options with Banners): each answers its menu straight through the daemon (the window may be
+// closed by then), by its number and words, or Allow / Deny by first and last. Kept until used or closed: a
+// collected Notification's events never come
+type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last' }
 const notes = new Set<Notification>()
-ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string, actions?: string[]) => {
+ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
   if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
-  const buttons = Array.isArray(actions) ? actions.filter(a => typeof a === 'string').slice(0, 2) : []
-  const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(text => ({ type: 'button' as const, text })) })
+  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last')).slice(0, 9)
+  const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })) })
   const done = () => notes.delete(n)
   n.on('click', () => (done(), show(tab)))
-  n.on('action', (_ev, i) => (done(), rpc('answer', { tab, pick: i === 0 ? 'first' : 'last' }).catch(() => show(tab)))) // it moved on: look
+  n.on('action', (_ev, i) => {
+    done()
+    const a = buttons[i]
+    if (a) rpc('answer', { tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) }).catch(() => show(tab)) // it moved on: look
+  })
   n.on('close', done)
   notes.add(n)
   if (notes.size > 50) notes.delete(notes.values().next().value!) // ponytail: the oldest go; Notification Center keeps them for days
@@ -256,19 +262,24 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
   )
 })
 
-// the floating bubbles (Settings › General): a small bar over every app and Space with a circle per workspace whose
-// agent works or waits, from the app window's list; hidden while Laki is in front. A circle's click shows its tab; a
-// hover shows its card in a window of its own beside the bar, toward the screen's middle, that takes no clicks (the
-// bar never moves under the mouse). The grip drags the bar; it stays where it's left
+// the floating bubbles (Settings › General): a drop stuck to the screen's left or right edge, over every app and Space,
+// with a circle per workspace whose agent works or waits, from the app window's list; hidden while Laki is in front.
+// A circle's click shows its tab; a hover shows its card in a window of its own beside the drop, toward the screen's
+// middle, that takes no clicks (the drop never moves under the mouse). Dragged anywhere (floater-drag: the page sends
+// how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the nearer edge as
+// it's let go, and stays there
 type Float = { tab: string }
-const BAR = 44 // the bar's width; floater.html's too
-let floats: { items: Float[]; colors: Record<string, string> } = { items: [], colors: {} }
+const BAR = 44 // the drop's window width; floater.html's too
+const STYLES = ['glow', 'gradient', 'arc', 'still'] // a working agent's circle (Settings' previews: floater.css)
+let floats: { items: Float[]; colors: Record<string, string>; style: string } = { items: [], colors: {}, style: 'glow' }
 let floater: BrowserWindow | null = null
 let card: BrowserWindow | null = null
 let hover: { tab: string; top: number } | null = null // the circle under the mouse: its tab, its top in the bar
 let front = false // Laki is the front app (a launch makes it so; one in the background doesn't)
 const floaterFile = () => join(app.getPath('userData'), 'floater.json') // where the bar was left: its top left corner
+let home: { x: number; y: number } | null = null // where it was left (floater.json); barAt: where it is (a screen gone: the main one's default)
 let barAt: { x: number; y: number } | null = null
+let dragFrom: { x: number; y: number } | null = null // the window's spot as a drag started
 const barSide = () => { // where the card goes: toward the middle of the bar's screen
   if (!barAt) return 'left'
   const d = screen.getDisplayNearestPoint(barAt).workArea
@@ -301,46 +312,30 @@ const floatWin = (hash: 'bar' | 'card', width: number) => {
   else f.loadFile(fileURLToPath(new URL('../renderer/floater.html', import.meta.url)), { hash })
   return f
 }
-// the bar's spot, or the default one (the sketch's: the right edge, low) when that's on no screen
-function onScreen() {
-  const on = (p: { x: number; y: number }) => screen.getAllDisplays().some(({ bounds: b }) => p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height)
-  if (barAt && on(barAt)) return
-  const d = screen.getPrimaryDisplay().workArea
-  barAt = { x: d.x + d.width - BAR - 8, y: d.y + Math.round(d.height * 0.6) }
+// the drop against the nearer edge (left or right) of the screen it's on (its spot's, or the main one's when that's on
+// no screen: a laptop undocked, home kept for its return), inside it top to bottom; the page told which side, for its
+// shape. animate: let go after a drag
+function snap(animate = false) {
+  if (!floater) return
+  const h = floater.getSize()[1]
+  const at = home ?? { x: Infinity, y: 0 }
+  const on = screen.getAllDisplays().find(({ bounds: b }) => at.x + BAR / 2 >= b.x && at.x + BAR / 2 < b.x + b.width && at.y >= b.y && at.y < b.y + b.height)
+  const d = (on ?? screen.getPrimaryDisplay()).workArea
+  const right = on ? at.x + BAR / 2 > d.x + d.width / 2 : true
+  barAt = { x: right ? d.x + d.width - BAR : d.x, y: on ? Math.max(d.y, Math.min(at.y, d.y + d.height - h)) : d.y + Math.round(d.height * 0.6) }
+  floater.setBounds({ ...barAt, width: BAR, height: h }, animate)
+  floater.webContents.send('floater-side', right ? 'right' : 'left')
 }
-// its screen gone (a laptop undocked): the default spot for now; floater.json keeps the one it was left at
-let placing = false
-app.whenReady().then(() =>
-  screen.on('display-removed', () => {
-    const kept = barAt
-    onScreen()
-    if (!floater || barAt === kept) return
-    placing = true
-    floater.setPosition(barAt!.x, barAt!.y)
-  }),
-)
+app.whenReady().then(() => screen.on('display-removed', () => snap()))
 function placeFloater() {
-  if (!floats.items.length || front) return void (floater?.hide(), card?.hide(), (hover = null))
+  if (!floats.items.length || front || parked) return void (floater?.hide(), card?.hide(), (hover = null))
   if (!floater) {
     try {
-      barAt ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
+      barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
     } catch {}
-    onScreen()
     const f = (floater = floatWin('bar', BAR))
-    f.webContents.on('did-finish-load', () => sendFloats())
-    let saving: ReturnType<typeof setTimeout> | undefined
-    f.on('moved', () => { // dragged by its grip (on macOS every step of the drag): kept once it stops
-      if (placing) return void (placing = false)
-      const [x, y] = f.getPosition()
-      barAt = { x, y }
-      clearTimeout(saving)
-      saving = setTimeout(() => {
-        try {
-          writeFileSync(floaterFile(), JSON.stringify(barAt))
-        } catch {} // ponytail: not kept, it comes back at the default spot
-      }, 500)
-    })
-    f.on('closed', () => floater === f && (floater = null))
+    f.webContents.on('did-finish-load', () => (snap(), sendFloats()))
+    f.on('closed', () => floater === f && ((floater = null), (dragFrom = null)))
     const c = (card = floatWin('card', 240))
     c.setIgnoreMouseEvents(true)
     c.on('closed', () => card === c && (card = null))
@@ -348,16 +343,77 @@ function placeFloater() {
   if (!floater.isVisible()) floater.showInactive()
 }
 const sendFloats = () => floater?.webContents.send('floats', floats)
-ipcMain.on('floats', (e, items: unknown, colors: unknown) => {
+ipcMain.on('floats', (e, items: unknown, colors: unknown, style: unknown) => {
   if (e.sender !== win?.webContents) return
-  floats = { items: Array.isArray(items) ? items.slice(0, 12) : [], colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {} }
+  floats = { items: Array.isArray(items) ? items.slice(0, 12) : [], colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {}, style: STYLES.includes(style as string) ? (style as string) : 'glow' }
+  if (parked && floatState() !== parked) parked = ''
   placeFloater()
 })
-ipcMain.on('floater-size', (e, h: number) => floater && e.sender === floater.webContents && h > 0 && h < 1200 && floater.setSize(BAR, Math.round(h))) // where it is: a drag may be under way
+// Stop (Settings › Resources): the bubbles' windows closed, until an agent's state changes
+let parked = ''
+const floatState = () => JSON.stringify(floats.items.map(x => [x.tab, (x as { status?: string }).status]))
+
+// what each of the app's processes holds, for Settings › Resources (by pid; ps has the memory): the window, the frames
+// in it of their own (a JS widget, the video), the preview's page, an agent browser's, the bubbles, the editor. stop:
+// what proc-stop frees (the renderer's own: the video, a widget, the preview)
+ipcMain.handle('procs', e => {
+  if (e.sender !== win?.webContents || !win) return []
+  const out: { pid: number; name: string; stop?: string }[] = []
+  const add = (pid: number, name: string, stop?: string) => pid > 0 && out.push({ pid, name, ...(stop && { stop }) })
+  const mine = win.webContents.getOSProcessId()
+  add(mine, 'The window')
+  for (const f of win.webContents.mainFrame.framesInSubtree) {
+    if (f.osProcessId === mine || !URL.canParse(f.url)) continue
+    const u = new URL(f.url)
+    const id = /^\/widget\/([^/]+)$/.exec(u.pathname)?.[1]
+    if (id && local(f.url)) add(f.osProcessId, `widget:${decodeURIComponent(id)}`, `widget:${decodeURIComponent(id)}`)
+    else if (u.hostname.endsWith('youtube-nocookie.com')) add(f.osProcessId, 'The video', 'video')
+    else add(f.osProcessId, u.host)
+  }
+  for (const wc of webContents.getAllWebContents()) if (wc.getType() === 'webview' && !wc.isDestroyed()) add(wc.getOSProcessId(), 'The preview', 'preview')
+  for (const [ws, a] of agentWins) if (!a.w.isDestroyed()) add(a.w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
+  for (const f of [floater, card]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater')
+  if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
+  return out
+})
+ipcMain.on('proc-stop', (e, what: unknown) => {
+  if (e.sender !== win?.webContents || typeof what !== 'string') return
+  if (what === 'floater') {
+    parked = floatState()
+    hover = null
+    for (const f of [floater, card]) if (f && !f.isDestroyed()) f.destroy()
+  } else if (what.startsWith('browse:')) {
+    const a = agentWins.get(what.slice(7))
+    if (!a) return
+    clearTimeout(a.idle)
+    agentWins.delete(what.slice(7))
+    if (!a.w.isDestroyed()) a.w.destroy()
+  }
+})
+ipcMain.on('floater-size', (e, h: number) => floater && e.sender === floater.webContents && h > 0 && h < 1200 && Math.round(h) !== floater.getSize()[1] && (floater.setSize(BAR, Math.round(h)), dragFrom || snap())) // where it is, kept on screen (a drag may be under way); the same height: nothing, a snap's animation goes on
 ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab)))
+ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
+  if (!floater || e.sender !== floater.webContents) return
+  if (phase === 'start') {
+    const [x, y] = floater.getPosition()
+    dragFrom = { x, y }
+    hover = null
+    card?.hide()
+  } else if (phase === 'move' && dragFrom && Number.isFinite(dx) && Number.isFinite(dy)) floater.setPosition(Math.round(dragFrom.x + dx), Math.round(dragFrom.y + dy))
+  else if (phase === 'end' && dragFrom) {
+    dragFrom = null
+    const [x, y] = floater.getPosition()
+    home = { x, y }
+    snap(true)
+    home = barAt
+    try {
+      writeFileSync(floaterFile(), JSON.stringify(home))
+    } catch {} // ponytail: not kept, it comes back at the default spot
+  }
+})
 // a hover: the card's text goes to its window, which says its size; then it's placed beside the circle and shown
 ipcMain.on('floater-hover', (e, tab: string, top: number) => {
-  if (!floater || e.sender !== floater.webContents) return
+  if (!floater || e.sender !== floater.webContents || dragFrom) return
   const f = floats.items.find(x => x.tab === tab)
   hover = f && Number.isFinite(top) ? { tab, top } : null
   if (hover) card?.webContents.send('card', f, floats.colors)
@@ -370,8 +426,13 @@ ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
   card.setBounds({ x: barSide() === 'left' ? barAt.x - 6 - Math.round(w) : barAt.x + BAR + 6, y: Math.round(y), width: Math.round(w), height: Math.round(h) })
   card.showInactive()
 })
-app.on('did-become-active', () => ((front = true), placeFloater()))
-app.on('did-resign-active', () => ((front = false), placeFloater()))
+// in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
+// takes the click), so being active alone isn't it: the drop would hide under the pointer as a drag starts
+const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card
+const setFront = (on: boolean) => on !== front && ((front = on), placeFloater())
+app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
+app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after
+app.on('did-resign-active', () => setFront(false))
 
 // the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels),
 // then the editor window (annotate) to draw on it, then the new-workspace page with it. Needs Screen Recording for Laki (macOS asks once).

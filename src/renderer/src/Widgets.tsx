@@ -134,6 +134,14 @@ const status = (w: WidgetView) => (w.running ? 'fetching…' : w.error ? `failed
 
 // the sidebar's widgets: a head that folds them, then a grid 3 cells across, each widget its size in cells
 export function WidgetGrid({ widgets, api, shut, onShut }: { widgets: WidgetView[]; api: WidgetApi; shut: boolean; onShut: (shut: boolean) => void }) {
+  // JS widgets stopped in Settings › Resources (laki-stop): unloaded until a click, or the widgets fold and open again
+  const [parked, setParked] = useState<string[]>([])
+  useEffect(() => {
+    const f = (e: Event) => (d => typeof d === 'string' && d.startsWith('widget:') && setParked(p => [...p, d.slice(7)]))((e as CustomEvent).detail)
+    window.addEventListener('laki-stop', f)
+    return () => window.removeEventListener('laki-stop', f)
+  }, [])
+  useEffect(() => void (shut && setParked([])), [shut])
   const on = widgets.filter(w => w.on)
   if (!on.length) return null
   return (
@@ -148,8 +156,14 @@ export function WidgetGrid({ widgets, api, shut, onShut }: { widgets: WidgetView
       {!shut && (
         <div className="widget-grid">
           {on.map(w => (
-            <div key={w.id} className={`widget ${w.full ? 'opens' : ''}`} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1]}` }} data-tip={`${w.name}${status(w) ? ` · ${status(w)}` : ''}`}>
-              <WidgetBody w={w} full={false} api={api} />
+            <div key={w.id} className={`widget ${w.full ? 'opens' : ''}`} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1] * 2}` /* half rows: ½ is a thin line */ }} data-tip={`${w.name}${status(w) ? ` · ${status(w)}` : ''}`}>
+              {w.js && parked.includes(w.id) ? (
+                <button className="widget-parked muted small" onClick={() => setParked(p => p.filter(x => x !== w.id))}>
+                  Stopped · load
+                </button>
+              ) : (
+                <WidgetBody w={w} full={false} api={api} />
+              )}
               {(w.error || w.running) && <span className={`widget-dot ${w.error && !w.running ? 'bad' : ''}`} />}
             </div>
           ))}

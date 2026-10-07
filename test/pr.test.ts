@@ -311,7 +311,7 @@ test('approve or close the PR: gh as you, by its URL; refused with none, when no
   const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', statusCheckRollup: [] }
   writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
   await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
-  await assert.rejects(act('merge'), /approve or close/)
+  await assert.rejects(act('rebase'), /approve, close or merge/)
   await act('approve')
   writeFileSync(join(gh, 'refuse'), 'failed to create review: GraphQL: Can not approve your own pull request (addPullRequestReview)')
   await assert.rejects(act('approve'), /^Error: gh: failed to create review: GraphQL: Can not approve your own pull request/)
@@ -323,6 +323,83 @@ test('approve or close the PR: gh as you, by its URL; refused with none, when no
   writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, state: 'CLOSED' }))
   await until(async () => (await rig.rpc('state')).workspaces[0].pr?.state === 'CLOSED', 'closed, scanned')
   await assert.rejects(act('close'), /PR #9 is closed/)
+})
+
+test('merge: gh pr merge by the way picked (kept as the project\'s next), -R off this worktree; the project\'s switches allow each act; merge when green once per head, only allowed', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', headRefOid: 'aaa', mergeable: 'MERGEABLE', reviewDecision: '', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, isDraft: true }))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  const log = () => readFileSync(rig.env.FAKE_LOG, 'utf8')
+  await rig.rpc('prAct', { ws: ws.id, act: 'merge', method: 'rebase', deleteBranch: false })
+  assert.match(log(), /gh pr merge --rebase -R github.com\/o\/r -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+  assert.equal((await rig.rpc('state')).projects[0].config.mergeMethod, 'rebase')
+  await rig.rpc('prAct', { ws: ws.id, act: 'merge' }) // no way: squash, the branch deleted
+  assert.match(log(), /gh pr merge --squash --delete-branch -R github.com\/o\/r -- /)
+  // the project's switches: off, refused; a page saving its config keeps the last way
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { merge: false, close: false, approve: true, land: false } } })
+  const cfg = (await rig.rpc('state')).projects[0].config
+  assert.deepEqual([cfg.pr, cfg.mergeMethod], [{ merge: false, close: false }, 'squash'])
+  await assert.rejects(rig.rpc('prAct', { ws: ws.id, act: 'merge' }), /merging PRs is off for this project/)
+  await assert.rejects(rig.rpc('prAct', { ws: ws.id, act: 'close' }), /closing PRs is off/)
+  await assert.rejects(rig.rpc('wsSet', { id: ws.id, autoLand: true }), /merge when green is off for this project/)
+  // merge when green: allowed, then waits for green (a draft isn't), merges once per head
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { land: true } } })
+  await rig.rpc('wsSet', { id: ws.id, autoLand: true })
+  await rig.rpc('prRefresh')
+  const merges = () => log().split('\n').filter(l => l.startsWith('gh pr merge')).length
+  assert.equal(merges(), 2, 'a draft waits')
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
+  await rig.rpc('prRefresh')
+  await until(async () => merges() === 3, 'merged when green')
+  assert.match(log(), /gh pr merge --squash --delete-branch -R github.com\/o\/r -- https:\/\/github.com\/o\/r\/pull\/9\n$/)
+  await rig.rpc('prRefresh')
+  assert.equal(merges(), 3, 'once per head')
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, headRefOid: 'bbb', reviewDecision: 'REVIEW_REQUIRED' }))
+  await rig.rpc('prRefresh')
+  assert.equal(merges(), 3, 'a review it needs first')
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, headRefOid: 'ccc', mergeStateStatus: 'BLOCKED' }))
+  await rig.rpc('prRefresh')
+  assert.equal(merges(), 3, 'GitHub blocks it: a required check to come')
+  // turned off and on: the head it tried goes again
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
+  await rig.rpc('wsSet', { id: ws.id, autoLand: false })
+  await rig.rpc('wsSet', { id: ws.id, autoLand: true })
+  await until(async () => merges() === 4, 'tried again')
+})
+
+test("merge when green waits while the workspace's agent works; the project's switch turned off clears the workspaces'", async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', headRefOid: 'aaa', mergeable: 'MERGEABLE', mergeStateStatus: 'CLEAN', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'SUCCESS' }] }
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { land: true } } })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
+  await rig.rpc('input', { tab: tab.id, data: 'slow\r' })
+  await until(async () => (await rig.tab(ws.id)).status === 'running', 'the agent works')
+  const merges = () => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('gh pr merge')).length
+  await rig.rpc('wsSet', { id: ws.id, autoLand: true })
+  await rig.rpc('prRefresh')
+  assert.equal(merges(), 0, 'green, but its agent may push yet')
+  await rig.rpc('input', { tab: tab.id, data: '\x1b' })
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'interrupted')
+  await rig.rpc('prRefresh')
+  await until(async () => merges() === 1, 'merged once the agent is done')
+  // off for the project: the switch goes with it, and turning the project's on again merges nothing unasked
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { land: false } } })
+  assert.equal((await rig.rpc('state')).workspaces[0].autoLand, undefined)
+  await rig.rpc('projectSet', { id: p.id, config: { pr: { land: true } } })
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, headRefOid: 'bbb' }))
+  await rig.rpc('prRefresh')
+  assert.equal(merges(), 1)
 })
 
 test('a workspace from a PR: gh pr checkout on its branch, named after it, its PR by URL, a fork’s as <owner>/<branch>; gh and branch errors', async t => {
@@ -421,4 +498,29 @@ test('a merged PR archives its workspace once it is clean (archiveMerged), not w
   await scans()
   assert.ok(await live(), 'once: an Undo stays')
   c.close()
+})
+
+test('Attach PR: one by URL or number becomes the workspace’s (asked for by URL); another branch’s only linked; a folder refused', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'login' })
+  await assert.rejects(rig.rpc('prAttach', { ws: ws.id, pr: '99' }), /PR 99 not found/)
+  await assert.rejects(rig.rpc('prAttach', { ws: ws.id, pr: ' ' }), /its URL or number/)
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 77, title: 'Login', url: 'https://github.com/o/r/pull/77', headRefName: ws.branch, baseRefName: 'main', isCrossRepository: false }))
+  assert.deepEqual(await rig.rpc('prAttach', { ws: ws.id, pr: '77' }), { number: 77, url: 'https://github.com/o/r/pull/77', linked: false })
+  let w = (await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id)
+  assert.deepEqual([w.prUrl, w.prLinked], ['https://github.com/o/r/pull/77', undefined])
+  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').includes('gh pr view https://github.com/o/r/pull/77 --json number,state'), 'scanned by its URL')
+  // a PR on another branch: linked (its status, no switches: a push here wouldn't reach it)
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 78, title: 'Other', url: 'https://github.com/o/r/pull/78', headRefName: 'someone-else', baseRefName: 'main', isCrossRepository: false }))
+  assert.equal((await rig.rpc('prAttach', { ws: ws.id, pr: 'https://github.com/o/r/pull/78' })).linked, true)
+  w = (await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id)
+  assert.deepEqual([w.prUrl, w.prLinked], ['https://github.com/o/r/pull/78', true])
+  const folder = join(rig.home, 'plain')
+  mkdirSync(folder)
+  const fp = await rig.rpc('projectAdd', { path: folder })
+  const fw = await rig.rpc('wsNew', { project: fp.id, preset: 'none' })
+  await assert.rejects(rig.rpc('prAttach', { ws: fw.id, pr: '77' }), /only a git project/)
 })

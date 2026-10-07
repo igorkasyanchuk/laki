@@ -262,3 +262,29 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
   const v = JSON.parse((await rig.cli('ls', '--json')).out)
   assert.ok(v.workspaces.some((w: any) => w.id === 'mcp-ws'))
 })
+
+test('/laki:new: claude tabs get Laki’s plugin (its new command); laki new . is the tab’s own project', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const plugin = join(rig.data, 'claude-plugin')
+  assert.equal(JSON.parse(readFileSync(join(plugin, '.claude-plugin', 'plugin.json'), 'utf8')).name, 'laki')
+  const cmd = readFileSync(join(plugin, 'commands', 'new.md'), 'utf8')
+  assert.match(cmd, /^---\ndescription: /)
+  assert.match(cmd, /\$ARGUMENTS/)
+  assert.match(cmd, / new \. --preset <agent> --prompt '<prompt>'/)
+  const run = await until(() => rig.fakeLog().find(l => l.bin === 'claude'), 'claude')
+  assert.equal(run.args[run.args.indexOf('--plugin-dir') + 1], plugin)
+  // in a tab: . is its project; elsewhere it says so
+  const here = await rig.cliIn(undefined, 'new', '.', '--preset', 'codex', '--prompt', 'add the export button')
+  assert.notEqual(here.code, 0)
+  assert.match(here.err, /only in a Laki tab/)
+  rig.env.LAKI_WORKSPACE = ws.id
+  const made = await rig.cli('new', '.', '--preset', 'codex', '--prompt', 'add the export button')
+  delete rig.env.LAKI_WORKSPACE
+  assert.equal(made.code, 0, made.err)
+  const v = await rig.rpc('state')
+  const w = v.workspaces.find((x: { id: string }) => x.id === 'add-the-export-button')
+  assert.deepEqual([w?.project, w?.kind], [p.id, 'worktree'])
+  assert.equal(v.tabs.find((x: { workspace: string }) => x.workspace === w.id)?.preset, 'codex')
+})

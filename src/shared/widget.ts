@@ -132,7 +132,24 @@ table { width: 100%; border-collapse: collapse; } th { text-align: left; font-we
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--line, #232833); vertical-align: top; }
 button { font: inherit; color: inherit; background: var(--hover, #1b2029); border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); padding: 3px 10px; cursor: pointer; }
 [data-busy] { opacity: 0.6; cursor: progress; }
-p { margin: 0 0 10px; }`
+p { margin: 0 0 10px; }
+.row { display: flex; align-items: center; gap: 6px; min-width: 0; } .col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.grow { flex: 1; min-width: 0; } .wrap { flex-wrap: wrap; } .fill { height: 100%; } .center { justify-content: center; align-items: center; text-align: center; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel { background: var(--hover, #1b2029); border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); padding: 8px 10px; }
+.title { font-weight: 600; } .sub { color: var(--muted, #7a8294); font-size: 11px; }
+.link { color: var(--fg, #d5d9e3); } .link:hover { color: var(--accent, #7aa2f7); text-decoration: none; }
+.linkbar { display: flex; flex-wrap: wrap; align-items: center; row-gap: 2px; padding-left: 0; overflow: hidden; }
+.linkbar > * { margin-left: -1px; padding: 1px 9px; border-left: 1px solid var(--line, #232833); color: var(--muted, #7a8294); line-height: 18px; white-space: nowrap; max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+.linkbar > a:hover { color: var(--fg, #d5d9e3); background: var(--hover, #1b2029); text-decoration: none; }
+.linkbar.spread > * { flex: 1 1 auto; text-align: center; }
+button.primary { background: var(--accent, #7aa2f7); border-color: transparent; color: var(--accent-fg, #fff); font-weight: 600; }
+button.quiet { background: none; border-color: transparent; color: var(--muted, #7a8294); } button.quiet:hover { background: var(--hover, #1b2029); color: var(--fg, #d5d9e3); }
+button.danger { color: var(--error, #f7768e); } button.sm { padding: 1px 7px; font-size: 11px; } button:disabled { opacity: 0.5; cursor: default; }
+.list { list-style: none; margin: 0; padding: 0; } .list > li, .item { display: flex; align-items: center; gap: 8px; min-width: 0; padding: 5px 2px; border-bottom: 1px solid var(--line, #232833); } .list > li:last-child, .item:last-child { border-bottom: none; }
+.badge { display: inline-block; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--accent, #7aa2f7); color: var(--accent-fg, #fff); font-size: 10.5px; line-height: 16px; text-align: center; font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; flex: none; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.empty { color: var(--muted, #7a8294); text-align: center; padding: 10px; }`
 
 // what a widget asks the app to show (`laki.toast`, `laki.modal` in a JS widget's page, or an action that prints it
 // as JSON): a toast, bottom right, and a dialog with buttons, each running one of its actions (arg), opening a link

@@ -5,6 +5,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type M
 import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { Folded, Markdown } from './MarkdownView'
+import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, toCsv } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
@@ -424,7 +425,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   )
 }
 
-function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct) => void }) {
+function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void }) {
   const pr = p.w.pr
   const [threads, err, reload] = useLoad(p.api.threads, `${p.w.id}#${pr?.number ?? ''}`, 60000)
   const said = (threads ?? []).filter(t => t.comments.length)
@@ -503,7 +504,7 @@ export function SidePanel(p: {
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: FixWhat) => void
-  onAct: (act: PRAct) => void
+  onAct: (act: PRAct, method?: MergeMethod) => void
 }) {
   const tabs = TABS.filter(t => p.git || t.id === 'files' || t.id === 'preview')
   const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
@@ -570,6 +571,12 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   const stage = useRef<HTMLDivElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<any>(null) // the webview element
+  const [parked, setParked] = useState(false) // stopped in Settings › Resources (laki-stop): its page unloaded until Load
+  useEffect(() => {
+    const f = (e: Event) => (e as CustomEvent).detail === 'preview' && setParked(true)
+    window.addEventListener('laki-stop', f)
+    return () => window.removeEventListener('laki-stop', f)
+  }, [])
   const pickSize = (s: Size) => {
     setSize(s)
     setTyped(s ? `${s.w}×${s.h}` : '')
@@ -601,7 +608,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
   }
   const go = () => load(previewUrl(addr, port))
   useEffect(() => {
-    if (!bridge || !host.current) return
+    if (!bridge || !host.current || parked) return
     const v = document.createElement('webview') as any
     v.setAttribute('src', url)
     v.setAttribute('partition', 'persist:preview') // its own cookies, kept: a dev app's sign-in stays
@@ -622,7 +629,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
       v.remove()
       view.current = null
     }
-  }, [])
+  }, [parked])
   const capture = () => {
     const id = on(v => v.getWebContentsId())
     if (bridge?.capture && id) bridge.capture(id).then(data => setShot({ data, url: on(v => v.getURL()) || url }), e => setErr(String(e?.message ?? e)))
@@ -652,7 +659,7 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
       <div className="sp-tools web-tools">
         {bridge && <IconButton icon="back" title="Back" onClick={() => on(v => v.goBack())} />}
         {bridge && <IconButton icon="forward" title="Forward" onClick={() => on(v => v.goForward())} />}
-        <IconButton icon="refresh" title="Reload" onClick={() => (setErr(''), bridge ? on(v => v.reload()) : setN(x => x + 1))} />
+        <IconButton icon="refresh" title="Reload" onClick={() => (setErr(''), parked ? setParked(false) : bridge ? on(v => v.reload()) : setN(x => x + 1))} />
         <input value={addr} spellCheck={false} placeholder="localhost:3000/ · :5173 · example.com" data-tip="A path on this port (/x), another port (:5173), or any address" onChange={e => setAddr(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} onFocus={e => e.target.select()} />
         <IconButton icon="devices" title="Sizes: a phone's, a tablet's, HD…" on={sizes} onClick={() => (sizes && pickSize(null), setSizes(!sizes))} />
         {bridge && <IconButton icon="pick" title={picking ? 'Picking: click an element (Esc stops)' : "Pick an element: its CSS selector into the agent's prompt"} on={!!picking} onClick={pick} />}
@@ -691,6 +698,11 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
       )}
       {shot && <ShotBox shot={shot} api={api} onClose={() => setShot(null)} />}
       {err && <div className="warn small pad">{err}</div>}
+      {parked && (
+        <div className="muted small pad">
+          Unloaded to free memory. <button className="small" onClick={() => setParked(false)}>Load it again</button>
+        </div>
+      )}
       <div className={`web-body ${size ? 'sized' : ''}`} ref={stage}>
         <div className="web-host" ref={host} style={size ? { width: size.w, height: size.h, transform: `scale(${k})` } : undefined}>
           {!bridge && <iframe key={n} className="web-view" src={url} title="Preview" />}

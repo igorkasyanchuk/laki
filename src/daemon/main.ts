@@ -3,7 +3,7 @@
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
 import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -45,7 +45,9 @@ function takeLock(): boolean {
         pid = Number(readFileSync(lockPath, 'utf8').trim())
       } catch {}
       if (pid && pid !== process.pid && isDaemon(pid)) return false
-      rmSync(lockPath, { force: true }) // stale: dead, or its pid now belongs to another program
+      try {
+        unlinkSync(lockPath) // stale: dead, or its pid now belongs to another program (a link to nothing too: rmSync follows it)
+      } catch {}
     }
     return false
   } finally {
@@ -133,6 +135,8 @@ const api: Record<string, Handler> = {
   prFix: p => core.prFix(p),
   logs: p => core.logs(p), // development mode's: ws:<id> or widget:<id>
   progress: p => core.progress(p),
+  prAttach: p => core.prAttach(p), // the app's Attach PR: { ws, pr: a URL or number }
+  phoneTick: () => core.phoneTick(), // answers from the phone now (tests: not every 5 s)
   prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
   webhookTest: p => core.webhookTest(p),
   portKill: p => core.portKill(p),

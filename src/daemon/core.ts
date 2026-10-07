@@ -10,10 +10,10 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
-import { pushTo } from './push.ts'
+import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
 import { scanWidgets, widgetDir, widgetHome, widgetKey, widgetsView, widgetTick } from './widgets.ts'
 
@@ -162,8 +162,35 @@ function hookFiles(h: Hooks): Record<string, string> {
   }
 }
 
+// /laki:new in claude tabs: a plugin Laki loads with --plugin-dir (agentCmd; this Mac's only: a host has no laki CLI),
+// its one command a new session for a task: a new workspace in this project (laki new .) with the agent named
+const LAKI_CLI = `/usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')}`
+const claudePlugin = (): Record<string, string> => ({
+  'claude-plugin/.claude-plugin/plugin.json': JSON.stringify({ name: 'laki', description: "Laki's commands for its tabs: /laki:new", author: { name: 'Laki' } }, null, 2),
+  'claude-plugin/commands/new.md': `---
+description: A new Laki session for a task, in a workspace of its own in this project, with codex, claude or another agent
+argument-hint: <the task> [with codex | claude | gemini | grok | opencode]
+allowed-tools: Bash(${LAKI_CLI} new:*)
+---
+Start a new Laki session for this request: $ARGUMENTS
+
+A session is a new workspace in this project (a git worktree of its own on a new branch; in a folder that isn't git,
+another session in it) with an agent started on the task. This session goes on as it is: don't do the task here.
+
+1. The agent: the one the request names (claude, codex, gemini, grok or opencode); none named: claude.
+2. The prompt: the task as the new agent needs it without this conversation: what to do, the files and facts from
+   here that matter, how to tell it's done. Leave out the agent's name and "start a new session".
+3. Run it, one command (the prompt in single quotes, each ' in it written as '\\''):
+
+       ${LAKI_CLI} new . --preset <agent> --prompt '<prompt>'
+
+   \`--name <short-name>\` names the workspace, \`--base <branch>\` starts it from another branch.
+4. Say in one line what it made: the workspace id it printed, and the agent.
+`,
+})
+
 export function writeHooks() {
-  for (const [f, text] of Object.entries(hookFiles(localHooks))) {
+  for (const [f, text] of Object.entries({ ...hookFiles(localHooks), ...claudePlugin() })) {
     mkdirSync(dirname(join(dir, f)), { recursive: true })
     writeFileSync(join(dir, f), text)
   }
@@ -424,7 +451,7 @@ async function uniqueWsId(want: string, proj?: Project) {
 const hasDir = async (proj: Project, id: string) =>
   proj.host
     ? exec({ host: proj.host, path: '/' }, 'test', ['-e', `${(await hostUp(proj.host)).dir}/worktrees/${proj.id}/${id}`]).then(() => true, () => false)
-    : existsSync(join(dir, 'worktrees', proj.id, id))
+    : existsSync(join(worktreesOf(proj), id))
 
 // allocPort: 3100 + n*10, the first not taken by another live workspace
 export function allocPort() {
@@ -483,9 +510,10 @@ function actionsOk(l: unknown): RunAction[] | undefined {
   return ok.length ? ok.map(a => ({ name: a.name, target: a.target, text: a.text })) : undefined
 }
 
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[] }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string }) {
   const p = findProject(ref)
   if (o.name?.trim()) p.name = o.name.trim()
+  if (typeof o.notes === 'string') p.notes = o.notes.trim() ? o.notes.slice(0, 100000) : undefined
   if (Array.isArray(o.seps)) {
     const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}) }))
     p.seps = seps.length ? seps : undefined
@@ -502,11 +530,33 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       actions: actionsOk(o.config.actions),
       templates: templatesOk(o.config.templates),
       env: Object.keys(env).length ? env : undefined,
+      worktrees: typeof o.config.worktrees === 'string' && o.config.worktrees.trim() ? o.config.worktrees.trim().slice(0, 1000) : undefined,
+      pr: prAllowOk(o.config.pr),
+      mergeMethod: p.config?.mergeMethod, // prAct's only: a page opened before a merge would send an older one
     }
+    // merge when green off for the project: its workspaces' switches go too, so turning it on again merges nothing unasked
+    if (!prAllows(p.config, 'land')) for (const w of state.workspaces) if (w.project === p.id) w.autoLand = undefined
   }
   save()
   changed()
   return p
+}
+
+// a project's PR switches: only the ones turned from their default (prAllows)
+function prAllowOk(a: unknown): PRAllow | undefined {
+  if (!a || typeof a !== 'object') return undefined
+  const r = Object.fromEntries((['approve', 'close', 'merge', 'land'] as const).filter(k => typeof (a as PRAllow)[k] === 'boolean' && (a as PRAllow)[k] !== (k !== 'land')).map(k => [k, (a as PRAllow)[k]]))
+  return Object.keys(r).length ? r : undefined
+}
+
+// where a project's new worktrees go: its own folder (the app's project settings; relative: to the repo), else
+// Settings' root with a folder per project, else <data>/worktrees/<project>. ~ is the home folder. A host's stay
+// in its ~/.laki-host (ponytail: no folder of choice there). Workspaces keep their path: a change moves none
+const tilde = (p: string) => p.replace(/^~(?=\/|$)/, homedir())
+function worktreesOf(proj: Project) {
+  const own = proj.config?.worktrees?.trim()
+  const root = typeof state.settings?.worktrees === 'string' ? state.settings.worktrees.trim() : ''
+  return own ? resolve(proj.path, tilde(own)) : root ? join(resolve(homedir(), tilde(root)), proj.id) : join(dir, 'worktrees', proj.id)
 }
 
 const setupMarker = (ws: Workspace) => join(runDir, `${ws.id}.setup`)
@@ -619,7 +669,7 @@ async function slot<T>(host: string, f: () => Promise<T>): Promise<T> {
 function sshSays(host: string, err: string) {
   const last = err.trim().split('\n').filter(l => l.trim() && !/^warning:/i.test(l)).at(-1) ?? ''
   if (/host key verification failed|remote host identification/i.test(err)) return `ssh ${host}: its host key isn't known (or changed): ssh ${host} once in a terminal`
-  if (/permission denied/i.test(last)) return `ssh ${host}: ${last}. Laki signs in with your SSH keys or agent, never a password`
+  if (/permission denied/i.test(last)) return `ssh ${host}: ${last.replace(/\.+$/, '')}. Laki signs in with your SSH keys or agent, never a password` // ssh's line ends with its own .
   return `ssh ${host}: ${last || "can't connect"}`
 }
 
@@ -846,7 +896,7 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   let argv: string[]
   let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
   if (tab.preset === 'claude') {
-    argv = ['claude', '--settings', join(h.dir, 'claude-settings.json')]
+    argv = ['claude', '--settings', join(h.dir, 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
   } else if (tab.preset === 'codex') {
@@ -889,6 +939,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   sessions.get(tab.id)?.kill()
   asleep.delete(tab.id)
   const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
+  wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
   sessions.set(tab.id, s)
   const r = rtOf(tab.id)
   // a hook on the host: OSC 7717 ; key ; state ; base64 JSON. Only with this start's key: a file shown in the tab
@@ -985,7 +1036,8 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
 // answer: a choice of the menu a waiting agent shows (n, or the first or last), as its arrows and Enter would pick it;
 // one at a time per tab, and not again for a second after (a double click, Allow and a click: the menu isn't redrawn yet)
 const answering = new Set<string>()
-export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'last' }) {
+// label: the choice's words as they were asked (a notification's, a phone's button): refused when n says something else now
+export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'last'; label?: string }) {
   const t = findTab(p.tab)
   const s = sessions.get(t.id)
   if (!s || s.exited) throw new Error(`${t.name} isn't running`)
@@ -998,6 +1050,7 @@ export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'las
     if (!a) throw new Error(`${t.name} isn't asking anything with choices now`)
     const n = p.n ?? (p.pick === 'last' ? a.options.at(-1)!.n : a.options[0].n)
     if (!a.options.some(o => o.n === n)) throw new Error(`${t.name} has no choice ${n}`)
+    if (p.label !== undefined && a.options.find(o => o.n === n)!.label !== p.label) throw new Error(`${t.name} asks something else now`)
     const key = `\x1b${s.appCursor ? 'O' : '['}${n > a.at ? 'B' : 'A'}`
     // one key at a time: a TUI reads a burst as one unknown key
     for (let i = 0; i < Math.abs(n - a.at); i++) input(t.id, key), await new Promise(r => setTimeout(r, 40))
@@ -1029,8 +1082,9 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 }
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; muted?: boolean; pinned?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean }) {
   const w = findWs(o.id)
+  if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.name !== undefined) {
     const name = Array.from(o.name.trim()).slice(0, 60).join('') // by character: an emoji stays whole
@@ -1043,11 +1097,13 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.autoFix !== undefined) w.autoFix = o.autoFix || undefined
   if (o.autoReview !== undefined) w.autoReview = o.autoReview || undefined
   if (o.autoMerge !== undefined) w.autoMerge = o.autoMerge || undefined
+  if (o.autoLand && !w.autoLand && w.fix?.land) retry.add(`${w.id}:land`) // the head it tried may go again
+  if (o.autoLand !== undefined) w.autoLand = o.autoLand || undefined
   if (o.muted !== undefined) w.muted = o.muted || undefined
   if (o.pinned !== undefined) w.pinned = o.pinned || undefined
   save()
   changed()
-  if (o.autoFix || o.autoReview || o.autoMerge) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
+  if (o.autoFix || o.autoReview || o.autoMerge || o.autoLand) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
   return w
 }
 
@@ -1262,7 +1318,27 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
   return made
 }
 
+// development mode's log of what making a workspace runs (key new: Settings › General's *Creation log*), each line in
+// the workspace's own log too once it has an id; a failure's message last
 export async function wsNew(o: NewWs): Promise<Workspace> {
+  const said: string[] = []
+  const step = (text: string | (() => string)) => {
+    if (!state.settings?.devMode) return // nothing built for a log no one keeps
+    const t = typeof text === 'function' ? text() : text
+    said.push(t)
+    devLog('new', `${o.project}: ${t}`)
+  }
+  step(() => `asked: ${JSON.stringify({ ...o, prompt: o.prompt && (o.prompt.length > 200 ? `${o.prompt.slice(0, 200)}…` : o.prompt) })}`)
+  try {
+    const ws = await makeWs(o, step)
+    for (const l of said) wsLog(ws, l)
+    return ws
+  } catch (e) {
+    step(`failed: ${firstLine(e)}`)
+    throw e
+  }
+}
+async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
   const proj = findProject(o.project)
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
@@ -1272,6 +1348,12 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   // the folder's own workspace (not a scheduled run's session): Local again is that one, as it is (asked again below:
   // another wsNew may make it meanwhile)
   const own = () => (o.local || proj.git === false ? state.workspaces.find(w => w.project === proj.id && w.kind === 'local' && !w.schedule) : undefined)
+  // an agent or a prompt asked for there: another local workspace beside it, with that agent (a folder has its own
+  // from the start, a shell: the new-workspace page's Create would give that back with no agent started)
+  if (own() && !o.another && (o.prompt?.trim() || (o.preset && o.preset !== 'none'))) {
+    o = { ...o, another: true, name: o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' ') }
+    step(`${own()!.id} is the folder's own workspace: another one beside it`)
+  }
   if (!own() || o.another) o = await fromPRLink(proj, o)
   const current = proj.git === false ? '' : await git(proj, 'rev-parse', '--abbrev-ref', 'HEAD')
   // a PR: the worktree on its head branch, named after it, its base the PR's, linked to it (by URL) for the PR status
@@ -1288,18 +1370,19 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   let ws: Workspace
   if (o.local || proj.git === false) {
     const have = own()
-    if (have && !o.another) return have
+    if (have && !o.another) return step(`${have.id}: the folder's own workspace, as it is`), have
     const id = await uniqueWsId(o.another ? slug(o.name || '') || proj.id : proj.id)
     ws = { id, project: proj.id, path: proj.path, ...(proj.host && { host: proj.host }), branch: current, base: current, kind: 'local', port: allocPort(), created: Date.now() }
   } else {
     const want = slug(o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' '))
     const id = await uniqueWsId(want, proj)
-    const path = proj.host ? `${(await hostUp(proj.host)).dir}/worktrees/${proj.id}/${id}` : join(dir, 'worktrees', proj.id, id)
+    const path = proj.host ? `${(await hostUp(proj.host)).dir}/worktrees/${proj.id}/${id}` : join(worktreesOf(proj), id)
     const at: At = { path, host: proj.host }
     let base = o.base || current
     let branch = `${branchPrefix()}${id}`
     if (!proj.host) mkdirSync(dirname(path), { recursive: true }) // git makes a host's
     const add = pr ? ['--detach', path] : [path, '-b', branch, base]
+    step(`git worktree add ${add.join(' ')} (in ${proj.path})`)
     await git(proj, 'worktree', 'add', ...add).catch(e => {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
     })
@@ -1328,12 +1411,15 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
   save()
   forward(ws)
   const cfg = projectConfig(ws)
+  step(`${ws.id}: ${ws.kind} at ${ws.path}${ws.branch ? `, branch ${ws.branch}` : ''}, port ${ws.port}`)
   if (cfg.setup && ws.kind === 'worktree') {
+    step(`setup: ${cfg.setup}`)
     writeFileSync(setupMarker(ws), String(Date.now()))
     addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
   }
   try {
-    if (preset !== 'none') addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort })
+    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort }).name} (its command: the workspace's Logs)`)
+    else step('no agent (none)')
   } finally {
     changed() // the workspace is made, even when its agent didn't start
   }
@@ -2008,7 +2094,7 @@ export function stopTunnels(ws?: string) {
 // one email in Settings: Cloudflare Access sends it a one-time code, and the link carries a token of its own. It
 // ends after the hours asked for (remoteTick; 0: forever, no until), on remoteStop, or with the daemon; a new token each
 // time, so a stopped link is dead.
-export const REMOTE_HOURS = [1, 2, 4, 8, 24, 0]
+export const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0]
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf }
 let remote: RemoteRun | undefined
@@ -2098,6 +2184,25 @@ export function prTick(now = Date.now()) {
   return scanPRs()
 }
 
+// Attach PR (the app's, for a workspace on a branch with no PR found): a PR by its URL or number in the repo, asked for
+// by URL from then on; only linked (prLinked: no switches, as a prompt's) when its head isn't this workspace's branch
+export async function prAttach(o: { ws: string; pr: string }) {
+  const w = findWs(o.ws)
+  const proj = findProject(w.project)
+  if (proj.git === false) throw new Error('a folder has no pull requests: only a git project')
+  if (!o.pr?.trim()) throw new Error('a PR: its URL or number')
+  const pr = await prHead(proj, o.pr.trim())
+  const head = pr.isCrossRepository && pr.headRepositoryOwner?.login ? `${pr.headRepositoryOwner.login}/${pr.headRefName}` : pr.headRefName
+  w.prUrl = pr.url
+  w.prLinked = head === w.branch ? undefined : true
+  prs.delete(w.id)
+  wsLog(w, `PR: #${pr.number} attached${w.prLinked ? `, only linked (its branch is ${head})` : ''}`)
+  save()
+  changed()
+  void scanPRs()
+  return { number: pr.number, url: pr.url, linked: !!w.prLinked }
+}
+
 let prScan: Promise<void> | null = null
 let prAgain = false
 export function scanPRs(): Promise<void> {
@@ -2117,7 +2222,7 @@ export function scanPRs(): Promise<void> {
   return prScan
 }
 
-const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,mergeable,additions,deletions,body,updatedAt,statusCheckRollup'
+const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,mergeable,mergeStateStatus,additions,deletions,body,updatedAt,statusCheckRollup'
 
 // who you are on GitHub, per host ('': this Mac): gh api user's login, kept 10 minutes (gh auth switch), a failure
 // not at all
@@ -2151,6 +2256,7 @@ async function scanPR(ws: Workspace) {
       head: j.headRefOid,
       review: j.reviewDecision || undefined,
       conflict: j.mergeable === 'CONFLICTING' ? true : j.mergeable === 'MERGEABLE' ? false : undefined, // UNKNOWN for a while after a push
+      ready: j.mergeStateStatus && j.mergeStateStatus !== 'UNKNOWN' ? j.mergeStateStatus === 'CLEAN' || j.mergeStateStatus === 'HAS_HOOKS' : undefined, // GitHub would merge it now: required checks and reviews in, not behind
       base: j.baseRefName,
       additions: j.additions,
       deletions: j.deletions,
@@ -2198,11 +2304,12 @@ const retry = new Set<string>() // `<ws>:ci`, `<ws>:merge`: a switch turned on a
 
 async function autoPR(ws: Workspace, pr: PR) {
   // a PR only linked (prLinked): its branch isn't this workspace's, so the agent's push wouldn't reach it
-  if (!(ws.autoFix || ws.autoReview || ws.autoMerge)) return
+  if (!(ws.autoFix || ws.autoReview || ws.autoMerge || ws.autoLand)) return
   if (pr.state !== 'OPEN' || ws.prLinked) return wsLog(ws, `switches: nothing to do, the PR is ${ws.prLinked ? 'only linked (its branch is not this workspace\'s)' : pr.state}`)
   const f: PRFix = ws.fix?.pr === pr.number ? { ...ws.fix } : { pr: pr.number }
   if (retry.delete(`${ws.id}:ci`)) Object.assign(f, { ci: undefined, tries: 0 }) // and the current commit's failure goes again
   if (retry.delete(`${ws.id}:merge`)) Object.assign(f, { merge: undefined, merges: 0 })
+  if (retry.delete(`${ws.id}:land`)) f.land = undefined
   const max = state.settings?.prTries || PR_TRIES
   if (ws.autoFix) {
     if (pr.checks === 'pass') (f.tries = 0), wsLog(ws, 'fix CI: checks pass')
@@ -2214,7 +2321,7 @@ async function autoPR(ws: Workspace, pr: PR) {
         Object.assign(f, { ci: pr.head, tries })
       } else if (await prFix({ ws: ws.id, what: 'ci' }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), wsLog(ws, `fix CI: not sent (try ${tries} of ${max}): ${e.message}`), false)))
         Object.assign(f, { ci: pr.head, tries }) // recorded once sent: no agent yet means the next scan tries again
-    } else wsLog(ws, pr.checks === 'fail' ? `fix CI: already sent for ${pr.head?.slice(0, 7)} (try ${f.tries ?? 0} of ${max}): waiting for a push` : `fix CI: checks ${pr.checks || 'none yet'}: waiting`)
+    } else wsLog(ws, pr.checks === 'fail' && !pr.head ? 'fix CI: failing, its head commit not known yet: waiting' : pr.checks === 'fail' ? `fix CI: already sent for ${pr.head?.slice(0, 7)} (try ${f.tries ?? 0} of ${max}): waiting for a push` : `fix CI: checks ${pr.checks || 'none yet'}: waiting`)
   }
   if (ws.autoMerge) {
     // ponytail: once per head commit, so a base that moves while the agent merges doesn't queue another; one that
@@ -2251,6 +2358,21 @@ async function autoPR(ws: Workspace, pr: PR) {
       }
     else if (k !== null) f.review = k // resolved threads drop out of the key
   }
+  if (ws.autoLand) {
+    const proj = state.projects.find(p => p.id === ws.project)
+    // its agent at work (a review just sent, a fix under way): a push may come, so not under it
+    const working = tabsOf(ws.id).some(t => tracked(t) && isLive(t) && (rtOf(t.id).status === 'running' || !!t.queue?.length))
+    const not = !prAllows(proj?.config, 'land') ? "off in the project's settings" : working ? 'its agent is working: a push may come' : pr.draft ? 'a draft' : pr.checks !== 'pass' ? `checks ${pr.checks || 'none yet'}` : pr.conflict !== false ? (pr.conflict ? 'conflicts' : 'GitHub is still working out whether it merges') : pr.review && pr.review !== 'APPROVED' ? `review ${pr.review}` : pr.ready === false ? 'GitHub blocks it still (a required check or review to come, or behind its base)' : pr.head === f.land ? `tried ${pr.head?.slice(0, 7)} already` : ''
+    if (not) wsLog(ws, `merge when green: not yet, ${not}`)
+    else {
+      f.land = pr.head // once per head commit: a failure waits for a push (or a click)
+      const how = proj?.config?.mergeMethod ?? 'squash'
+      await merge(ws, pr, how, true).then(
+        () => (log(`merged ${ws.id}: PR #${pr.number} (${how}), green`), wsLog(ws, `merge when green: merged (${how})`)),
+        e => (wsLog(ws, `merge when green: failed: ${e.message}`), overToYou(ws, `Merge when green failed: ${e.message}`)),
+      )
+    }
+  }
   if (JSON.stringify(f) !== JSON.stringify(ws.fix)) {
     ws.fix = f
     save()
@@ -2279,7 +2401,63 @@ function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
   pushed.set(tab.id, kind)
   // a wait's message; a done turn's last line that asks something
   const question = (kind === 'waiting' ? text : text.split('\n').reverse().find(l => l.trim().endsWith('?')) ?? '').trim().slice(0, 500)
-  pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined }).catch(e => log(`push ${tab.id}: ${e.message}`))
+  // a wait goes a moment later, with its menu (drawn after the hook, often), unless it's over by then
+  const go = () => {
+    const s = sessions.get(tab.id)
+    if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited)) return
+    const ask = kind === 'waiting' ? askOf(s!.screenText(16)) : undefined
+    const nonce = ask && w.answer && (w.format === 'telegram' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined
+    if (nonce) awaiting.set(nonce, { tab: tab.id, key: JSON.stringify(ask!.options), until: Date.now() + 864e5 }), listen(w)
+    pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined, options: ask?.options, nonce }).catch(e => log(`push ${tab.id}: ${e.message}`))
+  }
+  if (kind === 'waiting') setTimeout(go, 800)
+  else go()
+}
+
+// Answer from the phone (webhook.answer): a push with buttons leaves its nonce here, with the tab and its choices as
+// pushed, until a tap answers it, the tab stops waiting or asks something else, or a day goes by. While any is here,
+// phoneTick asks Telegram or ntfy for taps every 5 s; none: it stops
+const awaiting = new Map<string, { tab: string; key: string; until: number }>()
+let tapCursor = '' // replies()'s: Telegram's next update, ntfy's last message (a unix time at first)
+let tapTimer: NodeJS.Timeout | undefined
+let tapping = false
+let tapFailed = '' // the last failure, logged once until a poll works
+let tapFor = '' // the webhook tapCursor is for: another one (Settings changed meanwhile) starts over
+const tapStart = (w: Webhook) => ((tapFor = `${w.format}|${w.url}`), (tapCursor = w.format === 'telegram' ? '' : String(Math.floor(Date.now() / 1000) - 5)))
+function listen(w: Webhook) {
+  if (tapTimer) return
+  tapStart(w)
+  tapTimer = setInterval(() => void phoneTick(), 5000)
+}
+export async function phoneTick() {
+  if (tapping) return
+  const w = state.settings?.webhook
+  for (const [k, a] of awaiting) if (a.until < Date.now() || !state.tabs.some(t => t.id === a.tab) || rtOf(a.tab).status !== 'waiting') awaiting.delete(k)
+  if (!awaiting.size || !w?.answer || !w.url) return void (clearInterval(tapTimer), (tapTimer = undefined), awaiting.clear())
+  if (tapFor !== `${w.format}|${w.url}`) tapStart(w)
+  tapping = true
+  try {
+    const r = await replies(w, tapCursor)
+    tapCursor = r.cursor
+    tapFailed = ''
+    for (const tap of r.taps) {
+      const a = awaiting.get(tap.nonce)
+      if (!a) continue
+      awaiting.delete(tap.nonce)
+      const s = sessions.get(a.tab)
+      const now = s && !s.exited && rtOf(a.tab).status === 'waiting' ? askOf(s.screenText(16)) : undefined
+      const o = now && JSON.stringify(now.options) === a.key ? now.options.find(x => x.n === tap.n) : undefined
+      if (!o) continue // it moved on
+      await answer({ tab: a.tab, n: o.n, label: o.label }).then(
+        () => log(`answered ${a.tab} from the phone: ${o.label}`),
+        e => log(`answer from the phone ${a.tab}: ${e.message}`),
+      )
+    }
+  } catch (e) {
+    if ((e as Error).message !== tapFailed) log(`answers from the phone: ${(tapFailed = (e as Error).message)}`)
+  } finally {
+    tapping = false
+  }
 }
 
 // Settings' Send test: the webhook as the page has it, answered (not fired and forgotten)
@@ -2885,20 +3063,41 @@ export async function prComment(o: { ws: string; path: string; line: number; sid
   return { url: c.html_url as string | undefined }
 }
 
-// prAct: the PR approved or closed (the side panel's buttons, the status bar's menu, after a confirm), by gh as you;
-// then a scan, for its new state
-export async function prAct(o: { ws: string; act: 'approve' | 'close' }) {
+// prAct: the PR approved, closed or merged (the side panel's buttons, the status bar's menu, after a confirm), by gh
+// as you, when the project's settings allow it (prAllows); a merge's way becomes the project's next default. Then a
+// scan, for its new state
+export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge'; method?: MergeMethod; deleteBranch?: boolean }) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
-  if (o.act !== 'approve' && o.act !== 'close') throw new Error('approve or close?')
+  if (o.act !== 'approve' && o.act !== 'close' && o.act !== 'merge') throw new Error('approve, close or merge?')
+  const proj = state.projects.find(p => p.id === ws.project)
+  if (!prAllows(proj?.config, o.act)) throw new Error(`${o.act === 'merge' ? 'merging' : o.act === 'close' ? 'closing' : 'approving'} PRs is off for this project: its settings' Pull requests`)
   if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
+  if (o.act === 'merge') {
+    const how = MERGE_METHODS.includes(o.method!) ? o.method! : 'squash'
+    if (proj && proj.config?.mergeMethod !== how) (proj.config = { ...proj.config, mergeMethod: how }), save(), changed()
+    await merge(ws, pr, how, o.deleteBranch !== false)
+    return {}
+  }
   const args = o.act === 'approve' ? ['pr', 'review', '--approve', '--', pr.url] : ['pr', 'close', '--', pr.url]
   await exec(ws, 'gh', args, { timeout: 30000 }).catch(e => {
     throw new Error(ghSays(e, `PR #${pr.number}`))
   })
   void scanPRs()
   return {}
+}
+
+// gh pr merge by the PR's URL. -R (its repo, from the URL) keeps gh off this worktree's git: without it,
+// --delete-branch also checks out the default branch here and deletes the local one. GitHub deletes the head branch
+// (not a fork's). Then a scan, a moment later: this may run inside one (autoPR)
+async function merge(ws: Workspace, pr: PR, how: MergeMethod, deleteBranch: boolean) {
+  const u = new URL(pr.url)
+  const repo = `${u.host}/${u.pathname.split('/').slice(1, 3).join('/')}`
+  await exec(ws, 'gh', ['pr', 'merge', `--${how}`, ...(deleteBranch ? ['--delete-branch'] : []), '-R', repo, '--', pr.url], { timeout: 60000 }).catch(e => {
+    throw new Error(ghSays(e, `PR #${pr.number}`))
+  })
+  setTimeout(() => void scanPRs(), 1000)
 }
 
 // prDiff: the PR's whole diff as GitHub has it (gh pr diff), in diff's shape: Changes' PR view, for a workspace that

@@ -1,0 +1,17 @@
+/* the floating bubbles' circles (floater.html), also Settings' previews of their styles: [data-fstyle] on a parent
+   says how a working agent's circle looks (glow, the default; gradient; arc; still); a waiting one pulses in each */
+.fl-dot { --c: var(--running); position: relative; width: 28px; height: 28px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 55%, transparent); display: grid; place-items: center; font: 600 10px/1 var(--font, var(--ui-font, system-ui)); letter-spacing: 0.02em; color: var(--ink, var(--fg)); background: color-mix(in srgb, var(--c) 12%, var(--bg)); }
+.fl-dot.waiting { --c: var(--waiting); border-color: var(--c); animation: fl-pulse 1.8s ease-in-out infinite; }
+@keyframes fl-pulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); } }
+/* glow: a soft halo, breathing */
+[data-fstyle='glow'] .fl-dot.running { animation: fl-glow 2.8s ease-in-out infinite; }
+@keyframes fl-glow { 0%, 100% { box-shadow: 0 0 3px 0 color-mix(in srgb, var(--c) 25%, transparent); } 50% { box-shadow: 0 0 9px 1px color-mix(in srgb, var(--c) 45%, transparent); } }
+/* gradient: the agent's color turning slowly inside */
+@property --fl-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+[data-fstyle='gradient'] .fl-dot.running { border-color: color-mix(in srgb, var(--c) 35%, transparent); background: conic-gradient(from var(--fl-a), color-mix(in srgb, var(--c) 38%, var(--bg)), var(--bg) 40%, color-mix(in srgb, var(--c) 22%, var(--bg)) 70%, color-mix(in srgb, var(--c) 38%, var(--bg))); animation: fl-turn 5s linear infinite; }
+@keyframes fl-turn { to { --fl-a: 360deg; } }
+/* arc: an arc going round */
+[data-fstyle='arc'] .fl-dot.running::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid transparent; border-top-color: var(--c); animation: fl-spin 1.4s linear infinite; }
+@keyframes fl-spin { to { transform: rotate(360deg); } }
+/* still: the ring, nothing moving */
+@media (prefers-reduced-motion: reduce) { .fl-dot, .fl-dot::after { animation: none !important; } }

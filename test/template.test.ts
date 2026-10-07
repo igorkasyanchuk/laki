@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { csvSep, fillTemplate, importable, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
+import { csvSep, fillTemplate, importable, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -96,8 +96,9 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
 
   // Appearance's accent (text on it black or white, whichever reads) and corners, over the theme's; a bad color is skipped
   applyTheme({ theme: 'kraft', accent: '#ffe066', radius: '0px' })
-  assert.deepEqual([props.get('--accent'), props.get('--accent-fg'), props.get('--radius'), props.get('--bg')], ['#ffe066', '#000000', '0px', '#dcc39a'])
+  assert.deepEqual([props.get('--accent'), props.get('--accent-fg'), props.get('--radius'), props.get('--rs'), props.get('--bg')], ['#ffe066', '#000000', '0px', '0px', '#dcc39a'])
   applyTheme({ accent: '#1a237e' })
+  assert.equal(props.get('--rs'), undefined) // the theme's corners: each fixed radius its own
   assert.deepEqual([props.get('--accent'), props.get('--accent-fg')], ['#1a237e', '#ffffff'])
   applyTheme({ theme: 'kraft', accent: 'red;x' })
   assert.equal(props.get('--accent'), kraft.c!.accent)
@@ -138,6 +139,26 @@ test("the sidebar's timer: lengths as typed, its clock", () => {
   for (const bad of ['', 'soon', '0', '25 x', '25 parsecs', '-5', '25h', 'm', '1h 2'])
     assert.equal(parseDuration(bad), null, bad)
   assert.deepEqual([clock(0), clock(999), clock(65000), clock(3723000), clock(-5)], ['0:00', '0:01', '1:05', '1:02:03', '0:00'])
+})
+
+test('Send later: in a length, or at a time of day (today, tomorrow once past)', () => {
+  const m = 60000
+  const now = new Date(2026, 9, 7, 14, 10).getTime()
+  for (const [typed, ms] of [['10m', 10 * m], ['in 2h', 120 * m], ['1h 30m', 90 * m], ['45', 45 * m], ['at 15:30', 80 * m], ['15:30', 80 * m], ['3pm', 50 * m], ['at 3 PM', 50 * m], ['at 15', 50 * m], ['14:00', 24 * 60 * m - 10 * m], ['12am', (24 - 14) * 60 * m - 10 * m], ['at 9:05am', (24 - 14 + 9) * 60 * m - 5 * m]] as const)
+    assert.equal(parseLater(typed, now), ms, typed)
+  for (const bad of ['', 'later', 'at', 'at noon', '25:00', '13pm', '0am', 'at 7:75', '25h']) assert.equal(parseLater(bad, now), null, bad)
+})
+
+test("Send later's edit: its time again, read back to the same minute (ASCII digits in any locale); 1m once that minute began", () => {
+  const now = new Date(2026, 9, 7, 22, 40, 30).getTime()
+  for (const ahead of [5 * 60000, 3 * 3600000 + 17 * 60000, 23 * 3600000]) {
+    const at = now + ahead
+    assert.match(laterText(at, now), /^at \d{1,2}:\d{2}$/)
+    const back = parseLater(laterText(at, now), now)!
+    assert.ok(Math.abs(back - ahead) < 60000, `${ahead}: ${back}`) // past midnight too: tomorrow's
+  }
+  assert.equal(laterText(now + 90000, now), '1m')
+  assert.equal(laterText(now - 5000, now), '1m')
 })
 
 test('a settings file from another version: fields of the wrong kind left out, the rest (unknown ones too) in', () => {

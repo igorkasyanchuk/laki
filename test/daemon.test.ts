@@ -281,7 +281,7 @@ test('resume after a daemon restart: agents get --resume <id>, shells start fres
   await rig.start()
   await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length === 2, 'claude restarted')
   const again = rig.fakeLog().filter(l => l.bin === 'claude')[1]
-  assert.deepEqual(again.args.slice(2), ['--resume', tab.resumeId])
+  assert.deepEqual(again.args.slice(4), ['--resume', tab.resumeId])
   await until(() => rig.fakeLog().filter(l => l.bin === 'codex').length === 2, 'codex restarted')
   const cx = rig.fakeLog().filter(l => l.bin === 'codex')[1]
   assert.deepEqual(cx.args.slice(0, 2), ['resume', thread])
@@ -476,7 +476,7 @@ test('archive keeps the branch and resume ids; restore brings them back', async 
   assert.ok(!existsSync(ws.path))
   await rig.rpc('wsRestore', { id: ws.id })
   await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length === 2, 'claude resumed')
-  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[1].args.slice(2), ['--resume', id])
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[1].args.slice(4), ['--resume', id])
   v = await rig.rpc('state')
   assert.equal(v.workspaces[0].archived, false)
   assert.ok(existsSync(join(ws.path, 'README.md')))
@@ -484,7 +484,7 @@ test('archive keeps the branch and resume ids; restore brings them back', async 
   const fork = await rig.rpc('wsFork', { id: ws.id })
   assert.equal(fork.base, 'laki/keep')
   await until(() => rig.fakeLog().some(l => l.bin === 'claude' && l.args.includes('--fork-session')), 'forked claude')
-  assert.deepEqual(rig.fakeLog().find(l => l.args.includes('--fork-session')).args.slice(2), ['--resume', id, '--fork-session'])
+  assert.deepEqual(rig.fakeLog().find(l => l.args.includes('--fork-session')).args.slice(4), ['--resume', id, '--fork-session'])
 })
 
 test('usage limit from codex screen: ◷ until reset, then "continue"', async t => {
@@ -805,4 +805,21 @@ test('a model and effort go into the agent\'s flags (a wrong one makes nothing);
   await rig.rpc('tabNew', { ws: ws.id, preset: 'fast', model: 'haiku' })
   await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length > n, 'the preset\'s claude')
   assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[n].args.slice(-4), ['--model', 'sonnet', '--model', 'haiku'])
+})
+
+test('worktrees go to Settings’ folder (~: home), a folder per project, or the project’s own (relative: to the repo); made ones stay', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const home = rig.env.HOME
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.equal(a.path, join(rig.env.LAKI_HOME, 'worktrees', p.id, a.id))
+  await rig.rpc('settingsSet', { worktrees: '~/trees' })
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.equal(b.path, join(home, 'trees', p.id, b.id))
+  assert.ok(existsSync(join(b.path, '.git')))
+  await rig.rpc('projectSet', { id: p.id, config: { worktrees: '../wt' } })
+  const c = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.equal(c.path, join(realpathSync(home), 'wt', c.id)) // the repo's real path
+  const ws = (await rig.rpc('state')).workspaces
+  assert.deepEqual(ws.map((w: any) => w.path), [a.path, b.path, c.path])
 })

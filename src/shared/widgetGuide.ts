@@ -27,7 +27,7 @@ export const widgetFormat = () => `## widget.json
 }
 \`\`\`
 
-- \`size\`: cells [across 1–3, down 1–4] in the sidebar's grid; one cell is about 70×64 px. The user can change it.
+- \`size\`: cells [across 1–3, down 0.5 or 1–4] in the sidebar's grid; one cell is about 70×64 px, 0.5 a line 29 px tall. The user can change it.
 - \`every\`: minutes between fetches (default ${WIDGET_EVERY}); the user can change it. A fetch also runs when the widget is
   turned on, when its settings change, on Reload and from \`laki widget run <id>\`.
 - \`view\`: the full view's dialog, \`s\` (small), \`m\` (medium, the default) or \`l\` (large: for wide tables). The user
@@ -95,9 +95,15 @@ print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
   is false), \`{{date x}}\` (Sep 2, 2026), \`{{ago x}}\` (3 hours ago), \`{{spark list}}\` (a line chart of numbers, SVG).
   Names: \`data\` (the fetch's JSON), \`config\` (the settings, as in \`$LAKI_WIDGET_CONFIG\`), \`at\` (the last fetch, ms),
   \`error\`, \`full\`.
-- Ready-made classes: \`tile\`, \`num\`, \`label\`, \`muted\`, \`small\`, \`nowrap\`, \`bad\`, \`good\`, \`warn\`, \`tag\` (a pill, for
-  labels), \`spark\`; tables, links and buttons are styled. Colors: the app's theme variables, \`var(--fg)\`,
-  \`var(--muted)\`, \`var(--accent)\`, \`var(--error)\`, \`var(--done)\`, \`var(--waiting)\`, \`var(--line)\`, \`var(--bg)\`, \`var(--panel)\`.
+- Ready-made classes (use them before your own CSS: they follow the app's theme):
+  - a number: \`tile\` (centered), \`num\`, \`label\`; text: \`muted\`, \`small\`, \`nowrap\`, \`ellipsis\`, \`title\`, \`sub\`,
+    \`bad\`, \`good\`, \`warn\`; \`tag\` (a pill, for labels), \`badge\` (a count), \`dot\` (a status dot in the current color), \`spark\`;
+  - layout: \`row\`, \`col\`, \`grow\`, \`wrap\`, \`fill\`, \`center\`; \`panel\` (a card); \`list\` (a \`<ul>\` of rows) or
+    \`item\` rows; \`empty\` (nothing to show);
+  - links: \`link\` (one that reads as text), \`linkbar\` (plain links in a line with a rule between them, wrapping;
+    \`linkbar spread\`: they share the width);
+  - buttons: plain (secondary), \`primary\`, \`quiet\`, \`danger\`, \`sm\`; tables and links are styled too.
+- Colors: the app's theme variables, \`var(--fg)\`, \`var(--muted)\`, \`var(--accent)\`, \`var(--error)\`, \`var(--done)\`, \`var(--waiting)\`, \`var(--line)\`, \`var(--bg)\`, \`var(--panel)\`.
 - Links open in the browser. \`data-laki="refresh"\` on an element fetches again; \`data-run\` runs an action (above).
 - Without a \`<script>\` the widget is drawn inside the app: no scripts, frames, forms or \`on…\` attributes (they're removed).
 - With a \`<script>\` it's a JS widget: its page runs in a sandboxed frame with no network (no fetch, no external
