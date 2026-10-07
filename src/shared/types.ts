@@ -184,6 +184,10 @@ export type Settings = {
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
+  sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
+  progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)
+  devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
+  widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
 }
 
 // Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
@@ -193,7 +197,10 @@ export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | '
 export type ProjectLook = { font?: 'theme' | 'ui' | 'mono'; case?: 'theme' | 'upper' | 'none'; spacing?: string; size?: string; weight?: string }
 // the sidebar's lines and rows (Settings › Appearance) as CSS values, 'theme' (or unset): as the theme draws them;
 // labels: words beside its bottom buttons (unset: shown)
-export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; labels?: boolean }
+export type SideStyle = 'compact' | 'default' | 'extended' | 'cards' // Settings.tsx SIDE_STYLES
+// development mode's event log (core.ts devLog): n, how many times a line came again
+export type LogLine = { at: number; text: string; n?: number }
+export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; labels?: boolean }
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
 export type Todo = { id: string; project: string; text: string; at: number }
@@ -246,7 +253,8 @@ export type PR = {
 // ask: a waiting agent's numbered menu on its screen (a permission prompt, a question): the choices and the highlighted one
 export type Ask = { options: { n: number; label: string }[]; at: number }
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean }
+// progress: the agent's estimate of its task (laki progress), until its turn ends
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string } }
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -285,4 +293,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 28
+export const API = 30

@@ -2,7 +2,7 @@
 // fake claude: records its args, reports states through the hook commands in --settings, echoes input
 const fs = require('fs'), { execSync } = require('child_process')
 const args = process.argv.slice(2)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, args, env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_'))) }) + '\n')
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, args, env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_') || k === 'LAKI_PROGRESS')) }) + '\n')
 const settings = JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8'))
 const hook = (ev, payload) => {
   const cmd = settings.hooks[ev][0].hooks[0].command

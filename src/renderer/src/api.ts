@@ -16,7 +16,7 @@ type Bridge = {
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
-  onShot?(cb: (png: string) => void): void
+  onShot?(cb: (png: string, note?: string) => void): void
 }
 export const bridge: Bridge | undefined = (window as any).laki
 

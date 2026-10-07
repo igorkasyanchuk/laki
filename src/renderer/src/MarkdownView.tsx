@@ -1,6 +1,7 @@
 // Markdown as React nodes (markdown.ts' tree: nothing in it is HTML), for a file's preview, a PR's description and
-// review comments; links open in the browser
-import { Fragment, useLayoutEffect, useMemo, useRef, useState } from 'react'
+// review comments; links open in the browser. A ```mermaid block is a diagram: mermaid's SVG (securityLevel strict:
+// its labels are text, no scripts or links), the library loaded the first time one shows
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { highlight } from './highlight'
 import { type Block, type Inline, markdown } from './markdown'
@@ -39,6 +40,33 @@ export function Folded({ text, lines }: { text: string; lines: number }) {
     </div>
   )
 }
+let mermaid: Promise<typeof import('mermaid').default> | undefined
+let drawn = 0
+function Mermaid({ text }: { text: string }) {
+  const [svg, setSvg] = useState('')
+  const [err, setErr] = useState('')
+  const dark = getComputedStyle(document.documentElement).colorScheme !== 'light' // the theme's, as it is now
+  useEffect(() => {
+    let live = true
+    ;(mermaid ??= import('mermaid').then(m => m.default))
+      .then(m => {
+        m.initialize({ startOnLoad: false, securityLevel: 'strict', suppressErrorRendering: true /* else its error drawing stays in <body> */, theme: dark ? 'dark' : 'default', fontFamily: 'var(--ui-font)' })
+        return m.render(`mermaid-${++drawn}`, text)
+      })
+      .then(r => live && (setSvg(r.svg), setErr('')), e => live && (setSvg(''), setErr(String(e?.message ?? e).split('\n')[0])))
+    return () => void (live = false)
+  }, [text, dark])
+  if (svg) return <div className="mermaid" dangerouslySetInnerHTML={{ __html: svg }} />
+  return (
+    <>
+      <pre>
+        <code>{text}</code>
+      </pre>
+      {err && <div className="warn small">Mermaid can't draw it: {err}</div>}
+    </>
+  )
+}
+
 function mdBlock(b: Block, k: number): React.ReactNode {
   switch (b.t) {
     case 'h': {
@@ -52,6 +80,7 @@ function mdBlock(b: Block, k: number): React.ReactNode {
     case 'quote':
       return <blockquote key={k}>{b.blocks.map(mdBlock)}</blockquote>
     case 'code':
+      if (b.lang === 'mermaid') return <Mermaid key={k} text={b.text} />
       return (
         <pre key={k}>
           <code>

@@ -107,8 +107,55 @@ export function clock(ms: number) {
   return h ? `${h}:${two(m)}:${two(sec)}` : `${m}:${two(sec)}`
 }
 
+// CSV (the file preview's Table): RFC 4180 rows, quotes doubled inside quotes, newlines inside them; quoted: which
+// fields were in quotes, cell by cell (written back the same way, so an edit doesn't rewrite the whole file). sep: a
+// comma, or what the first line has most of (; or a tab), a tab for .tsv
+export function csvSep(path: string, text: string) {
+  if (/\.tsv$/i.test(path)) return '\t'
+  const line = text.slice(0, text.search(/\r?\n|$/)).replace(/"[^"]*"/g, '')
+  return [',', ';', '\t'].map(c => [c, line.split(c).length] as const).sort((a, b) => b[1] - a[1])[0][0]
+}
+export function parseCsv(text: string, sep = ','): { rows: string[][]; quoted: boolean[][] } {
+  const rows: string[][] = []
+  const quoted: boolean[][] = []
+  let row: string[] = []
+  let qs: boolean[] = []
+  let cell = ''
+  let q = false // inside quotes
+  let was = false // this field was quoted
+  const end = () => {
+    row.push(cell)
+    qs.push(was)
+    cell = ''
+    was = false
+  }
+  const next = () => (rows.push(row), quoted.push(qs), (row = []), (qs = []))
+  for (let i = 0; i < text.length; i++) {
+    const c = text[i]
+    if (q) {
+      if (c !== '"') cell += c
+      else if (text[i + 1] === '"') (cell += '"'), i++
+      else q = false
+    } else if (c === '"' && !cell && !was) q = was = true
+    else if (c === sep) end()
+    else if (c === '\n' || c === '\r') {
+      if (c === '\r' && text[i + 1] === '\n') i++
+      end()
+      next()
+    } else cell += c
+  }
+  if (cell || was || row.length) end(), next()
+  return { rows, quoted }
+}
+// LF only: the edit's text is (FilePreview's save puts a CRLF file's \r\n back). A cell in quotes before stays in
+// them; a new row is quoted like the one above it, a new column like the cell before it; any that needs them gets them
+export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], trail = true) {
+  const was = (r: number, c: number): boolean => (quoted[r] ? (quoted[r][c] ?? quoted[r][c - 1] ?? false) : r > 0 && was(r - 1, c))
+  return rows.map((row, r) => row.map((v, c) => (was(r, c) || v.includes(sep) || /["\r\n]/.test(v) ? `"${v.replace(/"/g, '""')}"` : v)).join(sep)).join('\n') + (trail && rows.length ? '\n' : '')
+}
+
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {

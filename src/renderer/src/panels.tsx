@@ -1,6 +1,6 @@
 import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, MODELS, prIn, type View } from '../../shared/types'
+import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, type LogLine, MODELS, prIn, type View } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -25,6 +25,48 @@ function Modal({ title, onClose, children, wide }: { title: string; onClose: () 
 }
 
 const SITE = 'https://laki.igorkasyanchuk.com'
+
+// development mode's event log for a workspace (ws:<id>) or a widget (widget:<id>): the daemon's last 500 lines,
+// newest at the bottom, asked again every 2 s while it's open
+export function Logs({ title, load, copy, onClose }: { title: string; load: () => Promise<LogLine[]>; copy: (text: string) => void; onClose: () => void }) {
+  const [lines, setLines] = useState<LogLine[] | null>(null)
+  const [err, setErr] = useState('')
+  const box = useRef<HTMLDivElement>(null)
+  const ld = useRef(load)
+  ld.current = load
+  useEffect(() => {
+    let live = true
+    const get = () => ld.current().then(l => live && (setLines(l), setErr('')), e => live && setErr(String(e?.message ?? e)))
+    get()
+    const t = setInterval(get, 2000)
+    return () => void ((live = false), clearInterval(t))
+  }, [])
+  const stick = useRef(true) // at the bottom (as it opens too): it follows
+  useEffect(() => void (box.current && stick.current && (box.current.scrollTop = box.current.scrollHeight)), [lines])
+  const text = (l: LogLine) => `${new Date(l.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}  ${l.text}${l.n ? ` (×${l.n})` : ''}`
+  return (
+    <Modal title={title} onClose={onClose} wide>
+      <div className="logs" ref={box} onScroll={e => (stick.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 60)}>
+        {err && <div className="warn small">{err}</div>}
+        {lines?.map((l, i) => (
+          <div key={i} className="log-line">
+            {text(l)}
+          </div>
+        ))}
+        {lines && !lines.length && <div className="muted small">Nothing yet: it logs from when development mode went on (Settings › General).</div>}
+      </div>
+      <div className="row">
+        <span className="muted small grow">Kept in the daemon's memory, the last 500 lines; a restart starts over.</span>
+        <button disabled={!lines?.length} onClick={() => copy(lines!.map(text).join('\n'))}>
+          <Icon name="copy" /> Copy
+        </button>
+        <button className="primary" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Modal>
+  )
+}
 
 // the sidebar's video, to watch while you work: a YouTube embed with its own controls (main gives it a Referer: a
 // file:// page has none, and YouTube refuses to play without one). Sandboxed: it can't take the window anywhere.
@@ -211,7 +253,9 @@ const keep = (key: string, v: unknown) => {
 
 // initial: a laki://new link's prompt, preset and name; project and initial win over the last choices; images: the menu
 // bar's screenshots
-export function NewWorkspace({ view, project, agent, initial, images: shots, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Img[]; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
+const notesOf = (s?: Shot[]) => (s ?? []).flatMap(x => (x.note ? [x.note] : []))
+export type Shot = Img & { note?: string } // the menu bar's screenshot, and what to do with it (the editor's note)
+export function NewWorkspace({ view, project, agent, initial, images: shots, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Shot[]; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
   const [p, setP] = useState<NewWsParams>(() => {
     const names = [...view.presets.filter(x => !x.off).map(x => x.name), 'shell', 'custom', 'none']
@@ -229,6 +273,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       effort: same ? last.effort : undefined,
       base: '',
       ...initial,
+      ...(notesOf(shots).length && { prompt: [initial?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
     }
   })
   const [branches, setBranches] = useState<string[]>([])
@@ -238,7 +283,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   useEffect(() => {
     const more = (shots ?? []).filter(s => !had.current.has(s.path))
     for (const s of more) had.current.add(s.path)
-    if (more.length) setImages(i => [...i, ...more]) // another screenshot, the prompt kept
+    if (more.length) setImages(i => [...i, ...more]) // another screenshot, the prompt kept: its note added to it
+    if (notesOf(more).length) setP(x => ({ ...x, prompt: [x.prompt, ...notesOf(more)].filter(Boolean).join('\n\n') }))
   }, [shots])
   const [saving, setSaving] = useState(false) // an image isn't saved yet
   const [tplName, setTplName] = useState(last.tpl ?? '') // a prompt template's name ('' none): another project's of the same name too

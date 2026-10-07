@@ -12,7 +12,7 @@ const TIME = String.raw`(\d{1,2})(?::(\d{2}))?\s*(am|pm)?`
 const ALL = [0, 1, 2, 3, 4, 5, 6]
 const DAY_WORD = '(?:week ?days?|work ?days?|weekends?|(?:sun|mon|tue|wed|thu|fri|sat)[a-z]*)'
 // except weekends · but not on fri · excluding mon and tue: only the days, so what follows them (at 2am) still counts
-const EXCEPT = new RegExp(`\\b(?:except|but not|excluding|not on|skip(?:ping)?)(?: on)? (${DAY_WORD}(?:(?: , | and | or | ?[-–] ?| to | through | thru )${DAY_WORD})*)\\b`, 'g')
+const EXCEPT = new RegExp(`\\b(?:except|but not|excluding|not on|not|no|skip(?:ping)?)(?: on)? (${DAY_WORD}(?:(?: , | and | or | ?[-–] ?| to | through | thru )${DAY_WORD})*)\\b`, 'g')
 
 // "2am" → 120, "14:30" → 870, "noon" → 720; null for a time that can't be
 function minutes(h: string, m = '0', ap = ''): number | null {
@@ -42,8 +42,10 @@ function daysIn(s: string): number[] {
   return [...out].sort()
 }
 
+const tidy = (text: string) => ` ${text.toLowerCase().replace(/\b([ap])\.m\.?/g, '$1m').replace(/(\d)\.(\d\d)(?!\d)/g, '$1:$2').replace(/[,;&]/g, ' , ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ')} `
+
 export function parseWhen(text: string, now = Date.now()): Rule | { error: string } {
-  let s = ` ${text.toLowerCase().replace(/\b([ap])\.m\.?/g, '$1m').replace(/(\d)\.(\d\d)(?!\d)/g, '$1:$2').replace(/[,;&]/g, ' , ').replace(/[.!?]/g, ' ').replace(/\s+/g, ' ')} `
+  let s = tidy(text)
   s = s.replace(/\b(\d{1,2}(?::\d\d)?) (?:in the )?(morning|afternoon|evening)\b/g, (_, t: string, w: string) => `${t}${w === 'morning' ? 'am' : 'pm'}`) // at 3 in the afternoon
   if (/\bevery (\d+ |other )(days?|weeks?)\b|\bevery (\d+ )?(months?|years?)\b|\b(monthly|yearly)\b/.test(s)) return { error: 'Every few days isn’t a choice: name the days (mon and thu at 9am)' }
   let once = /\b(?:once|one time)\b(?! (?:a|per|each|every) )/.test(s) // not once a day
@@ -107,6 +109,36 @@ export function nextRun(r: Rule, after: number): number | undefined {
   }
 }
 
+// widgets' working hours (Settings › Widgets): 9am-9pm · weekdays 8:00 to 18:30 · 22:00-6:00 except weekends. to before
+// from: across midnight (the night belongs to the day it starts on). Empty: always
+export type Hours = { days: number[]; from: number; to: number }
+export function parseHours(text: string): Hours | { error: string } {
+  let s = tidy(text).replace(/\bnoon\b/g, '12pm').replace(/\bmidnight\b/g, '12am')
+  const span = new RegExp(`\\b${TIME}\\s*(?:-|–|to|until|till|and)\\s*${TIME}(?![\\d:])`).exec(s)
+  if (!span) return { error: 'From when to when? (9am-9pm weekdays)' }
+  let from = minutes(span[1], span[2], span[3])
+  let to = minutes(span[4], span[5], span[6])
+  if (from !== null && to !== null && !span[3] && span[6] === 'pm' && from + 720 < to) from += 720 // 1-5pm: 13:00
+  if (from !== null && to !== null && !span[6] && to < from && from <= 720 && to < 720) to += 720 // 9-5, 9am-5, noon-6: to 17:00, 18:00
+  if (from === null || to === null || from === to) return { error: 'From when to when? (9am-9pm weekdays)' }
+  s = s.replace(span[0], ' ')
+  let skipped = ''
+  s = s.replace(EXCEPT, (_, d: string) => ((skipped += ` ${d}`), ' '))
+  if (/\b(?:except|but not|excluding|skip(?:ping)?)\b/.test(s)) return { error: 'Except which days? (except weekends)' }
+  const skip = daysIn(skipped)
+  const named = daysIn(s)
+  const days = (named.length ? named : ALL).filter(d => !skip.includes(d))
+  if (!days.length) return { error: 'That leaves no days' }
+  return { days, from, to }
+}
+// is it within them now
+export function inHours(h: Hours, now = Date.now()) {
+  const d = new Date(now)
+  const t = d.getHours() * 60 + d.getMinutes()
+  if (h.from < h.to) return h.days.includes(d.getDay()) && t >= h.from && t < h.to
+  return (h.days.includes(d.getDay()) && t >= h.from) || (h.days.includes((d.getDay() + 6) % 7) && t < h.to)
+}
+
 const hhmm = (t: number) => `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`
 const DAY_LABEL = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 
@@ -119,6 +151,13 @@ export function describe(r: Rule): string {
   const even = step > 0 && t.every((x, i) => !i || x - t[i - 1] === step)
   const times = even ? `every ${step % 60 ? `${step} min` : step === 60 ? 'hour' : `${step / 60} hours`} from ${hhmm(t[0])} to ${hhmm(t[t.length - 1])}` : `at ${t.map(hhmm).join(', ')}`
   return r.once ? `Once, ${days === 'Every day' ? '' : `${days} `}${times}` : `${days} ${times}`
+}
+
+// "Weekdays, 09:00–21:00"
+export function describeHours(h: Hours) {
+  const k = h.days.join()
+  const days = k === '0,1,2,3,4,5,6' ? 'Every day' : k === '1,2,3,4,5' ? 'Weekdays' : k === '0,6' ? 'Weekends' : h.days.map(d => DAY_LABEL[d]).join(', ')
+  return `${days}, ${hhmm(h.from)}–${hhmm(h.to)}${h.to < h.from ? ' (the next day)' : ''}`
 }
 
 // a date in a task's name or prompt, a prompt template or an action: any of these tokens, in any order, with any of

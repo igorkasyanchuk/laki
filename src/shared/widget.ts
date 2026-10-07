@@ -131,13 +131,33 @@ a { color: var(--accent, #7aa2f7); text-decoration: none; } a:hover { text-decor
 table { width: 100%; border-collapse: collapse; } th { text-align: left; font-weight: 600; color: var(--muted, #7a8294); }
 th, td { padding: 6px 8px; border-bottom: 1px solid var(--line, #232833); vertical-align: top; }
 button { font: inherit; color: inherit; background: var(--hover, #1b2029); border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); padding: 3px 10px; cursor: pointer; }
+[data-busy] { opacity: 0.6; cursor: progress; }
 p { margin: 0 0 10px; }`
 
+// what a widget asks the app to show (`laki.toast`, `laki.modal` in a JS widget's page, or an action that prints it
+// as JSON): a toast, bottom right, and a dialog with buttons, each running one of its actions (arg), opening a link
+// (http(s), mailto, laki://) or only closing it; none: OK. Anything else is dropped.
+export type WidgetButton = { label: string; run?: string; arg?: string; open?: string; primary?: boolean }
+export type WidgetSay = { toast?: string; modal?: { title: string; text?: string; buttons: WidgetButton[] } }
+const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined)
+export function sayOf(x: unknown): WidgetSay | null {
+  if (!x || typeof x !== 'object' || Array.isArray(x)) return null
+  const o = x as Record<string, unknown>
+  const toast = text(o.toast, 300)
+  const m = o.modal && typeof o.modal === 'object' && !Array.isArray(o.modal) ? (o.modal as Record<string, unknown>) : undefined
+  const buttons = (Array.isArray(m?.buttons) ? m.buttons : [])
+    .filter((b): b is Record<string, unknown> => !!b && typeof b === 'object' && !!text(b.label, 40))
+    .slice(0, 4)
+    .map(b => ({ label: text(b.label, 40)!, run: text(b.run, 100), arg: typeof b.arg === 'string' || typeof b.arg === 'number' ? String(b.arg).slice(0, 2000) : undefined, open: [text(b.open, 2000)].find(u => u && /^(https?:|mailto:|laki:\/\/)/i.test(u)), primary: b.primary === true || undefined }))
+  const modal = m && (text(m.title, 120) || text(m.text, 2000)) ? { title: text(m.title, 120) ?? '', text: text(m.text, 2000), buttons: buttons.length ? buttons : [{ label: 'OK', primary: true }] } : undefined
+  return toast || modal ? JSON.parse(JSON.stringify({ toast, modal })) : null // without the undefined fields
+}
+
 // a JS widget's page (the daemon serves it, sandboxed, to a frame of the app): the filled template with window.laki
-// (data, config, at, error, full; refresh(), open(url), expand(), run(action, arg)); links open in the browser,
-// data-laki="refresh" or "full" on an element asks the app for that, data-run="<action>" (data-arg) runs one of
-// widget.json's actions, a click elsewhere on a preview opens the full view, Esc closes it. The app takes these only
-// right after a click in the frame
+// (data, config, at, error, full; refresh(), open(url), expand(), run(action, arg), toast(text), modal({ title, text,
+// buttons })); links open in the browser, data-laki="refresh" or "full" on an element asks the app for that,
+// data-run="<action>" (data-arg) runs one of widget.json's actions (the button is data-busy until it's done), a click
+// elsewhere on a preview opens the full view, Esc closes it. The app takes these only right after a click in the frame
 // vars: the app's theme (its CSS variables), as the app asked for the page
 export function pageOf(body: string, ctx: Record<string, unknown>, vars: Record<string, string> = {}) {
   const json = JSON.stringify(ctx).replace(/</g, '\\u003c')
@@ -146,17 +166,19 @@ export function pageOf(body: string, ctx: Record<string, unknown>, vars: Record<
     .filter(([k, v]) => typeof v === 'string' && (k === 'color-scheme' ? /^(light|dark|normal)( (light|dark))?$/.test(v) : /^--[\w-]+$/.test(k) && !/[<>{};\\]/.test(v)))
     .map(([k, v]) => `${k}: ${v};`)
     .join(' ')
-  return `<!doctype html><html><head><meta charset="utf-8"><style>:root { ${theme} } ${WIDGET_CSS}</style><script>
+  return `<!doctype html><html><head><meta charset="utf-8"><style>:root { ${theme} } html { height: 100%; } ${WIDGET_CSS}</style><script>
 const say = m => parent.postMessage(m, '*')
-window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url => say({ laki: 'open', url: String(url) }), expand: () => say({ laki: 'full' }), run: (action, arg) => say({ laki: 'run', action: String(action), arg: arg === undefined ? '' : String(arg) }) }
+window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url => say({ laki: 'open', url: String(url) }), expand: () => say({ laki: 'full' }), run: (action, arg, label) => say({ laki: 'run', action: String(action), arg: arg === undefined ? '' : String(arg), label: label === undefined ? '' : String(label) }), toast: text => say({ laki: 'say', toast: String(text) }), modal: m => say({ laki: 'say', modal: m }) }
 addEventListener('click', e => {
   const t = e.target instanceof Element ? e.target : null
   const a = t && t.closest('a[href]'), b = t && t.closest('[data-laki]'), r = t && t.closest('[data-run]')
   if (a) e.preventDefault(), laki.open(a.href)
-  else if (r) e.preventDefault(), laki.run(r.getAttribute('data-run'), r.getAttribute('data-arg') ?? undefined)
+  else if (r) e.preventDefault(), r.hasAttribute('data-busy') || (r.setAttribute('data-busy', ''), laki.run(r.getAttribute('data-run'), r.getAttribute('data-arg') ?? undefined, r.textContent.trim()))
   else if (b) e.preventDefault(), say({ laki: b.getAttribute('data-laki') })
   else if (!laki.full && !(t && t.closest('button, input, select, textarea, label'))) laki.expand()
 })
 addEventListener('keydown', e => e.key === 'Escape' && say({ laki: 'close' }))
+// the app says an action is done: its buttons work again
+addEventListener('message', e => e.source === parent && e.data && e.data.laki === 'done' && document.querySelectorAll('[data-run][data-busy]').forEach(r => r.getAttribute('data-run') === e.data.action && (r.getAttribute('data-arg') ?? '') === e.data.arg && r.removeAttribute('data-busy')))
 </script></head><body>${body}</body></html>`
 }

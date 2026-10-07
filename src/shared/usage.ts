@@ -12,6 +12,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki rm <ws> | archive <ws> | restore <ws> | fork <ws>
   laki tab <ws> [--preset p] [--cmd c]        a new tab
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
+  laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
   laki diff <ws> | run <ws> | ship <ws> -m <message>
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
@@ -25,7 +26,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget [ls] | reload                   the sidebar's widgets | read their folders again and fetch
   laki widget on|off|run <id>                 show or hide one | run its fetch now
   laki widget render <id> [--full]            the HTML it shows now, filled from its data
-  laki widget action <id> <action> [arg]      run one of its widget.json actions
+  laki widget action <id> <action> [arg]      run one of its widget.json actions: what the app would show
   laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
   laki daemon | stop                          run the daemon in the foreground | stop it
   --json prints machine-readable output`

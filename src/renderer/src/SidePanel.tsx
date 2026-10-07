@@ -6,7 +6,7 @@ import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { Folded, Markdown } from './MarkdownView'
 import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, parseSize, previewAddr, previewUrl, type RunAction, SIZES } from './text'
+import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, toCsv } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
 
 export type PanelTab = 'files' | 'changes' | 'review' | 'preview'
@@ -901,6 +901,97 @@ export function actionMenu({ agent, terminal }: ReturnType<typeof actionsFor>, t
   ]
 }
 
+// a CSV file as a table, its first row the head; edit: a click on a cell edits it (Enter: the one below, Tab: the next,
+// Esc: as it was), + Row, + Column, × on a row's number. Each change is the whole file again (toCsv), as the text edit's
+const CSV_MAX = 2000 // ponytail: rows shown; the rest is there, edited in Raw
+function CsvTable({ path, text, edit, onText }: { path: string; text: string; edit: boolean; onText: (t: string) => void }) {
+  const sep = useMemo(() => csvSep(path, text), [path]) // the file's, not each edit's
+  const { rows, quoted } = useMemo(() => parseCsv(text, sep), [text, sep])
+  const cols = rows.reduce((n, r) => Math.max(n, r.length), 0)
+  const [at, setAt] = useState<[number, number] | null>(null)
+  useEffect(() => void (edit || setAt(null)), [edit])
+  const commit = (next: string[][], q = quoted) => onText(toCsv(next, sep, q, text.endsWith('\n') || !text)) // q: each cell's quotes, row for row with next
+  const setCell = (r: number, c: number, v: string) => {
+    if ((rows[r]?.[c] ?? '') === v) return
+    const next = rows.map(x => [...x])
+    while (next.length <= r) next.push([])
+    while (next[r].length <= c) next[r].push('')
+    next[r][c] = v
+    commit(next)
+  }
+  const cell = (r: number, c: number) => {
+    const v = rows[r]?.[c] ?? ''
+    if (at?.[0] === r && at[1] === c)
+      return (
+        <input
+          className="csv-input"
+          autoFocus
+          defaultValue={v}
+          onFocus={e => e.target.select()}
+          onBlur={e => (setCell(r, c, e.target.value), setAt(x => (x?.[0] === r && x[1] === c ? null : x)))}
+          onKeyDown={e => {
+            const back = () => e.currentTarget.closest<HTMLElement>('.pv-body')?.focus({ preventScroll: true }) // its keys (⌘S, Esc) work on
+            const go = (to: [number, number] | null) => (e.preventDefault(), setCell(r, c, e.currentTarget.value), to || back(), setAt(to))
+            if (e.key === 'Enter') go(r + 1 < Math.max(rows.length, 1) ? [r + 1, c] : null)
+            else if (e.key === 'Tab') go(e.shiftKey ? (c > 0 ? [r, c - 1] : null) : c + 1 < cols ? [r, c + 1] : r + 1 < rows.length ? [r + 1, 0] : null)
+            else if (e.key === 'Escape') e.preventDefault(), e.stopPropagation(), (e.currentTarget.value = v), back(), setAt(null)
+            else if (e.key === 's' && (e.metaKey || e.ctrlKey)) setCell(r, c, e.currentTarget.value) // then ⌘S saves it, with this cell
+          }}
+        />
+      )
+    return v
+  }
+  const pick = (r: number, c: number) => edit && setAt([r, c])
+  const shown = rows.slice(1, CSV_MAX + 1)
+  return (
+    <div className="csv">
+      <table>
+        <thead>
+          <tr>
+            <th className="csv-n" />
+            {[...Array(cols)].map((_, c) => (
+              <th key={c} className={edit ? 'csv-edit' : ''} onClick={() => pick(0, c)}>
+                {cell(0, c)}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {shown.map((row, i) => (
+            <tr key={i}>
+              <td className="csv-n">
+                {i + 1}
+                {edit && (
+                  <button className="csv-del" aria-label={`Delete row ${i + 1}`} data-tip="Delete this row" onClick={() => commit(rows.filter((_, j) => j !== i + 1), quoted.filter((_, j) => j !== i + 1))}>
+                    ×
+                  </button>
+                )}
+              </td>
+              {[...Array(cols)].map((_, c) => (
+                <td key={c} className={`${edit ? 'csv-edit' : ''} ${c >= row.length ? 'csv-none' : ''}`} onClick={() => pick(i + 1, c)}>
+                  {cell(i + 1, c)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      {rows.length > CSV_MAX + 1 && <div className="muted small pad">Showing the first {CSV_MAX} rows of {rows.length - 1}: Raw has the rest.</div>}
+      {edit && (
+        <div className="row pad">
+          <button className="small" onClick={() => (commit([...rows, Array(Math.max(cols, 1)).fill('')]), setAt([rows.length, 0]))}>
+            <Icon name="plus" /> Row
+          </button>
+          <button className="small" onClick={() => commit(rows.length ? rows.map(r => [...r, ...Array(Math.max(0, cols - r.length)).fill(''), '']) : [['']])}>
+            <Icon name="plus" /> Column
+          </button>
+          <span className="muted small">{sep === '\t' ? 'Tabs' : sep === ';' ? 'Semicolons' : 'Commas'} between fields · click a cell to edit it</span>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const sizeText = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${(n / 1024).toFixed(1)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 
 // a file in the app, next to the panel: text with line numbers, an image, or what it is
@@ -967,11 +1058,17 @@ export function FilePreview(p: {
       setSaving(false)
     }
   }
-  // Markdown: Rendered or Raw (the last one picked; a jump to a line: Raw)
+  const [saveSoon, setSaveSoon] = useState(0) // the table's ⌘S: after the render that has the cell it was typed in
+  useEffect(() => void (saveSoon && save()), [saveSoon])
+  // Markdown: Rendered or Raw (the last one picked; a jump to a line: Raw); CSV: Table or Raw, the same way (laki.csv)
   const md = /\.(md|markdown|mdx)$/i.test(p.path)
-  const [mode, setMode] = useState<'raw' | 'rendered'>(() => (p.line ? 'raw' : (localStore('laki.md') as 'raw') || 'rendered'))
-  const rendered = md && mode === 'rendered' && f?.text !== undefined
-  const pickMode = (m: typeof mode) => (setMode(m), localStore('laki.md', m))
+  const csv = /\.(csv|tsv)$/i.test(p.path)
+  const modeKey = csv ? 'laki.csv' : 'laki.md'
+  const [mode, setMode] = useState<'raw' | 'rendered'>(() => (p.line ? 'raw' : (localStore(modeKey) as 'raw') || 'rendered'))
+  const rendered = (md || csv) && mode === 'rendered' && f?.text !== undefined && !(csv && f.cut) // a cut CSV: Raw only
+  const table = csv && rendered
+  useEffect(() => void (p.edit && table && body.current?.focus({ preventScroll: true })), [!!p.edit, table]) // ⌘S and Esc from the start
+  const pickMode = (m: typeof mode) => (setMode(m), localStore(modeKey, m))
   const lines = useMemo(() => (f?.text === undefined || rendered || p.edit ? [] : highlight(p.path, f.text)), [f, p.path, rendered, !!p.edit]) // colored up to 50 KB
   const cut = p.path.lastIndexOf('/') + 1
   return (
@@ -993,10 +1090,10 @@ export function FilePreview(p: {
           </>
         ) : (
           <>
-        {md && f?.text !== undefined && (
+        {(md || csv) && f?.text !== undefined && !(csv && f.cut) && (
           <div className="seg small">
             <button className={mode === 'rendered' ? 'on' : ''} onClick={() => pickMode('rendered')}>
-              Rendered
+              {csv ? 'Table' : 'Rendered'}
             </button>
             <button className={mode === 'raw' ? 'on' : ''} onClick={() => pickMode('raw')}>
               Raw
@@ -1014,7 +1111,19 @@ export function FilePreview(p: {
         <IconButton icon="x" title="Close (⌘W)" onClick={p.onClose} />
       </div>
       {err && p.edit && <div className="warn small pad">{err}</div>}
-      {p.edit ? (
+      {p.edit && table ? (
+        <div
+          className="pv-body"
+          ref={body}
+          onKeyDown={e => {
+            if (e.key === 's' && (e.metaKey || e.ctrlKey)) (e.preventDefault(), setSaveSoon(n => n + 1)) // once a cell being typed is in
+            else if (e.key === 'Escape' && !(e.target instanceof HTMLInputElement)) (e.preventDefault(), cancel())
+          }}
+          tabIndex={-1}
+        >
+          <CsvTable path={p.path} text={p.edit.text} edit onText={text => p.onEdit({ ...p.edit!, text })} />
+        </div>
+      ) : p.edit ? (
         <textarea
           ref={area}
           className="pv-edit"
@@ -1036,7 +1145,7 @@ export function FilePreview(p: {
             <img src={f.image} alt={p.path} />
           </div>
         )}
-        {rendered && <Markdown src={f.text!} />}
+        {rendered && (table ? <CsvTable path={p.path} text={f.text!} edit={false} onText={() => {}} /> : <Markdown src={f.text!} />)}
         {f?.text !== undefined &&
           lines.map((l, i) => (
             <div key={i} className={`pv-line ${p.line === i + 1 ? 'at' : ''}`}>

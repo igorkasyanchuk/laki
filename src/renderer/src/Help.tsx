@@ -86,6 +86,7 @@ export function HelpPage({ cli, ship, onClose }: { cli: string; ship?: boolean; 
     [`${cli} new <project> --fan claude,codex --prompt "…"`, 'a race: the same prompt to each agent, a worktree each; Compare them in the app'],
     [`${cli} browser <ws> open /login · screenshot · click "<css>" · fill "<css>" "text" · text`, 'the agent browser: the dev server in a hidden window of the app'],
     [`${cli} send <ws>[/<tab>] "run the tests"`, 'type into an agent now; --when-idle waits for its turn to end'],
+    [`${cli} progress 40 "writing tests"`, "in an agent's tab: how far along it is, on the tab (Settings › General › Progress on tabs)"],
     [`${cli} screen <ws>[/<tab>]`, 'the bottom of a tab’s screen'],
     [`${cli} tab <ws> --preset codex`, 'a new tab (a shell by default)'],
     [`${cli} run <ws>`, 'the run script, in a dev tab'],

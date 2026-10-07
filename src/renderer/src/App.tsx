@@ -1,12 +1,13 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, rowsOf, type Doctor, PR_SCAN, PR_TRIES, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, rowsOf, type Doctor, type LogLine, PR_SCAN, PR_TRIES, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, Avatar, ciText, type FixWhat, InfoPanel, type PRAct, prState, PRStatus, type WsInfo } from './Info'
-import { About, AddProject, Fun, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, StarLaki, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, Fun, Logs, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, type Shot, StarLaki, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
+import type { WidgetSay } from '../../shared/widget'
 import { ComparePage } from './Compare'
 import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
@@ -15,16 +16,15 @@ import { Term, xterms } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { type Img } from './PromptInput'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, nameOf, parseDuration, type RunAction, shortPath, youtubeEmbed } from './text'
 import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, AskHost, colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
+import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { remind: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { remind: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string } | { logs: string; title: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -44,10 +44,12 @@ const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_I
 const own = (pl: ProjectLook | undefined, k: keyof ProjectLook) => (pl?.[k] && pl[k] !== 'theme' ? pl[k] : undefined)
 const phAttrs = (pl?: ProjectLook) => Object.fromEntries((['font', 'case', 'spacing', 'size', 'weight'] as const).flatMap(k => (own(pl, k) ? [[`data-ph-${k}`, k === 'font' || k === 'case' ? own(pl, k) : '']] : [])))
 const phVars = (pl?: ProjectLook) => Object.fromEntries((['spacing', 'size', 'weight'] as const).flatMap(k => (own(pl, k) ? [[`--ph-${k}`, own(pl, k)]] : []))) as CSSProperties
+// a workspace's state in words, for the sidebar's Extended and Cards rows
+const STATE_WORDS: Record<string, string> = { waiting: 'needs you', running: 'working', done: 'done', idle: 'idle', exited: 'stopped', limit: 'at its usage limit' }
 // a row's +/-: 1234 as 1.2k, 12345 as 12k
 const short = (n: number) => (n >= 10000 ? `${Math.round(n / 1000)}k` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
 // …and its lines and rows (SideLook): the variables looks set (styles.css .project-ws), nearer than the theme's
-const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font' } as const
+const SIDE_VARS = { guide: '--ws-guide', divider: '--proj-divider', indent: '--ws-indent', rows: '--ws-h', text: '--ws-font', icons: '--ws-icon' } as const
 const sideVars = (sl?: SideLook) => Object.fromEntries((Object.keys(SIDE_VARS) as (keyof typeof SIDE_VARS)[]).flatMap(k => (sl?.[k] && sl[k] !== 'theme' ? [[SIDE_VARS[k], sl[k]]] : []))) as CSSProperties
 
 // the sidebar's timers: what happens as one ends (a notification and a message always); its quick lengths, minutes
@@ -132,7 +134,7 @@ export function App() {
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
   const [newInit, setNewInit] = useState<Partial<NewWsParams>>() // a laki://new link's prompt, preset, name
-  const [newImages, setNewImages] = useState<Img[]>([]) // the menu bar's screenshots, in the new workspace's prompt
+  const [newImages, setNewImages] = useState<Shot[]>([]) // the menu bar's screenshots, in the new workspace's prompt
   const [link, setLink] = useState<string>() // a laki:// link, routed once the view is in
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review
   const [panelTab, setPanelTab] = useState<PanelTab>(() => load('laki.panelTab', 'files'))
@@ -155,7 +157,7 @@ export function App() {
     return src ? { src } : null
   })
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
-  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure
+  const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, openMenu] = useMenu()
   const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
@@ -372,9 +374,9 @@ export function App() {
     bridge?.onFocusTab(id => (setDialog(null), selectTab(id))) // a notification's or the menu bar's: over any page, as ⌘J
     bridge?.onDeepLink?.(setLink)
     // the menu bar's screenshot: saved where pasted images go, then the new-workspace page with it (another one adds to it)
-    bridge?.onShot?.(png =>
+    bridge?.onShot?.((png, note) =>
       api.call<string>('imageSave', { data: png, ext: 'png' }).then(
-        path => (setNewImages(i => [...i, { path, url: `data:image/png;base64,${png}` }]), setDialog('new')),
+        path => (setNewImages(i => [...i, { path, url: `data:image/png;base64,${png}`, ...(note && { note }) }]), setDialog('new')), // its note: the page adds it to the prompt
         e => toast(`The screenshot wasn't saved: ${(e as Error).message}`),
       ),
     )
@@ -630,8 +632,26 @@ export function App() {
     open: openExternal,
     full: id => setDialog({ widget: id }),
     close: () => setDialog(null),
-    action: (id, action, arg) =>
-      void call<{ ok: boolean; out?: string; error?: string }>('widgetAction', { id, action, arg }).then(r => toast(r.ok ? r.out || `${action}: done` : `${action} failed: ${r.error}`, undefined, undefined, r.ok), () => {}),
+    action: (id, action, arg, label) => {
+      const what = label || action
+      clearTimeout(noteTimer.current)
+      setNote({ text: `${what}…`, busy: true }) // something is happening, until it says what
+      return api.call<{ ok: boolean; out?: string; error?: string } & WidgetSay>('widgetAction', { id, action, arg }).then(
+        r => (!r.ok ? toast(`${what} failed: ${r.error}`) : r.toast || r.modal ? (setNote(null), widgetApi.say(id, r)) : done(r.out || `${what}: done`)),
+        e => toast(`${what} failed: ${(e as Error).message}`),
+      )
+    },
+    say: (id, s) => {
+      if (s.toast) done(s.toast)
+      const m = s.modal
+      if (m)
+        void choose(m.title, m.text, m.buttons).then(i => {
+          const b = m.buttons[i]
+          if (b?.run) void widgetApi.action(id, b.run, b.arg ?? '', b.label)
+          else if (b?.open && /^laki:\/\//i.test(b.open)) setLink(b.open)
+          else if (b?.open) openExternal(b.open)
+        })
+    },
     settings: () => setDialog({ section: 'widgets' }),
     key: view?.widgetKey,
   }
@@ -714,6 +734,7 @@ export function App() {
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
     ...(w.branch ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
     ...(w.kind === 'worktree' ? [{ label: w.pr ? 'Refresh PR status' : 'Look for a PR', icon: 'refresh', run: refreshPR } as MenuItem] : []),
+    ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
     ...(w.pr?.state === 'OPEN' && !w.pr.mine ? [{ label: `Approve PR #${w.pr.number}…`, icon: 'check', run: () => prAct(w, 'approve') } as MenuItem] : []),
     null,
     { head: 'Open in' },
@@ -1000,9 +1021,13 @@ export function App() {
   const busiest = (list: WorkspaceView[]) => rollup([...view.tabs.filter(t => list.some(w => w.id === t.workspace)), ...(list.some(w => w.setup) ? [{ status: 'running' } as TabView] : [])])
   // a workspace's row: under its project, or under Pinned (with its project's name; no drag there: pins keep the
   // sidebar's order)
+  const sideStyle = settings.sideStyle ?? 'default'
+  const more = sideStyle === 'extended' || sideStyle === 'cards' // a second line under each row
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
+    const state = more ? rollup(wt) : 'idle' // the second line's
+    const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
     return (
       <div
         key={w.id}
@@ -1068,7 +1093,7 @@ export function App() {
         )}
         {w.pr && settings.prIcon !== false && (
           <span className={`ws-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
-            {!w.pr.mine && <Avatar login={w.pr.author} />}
+            {!w.pr.mine && <Avatar login={w.pr.author} size={16} />}
             <Icon name="github" size={11} />
           </span>
         )}
@@ -1076,6 +1101,21 @@ export function App() {
         <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
           <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
         </span>
+        {more && (
+          <div className="ws-sub">
+            {(w.branch || w.kind !== 'worktree') && <span className="ws-branch">{w.branch || 'folder'}</span>}
+            <span className={`ws-state g-${state}`}>{w.setup ? 'setting up' : (STATE_WORDS[state] ?? state)}</span>
+            {wt.map(t => t.progress && <span key={t.id}>{t.progress.pct}%</span>)}
+            {w.pr && <span className="ws-sub-pr">#{w.pr.number} {w.pr.title}</span>}
+            {w.stat && (w.stat.add > 0 || w.stat.del > 0) && (
+              <span className="ws-stat">
+                <span className="add">+{short(w.stat.add)}</span>
+                <span className="del">−{short(w.stat.del)}</span>
+              </span>
+            )}
+          </div>
+        )}
+        {sideStyle === 'cards' && last && <div className="ws-last">{last}</div>}
       </div>
     )
   }
@@ -1164,10 +1204,11 @@ export function App() {
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-tip={[...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
+            {ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
             {settings.timers && <TurnTime tabs={ts} />}
             {ts.some(t => t.muted) && (
               <span className="ws-mark">
@@ -1192,7 +1233,7 @@ export function App() {
   return (
     <div className={`app ${sideOpen ? '' : 'side-closed'} ${narrow ? 'narrow' : ''} ${bridge ? 'electron' : ''} ${settings.dimPanes ? 'dim-panes' : ''}`}>
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
-      <aside className="sidebar" hidden={!sideOpen} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
+      <aside className="sidebar" hidden={!sideOpen} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
         <div className="side-head drag">
           <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
           <span className="spacer" />
@@ -1275,7 +1316,7 @@ export function App() {
         {video && (
           <Video
             key={video.at}
-            src={`${video.src}${video.src.includes('?') ? '&' : '?'}enablejsapi=1${video.play ? '&autoplay=1' : ''}` /* the timer pauses and plays it */}
+            src={`${video.src}${video.src.includes('?') ? '&' : '?'}enablejsapi=1&cc_load_policy=0&iv_load_policy=3&rel=0&playsinline=1${video.play ? '&autoplay=1' : ''}` /* enablejsapi: the timer pauses and plays it; captions and annotations off, related videos only the channel's (YouTube won't hide its own buttons) */}
             min={video.min}
             onMin={min => setVideo(v => v && { ...v, min })}
             onChange={() => setDialog('video')}
@@ -1480,6 +1521,7 @@ export function App() {
                 const w = view.widgets?.find(x => x.id === id)
                 openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])
               },
+              logs: settings.devMode ? id => setDialog({ logs: `widget:${id}`, title: `Logs · ${view.widgets?.find(x => x.id === id)?.name ?? id}` }) : undefined,
             }}
             section={settingsFor ? `project:${settingsFor.id}` : section}
             script={typeof dialog === 'object' && dialog && 'script' in dialog ? dialog.script : undefined}
@@ -1488,6 +1530,7 @@ export function App() {
         {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? view.widgets?.find(x => x.id === dialog.widget) : undefined)}
         {dialog === 'help' && <HelpPage cli="laki" ship onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
+        {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.logs.startsWith('widget:') ? { section: 'widgets' } : null)} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
         {dialog === 'board' && (
           <BoardPage
@@ -1656,8 +1699,9 @@ export function App() {
       <AskHost />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {note && (
-        <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok ? 'ok' : ''}`} role="status">
+        <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok || note.busy ? 'ok' : ''}`} role="status">
           {note.ok && <Icon name="check" size={14} />}
+          {note.busy && <Glyph s="running" />}
           <span>{note.text}</span>
           {note.undo && (
             <button className="toast-undo" onClick={() => (setNote(null), note.undo!())}>

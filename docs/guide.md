@@ -350,7 +350,11 @@ until the agent's next run renews it. Settings › General turns each agent off 
   click outside it first. In a browser (remote access), it works only on the Mac itself.
 
 **File preview:** a Markdown file (`.md`) shows rendered (headings, lists, tables, code, links: they open in your
-browser) or *Raw* (its lines, numbered); the switch is in its header and remembered.
+browser; a ```` ```mermaid ```` block as its diagram, PR descriptions too) or *Raw* (its lines, numbered); the switch is
+in its header and remembered. A CSV file (`.csv`, `.tsv`; commas, semicolons or tabs) shows as a *Table* (its first
+row the head) or *Raw*: with the pencil, a click on a cell edits it (Enter: the cell below, Tab: the next, Esc: as it
+was), *+ Row*, *+ Column*, × on a row's number deletes it, ⌘S saves. Only the cells you change change in the file:
+its quotes and line ends stay as they were. The first 2,000 rows show; Raw has the rest.
 
 **Find files** (*Find files…*, first in ⌘K; or ⌘P): type parts of a path (`crt` finds `src/cart.ts`); names match
 before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
@@ -423,9 +427,11 @@ group holding it, or the one you were on, opens. The prompt:
   page; it goes on there.
 
 **A screenshot to an agent**: Laki's mark in the menu bar has *Screenshot Area…* (drag over what you
-want, or Space and a click for a window; Esc cancels) and *Screenshot Screen* (the main display). The
-new-workspace page opens with the picture in the prompt: pick the project and agent, add a line, ⌘⏎. macOS asks
-once for Screen Recording for Laki.
+want, or Space and a click for a window; Esc cancels) and *Screenshot Screen* (the main display). A small window
+opens over the others to draw on it: *Crop* (C), *Arrow* (A), *Text* (T: click, type, Enter), *Rectangle* (R) and
+*Pen* (P), in red, orange, yellow, green, blue or white (1–6), ⌘Z undoes; the box under it says what the agent should
+do with it. *Add to prompt* (⌘⏎) opens the new-workspace page with the picture and that note in the prompt: pick the
+project and agent, ⌘⏎. Esc drops it. macOS asks once for Screen Recording for Laki.
 
 **⌘K palette:** jump to any workspace or tab, or run any action.
 
@@ -446,13 +452,25 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock ic
 for you or finished while you looked away (muted ones aside); so does Laki's mark in the menu bar, whose menu lists
 those tabs (waiting first, with what they ask): a click opens one. With *Turn timers* on (Settings › General), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
+With *Progress on tabs* on (Settings › General) and the laki skill installed (Settings › Agent skill), agents get
+`LAKI_PROGRESS=1` and report how far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`, or
+MCP's `laki_progress`): the tab shows `40%` over a bar, its tooltip what they're on, until the turn ends.
+
+**The sidebar's style** (Settings › Appearance › The sidebar): *Compact* (a short line: the state and the name),
+*Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
+progress, the PR's title, the diff) or *Cards* (a card each, with the agent's last answer). *Icon size* sets the PR
+mark, its author's picture and the other marks to one size.
 
 ### Widgets
 
 Small live pages at the bottom of the sidebar, above its buttons, in a grid 3 cells across (a cell is 64 px tall);
 *Widgets* folds them away. A click on one opens its full view in a dialog, small, medium or large (its *view* in
 Settings › Widgets: large for wide tables; ↻ fetches now, the sliders its settings).
-Links open in the browser; a widget's buttons can run commands its `widget.json` names (*Review in Laki*).
+Links open in the browser; a widget's buttons can run commands its `widget.json` names (*Review in Laki*). While one
+runs, a toast in the bottom right says so (and the button waits); what it prints decides what shows after: a line as
+a toast, or JSON with `toast` and `modal` (a dialog with a title, text and up to 4 buttons, each running another of
+its actions, opening a link or closing it; none: OK). A widget's page can do the same from its script:
+`laki.toast(text)`, `laki.modal({ title, text, buttons })`.
 
 Each widget is a folder: `widget.json` (its name, size in cells, settings, how often it fetches, and the command
 or JS script that fetches its data, as JSON) and `widget.html` (what the tile shows and what the full view shows).
@@ -468,19 +486,25 @@ what the command printed last, or what the script threw).
 A widget's settings each have a kind: text, a number, an on/off, one of a few choices, or a list (logins, labels:
 typed as chips, Enter or a comma after each).
 
-Two come with Laki, off until you turn them on in Settings › Widgets:
+*Working hours* (Settings › Widgets › *Fetch only*): when widgets fetch on their own, in plain English: `9am-9pm
+weekdays`, `8:00 to 18:30 except fri`, `9am-6pm, no weekends`, `noon-6`, `10pm-6am` (overnight). Outside them nothing fetches until they start again;
+*Fetch now* and a change of settings still do. Empty: any time the app is open.
+
+Three come with Laki, off until you turn them on in Settings › Widgets:
 - *My PRs*: your open PRs in a repo (*Repo*: `owner/name` or its GitHub link; *Author*: `@me`, or someone's login;
   blank: you) counted: open, drafts, with conflicts, and with each of up to 3 labels (*Count label 1–3*); the full
   view (large) has the counts and the PRs grouped by what they need: conflicts, failing CI, changes asked, approved,
   in review, drafts, each with its labels, CI, review and date.
 - *Team PRs*: the open PRs of your team (*GitHub logins*, a chip each; one query per login, so a busy repo doesn't
   time out) in a repo: how many; the full view (large) lists them with labels, CI, review and conflicts, a filter by
-  author (a click on a name too) and by words, sorting, *Open PR* and *Review in Laki* (a new workspace on the PR with the *Review prompt*; set *Laki project* to the project's name).
+  author (a click on a name too) and by words, sorting, *Open PR* and *Review in Laki* (a new workspace on the PR with the *Review prompt*; set *Laki project* to the project's name; a toast while it's made, then *Review started* with *Open it*).
   *Review command* runs a shell command of yours instead (`$PR` is the PR's URL, `$PR_NUMBER` its number, `$LAKI_CLI`
   the laki command: `"$LAKI_CLI" new myapp --pr "$PR" --preset codex --prompt 'Review it'`), and *Button* renames the
   button.
+- *Links*: sites you open often, a click away in your default browser (Linear, New Relic, lunch): each chip of
+  *Links* is `Label: https://…` (a bare URL: its host as the label; `mailto:` links open your mail).
 
-Both take *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
+My PRs and Team PRs take *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
 
 To make one, install the *Widget creator* skill (Settings › Agent skill) and ask your agent ("a widget with my
 open issues"), or use any AI chat: Settings › Widgets › *Make one with AI* has the whole format as a prompt (type what
@@ -550,7 +574,11 @@ lit for a moment.
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
   mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Fun button* (the smiley at the bottom of the sidebar; on by default), *Turn
-  timers* (off by default), *Diff size in the sidebar* (off by default), and environment
+  timers* (off by default), *Diff size in the sidebar* (off by default), *Progress on tabs* (agents report how far
+  along they are; off by default), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
+  its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
+  waited in its queue and went in, its tabs' turns; and per widget, *Logs* in Settings › Widgets: each fetch, how
+  long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
   reads it back (projects and their own settings don't move). A file from another version comes in too: a setting
@@ -561,7 +589,8 @@ lit for a moment.
   keeps them on top), *Project names in the sidebar* (font,
   case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line: thin,
   thick, dashed, dotted, big dots, accent, accent dots or none; the line between projects: a line, dashed, dotted,
-  double or nothing; the indent, row height and text size, each the theme's unless you pick one; *Button labels*: words
+  double or nothing; the indent, row height, text size and icon size, each the theme's unless you pick one; the style:
+  Compact, Default, Extended or Cards, above; *Button labels*: words
   beside Scheduled, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked; hovering one shows it on
@@ -614,7 +643,8 @@ lit for a moment.
 - *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist
   Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
-  cursor style (block, bar, underline) and blinking, copy selected text to the clipboard (on by default) and
+  cursor style (block, bar, underline) and blinking, *Scroll speed* (lines per wheel step: 3× by default, xterm's own
+  is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default) and
   *Dim other panes* (in a split, the panes without the keyboard fade back; off by default) and *Focus the pane under
   the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; off by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
@@ -659,9 +689,9 @@ lit for a moment.
   lines to merge into `~/.config/opencode/opencode.json`.
 - *Remote access*: the email it lets in, how long, start and stop, the QR code and link (above).
 - *Widgets*: *Make one with AI* (the prompt, above), the folders they're found in (Laki's own, and more of yours,
-  one per line), *Reload widgets*, and each widget in a row: on or off, its size (cells across × down), how often it
-  fetches (minutes), its full view's size, *Fetch now*, *Open*, and its folder (in Finder, your editor or a terminal,
-  or *Copy path*); its settings under it.
+  one per line), *Reload widgets*, *Working hours*, and each widget in a row: on or off, its size (cells across ×
+  down), how often it fetches (minutes), its full view's size, *Fetch now*, *Open*, its folder (in Finder, your editor
+  or a terminal, or *Copy path*) and, in development mode, its *Logs*; its settings under it.
 - *Resources* (also ⌘K *Resources*): memory and CPU now, refreshed every 3 seconds while it's open. macOS counts every
   process Laki starts as Laki's (the Force Quit window's number): each agent, its MCP servers, the dev servers in
   its tabs. *Laki itself* is the app's own processes and the daemon; then each tab, biggest first, with its
@@ -725,6 +755,7 @@ laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's 
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app
 laki ls [--json]
 laki send fix-the-login --when-idle "now add tests"     # queued; typed in when the turn ends
+laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 laki screen fix-the-login/claude
 laki diff fix-the-login | run fix-the-login | ship fix-the-login -m "Fix redirect"
 laki browser fix-the-login open /login                  # the agent browser (the app must be open)
@@ -736,6 +767,7 @@ laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule 
 laki widget | widget reload                             # the sidebar's widgets | read their folders again, fetch
 laki widget on|off|run <id>                             # show or hide one | fetch now
 laki widget render <id> --full                          # the HTML its full view shows now
+laki widget action <id> <action> [arg]                  # run one of its buttons' actions: what the app would show
 laki open                                               # the app
 laki mcp                                                # an MCP server on stdio (below)
 laki stop                                               # stop the daemon (agents resume when it starts again)
@@ -746,7 +778,7 @@ laki daemon                                             # run the daemon in the 
 
 `laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. Its tools: `laki_state`
 (projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
-`presets`), `laki_send`, `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
+`presets`), `laki_send`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
 `laki_schedule_add`. None deletes, archives or ships. Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
 

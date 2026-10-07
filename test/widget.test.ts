@@ -2,8 +2,19 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { ago, hasFull, hasScript, pageOf, render, spark, viewOf } from '../src/shared/widget.ts'
+import { ago, hasFull, hasScript, pageOf, render, sayOf, spark, viewOf } from '../src/shared/widget.ts'
 import { fresh, type Rig, until } from './helpers.ts'
+
+test('widget toasts and modals: sayOf keeps what the app can show', () => {
+  assert.equal(sayOf(null), null)
+  assert.equal(sayOf({ toast: '  ' }), null, 'nothing to show')
+  assert.deepEqual(sayOf({ toast: 'hi', modal: { text: 'x' } }), { toast: 'hi', modal: { title: '', text: 'x', buttons: [{ label: 'OK', primary: true }] } }, 'no buttons: OK')
+  const m = sayOf({ modal: { title: 'T', buttons: [...Array(6)].map((_, i) => ({ label: `b${i}`, open: i ? 'laki://ws/a' : 'file:///etc', primary: 'yes' })) } })!.modal!
+  assert.equal(m.buttons.length, 4, 'four at most')
+  assert.deepEqual(m.buttons.slice(0, 2), [{ label: 'b0' }, { label: 'b1', open: 'laki://ws/a' }])
+  assert.equal(sayOf({ modal: { title: 'T', buttons: [{ label: 'Go', run: 'open', arg: 42 }] } })!.modal!.buttons[0].arg, '42', 'a number as its text')
+  assert.match(pageOf('', {}), /toast: text => say/)
+})
 
 test('widget templates: values escaped, each, if, unless, helpers, views', () => {
   const ctx = { data: { prs: [{ n: 1, t: '<b>a</b>' }, { n: 2, t: 'b & c' }], none: [], who: { name: 'x' } }, config: { repo: 'o/r' }, at: 0 }
@@ -212,7 +223,7 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   widget(
     rig,
     'js',
-    { name: 'JS', script: 'fetch.mjs', config: { step: '2' }, actions: { say: 'echo "got $WIDGET_ARG" > said.txt; echo said it', ls: '"$LAKI_CLI" ls --json | head -c 1', fail: 'exit 1' } },
+    { name: 'JS', script: 'fetch.mjs', config: { step: '2' }, actions: { say: 'echo "got $WIDGET_ARG" > said.txt; echo said it', ls: '"$LAKI_CLI" ls --json | head -c 1', fail: 'exit 1', logged: `echo working; echo '{"toast":"after a log line"}'`, tell: `echo '{"toast":"started","modal":{"title":"Done","buttons":[{"label":"Bad","open":"javascript:alert(1)"},{"label":"Again","run":"say","arg":"x"}]}}'` } },
     '<template preview><b id="n"></b><script>document.getElementById("n").textContent = laki.data.n</script></template>',
     { 'fetch.mjs': 'export default ({ config, last }) => ({ n: (last?.n ?? 0) + Number(config.step), end: "</script>" })' },
   )
@@ -246,6 +257,10 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   assert.ok(!existsSync(join(dir, 'hacked')))
   assert.deepEqual(await rig.rpc('widgetAction', { id: 'js', action: 'ls' }), { ok: true, out: '{' })
   assert.equal((await rig.rpc('widgetAction', { id: 'js', action: 'fail' })).ok, false)
+  // what an action prints as JSON with toast or modal: what the app shows, links only http(s), mailto, laki://
+  assert.deepEqual(await rig.rpc('widgetAction', { id: 'js', action: 'logged' }), { ok: true, toast: 'after a log line' }, 'JSON on the last line')
+  assert.equal((await rig.cli('widget', 'action', 'js', 'logged')).out.trim(), 'after a log line', 'the CLI says what the app would')
+  assert.deepEqual(await rig.rpc('widgetAction', { id: 'js', action: 'tell' }), { ok: true, toast: 'started', modal: { title: 'Done', buttons: [{ label: 'Bad' }, { label: 'Again', run: 'say', arg: 'x' }] } })
   assert.match((await rig.rpc('widgetAction', { id: 'js', action: 'constructor' })).error, /has no action constructor/)
 
   // a script that throws: its message, not node's trailer
@@ -256,7 +271,7 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   assert.match((await rig.rpc('widgetRun', { id: 'js' })).error, /^Cannot read properties of null/)
 })
 
-test('widgets that come with Laki: My PRs, Team PRs', async t => {
+test('widgets that come with Laki: My PRs, Team PRs, Links', async t => {
   const rig = await fresh(t)
   mkdirSync(rig.env.FAKE_GH, { recursive: true })
   const pr = (number: number, login: string, mergeable: string, o: object = {}) => ({
@@ -357,8 +372,21 @@ test('widgets that come with Laki: My PRs, Team PRs', async t => {
   assert.match(page, /<select id="who" aria-label="Author">/, 'a filter by author')
   // its action needs a project
   assert.match((await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' })).error, /Set Laki project/)
+  // with one: a workspace from the PR, then a modal that opens it
+  const proj = await rig.rpc('projectAdd', { path: rig.repo })
+  writeFileSync(join(rig.env.FAKE_GH, 'prhead.json'), JSON.stringify({ number: 3, title: 'Fix it', url: 'https://github.com/o/r/pull/3', headRefName: 'fix-it', baseRefName: 'main', isCrossRepository: false }))
+  writeFileSync(join(rig.env.FAKE_GH, 'checkout'), 'fix-it')
+  await rig.rpc('widgetSet', { id: 'team-prs', config: { project: proj.id, prompt: 'review it' } })
+  const started = await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' })
+  assert.equal(started.modal?.title, 'Review started', JSON.stringify(started))
+  assert.deepEqual(started.modal.buttons[1], { label: 'Open it', open: 'laki://ws/pr-3-fix-it', primary: true })
   // or a command of your own, with the PR's URL and number; the button says what it does
   await rig.rpc('widgetSet', { id: 'team-prs', config: { command: 'echo "asked for $PR ($PR_NUMBER)"', button: 'Codex review' } })
   assert.deepEqual(await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' }), { ok: true, out: 'asked for https://github.com/o/r/pull/3 (3)' })
   assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/team-prs?key=${(await rig.rpc('state')).widgetKey}&full=1`)).text(), /"button":"Codex review"/)
+  // Links: no fetch, its chips from the settings
+  const links = (await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links')
+  assert.equal(links.every, undefined)
+  await rig.rpc('widgetSet', { id: 'links', on: true, config: { links: 'Lunch: https://food.example/order,https://linear.app' } })
+  assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/links?key=${(await rig.rpc('state')).widgetKey}`)).text(), /"links":\["Lunch: https:\/\/food.example\/order","https:\/\/linear.app"\]/)
 })

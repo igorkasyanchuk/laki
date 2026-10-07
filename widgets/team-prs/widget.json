@@ -16,6 +16,6 @@
   },
   "script": "fetch.mjs",
   "actions": {
-    "review": "PR=\"$WIDGET_ARG\"; export PR PR_NUMBER=\"${PR##*/}\"; [ -z \"$WIDGET_COMMAND\" ] || exec sh -c \"$WIDGET_COMMAND\"; [ -n \"$WIDGET_PROJECT\" ] || { echo 'Set Laki project (or a Review command) in Settings › Widgets' >&2; exit 1; }; exec \"$LAKI_CLI\" new \"$WIDGET_PROJECT\" --pr \"$PR\" --prompt \"$WIDGET_PROMPT\""
+    "review": "PR=\"$WIDGET_ARG\"; export PR PR_NUMBER=\"${PR##*/}\"; [ -z \"$WIDGET_COMMAND\" ] || exec sh -c \"$WIDGET_COMMAND\"; [ -n \"$WIDGET_PROJECT\" ] || { echo 'Set Laki project (or a Review command) in Settings › Widgets' >&2; exit 1; }; OUT=$(\"$LAKI_CLI\" new \"$WIDGET_PROJECT\" --pr \"$PR\" --prompt \"$WIDGET_PROMPT\") || exit 1; WS=${OUT%% *}; printf '{\"modal\":{\"title\":\"Review started\",\"text\":\"PR #%s is in the workspace %s: its agent is reviewing it.\",\"buttons\":[{\"label\":\"Close\"},{\"label\":\"Open it\",\"open\":\"laki://ws/%s\",\"primary\":true}]}}' \"$PR_NUMBER\" \"$WS\" \"$WS\""
   }
 }

@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, session, shell, Tray, webContents } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
@@ -16,7 +16,7 @@ let pendingTab: string | null = null
 let quitting = false
 let link: string | null = null // a laki:// link that came before the renderer listened
 let linkReady = false // the renderer listens for links
-let shot: string | null = null // a screenshot (a PNG, base64) from the menu bar, before the renderer listened
+let shot: [string, string] | null = null // a screenshot (a PNG, base64, and its note) from the menu bar, before the renderer listened
 let shotReady = false // the renderer listens for screenshots
 
 if (!app.requestSingleInstanceLock()) app.quit()
@@ -33,7 +33,7 @@ app.on('open-url', (e, url) => {
 })
 ipcMain.on('shot-ready', () => {
   shotReady = true
-  if (shot) win?.webContents.send('shot', shot)
+  if (shot) win?.webContents.send('shot', ...shot)
   shot = null
 })
 ipcMain.on('deep-link-ready', () => {
@@ -97,7 +97,7 @@ function create() {
     win?.show()
   })
   win.webContents.setWindowOpenHandler(({ url }) => {
-    if (/^https?:\/\//.test(url)) shell.openExternal(url)
+    if (typeof url === 'string' && /^(https?:\/\/|mailto:)/i.test(url)) shell.openExternal(url) // a site, or a mail to write (widgets' links)
     return { action: 'deny' }
   })
   win.webContents.on('will-navigate', e => e.preventDefault())
@@ -257,7 +257,7 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
 })
 
 // the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels),
-// then the new-workspace page with the picture in its prompt. Needs Screen Recording for Laki (macOS asks once).
+// then the editor window (annotate) to draw on it, then the new-workspace page with it. Needs Screen Recording for Laki (macOS asks once).
 // ponytail: the whole screen is the main display; screencapture takes a file per display for the others
 function screenshot(part: boolean) {
   const file = join(tmpdir(), `laki-shot-${process.pid}-${Date.now()}.png`)
@@ -270,11 +270,45 @@ function screenshot(part: boolean) {
         return // cancelled, or no permission: no file
       }
       rmSync(file, { force: true })
-      if (shotReady && win) win.webContents.send('shot', png)
-      else shot = png
-      show()
+      annotate(png)
     }), 250)
 }
+
+// the screenshot's editor (annotate.html): a small window over the others to crop it, draw on it and say what to do
+// with it; Add to prompt sends both to the new-workspace page, Esc drops them
+let annot: BrowserWindow | null = null
+function annotate(png: string) {
+  annot?.destroy()
+  const { width, height } = nativeImage.createFromBuffer(Buffer.from(png, 'base64')).getSize()
+  const d = screen.getPrimaryDisplay()
+  const fit = (n: number, extra: number, min: number, max: number) => Math.round(Math.min(Math.max(n / d.scaleFactor + extra, min), max))
+  const w = (annot = new BrowserWindow({
+    width: fit(width, 48, 720, d.workAreaSize.width * 0.85),
+    height: fit(height, 190, 460, d.workAreaSize.height * 0.85),
+    title: 'Screenshot',
+    backgroundColor: '#0e1014',
+    titleBarStyle: 'hiddenInset',
+    trafficLightPosition: { x: 14, y: 16 },
+    alwaysOnTop: true,
+    webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  }))
+  w.setAlwaysOnTop(true, 'floating')
+  w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  w.webContents.on('will-navigate', e => e.preventDefault())
+  w.webContents.once('did-finish-load', () => w.webContents.send('annotate-image', png))
+  w.on('closed', () => annot === w && (annot = null))
+  if (dev) w.loadURL(new URL('annotate.html', `${process.env.ELECTRON_RENDERER_URL}/`).href)
+  else w.loadFile(fileURLToPath(new URL('../renderer/annotate.html', import.meta.url)))
+}
+ipcMain.on('annotate-done', (e, png: unknown, note: unknown) => {
+  if (!annot || e.sender !== annot.webContents || typeof png !== 'string') return
+  annot.destroy()
+  const s: [string, string] = [png, typeof note === 'string' ? note.slice(0, 4000) : '']
+  if (shotReady && win) win.webContents.send('shot', ...s)
+  else shot = s
+  show()
+})
+ipcMain.on('annotate-cancel', e => annot && e.sender === annot.webContents && annot.destroy())
 
 // the menu bar's icon: Laki's mark (a chevron and a dot) drawn as a 32×32 template image (@2x): macOS colors it for a
 // light or dark menu bar from its alpha alone

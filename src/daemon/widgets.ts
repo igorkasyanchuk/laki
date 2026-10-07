@@ -9,9 +9,10 @@ import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { WidgetOption, WidgetSize, WidgetView } from '../shared/types.ts'
-import { hasFull, hasScript, pageOf, render, viewOf } from '../shared/widget.ts'
+import { hasFull, hasScript, pageOf, render, sayOf, viewOf, type WidgetSay } from '../shared/widget.ts'
+import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
-import { changed, cliArgv, cliEnv, clients, dir, plainEnv, q, state } from './core.ts'
+import { changed, cliArgv, cliEnv, clients, devLog, dir, plainEnv, q, state } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -37,7 +38,9 @@ let rev = 0 // each reload: the app renders its widgets again
 // what a JS widget's page asks for (GET /widget/<id>?key=…): its data is the user's, so not for any page on this Mac
 export const widgetKey = randomBytes(16).toString('hex')
 const fetches = (w: Entry) => !!(w.m.fetch || w.m.script)
+const wLog = (w: { id: string }, text: string | (() => string)) => devLog(`widget:${w.id}`, text) // a function: only in dev mode
 const fetchable = (w: Entry) => onOf(w) && fetches(w) && !running.has(w.id) // on, with a fetch, not fetching now
+const due = (w: Entry, now: number) => fetchable(w) && now - (w.s.at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
 
 const storePath = (id: string) => join(dir, 'widget-data', `${id}.json`)
 const home = (p: string) => (p.startsWith('~/') ? join(homedir(), p.slice(2)) : p)
@@ -219,6 +222,7 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
     s.config = { ...Object.fromEntries(Object.entries(s.config ?? {}).filter(([k]) => opts.has(k))), ...Object.fromEntries(given) }
   }
   writeStore(w.id, s)
+  wLog(w, `settings changed: ${[...Object.keys(o).filter(k => k !== 'id' && k !== 'config'), ...Object.keys(o.config ?? {})].join(', ')}`) // names only: a setting may be a key
   const { data: _, ...meta } = s
   w.s = meta
   changed()
@@ -300,6 +304,8 @@ export async function widgetRun(o: { id: string }): Promise<{ ok: boolean; error
   if (script && !script.startsWith(w.dir + '/')) return { ok: false, error: `${w.m.script} isn't in the widget's folder` }
   running.add(w.id)
   changed()
+  const t0 = Date.now()
+  wLog(w, `fetch: ${script ? `node ${w.m.script}` : w.m.fetch}`)
   let data: unknown
   let error: string | undefined
   try {
@@ -314,6 +320,8 @@ export async function widgetRun(o: { id: string }): Promise<{ ok: boolean; error
     error = (e as Error).message
   }
   running.delete(w.id)
+  const ms = Date.now() - t0
+  wLog(w, () => (error ? `fetch failed after ${ms} ms: ${error}` : `fetched in ${ms} ms: ${JSON.stringify(data)?.length ?? 0} bytes of JSON`))
   const s = readStore(w.id) // its settings may have changed meanwhile
   if (!error) s.data = data
   s.at = Date.now()
@@ -327,26 +335,40 @@ export async function widgetRun(o: { id: string }): Promise<{ ok: boolean; error
 }
 
 // a button's command (widget.json's actions), its data-arg as $WIDGET_ARG (never in the command line); then the widget
-// fetches again, to show what it changed
-export async function widgetAction(o: { id: string; action: string; arg?: string }): Promise<{ ok: boolean; out?: string; error?: string }> {
+// fetches again, to show what it changed. What it prints as JSON with toast or modal (sayOf) is what the app shows
+export async function widgetAction(o: { id: string; action: string; arg?: string }): Promise<{ ok: boolean; out?: string; error?: string } & WidgetSay> {
   const w = find(o.id)
   const cmd = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
   if (typeof cmd !== 'string') return { ok: false, error: `${w.m.name || w.id} has no action ${o.action}` }
+  wLog(w, `action ${o.action}${o.arg ? ` (${String(o.arg).slice(0, 200)})` : ''}`)
   try {
     const out = await exec(w, '/bin/sh', ['-c', cmd], { WIDGET_ARG: String(o.arg ?? '') })
+    wLog(w, `action ${o.action} done: ${lastLine(out) ?? 'printed nothing'}`)
     if (fetches(w)) void widgetRun({ id: w.id }) // fetching already: once more after it
-    return { ok: true, out: lastLine(out) }
+    let say: WidgetSay | null = null
+    for (const s of [out, lastLine(out)]) // all of it, or its last line after some log lines
+      try {
+        if ((say = sayOf(JSON.parse(s ?? '')))) break
+      } catch {}
+    return say ? { ok: true, ...say } : { ok: true, out: lastLine(out) }
   } catch (e) {
+    wLog(w, `action ${o.action} failed: ${(e as Error).message}`)
     return { ok: false, error: (e as Error).message }
   }
 }
 
 // every 30 s, and as the app connects or its window shows again: each widget that's on and due fetches (its every
 // minutes since the last try, which a failure counts as), only while the app's window is open (a client whose page is
-// visible: closing the window only hides it): no API calls nobody sees
+// visible: closing the window only hides it) and within settings.widgetHours (9am-9pm weekdays; a line that doesn't
+// read: always): no API calls nobody sees. Fetch now and a change of settings still fetch
 export function widgetTick(now = Date.now()) {
   if (![...clients].some(c => c.view?.shown !== false)) return
-  for (const w of widgets.values()) if (fetchable(w) && now - (w.s.at ?? 0) >= everyOf(w) * 60_000) void widgetRun({ id: w.id })
+  const hours = typeof state.settings?.widgetHours === 'string' && state.settings.widgetHours.trim() ? parseHours(state.settings.widgetHours) : null
+  if (hours && !('error' in hours) && !inHours(hours, now)) {
+    for (const w of widgets.values()) if (due(w, now)) wLog(w, () => `not fetched: outside the working hours (${describeHours(hours)})`)
+    return
+  }
+  for (const w of widgets.values()) if (due(w, now)) void widgetRun({ id: w.id })
 }
 
 // a widget's folder, for Open in (core's openIn)

@@ -125,22 +125,27 @@ export function Switch({ on, onChange, tip, className = '', children }: { on?: b
 
 // ask: a yes/no question in the app's own dialog (confirm() is the OS's sheet), true on OK. AskHost, mounted once
 // in App, shows it; a newer question answers the one before with no. Esc or a click outside: no; Enter: the focused
-// button (OK at first); its keys never reach what's under it, ⌘ shortcuts aside.
-type Asking = { title: string; text?: string; ok: string; danger?: boolean; done: (yes: boolean) => void }
+// button (OK at first); its keys never reach what's under it, ⌘ shortcuts aside. choose: the same dialog with any
+// buttons (a widget's modal), the index picked, -1 for none.
+type Choice = { label: string; primary?: boolean; danger?: boolean }
+type Asking = { title: string; text?: string; buttons: Choice[]; done: (i: number) => void }
 let asker: ((a: Asking) => void) | null = null
 export const ask = (title: string, o: { text?: string; ok?: string; danger?: boolean } = {}) =>
-  new Promise<boolean>(done => (asker ? asker({ title, ok: 'OK', ...o, done }) : done(confirm([title, o.text].filter(Boolean).join(' ')))))
+  new Promise<boolean>(done =>
+    asker ? asker({ title, text: o.text, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
+  )
+export const choose = (title: string, text: string | undefined, buttons: Choice[]) => new Promise<number>(done => (asker ? asker({ title, text, buttons, done }) : done(-1)))
 
 export function AskHost() {
   const [a, setA] = useState<Asking | null>(null)
   const cur = useRef<{ a: Asking; back: Element | null } | null>(null)
   const box = useRef<HTMLDivElement>(null)
-  const close = (yes: boolean) => {
+  const close = (i: number) => {
     const c = cur.current
     if (!c) return
     cur.current = null
     setA(null)
-    c.a.done(yes)
+    c.a.done(i)
     if (c.back instanceof HTMLElement) c.back.focus() // the terminal it came from
   }
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
@@ -150,13 +155,14 @@ export function AskHost() {
     e.stopPropagation()
     const btns = [...(box.current?.querySelectorAll('button') ?? [])]
     const at = btns.indexOf(document.activeElement as HTMLButtonElement)
-    if (e.key === 'Escape') close(false)
-    else if (e.key === 'Enter') close(at !== 0)
-    else if (['Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) btns[at === 0 ? 1 : 0]?.focus()
+    const n = btns.length
+    if (e.key === 'Escape') close(-1)
+    else if (e.key === 'Enter') close(at >= 0 ? at : cur.current.a.buttons.findIndex(b => b.primary))
+    else if (['Tab', 'ArrowLeft', 'ArrowRight'].includes(e.key)) btns[(at + (e.key === 'ArrowLeft' || (e.key === 'Tab' && e.shiftKey) ? n - 1 : 1)) % n]?.focus()
   }
   useEffect(() => {
     asker = next => {
-      cur.current?.a.done(false)
+      cur.current?.a.done(-1)
       cur.current = { a: next, back: cur.current?.back ?? document.activeElement }
       setA(next)
     }
@@ -170,15 +176,16 @@ export function AskHost() {
   useEffect(() => box.current?.querySelector<HTMLButtonElement>('button.primary')?.focus(), [a])
   if (!a) return null
   return (
-    <div className="overlay ask-overlay" onMouseDown={e => e.target === e.currentTarget && close(false)}>
+    <div className="overlay ask-overlay" onMouseDown={e => e.target === e.currentTarget && close(-1)}>
       <div className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
         <div className="ask-title">{a.title}</div>
         {a.text && <p className="ask-text">{a.text}</p>}
         <div className="ask-buttons">
-          <button onClick={() => close(false)}>Cancel</button>
-          <button className={`primary ${a.danger ? 'danger' : ''}`} onClick={() => close(true)}>
-            {a.ok}
-          </button>
+          {a.buttons.map((b, i) => (
+            <button key={i} className={`${b.primary ? 'primary' : ''} ${b.danger ? 'danger' : ''}`} onClick={() => close(i)}>
+              {b.label}
+            </button>
+          ))}
         </div>
       </div>
     </div>

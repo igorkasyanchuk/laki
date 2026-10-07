@@ -76,6 +76,12 @@ const TOOLS: Tool[] = [
     run: a => rpc('send', { target: a.target, text: a.text, whenIdle: !!a.when_idle }),
   },
   {
+    name: 'laki_progress',
+    description: "Say how far along your task is, shown on your tab in Laki: an estimate of the whole task (0-100) and what you're on. When LAKI_PROGRESS is set, call it every 20-30 seconds of work; 100 when done.",
+    inputSchema: obj({ pct: { type: 'number', description: '0 to 100: how much of the whole task is done' }, note: str('what you are on now, a few words') }, ['pct']),
+    run: a => rpc('progress', { tab: process.env.LAKI_TAB, pct: a.pct, note: a.note }),
+  },
+  {
     name: 'laki_screen',
     description: "The last lines of a tab's terminal: what the agent or command shows now.",
     inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), lines: { type: 'number', description: 'how many lines (default 40)' } }, ['target']),

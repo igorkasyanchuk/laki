@@ -69,7 +69,8 @@ board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `
 `unread`, `wsFan` and a workspace's `race`, `wsNew` `issue`, `browse`/`browseDone`; 14: settings' `prPrompts`, `prScan`,
 `prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
 workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
-workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`). A
+workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
+`progress`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -126,6 +127,14 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   bundle's processes by `--type`, none on plain node; `daemon` with its heap; `tabs`, each live session's process
   tree, the program first; RSS in KB); `tabSleep` (now: `cantSleep`'s rules: claude or codex with a `resumeId`, idle, no queue or limit, not on a host),
   `tabWake`, `sleepTick` (`now`: tests move the clock; every 60 s);
+- development mode (`settings.devMode`): `logs` (`key`: `ws:<id>` or `widget:<id>`): `core.ts` `devLog`'s lines, the
+  last 500 per key in memory, a line among the last 6 again counted (`n`) and moved to the end, all let go when dev mode
+  goes off; a line may be a function, called only in dev mode; PR scans, the PR switches' choices and why
+  not (`autoPR`, `prFix`, `tellAgent`), queue deliveries, tabs' status changes (`turn`), widgets' fetches and actions;
+- an agent's estimate: `progress` (`tab`, `pct` 0-100, `note`; `laki progress`, MCP's `laki_progress`): it returns what
+  it stored (clamped, rounded), and the tab's view has it until the turn ends (`view` drops it on idle or exit, however
+  the turn ended); `settings.progress` puts `LAKI_PROGRESS=1` in agents' env (`lakiEnv`) and
+  the laki skill tells them to report every 20-30 s;
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`: resolves once there's a link),
   `remoteStop`, `remoteTick` (`now`: tests move the clock);
 - terminals: `screen`, `input`, `resize`, `view`, `detach`;
@@ -436,7 +445,12 @@ on `widgetReload` and when `widgetDirs` changes; only that list stays in memory.
 guide says so) in the widget's folder with `$WIDGET_<NAME>` per setting, `$LAKI_WIDGET_CONFIG`,
 `$LAKI_WIDGET_FILE`, `$LAKI_CLI` (`launcher`: `<data>/widget-data/laki`) and an action's `$WIDGET_ARG` (never in the
 command); stdout must be JSON; a failure keeps the last data. `widgetTick` (30 s, and as the first client connects)
-fetches what's due, only while a client is on the socket (the app is open).
+fetches what's due, only while a client is on the socket (the app is open) and within `settings.widgetHours` (`when.ts`
+`parseHours`/`inHours`: `9am-9pm weekdays`, `no weekends`, overnight spans; a line that doesn't read: always). An action that prints
+JSON (all of stdout, or its last line) with `toast`/`modal` (`shared/widget.ts` `sayOf`: up to 4 buttons, each `run` (an action, `arg`), `open` (http(s),
+mailto, laki://) or nothing) returns them; a JS page's `laki.toast`/`laki.modal` post the same (`say`). The renderer
+shows a busy toast while an action runs (the button `data-busy`, cleared by a `done` message to the frame), then the
+result: App's `widgetApi.say`, a modal through ui.tsx's `choose` (the `ask` dialog with any buttons).
 
 `shared/widget.ts`: the template language (`render`: `{{a.b}}` escaped, `#each`/`#if`/`#unless` with `else`, `date`,
 `ago`, `spark`), `viewOf` (`<template preview>` / `<template full>`), `WIDGET_CSS` and `pageOf`. A widget whose HTML
@@ -449,7 +463,8 @@ non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages 
 Settings' `WidgetsSection` (`WidgetPrompt`: `shared/widgetGuide.ts` `widgetPrompt`, the format as a prompt for any AI
 chat, which the laki-widget skill's SKILL.md shares as `widgetFormat`; `WidgetCard`: a head row, then
 `WidgetOptionField` per setting, a list's `ChipsInput`; its folder button is App's Open in menu with `widget`). The
-two that come with Laki, `widgets/my-prs` (shell, gh `--jq`: an author's open PRs (`@me`, empty too) as `stats`, open,
+ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, opened in the browser; no fetch),
+`widgets/my-prs` (shell, gh `--jq`: an author's open PRs (`@me`, empty too) as `stats`, open,
 drafts, conflicts and `label1`–`label3`'s counts, and `groups`, each PR in the first of conflict, failing CI, changes,
 approved, in review, a draft first of all; a template) and
 `widgets/team-prs` (a JS fetch, a `gh pr list --author` per login at once: the whole list with its checks is a 504 in
@@ -542,7 +557,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     *archiving…* / *deleting…*), Compare's *Keep this one* too.
   - A new workspace stays in sight (`showNew`, from the new-workspace page, a fork, a restore): `reveal` unfolds the
     project and sep holding it, and the one selected before it, once the view has them.
-  - The menu bar's screenshot (`bridge.onShot`): `imageSave`, then the new-workspace page with it (`newImages`).
+  - The menu bar's screenshot (`bridge.onShot`): `imageSave`, then the new-workspace page with it (`newImages`, a
+    `Shot` each: its editor note goes in the prompt as it arrives, the page kept).
   - `making`: workspaces the new-workspace page is making, a row each (`makingRows`, a spinner, *creating…*) where
     `place` puts them; Esc closes the page and they stay until `wsNew`/`wsFan` answers (a dialog opened meanwhile stays).
   - No project: `Welcome` (panels.tsx) with `doctor`'s checks. `settings.dimPanes`: `.dim-panes` on `.app`.
@@ -591,6 +607,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     `.tab-dragging` on `<html>`: grabbing, no selection. After a drop the pane's terminal gets the keyboard. Off on a
     phone;
   - `SideHandle` resizes the sidebar.
+- **`annotate.ts`** (`annotate.html`, electron-vite's second renderer entry): the menu bar screenshot's editor, a
+  window main keeps on top (`annotate()` in main, `bridge.annotate`): crop, arrow, text, rectangle, pen, six colors,
+  ⌘Z, a note; *Add to prompt* sends the PNG and note to main (only from that window), which sends `shot` (png, note)
+  to the app: the new-workspace page with the image and the note as its prompt. Vanilla TS; in a browser (the dev
+  server) a stand-in picture.
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
   terminal's `minimumContrastRatio` keeps their text readable.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki
@@ -611,6 +632,14 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   before the first render: a terminal measures its cells once.
 - **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB);
   tokens become React text, never HTML.
+- **Sidebar styles** (`settings.sideStyle`, `SIDE_STYLES` in Settings.tsx): `.sidebar[data-style]`; App's `wsRow` adds
+  `.ws-sub` (branch, `STATE_WORDS`, progress, PR, diff) for extended and cards, `.ws-last` (the agent's last answer)
+  for cards; compact is CSS only. `sideLook.icons` is `--ws-icon`, every row mark's size (avatar and GitHub's alike).
+- **CSV** (`SidePanel.tsx` `CsvTable`, `text.ts` `csvSep`/`parseCsv`/`toCsv`): a `.csv`/`.tsv` preview's Table (or
+  Raw, `laki.csv`); editing a cell rewrites the file through `toCsv` (`parseCsv`'s `quoted`, cell by cell: a quoted cell stays quoted, a
+  new row's like the row above, a new column's like the cell before; LF only: FilePreview's save puts CRLF back), saved like the
+  text edit. ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
+  (`securityLevel: strict`).
 - **`markdown.ts`**: `markdown` (blocks) and `inline`: a Markdown file as a tree (GitHub's common subset), which
   `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
@@ -723,8 +752,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m`, sent as `shot` once the renderer says `shot-ready`), `pick-folder` IPC, laki:// links, the preview's webview guard and `capture` |
-| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot), capture, browse |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m`, then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
+| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
@@ -751,7 +780,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 ## Conventions
 
 - **Keep it small.** Use node's stdlib plus the existing deps (Electron, node-pty, xterm and its addons,
-  React); no new dependencies. Fonts are bundled (`fonts/`: OFL, Hack MIT; each in `NOTICE.md`), never loaded from the web. Mark deliberate shortcuts with a `ponytail:` comment naming the limit.
+  React, mermaid: the user's call, loaded only for a diagram); no new dependencies. Fonts are bundled (`fonts/`: OFL, Hack MIT; each in `NOTICE.md`), never loaded from the web. Mark deliberate shortcuts with a `ponytail:` comment naming the limit.
 - **`laki hook` must never fail or block the agent.**
 - **Never write** `~/.claude/settings.json` or `~/.codex/*`. Agents get settings and notify through
   flags only.

@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
@@ -26,6 +26,32 @@ export const shell = process.env.SHELL || userInfo().shell || '/bin/zsh'
 
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 
+// development mode (settings.devMode): what happened to each workspace (ws:<id>: PR scans, the PR switches' choices,
+// what went to its agent, its tabs' turns) and widget (widget:<id>: fetches, actions), for ⋯ › Logs and Settings ›
+// Widgets. The last 500 lines of each; a line among the last 6 again (each scan says the same few) is counted (n),
+// dated anew and moved to the end; text may be a function, called only in development mode. ponytail: in memory, a daemon restart or dev mode
+// going off starts them over (a removed workspace's lines stay until then)
+const events = new Map<string, LogLine[]>()
+export function devLog(key: string, line: string | (() => string)) {
+  if (!state.settings?.devMode) return void (events.size && events.clear())
+  const text = typeof line === 'function' ? line() : line
+  const l = events.get(key) ?? []
+  const same = l.slice(-6).find(x => x.text === text)
+  if (same) {
+    same.n = (same.n ?? 1) + 1
+    same.at = Date.now()
+    l.splice(l.indexOf(same), 1)
+    l.push(same) // the log stays in time order
+  } else {
+    l.push({ at: Date.now(), text })
+    if (l.length > 500) l.splice(0, l.length - 500)
+  }
+  events.set(key, l)
+}
+export const logs = (o: { key: string }) => events.get(String(o.key)) ?? []
+const wsLog = (ws: { id: string }, text: string | (() => string)) => devLog(`ws:${ws.id}`, text)
+const firstLine = (e: unknown) => String((e as { stderr?: string }).stderr || (e as Error).message || e).trim().split('\n')[0].slice(0, 300)
+
 // the agents to start: Settings' presets, or each agent as it is: claude and codex, and the others found on PATH
 // ponytail: looked for once; one installed later shows after a daemon restart, or added in Settings
 let found: Preset[] | undefined
@@ -36,7 +62,7 @@ const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; askKey?: string } // askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy)
+type Runtime = { progress?: { pct: number; note?: string }; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; askKey?: string } // askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy)
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -229,9 +255,10 @@ export function view(): View {
     else r.runAt = undefined
     if (status === 'idle') r.idleAt ??= Date.now()
     else r.idleAt = undefined
+    if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
-    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }) }
+    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }) }
   })
   return {
     projects: state.projects,
@@ -796,6 +823,7 @@ function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, ho
     ...state.settings?.env, // Settings → General: every session's
     ...projectConfig(ws).env,
     ...presetOf(tab)?.env,
+    ...(tab.kind === 'agent' && state.settings?.progress && { LAKI_PROGRESS: '1' }), // the laki skill: report how far along with laki progress
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
     TERM_PROGRAM: 'laki',
@@ -1502,6 +1530,8 @@ function turn(p: { tab: string; state: string; payload?: any }) {
   if (!tab) return
   const r = rtOf(tab.id)
   const pl = p.payload ?? {}
+  const was = r.status
+  if (state.settings?.devMode) queueMicrotask(() => r.status !== was && wsLog({ id: tab.workspace }, `${tab.name}: ${was} → ${r.status}${p.state !== r.status ? ` (${p.state})` : ''}${tab.queue?.length ? `, ${tab.queue.length} queued` : ''}`))
   switch (p.state) {
     case 'start':
       if (pl.session_id && pl.session_id !== tab.resumeId) {
@@ -1548,6 +1578,21 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       break
   }
   changed()
+}
+
+// an agent's estimate of how far along its task is (laki progress, MCP's laki_progress; the skill asks for one every
+// 20-30 s while LAKI_PROGRESS is set): on its tab until the turn ends
+export function progress(o: { tab?: string; pct: number; note?: string }) {
+  const tab = state.tabs.find(t => t.id === o.tab)
+  if (!tab) throw new Error(o.tab ? `no tab ${o.tab}` : 'which tab? (run it in a Laki tab: $LAKI_TAB)')
+  const pct = typeof o.pct === 'number' ? o.pct : typeof o.pct === 'string' && (o.pct as string).trim() ? Number(o.pct) : NaN // JSON's NaN is null
+  if (!Number.isFinite(pct)) throw new Error('a percentage: 0 to 100')
+  const note = typeof o.note === 'string' && o.note.trim() ? o.note.trim().replace(/\s+/g, ' ').slice(0, 120) : undefined
+  rtOf(tab.id).progress = { pct: Math.min(100, Math.max(0, Math.round(pct))), ...(note && { note }) }
+  const p = rtOf(tab.id).progress!
+  wsLog({ id: tab.workspace }, `${tab.name}: ${p.pct}%${note ? ` · ${note}` : ''}`)
+  changed()
+  return { ok: true, ...p }
 }
 
 // ---------- typing into agents, queue
@@ -1615,6 +1660,7 @@ function deliver(id: string) {
   const msg = tab.queue.shift()!
   if (!tab.queue.length) delete tab.queue
   save()
+  wsLog({ id: tab.workspace }, `to ${tab.name}: a queued message typed in${tab.queue?.length ? ` (${tab.queue.length} more waiting)` : ''}: ${msg.split('\n')[0].slice(0, 120)}`)
   typeInto(s, textFor(tab, msg))
   r.status = 'running'
   changed()
@@ -2111,10 +2157,13 @@ async function scanPR(ws: Workspace) {
       body: typeof j.body === 'string' ? j.body.slice(0, 4000) : undefined,
       updated: j.updatedAt,
     }
-  } catch {
+  } catch (e) {
+    wsLog(ws, `PR: gh pr view ${ws.prUrl ?? ws.branch}: ${firstLine(e)}`)
     if (prs.delete(ws.id)) changed()
     return
   }
+  const count = (st: Check['state']) => pr.list?.filter(c => c.state === st).length ?? 0
+  wsLog(ws, () => `PR #${pr.number} ${pr.state}${pr.draft ? ' draft' : ''}, head ${pr.head?.slice(0, 7) ?? '?'}: checks ${pr.checks || 'none'} (${count('fail')} failing${count('fail') ? `: ${pr.list!.filter(c => c.state === 'fail').map(c => c.name).join(', ')}` : ''}, ${count('pending')} running, ${count('pass')} passing), conflicts ${pr.conflict === undefined ? 'unknown' : pr.conflict ? 'yes' : 'no'}, review ${pr.review ?? 'none'}`)
   if (JSON.stringify(prs.get(ws.id)) !== JSON.stringify(pr)) {
     prs.set(ws.id, pr)
     changed()
@@ -2128,14 +2177,14 @@ async function scanPR(ws: Workspace) {
 // shows it with Undo; one left alone shows "merged" in the sidebar
 async function archiveMerged(ws: Workspace, pr: PR) {
   if (!state.settings?.archiveMerged || ws.kind !== 'worktree' || ws.archived || ws.autoArchived === pr.number || !pr.head) return
-  if (tabsOf(ws.id).some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return
-  if ((await git(ws, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return // unpushed (or git can't tell)
+  if (tabsOf(ws.id).some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return wsLog(ws, 'archive on merge: not now, an agent is at work')
+  if ((await git(ws, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return wsLog(ws, 'archive on merge: no, commits past the PR\'s head') // unpushed (or git can't tell)
   ws.autoArchived = pr.number // before: wsArchive saves it
   const r = await wsArchive(ws.id, { ifClean: true }).catch(e => {
     ws.autoArchived = undefined // failed: the next scan tries again
     throw e
   })
-  if (r?.dirty) return void (ws.autoArchived = undefined)
+  if (r?.dirty) return void ((ws.autoArchived = undefined), wsLog(ws, 'archive on merge: no, uncommitted changes'))
   log(`archived ${ws.id}: PR #${pr.number} merged`)
   broadcast({ ev: 'archived', ws: ws.id, name: ws.name || ws.id, pr: pr.number })
 }
@@ -2149,47 +2198,56 @@ const retry = new Set<string>() // `<ws>:ci`, `<ws>:merge`: a switch turned on a
 
 async function autoPR(ws: Workspace, pr: PR) {
   // a PR only linked (prLinked): its branch isn't this workspace's, so the agent's push wouldn't reach it
-  if (pr.state !== 'OPEN' || ws.prLinked || !(ws.autoFix || ws.autoReview || ws.autoMerge)) return
+  if (!(ws.autoFix || ws.autoReview || ws.autoMerge)) return
+  if (pr.state !== 'OPEN' || ws.prLinked) return wsLog(ws, `switches: nothing to do, the PR is ${ws.prLinked ? 'only linked (its branch is not this workspace\'s)' : pr.state}`)
   const f: PRFix = ws.fix?.pr === pr.number ? { ...ws.fix } : { pr: pr.number }
   if (retry.delete(`${ws.id}:ci`)) Object.assign(f, { ci: undefined, tries: 0 }) // and the current commit's failure goes again
   if (retry.delete(`${ws.id}:merge`)) Object.assign(f, { merge: undefined, merges: 0 })
   const max = state.settings?.prTries || PR_TRIES
   if (ws.autoFix) {
-    if (pr.checks === 'pass') f.tries = 0
+    if (pr.checks === 'pass') (f.tries = 0), wsLog(ws, 'fix CI: checks pass')
     else if (pr.checks === 'fail' && pr.head && pr.head !== f.ci) {
       const tries = (f.tries ?? 0) + 1
       if (tries > max) {
         if (tries - 1 <= max) overToYou(ws, `CI still fails after ${max} fixes`) // once, as it goes over (max may have changed)
+        wsLog(ws, `fix CI: still failing after ${max} tries: over to you`)
         Object.assign(f, { ci: pr.head, tries })
-      } else if (await prFix({ ws: ws.id, what: 'ci' }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), false)))
+      } else if (await prFix({ ws: ws.id, what: 'ci' }).then(() => true, e => (log(`fix ci ${ws.id}: ${e.message}`), wsLog(ws, `fix CI: not sent (try ${tries} of ${max}): ${e.message}`), false)))
         Object.assign(f, { ci: pr.head, tries }) // recorded once sent: no agent yet means the next scan tries again
-    }
+    } else wsLog(ws, pr.checks === 'fail' ? `fix CI: already sent for ${pr.head?.slice(0, 7)} (try ${f.tries ?? 0} of ${max}): waiting for a push` : `fix CI: checks ${pr.checks || 'none yet'}: waiting`)
   }
   if (ws.autoMerge) {
     // ponytail: once per head commit, so a base that moves while the agent merges doesn't queue another; one that
     // conflicts again with the same head waits for a push (or Send merge conflicts)
     const merges = (f.merges ?? 0) + 1
-    if (pr.conflict === false) f.merges = 0 // not unknown: that comes after every push, and would undo the limit
+    if (pr.conflict === false) (f.merges = 0), wsLog(ws, 'fix conflicts: none')
     else if (pr.conflict && pr.head && pr.head !== f.merge) {
       if (merges > max) {
         if (merges - 1 <= max) overToYou(ws, `Merge conflicts remain after ${max} tries`)
+        wsLog(ws, `fix conflicts: still there after ${max} tries: over to you`)
         Object.assign(f, { merge: pr.head, merges })
-      } else if (await prFix({ ws: ws.id, what: 'conflict' }).then(() => true, e => (log(`fix conflicts ${ws.id}: ${e.message}`), false)))
+      } else if (await prFix({ ws: ws.id, what: 'conflict' }).then(() => true, e => (log(`fix conflicts ${ws.id}: ${e.message}`), wsLog(ws, `fix conflicts: not sent: ${e.message}`), false)))
         Object.assign(f, { merge: pr.head, merges })
-    }
+    } else wsLog(ws, pr.conflict ? `fix conflicts: already sent for ${pr.head?.slice(0, 7)}: waiting for a push` : 'fix conflicts: GitHub is still working out whether it merges')
   }
   if (ws.autoReview) {
-    const t = await reviewThreads(ws, pr.number).catch(() => null)
+    const t = await reviewThreads(ws, pr.number).catch(e => (wsLog(ws, `review: ${e.message}`), null))
     const ids = new Set(f.mine)
     const mine = (c: Comment) => !!c.id && (ids.has(c.id) || (!!c.createdAt && agentSaid(ws.id, c.createdAt) && !!ids.add(c.id)))
     const k = t && reviewKey(t.threads, t.me, mine)
     if (ids.size) f.mine = [...ids].slice(-200)
+    if (t)
+      wsLog(ws, () => {
+        const open = t.threads.filter(x => !x.isResolved)
+        return `review: ${t.threads.length} inline threads, ${open.length} open, ${open.filter(x => x.comments.nodes.length).length} with comments that count (${t.dropped} from people without write access left out; the agent's own as you: ${ids.size}); ${k && newReview(k, f.review) ? 'something new' : 'nothing new since the last send'}`
+      })
     if (t && k !== null && newReview(k, f.review))
       try {
         tellAgent(ws, reviewMessage(pr, t.threads))
         f.review = k
       } catch (e) {
         log(`fix review ${ws.id}: ${(e as Error).message}`)
+        wsLog(ws, `review: not sent: ${(e as Error).message}`)
       }
     else if (k !== null) f.review = k // resolved threads drop out of the key
   }
@@ -2203,6 +2261,7 @@ async function autoPR(ws: Workspace, pr: PR) {
 // ◆ on the workspace's agent: over to you
 function overToYou(ws: Workspace, text: string) {
   const tab = agentOf(ws)
+  wsLog(ws, `over to you: ${text}${tab ? '' : ' (no live agent to mark)'}`)
   if (!tab) return
   rtOf(tab.id).status = 'waiting'
   broadcast({ ev: 'turn', tab: tab.id, ws: ws.id, kind: 'waiting', text })
@@ -2233,7 +2292,9 @@ const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && isLive(
 function tellAgent(ws: Workspace, text: string) {
   const tab = agentOf(ws)
   if (!tab) throw new Error(`${ws.id} has no running agent`)
-  return send({ target: tab.id, text, whenIdle: true })
+  const r = send({ target: tab.id, text, whenIdle: true })
+  wsLog(ws, `to ${tab.name}: ${'queued' in r ? `queued (${r.queued} waiting): it's ${rtOf(tab.id).status}${rtOf(tab.id).limit ? ', at its usage limit' : ''}` : 'typed in'}: ${text.split('\n')[0].slice(0, 120)}`)
+  return r
 }
 
 // what to tell the agent about a PR: settings.prPrompts' or PR_PROMPTS' text, its {{pr}}, {{url}} and {{base}} filled in
@@ -2262,6 +2323,7 @@ export async function prFix(o: { ws: string; what: FixWhat }) {
   const { stdout } = await exec(ws, 'gh', ['pr', 'checks', String(pr.number), '--json', 'name,bucket,link'], { timeout: 20000 }).catch(e => ({ stdout: String(e.stdout ?? '') }))
   const failing = (JSON.parse(stdout.trim() || '[]') as { name: string; bucket: string; link: string }[]).filter(c => c.bucket === 'fail')
   if (!failing.length) throw new Error(`no failing checks on PR #${pr.number}`)
+  wsLog(ws, `fix CI: gh pr checks: ${failing.length} failing: ${failing.map(c => c.name).join(', ')}`)
   let body = ''
   let logs = 0
   for (const c of failing) {
@@ -2301,14 +2363,15 @@ const REVIEW_QUERY = `query($owner: String!, $repo: String!, $pr: Int!) {
 }`
 
 // a PR's review threads, and who you are on GitHub
-async function reviewThreads(at: At, pr: number): Promise<{ threads: Thread[]; me: string }> {
+async function reviewThreads(at: At, pr: number): Promise<{ threads: Thread[]; me: string; dropped: number }> {
   const { stdout } = await exec(at, 'gh', ['api', 'graphql', '-F', 'owner={owner}', '-F', 'repo={repo}', '-F', `pr=${pr}`, '-f', `query=${REVIEW_QUERY}`], { timeout: 20000 }).catch(e => {
     throw new Error(`gh couldn't read the review comments: ${String(e.stderr || '').trim().split('\n')[0] || 'it failed'}`)
   })
   const d = JSON.parse(stdout).data
   const threads: Thread[] | undefined = d?.repository?.pullRequest?.reviewThreads?.nodes
   if (!threads) throw new Error(`no review threads for PR #${pr} (gh api graphql)`)
-  return { threads: threads.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(trusted) } })), me: d.viewer.login }
+  const dropped = threads.reduce((n, t) => n + t.comments.nodes.filter(c => !trusted(c)).length, 0)
+  return { threads: threads.map(t => ({ ...t, comments: { nodes: t.comments.nodes.filter(trusted) } })), me: d.viewer.login, dropped }
 }
 
 // the open threads with how many comments count on each ("id:n id:n"): everyone's but the agent's. It comments as you,

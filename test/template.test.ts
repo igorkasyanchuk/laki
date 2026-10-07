@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { fillTemplate, importable, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
+import { csvSep, fillTemplate, importable, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -178,4 +178,25 @@ test("the preview's address bar: a path on the port, another port, this Mac's, a
   assert.deepEqual(parseSize(' 375 × 667 '), [375, 667])
   assert.equal(parseSize('100x100'), null)
   assert.equal(parseSize('wide'), null)
+})
+
+test('csv: parsed and written back as it was; quotes, newlines, separators', () => {
+  const t = 'name,note\n"Doe, J","said ""hi""\nthen left"\nx,\n'
+  const { rows, quoted } = parseCsv(t)
+  assert.deepEqual(rows, [['name', 'note'], ['Doe, J', 'said "hi"\nthen left'], ['x', '']])
+  assert.deepEqual(quoted, [[false, false], [true, true], [false, false]])
+  assert.equal(toCsv(rows), t, 'round trip')
+  const all = '"a","b"\n"1","2"'
+  assert.equal(toCsv(parseCsv(all).rows, ',', parseCsv(all).quoted, false), all, 'all quoted, no last newline: kept')
+  const mixed = parseCsv('"name",price\n"Coffee",12.5\n')
+  mixed.rows[1][1] = '13'
+  assert.equal(toCsv(mixed.rows, ',', mixed.quoted), '"name",price\n"Coffee",13\n', 'quoted text, bare numbers: only the cell edited changes')
+  assert.equal(toCsv([...mixed.rows, ['Tea', '4'], ['Mug', '9']].map(r => [...r, 'x']), ',', mixed.quoted), '"name",price,x\n"Coffee",13,x\n"Tea",4,x\n"Mug",9,x\n', 'new rows like the one above, a new column like the cell before')
+  assert.deepEqual(parseCsv('a;b\r\n1;2\r\n', ';').rows, [['a', 'b'], ['1', '2']], 'CRLF')
+  assert.deepEqual(parseCsv('').rows, [])
+  assert.deepEqual(parseCsv('"",x').rows, [['', 'x']])
+  assert.equal(csvSep('a.csv', 'a;b;c\n1;2;3'), ';')
+  assert.equal(csvSep('a.csv', '"x,y";b\n'), ';', 'commas in quotes do not count')
+  assert.equal(csvSep('a.tsv', 'a,b'), '\t')
+  assert.equal(csvSep('a.csv', 'single'), ',')
 })

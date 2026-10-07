@@ -19,9 +19,15 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.send('deep-link-ready') // then main sends one that came first
   },
   capture: (webContentsId: number): Promise<string> => ipcRenderer.invoke('capture', webContentsId), // the preview's PNG, base64
-  // the menu bar's screenshot (a PNG, base64): to a new workspace's prompt
-  onShot: (cb: (png: string) => void) => {
-    ipcRenderer.on('shot', (_e, png: string) => cb(png))
+  // the menu bar's screenshot (a PNG, base64, drawn on) and its note: to a new workspace's prompt
+  onShot: (cb: (png: string, note?: string) => void) => {
+    ipcRenderer.on('shot', (_e, png: string, note?: string) => cb(png, note))
     ipcRenderer.send('shot-ready') // then main sends one taken before
+  },
+  // the screenshot's editor window (annotate.html): the picture in, the drawn one and a note out
+  annotate: {
+    onImage: (cb: (png: string) => void) => ipcRenderer.on('annotate-image', (_e, png: string) => cb(png)),
+    done: (png: string, note: string) => ipcRenderer.send('annotate-done', png, note),
+    cancel: () => ipcRenderer.send('annotate-cancel'),
   },
 })

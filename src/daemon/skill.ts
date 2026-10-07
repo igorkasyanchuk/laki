@@ -40,7 +40,7 @@ function files(at: string, k: SkillName): Record<string, string> {
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work.
 ---
 
 # Laki
@@ -60,6 +60,14 @@ For example \`"${cli}" ls --json\`. Below, \`laki\` stands for it.
 Inside a Laki tab, \`$LAKI_APP\` is \`true\`, \`$LAKI_HOME\` is set, \`$LAKI_WORKSPACE\` is your workspace's id,
 \`$LAKI_TAB\` your tab's and \`$PORT\` the workspace's port. Outside Laki they're unset. A tab with
 \`$LAKI_GO_HOME\` instead is Laki Go's: use the laki-go skill there, not this one.
+
+## Report progress
+
+When \`$LAKI_PROGRESS\` is \`1\` (the user turned on Settings › General › Progress on tabs), say how far along your
+task is while you work on it: \`laki progress <0-100> "<what you're on>"\` (or the MCP tool \`laki_progress\`) about
+every 20-30 seconds of work. It's your estimate of the whole task, not of the step: weigh the steps by how long
+they take, never go back down, and send \`100\` when it's done. Laki shows it on your tab until your turn ends.
+Unset: don't.
 
 ## Commands
 
@@ -164,6 +172,7 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget reload               # read the folders again (after any change) and fetch
     laki widget run <id>             # fetch now: "fetched" or the error
     laki widget render <id> [--full] # the HTML it shows now
+    laki widget action <id> <action> [arg] # a button's action: what the app would show (it really runs)
     laki widget ls                   # each one: on or off, size, schedule, last error
 
 A new widget in Laki's folder is on as soon as it's found. Tell the user which settings to fill in (Settings ›

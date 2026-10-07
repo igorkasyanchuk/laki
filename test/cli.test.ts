@@ -54,6 +54,28 @@ test('cli: project add, new, ls, send, screen, rm (--json)', async t => {
   assert.deepEqual(JSON.parse(r.out).workspaces, [])
 })
 
+test('cli: laki progress, an agent\'s estimate on its tab until its turn ends; LAKI_PROGRESS with the setting', async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { progress: true })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'slow work' })
+  const tab = await until(async () => (await rig.rpc('state')).tabs.find((t: any) => t.workspace === ws.id && t.status === 'running'), 'claude at work')
+  const started = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find((l: any) => l.bin === 'claude'), 'claude started')
+  assert.equal(started.env.LAKI_PROGRESS, '1')
+  let r = await rig.cli('progress', '40', 'reading', 'the', 'code', '--tab', tab.id)
+  assert.equal(r.out, '40%\n', r.err)
+  const cur = async () => (await rig.rpc('state')).tabs.find((t: any) => t.id === tab.id).progress
+  assert.deepEqual(await cur(), { pct: 40, note: 'reading the code' })
+  assert.equal((await rig.cli('progress', '140%', '--tab', tab.id)).out, '100%\n', 'what the tab shows')
+  assert.deepEqual(await cur(), { pct: 100 })
+  r = await rig.cli('progress', 'lots', '--tab', tab.id)
+  assert.match(r.err, /a percentage/)
+  assert.match((await rig.cli('progress', '5')).err, /which tab/)
+  await rig.rpc('input', { tab: tab.id, data: '\x1b' })
+  await until(async () => (await rig.rpc('state')).tabs.find((t: any) => t.id === tab.id).status === 'idle', 'interrupted')
+  assert.equal(await cur(), undefined, 'gone with the turn')
+})
+
 test('cli: hook never fails, even without a daemon', async t => {
   const rig = await fresh(t)
   await rig.stop()
@@ -231,7 +253,7 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
   assert.equal(got[1].result.protocolVersion, '2025-03-26')
   assert.equal(got[1].result.serverInfo.name, 'laki')
   const names = got[2].result.tools.map((t: any) => t.name)
-  assert.ok(names.includes('laki_state') && names.includes('laki_send') && names.includes('laki_browser'))
+  assert.ok(names.includes('laki_state') && names.includes('laki_send') && names.includes('laki_browser') && names.includes('laki_progress'))
   assert.ok(!names.some((n: string) => /rm|archive|ship/.test(n)))
   assert.ok(!got[3].result.isError, got[3].result.content[0].text)
   assert.equal(JSON.parse(got[3].result.content[0].text).id, 'mcp-ws')

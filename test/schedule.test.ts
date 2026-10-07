@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, realpathSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { describe, nextRun, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
+import { describe, describeHours, inHours, nextRun, parseHours, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
 import { fresh, until } from './helpers.ts'
 
 const SUN = new Date(2026, 9, 4, 10, 0).getTime() // Sunday 4 October 2026, 10:00
@@ -13,6 +13,32 @@ const rule = (t: string) => {
 }
 const error = (t: string) => (parseWhen(t, SUN) as { error?: string }).error
 const day = (d: number, h: number, m = 0) => new Date(2026, 9, d, h, m).getTime()
+
+test('widget hours: a line of English to days and a span; in it or not', () => {
+  const h = (t: string) => {
+    const r = parseHours(t)
+    return 'error' in r ? r.error : describeHours(r)
+  }
+  assert.equal(h('9am-9pm'), 'Every day, 09:00–21:00')
+  assert.equal(h('weekdays 8:00 to 18:30'), 'Weekdays, 08:00–18:30')
+  assert.equal(h('from 9 till 5pm, mon-thu'), 'Mon, Tue, Wed, Thu, 09:00–17:00')
+  assert.equal(h('1-5pm except weekends'), 'Weekdays, 13:00–17:00')
+  assert.equal(h('9-5'), 'Every day, 09:00–17:00')
+  assert.equal(h('9am-5'), 'Every day, 09:00–17:00')
+  assert.equal(h('noon-6'), 'Every day, 12:00–18:00')
+  assert.equal(h('9am-6pm, no weekends'), 'Weekdays, 09:00–18:00')
+  assert.equal(h('9-5 not fri'), 'Sun, Mon, Tue, Wed, Thu, Sat, 09:00–17:00')
+  assert.equal(h('10pm to 6am'), 'Every day, 22:00–06:00 (the next day)')
+  assert.match(h('sometimes'), /From when to when/)
+  assert.match(h('9am-9am'), /From when to when/)
+  const r = parseHours('9am-9pm weekdays') as Exclude<ReturnType<typeof parseHours>, { error: string }>
+  const at = (day: number, hh: number, mm = 0) => new Date(2026, 9, 4 + day, hh, mm).getTime() // Oct 4 2026: a Sunday
+  assert.ok(inHours(r, at(1, 9)) && inHours(r, at(5, 20, 59)))
+  assert.ok(!inHours(r, at(1, 21)) && !inHours(r, at(1, 8, 59)) && !inHours(r, at(6, 12)), 'after, before, a Saturday')
+  const night = parseHours('10pm-6am fri') as typeof r
+  assert.ok(inHours(night, at(5, 23)) && inHours(night, at(6, 5)), 'Friday night into Saturday')
+  assert.ok(!inHours(night, at(5, 5)), 'Friday morning is Thursday night')
+})
 
 test('when: a line of English to days and times; the next run; in words', () => {
   const WEEK = [1, 2, 3, 4, 5]

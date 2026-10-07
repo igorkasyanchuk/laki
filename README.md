@@ -5,7 +5,7 @@ worktree. Agents keep running when the window is closed.
 
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts and your `.env` copied in.
   Start one from a prompt, a GitHub issue or a PR. Plain folders work too.
-- **Status**: running, needs you, done, on every tab and row; notifications (Allow / Deny on a permission prompt),
+- **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications (Allow / Deny on a permission prompt),
   a Dock and menu bar count, pushes to your phone (ntfy, Slack, Telegram), a follow-up queue. Agents resume after a
   restart or a usage limit.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
@@ -14,15 +14,18 @@ worktree. Agents keep running when the window is closed.
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
 - **PRs**: CI and reviews in the status bar, sent to the agent if you like; ship (commit, push, PR) in one step;
   archived once merged, if you like.
-- **Side panel**: files (Markdown rendered), the diff (comment on a line; images before and after), review threads, and a preview of the dev
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (comment on a line; images before and after), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`).
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only.
 - **Looks**: 86 themes, 68 of which change shapes and type too (some after films' and games' screens); glass; your
-  accent, corners and sidebar lines; tabs on top, bottom, left or right.
-- **Widgets**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, or any you make with an agent or any AI
-  chat: Settings has the prompt), each fed by a command on a schedule, with a full view a click away.
+  accent, corners, sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
+- **Widgets**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
+  with an agent or any AI chat: Settings has the prompt), each fed by a command on a schedule (within working hours, if
+  you like), with a full view a click away; their buttons answer with toasts and dialogs.
+- **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new
+  workspace's prompt.
 - **A video while you work**: a YouTube link plays at the bottom of the sidebar.
 - **Keyboard and CLI**: ⌘K for everything; `laki` (also an MCP server) drives it all, agents included.
 

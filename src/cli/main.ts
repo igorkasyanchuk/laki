@@ -13,7 +13,7 @@ import { describe } from '../shared/when.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -154,6 +154,12 @@ async function main() {
       const r = await rpc('send', { target, text: words.join(' '), whenIdle: !!flags['when-idle'] })
       return out(r, r.sent ? 'sent' : `queued (${r.queued} waiting): sent when the agent finishes its turn`)
     }
+    case 'progress': {
+      // laki progress <0-100> [what you're on]: an agent's estimate, on its tab (LAKI_TAB) until its turn ends
+      if (!rest[0]) throw new Error('usage: laki progress <0-100> [what you are on]')
+      const r = await rpc('progress', { tab: flags.tab || process.env.LAKI_TAB, pct: String(rest[0]).replace(/%$/, ''), note: rest.slice(1).join(' ') || undefined })
+      return out(r, `${r.pct}%`) // as the tab shows it: 0 to 100, whole
+    }
     case 'screen': {
       const text = await rpc('screen', { target: rest[0], lines: Number(flags.lines) || 30 })
       return out(text, text)
@@ -213,7 +219,7 @@ async function main() {
       }
       if (sub === 'action') {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' ') }, 130000)
-        return out(r, r.ok ? r.out || 'done' : `✗ ${r.error}`)
+        return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
       throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg]')
     }

@@ -156,6 +156,37 @@ test('autoFix and autoReview: they wait for an agent; CI goes over to you after 
   c.close()
 })
 
+test('development mode: a workspace log of PR scans, what the switches did and why not, turns', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 4, state: 'OPEN', url: 'https://example.invalid/pr/4', headRefOid: 'abcdef123', mergeable: 'MERGEABLE', statusCheckRollup: [{ __typename: 'CheckRun', name: 'lint', status: 'COMPLETED', conclusion: 'FAILURE' }] }))
+  writeFileSync(join(gh, 'checks.json'), JSON.stringify([{ name: 'lint', bucket: 'fail', link: '' }]))
+  graphql(gh, [thread('t1', [said('bob', 'rename this'), said('eve', 'drive-by', 'User', 'NONE')])])
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  const lines = async () => ((await rig.rpc('logs', { key: `ws:${ws.id}` })) as { text: string }[]).map(l => l.text).join('\n')
+  await rig.rpc('wsSet', { id: ws.id, autoFix: true, autoReview: true })
+  await until(async () => (await rig.rpc('state')).workspaces[0].fix?.pr === 4, 'a scan')
+  assert.equal(await lines(), '', 'off: nothing kept')
+  await rig.rpc('settingsSet', { devMode: true })
+  await until(async () => /review: not sent: .* has no running agent/.test(await lines()), 'a scan logged', 15000)
+  const l = await lines()
+  assert.match(l, /PR #4 OPEN, head abcdef1: checks fail \(1 failing: lint, 0 running, 0 passing\), conflicts no/)
+  assert.match(l, /fix CI: not sent \(try 1 of 3\): .* has no running agent/)
+  assert.match(l, /review: 1 inline threads, 1 open, 1 with comments that count \(1 from people without write access left out/)
+  const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await until(async () => /fix CI: gh pr checks: 1 failing: lint/.test(await lines()) && /to claude: (typed in|queued)/.test(await lines()), 'sent, logged', 15000)
+  await until(async () => /claude: running → idle/.test(await lines()), 'its turn logged', 15000).catch(async e => assert.fail(`${e.message}\n${await lines()}`))
+  assert.ok(tab.id)
+  const raw = (await rig.rpc('logs', { key: `ws:${ws.id}` })) as { at: number; text: string; n?: number }[]
+  assert.ok(raw.some(x => x.text.startsWith('PR #4 OPEN') && x.n! > 1), 'each scan the same: counted, not repeated')
+  assert.ok(raw.every((x, i) => !i || raw[i - 1].at <= x.at), 'in time order')
+  await rig.rpc('settingsSet', { devMode: false })
+  await rig.rpc('prRefresh')
+  assert.equal(await lines(), '', 'off again: let go')
+})
+
 test('autoMerge: merge conflicts go to the agent once per head commit, with your prompt and tries; unknown keeps the count, none starts it over', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

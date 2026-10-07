@@ -6,7 +6,7 @@
 // Only what's on screen is rendered: a folded grid, or a closed dialog, holds nothing.
 import { type MouseEvent, useEffect, useRef, useState } from 'react'
 import type { WidgetView } from '../../shared/types'
-import { ago, WIDGET_CSS } from '../../shared/widget'
+import { ago, sayOf, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
 import { daemonBase } from './api'
 import { Icon, IconButton } from './ui'
 
@@ -16,7 +16,8 @@ export type WidgetApi = {
   open: (url: string) => void
   full: (id: string) => void
   close: () => void // the full view's dialog (Esc in a JS widget's frame)
-  action: (id: string, action: string, arg: string) => void // a button's data-run: one of widget.json's actions
+  action: (id: string, action: string, arg: string, label?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
+  say: (id: string, s: WidgetSay) => void // a toast, a dialog with buttons
   settings: () => void
   key?: string // the daemon's key for JS widgets' pages
 }
@@ -91,11 +92,13 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
     if (!w.js) return
     const f = (e: MessageEvent) => {
       if (e.source !== frame.current?.contentWindow || !e.data || typeof e.data !== 'object') return
-      const { laki, url, action, arg } = e.data as { laki?: string; url?: string; action?: string; arg?: string }
+      const { laki, url, action, arg, label } = e.data as { laki?: string; url?: string; action?: string; arg?: string; label?: string }
       if (laki === 'close' && full) return api.close()
       if (document.activeElement !== frame.current || navigator.userActivation?.isActive === false) return
       if (laki === 'open' && typeof url === 'string' && LINK.test(url)) api.open(url)
-      else if (laki === 'run' && typeof action === 'string') api.action(w.id, action, String(arg ?? ''))
+      else if (laki === 'run' && typeof action === 'string')
+        void api.action(w.id, action, String(arg ?? ''), String(label ?? '')).then(() => frame.current?.contentWindow?.postMessage({ laki: 'done', action, arg: String(arg ?? '') }, '*')) // its button works again
+      else if (laki === 'say') (s => s && api.say(w.id, s))(sayOf(e.data))
       else if (laki === 'refresh') void api.run(w.id).catch(() => {})
       else if (laki === 'full' && !full && w.full) api.full(w.id)
     }
@@ -111,7 +114,10 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
       e.preventDefault()
       const href = a.getAttribute('href') ?? ''
       if (LINK.test(href)) api.open(href)
-    } else if (r) api.action(w.id, r.getAttribute('data-run') ?? '', r.getAttribute('data-arg') ?? '')
+    } else if (r && !r.hasAttribute('data-busy')) {
+      r.setAttribute('data-busy', '') // until it's done
+      void api.action(w.id, r.getAttribute('data-run') ?? '', r.getAttribute('data-arg') ?? '', r.textContent?.trim()).then(() => r.removeAttribute('data-busy'))
+    }
     else if (b?.getAttribute('data-laki') === 'refresh') void api.run(w.id).catch(() => {})
     else if (!full && w.full && !path.some(n => n.matches('button, input, select, textarea, label'))) api.full(w.id)
   }

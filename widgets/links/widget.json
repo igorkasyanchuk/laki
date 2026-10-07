@@ -1,0 +1,8 @@
+{
+  "name": "Links",
+  "description": "Sites you open often, a click away in your browser: Linear, New Relic, lunch.",
+  "size": [3, 1],
+  "config": {
+    "links": { "type": "list", "label": "Links", "hint": "Label: https://… (one per chip)", "default": ["Linear: https://linear.app", "GitHub PRs: https://github.com/pulls"] }
+  }
+}

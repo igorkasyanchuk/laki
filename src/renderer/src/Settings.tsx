@@ -3,10 +3,11 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProcUse, type ProjectLook, type Resources, type SideLook, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, parseMails, type RunAction, type Template } from './text'
+import { describeHours, parseHours } from '../../shared/when'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
 import { QR } from './Tunnel'
@@ -49,6 +50,14 @@ const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]]
   ['indent', 'Indent', [['theme', "Theme's"], ['0px', 'None'], ['11px', 'Small'], ['20px', 'Large']]],
   ['rows', 'Row height', [['theme', "Theme's"], ['22px', 'Compact'], ['26px', 'Snug'], ['28px', 'Normal'], ['32px', 'Roomy']]],
   ['text', 'Text size', [['theme', "Theme's"], ['11px', '11'], ['12px', '12'], ['13px', '13'], ['14px', '14'], ['15px', '15']]],
+  ['icons', 'Icon size', [['theme', 'Default (13)'], ['11px', '11'], ['12px', '12'], ['14px', '14'], ['16px', '16'], ['18px', '18']]],
+]
+// the sidebar's rows (App.tsx wsRow, styles.css [data-style]): how much each says
+export const SIDE_STYLES: [SideStyle, string, string][] = [
+  ['compact', 'Compact', 'one short line: its state and name'],
+  ['default', 'Default', 'a line with its marks: PR, author, timers'],
+  ['extended', 'Extended', 'a second line: branch, what the agent is doing, the PR, the diff'],
+  ['cards', 'Cards', 'a card each, with the agent’s last answer'],
 ]
 // Appearance's corners (--radius) and where the tabs go
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
@@ -68,6 +77,7 @@ export type AppSettings = Paint & {
   minContrast?: number // 1: the theme's colors as they are
   cursorStyle?: 'block' | 'bar' | 'underline'
   cursorBlink?: boolean
+  scrollSpeed?: number // lines per wheel step, xterm's scrollSensitivity (unset: SCROLL)
   templates?: Template[] // prompt templates: {{prompt}}, {{project}}, {{base}}
   actions?: RunAction[] // Run ▾'s actions, with each project's
   env?: Record<string, string> // every session's
@@ -94,6 +104,10 @@ export type AppSettings = Paint & {
   menuBar?: boolean // the menu bar's item (unset: on)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
+  widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
+  devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
+  progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
+  sideStyle?: SideStyle // the sidebar's rows
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -206,6 +220,7 @@ export function installedFonts() {
 // a font name for xterm, with fallbacks
 export const fontStack = (f?: string) => [f?.trim() && JSON.stringify(f.trim()), '"JetBrains Mono"', '"SF Mono"', 'Menlo', 'Monaco', 'monospace'].filter(Boolean).join(', ')
 
+export const SCROLL = 3 // xterm's own 1 crawls through a long agent session
 // the terminal's typography and cursor, as xterm options (size and family: Term's props, zoom changes them)
 export const termLook = (s: AppSettings) => ({
   lineHeight: s.lineHeight ?? 1.15,
@@ -215,6 +230,8 @@ export const termLook = (s: AppSettings) => ({
   minimumContrastRatio: s.minContrast ?? 1,
   cursorStyle: s.cursorStyle ?? 'block',
   cursorBlink: s.cursorBlink !== false,
+  scrollSensitivity: s.scrollSpeed ?? SCROLL,
+  fastScrollSensitivity: (s.scrollSpeed ?? SCROLL) * 3, // with ⌥
 })
 
 const SAMPLE = [
@@ -548,7 +565,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Corners', 'radius rounded square'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Project names in the sidebar', 'font case letter spacing size weight'],
-  ['appearance', 'The sidebar', 'guide line divider indent row height dotted dashed text size'],
+  ['appearance', 'The sidebar', 'guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
   ['appearance', 'Button labels', 'sidebar scheduled board settings words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
   ['appearance', 'Glow', 'glass colors'],
@@ -560,6 +577,7 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'Font weight', 'bold light'],
   ['terminal', 'Minimum contrast', 'readable'],
   ['terminal', 'Cursor style', 'block bar underline'],
+  ['terminal', 'Scroll speed', 'wheel trackpad faster slow scrolling'],
   ['terminal', 'Blinking cursor', 'blink'],
   ['terminal', 'Copy selected text', 'clipboard selection'],
   ['terminal', 'Dim other panes', 'split focus fade'],
@@ -579,6 +597,9 @@ const FIND: [string, string, string?][] = [
   ['skill', 'Widget creator', 'agent skill widgets laki-widget make extension ai'],
   ['widgets', 'Widgets', 'sidebar extensions plugins folder reload fetch schedule'],
   ['widgets', 'More folders', 'widgets extensions'],
+  ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
+  ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
+  ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
@@ -928,6 +949,7 @@ export type WidgetsApi = {
   reload: () => Promise<unknown>
   open: (id: string) => void // its full view
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
+  logs?: (id: string) => void // development mode's: its fetches and actions
 }
 
 const SIZES: [number, number][] = [1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number]))
@@ -1057,6 +1079,7 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         {w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
         {w.full && <button onClick={() => api.open(w.id)}>Open</button>}
         {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
+        {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
       </div>
       {w.description && <div className="muted small">{w.description}</div>}
       {options.length > 0 && (
@@ -1091,8 +1114,9 @@ function WidgetPrompt({ home }: { home: string }) {
   )
 }
 
-function WidgetsSection({ api, dirs, onDirs }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void }) {
+function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void; hours: string; onHours: (h: string) => void }) {
   const [busy, setBusy] = useState(false)
+  const read = hours.trim() ? parseHours(hours) : null
   return (
     <>
       <h2>Widgets</h2>
@@ -1117,6 +1141,15 @@ function WidgetsSection({ api, dirs, onDirs }: { api: WidgetsApi; dirs: string[]
           </button>
           <span className="muted small">Reads the folders again and fetches each widget that's on: changes show without a restart.</span>
         </div>
+      </Group>
+      <Group title="Working hours">
+        <label>
+          <span>
+            Fetch only <span className="muted">· in plain English; empty: any time the app is open</span>
+          </span>
+          <input value={hours} spellCheck={false} placeholder="9am-9pm weekdays" onChange={e => onHours(e.target.value)} />
+        </label>
+        {read && <div className={`small ${'error' in read ? 'warn' : 'schedule-preview'}`}>{'error' in read ? `${read.error}: fetching any time until then` : `${describeHours(read)} · Fetch now still works outside them`}</div>}
       </Group>
       {api.list.map(w => (
         <WidgetCard key={w.id} w={w} api={api} />
@@ -1399,6 +1432,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
+                <Switch className="switch-row" on={!!s.progress} onChange={v => set({ progress: v })}>
+                  <Says title="Progress on tabs" hint="Agents estimate how far along their task is and report it every 20-30 seconds (LAKI_PROGRESS=1; needs the laki skill up to date, Settings › Agent skill: Update if it says outdated); new sessions get it" />
+                </Switch>
                 <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
                   <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
                 </Switch>
@@ -1407,6 +1443,13 @@ export function SettingsPage(p: {
                     <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
                   </Switch>
                 ))}
+              </div>
+              </Group>
+              <Group title="Development">
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.devMode} onChange={v => set({ devMode: v })}>
+                  <Says title="Development mode" hint="Keeps what happens to each workspace (PR checks, what the PR switches sent and why not, its agents' turns) and widget (fetches, actions): ⋯ › Logs, and Logs on a widget in Settings › Widgets" />
+                </Switch>
               </div>
               </Group>
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
@@ -1490,6 +1533,13 @@ export function SettingsPage(p: {
                 <span>
                   The sidebar <span className="muted">· over the theme's</span>
                 </span>
+                <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">
+                  {SIDE_STYLES.map(([k, name, what]) => (
+                    <button key={k} role="radio" aria-checked={(s.sideStyle ?? 'default') === k} className={(s.sideStyle ?? 'default') === k ? 'on' : ''} data-tip={what} onClick={() => set({ sideStyle: k })}>
+                      {name}
+                    </button>
+                  ))}
+                </div>
                 {lookGrid('sideLook', SIDE_LOOK)}
                 <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
                   <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled, Board, Video, Timer, Settings; the last ones drop theirs when the row is too narrow" />
@@ -1622,6 +1672,7 @@ export function SettingsPage(p: {
                 {pick('Font weight', 'fontWeight', '400', ['300', '400', '500', '600', '700'], w => `${w} · ${WEIGHTS[w]}`)}
                 {pick('Minimum contrast', 'minContrast', 1, [1, 3, 4.5, 7], n => CONTRAST[n])}
                 {pick('Cursor style', 'cursorStyle', 'block', ['block', 'bar', 'underline'], c => c[0].toUpperCase() + c.slice(1))}
+                {pick('Scroll speed', 'scrollSpeed', SCROLL, [1, 2, 3, 4, 5, 8], n => `${n}×${n === 1 ? ' · xterm’s' : ''} · ⌥ ${n * 3}×`)}
                 <div className="checks">
                   <Switch className="switch-row" on={s.cursorBlink !== false} onChange={v => set({ cursorBlink: v })}>
                     Blinking cursor
@@ -1683,7 +1734,7 @@ export function SettingsPage(p: {
             </>
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
-          {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} />}
+          {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} />}
           {sec === 'remote' && p.remote && <RemoteSection api={p.remote} mail={s.remoteMail ?? ''} onMail={remoteMail => set({ remoteMail })} />}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? 0} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}

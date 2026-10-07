@@ -64,7 +64,11 @@ print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
 - Shape the data in the fetch (gh's \`--jq\`, jq, JS): small, only what the page shows, with ready-made fields
   (\`"ci": "failing"\`, \`"approved": true\`), since templates have no comparisons.
 - \`actions\`: commands a button runs (\`<button data-run="review" data-arg="{{url}}">\`), with \`data-arg\` as \`$WIDGET_ARG\`
-  (never paste it into the command itself); then the widget fetches again. Their output's last line is shown to the user.
+  (never paste it into the command itself); then the widget fetches again. While it runs the app shows a toast and the
+  button waits; after, its output's last line is a toast, or print JSON (all of it, or its last line) to say more: \`{"toast": "Done"}\`, or
+  \`{"modal": {"title": "Review started", "text": "…", "buttons": [{"label": "Close"}, {"label": "Open it", "open":
+  "laki://ws/<id>", "primary": true}]}}\` (up to 4 buttons; each runs another action with \`"run"\` and \`"arg"\`, opens
+  an http(s), mailto or laki:// link with \`"open"\`, or just closes; no buttons: OK).
   Like \`fetch\`, a shell command in the widget's folder with the same environment, so a script of the widget's works:
   \`"done": "python3 mark_done.py"\`, \`"open": "sh open.sh"\`.
 
@@ -98,7 +102,8 @@ print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
 - Without a \`<script>\` the widget is drawn inside the app: no scripts, frames, forms or \`on…\` attributes (they're removed).
 - With a \`<script>\` it's a JS widget: its page runs in a sandboxed frame with no network (no fetch, no external
   scripts: inline everything), and gets \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`,
-  \`open(url)\`, \`expand()\` (the full view), \`run(action, arg)\`. Templates are filled first, so both work. Use it for
+  \`open(url)\`, \`expand()\` (the full view), \`run(action, arg)\`, \`toast(text)\`, \`modal({ title, text, buttons })\`
+  (the same as an action's JSON; these only work right after a click in the widget). Templates are filled first, so both work. Use it for
   canvas charts, sorting, filtering; build HTML with your own escaping. Draw a canvas at a fixed size (its \`width\` and
   \`height\` attributes, CSS stretching it): the frame's size may not be known yet while the page runs.
 `
