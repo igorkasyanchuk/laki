@@ -87,19 +87,20 @@ export function Term({
     ]
 
     let alive = true
-    const attach = async () => {
+    const attach = async (quiet = false) => {
       try {
         const r = await api.call('attach', { tab, cols: term.cols, rows: term.rows })
         if (!alive) return
         term.reset()
         term.write(r.snapshot)
       } catch (e) {
-        if (alive) term.write(`\r\n\x1b[2m[${(e as Error).message}]\x1b[0m\r\n`)
+        if (alive && !quiet) term.write(`\r\n\x1b[2m[${(e as Error).message}]\x1b[0m\r\n`) // quiet: a closed tab's, going
       }
     }
     const off = api.on(m => {
       if (m.tab === tab && m.ev === 'data') term.write(m.d)
       else if (m.tab === tab && m.ev === 'responder') responder = m.on
+      else if (m.tab === tab && m.ev === 'exit' && m.code === -1) attach(true) // the daemon replaced its session (a restart, a wake): the new one's
       else if (m.ev === 'open') attach()
     })
     // a keypress whose keydown went elsewhere isn't ours: Enter that closed a dialog and so focused this

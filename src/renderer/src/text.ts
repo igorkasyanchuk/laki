@@ -108,7 +108,7 @@ export function clock(ms: number) {
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {

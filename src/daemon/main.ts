@@ -152,6 +152,10 @@ const api: Record<string, Handler> = {
   run: p => core.runDev(p.ws),
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
   usage: () => usage(core.state.settings?.usage),
+  resources: () => core.resources(),
+  sleepTick: p => core.sleepTick(p?.now), // tests move the clock
+  tabSleep: p => core.sleepNow(p.tab),
+  tabWake: p => core.wake(p.tab), // a pane already on it: a look doesn't attach again
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message),
@@ -244,6 +248,11 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         return
       }
       if (m.method === 'attach') {
+        try {
+          core.wake(m.params?.tab) // a look wakes an agent put to sleep
+        } catch (e) {
+          log('wake', e) // its folder gone: the old screen, which says so
+        }
         const s = core.sessions.get(m.params?.tab)
         if (!s) return c.send({ id: m.id, error: `no session ${m.params?.tab}` })
         if (m.params.cols) core.resize(s.tab, m.params.cols, m.params.rows)
@@ -279,6 +288,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   every(prMs || 60000, () => (prMs ? core.scanPRs() : core.prTick()))
   every(2000, core.sweepRunning)
+  every(60000, () => core.sleepTick())
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
   every(30000, () => core.watchLimits())
   every(15000, () => core.remoteTick())

@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type Proc, type Project, type ProjectConfig, REMOTE, type Remote, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
@@ -36,7 +36,7 @@ const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; askKey?: string } // askKey: the ask the last pushed view gave
+type Runtime = { status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; askKey?: string } // askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy)
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -223,13 +223,15 @@ export function view(): View {
   const tabs: TabView[] = state.tabs.map(t => {
     const s = sessions.get(t.id)
     const r = rtOf(t.id)
-    const status: Status = !s || s.exited ? 'exited' : tracked(t) ? r.status : 'idle'
+    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : 'idle'
     // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
     if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
     else r.runAt = undefined
+    if (status === 'idle') r.idleAt ??= Date.now()
+    else r.idleAt = undefined
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
-    return { ...t, status, code: s?.exited ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask }
+    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }) }
   })
   return {
     projects: state.projects,
@@ -857,6 +859,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   else if (tab.kind === 'shell') args = ['-l']
   else args = ['-lic', wait + (o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, o.prompt, !!o.resume) : tab.cmd || 'true'))]
   sessions.get(tab.id)?.kill()
+  asleep.delete(tab.id)
   const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
   sessions.set(tab.id, s)
   const r = rtOf(tab.id)
@@ -887,9 +890,12 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   r.done = false
   s.onExit = code => {
     if (tab.kind === 'setup') rmSync(setupMarker(ws), { force: true })
-    // `exit` closes a shell's tab, a clean exit an agent's; one we ended (close, restart, archive, shutdown) is no longer in
-    // sessions. A host's shell that lost its connection (ssh's 255) stays: Enter starts it again
-    if (((tab.kind === 'shell' && (!ws.host || code !== 255)) || (tab.kind === 'agent' && code === 0)) && sessions.get(tab.id) === s && state.tabs.includes(tab)) return closeTab(tab.id)
+    // one we ended (close, restart, wake, archive, shutdown) is no longer in sessions: not this tab's end any more
+    if (sessions.get(tab.id) !== s) return
+    if (asleep.has(tab.id)) return changed() // put to sleep (sleepTick): it stays, and says so
+    // `exit` closes a shell's tab, a clean exit an agent's. A host's shell that lost its connection (ssh's 255) stays:
+    // Enter starts it again
+    if (((tab.kind === 'shell' && (!ws.host || code !== 255)) || (tab.kind === 'agent' && code === 0)) && state.tabs.includes(tab)) return closeTab(tab.id)
     changed()
     if (tab.kind !== 'agent' && tab.kind !== 'dev' && !(ws.host && tab.kind === 'shell')) return
     s.term.write('', () => {
@@ -1145,6 +1151,7 @@ export function closeTab(id: string) {
   const t = findTab(id)
   sessions.get(id)?.kill()
   sessions.delete(id)
+  asleep.delete(id)
   rt.delete(id)
   state.tabs = state.tabs.filter(x => x !== t)
   save()
@@ -1356,6 +1363,7 @@ async function teardown(ws: Workspace) {
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
     sessions.delete(t.id)
+    asleep.delete(t.id)
   }
   const cfg = projectConfig(ws)
   const none: Tab = { id: '', workspace: ws.id, name: '', kind: 'shell' }
@@ -1383,6 +1391,7 @@ function dropWs(ws: Workspace) {
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
     sessions.delete(t.id)
+    asleep.delete(t.id)
     rt.delete(t.id)
   }
   state.tabs = state.tabs.filter(t => t.workspace !== ws.id)
@@ -1574,6 +1583,8 @@ function textFor(tab: Tab, text: string): string | Promise<string> {
 // enter: false types it into the prompt for the user to finish (the preview's picked element): no turn starts
 export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean }) {
   const tab = resolveTarget(p.target)
+  if (p.enter === false && asleep.has(tab.id)) throw new Error(`${tab.name} is asleep: look at it to wake it, then send again`)
+  const woke = wake(tab.id) // running until it's up: what's sent waits for that (below)
   const s = sessions.get(tab.id)
   if (!s || s.exited) throw new Error(`${tab.name} isn't running`)
   const r = rtOf(tab.id)
@@ -1581,7 +1592,7 @@ export function send(p: { target: string; text: string; whenIdle?: boolean; ente
     if (r.status === 'waiting') throw new Error(`${tab.name} is asking you something: answer it first`) // the text would be keys to its question
     return typeInto(s, textFor(tab, p.text), false), { tab: tab.id, sent: true }
   }
-  if (p.whenIdle) {
+  if (p.whenIdle || woke) {
     if (!tracked(tab)) throw new Error(`${tab.name} doesn't report when it's done (agents do): send it now`)
     if (r.status !== 'idle' || r.limit || tab.queue?.length) {
       tab.queue = [...(tab.queue ?? []), p.text]
@@ -1617,13 +1628,19 @@ export function clearQueue(target: string) {
 }
 
 // input from a client's keyboard. Agents but claude don't say when a turn starts: Enter does.
+// what xterm sends on its own, not a key: focus in/out and mouse reports (modes the agent left on)
+const REPORTS = /^(?:\x1b\[[IO]|\x1b\[<\d+;\d+;\d+[Mm]|\x1b\[M[\s\S]{3})+$/
+
 export function input(id: string, data: string, c?: Client) {
+  if (asleep.has(id) && REPORTS.test(data)) return // a look's focus or a mouse over it isn't asking it to wake
+  if (wake(id)) return // the key is dropped: it was asleep
   const s = sessions.get(id)
   if (!s) return
   if (c) s.follow(c)
   const tab = state.tabs.find(t => t.id === id)
   if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev' || (tab.kind === 'shell' && state.workspaces.find(w => w.id === tab.workspace)?.host)) && data.includes('\r')) {
     spawnTab(tab, { resume: true }) // Enter on an ended agent or dev server (or a host's shell) starts it again
+    if (tracked(tab) && tab.queue?.length) rtOf(id).status = 'running' // what waits for it goes once it's up (sweepRunning)
     return
   }
   s.write(data)
@@ -2210,7 +2227,7 @@ function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
 export const webhookTest = (w: Webhook) => pushTo(w ?? {}, { event: 'test', workspace: '', tab: '', agent: 'Laki' }).then(() => true)
 
 // the workspace's agent: its first live agent tab
-const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && sessions.get(t.id) && !sessions.get(t.id)!.exited)
+const agentOf = (ws: Workspace) => tabsOf(ws.id).find(t => tracked(t) && isLive(t))
 
 // tellAgent types text into the workspace's agent, now or when its turn ends
 function tellAgent(ws: Workspace, text: string) {
@@ -2342,6 +2359,122 @@ export function sweepRunning(now = Date.now()) {
     changed()
     if (t.queue?.length) setTimeout(() => deliver(t.id), 800) // what waited for this turn's end (autoPR's too)
   }
+}
+
+// ---------- resources (Settings): memory and CPU by process; idle agents put to sleep
+
+type PsRow = ProcUse & { ppid: number }
+// every process, from one ps (%cpu may have the locale's decimal comma)
+async function psAll(): Promise<PsRow[]> {
+  const { stdout } = await run('ps', ['-axo', 'pid=,ppid=,rss=,%cpu=,command='], { maxBuffer: 64 << 20 }).catch(() => ({ stdout: '' }))
+  return stdout.split('\n').flatMap(l => {
+    const m = l.match(/^\s*(\d+)\s+(\d+)\s+(\d+)\s+([\d.,]+)\s+(.*)$/)
+    return m ? [{ pid: +m[1], ppid: +m[2], rss: +m[3], cpu: Number(m[4].replace(',', '.')) || 0, cmd: m[5].slice(0, 300) }] : []
+  })
+}
+// a process and everything under it, the process first
+function trees(rows: PsRow[]) {
+  const kids = new Map<number, PsRow[]>()
+  for (const r of rows) kids.get(r.ppid)?.push(r) ?? kids.set(r.ppid, [r])
+  return (pid: number) => {
+    const out = new Set<PsRow>()
+    const walk = (r?: PsRow) => {
+      if (!r || out.has(r)) return
+      out.add(r)
+      for (const k of kids.get(r.pid) ?? []) walk(k)
+    }
+    walk(rows.find(r => r.pid === pid))
+    return [...out]
+  }
+}
+const use = ({ pid, rss, cpu, cmd }: PsRow): ProcUse => ({ pid, rss, cpu, cmd })
+const sum = (ps: PsRow[], k: 'rss' | 'cpu') => Math.round(ps.reduce((n, p) => n + p[k], 0) * 10) / 10
+
+// macOS counts everything Laki starts as Laki's: each tab's agent, its MCP servers, its dev servers. Laki's own are the
+// app bundle's processes (main, windows, GPU, network…; none in dev, on plain node) and this daemon.
+// ponytail: a process that left its tab's tree (a double fork) shows nowhere
+export async function resources(): Promise<Resources> {
+  const rows = await psAll()
+  const tree = trees(rows)
+  const tabs = [...sessions].flatMap(([tab, s]) => {
+    if (s.exited || !state.tabs.some(t => t.id === tab)) return []
+    const ps = tree(s.pty.pid)
+    return [{ tab, rss: sum(ps, 'rss'), cpu: sum(ps, 'cpu'), procs: ps.map(use) }]
+  })
+  const mine = new Set([process.pid, ...tabs.flatMap(t => t.procs.map(p => p.pid))])
+  const bundle = process.execPath.match(/^(.*?\.app)\//)?.[1]
+  const kind = (cmd: string) => cmd.match(/--utility-sub-type=(\w+)/)?.[1] ?? cmd.match(/--type=([\w-]+)/)?.[1] ?? 'main'
+  const app = bundle ? rows.filter(r => r.cmd.startsWith(`${bundle}/`) && !mine.has(r.pid)).map(r => ({ ...use(r), kind: kind(r.cmd) })) : []
+  const me = rows.find(r => r.pid === process.pid)
+  const mem = process.memoryUsage()
+  const kb = (b: number) => Math.round(b / 1024)
+  return { app, daemon: { ...(me ? use(me) : { pid: process.pid, rss: kb(mem.rss), cpu: 0, cmd: process.argv.join(' ') }), heap: kb(mem.heapUsed) }, tabs }
+}
+
+// An idle claude or codex nobody looks at, quiet for settings.sleepAfter minutes, is put to sleep: its process ends
+// (it frees what it holds, and a long one grows), its screen stays, and a look (attach), a key or a message resumes
+// its chat (wake). Not one with a queue or a usage limit, without a chat to resume, on an SSH host, in a workspace
+// whose PR feedback goes to it (autoFix…), nor one with a port listening under it (a dev server it started).
+// ponytail: in memory; a daemon restart resumes every tab, asleep or not
+const asleep = new Set<string>()
+const isLive = (t: Tab) => asleep.has(t.id) || !!(sessions.get(t.id) && !sessions.get(t.id)!.exited)
+// why a tab can't sleep even when asked: a chat it can resume, here, idle with nothing waiting for it
+function cantSleep(t: Tab) {
+  const r = rt.get(t.id)
+  if ((t.preset !== 'claude' && t.preset !== 'codex') || !t.resumeId) return `${t.name} can't resume a chat: claude and codex can, once they have one`
+  if (state.workspaces.find(w => w.id === t.workspace)?.host) return `${t.name} runs on an SSH host: its memory is there`
+  if (r?.status !== 'idle' || r.limit || t.queue?.length) return `${t.name} is busy: it can sleep once its turn ends${r?.limit ? ' and its usage limit resets' : ''}`
+}
+// quiet: idle since (view sets idleAt) and since anyone last looked at it, not since it last printed: a TUI may redraw
+// while it waits (a status line)
+function sleepy(t: Tab, now: number) {
+  const min = Number(state.settings?.sleepAfter) || 0
+  const s = sessions.get(t.id)
+  const ws = state.workspaces.find(w => w.id === t.workspace)
+  return !!(min > 0 && s && !s.exited && !asleep.has(t.id) && !s.attachedClients().length && !cantSleep(t) && now - Math.max(rt.get(t.id)?.idleAt ?? now, s.lookedAt) > min * 60000 && ws && !ws.archived && !ws.autoFix && !ws.autoReview && !ws.autoMerge)
+}
+export async function sleepTick(now = Date.now()) {
+  if (!state.tabs.some(t => sleepy(t, now))) return []
+  const tree = trees(await psAll())
+  const slept: string[] = []
+  for (const t of state.tabs) {
+    if (!sleepy(t, now)) continue // again: a look or a turn may have come during ps
+    const s = sessions.get(t.id)!
+    const pids = new Set(tree(s.pty.pid).map(r => r.pid))
+    if (Object.values(procs.get(t.workspace) ?? {}).some(p => pids.has(p.pid))) continue
+    toSleep(t.id, s)
+    slept.push(t.id)
+  }
+  if (slept.length) log(`asleep: ${slept.join(', ')}`), changed()
+  return slept
+}
+function toSleep(id: string, s: Session) {
+  asleep.add(id)
+  s.end('\r\n\x1b[2m[asleep: ended to free memory · look at it, type or send it a message to resume it]\x1b[0m\r\n')
+}
+
+// Resources' Sleep: now, looked at or not (a dev server it started goes with it: your call)
+export function sleepNow(id: string) {
+  const t = findTab(id)
+  const s = sessions.get(t.id)
+  if (!s || s.exited || asleep.has(t.id)) return false
+  const why = cantSleep(t)
+  if (why) throw new Error(why)
+  toSleep(t.id, s)
+  changed()
+  return true
+}
+
+// an agent put to sleep resumes its chat; it counts as running until its screen goes quiet (sweepRunning), which
+// then delivers what was sent meanwhile. Its unread ● stays
+export function wake(id: string) {
+  const tab = state.tabs.find(t => t.id === id)
+  if (!tab || !asleep.has(id) || !sessions.has(id)) return false // no session: the daemon dropped it (shutdown)
+  const done = rtOf(id).done
+  spawnTab(tab, { resume: true })
+  Object.assign(rtOf(id), { status: 'running', done })
+  changed()
+  return true
 }
 
 // ---------- diff, dev server, ship
@@ -2859,7 +2992,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       const ws = s.ws === 'local' ? await wsNew({ project: s.project, local: true, preset: 'none' }) : findWs(s.ws)
       if (ws.archived) throw new Error(`${ws.id} is archived`)
       r.ws = ws.id
-      const live = tabsOf(ws.id).find(t => t.kind === 'agent' && (t.profile ?? t.preset) === s.preset && sessions.get(t.id) && !sessions.get(t.id)!.exited)
+      const live = tabsOf(ws.id).find(t => t.kind === 'agent' && (t.profile ?? t.preset) === s.preset && isLive(t))
       if (live) {
         const sent = send({ target: live.id, text: prompt, whenIdle: tracked(live) })
         r.tab = live.id

@@ -341,13 +341,11 @@ test('widgets that come with Laki: My PRs, Team PRs', async t => {
       [1, 'failing', 'approved', true, false],
     ],
   )
-  assert.equal(d.history.length, 1)
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /pr list --repo o\/r --state open --author alice /, 'one list per login')
   await rig.rpc('widgetSet', { id: 'team-prs', config: { logins: 'carol' } })
   await until(async () => (await team()).prs[0]?.number === 3, 'another team')
   d = await team()
   assert.deepEqual(d.team, ['carol'])
-  assert.equal(d.history.length, 2, 'the count over time')
   await rig.rpc('widgetSet', { id: 'team-prs', config: { logins: 'alice,bob,carol', hide: 'bug' } })
   await until(async () => (await team()).prs.length === 0, 'all hidden by label')
   await rig.rpc('widgetSet', { id: 'team-prs', config: { hide: '', only: 'Bug' } })
@@ -359,4 +357,8 @@ test('widgets that come with Laki: My PRs, Team PRs', async t => {
   assert.match(page, /<select id="who" aria-label="Author">/, 'a filter by author')
   // its action needs a project
   assert.match((await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' })).error, /Set Laki project/)
+  // or a command of your own, with the PR's URL and number; the button says what it does
+  await rig.rpc('widgetSet', { id: 'team-prs', config: { command: 'echo "asked for $PR ($PR_NUMBER)"', button: 'Codex review' } })
+  assert.deepEqual(await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' }), { ok: true, out: 'asked for https://github.com/o/r/pull/3 (3)' })
+  assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/team-prs?key=${(await rig.rpc('state')).widgetKey}&full=1`)).text(), /"button":"Codex review"/)
 })

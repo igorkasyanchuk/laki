@@ -965,3 +965,21 @@ button.board-card:hover { border-color: var(--muted); }
 .ws-sep.tinted .ws-name::before { content: ''; display: inline-block; width: 6px; height: 6px; margin-right: 5px; border-radius: 50%; vertical-align: 1px; background: var(--tab-c); }
 .ws-sep.tinted::after { border-top-color: color-mix(in srgb, var(--tab-c) 45%, transparent); }
 @media (hover: hover) { .ws-sep:hover .ws-acts { display: inline-flex; } }
+
+/* Settings › Resources: memory by tab */
+.res-total { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; }
+.res-total b { font-size: 22px; font-variant-numeric: tabular-nums; }
+.res-rows { display: flex; flex-direction: column; }
+.res-row { display: grid; grid-template-columns: 14px 1fr 44px 76px 124px; gap: 10px; align-items: center; padding: 6px 4px; border-top: 1px solid var(--line); cursor: pointer; }
+.res-rows > :first-child, .res-rows > :first-child > .res-row { border-top: none; }
+.res-row:hover { background: var(--hover); }
+.res-row.still { cursor: default; } .res-row.still:hover { background: none; } /* an asleep tab's: nothing to open */
+.res-name { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.res-name > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.res-bar { display: block; height: 2px; min-width: 1px; border-radius: 1px; background: var(--accent); opacity: 0.7; }
+.res-row .num, .res-procs .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.res-acts { display: flex; gap: 6px; justify-content: flex-end; }
+.res-procs { display: flex; flex-direction: column; gap: 2px; padding: 0 4px 8px 28px; font-size: 12px; }
+.res-procs > div { display: grid; grid-template-columns: 1fr auto; gap: 12px; color: var(--muted); }
+.res-procs .mono { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tab.asleep > span { opacity: 0.55; font-style: italic; } /* asleep (Settings › Resources): a look resumes it */

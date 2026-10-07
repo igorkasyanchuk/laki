@@ -1,7 +1,5 @@
 <style>
   .ci-failing, .review-changes { color: var(--error); } .ci-passing, .review-approved { color: var(--done); } .ci-pending, .review-waiting { color: var(--waiting); }
-  .tile { padding: 3px 6px; gap: 0; }
-  canvas { display: block; width: 100%; height: 12px; margin-top: 2px; }
   .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
   .bar input, .bar select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 8px; }
   .bar input { flex: 1; }
@@ -11,26 +9,9 @@
 </style>
 <template preview>
   <div class="tile">
-    <div class="num" id="count">–</div>
+    <div class="num">{{#if data}}{{data.prs.length}}{{else}}–{{/if}}</div>
     <div class="label">team PRs</div>
-    <canvas id="chart" width="160" height="24"></canvas>
   </div>
-  <script>
-    const d = laki.data
-    document.getElementById('count').textContent = d ? d.prs.length : '–'
-    // the count over the last fetches, as a line in the theme's accent; drawn at the canvas's own size (CSS stretches
-    // it to the tile): a frame's size may not be known yet while its page runs
-    const c = document.getElementById('chart'), h = d ? d.history : []
-    if (h.length > 1) {
-      const r = 2, w = c.width, ht = c.height, x = c.getContext('2d')
-      const ns = h.map(p => p.count), lo = Math.min(...ns), span = Math.max(...ns) - lo || 1
-      x.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#7aa2f7'
-      x.lineWidth = 1.5 * r
-      x.beginPath()
-      ns.forEach((n, i) => x[i ? 'lineTo' : 'moveTo']((i / (ns.length - 1)) * w, ht - 2 * r - ((n - lo) / span) * (ht - 4 * r)))
-      x.stroke()
-    }
-  </script>
 </template>
 <template full>
   <div class="bar">
@@ -67,7 +48,7 @@
             <td class="nowrap ci-${p.ci}">${p.ci}</td>
             <td class="nowrap review-${p.review}">${p.review === 'approved' ? '✓ approved' : p.review === 'changes' ? 'changes asked' : 'waiting'}</td>
             <td class="nowrap">${new Date(p.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td>
-            <td class="acts"><a href="${esc(p.url)}">Open PR</a><button data-run="review" data-arg="${esc(p.url)}">Review in Laki</button></td>
+            <td class="acts"><a href="${esc(p.url)}">Open PR</a><button data-run="review" data-arg="${esc(p.url)}">${esc(laki.config.button || 'Review in Laki')}</button></td>
           </tr>`).join('')
         : `<tr><td colspan="7" class="muted">${laki.error ? esc(laki.error) : laki.at ? 'No open PRs by the team.' : 'Not fetched yet.'}</td></tr>`
     }

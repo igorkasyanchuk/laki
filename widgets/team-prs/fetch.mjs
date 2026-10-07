@@ -1,6 +1,5 @@
-// Team PRs' fetch, run by Laki's node: the repo's open PRs by the team's members, each with its labels, CI and review,
-// and the count over the last runs (for the chart). config: repo (owner/name or a link), logins (GitHub logins), only
-// and hide (labels)
+// Team PRs' fetch, run by Laki's node: the repo's open PRs by the team's members, each with its labels, CI and review.
+// config: repo (owner/name or a link), logins (GitHub logins), only and hide (labels)
 import { execFile } from 'node:child_process'
 
 const gh = (...args) => new Promise((ok, no) => execFile('gh', args, { maxBuffer: 32 << 20 }, (e, out, err) => (e ? no(new Error(String(err).trim().split('\n').pop() || e.message)) : ok(out))))
@@ -21,7 +20,7 @@ const repoOf = r => {
 }
 const low = list => new Set(list.map(x => x.replace(/^@/, '').toLowerCase()))
 
-export default async function ({ config, last }) {
+export default async function ({ config }) {
   const repo = repoOf(config.repo)
   if (!repo) throw new Error('Set Repo (owner/name) in Settings › Widgets')
   const want = low(config.logins)
@@ -51,6 +50,5 @@ export default async function ({ config, last }) {
       conflict: p.mergeable === 'CONFLICTING',
     }))
     .sort((a, b) => b.number - a.number) // the newest first
-  const history = [...(last?.history ?? []), { at: Date.now(), count: prs.length }].slice(-48)
-  return { prs, team: [...want], history }
+  return { prs, team: [...want] }
 }

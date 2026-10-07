@@ -153,7 +153,7 @@ A widget is a folder; its name is the widget's id. Make new ones in Laki's own f
     ${join(dir, 'widgets')}/<id>/
 
 (the user can add more folders in Settings › Widgets). Two complete examples come with Laki, read them first:
-${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq, counts and groups, a template) and \`${join(BUILTIN, 'team-prs')}\` (a JS fetch script, a JS page with a chart, a filter and an action)` : 'my-prs and team-prs in the app'}.
+${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq, counts and groups, a template) and \`${join(BUILTIN, 'team-prs')}\` (a JS fetch script, a JS page with a filter, sorting and an action)` : 'my-prs and team-prs in the app'}.
 Don't edit those: copy one to a new id.
 
 ${widgetFormat()}

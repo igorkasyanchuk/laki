@@ -178,6 +178,7 @@ export type Settings = {
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
+  sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset or 0: always)
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
@@ -244,7 +245,13 @@ export type PR = {
 // runAt: when its turn began (the daemon's clock), while it runs or waits
 // ask: a waiting agent's numbered menu on its screen (a permission prompt, a question): the choices and the highlighted one
 export type Ask = { options: { n: number; label: string }[]; at: number }
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask }
+// asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean }
+
+// Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
+// daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
+export type ProcUse = { pid: number; rss: number; cpu: number; cmd: string }
+export type Resources = { app: (ProcUse & { kind: string })[]; daemon: ProcUse & { heap: number }; tabs: { tab: string; rss: number; cpu: number; procs: ProcUse[] }[] }
 
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
 export type Tunnel = { port: number; url?: string; mails?: string[] }
@@ -278,4 +285,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 27
+export const API = 28

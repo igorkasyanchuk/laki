@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProcUse, type ProjectLook, type Resources, type SideLook, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, parseMails, type RunAction, type Template } from './text'
@@ -88,6 +88,7 @@ export type AppSettings = Paint & {
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
   prTries?: number // fix CI's and fix conflicts' tries in a row
+  sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (0: always)
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   menuBar?: boolean // the menu bar's item (unset: on)
@@ -579,6 +580,8 @@ const FIND: [string, string, string?][] = [
   ['widgets', 'Widgets', 'sidebar extensions plugins folder reload fetch schedule'],
   ['widgets', 'More folders', 'widgets extensions'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
+  ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
+  ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
 ]
 
 const SECTIONS: { id: string; label: string; icon: IconName }[] = [
@@ -594,8 +597,156 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'skill', label: 'Agent skill', icon: 'import' },
   { id: 'widgets', label: 'Widgets', icon: 'panel' },
   { id: 'remote', label: 'Remote access', icon: 'globe' },
+  { id: 'resources', label: 'Resources', icon: 'memory' },
 ]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
+
+// Resources: what Laki and each tab use now (the daemon's ps, every 3 s while it's open), and idle agents put to sleep
+// (settings.sleepAfter). macOS counts every process Laki starts as Laki's
+export type ResourcesApi = {
+  load: () => Promise<Resources>
+  tabs: TabView[]
+  wsName: (id: string) => string
+  sleep: (tab: string) => Promise<unknown>
+  open: (tab: string) => void
+}
+const SLEEP: [number, string][] = [[0, 'Never'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']]
+const KIND: Record<string, string> = { main: 'Laki', renderer: 'window', 'gpu-process': 'GPU', network: 'network', daemon: 'daemon' }
+// KB as MB, or GB from 1 GB
+const size = (kb: number) => (kb >= 1 << 20 ? `${(kb / (1 << 20)).toFixed(2)} GB` : `${Math.round(kb / 1024)} MB`)
+const total = (ps: { rss: number }[]) => ps.reduce((n, p) => n + p.rss, 0)
+// a command short: each absolute path as its last part, a flag's name kept (the whole one is its tooltip)
+const short = (cmd: string) => cmd.replace(/(^|[\s=])\/(?:[^\s/]+\/)+(?=[^\s/])/g, '$1').slice(0, 90)
+
+function Procs({ ps }: { ps: (ProcUse & { kind?: string })[] }) {
+  return (
+    <div className="res-procs">
+      {[...ps].sort((a, b) => b.rss - a.rss).map(p => (
+        <div key={p.pid} data-tip={`${p.pid}: ${p.cmd}`}>
+          <span className="mono">{p.kind ? (KIND[p.kind] ?? p.kind) : short(p.cmd)}</span>
+          <span className="num">{size(p.rss)}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi; sleepAfter: number; onSleepAfter: (min: number) => void }) {
+  const [r, setR] = useState<Resources | null>(null)
+  const [open, setOpen] = useState<string | null>(null) // the row whose processes show
+  const [said, setSaid] = useState('') // a Sleep that was refused
+  useEffect(() => {
+    let on = true
+    const load = () => !document.hidden && api.load().then(x => on && setR(x), () => {}) // not while the window is hidden
+    load()
+    const t = setInterval(load, 3000)
+    return () => ((on = false), clearInterval(t))
+  }, [])
+  const tabOf = (id: string) => api.tabs.find(t => t.id === id)
+  const app = r ? [...r.app, { ...r.daemon, kind: 'daemon' }] : []
+  const own = total(app)
+  const live = (r?.tabs ?? []).filter(x => tabOf(x.tab))
+  const rows = live.filter(x => !tabOf(x.tab)!.asleep).sort((a, b) => b.rss - a.rss) // an asleep one still exiting: its own row, below
+  const all = own + total(live)
+  const canSleep = (t: TabView) => (t.preset === 'claude' || t.preset === 'codex') && !!t.resumeId && t.status === 'idle'
+  const row = (key: string, name: ReactNode, kb: number, cpu: number, acts?: ReactNode) => (
+    <div className={`res-row${open === key ? ' open' : ''}`} onClick={() => setOpen(open === key ? null : key)}>
+      <Icon name={open === key ? 'chevron' : 'chevronRight'} size={12} />
+      <span className="res-name">
+        <span>{name}</span>
+        <i className="res-bar" style={{ width: `${all ? (kb / all) * 100 : 0}%` }} />
+      </span>
+      <span className="num muted">{cpu >= 1 ? `${Math.round(cpu)}%` : ''}</span>
+      <span className="num">{size(kb)}</span>
+      <span className="res-acts" onClick={e => e.stopPropagation()}>
+        {acts}
+      </span>
+    </div>
+  )
+  return (
+    <>
+      <h2>Resources</h2>
+      <p className="muted small">
+        Memory and CPU now, every 3 seconds while this is open. macOS counts every process Laki starts as Laki's: each agent, its MCP servers, the dev
+        servers in its tabs. An agent grows the longer it runs; sleeping it gives that back.
+      </p>
+      <Group title="Memory">
+        {!r ? (
+          <p className="muted small">Measuring…</p>
+        ) : (
+          <>
+            <div className="res-total">
+              <b>{size(all)}</b>
+              <span className="muted">
+                Laki itself {size(own)} · tabs {size(total(live))}
+              </span>
+            </div>
+            <div className="res-rows">
+              {row('laki', 'Laki itself', own, app.reduce((n, p) => n + p.cpu, 0))}
+              {open === 'laki' && <Procs ps={app} />}
+              {rows.map(x => {
+                const t = tabOf(x.tab)!
+                return (
+                  <div key={x.tab}>
+                    {row(
+                      x.tab,
+                      <>
+                        {api.wsName(t.workspace)} <span className="muted">· {t.name}</span>
+                      </>,
+                      x.rss,
+                      x.cpu,
+                      <>
+                        {canSleep(t) && (
+                          <button className="small" data-tip="End its process now: a look, a key or a message resumes the chat" onClick={() => api.sleep(t.id).then(() => setSaid(''), e => setSaid((e as Error).message))}>
+                            Sleep
+                          </button>
+                        )}
+                        <button className="small" onClick={() => api.open(t.id)}>
+                          Open
+                        </button>
+                      </>,
+                    )}
+                    {open === x.tab && <Procs ps={x.procs} />}
+                  </div>
+                )
+              })}
+              {api.tabs.filter(t => t.asleep).map(t => (
+                <div key={t.id} className="res-row still">
+                  <span />
+                  <span className="res-name">
+                    <span>
+                      {api.wsName(t.workspace)} <span className="muted">· {t.name} · asleep</span>
+                    </span>
+                  </span>
+                  <span />
+                  <span className="num muted">{size(live.find(x => x.tab === t.id)?.rss ?? 0)}</span>
+                  <span className="res-acts">
+                    <button className="small" onClick={() => api.open(t.id)}>
+                      Wake
+                    </button>
+                  </span>
+                </div>
+              ))}
+            </div>
+            {said && <p className="muted small">{said}</p>}
+          </>
+        )}
+      </Group>
+      <Group title="Idle agents" hint="An idle claude or codex you aren't looking at is ended to free its memory; its screen stays. Looking at it, a key or a message resumes the chat. Not one with a dev server listening under it, getting PR feedback, or on an SSH host.">
+        <label>
+          Sleep idle agents after
+          <select value={sleepAfter} onChange={e => onSleepAfter(Number(e.target.value))}>
+            {(SLEEP.some(([m]) => m === sleepAfter) ? SLEEP : [...SLEEP, [sleepAfter, `${sleepAfter} minutes`] as [number, string]]).map(([m, name]) => (
+              <option key={m} value={m}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+      </Group>
+    </>
+  )
+}
 
 // remote access: this app in a browser elsewhere, through cloudflared, for one email; no link yet: starting
 export type Remote = { mail: string; until?: number; url?: string; link?: string }
@@ -989,6 +1140,7 @@ export function SettingsPage(p: {
   skill?: SkillApi
   remote?: RemoteApi
   widgets?: WidgetsApi
+  resources?: ResourcesApi
   webhookTest?: (w: Webhook) => Promise<unknown> // Notifications webhook's Send test
   presets: Preset[] // the daemon's: the settings', or its defaults
 }) {
@@ -1119,7 +1271,7 @@ export function SettingsPage(p: {
     )
   }
   // Find a setting: every word typed in a setting's title, words or section (and projects by name)
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets))
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
   const words = findQ.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const hits = (text: string) => words.every(w => text.toLowerCase().includes(w))
   const found = !words.length
@@ -1533,6 +1685,7 @@ export function SettingsPage(p: {
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} />}
           {sec === 'remote' && p.remote && <RemoteSection api={p.remote} mail={s.remoteMail ?? ''} onMail={remoteMail => set({ remoteMail })} />}
+          {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? 0} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (
             <>

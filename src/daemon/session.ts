@@ -68,7 +68,9 @@ export class Session {
   responder: Client | null = null
   exited = false
   exitCode = 0
+  note = '' // what end() said: printed instead of the exit line
   lastOutput = Date.now() // when the program last printed
+  lookedAt = 0 // when a client last stopped looking (detach): a sleep counts from then too
   title = '' // the window title it set (OSC 0/2): gemini's and grok's say whether they work or ask
   onExit: (code: number) => void = () => {}
   onOutput: (data: string) => void = () => {}
@@ -93,7 +95,7 @@ export class Session {
       const exitCode = signal ? 128 + signal : code // killed: not a clean exit
       this.exited = true
       this.exitCode = exitCode
-      this.output(`\r\n\x1b[2m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`)
+      this.output(this.note || `\r\n\x1b[2m[process exited${exitCode ? ` with code ${exitCode}` : ''}]\x1b[0m\r\n`)
       for (const c of this.clients.keys()) c.send({ ev: 'exit', tab: this.tab, code: exitCode })
       this.onExit(exitCode)
     })
@@ -128,6 +130,7 @@ export class Session {
 
   detach(c: Client) {
     if (!this.clients.delete(c)) return
+    this.lookedAt = Date.now()
     if (this.responder === c) {
       const ready = [...this.clients].filter(([, s]) => s.ready).map(([k]) => k)
       this.setResponder(ready.at(-1) ?? null)
@@ -219,15 +222,31 @@ export class Session {
     return new Promise(r => this.term.write('', r))
   }
 
+  // end ends the program and keeps its screen and clients (an agent put to sleep): note is the line it leaves
+  end(note: string) {
+    this.note = note
+    this.hup()
+    // one still there 5 s later (it traps SIGHUP) gets SIGKILL: freeing its memory is the point
+    setTimeout(() => {
+      if (this.exited) return
+      try {
+        process.kill(-this.pty.pid, 'SIGKILL')
+      } catch {}
+    }, 5000).unref()
+  }
+
+  private hup() {
+    if (this.exited) return
+    try {
+      process.kill(-this.pty.pid, 'SIGHUP') // the whole job: node-pty makes the child a session leader
+    } catch {}
+    try {
+      this.pty.kill('SIGHUP')
+    } catch {}
+  }
+
   kill() {
-    if (!this.exited) {
-      try {
-        process.kill(-this.pty.pid, 'SIGHUP') // the whole job: node-pty makes the child a session leader
-      } catch {}
-      try {
-        this.pty.kill('SIGHUP')
-      } catch {}
-    }
+    this.hup()
     for (const c of this.clients.keys()) c.send({ ev: 'exit', tab: this.tab, code: -1 })
     this.clients.clear()
     setTimeout(() => this.term.dispose(), 1000)

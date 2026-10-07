@@ -1,5 +1,5 @@
 import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, rowsOf, type Doctor, PR_SCAN, PR_TRIES, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, rowsOf, type Doctor, PR_SCAN, PR_TRIES, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, openExternal } from './api'
 import { type AutoKey, Avatar, ciText, type FixWhat, InfoPanel, type PRAct, prState, PRStatus, type WsInfo } from './Info'
@@ -906,6 +906,7 @@ export function App() {
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
     for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Widget: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
     a({ label: 'Widgets: settings, reload', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
+    a({ label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
     a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
     a({ label: 'About Laki', icon: 'info', run: () => setDialog('about') })
     a({ label: 'Collapse all projects', icon: 'chevronRight', run: () => setFolded(view?.projects.map(p => p.id) ?? []) })
@@ -1156,14 +1157,14 @@ export function App() {
         return (
           <div
             key={ts[0]?.id}
-            className={`tab nodrag ${g === group ? 'sel' : ''}`}
+            className={`tab nodrag ${g === group ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}`}
             style={colorVar(colorOf(ts[0]))}
             onClick={() => selectGroup(g)}
             onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-tip={[...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
@@ -1460,6 +1461,13 @@ export function App() {
             renameProjects
             skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }) }}
             webhookTest={w => api.call('webhookTest', w)}
+            resources={{
+              load: () => api.call<Resources>('resources'),
+              tabs: view.tabs,
+              wsName: id => (w => (w ? wsName(w) : id))(view.workspaces.find(w => w.id === id)),
+              sleep: tab => api.call('tabSleep', { tab }),
+              open: tab => (setDialog(null), selectTab(tab), view.tabs.find(t => t.id === tab)?.asleep && call('tabWake', { tab }).catch(() => {})),
+            }}
             remote={{ state: view.remote, start: (hours, mail) => api.call('remoteStart', { hours, mail }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             widgets={{
               list: view.widgets ?? [],

@@ -67,6 +67,7 @@ const paths = {
   conflict: 'M8 2.2l6.2 11H1.8zM8 6.6v3.2M8 11.6v.01',
   check: 'M3.5 8.5l3 3 6-7',
   minus: 'M4 8h8',
+  memory: 'M4 4h8v8H4zM6.5 6.5h3v3h-3zM6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5',
   help: 'M8 14a6 6 0 100-12 6 6 0 000 12zM6.2 6.3a1.9 1.9 0 113 1.5c-.7.5-1.2.9-1.2 1.7M8 11.2v.01',
   // GitHub's mark (Octicons, MIT), filled
   github:

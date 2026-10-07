@@ -37,6 +37,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   and the images' paths. Prompt templates wrap it (`{{prompt}}`).
 - **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans; click
   it for each one (5-hour, weekly, per model) and when it resets.
+- **Resources**: memory and CPU for Laki and each tab (its agent, MCP servers, dev servers), in Settings or ⌘K; idle
+  agents can sleep to give their memory back, and resume their chat when you look.
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI, new review
   comments or merge conflicts to the agent on their own; an info panel with the PR, its checks and what the agents said last;
   a workspace archived once its PR merges (off by default).
@@ -472,9 +474,11 @@ Two come with Laki, off until you turn them on in Settings › Widgets:
   view (large) has the counts and the PRs grouped by what they need: conflicts, failing CI, changes asked, approved,
   in review, drafts, each with its labels, CI, review and date.
 - *Team PRs*: the open PRs of your team (*GitHub logins*, a chip each; one query per login, so a busy repo doesn't
-  time out) in a repo: how many, with a line of the count over time; the full view (large) lists them with labels, CI, review and conflicts, a filter by author (a click on
-  a name too) and by words, sorting, *Open PR*
-  and *Review in Laki* (a new workspace on the PR with a review prompt; set *Laki project* to the project's name).
+  time out) in a repo: how many; the full view (large) lists them with labels, CI, review and conflicts, a filter by
+  author (a click on a name too) and by words, sorting, *Open PR* and *Review in Laki* (a new workspace on the PR with the *Review prompt*; set *Laki project* to the project's name).
+  *Review command* runs a shell command of yours instead (`$PR` is the PR's URL, `$PR_NUMBER` its number, `$LAKI_CLI`
+  the laki command: `"$LAKI_CLI" new myapp --pr "$PR" --preset codex --prompt 'Review it'`), and *Button* renames the
+  button.
 
 Both take *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
 
@@ -658,6 +662,15 @@ lit for a moment.
   one per line), *Reload widgets*, and each widget in a row: on or off, its size (cells across × down), how often it
   fetches (minutes), its full view's size, *Fetch now*, *Open*, and its folder (in Finder, your editor or a terminal,
   or *Copy path*); its settings under it.
+- *Resources* (also ⌘K *Resources*): memory and CPU now, refreshed every 3 seconds while it's open. macOS counts every
+  process Laki starts as Laki's (the Force Quit window's number): each agent, its MCP servers, the dev servers in
+  its tabs. *Laki itself* is the app's own processes and the daemon; then each tab, biggest first, with its
+  processes under it (a click). *Sleep* ends an idle Claude or Codex tab's process now; *Open* goes to the tab.
+  *Sleep idle agents after* (never by default; 15 minutes to 8 hours) does it on its own for an idle Claude or Codex
+  tab nobody is looking at, quiet that long. A sleeping tab keeps its screen and says so; looking at it, a key, or a
+  message (`laki send`, a scheduled task, the PR buttons) resumes the chat (`--resume`), and a message waits until
+  it's up. Never one with a dev server listening under it, getting PR feedback (the PR switches), or on an SSH
+  host. An agent grows the longer it runs; a resumed one starts small.
 - *Projects*: each project's settings (below).
 
 Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle, and so does one
@@ -841,6 +854,9 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
 ## Troubleshooting
 
 - **The app shows "connecting to the daemon…"**: check `~/.laki/daemon.log`. To restart the daemon, run `laki stop`, then reopen the app.
+- **Laki uses a lot of memory**: Settings › Resources says what: it's nearly always the agents (each Claude is
+  200 MB to a few GB after a long day) and what they started. *Sleep* the idle ones, or set *Sleep idle agents
+  after*.
 - **An agent isn't found**: commands run through your login shell (`$SHELL -lic`), so `claude`, `codex` and the others must be on the PATH your `~/.zshrc` sets.
 - **No PR badge**: run `gh auth status`. PRs are checked once a minute.
 - **A host won't connect**: run `ssh <host>` in a terminal; it must sign in without asking anything (keys or agent, a
@@ -858,6 +874,8 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
   so Laki reads its screen and window title: Enter or a prompt starts a turn, *Action Required* is waiting, a few
   quiet seconds end it and notify (a turn you started with Enter only after 8 seconds: a shorter one is likely a menu). Gemini without hooks works the same way. Laki never writes `~/.gemini`, `~/.grok` or `~/.config/opencode`.
 - **Snapshots** keep 5,000 lines of scrollback.
+- **Sleeping agents** live in the daemon's memory: a daemon restart resumes every tab, asleep or not. A process that
+  left its tab's tree (a double fork) shows nowhere in Resources.
 - **Fork** copies commits only; uncommitted changes stay behind.
 - **SSH hosts**: a dropped connection (the Mac asleep) ends the host's tabs, as nothing holds them there; Enter
   resumes each. Keys or an agent only, no password prompts.
