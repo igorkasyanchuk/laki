@@ -6,7 +6,7 @@ worktree. Agents keep running when the window is closed.
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts and your `.env` copied in.
   Start one from a prompt, a GitHub issue or a PR. Plain folders work too.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications (Allow / Deny on a permission prompt),
-  a Dock and menu bar count, pushes to your phone (ntfy, Slack, Telegram), a follow-up queue. Agents resume after a
+  a Dock and menu bar count, floating bubbles over other apps (agents working or waiting; click one to jump there), pushes to your phone (ntfy, Slack, Telegram), a follow-up queue. Agents resume after a
   restart or a usage limit.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon.

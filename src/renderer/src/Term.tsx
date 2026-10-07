@@ -21,6 +21,7 @@ export function Term({
   fontSize = FONT_SIZE,
   fontFamily,
   copyOnSelect = true,
+  editKeys = true,
   theme = '',
   look = termLook({}),
   newline = false,
@@ -31,6 +32,7 @@ export function Term({
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  editKeys?: boolean // ⌘← ⌘→ ⌘⌫ ⌥← ⌥→: EDIT_KEYS
   theme?: string // the app's (themes.ts): the colors come from its CSS
   look?: ReturnType<typeof termLook> // line height, weight, cursor… (Settings)
   newline?: boolean // an agent's: ⌘⏎ and ⇧⏎ make a new line in its prompt
@@ -39,6 +41,8 @@ export function Term({
   nl.current = newline
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
+  const edit = useRef(editKeys)
+  edit.current = editKeys
   const box = useRef<HTMLDivElement>(null)
   const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon; fit: FitAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
@@ -110,6 +114,13 @@ export function Term({
       // ⌘⏎ / ⇧⏎ in an agent: ⌃J, a new line in claude's, codex's and opencode's prompt (xterm would send ⏎: submit)
       if (nl.current && e.key === 'Enter' && (e.metaKey || e.shiftKey) && !e.ctrlKey && !e.altKey) {
         if (e.type === 'keydown') api.send('input', { tab, data: '\n' })
+        return false
+      }
+      const only = !e.ctrlKey && !e.shiftKey && e.metaKey !== e.altKey // ⌘ or ⌥, not both
+      const seq = edit.current && only && EDIT_KEYS[`${e.metaKey ? '⌘' : '⌥'}${e.key}`]
+      if (seq) {
+        e.preventDefault() // a browser's own: ⌘← and Alt+← are Back
+        if (e.type === 'keydown') api.send('input', { tab, data: seq })
         return false
       }
       return e.type === 'keydown' ? (down = true) : e.type === 'keyup' ? !(down = false) : down
@@ -189,5 +200,9 @@ export function Term({
     </>
   )
 }
+
+// macOS editing keys as iTerm's Natural Text Editing sends them (xterm sends nothing for ⌘← ⌘→, a plain ⌫ for ⌘⌫):
+// line start and end (⌃A ⌃E), delete the line (⌃U), a word back and on (Esc b, Esc f)
+const EDIT_KEYS: Record<string, string> = { '⌘ArrowLeft': '\x01', '⌘ArrowRight': '\x05', '⌘Backspace': '\x15', '⌥ArrowLeft': '\x1bb', '⌥ArrowRight': '\x1bf' }
 
 const quote = (p: string) => (/^[\w@%+=:,./-]+$/.test(p) ? p : `'${p.replace(/'/g, `'\\''`)}'`)

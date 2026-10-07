@@ -27,6 +27,6 @@ export default defineConfig({
       },
     ],
     server: { port: 5199, strictPort: true, host: '127.0.0.1' },
-    build: { rollupOptions: { input: { index: resolve('src/renderer/index.html'), annotate: resolve('src/renderer/annotate.html') } } }, // annotate: the menu bar screenshot's editor window
+    build: { rollupOptions: { input: { index: resolve('src/renderer/index.html'), annotate: resolve('src/renderer/annotate.html'), floater: resolve('src/renderer/floater.html') } } }, // annotate: the menu bar screenshot's editor window; floater: the floating bubbles
   },
 })

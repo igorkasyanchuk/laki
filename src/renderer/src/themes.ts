@@ -895,7 +895,7 @@ export const THEMES: Theme[] = [
   },
 ]
 
-const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
+export const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
 const PREVIEW = ['--bg', '--panel', '--fg', '--accent', '--ansi-1', '--ansi-2', '--ansi-3', '--ansi-4', '--ansi-5']
 // a variable as the stylesheet's :root has it (the default theme), whatever theme paints <html> now; found once
 const roots = new Map<string, string>()

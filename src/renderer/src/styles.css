@@ -74,7 +74,11 @@ textarea { resize: vertical; font-family: inherit; }
 .electron .side-head { padding-left: 76px; }
 /* the sidebar's filter, under its head */
 .side-find { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 2px 8px 8px; }
-.side-find input { font-size: 12px; padding: 4px 8px; }
+.side-find input { font-size: 12px; padding: 4px 8px; width: 100%; }
+/* its reset ×, inside the field's right end */
+.find-field { position: relative; display: flex; }
+.find-field input { padding-right: 26px; }
+.find-field .ib { position: absolute; right: 2px; top: 50%; transform: translateY(-50%); width: 22px; height: 22px; }
 .side-find .seg button { flex: 1; font-size: 11px; padding: 2px 4px; }
 /* Remind me's quick times, two by two */
 .remind-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }

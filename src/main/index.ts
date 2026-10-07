@@ -256,6 +256,123 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
   )
 })
 
+// the floating bubbles (Settings › General): a small bar over every app and Space with a circle per workspace whose
+// agent works or waits, from the app window's list; hidden while Laki is in front. A circle's click shows its tab; a
+// hover shows its card in a window of its own beside the bar, toward the screen's middle, that takes no clicks (the
+// bar never moves under the mouse). The grip drags the bar; it stays where it's left
+type Float = { tab: string }
+const BAR = 44 // the bar's width; floater.html's too
+let floats: { items: Float[]; colors: Record<string, string> } = { items: [], colors: {} }
+let floater: BrowserWindow | null = null
+let card: BrowserWindow | null = null
+let hover: { tab: string; top: number } | null = null // the circle under the mouse: its tab, its top in the bar
+let front = false // Laki is the front app (a launch makes it so; one in the background doesn't)
+const floaterFile = () => join(app.getPath('userData'), 'floater.json') // where the bar was left: its top left corner
+let barAt: { x: number; y: number } | null = null
+const barSide = () => { // where the card goes: toward the middle of the bar's screen
+  if (!barAt) return 'left'
+  const d = screen.getDisplayNearestPoint(barAt).workArea
+  return barAt.x + BAR / 2 > d.x + d.width / 2 ? 'left' : 'right'
+}
+const floatWin = (hash: 'bar' | 'card', width: number) => {
+  const f = new BrowserWindow({
+    ...barAt,
+    width,
+    height: 60,
+    type: 'panel', // an NSPanel: over full-screen apps, and a click doesn't bring Laki forward
+    frame: false,
+    transparent: true,
+    hasShadow: false,
+    resizable: false,
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    hiddenInMissionControl: true,
+    acceptFirstMouse: true, // a click while another app is in front lands on the circle
+    show: false,
+    webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  })
+  f.setAlwaysOnTop(true, 'floating')
+  f.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
+  f.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  f.webContents.on('will-navigate', e => e.preventDefault())
+  if (dev) f.loadURL(`${new URL('floater.html', `${process.env.ELECTRON_RENDERER_URL}/`).href}#${hash}`)
+  else f.loadFile(fileURLToPath(new URL('../renderer/floater.html', import.meta.url)), { hash })
+  return f
+}
+// the bar's spot, or the default one (the sketch's: the right edge, low) when that's on no screen
+function onScreen() {
+  const on = (p: { x: number; y: number }) => screen.getAllDisplays().some(({ bounds: b }) => p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height)
+  if (barAt && on(barAt)) return
+  const d = screen.getPrimaryDisplay().workArea
+  barAt = { x: d.x + d.width - BAR - 8, y: d.y + Math.round(d.height * 0.6) }
+}
+// its screen gone (a laptop undocked): the default spot for now; floater.json keeps the one it was left at
+let placing = false
+app.whenReady().then(() =>
+  screen.on('display-removed', () => {
+    const kept = barAt
+    onScreen()
+    if (!floater || barAt === kept) return
+    placing = true
+    floater.setPosition(barAt!.x, barAt!.y)
+  }),
+)
+function placeFloater() {
+  if (!floats.items.length || front) return void (floater?.hide(), card?.hide(), (hover = null))
+  if (!floater) {
+    try {
+      barAt ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
+    } catch {}
+    onScreen()
+    const f = (floater = floatWin('bar', BAR))
+    f.webContents.on('did-finish-load', () => sendFloats())
+    let saving: ReturnType<typeof setTimeout> | undefined
+    f.on('moved', () => { // dragged by its grip (on macOS every step of the drag): kept once it stops
+      if (placing) return void (placing = false)
+      const [x, y] = f.getPosition()
+      barAt = { x, y }
+      clearTimeout(saving)
+      saving = setTimeout(() => {
+        try {
+          writeFileSync(floaterFile(), JSON.stringify(barAt))
+        } catch {} // ponytail: not kept, it comes back at the default spot
+      }, 500)
+    })
+    f.on('closed', () => floater === f && (floater = null))
+    const c = (card = floatWin('card', 240))
+    c.setIgnoreMouseEvents(true)
+    c.on('closed', () => card === c && (card = null))
+  } else sendFloats()
+  if (!floater.isVisible()) floater.showInactive()
+}
+const sendFloats = () => floater?.webContents.send('floats', floats)
+ipcMain.on('floats', (e, items: unknown, colors: unknown) => {
+  if (e.sender !== win?.webContents) return
+  floats = { items: Array.isArray(items) ? items.slice(0, 12) : [], colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {} }
+  placeFloater()
+})
+ipcMain.on('floater-size', (e, h: number) => floater && e.sender === floater.webContents && h > 0 && h < 1200 && floater.setSize(BAR, Math.round(h))) // where it is: a drag may be under way
+ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab)))
+// a hover: the card's text goes to its window, which says its size; then it's placed beside the circle and shown
+ipcMain.on('floater-hover', (e, tab: string, top: number) => {
+  if (!floater || e.sender !== floater.webContents) return
+  const f = floats.items.find(x => x.tab === tab)
+  hover = f && Number.isFinite(top) ? { tab, top } : null
+  if (hover) card?.webContents.send('card', f, floats.colors)
+  else card?.hide()
+})
+ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
+  if (!card || !barAt || e.sender !== card.webContents || hover?.tab !== tab || !(w > 0 && w < 800 && h > 0 && h < 800)) return
+  const d = screen.getDisplayNearestPoint(barAt).workArea
+  const y = Math.max(d.y, Math.min(barAt.y + hover.top - 6, d.y + d.height - h))
+  card.setBounds({ x: barSide() === 'left' ? barAt.x - 6 - Math.round(w) : barAt.x + BAR + 6, y: Math.round(y), width: Math.round(w), height: Math.round(h) })
+  card.showInactive()
+})
+app.on('did-become-active', () => ((front = true), placeFloater()))
+app.on('did-resign-active', () => ((front = false), placeFloater()))
+
 // the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels),
 // then the editor window (annotate) to draw on it, then the new-workspace page with it. Needs Screen Recording for Laki (macOS asks once).
 // ponytail: the whole screen is the main display; screencapture takes a file per display for the others

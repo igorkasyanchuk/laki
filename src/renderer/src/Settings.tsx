@@ -71,6 +71,7 @@ export type AppSettings = Paint & {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  editKeys?: boolean // ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   lineHeight?: number
   letterSpacing?: number // px
   fontWeight?: string // 300…700
@@ -102,6 +103,7 @@ export type AppSettings = Paint & {
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   menuBar?: boolean // the menu bar's item (unset: on)
+  floater?: boolean // the floating bubbles over other apps (unset: on)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
@@ -552,6 +554,7 @@ const FIND: [string, string, string?][] = [
   ['webhook', 'Notifications webhook', 'phone push ntfy slack telegram json notify waiting done'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['general', 'Menu bar item', 'tray status count waiting needs you'],
+  ['general', 'Floating bubbles', 'floating window overlay always on top worktrees agents working waiting circles bar'],
   ['general', 'Fun button', 'meme reddit smiley break joke'],
   ['general', 'Pull requests in the sidebar', 'pr github icon'],
   ['general', 'Turn timers', 'elapsed time'],
@@ -580,6 +583,7 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'Scroll speed', 'wheel trackpad faster slow scrolling'],
   ['terminal', 'Blinking cursor', 'blink'],
   ['terminal', 'Copy selected text', 'clipboard selection'],
+  ['terminal', 'Mac editing keys: ⌘← ⌘→ ⌥← ⌥→ ⌘⌫', 'cmd option arrow keys line start end word caret cursor home natural text editing iterm'],
   ['terminal', 'Dim other panes', 'split focus fade'],
   ['terminal', 'Focus the pane under the mouse', 'split hover caret cursor follows'],
   ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
@@ -1426,6 +1430,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
                   <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
                 </Switch>
+                <Switch className="switch-row" on={s.floater !== false} onChange={v => set({ floater: v })}>
+                  <Says title="Floating bubbles" hint="While you're in another app: a small bar over every app and Space with a circle per agent working or waiting for you; hover one to see what it said, click to open it, drag the grip to move the bar" />
+                </Switch>
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
                 </Switch>
@@ -1679,6 +1686,9 @@ export function SettingsPage(p: {
                   </Switch>
                   <Switch className="switch-row" on={s.copyOnSelect !== false} onChange={v => set({ copyOnSelect: v })}>
                     Copy selected text
+                  </Switch>
+                  <Switch className="switch-row" on={s.editKeys !== false} onChange={v => set({ editKeys: v })}>
+                    Mac editing keys: ⌘← ⌘→ ⌥← ⌥→ ⌘⌫
                   </Switch>
                   <Switch className="switch-row" on={!!s.dimPanes} onChange={v => set({ dimPanes: v })}>
                     Dim other panes

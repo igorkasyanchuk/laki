@@ -487,7 +487,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   const p = findProject(ref)
   if (o.name?.trim()) p.name = o.name.trim()
   if (Array.isArray(o.seps)) {
-    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}) }))
+    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}) }))
     p.seps = seps.length ? seps : undefined
     if (!p.seps) p.rows = undefined
   }

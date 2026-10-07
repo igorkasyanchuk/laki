@@ -24,6 +24,17 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.on('shot', (_e, png: string, note?: string) => cb(png, note))
     ipcRenderer.send('shot-ready') // then main sends one taken before
   },
+  // the floating bubbles: the workspaces whose agent works or waits (none: no bar), in the theme's colors
+  floats: (items: object[], colors: Record<string, string>) => ipcRenderer.send('floats', items, colors),
+  // the bubbles' own windows (floater.html): the bar (the list in; its height, a hover and a click out) and the card
+  floater: {
+    onFloats: (cb: (f: { items: object[]; colors: Record<string, string> }) => void) => ipcRenderer.on('floats', (_e, f) => cb(f)),
+    size: (h: number) => ipcRenderer.send('floater-size', h),
+    hover: (tab: string, top: number) => ipcRenderer.send('floater-hover', tab, top),
+    open: (tab: string) => ipcRenderer.send('floater-open', tab),
+    onCard: (cb: (f: object, colors: Record<string, string>) => void) => ipcRenderer.on('card', (_e, f, colors) => cb(f, colors)),
+    cardSize: (tab: string, w: number, h: number) => ipcRenderer.send('floater-card', tab, w, h),
+  },
   // the screenshot's editor window (annotate.html): the picture in, the drawn one and a note out
   annotate: {
     onImage: (cb: (png: string) => void) => ipcRenderer.on('annotate-image', (_e, png: string) => cb(png)),

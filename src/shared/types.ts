@@ -35,7 +35,7 @@ export type Project = {
   seps?: Sep[] // the sidebar's named lines between its workspaces
   rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
 }
-export type Sep = { id: string; name: string; color?: string } // color: TAB_COLORS' name, its label's tint
+export type Sep = { id: string; name: string; color?: string; template?: string } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with
 // a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others
 // after, seps first); the app's sidebar and the daemon's placeWs
 export const rowsOf = <W extends { id: string; project: string }>(p: Pick<Project, 'id' | 'seps' | 'rows'>, ws: W[]): (W | Sep)[] => {
@@ -148,6 +148,7 @@ export type Settings = {
   fontSize?: number
   fontFamily?: string
   copyOnSelect?: boolean
+  editKeys?: boolean // the terminal's ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   notify?: boolean
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
@@ -182,6 +183,7 @@ export type Settings = {
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
+  floater?: boolean // the floating bubbles over other apps: agents working or waiting (unset: on)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
@@ -293,4 +295,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 30
+export const API = 31

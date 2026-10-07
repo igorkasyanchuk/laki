@@ -18,8 +18,8 @@ import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, nameOf, parseDuration, type RunAction, shortPath, youtubeEmbed } from './text'
-import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
+import { actionsFor, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
+import { applyTheme, css, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
@@ -286,6 +286,17 @@ export function App() {
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
+  // the floating bubbles (Settings › General; main shows them while Laki isn't in front): each workspace whose agent
+  // works or waits, the waiting ones first, with what it asked or last said, in the theme's colors
+  const floats = view?.settings.floater === false ? [] : live.flatMap(w => {
+    const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
+    const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
+    const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
+    return t ? [{ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: t.status as 'running' | 'waiting', color: w.color && w.color !== 'none' ? w.color : undefined, last: last?.replace(/\s+/g, ' ').trim().slice(0, 300) }] : []
+  }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
+  const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
+  const floatKey = JSON.stringify([floats, floatColors])
+  useEffect(() => bridge?.floats?.(floats, floatColors), [floatKey])
 
   const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const archived = useRef<string[]>([]) // workspaces archived for a merged PR, while their toast shows
@@ -492,10 +503,21 @@ export function App() {
     for (const t of ts) await call('tabClose', { id: t.id })
   }
 
+  // ⌘↑ ⌘↓: the rows in sight, not those a folded project or group hides
   const moveWs = (d: number) => {
-    if (!order.length) return
-    const i = Math.max(0, order.findIndex(w => w.id === ws?.id))
-    setWsId(order[(i + d + order.length) % order.length].id)
+    const seen = order.filter(w => w.id === ws?.id || !foldedAway(w))
+    if (!seen.length) return
+    const i = Math.max(0, seen.findIndex(w => w.id === ws?.id))
+    setWsId(seen[(i + d + seen.length) % seen.length].id)
+  }
+  const foldedAway = (w: WorkspaceView) => {
+    const p = view?.projects.find(p => p.id === w.project)
+    if (w.pinned || !p || find) return false // filtering: the hits show, folded or not
+    if (folded.includes(p.id)) return true
+    let under = false // a folded sep above it
+    for (const x of rowsOf(p, live)) if (!('path' in x)) under = folded.includes(x.id)
+      else if (x.id === w.id) return under
+    return false
   }
 
   // while f runs, the rows of ids say what's happening (archiving, deleting: a worktree takes a moment to go)
@@ -676,20 +698,21 @@ export function App() {
     if (d.into && folded.includes(d.target)) fold(d.target) // dropped into a folded group: it opens, to show it there
   })
   // a sep: name it (a new one goes under after, else at the top), or rename it
-  const sepName = async (o: { sep: string; id?: string; after?: string }, name: string) => {
+  // template: the default prompt template of a new workspace under it ('' none)
+  const sepName = async (o: { sep: string; id?: string; after?: string }, name: string, template: string) => {
     const p = view!.projects.find(p => p.id === o.sep)
     if (!p) return
-    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name } : x)) }))
+    if (o.id) return void (await call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === o.id ? { ...x, name, template } : x)) }))
     const id = `sep-${Math.random().toString(36).slice(2, 10)}`
     const ids = rowsOf(p, view!.workspaces).map(x => x.id)
     ids.splice(o.after ? ids.indexOf(o.after) + 1 : 0, 0, id)
-    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name }], rows: ids })
+    await call('projectSet', { id: p.id, seps: [...(p.seps ?? []), { id, name, template }], rows: ids })
   }
   const sepMenu = (p: Project, s: Sep): MenuItem[] => [
     { colors: TAB_COLORS, value: s.color, pick: c => call('projectSet', { id: p.id, seps: p.seps?.map(x => (x.id === s.id ? { ...x, color: c } : x)) }) },
     { label: 'New workspace here…', icon: 'plus', key: 'n', run: () => newWs(p.id, { place: s.id }) },
     { label: folded.includes(s.id) ? 'Expand' : 'Collapse', icon: folded.includes(s.id) ? 'chevron' : 'chevronRight', key: 'c', run: () => fold(s.id) },
-    { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ sep: p.id, id: s.id }) },
+    { label: 'Rename or set its template…', icon: 'pencil', key: 'r', run: () => setDialog({ sep: p.id, id: s.id }) },
     { label: 'Remove group (keeps its workspaces)', icon: 'trash', key: 'd', danger: true, run: () => call('projectSet', { id: p.id, seps: p.seps?.filter(x => x.id !== s.id), rows: p.rows?.filter(x => x !== s.id) }) },
   ]
 
@@ -1036,7 +1059,7 @@ export function App() {
         data-row={`ws:${w.id}`}
         data-group={pin ? 'pinned' : w.project}
         onPointerDown={e => !pin && !find && rows.start(e, 'ws', w.id, w.project) /* filtered: the order isn't all there */}
-        onClick={() => (setWsId(w.id), narrow && setSideOpen(false))}
+        onClick={() => (setWsId(w.id), (!pin && !find && rows.dragged()) || setDialog(null), narrow && setSideOpen(false)) /* a page over the main area (Settings, the new-workspace page…) gives way to it, not to a drag's end */}
         onContextMenu={e => openMenu(e, wsMenu(w))}
         data-tip={[
           `${w.branch || w.path} · $PORT ${w.port}`,
@@ -1142,7 +1165,7 @@ export function App() {
         data-row={`ws:${s.id}`}
         data-group={p.id}
         data-head=""
-        data-tip={`${s.name}: ${n} ${n === 1 ? 'workspace' : 'workspaces'} · click to ${shut ? 'expand' : 'collapse'} · drag to move · drop a workspace on it to put it here · double click to rename`}
+        data-tip={`${s.name}: ${n} ${n === 1 ? 'workspace' : 'workspaces'}${s.template ? ` · new ones start with the template ${s.template}` : ''} · click to ${shut ? 'expand' : 'collapse'} · drag to move · drop a workspace on it to put it here · double click to rename`}
         onPointerDown={e => rows.start(e, 'ws', s.id, p.id, true)}
         onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(s.id)}
         onDoubleClick={() => setDialog({ sep: p.id, id: s.id })}
@@ -1171,7 +1194,7 @@ export function App() {
           <span className="ws-going">creating…</span>
         </div>
       ))
-  // a project's rows as shown: under a folded sep, only the selected workspace (each folded sep's others in hidden)
+  // a project's rows as shown: none under a folded sep, the selected one too (each folded sep's in hidden)
   const shownRows = (p: Project, mine: WorkspaceView[]) => {
     const hidden = new Map<string, WorkspaceView[]>()
     const count = new Map<string, number>() // each sep's workspaces
@@ -1180,7 +1203,7 @@ export function App() {
     const shown = rowsOf(p, mine).filter(x => {
       if (!('path' in x)) return (sep = x.id), (under = folded.includes(x.id) ? x.id : ''), true
       if (sep) count.set(sep, (count.get(sep) ?? 0) + 1)
-      if (!under || x.id === ws?.id) return true
+      if (!under) return true
       hidden.get(under)?.push(x) ?? hidden.set(under, [x])
       return false
     })
@@ -1243,7 +1266,10 @@ export function App() {
         </div>
         {find && (
           <div className="side-find">
-            <input autoFocus value={find.q} placeholder="Filter: name, branch, PR…" spellCheck={false} onChange={e => setFind({ ...find, q: e.target.value })} onKeyDown={e => e.key === 'Escape' && setFind(null)} />
+            <div className="find-field">
+              <input autoFocus value={find.q} placeholder="Filter: name, branch, PR…" spellCheck={false} onChange={e => setFind({ ...find, q: e.target.value })} onKeyDown={e => e.key === 'Escape' && setFind(null)} />
+              {(find.q || find.only) && <IconButton icon="x" title="Clear and close the filter" onClick={() => setFind(null)} />}
+            </div>
             <span className="seg">
               {ONLY.map(([id, label]) => (
                 <button key={id} type="button" className={find.only === id ? 'on' : ''} onClick={() => setFind({ ...find, only: find.only === id ? undefined : id })}>
@@ -1300,7 +1326,7 @@ export function App() {
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               <div className="project-ws">{/* under its project, on a guide line */}
-              {hits ? hits.map(w => wsRow(w)) : shut ? [...makingRows(p, ''), ...(p.seps ?? []).flatMap(s => makingRows(p, s.id)), ...mine.filter(w => w.id === ws?.id).map(w => wsRow(w))] : shownRows(p, mine)}{/* folded: the selected one, and one on its way, stay */}
+              {hits ? hits.map(w => wsRow(w)) : shut ? [...makingRows(p, ''), ...(p.seps ?? []).flatMap(s => makingRows(p, s.id))] : shownRows(p, mine)}{/* folded: only one on its way stays */}
               {!shut && !hits && !live.some(w => w.project === p.id) && !making.some(m => m.project === p.id) && ( // nothing here yet (none pinned either): the way to start
                 <div className="ws ws-new" onClick={() => newWs(p.id)}>
                   <Icon name="plus" size={12} />
@@ -1398,6 +1424,7 @@ export function App() {
                     fontSize={narrow ? Math.min(fontSize, 11) : fontSize /* ponytail: a phone's own size, not a setting */}
                     fontFamily={settings.fontFamily}
                     copyOnSelect={settings.copyOnSelect !== false}
+                    editKeys={settings.editKeys !== false}
                     theme={theme}
                     look={termLook(settings)}
                     newline={byId(id)?.kind === 'agent'}
@@ -1825,18 +1852,24 @@ export function App() {
           }}
         />
       )}
-      {dialog && typeof dialog === 'object' && 'sep' in dialog && (
+      {dialog && typeof dialog === 'object' && 'sep' in dialog && (() => {
+        const p = view.projects.find(p => p.id === dialog.sep)
+        const s = p?.seps?.find(x => x.id === dialog.id)
+        const tpls = templatesFor(settings.templates, p?.config?.templates)
+        return (
         <Prompt
-          title={dialog.id ? 'Rename group' : 'New group'}
+          title={dialog.id ? 'Edit group' : 'New group'}
           hint={dialog.id ? undefined : 'A named line between workspaces. Drag it, or them, to sort.'}
-          initial={view.projects.find(p => p.id === dialog.sep)?.seps?.find(x => x.id === dialog.id)?.name}
+          initial={s?.name}
+          pick={tpls.length || s?.template ? { label: 'Default prompt template: a new workspace here starts with it', none: 'None: the last one used', options: tpls.map(t => t.name), value: s?.template } : undefined}
           onClose={() => setDialog(null)}
-          onSubmit={async name => {
-            await sepName(dialog, name)
+          onSubmit={async (name, template) => {
+            await sepName(dialog, name, template)
             setDialog(null)
           }}
         />
-      )}
+        )
+      })()}
       {dialog && typeof dialog === 'object' && 'renameWs' in dialog && live.some(w => w.id === dialog.renameWs) && (
         <Prompt
           title="Rename workspace"

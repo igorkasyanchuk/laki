@@ -26,6 +26,7 @@ const KEYS: [string, string][] = [
   ['⌘F', 'find in the terminal (here: the filter)'],
   ['⌘S', "save the file you're editing in the preview"],
   ['⌘⏎ / ⇧⏎', "a new line in an agent's prompt"],
+  ['⌘← / ⌘→ · ⌥← / ⌥→ · ⌘⌫', "in a terminal: the line's start / end, a word back / on, delete the line"],
   ['⌘D', 'changes against the base branch'],
   ['⌥⌘B', 'side panel: files, changes, review, preview'],
   ['⌘I', 'workspace info: PR, checks, what each agent said last'],

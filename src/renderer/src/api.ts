@@ -14,6 +14,7 @@ type Bridge = {
   dictationSettings?(): void
   glass?(on: boolean): void
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
+  floats?(items: object[], colors: Record<string, string>): void // the floating bubbles' workspaces (none: hidden)
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
   onShot?(cb: (png: string, note?: string) => void): void

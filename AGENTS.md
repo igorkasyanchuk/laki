@@ -70,13 +70,13 @@ board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `
 `prTries`, which the PR switches' tooltips quote; 15: `webhookTest`, `wsNew` `pr`, the `archived` event; 16: `portKill`, a
 workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
 workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
-`progress`). A
+`progress`; 31: a sep's `template`, kept by `projectSet`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `seps`: the sidebar's groups (the app's word: a
   named head over the workspaces up to the next one, its count beside it; a workspace dropped on it goes first in it (its top
-  third: before it), `RowDrop` `into`, from `data-head`), each with a `color` of `TAB_COLORS` or none, and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+  third: before it), `RowDrop` `into`, from `data-head`), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it, over the last one used), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - `wsNew`/`wsFan` `place` (`placeWs`, as a drag would: `top`, first in the project, or a sep's id, first under it; a
   race in its order; none: last, as the CLI's and scheduled runs are);
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
@@ -612,6 +612,13 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   ⌘Z, a note; *Add to prompt* sends the PNG and note to main (only from that window), which sends `shot` (png, note)
   to the app: the new-workspace page with the image and the note as its prompt. Vanilla TS; in a browser (the dev
   server) a stand-in picture.
+- **`floater.ts`** (`floater.html`, the third renderer entry): the floating bubbles (`settings.floater`, unset: on).
+  App's `floats` (each workspace whose agent tab works or waits, waiting first: `tab`, name, project, status, its
+  color, what it asked or last said) and the theme's colors go to main (`bridge.floats`); main's `placeFloater` shows
+  the bar while Laki isn't the front app (`did-resign-active`), two `type: 'panel'` windows over every Space and
+  full-screen app: `#bar` (the circles; a click is `floater-open`: `show(tab)`; the grip drags it, `floater.json` in
+  userData keeps where) and `#card` (a hover's card, beside the bar toward the screen's middle, click-through:
+  its own window so the bar never moves under the mouse).
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
   terminal's `minimumContrastRatio` keeps their text readable.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki
@@ -752,8 +759,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m`, then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
-| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), capture, browse |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m`, then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), the floating bubbles (`floats` IPC: `placeFloater`, floater.html's bar and card windows), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
+| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list; their windows'), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |

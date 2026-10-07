@@ -287,7 +287,12 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     if (notesOf(more).length) setP(x => ({ ...x, prompt: [x.prompt, ...notesOf(more)].filter(Boolean).join('\n\n') }))
   }, [shots])
   const [saving, setSaving] = useState(false) // an image isn't saved yet
-  const [tplName, setTplName] = useState(last.tpl ?? '') // a prompt template's name ('' none): another project's of the same name too
+  // a prompt template's name ('' none): another project's of the same name too; opened from a group, its default first
+  const [tplName, setTplName] = useState(() => {
+    const pr = view.projects.find(x => x.id === project)
+    const t = pr?.seps?.find(s => s.id === initial?.place)?.template
+    return (t && templatesFor(view.settings.templates, pr?.config?.templates).some(x => x.name === t) ? t : last.tpl) || ''
+  })
   const [adv, setAdv] = useState(() => load(ADV_OPEN, false) || !!initial?.name || !!initial?.pr)
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
   const proj = view.projects.find(x => x.id === p.project)
@@ -579,19 +584,34 @@ export function AddProject({ onClose, onAdd }: { onClose: () => void; onAdd: (pa
   )
 }
 
-export function Prompt({ title, hint, placeholder, initial = '', onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; onClose: () => void; onSubmit: (v: string) => Promise<void> }) {
+// pick: a select under the field (a group's default template), its value given with the text ('' none)
+export function Prompt({ title, hint, placeholder, initial = '', pick, onClose, onSubmit }: { title: string; hint?: string; placeholder?: string; initial?: string; pick?: { label: string; none: string; options: string[]; value?: string }; onClose: () => void; onSubmit: (v: string, picked: string) => Promise<void> }) {
   const [v, setV] = useState(initial)
+  const [picked, setPicked] = useState(pick?.value ?? '')
   return (
     <Modal title={title} onClose={onClose}>
       <form
         className="form"
         onSubmit={e => {
           e.preventDefault()
-          if (v.trim()) onSubmit(v.trim()).catch(() => {})
+          if (v.trim()) onSubmit(v.trim(), picked).catch(() => {})
         }}
       >
         <input value={v} autoFocus placeholder={placeholder} onFocus={e => e.target.select()} onChange={e => setV(e.target.value)} />
         {hint && <div className="muted small">{hint}</div>}
+        {pick && (
+          <label>
+            {pick.label}
+            <select value={picked} onChange={e => setPicked(e.target.value)}>
+              <option value="">{pick.none}</option>
+              {[...new Set([...pick.options, picked])].filter(Boolean).map(o => ( // one gone since stays as it was
+                <option key={o} value={o}>
+                  {o}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         <div className="buttons">
           <span className="spacer" />
           <button type="button" onClick={onClose}>

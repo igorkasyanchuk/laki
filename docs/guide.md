@@ -159,8 +159,8 @@ selected workspace's PR is in the status bar.
   over the bottom buttons (its menu: open it, 15 more minutes, cancel) and a timer mark on the workspace's row. A
   reminder that came due while Laki was closed comes as it opens.
 - The funnel at the top filters the workspaces: words in a name, branch, PR title, author or `#number`, and *Needs
-  you*, *Working* or *With a PR*; the projects with none hide, groups too. Esc or the funnel again stops it (⌘K
-  too).
+  you*, *Working* or *With a PR*; the projects with none hide, groups too. Esc, the funnel again or the × in the
+  field stops it (⌘K too).
 - ⋯ on a project opens its menu:
   - *New workspace*;
   - *Collapse* / *Expand*;
@@ -180,11 +180,12 @@ selected workspace's PR is in the status bar.
   *Mark as unread* (its ● again, until you look at it) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
 - Drag projects, and workspaces within a project, to reorder them.
 - Groups: a project's ⋯ › *Add a group*, or a workspace's *Add a group below*, puts a named head over its
-  workspaces, up to the next group; it shows how many it holds. A click folds it: they hide (the busiest one's mark
-  stays on it; the selected one stays) until another click. Drop a workspace on a group's head to put it first in
+  workspaces, up to the next group; it shows how many it holds. A click folds it: they hide, the selected one too (the
+  busiest one's mark stays on it), until another click. Drop a workspace on a group's head to put it first in
   that group (a folded one opens). Drag the head like a workspace; double click to rename; right click (or its ⋯)
   for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
-  put it first in this group), *Rename…* and *Remove group* (its workspaces stay).
+  put it first in this group), *Rename or set its template…* (a default prompt template: *New workspace here…* starts
+  with it rather than the last one used) and *Remove group* (its workspaces stay).
 - A workspace with someone else's PR shows its author's GitHub picture before the PR mark.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
@@ -557,6 +558,7 @@ settings) and shows a server icon; the status bar shows `devbox:` before the pat
 | ⌘F | find in the terminal |
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it) |
+| ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
 | ⌘, | settings |
@@ -573,7 +575,7 @@ lit for a moment.
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
-  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Fun button* (the smiley at the bottom of the sidebar; on by default), *Turn
+  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Floating bubbles* (while you're in another app, a small bar over every app and Space with a circle per agent working (an arc going round) or waiting for you (a pulse), its workspace's initials inside: hover one for its name, project and what it asked or last said, click to open it in Laki, drag the grip on top to move the bar, which stays where you leave it; hidden while Laki is in front; on by default), *Fun button* (the smiley at the bottom of the sidebar; on by default), *Turn
   timers* (off by default), *Diff size in the sidebar* (off by default), *Progress on tabs* (agents report how far
   along they are; off by default), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
@@ -644,7 +646,9 @@ lit for a moment.
   Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
   cursor style (block, bar, underline) and blinking, *Scroll speed* (lines per wheel step: 3× by default, xterm's own
-  is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default) and
+  is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default), *Mac editing keys* (⌘← and
+  ⌘→ go to the line's start and end, ⌥← and ⌥→ a word back and on, ⌘⌫ deletes the line, as iTerm's Natural Text
+  Editing has them; on by default) and
   *Dim other panes* (in a split, the panes without the keyboard fade back; off by default) and *Focus the pane under
   the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; off by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).

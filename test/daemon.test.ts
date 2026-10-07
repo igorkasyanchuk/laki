@@ -640,6 +640,13 @@ test('presets: args and env on top of the project env; Esc ends a turn; reorder;
     await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later', color }] })
     assert.deepEqual((await rig.rpc('state')).projects[0].seps, [{ id: 'sep-a1', name: 'Later' }])
   }
+  // its default prompt template: a name, kept trimmed; empty or not a string, none
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later', template: ' Bugfix ' }] })
+  assert.deepEqual((await rig.rpc('state')).projects[0].seps, [{ id: 'sep-a1', name: 'Later', template: 'Bugfix' }])
+  for (const template of ['', '  ', 7, null]) {
+    await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later', template }] })
+    assert.deepEqual((await rig.rpc('state')).projects[0].seps, [{ id: 'sep-a1', name: 'Later' }])
+  }
   assert.deepEqual(pr.rows, [ws2.id, 'sep-a1', ws.id])
   await rig.rpc('reorder', { workspaces: ['sep-a1', ws.id, ws2.id] })
   const v2 = await rig.rpc('state')
