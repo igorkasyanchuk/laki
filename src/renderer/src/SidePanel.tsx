@@ -4,15 +4,15 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
-import { type Block, type Inline, markdown } from './markdown'
-import { type AutoKey, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, type RunAction } from './text'
+import { Folded, Markdown } from './MarkdownView'
+import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
+import { type actionsFor, parseSize, previewAddr, previewUrl, type RunAction, SIZES } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
 
 export type PanelTab = 'files' | 'changes' | 'review' | 'preview'
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
-export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string }[] }
+export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] } // at: an older daemon gives none
 // a file to show: text (up to a size), an image as a data: URL, or neither (binary)
 export type FileContent = { size: number; text?: string; image?: string; cut?: boolean; lossy?: boolean } // lossy: not UTF-8
 // an edit in the file preview: the text as typed (a textarea's \n line ends) and the file's text it started from (App
@@ -25,6 +25,7 @@ export type PanelApi = {
   openFile: (path: string) => void // in the editor
   preview: (path: string, line?: number) => void // in the app
   changes: () => Promise<Changes>
+  prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
   read: (path: string, base?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image)
   threads: () => Promise<Thread[]>
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
@@ -314,11 +315,14 @@ function ImageSide({ label, c, onZoom }: { label: string; c: FileContent | strin
   )
 }
 
-function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number }) {
-  const [d, err, reload] = useLoad(api.changes, ws, 8000)
+// whole: the PR's diff (gh pr diff) instead of the workspace's; first for a workspace that only links its PR
+function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string; pr?: { number: number; url: string }; linked?: boolean; onOpen: (url: string) => void }) {
+  const [whole, setWhole] = useState<boolean | null>(null) // null: as linked says (its PR may come after the panel opens)
+  const all = !!pr && (whole ?? !!linked)
+  const [d, err, reload] = useLoad(all ? api.prChanges : api.changes, `${ws}#${all}`, all ? 60000 : 8000) // gh's: once a minute
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [at, setAt] = useState<{ path: string; line: DiffLine; text: string } | null>(null) // the line being commented on, as it was
-  useEffect(() => (setOpen(new Set()), setAt(null)), [ws])
+  useEffect(() => (setOpen(new Set()), setAt(null)), [ws, all])
   const byFile = useMemo(() => {
     const m = new Map<string, DiffLine[]>()
     let cur: DiffLine[] | null = null
@@ -350,13 +354,24 @@ function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number })
   return (
     <>
       <div className="sp-tools">
-        <span className="muted small grow">{d ? `${files.length} file${files.length === 1 ? '' : 's'} changed vs ${d.base}${files.length ? ' · click a line to comment' : ''}` : 'Loading…'}</span>
+        {pr && (
+          <span className="seg">
+            <button type="button" className={all ? '' : 'on'} data-tip="This workspace's changes: its branch against its base, and what isn't committed" onClick={() => setWhole(false)}>
+              Here
+            </button>
+            <button type="button" className={all ? 'on' : ''} data-tip={`All of PR #${pr.number}, as GitHub has it (gh pr diff)`} onClick={() => setWhole(true)}>
+              PR #{pr.number}
+            </button>
+          </span>
+        )}
+        <span className="muted small grow">{d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : ` changed vs ${d.base}`}${files.length ? ' · click a line to comment' : ''}` : err ? '' : 'Loading…'}</span>
+        {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
         <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} />
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
       <div className="sp-body">
         {err && <div className="warn small pad">{err}</div>}
-        {d && !files.length && <div className="muted small pad">No changes: the branch is where {d.base} is, and nothing is uncommitted.</div>}
+        {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
         {files.map(f => (
           <div key={f.path} className="sp-change">
             <div className="sp-row" onClick={() => toggle(f.path)} data-tip={f.path}>
@@ -373,8 +388,8 @@ function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number })
                 </span>
               )}
             </div>
-            {open.has(f.path) && IMAGE.test(f.path) && <ImageDiff api={api} path={f.path} status={f.status} />}
-            {open.has(f.path) && !IMAGE.test(f.path) && (
+            {open.has(f.path) && IMAGE.test(f.path) && !all && <ImageDiff api={api} path={f.path} status={f.status} />}
+            {open.has(f.path) && (!IMAGE.test(f.path) || all) /* the PR's images: GitHub has them */ && (
               <div className="sp-diff">
                 {(lines => {
                   const box = boxAt(f.path, lines)
@@ -386,11 +401,11 @@ function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number })
                       >
                         {l.text || ' '}
                       </div>
-                      {at && i === box && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr} api={api} onClose={() => setAt(null)} />}
+                      {at && i === box && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr?.number} api={api} onClose={() => setAt(null)} />}
                     </Fragment>
                   ))
                 })(byFile.get(f.path) ?? [{ text: '(no text diff: binary, or past the size cap)' }])}
-                {f.status[0] !== 'D' && (
+                {f.status[0] !== 'D' && !all /* this workspace's copy needn't be the PR's */ && (
                   <span className="row">
                     <button className="link small" onClick={() => api.preview(f.path)}>
                       show the file
@@ -412,39 +427,66 @@ function ChangesTab({ api, ws, pr }: { api: PanelApi; ws: string; pr?: number })
 function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct) => void }) {
   const pr = p.w.pr
   const [threads, err, reload] = useLoad(p.api.threads, `${p.w.id}#${pr?.number ?? ''}`, 60000)
-  const open = (threads ?? []).filter(t => !t.resolved && t.comments.length)
-  const resolved = (threads ?? []).filter(t => t.resolved).length
+  const said = (threads ?? []).filter(t => t.comments.length)
+  const open = said.filter(t => !t.resolved)
+  const resolved = said.filter(t => t.resolved)
   return (
     <div className="sp-body info-body">
-      <PRSection w={p.w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />
+      <PRSection w={p.w} threads={threads ? open.length : err ? undefined : 0} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />
       {pr && (
         <section>
           <h3>
             <Icon name="review" /> Review comments
+            {open.length > 0 && <span className="sp-count">{open.length}</span>}
             <span className="grow" />
             <IconButton icon="refresh" title="Refresh" onClick={reload} />
           </h3>
           {err && <div className="warn small">{err}</div>}
           {!threads && !err && <span className="muted small">Loading…</span>}
-          {threads && !open.length && <span className="muted small">No open threads{resolved ? ` (${resolved} resolved)` : ''}.</span>}
-          {open.map((t, i) => (
-            <div key={i} className="sp-thread">
-              <div className="sp-thread-head mono small" onClick={() => p.api.preview(t.path, t.line)} data-tip="Show the file">
-                {t.path}
-                {t.line ? `:${t.line}` : ''}
-                {t.outdated && <span className="tag">outdated</span>}
-              </div>
-              {t.comments.map((c, j) => (
-                <div key={j} className="sp-comment">
-                  <b>@{c.author}</b> {c.body}
-                </div>
-              ))}
-            </div>
+          {threads && !open.length && <span className="muted small">{resolved.length ? 'No open review comments' : 'No review comments'}</span>}
+          {open.map(t => (
+            <ThreadCard key={threadKey(t)} t={t} api={p.api} />
           ))}
-          {open.length > 0 && resolved > 0 && <span className="muted small">{resolved} resolved, not shown.</span>}
-          <span className="muted small">From reviewers with write access and bots: what the agent gets.</span>
+          {resolved.length > 0 && (
+            <details className="sp-resolved">
+              <summary>{resolved.length} resolved</summary>
+              {resolved.map(t => (
+                <ThreadCard key={threadKey(t)} t={t} api={p.api} />
+              ))}
+            </details>
+          )}
+          {threads && <span className="muted small">From reviewers with write access and bots: what the agent gets.</span>}
         </section>
       )}
+    </div>
+  )
+}
+
+// a thread's key across refreshes: where it is and when it began (the daemon gives no id)
+const threadKey = (t: Thread) => `${t.path}:${t.line ?? ''}:${t.comments[0]?.at ?? t.comments[0]?.body.slice(0, 40)}`
+
+// a review thread: where (a click shows the file at that line), then each comment as Markdown
+function ThreadCard({ t, api }: { t: Thread; api: PanelApi }) {
+  return (
+    <div className="sp-thread">
+      <button className="sp-thread-head" onClick={() => api.preview(t.path, t.line)} data-tip="Show the file at this line">
+        <Icon name="file" />
+        <span className="sp-thread-path">
+          {t.path}
+          {t.line ? `:${t.line}` : ''}
+        </span>
+        {t.outdated && <span className="tag">outdated</span>}
+      </button>
+      {t.comments.map((c, j) => (
+        <div key={j} className="sp-comment">
+          <div className="sp-comment-by">
+            <Avatar login={c.author} size={16} />
+            <b>{c.author}</b>
+            {c.at && <span className="muted">{ago(c.at)}</span>}
+          </div>
+          <Folded text={c.body} lines={10} />
+        </div>
+      ))}
     </div>
   )
 }
@@ -484,7 +526,7 @@ export function SidePanel(p: {
         <IconButton icon="x" title="Close (⌥⌘B)" onClick={p.onClose} />
       </div>
       {tab === 'files' && <Files api={p.api} ws={p.w.id} />}
-      {tab === 'changes' && <ChangesTab api={p.api} ws={p.w.id} pr={p.w.pr?.number} />}
+      {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
     </div>
@@ -494,23 +536,55 @@ export function SidePanel(p: {
 const LOCAL = /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/ // main's will-attach-webview's first page; the iframe's only ones
 const canFrame = !bridge && ['localhost', '127.0.0.1'].includes(location.hostname) // a browser on this Mac: an iframe
 
-const SITE = /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#]|$)/ // example.com, docs.example.com:8080/x: no spaces, a dot, no leading /. ponytail: index.html typed bare reads as a site; /index.html is the path
+// the size the page is laid out at (null: the panel's), and whether the sizes bar is open; per viewer
+type Size = { w: number; h: number } | null
+const SIZE_KEY = 'laki.previewSize'
+const keptSize = (): Size => {
+  try {
+    const s = JSON.parse(localStorage.getItem(SIZE_KEY) ?? 'null')
+    return s && parseSize(`${s.w}x${s.h}`) ? { w: s.w, h: s.h } : null
+  } catch {
+    return null
+  }
+}
 
 // Preview: the workspace's dev server in the panel, or any website. In the app a <webview> (no node, no preload, its
 // own session with few permissions: main's will-attach-webview), with back, forward and a screenshot for the agent; in
 // a browser on this Mac an iframe, localhost only (the CSP's frame-src): another site opens in a tab of its own.
-// ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them)
+// A size (the devices bar) lays the page out at a phone's or a screen's width and height, scaled down to fit.
+// ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them); a size is only the
+// viewport's: no touch, no phone's user agent
 function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void }) {
-  const ports = [...new Set([w.port, ...(w.ports ?? [])])] // $PORT first
-  const [port, setPort] = useState(ports[0])
-  const [addr, setAddr] = useState('/') // the address bar: a path on the port, or a whole URL
-  const [url, setUrl] = useState(`http://localhost:${ports[0]}/`) // what's shown
+  const first = `http://localhost:${w.port}/` // $PORT's
+  const [port, setPort] = useState(w.port) // for a path typed bare
+  const [addr, setAddr] = useState(previewAddr(first)) // the address bar: a path on the port, or a whole URL
+  const [url, setUrl] = useState(first) // what's shown
   const [n, setN] = useState(0) // the iframe's reloads
   const [err, setErr] = useState('')
   const [shot, setShot] = useState<{ data: string; url: string } | null>(null)
   const [picking, setPicking] = useState(0) // a pick in progress (its number: a later one wins)
+  const [size, setSize] = useState<Size>(keptSize)
+  const [sizes, setSizes] = useState(() => !!keptSize()) // the bar
+  const [typed, setTyped] = useState(() => (size ? `${size.w}×${size.h}` : '')) // its own size, as typed
+  const [box, setBox] = useState({ w: 0, h: 0 }) // the room the page has
+  const stage = useRef<HTMLDivElement>(null)
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<any>(null) // the webview element
+  const pickSize = (s: Size) => {
+    setSize(s)
+    setTyped(s ? `${s.w}×${s.h}` : '')
+    try {
+      localStorage.setItem(SIZE_KEY, JSON.stringify(s))
+    } catch {}
+  }
+  useLayoutEffect(() => {
+    const el = stage.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setBox({ w: el.clientWidth, h: el.clientHeight }))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const k = size && box.w ? Math.max(0.05, Math.min(1, (box.w - 16) / size.w, (box.h - 16) / size.h)) : 1 // 8px around it
   // its methods throw until it's attached and ready
   const on = (f: (v: any) => unknown) => {
     try {
@@ -522,11 +596,10 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
     if (!bridge && !LOCAL.test(u)) return onOpen(u) // the iframe takes localhost only
     setErr('')
     setUrl(u)
+    setAddr(previewAddr(u))
     if (view.current && on(v => v.loadURL(u).catch(() => {})) === undefined) view.current.setAttribute('src', u) // a failure comes as did-fail-load
   }
-  // a path on the port, a whole URL, localhost:5173/x without the http://, or a site's address (example.com/x: https)
-  const go = (p = port, a = addr.trim()) =>
-    load(/^https?:\/\//.test(a) ? a : LOCAL.test(`http://${a}`) ? `http://${a}` : SITE.test(a) ? `https://${a}` : `http://localhost:${p}${a.startsWith('/') ? a : `/${a}`}`)
+  const go = () => load(previewUrl(addr, port))
   useEffect(() => {
     if (!bridge || !host.current) return
     const v = document.createElement('webview') as any
@@ -536,15 +609,13 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
     const at = (e: any) => {
       setUrl(e.url)
       setErr('')
-      const u = new URL(e.url)
-      if (!LOCAL.test(e.url)) return setAddr(e.url)
-      setPort(Number(u.port) || 80)
-      setAddr(u.pathname + u.search + u.hash)
+      setAddr(previewAddr(e.url))
+      if (LOCAL.test(e.url)) setPort(Number(new URL(e.url).port) || 80)
     }
     v.addEventListener('did-navigate', at)
     v.addEventListener('did-start-navigation', (e: any) => e.isMainFrame && !e.isInPlace && setPicking(0)) // the page's picker goes with it
     v.addEventListener('did-navigate-in-page', (e: any) => e.isMainFrame && at(e))
-    v.addEventListener('did-fail-load', (e: any) => e.isMainFrame && e.errorCode !== -3 && setErr(e.errorCode === -102 ? `Nothing listens on ${new URL(e.validatedURL).host} yet: ▷ Run starts the dev server` : e.errorDescription || 'It didn’t load'))
+    v.addEventListener('did-fail-load', (e: any) => e.isMainFrame && e.errorCode !== -3 && setErr(e.errorCode === -102 ? `Nothing listens on ${new URL(e.validatedURL).host} yet: ▷ Run starts the dev server. Or type another address above.` : e.errorDescription || 'It didn’t load'))
     host.current.appendChild(v)
     view.current = v
     return () => {
@@ -575,36 +646,55 @@ function PreviewTab({ w, api, onOpen }: { w: WsInfo; api: PanelApi; onOpen: (url
     }, end)
   }
   if (!bridge && !canFrame) return <div className="muted small pad">The preview shows this Mac's localhost: open {w.name || w.id} in the app there. To open a port from here, share it with the globe in the status bar.</div>
+  const own = size && !SIZES.some(([, sw, sh]) => sw === size.w && sh === size.h)
   return (
     <>
       <div className="sp-tools web-tools">
         {bridge && <IconButton icon="back" title="Back" onClick={() => on(v => v.goBack())} />}
         {bridge && <IconButton icon="forward" title="Forward" onClick={() => on(v => v.goForward())} />}
         <IconButton icon="refresh" title="Reload" onClick={() => (setErr(''), bridge ? on(v => v.reload()) : setN(x => x + 1))} />
-        <select
-          value={port}
-          title="Port"
-          onChange={e => {
-            setPort(Number(e.target.value))
-            setAddr('/')
-            go(Number(e.target.value), '/')
-          }}
-        >
-          {[...new Set([...ports, port])].map(x => (
-            <option key={x} value={x}>
-              :{x}
-            </option>
-          ))}
-        </select>
-        <input value={addr} spellCheck={false} onChange={e => setAddr(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} />
+        <input value={addr} spellCheck={false} placeholder="localhost:3000/ · :5173 · example.com" data-tip="A path on this port (/x), another port (:5173), or any address" onChange={e => setAddr(e.target.value)} onKeyDown={e => e.key === 'Enter' && go()} onFocus={e => e.target.select()} />
+        <IconButton icon="devices" title="Sizes: a phone's, a tablet's, HD…" on={sizes} onClick={() => (sizes && pickSize(null), setSizes(!sizes))} />
         {bridge && <IconButton icon="pick" title={picking ? 'Picking: click an element (Esc stops)' : "Pick an element: its CSS selector into the agent's prompt"} on={!!picking} onClick={pick} />}
         {bridge?.capture && <IconButton icon="camera" title="Screenshot to the agent" onClick={capture} />}
         <IconButton icon="link" title="Open in the browser" onClick={() => onOpen(url)} />
       </div>
+      {sizes && (
+        <div className="sp-tools web-sizes">
+          <span className="seg wrap">
+            <button type="button" className={size ? '' : 'on'} data-tip="As wide and tall as the panel" onClick={() => pickSize(null)}>
+              Fit
+            </button>
+            {SIZES.map(([name, sw, sh]) => (
+              <button key={name} type="button" className={size?.w === sw && size.h === sh ? 'on' : ''} data-tip={`${sw}×${sh}`} onClick={() => pickSize({ w: sw, h: sh })}>
+                {name}
+              </button>
+            ))}
+          </span>
+          <input
+            className={own ? 'on' : ''}
+            value={typed}
+            placeholder="1440×900"
+            spellCheck={false}
+            data-tip="Your own size: width×height, then Enter"
+            onChange={e => setTyped(e.target.value)}
+            onKeyDown={e => {
+              if (e.key !== 'Enter') return
+              const s = parseSize(typed)
+              if (s) pickSize({ w: s[0], h: s[1] })
+              else setTyped(size ? `${size.w}×${size.h}` : '')
+            }}
+          />
+          {size && <IconButton icon="refresh" title="Turn it: width and height swapped" onClick={() => pickSize({ w: size.h, h: size.w })} />}
+          {size && <span className="muted small">{Math.round(k * 100)}%</span>}
+        </div>
+      )}
       {shot && <ShotBox shot={shot} api={api} onClose={() => setShot(null)} />}
       {err && <div className="warn small pad">{err}</div>}
-      <div className="web-body" ref={host}>
-        {!bridge && <iframe key={n} className="web-view" src={url} title="Preview" />}
+      <div className={`web-body ${size ? 'sized' : ''}`} ref={stage}>
+        <div className="web-host" ref={host} style={size ? { width: size.w, height: size.h, transform: `scale(${k})` } : undefined}>
+          {!bridge && <iframe key={n} className="web-view" src={url} title="Preview" />}
+        </div>
       </div>
     </>
   )
@@ -969,124 +1059,6 @@ function localStore(k: string, v?: string) {
     localStorage.setItem(k, v)
   } catch {}
   return null
-}
-
-// a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
-// open in the browser, images show as links (a preview fetches nothing)
-function Markdown({ src }: { src: string }) {
-  const tree = useMemo(() => markdown(src), [src])
-  return <div className="md">{tree.map(mdBlock)}</div>
-}
-function mdBlock(b: Block, k: number): React.ReactNode {
-  switch (b.t) {
-    case 'h': {
-      const H = `h${b.level}` as 'h1'
-      return <H key={k}>{b.inl.map(mdInline)}</H>
-    }
-    case 'p':
-      return <p key={k}>{b.inl.map(mdInline)}</p>
-    case 'hr':
-      return <hr key={k} />
-    case 'quote':
-      return <blockquote key={k}>{b.blocks.map(mdBlock)}</blockquote>
-    case 'code':
-      return (
-        <pre key={k}>
-          <code>
-            {highlight(`x.${b.lang || 'txt'}`, b.text).map((l, i) => (
-              <Fragment key={i}>
-                {i > 0 && '\n'}
-                {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
-              </Fragment>
-            ))}
-          </code>
-        </pre>
-      )
-    case 'list': {
-      const items = b.items.map((it, i) => {
-        const box = it.task !== undefined && <input key="box" type="checkbox" checked={it.task} readOnly />
-        const [first, ...more] = it.blocks
-        return (
-          <li key={i} className={it.task !== undefined ? 'task' : undefined}>
-            {/* one paragraph: a tight list's line, no paragraph's margins; a task's box goes in its first line */}
-            {first?.t !== 'p' ? (
-              [box, ...it.blocks.map(mdBlock)]
-            ) : more.length ? (
-              <>
-                <p>
-                  {box}
-                  {first.inl.map(mdInline)}
-                </p>
-                {more.map(mdBlock)}
-              </>
-            ) : (
-              [box, ...first.inl.map(mdInline)]
-            )}
-          </li>
-        )
-      })
-      return b.ordered ? (
-        <ol key={k} start={b.start}>
-          {items}
-        </ol>
-      ) : (
-        <ul key={k}>{items}</ul>
-      )
-    }
-    case 'table':
-      return (
-        <div key={k} className="md-table">
-          <table>
-            <thead>
-              <tr>
-                {b.head.map((c, i) => (
-                  <th key={i} style={{ textAlign: b.align[i] || undefined }}>
-                    {c.map(mdInline)}
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {b.rows.map((r, i) => (
-                <tr key={i}>
-                  {b.head.map((_, j) => (
-                    <td key={j} style={{ textAlign: b.align[j] || undefined }}>
-                      {(r[j] ?? []).map(mdInline)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )
-  }
-}
-function mdInline(x: Inline, k: number): React.ReactNode {
-  if (typeof x === 'string') return x
-  switch (x.t) {
-    case 'code':
-      return <code key={k}>{x.text}</code>
-    case 'b':
-      return <strong key={k}>{x.kids.map(mdInline)}</strong>
-    case 'i':
-      return <em key={k}>{x.kids.map(mdInline)}</em>
-    case 's':
-      return <del key={k}>{x.kids.map(mdInline)}</del>
-    case 'br':
-      return <br key={k} />
-    case 'a':
-    case 'img': {
-      const href = x.t === 'a' ? x.href : x.src
-      const web = /^(https?:|mailto:)/i.test(href) // a relative one is a file of the repo: shown, not followed
-      const kids = x.t === 'a' ? x.kids.map(mdInline) : `🖼 ${x.alt || 'image'}`
-      return (
-        <a key={k} href={web ? href : undefined} data-tip={href} onClick={e => (e.preventDefault(), web && openExternal(href))}>
-          {kids}
-        </a>
-      )
-    }
-  }
 }
 
 // q's characters in order in s, case aside: a score (contiguous runs and word starts count more) and

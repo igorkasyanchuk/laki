@@ -15,6 +15,7 @@ import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo } from './push.ts'
 import { type Client, Session } from './session.ts'
+import { scanWidgets, widgetDir, widgetHome, widgetKey, widgetsView, widgetTick } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -40,7 +41,7 @@ const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
 const prs = new Map<string, PR>()
-export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean } } // browse: the app's window, which has the agent browser
+export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden)
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
 
@@ -245,6 +246,9 @@ export function view(): View {
     schedules: state.schedules,
     runs: state.runs?.slice(0, RUNS_SHOWN),
     todos: state.todos,
+    widgets: widgetsView(),
+    widgetKey,
+    widgetHome: widgetHome(),
     api: API,
   }
 }
@@ -282,8 +286,10 @@ const agentSaid = (ws: string, at: string) => {
 const shown = (v: { tab: string | null; tabs?: string[] }) => v.tabs ?? (v.tab ? [v.tab] : [])
 const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(c.view).includes(tab))
 
-export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean }) {
+export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean }) {
+  const hidden = c.view?.shown === false
   c.view = v
+  if (hidden && v.shown !== false) widgetTick() // the window's back: what fell due meanwhile
   if (!v.focused) return
   for (const id of shown(v)) {
     const r = rt.get(id)
@@ -452,7 +458,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
   const p = findProject(ref)
   if (o.name?.trim()) p.name = o.name.trim()
   if (Array.isArray(o.seps)) {
-    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join('') }))
+    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}) }))
     p.seps = seps.length ? seps : undefined
     if (!p.seps) p.rows = undefined
   }
@@ -763,13 +769,19 @@ const readHostCfgs = (ws: Workspace, fresh = true) =>
 
 // ---------- tabs
 
-function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
+// this Mac's environment without the daemon's own (Electron as node, Laki's, a Claude Code session's): what a
+// tab's or a widget's command starts from
+export function plainEnv() {
   const env: Record<string, string> = {}
   for (const [k, v] of Object.entries(process.env)) {
     if (v === undefined || k.startsWith('ELECTRON_') || k.startsWith('LAKI_') || k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_')) continue
     env[k] = v
   }
-  return { ...env, ...lakiEnv(ws, tab, extra) }
+  return env
+}
+
+function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
+  return { ...plainEnv(), ...lakiEnv(ws, tab, extra) }
 }
 
 // what Laki adds to a tab's environment: over this Mac's (childEnv), or all of it on an SSH host (hostScript); hooks:
@@ -1053,11 +1065,13 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 }
 
 export function settingsSet(o: Settings) {
+  const dirsWere = JSON.stringify(state.settings?.widgetDirs ?? [])
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
   state.settings = { ...state.settings, ...o }
   save()
   changed()
   if ('diffStat' in o) void scanStats() // its numbers now, not at the next scan
+  if (JSON.stringify(state.settings.widgetDirs ?? []) !== dirsWere) scanWidgets() // the folders added or taken out
   return state.settings
 }
 
@@ -1102,15 +1116,15 @@ export function apps() {
 
 // open a workspace's (or a project's) folder, or a file in it, in an app; 'editor' is the one in Settings, 'default'
 // macOS's for the file
-export async function openIn(o: { ws?: string; project?: string; app: string; file?: string }) {
+export async function openIn(o: { ws?: string; project?: string; widget?: string; app: string; file?: string }) {
   const file = !!(o.file && o.ws)
-  const path = file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : findProject(o.project ?? '').path
+  const path = file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
   const s = state.settings ?? {}
   const app = o.app === 'editor' ? s.editor || 'cursor' : o.app
   const fail = (e: any) => {
     throw new Error(String(e.stderr || e.message).trim().split('\n')[0])
   }
-  const host = o.ws ? findWs(o.ws).host : findProject(o.project ?? '').host
+  const host = o.ws ? findWs(o.ws).host : o.widget ? undefined : findProject(o.project ?? '').host
   if (host) {
     // a folder or file on an SSH host: the editors with Remote - SSH open it there
     const scheme = ({ vscode: 'vscode', cursor: 'cursor', windsurf: 'windsurf' } as Record<string, string>)[app]
@@ -1990,8 +2004,11 @@ function checkOf(c: any): Check {
       : ['SKIPPED', 'NEUTRAL', 'STALE'].includes(s)
         ? 'skip'
         : 'pass'
-  return { name: c.name || c.context || '?', state, url: c.detailsUrl || c.targetUrl || undefined }
+  const took = Math.round((checkTime(c.completedAt) - checkTime(c.startedAt)) / 1000)
+  return { name: c.name || c.context || '?', state, url: c.detailsUrl || c.targetUrl || undefined, took: took > 0 && state !== 'pending' ? took : undefined }
 }
+// a check's time, NaN for none or Go's zero time (not started or not done)
+const checkTime = (t: unknown) => (typeof t === 'string' && !t.startsWith('0001') ? Date.parse(t) : NaN)
 
 // the newest run of each check: a re-run leaves the old one in statusCheckRollup (gh pr checks drops it too), so a
 // fixed check would read as failing; one not started yet (no time, or Go's zero time) is the newest
@@ -2039,6 +2056,18 @@ export function scanPRs(): Promise<void> {
 
 const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,mergeable,additions,deletions,body,updatedAt,statusCheckRollup'
 
+// who you are on GitHub, per host ('': this Mac): gh api user's login, kept 10 minutes (gh auth switch), a failure
+// not at all
+const logins = new Map<string, { at: number; p: Promise<string> }>()
+function ghLogin(at: At) {
+  const k = at.host ?? ''
+  const had = logins.get(k)
+  if (had && Date.now() - had.at < 600000) return had.p
+  const p = exec(at, 'gh', ['api', 'user', '--jq', '.login'], { timeout: 20000 }).then(r => r.stdout.trim(), () => (logins.delete(k), ''))
+  logins.set(k, { at: Date.now(), p })
+  return p
+}
+
 async function scanPR(ws: Workspace) {
   if (ws.host) await hostSync(ws)
   let pr: PR
@@ -2054,6 +2083,7 @@ async function scanPR(ws: Workspace) {
       list,
       title: j.title,
       author: j.author?.login,
+      mine: j.author?.login && j.author.login === (await ghLogin(ws)) ? true : undefined,
       draft: j.isDraft,
       head: j.headRefOid,
       review: j.reviewDecision || undefined,
@@ -2675,6 +2705,35 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' }) {
   return {}
 }
 
+// prDiff: the PR's whole diff as GitHub has it (gh pr diff), in diff's shape: Changes' PR view, for a workspace that
+// only links the PR or isn't at its head
+export async function prDiff(ref: string) {
+  const ws = findWs(ref)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  const { stdout } = await exec(ws, 'gh', ['pr', 'diff', '--color=never', '--', pr.url], { timeout: 30000 }).catch(e => {
+    throw new Error(ghSays(e, `PR #${pr.number}`))
+  })
+  return { base: pr.base ?? 'its base', from: `PR #${pr.number}`, files: diffFiles(stdout), diff: stdout.length > 4 << 20 ? stdout.slice(0, 4 << 20) + '\n… (cut)' : stdout }
+}
+
+// a unified diff's files, each with its status (A, D, R, else M) and lines added and taken out
+function diffFiles(text: string) {
+  const files: { path: string; status: string; add: number; del: number }[] = []
+  let f: (typeof files)[number] | undefined
+  let hunk = false // past the file's header: +++ and --- are lines then
+  for (const l of text.split('\n')) {
+    const g = /^diff --git a\/.* b\/(.*)$/.exec(l)
+    if (g) (files.push((f = { path: g[1], status: 'M', add: 0, del: 0 })), (hunk = false))
+    else if (!f) continue
+    else if (l.startsWith('@@')) hunk = true
+    else if (!hunk) f.status = l.startsWith('new file') ? 'A' : l.startsWith('deleted file') ? 'D' : l.startsWith('rename from') ? 'R' : f.status
+    else if (l[0] === '+') f.add++
+    else if (l[0] === '-') f.del++
+  }
+  return files
+}
+
 // prThreads: the PR's review threads, for the side panel
 export async function prThreads(ref: string) {
   const ws = findWs(ref)
@@ -2686,7 +2745,7 @@ export async function prThreads(ref: string) {
     line: t.line ?? undefined,
     resolved: t.isResolved,
     outdated: t.isOutdated,
-    comments: t.comments.nodes.map(c => ({ author: c.author?.login ?? 'ghost', body: c.body })),
+    comments: t.comments.nodes.map(c => ({ author: c.author?.login ?? 'ghost', body: c.body, at: c.createdAt })),
   }))
 }
 

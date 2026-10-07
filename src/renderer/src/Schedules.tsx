@@ -24,7 +24,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const only = view.projects.length > 1 && view.projects.some(p => p.id === picked) ? picked : '' // a removed project, or the only one: all
   const schedules = (view.schedules ?? []).filter(s => !only || s.project === only)
   const runs = (view.runs ?? []).filter(r => !only || (r.project ?? view.schedules?.find(s => s.id === r.schedule)?.project) === only)
-  const agents = view.presets.filter(p => p.agent !== 'command').map(p => p.name)
+  const agents = view.presets.filter(p => p.agent !== 'command' && !p.off).map(p => p.name)
   const newest = view.runs?.[0]?.id
   useEffect(() => void (!only && newest && onSeen?.(newest)), [only, newest]) // filtered: another project's failure stays unread
   const where0 = (project: string) => (view.projects.find(p => p.id === project)?.git === false ? 'local' : 'new') // a folder without git: no worktrees
@@ -124,7 +124,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
             <label>
               Agent
               <div className="seg">
-                {agents.map(a => (
+                {(agents.includes(form.preset) ? agents : [...agents, form.preset]).map(a => ( // its own, if switched off since
                   <button type="button" key={a} className={form.preset === a ? 'on' : ''} onClick={() => set({ preset: a })}>
                     {a}
                   </button>

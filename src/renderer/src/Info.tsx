@@ -3,10 +3,11 @@
 // workspace to WsInfo.
 import { type MouseEvent, type ReactNode } from 'react'
 import { Glyph } from './Glyph'
+import { Folded } from './MarkdownView'
 import { type Tunnel } from './Tunnel'
-import { Icon, IconButton, Switch } from './ui'
+import { Icon, IconButton, type IconName, Switch } from './ui'
 
-export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string }
+export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string; took?: number } // took: seconds (an older daemon: none)
 export type PRInfo = {
   number: number
   state: string // OPEN, MERGED, CLOSED
@@ -15,6 +16,7 @@ export type PRInfo = {
   list?: Check[]
   title?: string
   author?: string
+  mine?: boolean // you opened it
   draft?: boolean
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
   conflict?: boolean // merge conflicts with its base branch
@@ -59,18 +61,24 @@ export function ciText(pr: PRInfo) {
   return 'no checks'
 }
 
+// a PR author's GitHub picture (the CSP lets avatars.githubusercontent.com in); a bot's (app/…) has none, nor a
+// failed one
+export const Avatar = ({ login, size = 14 }: { login?: string; size?: number }) =>
+  login && /^[\w-]+$/.test(login) ? <img className="avatar" src={`https://avatars.githubusercontent.com/${login}?s=${size * 2}`} width={size} height={size} alt="" loading="lazy" onError={e => (e.currentTarget.hidden = true)} /> : null
+
 export const prState = (pr: PRInfo) => (pr.draft && pr.state === 'OPEN' ? 'draft' : pr.state.toLowerCase())
 const REVIEW: Record<string, string> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested', REVIEW_REQUIRED: 'review required' }
 
-const ago = (t?: string | number) => {
+export const ago = (t?: string | number) => {
   if (!t) return ''
   const s = (Date.now() - new Date(t).getTime()) / 1000
   if (!(s >= 0)) return ''
   return s < 90 ? 'just now' : s < 5400 ? `${Math.round(s / 60)}m ago` : s < 129600 ? `${Math.round(s / 3600)}h ago` : `${Math.round(s / 86400)}d ago`
 }
 
-// the auto switches, in the status bar and the panel
-export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void }) {
+// the auto switches, in the status bar and the panel; the panel's (under "Let the agent fix") are rows: names, and
+// row's Send now after each
+export function AutoToggles({ w, onToggle, names = ['fix CI', 'review', 'fix conflicts'], row }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void; names?: string[]; row?: (k: AutoKey) => ReactNode }) {
   if (w.prLinked)
     return (
       <span className="muted small" data-tip="The prompt named this PR; its branch isn't checked out here, so the agent couldn't push to it. A workspace from the PR (Pull request on the new-workspace page, laki new --pr) has the switches.">
@@ -78,17 +86,28 @@ export function AutoToggles({ w, onToggle }: { w: WsInfo; onToggle: (k: AutoKey,
       </span>
     )
   const when = `Checked every ${w.prScan === 1 ? 'minute' : `${w.prScan} minutes`} and after each turn; the prompt and pace: Settings › Pull requests.`
+  const tips: Record<AutoKey, string> = {
+    autoFix: `Failing CI on a new commit goes to the agent, with the failed logs: it fixes and pushes. Up to ${w.prTries} tries in a row, then it's over to you. ${when}`,
+    autoReview: `New review comments on the PR go to the agent: it addresses them and pushes. ${when}`,
+    autoMerge: `Merge conflicts with the base branch go to the agent: it merges the base in and pushes. Up to ${w.prTries} tries in a row, then it's over to you. ${when}`,
+  }
   return (
     <>
-      <Switch on={w.autoFix} tip={`Failing CI on a new commit goes to the agent, with the failed logs: it fixes and pushes. Up to ${w.prTries} tries in a row, then it's over to you. ${when}`} onChange={v => onToggle('autoFix', v)}>
-        fix CI
-      </Switch>
-      <Switch on={w.autoReview} tip={`New review comments on the PR go to the agent: it addresses them and pushes. ${when}`} onChange={v => onToggle('autoReview', v)}>
-        review
-      </Switch>
-      <Switch on={w.autoMerge} tip={`Merge conflicts with the base branch go to the agent: it merges the base in and pushes. Up to ${w.prTries} tries in a row, then it's over to you. ${when}`} onChange={v => onToggle('autoMerge', v)}>
-        fix conflicts
-      </Switch>
+      {(['autoFix', 'autoReview', 'autoMerge'] as const).map((k, i) => {
+        const s = (
+          <Switch key={k} on={w[k]} tip={tips[k]} onChange={v => onToggle(k, v)}>
+            {names[i]}
+          </Switch>
+        )
+        return row ? (
+          <div key={k} className="pr-fix">
+            {s}
+            {row(k)}
+          </div>
+        ) : (
+          s
+        )
+      })}
     </>
   )
 }
@@ -129,11 +148,62 @@ function Row({ k, children }: { k: string; children: ReactNode }) {
   )
 }
 
-// the PR: title, state, checks, the auto switches and what to send the agent (info panel, side panel)
-export function PRSection({ w, onOpen, onToggle, onFix, onAct }: { w: WsInfo; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct) => void }) {
-  const pr = w.pr
+// checks, failing first, then running, passing, skipped
+const CK: Record<Check['state'], { order: number; word: string; icon: IconName }> = {
+  fail: { order: 0, word: 'failing', icon: 'x' },
+  pending: { order: 1, word: 'running', icon: 'unread' },
+  pass: { order: 2, word: 'passing', icon: 'check' },
+  skip: { order: 3, word: 'skipped', icon: 'minus' },
+}
+const took = (s: number) => (s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor(s / 60) % 60}m`)
+
+function Checks({ pr, onOpen }: { pr: PRInfo; onOpen: (url: string) => void }) {
+  const list = [...(pr.list ?? [])].sort((a, b) => CK[a.state].order - CK[b.state].order)
+  const count = (s: Check['state']) => list.filter(c => c.state === s).length
   return (
-    <section>
+    <div className="pr-block">
+      <h4>
+        Checks
+        <span className="pr-sum">
+          {(['fail', 'pending', 'pass', 'skip'] as const).map(s => count(s) > 0 && <span key={s} className={`ck-${s}`}>{`${count(s)} ${CK[s].word}`}</span>)}
+        </span>
+      </h4>
+      {!list.length && <span className="muted small">No checks</span>}
+      {list.map((c, i) => (
+        <a key={i} className={`pr-check ck-${c.state}`} href={c.url} data-tip={c.url && 'Its details and log'} onClick={e => (e.preventDefault(), c.url && onOpen(c.url))}>
+          <Icon name={CK[c.state].icon} />
+          <span className="pr-check-name">{c.name}</span>
+          {!!c.took && <span className="muted">{took(c.took)}</span>}
+        </a>
+      ))}
+    </div>
+  )
+}
+
+const FIX: Record<AutoKey, FixWhat> = { autoFix: 'ci', autoReview: 'review', autoMerge: 'conflict' }
+const SEND: Record<FixWhat, [string, string]> = {
+  ci: ['Send failing CI', 'the failing checks and their logs, to the agent'],
+  review: ['Send review comments', 'the open ones, to the agent'],
+  conflict: ['Send conflicts', 'the agent merges the base branch in and pushes'],
+}
+
+// the PR: title, state, actions, its description, checks, and what the agent fixes (info panel, side panel)
+// threads: its open review threads (the side panel's), unknown in the info panel: Send review comments shows then
+export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct }: { w: WsInfo; threads?: number; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct) => void }) {
+  const pr = w.pr
+  const open = pr?.state === 'OPEN'
+  // Send now: what there is to send, by hand (a linked PR, with no switches: each named)
+  const send = (what: FixWhat, named = false) => {
+    if (!pr || !(what === 'ci' ? pr.checks === 'fail' : what === 'review' ? (threads ?? 1) > 0 : pr.conflict)) return null
+    const [label, tip] = SEND[what]
+    return (
+      <button key={what} className="pr-send" aria-label={label} data-tip={`${label}: ${tip}`} onClick={() => onFix(what)}>
+        <Icon name="agent" /> {named ? label : 'Send now'}
+      </button>
+    )
+  }
+  return (
+    <section className="pr-sec">
       <h3>
         <Icon name="pr" /> Pull request
       </h3>
@@ -141,57 +211,51 @@ export function PRSection({ w, onOpen, onToggle, onFix, onAct }: { w: WsInfo; on
         <p className="muted small">{w.kind === 'worktree' ? `None for ${w.branch} yet. Ship opens one.` : 'None.'}</p>
       ) : (
         <>
-          <a className="info-title" href={pr.url} onClick={e => (e.preventDefault(), onOpen(pr.url))}>
-            #{pr.number} {pr.title}
+          <a className="pr-title" href={pr.url} onClick={e => (e.preventDefault(), onOpen(pr.url))}>
+            {pr.title} <span className="pr-num">#{pr.number}</span>
           </a>
-          <div className="info-tags">
+          <div className="pr-meta">
             <span className={`tag tag-${prState(pr)}`}>{prState(pr)}</span>
             {pr.review && <span className={`tag tag-${pr.review.toLowerCase()}`}>{REVIEW[pr.review] ?? pr.review.toLowerCase()}</span>}
-            {pr.conflict && pr.state === 'OPEN' && <span className="tag tag-conflict">merge conflicts</span>}
-            {pr.author && <span className="muted">by {pr.author}</span>}
+            {pr.conflict && open && <span className="tag tag-conflict">merge conflicts</span>}
+            {pr.author && (
+              <span className="pr-by">
+                by {!pr.mine && <Avatar login={pr.author} />} {pr.mine ? 'you' : pr.author}
+              </span>
+            )}
             {!!(pr.additions || pr.deletions) && (
-              <span className="mono small">
+              <span className="mono">
                 <span className="add">+{pr.additions ?? 0}</span> <span className="del">−{pr.deletions ?? 0}</span>
               </span>
             )}
-            {pr.updated && <span className="muted small">updated {ago(pr.updated)}</span>}
+            {pr.updated && <span>updated {ago(pr.updated)}</span>}
           </div>
-          {pr.state === 'OPEN' && (
-            <>
-              <div className="info-checks">
-                {(pr.list ?? []).map((c, i) => (
-                  <a key={i} className={`info-check ck-${c.state}`} href={c.url} onClick={e => (e.preventDefault(), c.url && onOpen(c.url))}>
-                    <span className="ck">{{ pass: '✓', fail: '✗', pending: '…', skip: '–' }[c.state]}</span>
-                    {c.name}
-                  </a>
-                ))}
-                {!pr.list?.length && <span className="muted small">No checks.</span>}
-              </div>
-              <div className="info-auto">
-                <AutoToggles w={w} onToggle={onToggle} />
-                {w.autoFix && (w.fixTries ?? 0) > w.prTries && <span className="warn small">gave up after {w.prTries} fixes; turn fix CI off and on to try again</span>}
-                {w.autoMerge && (w.mergeTries ?? 0) > w.prTries && <span className="warn small">gave up on the conflicts after {w.prTries} tries; turn fix conflicts off and on to try again</span>}
-              </div>
-              <div className="row">
-                <button onClick={() => onFix('ci')} disabled={pr.checks !== 'fail'}>
-                  Send failing CI to the agent
-                </button>
-                <button onClick={() => onFix('review')}>Send review comments</button>
-                <button onClick={() => onFix('conflict')} disabled={!pr.conflict}>
-                  Send merge conflicts
-                </button>
-              </div>
-              <div className="row">
-                <button onClick={() => onAct('approve')} data-tip="An approving review, as you (gh pr review --approve)">
-                  <Icon name="check" /> Approve…
-                </button>
-                <button onClick={() => onAct('close')} data-tip="Closes it without merging (gh pr close); it can be reopened on GitHub">
-                  <Icon name="x" /> Close PR…
-                </button>
-              </div>
-            </>
+          <div className="pr-acts">
+            {open && !pr.mine /* GitHub takes no approval of your own */ && (
+              <button className="approve" onClick={() => onAct('approve')} data-tip="An approving review, as you (gh pr review --approve)">
+                <Icon name="check" /> Approve…
+              </button>
+            )}
+            <button onClick={() => onOpen(pr.url)} data-tip={pr.url}>
+              <Icon name="github" /> <span className="pr-wide">Open on </span>GitHub
+            </button>
+            {open && (
+              <button className="close-pr" onClick={() => onAct('close')} data-tip="Closes it without merging (gh pr close); it can be reopened on GitHub">
+                <Icon name="x" /> Close…
+              </button>
+            )}
+          </div>
+          {pr.body?.trim() && <Folded key={pr.url} text={pr.body.trim()} lines={6} />}
+          {open && <Checks pr={pr} onOpen={onOpen} />}
+          {open && (
+            <div className="pr-block">
+              <h4>Let the agent fix</h4>
+              <AutoToggles w={w} onToggle={onToggle} names={['failing CI', 'review comments', 'conflicts']} row={k => send(FIX[k])} />
+              {w.prLinked && <div className="pr-sends">{(['ci', 'review', 'conflict'] as const).map(what => send(what, true))}</div>}
+              {w.autoFix && (w.fixTries ?? 0) > w.prTries && <span className="warn small">Gave up after {w.prTries} fixes; turn failing CI off and on to try again.</span>}
+              {w.autoMerge && (w.mergeTries ?? 0) > w.prTries && <span className="warn small">Gave up on the conflicts after {w.prTries} tries; turn conflicts off and on to try again.</span>}
+            </div>
           )}
-          {pr.body?.trim() && <div className="info-pr-body">{pr.body.trim()}</div>}
         </>
       )}
     </section>

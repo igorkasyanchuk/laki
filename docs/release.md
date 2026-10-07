@@ -17,6 +17,9 @@ The build is unsigned, one architecture per build, with no auto-update (see the 
    npm run pack       # this Mac's architecture: dist/mac-arm64/Laki.app (Intel: dist/mac)
    npm run pack:x64   # the Intel app from an Apple silicon Mac: dist/mac/Laki.app
    ```
+   A disk image to hand out: `npm run dmg` bumps the minor version (`npm version minor`, no tag), builds, and writes
+   `dist/release/Laki-<version>-arm64.dmg` (its own folder: a running `dist/mac-arm64/Laki.app` and its daemon stay
+   as they are). Each run is a new minor version.
 5. Run `scripts/pack-smoke.sh` once before a release: it runs the packaged app's daemon, CLI and hooks on Electron's
    node with fake agents, in a temp home, and takes a window screenshot. For the Intel build:
    `APP=$PWD/dist/mac/Laki.app scripts/pack-smoke.sh` (under Rosetta).

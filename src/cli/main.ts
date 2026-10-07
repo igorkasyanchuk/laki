@@ -5,7 +5,7 @@ import { existsSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { REMOTE, type Schedule, type ScheduleRun, type View, type Workspace } from '../shared/types.ts'
+import { REMOTE, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { describe } from '../shared/when.ts'
@@ -14,7 +14,7 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan'])
-const BOOL = new Set(['json', 'local', 'when-idle'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -192,6 +192,30 @@ async function main() {
       }
       if (sub === 'rm') return out((await rpc('scheduleRm', { id })) ?? { ok: true }, `removed ${id}`)
       throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" <prompt> | on|off|run|rm <id>`)
+    }
+    case 'widget':
+    case 'widgets': {
+      const [sub = 'ls', id, action, ...arg] = rest
+      if (sub === 'ls') {
+        const ws: WidgetView[] = (await rpc('state')).widgets ?? []
+        const line = (w: WidgetView) => `${w.id}  ${w.on ? 'on ' : 'off'}  ${w.size.join('×')}  ${w.every ? `every ${w.every}m` : 'no fetch'}  ${w.error ? `✗ ${w.error}` : w.at ? '✓' : ''}  ${w.dir}`
+        return out(ws, ws.map(line).join('\n') || 'no widgets')
+      }
+      if (sub === 'reload') return out(await rpc('widgetReload'), 'reloaded')
+      if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
+      if (sub === 'run') {
+        const r = await rpc('widgetRun', { id }, 130000)
+        return out(r, r.ok ? 'fetched' : `✗ ${r.error}`)
+      }
+      if (sub === 'render') {
+        const html: string | null = await rpc('widgetRender', { id, full: !!flags.full })
+        return out(html, html ?? `${id} has no ${flags.full ? 'full' : 'preview'} view`)
+      }
+      if (sub === 'action') {
+        const r = await rpc('widgetAction', { id, action, arg: arg.join(' ') }, 130000)
+        return out(r, r.ok ? r.out || 'done' : `✗ ${r.error}`)
+      }
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg]')
     }
     default:
       throw new Error(`unknown command ${cmd}\n\n${USAGE}`)

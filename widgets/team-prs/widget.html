@@ -1,0 +1,92 @@
+<style>
+  .ci-failing, .review-changes { color: var(--error); } .ci-passing, .review-approved { color: var(--done); } .ci-pending, .review-waiting { color: var(--waiting); }
+  .tile { padding: 3px 6px; gap: 0; }
+  canvas { display: block; width: 100%; height: 12px; margin-top: 2px; }
+  .bar { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+  .bar input, .bar select { font: inherit; color: inherit; background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 4px 8px; }
+  .bar input { flex: 1; }
+  td a.who { color: inherit; cursor: pointer; } td a.who:hover { color: var(--accent); }
+  th[data-sort] { cursor: pointer; } th[data-sort]:hover { color: var(--fg); }
+  .acts { white-space: nowrap; } .acts a { display: inline-block; margin-right: 4px; padding: 3px 10px; border: 1px solid var(--line); border-radius: var(--radius); }
+</style>
+<template preview>
+  <div class="tile">
+    <div class="num" id="count">–</div>
+    <div class="label">team PRs</div>
+    <canvas id="chart" width="160" height="24"></canvas>
+  </div>
+  <script>
+    const d = laki.data
+    document.getElementById('count').textContent = d ? d.prs.length : '–'
+    // the count over the last fetches, as a line in the theme's accent; drawn at the canvas's own size (CSS stretches
+    // it to the tile): a frame's size may not be known yet while its page runs
+    const c = document.getElementById('chart'), h = d ? d.history : []
+    if (h.length > 1) {
+      const r = 2, w = c.width, ht = c.height, x = c.getContext('2d')
+      const ns = h.map(p => p.count), lo = Math.min(...ns), span = Math.max(...ns) - lo || 1
+      x.strokeStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#7aa2f7'
+      x.lineWidth = 1.5 * r
+      x.beginPath()
+      ns.forEach((n, i) => x[i ? 'lineTo' : 'moveTo']((i / (ns.length - 1)) * w, ht - 2 * r - ((n - lo) / span) * (ht - 4 * r)))
+      x.stroke()
+    }
+  </script>
+</template>
+<template full>
+  <div class="bar">
+    <select id="who" aria-label="Author"><option value="">Everyone</option></select>
+    <input id="q" placeholder="Filter: title, author, label" autofocus>
+    <span class="muted small" id="n"></span>
+  </div>
+  <table>
+    <thead><tr><th data-sort="title">Title</th><th data-sort="author">Author</th><th>Labels</th><th data-sort="ci">CI</th><th data-sort="review">Review</th><th data-sort="createdAt">Created</th><th></th></tr></thead>
+    <tbody id="rows"></tbody>
+  </table>
+  <script>
+    const prs = laki.data ? laki.data.prs : []
+    const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])
+    const color = c => (/^[0-9a-f]{6}$/i.test(c) ? '#' + c : 'var(--line)')
+    let sort = 'createdAt', desc = true
+    // the author filter: everyone, or one of those with open PRs (their count beside)
+    const who = document.getElementById('who')
+    const by = {}
+    for (const p of prs) by[p.author] = (by[p.author] || 0) + 1
+    for (const a of Object.keys(by).sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }))) who.add(new Option(`${a} (${by[a]})`, a))
+    function draw() {
+      const q = document.getElementById('q').value.trim().toLowerCase()
+      const shown = prs
+        .filter(p => !who.value || p.author === who.value)
+        .filter(p => !q || [p.title, p.author, ...p.labels.map(l => l.name)].join(' ').toLowerCase().includes(q))
+        .sort((a, b) => (a[sort] < b[sort] ? -1 : a[sort] > b[sort] ? 1 : 0) * (desc ? -1 : 1))
+      document.getElementById('n').textContent = `${shown.length} of ${prs.length}` + (laki.at ? ` · checked ${new Date(laki.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : '')
+      document.getElementById('rows').innerHTML = shown.length
+        ? shown.map(p => `<tr>
+            <td><a href="${esc(p.url)}">#${p.number} ${esc(p.title)}</a>${p.draft ? ' <span class="tag muted">draft</span>' : ''}${p.conflict ? ' <span class="tag bad">conflict</span>' : ''}</td>
+            <td><a class="who" data-who="${esc(p.author)}" title="Only ${esc(p.author)}'s">${esc(p.author)}</a></td>
+            <td>${p.labels.map(l => `<span class="tag" style="border-color:${color(l.color)}">${esc(l.name)}</span>`).join('')}</td>
+            <td class="nowrap ci-${p.ci}">${p.ci}</td>
+            <td class="nowrap review-${p.review}">${p.review === 'approved' ? '✓ approved' : p.review === 'changes' ? 'changes asked' : 'waiting'}</td>
+            <td class="nowrap">${new Date(p.createdAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}</td>
+            <td class="acts"><a href="${esc(p.url)}">Open PR</a><button data-run="review" data-arg="${esc(p.url)}">Review in Laki</button></td>
+          </tr>`).join('')
+        : `<tr><td colspan="7" class="muted">${laki.error ? esc(laki.error) : laki.at ? 'No open PRs by the team.' : 'Not fetched yet.'}</td></tr>`
+    }
+    document.getElementById('q').addEventListener('input', draw)
+    who.addEventListener('change', draw)
+    // a click on an author: only theirs (again: everyone's)
+    document.getElementById('rows').addEventListener('click', e => {
+      const a = e.target.closest('a.who')
+      if (!a) return
+      e.preventDefault()
+      e.stopPropagation()
+      who.value = who.value === a.dataset.who ? '' : a.dataset.who
+      draw()
+    })
+    document.querySelectorAll('th[data-sort]').forEach(th => th.addEventListener('click', () => {
+      desc = sort === th.dataset.sort ? !desc : th.dataset.sort === 'createdAt'
+      sort = th.dataset.sort
+      draw()
+    }))
+    draw()
+  </script>
+</template>

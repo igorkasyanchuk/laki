@@ -23,7 +23,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   writeFileSync(
     join(gh, 'pr.json'),
     JSON.stringify({ number: 7, state: 'OPEN', url: 'https://example.invalid/pr/7', headRefOid: 'abc', mergeable: 'CONFLICTING', statusCheckRollup: [
-      { __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: job(1) },
+      { __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: job(1), startedAt: '2026-10-06T10:00:00Z', completedAt: '2026-10-06T10:01:12Z' },
       { __typename: 'CheckRun', name: 'lint', status: 'COMPLETED', conclusion: 'NEUTRAL' },
       { __typename: 'StatusContext', context: 'deploy', state: 'PENDING', targetUrl: 'https://ci.invalid/1' },
       { __typename: 'StatusContext', state: 'SUCCESS' },
@@ -33,7 +33,7 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   assert.equal(pr.checks, 'fail')
   assert.equal(pr.conflict, true)
   assert.deepEqual(pr.list, [
-    { name: 'test', state: 'fail', url: job(1) },
+    { name: 'test', state: 'fail', url: job(1), took: 72 },
     { name: 'lint', state: 'skip' },
     { name: 'deploy', state: 'pending', url: 'https://ci.invalid/1' },
     { name: '?', state: 'pass' },
@@ -56,12 +56,12 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'review' }), /gh couldn't read the review comments: it failed/)
   writeFileSync(join(gh, 'graphql.json'), JSON.stringify({ data: {} }))
   await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'review' }), /no review threads for PR #7/)
-  const done = thread('t1', [said('ann', 'done already')], { isResolved: true, line: 1 })
+  const done = thread('t1', [{ ...said('ann', 'done already'), createdAt: '2026-10-06T10:00:00Z' }], { isResolved: true, line: 1 })
   graphql(gh, [done])
   await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'review' }), /no open review comments on PR #7/)
   graphql(gh, [done, thread('t2', [said('lint-bot', 'unused import', 'Bot', 'NONE'), said(null, 'ghost here\nsecond line')], { isOutdated: true, line: null, path: 'b.ts' })])
   assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), [
-    { path: 'a.ts', line: 1, resolved: true, outdated: false, comments: [{ author: 'ann', body: 'done already' }] },
+    { path: 'a.ts', line: 1, resolved: true, outdated: false, comments: [{ author: 'ann', body: 'done already', at: '2026-10-06T10:00:00Z' }] },
     { path: 'b.ts', resolved: false, outdated: true, comments: [{ author: 'lint-bot', body: 'unused import' }, { author: 'ghost', body: 'ghost here\nsecond line' }] },
   ])
   await rig.rpc('prFix', { ws: ws.id, what: 'review' })
@@ -213,6 +213,59 @@ test('a diff line comment on the PR: gh api with the head commit, a line not in 
   writeFileSync(join(gh, 'comment.json'), JSON.stringify({ html_url: 'https://example.invalid/pr/9#c1' }))
   assert.deepEqual(await rig.rpc('prComment', { ...c, side: 'LEFT' }), { url: 'https://example.invalid/pr/9#c1' })
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api repos\/\{owner\}\/\{repo\}\/pulls\/9\/comments -f body=why "this"\? -f commit_id=beef -f path=a\.ts -F line=3 -f side=LEFT/)
+})
+
+test("a PR's author: yours (gh api user) is mine; its whole diff (gh pr diff) for Changes, each file's status and lines", async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await assert.rejects(rig.rpc('prDiff', { ws: ws.id }), /has no PR/)
+  const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', baseRefName: 'main', author: { login: 'ann' }, statusCheckRollup: [] }
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  assert.equal((await rig.rpc('state')).workspaces[0].pr.mine, undefined) // ann's, and you are me
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, author: { login: 'me' } }))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr.mine === true, 'yours')
+  const diff = [
+    'diff --git a/a.ts b/a.ts',
+    'index 1..2 100644',
+    '--- a/a.ts',
+    '+++ b/a.ts',
+    '@@ -1,2 +1,2 @@',
+    '-old',
+    '+++ a line that starts with ++',
+    ' same',
+    'diff --git a/new.md b/new.md',
+    'new file mode 100644',
+    '--- /dev/null',
+    '+++ b/new.md',
+    '@@ -0,0 +1 @@',
+    '+hi',
+    'diff --git a/gone.txt b/gone.txt',
+    'deleted file mode 100644',
+    '--- a/gone.txt',
+    '+++ /dev/null',
+    '@@ -1 +0,0 @@',
+    '-bye',
+    'diff --git a/x b/y',
+    'similarity index 100%',
+    'rename from x',
+    'rename to y',
+    '',
+  ].join('\n')
+  writeFileSync(join(gh, 'pr.diff'), diff)
+  const d = await rig.rpc('prDiff', { ws: ws.id })
+  assert.equal(d.base, 'main')
+  assert.equal(d.diff, diff)
+  assert.deepEqual(d.files, [
+    { path: 'a.ts', status: 'M', add: 1, del: 1 },
+    { path: 'new.md', status: 'A', add: 1, del: 0 },
+    { path: 'gone.txt', status: 'D', add: 0, del: 1 },
+    { path: 'y', status: 'R', add: 0, del: 0 },
+  ])
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh pr diff --color=never -- https:\/\/github.com\/o\/r\/pull\/9\n/)
 })
 
 test('approve or close the PR: gh as you, by its URL; refused with none, when not open, or as gh says', async t => {

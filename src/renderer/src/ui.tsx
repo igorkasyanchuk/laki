@@ -59,11 +59,14 @@ const paths = {
   chevronUp: 'M4.5 9.5L8 6l3.5 3.5',
   timer: 'M8 14.5a5.5 5.5 0 100-11 5.5 5.5 0 000 11zM8 6.5V9M6.5 1.5h3M8 1.5v2',
   sep: 'M2 8h2.5M6.75 8h2.5M11.5 8h2.5',
+  filter: 'M2.5 3h11L9.25 8v4.25L6.75 13.5V8z',
+  devices: 'M1.5 3h9.5v6.5H1.5zM4.5 12.5h3.5M6.25 9.5v3M11.5 6.5h3v7h-3z',
   youtube: 'M4.5 3.5h7a3 3 0 013 3v3a3 3 0 01-3 3h-7a3 3 0 01-3-3v-3a3 3 0 013-3zM6.8 6v4L10.2 8z',
   smile: 'M8 14a6 6 0 100-12 6 6 0 000 12zM5.6 9.4c.6.9 1.4 1.3 2.4 1.3s1.8-.4 2.4-1.3M6.2 6.4v.01M9.8 6.4v.01',
   race: 'M3.5 14V2.5M3.5 3h8.5l-2 2.75 2 2.75H3.5',
   conflict: 'M8 2.2l6.2 11H1.8zM8 6.6v3.2M8 11.6v.01',
   check: 'M3.5 8.5l3 3 6-7',
+  minus: 'M4 8h8',
   help: 'M8 14a6 6 0 100-12 6 6 0 000 12zM6.2 6.3a1.9 1.9 0 113 1.5c-.7.5-1.2.9-1.2 1.7M8 11.2v.01',
   // GitHub's mark (Octicons, MIT), filled
   github:
@@ -110,7 +113,7 @@ export function TurnTime({ tabs }: { tabs: { runAt?: number }[] }) {
 // an on/off switch: the status bar's auto toggles, Settings' options (a row: className="switch-row")
 export function Switch({ on, onChange, tip, className = '', children }: { on?: boolean; onChange: (v: boolean) => void; tip?: string; className?: string; children?: ReactNode }) {
   return (
-    <button type="button" role="switch" aria-checked={!!on} className={`toggle ${on ? 'on' : ''} ${className}`} data-tip={tip} onClick={() => onChange(!on)}>
+    <button type="button" role="switch" aria-checked={!!on} aria-label={children ? undefined : tip} className={`toggle ${on ? 'on' : ''} ${className}`} data-tip={tip} onClick={() => onChange(!on)}>
       <span className="toggle-track">
         <span className="toggle-knob" />
       </span>
@@ -226,7 +229,8 @@ export const TAB_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', '
 export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(--tc-${c})` } as CSSProperties) : undefined)
 
 // a row dropped before or after another of its kind (and group: workspaces stay in their project)
-export type RowDrop = { kind: string; id: string; target: string; after: boolean }
+// into: onto a group's head (data-head) from a row that isn't one: first in that group (after the head)
+export type RowDrop = { kind: string; id: string; target: string; after: boolean; into?: boolean }
 
 // rows ([data-row="<kind>:<id>"], optional data-group) dragged into a new order; `over` is where the
 // pointer would drop, for an insertion line
@@ -235,7 +239,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
   const dragged = useRef(false)
   const done = useRef(onDrop)
   done.current = onDrop
-  const start = (e: PE, kind: string, id: string, group = '') => {
+  const start = (e: PE, kind: string, id: string, group = '', head = false) => {
     if (e.button !== 0) return
     const y0 = e.clientY
     let cur: RowDrop | null = null
@@ -248,7 +252,10 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
       const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>(`[data-row^="${kind}:"]`)
       const target = el && (el.dataset.group ?? '') === group ? el.dataset.row!.slice(kind.length + 1) : ''
       const r = el?.getBoundingClientRect()
-      cur = target && target !== id && r ? { kind, id, target, after: ev.clientY > r.top + r.height / 2 } : null
+      // a group's head, for a row that isn't one: its top third is before it (the group above, or none), the rest into it
+      const onHead = !head && el?.dataset.head !== undefined
+      const into = onHead && !!r && ev.clientY > r.top + r.height / 3
+      cur = target && target !== id && r ? { kind, id, target, after: into || (!onHead && ev.clientY > r.top + r.height / 2), into } : null
       setOver(cur)
     }
     const up = () => {
@@ -262,7 +269,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
     window.addEventListener('pointerup', up)
   }
   // the class a row gets while something would drop next to it
-  const at = (kind: string, id: string) => (over?.kind === kind && over.target === id ? (over.after ? 'drop-after' : 'drop-before') : '')
+  const at = (kind: string, id: string) => (over?.kind === kind && over.target === id ? (over.into ? 'drop-into' : over.after ? 'drop-after' : 'drop-before') : '')
   return { start, at, dragged: () => dragged.current }
 }
 

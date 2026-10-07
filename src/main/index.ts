@@ -247,8 +247,8 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
     Menu.buildFromTemplate([
       ...tabs,
       ...(tabs.length ? [{ type: 'separator' as const }] : []),
-      { label: 'Screenshot a part to an agent…', click: () => screenshot(true) },
-      { label: 'Screenshot the screen to an agent', click: () => screenshot(false) },
+      { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
+      { label: 'Screenshot Screen', click: () => screenshot(false) },
       { type: 'separator' },
       { label: `Open ${app.name}`, click: () => show() },
       { label: 'Quit', click: () => app.quit() },

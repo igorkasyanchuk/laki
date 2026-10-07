@@ -38,19 +38,31 @@ export function insert(l: Layout, node: Layout, target: string, edge: Edge): Lay
   return swap(l, target, { dir, a: first ? node : { tab: target }, b: first ? { tab: target } : node, at: 0.5 })
 }
 
-// move a pane (whole: its entire tab) next to another pane, or ('bar') out into a tab of its own
-export function move(groups: Layout[], tab: string, whole: boolean, to: { pane: string; edge: Edge } | 'bar'): Layout[] {
+// where a dragged pane or tab lands: beside a pane (center: in its place, the two trade places), or in the tab bar
+// before its bar'th tab (groups.length: last)
+export type Spot = { pane: string; edge: Edge | 'center' } | { bar: number }
+
+// move a pane (whole, or alone in its tab: its entire tab) to a spot ('bar': right after its own tab); a move that
+// changes nothing returns groups itself
+export function move(groups: Layout[], tab: string, whole: boolean, to: Spot | 'bar'): Layout[] {
   const gi = groups.findIndex(g => tabsOf(g).includes(tab))
   if (gi < 0) return groups
-  if (to === 'bar') {
-    const rest = keep(groups[gi], t => t !== tab)
-    if (whole || !rest) return groups // ponytail: tabs aren't reordered by dragging
-    return [...groups.slice(0, gi), rest, { tab }, ...groups.slice(gi + 1)]
+  const rest = whole ? null : keep(groups[gi], t => t !== tab) // what stays in its tab
+  const node: Layout = rest ? { tab } : groups[gi]
+  if (to === 'bar') to = { bar: gi + 1 }
+  if ('bar' in to) {
+    if (!rest && (to.bar === gi || to.bar === gi + 1)) return groups // already there
+    const out = groups.map((g, i) => (i === gi ? rest : g))
+    out.splice(to.bar, 0, node)
+    return out.filter((g): g is Layout => !!g)
   }
-  const node: Layout = whole ? groups[gi] : { tab }
-  if (tabsOf(node).includes(to.pane)) return groups
-  const out = whole ? groups.filter((_, i) => i !== gi) : groups.map(g => keep(g, t => t !== tab)).filter((g): g is Layout => !!g)
-  return out.map(g => (tabsOf(g).includes(to.pane) ? insert(g, node, to.pane, to.edge) : g))
+  const { pane, edge } = to
+  if (tabsOf(node).includes(pane)) return groups // onto itself
+  if (edge === 'center') {
+    const trade = (l: Layout): Layout => ('tab' in l ? (l.tab === pane ? node : l.tab === tab ? { tab: pane } : l) : { ...l, a: trade(l.a), b: trade(l.b) })
+    return groups.map((g, i) => (i === gi && !rest ? { tab: pane } : trade(g)))
+  }
+  return groups.flatMap((g, i) => (i !== gi ? [g] : rest ? [rest] : [])).map(g => (tabsOf(g).includes(pane) ? insert(g, node, pane, edge) : g))
 }
 
 // path: 'a'/'b' steps from the root to a split

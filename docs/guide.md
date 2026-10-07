@@ -63,12 +63,15 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
   tunnel that lets in one email address, for 1 to 24 hours or until you stop it; a QR code to open it.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
-- **A break**: the smiley in the tab bar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
+- **A break**: the smiley at the bottom of the sidebar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
   one you've seen); *Next* (→, N) for another, *Copy image* to paste it somewhere, a right click to copy, download or
   open it. Settings › General hides it.
 - **Timers**: the stopwatch at the bottom of the sidebar starts a countdown, 5 minutes to an hour (or any length), as
   many as you like; each shows as a bar over the bottom buttons and then notifies you, and pauses, plays or closes the
   video, or runs a command, if you like.
+- **Widgets**: small live pages at the bottom of the sidebar, in a grid 3 cells across: a count, a chart, a table,
+  each fed by a command or a script on a schedule, with a full view a click away (below: Widgets). Two come with
+  Laki: *My PRs* and *Team PRs*; the *Widget creator* agent skill makes more.
 - **A video while you work**: the play button at the bottom of the sidebar asks for a YouTube link (a video, a
   short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
@@ -134,16 +137,28 @@ selected workspace's PR is in the status bar.
 - Click a project to fold its workspaces away (its busiest status and their count stay), again to unfold;
   *Collapse all projects* and *Expand all projects* are in ⌘K.
 - ＋ on a project creates a new workspace in it.
+- *Meme* (the smiley) at its bottom, beside *Video*: a random meme from r/memes, r/ProgrammerHumor or
+  r/wholesomememes, pictures only, for a break (*Next*, → or N; *Copy image*; a right click: copy, download, open on
+  Reddit; Esc closes it); one you've seen comes again only when nothing new is left. Fetched only when you click:
+  Reddit's own, or meme-api.com when Reddit turns the request away.
 - *Video* at its bottom: a YouTube video under the projects, as wide as the sidebar (*YouTube* above it: the chevron
   minimizes it to that bar, playing on, and shows it again; the pencil asks for another, ✕ closes it; these are in ⌘K
   too). Hiding the sidebar (⌘B) keeps it playing; it's back, paused, after a restart.
-- *Timer* at its bottom starts a countdown (5, 10, 15, 25, 30, 45 minutes, 1 hour, or *Other length…*: 25, 1h 30m,
-  90s); start as many as you like. Each is a bar above the bottom buttons, like the minimized video, with its time left;
+- *Timer* at its bottom starts a countdown (5, 10, 15, 25, 30, 45 minutes, 1 hour, or *Other length, or a command…*:
+  25, 1h 30m, 90s, and its *Then run a command* switch with the command, run as it ends in the workspace in front);
+  start as many as you like. Each is a bar above the bottom buttons, like the minimized video, with its time left;
   its pencil (or a right click) adds 5 minutes, starts it over with another length and picks what happens as it ends: a
   notification always (with your sound), and the video paused, played or closed, or a command run (*Run a command…*:
   through your login shell, in a tab of the workspace selected then, not focused; it closes when the command succeeds),
   if you like; ✕ stops it. *Start a
   timer…* and *Stop all timers* are in ⌘K. They're kept when Laki quits; one that ends while it's closed is dropped, its action not run.
+- *Remind me…* (a workspace's right click, or ⌘K for the one in front): in 20 minutes, 1 hour, 3 hours, tomorrow at
+  9:00, or any length; then a notification about it (a click opens it) and a message with *Open*. Meanwhile it's a bar
+  over the bottom buttons (its menu: open it, 15 more minutes, cancel) and a timer mark on the workspace's row. A
+  reminder that came due while Laki was closed comes as it opens.
+- The funnel at the top filters the workspaces: words in a name, branch, PR title, author or `#number`, and *Needs
+  you*, *Working* or *With a PR*; the projects with none hide, groups too. Esc or the funnel again stops it (⌘K
+  too).
 - ⋯ on a project opens its menu:
   - *New workspace*;
   - *Collapse* / *Expand*;
@@ -155,23 +170,28 @@ selected workspace's PR is in the status bar.
   and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
 - Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
-  *Info*, *Mute notifications*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
-  *Mark as unread*, *Copy branch name*, *Refresh PR status* (asks GitHub now, not at the next check), *Compare the race* (a race's
+  *Info*, *Mute notifications*, *Remind me…*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
+  *Mark as unread*, *Copy branch name*, *Refresh PR status* (asks GitHub now, not at the next check), *Approve PR #n…* (someone
+  else's open PR), *Compare the race* (a race's
   workspace: the flag on its row), *Open in*, fork, archive and delete. While a workspace is archived or deleted its row
   shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
 - Drag projects, and workspaces within a project, to reorder them.
-- Separators: a project's ⋯ › *Add a separator*, or a workspace's *Add a separator below*, puts a named line
-  between its workspaces. A click folds it: the workspaces under it, up to the next one, hide (their count and the
-  busiest one's mark stay on it; the selected one stays) until another click. Drag it like a workspace; double click
-  to rename; right click to delete.
+- Groups: a project's ⋯ › *Add a group*, or a workspace's *Add a group below*, puts a named head over its
+  workspaces, up to the next group; it shows how many it holds. A click folds it: they hide (the busiest one's mark
+  stays on it; the selected one stays) until another click. Drop a workspace on a group's head to put it first in
+  that group (a folded one opens). Drag the head like a workspace; double click to rename; right click (or its ⋯)
+  for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
+  put it first in this group), *Rename…* and *Remove group* (its workspaces stay).
+- A workspace with someone else's PR shows its author's GitHub picture before the PR mark.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
 - ＋ in the tab bar opens a new tab: shell (⌘T), one of your agent presets (claude, codex, gemini, …) or a command.
 - Splitting:
-  - Drag a tab onto a pane's edge: it moves into that tab, on that side.
+  - Drag a tab onto a pane's edge: it moves into that tab, on that side. Onto a pane's center: they trade places.
   - *Split right* / *Split down* (⋯ menu or ⌘K) open a new shell next to the active pane.
-- Drag a pane's header to move the pane within its tab, or onto the tab bar to give it a tab of its own.
+- Drag a tab along the tab bar to reorder; a line shows where it goes. Esc cancels a drag.
+- Drag a pane's header to move the pane within its tab, or onto the tab bar to give it a tab of its own, there.
 - Drag the dividers to resize.
 - × on a pane closes that terminal; × on a tab closes all of its terminals. Both stop the process.
 - ⌘1…⌘9 switch tabs. Double click a tab to rename it.
@@ -195,9 +215,6 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–8 
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
-- smiley: a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes, pictures only, for a break (*Next*, → or N;
-  *Copy image*; a right click: copy, download, open on Reddit; Esc closes it); one you've seen comes again only when
-  nothing new is left. Fetched only when you click: Reddit's own, or meme-api.com when Reddit turns the request away;
 - info (⌘I): the workspace info panel (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
@@ -273,7 +290,7 @@ times you write in plain English.
   `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). The form says how
   it read it and the next three runs. Every 5 minutes at most; no "every few days" (name the days).
 - Dates in the name or the prompt: `{{DD-MM-YY}}`, `{{YYYY-MM-DD}}`, `{{HH:mm}}`, `{{ddd D MMM}}` (`Nightly deps
-  {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time. A new workspace is named after the task, or
+  {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time (any of the tokens, below in *Prompt templates*). A new workspace is named after the task, or
   with no name after the date and the prompt's first words (*05-10 02:00 update the deps and*), and gets a clock
   in the sidebar. A name a workspace already has gets four random characters (*Nightly deps 05-10-k3x9*).
 - *Run now* runs one at once; the switch turns one off; *Runs* lists the last 50 (click one to go to its
@@ -304,22 +321,29 @@ until the agent's next run renews it. Settings › General turns each agent off 
   or copies its path. Changed files are colored (modified, new, deleted) and their
   folders get a dot. Refresh, collapse all.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
-  for its diff, with links to preview the file or open it in the editor. Click a line of a diff to write a
+  for its diff, with links to preview the file or open it in the editor. With a PR, *Here* / *PR #n* switch to the
+  whole PR as GitHub has it (`gh pr diff`; first for a workspace that only links its PR), and the GitHub mark opens
+  its *Files changed* there. Click a line of a diff to write a
   comment on it: *Comment on PR #n* posts it on GitHub at that line (`gh`; the line must be in the PR's diff,
   so commit and push first), *Send to the agent* gives it to the workspace's agent with the file and line
   (when its turn ends). ⌘⏎ does the first that applies, Esc closes it. A changed image (PNG, JPEG, GIF, WebP, SVG)
   shows before and after side by side, each with its size in pixels and bytes (one side when it's new or deleted);
   click one for full size.
-- *Review*: the PR with its checks, the *fix CI* / *review* / *fix conflicts* switches and the send buttons, and the open
-  review threads (from reviewers with write access and bots: what the agent would get). Click a thread's
-  file to preview it at that line.
-- *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first, or a listening port (the menu), a path, any website
-  (type `example.com` or a whole URL; in the app, not in a browser elsewhere), back,
-  forward, reload, open in your browser. The camera takes a screenshot of the page and sends it to the agent
+- *Review*: the PR: its title, state, author and size; *Approve…*, *Open on GitHub* and *Close…*; its description,
+  rendered, a few lines of it until *Show more*; its checks, failing first, each with how long it ran and a click to its
+  log; *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
+  there's something to send. Then the review threads as cards (from reviewers with write access and bots: what the
+  agent would get), the resolved ones folded under *N resolved*. Click a thread's file to preview it at that line.
+- *Preview* (also the toolbar's globe): the workspace's dev server in a browser: `$PORT` first; the address bar takes
+  a path (`/admin`), another port (`:5173`), `localhost:8080/x` or any website (type `example.com` or a whole URL; in
+  the app, not in a browser elsewhere); back, forward, reload, open in your browser. The devices button opens the
+  sizes: *Fit* (the panel's), iPhone SE, iPhone, Android, iPad, Laptop, HD, Full HD, or your own (`1440×900`, Enter):
+  one click lays the page out at that width and height, scaled down to fit (the percentage says how much); the
+  arrows swap width and height. Only the size: no touch, no phone's user agent. The camera takes a screenshot of the page and sends it to the agent
   with what you write. The crosshair picks an element: hover outlines it, a click types its CSS selector, text,
   size, HTML (cut at 1,500 characters), its computed CSS (what isn't a default) and the path of a screenshot of
   just that element into the agent's prompt, without Enter, for you to say what to do with it; Esc stops (in the
-  app only). It opens pages on this Mac (`localhost`, `127.0.0.1`; links may lead elsewhere), without
+  app only). It starts on this Mac (`localhost`); the address bar and links go anywhere, without
   popups, the camera, the microphone or clipboard reads. Its cookies are its own and kept. While the page has the focus, ⌘ keys go to it:
   click outside it first. In a browser (remote access), it works only on the Mac itself.
 
@@ -331,9 +355,9 @@ before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 
 **Info panel** (ⓘ or ⌘I): the workspace's name, branch, path and `$PORT`; each public link (Expose to the
 world: open, copy, and who can open it); its PR's title, author, state,
-review decision, size, checks (each links to its run) and description; the PR switches, with a note when *fix CI* or
-*fix conflicts* gave up (turn it off and on to try again); buttons that send the failing CI, the open review comments or
-the merge conflicts to the agent now; and what each agent said last.
+review decision, size, checks (each links to its run) and description, as in *Review*; the PR switches, with a note
+when *failing CI* or *conflicts* gave up (turn it off and on to try again), and *Send now* beside one when there's
+something to send to the agent now; and what each agent said last.
 
 **PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute (Settings › *Pull requests*:
 1 to 30 minutes), and a couple of seconds after an agent's turn ends (at most every 20 seconds), so a PR the agent just
@@ -357,8 +381,9 @@ with no agent running nothing is sent, and the next check tries again.
   you. Right after a push GitHub doesn't know yet whether it conflicts: that keeps the count; no conflicts, or the
   switch turned off and on, starts it over.
 
-*Approve…* and *Close PR…* (the side panel's *Review*, the info panel, and the status bar PR's right click) approve or
-close the open PR with `gh`, as you, after you confirm. GitHub refuses to approve your own PR; Laki says so.
+*Approve…* (green) and *Close…* (red on hover), under the PR's title (the side panel's *Review*, the info panel), in
+the status bar PR's right click and (approve) a workspace's right click, approve or close the open PR with `gh`, as
+you, after you confirm. Your own PR has no *Approve* (GitHub refuses it).
 
 *Archive workspace when its PR merges* (Settings › *Pull requests*, off by default): the next check after a merge
 archives the workspace, if it's clean: nothing uncommitted, no commit the PR doesn't have, no agent at work. Once per
@@ -366,13 +391,13 @@ PR: *Undo* in the message brings it back for good. One that can't go says *merge
 
 What each sends is a prompt in Settings › *Pull requests*, which you can change: `{{pr}}` is the PR's number, `{{url}}`
 its link, `{{base}}` its base branch; the failing checks or the review threads go after it. *Reset* puts the default
-back. The info panel's *Send failing CI*, *Send review comments* and *Send merge conflicts* buttons send the same
-prompts once, switches or not.
+back. *Send now* beside each switch (*Review*, the info panel) sends the same prompt once, switch or not; it shows
+only when there's something to send: failing checks, open review threads, merge conflicts.
 
 **New workspace** (a page, like Settings; Esc closes it): pick the project and the agent, then write the prompt.
-It goes first in its project in the sidebar or, when the project has separators, first under the one you pick in
+It goes first in its project in the sidebar or, when the project has groups, first in the one you pick in
 *In the sidebar*.
-It starts from your last choices (project, its separator, agent, template, and what's under *Advanced*), never the last prompt.
+It starts from your last choices (project, its group, agent, template, and what's under *Advanced*), never the last prompt.
 *Advanced* (folded; its line says what it holds, like *a worktree off main · high effort*) has *Local* (the repo itself,
 no worktree), *Pull request* (optional: a PR's number
 or URL; the worktree is on its branch through `gh pr checkout`, a fork's as `<owner>/<branch>`, its base the PR's,
@@ -380,7 +405,7 @@ named `pr-<n>-<title>`; a fork's own `.laki.json` is ignored, so its setup never
 is used; when a workspace has that branch already, the message offers *Open it*), base branch, name, the agent's
 model (like `opus` or a full name) and, for Claude Code and Codex, its effort (both blank: the agent's
 default, kept for its restarts and forks), and *Race* (below). A new workspace is never hidden: a folded project or
-separator holding it, or the one you were on, opens. The prompt:
+group holding it, or the one you were on, opens. The prompt:
 - paste a screenshot (⌘V), drop image files on it, or pick them with the image icon; each shows as a
   thumbnail, and its path goes after your text;
 - the mic starts macOS dictation (or press Fn twice). *mic & language…* opens System Settings → Keyboard →
@@ -395,8 +420,8 @@ separator holding it, or the one you were on, opens. The prompt:
   and for how long, *Create* spins, and the sidebar shows its row, *creating…*, where it will be. Esc closes the
   page; it goes on there.
 
-**A screenshot to an agent**: Laki's mark in the menu bar has *Screenshot a part to an agent…* (drag over what you
-want, or Space and a click for a window; Esc cancels) and *Screenshot the screen to an agent* (the main display). The
+**A screenshot to an agent**: Laki's mark in the menu bar has *Screenshot Area…* (drag over what you
+want, or Space and a click for a window; Esc cancels) and *Screenshot Screen* (the main display). The
 new-workspace page opens with the picture in the prompt: pick the project and agent, add a line, ⌘⏎. macOS asks
 once for Screen Recording for Laki.
 
@@ -419,6 +444,46 @@ sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock ic
 for you or finished while you looked away (muted ones aside); so does Laki's mark in the menu bar, whose menu lists
 those tabs (waiting first, with what they ask): a click opens one. With *Turn timers* on (Settings › General), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
+
+### Widgets
+
+Small live pages at the bottom of the sidebar, above its buttons, in a grid 3 cells across (a cell is 64 px tall);
+*Widgets* folds them away. A click on one opens its full view in a dialog, small, medium or large (its *view* in
+Settings › Widgets: large for wide tables; ↻ fetches now, the sliders its settings).
+Links open in the browser; a widget's buttons can run commands its `widget.json` names (*Review in Laki*).
+
+Each widget is a folder: `widget.json` (its name, size in cells, settings, how often it fetches, and the command
+or JS script that fetches its data, as JSON) and `widget.html` (what the tile shows and what the full view shows).
+The fetch and the buttons' commands run in the widget's folder, so they can run its own scripts in any language:
+`sh fetch.sh`, `python3 fetch.py`; each setting comes as `$WIDGET_<NAME>`, all of them as JSON in
+`$LAKI_WIDGET_CONFIG`.
+Laki looks in `<data>/widgets/` and the folders you add in Settings › Widgets; *Reload widgets* reads them again,
+no restart. A widget fetches when it's turned on, when its settings change, and every few minutes (its own
+*Fetch every*) while the app is open; what it fetched last is kept in `<data>/widget-data/<id>.json`, with your
+settings. A failed fetch keeps the last data and shows a red dot (its tooltip, and Settings › Widgets, say why:
+what the command printed last, or what the script threw).
+
+A widget's settings each have a kind: text, a number, an on/off, one of a few choices, or a list (logins, labels:
+typed as chips, Enter or a comma after each).
+
+Two come with Laki, off until you turn them on in Settings › Widgets:
+- *My PRs*: your open PRs in a repo (*Repo*: `owner/name` or its GitHub link; *Author*: `@me`, or someone's login;
+  blank: you) counted: open, drafts, with conflicts, and with each of up to 3 labels (*Count label 1–3*); the full
+  view (large) has the counts and the PRs grouped by what they need: conflicts, failing CI, changes asked, approved,
+  in review, drafts, each with its labels, CI, review and date.
+- *Team PRs*: the open PRs of your team (*GitHub logins*, a chip each; one query per login, so a busy repo doesn't
+  time out) in a repo: how many, with a line of the count over time; the full view (large) lists them with labels, CI, review and conflicts, a filter by author (a click on
+  a name too) and by words, sorting, *Open PR*
+  and *Review in Laki* (a new workspace on the PR with a review prompt; set *Laki project* to the project's name).
+
+Both take *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
+
+To make one, install the *Widget creator* skill (Settings › Agent skill) and ask your agent ("a widget with my
+open issues"), or use any AI chat: Settings › Widgets › *Make one with AI* has the whole format as a prompt (type what
+you want, copy it, paste it in the chat), then save the files it gives you in `<data>/widgets/<id>/` and press
+*Reload widgets*. A widget without a script is drawn inside the app; one whose page has a `<script>` runs in a
+sandboxed frame that can't reach the network or the app (its data comes from its fetch). `laki widget` lists,
+reloads, fetches and renders them.
 
 ### Projects over SSH
 
@@ -467,7 +532,7 @@ settings) and shows a server icon; the status bar shows `devbox:` before the pat
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
 | ⌘, | settings |
-| ⌘/ | help: keys, status glyphs, the main CLI commands (also the ? at the top of the sidebar) |
+| ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
 | ⌘+ / ⌘− / ⌘0 | terminal font bigger / smaller / default |
 
 ## Settings
@@ -480,7 +545,7 @@ lit for a moment.
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
-  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Fun button* (the smiley; on by default), *Turn
+  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Fun button* (the smiley at the bottom of the sidebar; on by default), *Turn
   timers* (off by default), *Diff size in the sidebar* (off by default), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
@@ -493,7 +558,7 @@ lit for a moment.
   case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line: thin,
   thick, dashed, dotted, big dots, accent, accent dots or none; the line between projects: a line, dashed, dotted,
   double or nothing; the indent, row height and text size, each the theme's unless you pick one; *Button labels*: words
-  beside Scheduled, Board, Video, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit), *Glass* (a see-through
+  beside Scheduled, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit), *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds
@@ -551,7 +616,8 @@ lit for a moment.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
 - *Agent presets*: how agents start. A preset is an agent (Claude Code, Codex, Gemini, Grok, OpenCode) with extra
   arguments (e.g. `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each
-  one is in the new-tab menu and the new-workspace page. The defaults are the agents on your PATH (*Reset to the
+  one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
+  don't use out of them (its tabs still start and resume). The defaults are the agents on your PATH (*Reset to the
   agents installed* goes back to them). Edit `claude` or `codex` to change how every new one starts; a tab started from a preset uses its current settings when it restarts or resumes.
   The chips under the arguments (`$PORT`, `$LAKI_WORKSPACE`, `$LAKI_TAB`, `$LAKI_PROJECT_PATH`) put a variable in at the
   cursor: the line goes through the shell, so they work there. Every tab also gets `LAKI_APP=true` (a program or
@@ -566,9 +632,14 @@ lit for a moment.
   conflicts* get (3), *Archive workspace when its PR merges* (off), and the prompts the PR switches send (above, in
   *PRs*).
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
-  `{{base}}` the workspace's project and base branch; a template without `{{prompt}}` gets the prompt after
-  it. *Add template* starts from an example; the chips under each one put a variable in at the cursor. A project can
-  have its own (its settings, below).
+  `{{base}}` the workspace's project and base branch, `{{pr}}` its PR (the *Pull request* field, else a PR link in
+  the prompt, or a prompt of only `#123`: *Review {{pr}}, list what's risky* then takes just the number); a template
+  without `{{prompt}}` gets the prompt after it (not a prompt `{{pr}}` took). Dates are the time you use it, any
+  tokens in any order between `{{` and `}}`: `YYYY` `YY`, `MMMM` (October) `MMM` (Oct) `MM`, `DD` `D`, `dddd`
+  (Monday) `ddd`, `HH` `H` `hh` (12-hour), `mm` `ss`, `A` (AM/PM), with `-:./,_` or spaces between: `{{DDMMYY
+  HH-MM}}` → *051026 07-05* (`MM` right after an hour is the minutes; `mm` always is). They work in actions and
+  the PR prompts too; what you type for `{{prompt}}` is left as it is. *Add template* starts from an example; the
+  chips under each one put a variable in at the cursor. A project can have its own (its settings, below).
 - *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent, *Any agent*: whichever runs, or a terminal) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
   findings` for Codex, `bundle exec rails db:migrate` for a terminal. The copy button duplicates one (to make the
@@ -576,11 +647,17 @@ lit for a moment.
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
+  *Widget creator* (`skills/laki-widget`, installed on its own) teaches them to make widgets: the files, the
+  template language, JS widgets, actions, and checking one with `laki widget`.
   It holds the app's path: update it after moving the app. *Remove* takes only its own files. Below it, *MCP
   server*: the command that adds Laki to each agent as an MCP server (Copy, then run it in a terminal: it goes in
   the agent's own settings, which Laki never writes); OpenCode's `mcp add` only asks questions, so it gets the
   lines to merge into `~/.config/opencode/opencode.json`.
 - *Remote access*: the email it lets in, how long, start and stop, the QR code and link (above).
+- *Widgets*: *Make one with AI* (the prompt, above), the folders they're found in (Laki's own, and more of yours,
+  one per line), *Reload widgets*, and each widget in a row: on or off, its size (cells across × down), how often it
+  fetches (minutes), its full view's size, *Fetch now*, *Open*, and its folder (in Finder, your editor or a terminal,
+  or *Copy path*); its settings under it.
 - *Projects*: each project's settings (below).
 
 Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle, and so does one
@@ -643,6 +720,9 @@ laki archive fix-the-login | restore … | fork … | rm …
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
+laki widget | widget reload                             # the sidebar's widgets | read their folders again, fetch
+laki widget on|off|run <id>                             # show or hide one | fetch now
+laki widget render <id> --full                          # the HTML its full view shows now
 laki open                                               # the app
 laki mcp                                                # an MCP server on stdio (below)
 laki stop                                               # stop the daemon (agents resume when it starts again)
@@ -736,11 +816,12 @@ agents find their conversations by those paths. It holds:
 - `daemon.json`: the daemon's port and token (0600);
 - `daemon.log`;
 - `claude-settings.json`: the hooks Claude gets through `--settings`;
+- `widgets/` (your widgets) and `widget-data/` (each one's settings and last data);
 - `worktrees/` and `run/`.
 
 `~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok` and `~/.config/opencode` are left alone, except the skill folders *Settings → Agent skill* writes when you click Install.
 
-No telemetry. Laki goes online only for what you use: `gh` (PRs, issues), the agents' plan limits, cloudflared
+No telemetry. Laki goes online only for what you use: `gh` (PRs, issues, the widgets that use it), the agents' plan limits, cloudflared
 (tunnels, remote access), your phone-push webhook, a meme when you click the smiley, and the YouTube video you ask the
 sidebar for (youtube-nocookie.com).
 

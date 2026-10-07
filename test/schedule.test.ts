@@ -70,6 +70,10 @@ test('when: a line of English to days and times; the next run; in words', () => 
   assert.equal(stamp('deps {{DD-MM-YY}} at {{HH:mm}}', at), 'deps 05-10-26 at 07:05')
   assert.equal(stamp('{{YYYY-MM-DD}} · {{ddd D MMM}} · {{H}}h', at), '2026-10-05 · Mon 5 Oct · 7h')
   assert.equal(stamp('{{project}} {{comment}} {{ - }} {{DD}', at), '{{project}} {{comment}} {{ - }} {{DD}')
+  // any token, any order; MM right after an hour is the minutes
+  assert.equal(stamp('{{DDMMYY HH-MM}} {{HH:MM}} {{MM}}', at), '051026 07-05 07:05 10')
+  assert.equal(stamp('{{dddd, D MMMM YYYY hh:mm:ss A}}', at), 'Monday, 5 October 2026 07:05:00 AM')
+  assert.equal(stamp('{{hh A}}', at + 12 * 3600_000), '07 PM')
   assert.equal(wsTitle({ prompt: ' update the deps and run the tests' }, at), '05-10 07:05 update the deps and')
   assert.equal(wsTitle({ name: 'Nightly {{DD.MM}}', prompt: 'x' }, at), 'Nightly 05.10')
 })

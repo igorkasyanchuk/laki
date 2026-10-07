@@ -21,6 +21,8 @@ worktree. Agents keep running when the window is closed.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only.
 - **Looks**: 86 themes, 68 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners and sidebar lines; tabs on top, bottom, left or right.
+- **Widgets**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, or any you make with an agent or any AI
+  chat: Settings has the prompt), each fed by a command on a schedule, with a full view a click away.
 - **A video while you work**: a YouTube link plays at the bottom of the sidebar.
 - **Keyboard and CLI**: ⌘K for everything; `laki` (also an MCP server) drives it all, agents included.
 

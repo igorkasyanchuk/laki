@@ -24,3 +24,18 @@ test('tabs of panes: sessions in no tab get one, moving splits and merges, nothi
   assert.deepEqual(panes.find(p => p.tab === 'c')!.box, { x: 0, y: 0.25, w: 0.5, h: 0.75 })
   assert.equal(bars.length, 2)
 })
+
+test('dragging: tabs reordered in the bar, a pane out at an index, center trades places, no-ops return groups', () => {
+  const g = groupsOf(undefined, ['a', 'b', 'c'])
+  assert.deepEqual(move(g, 'c', true, { bar: 0 }).map(tabsOf), [['c'], ['a'], ['b']])
+  assert.deepEqual(move(g, 'a', true, { bar: 3 }).map(tabsOf), [['b'], ['c'], ['a']])
+  assert.equal(move(g, 'b', true, { bar: 1 }), g) // before itself
+  assert.equal(move(g, 'b', false, { bar: 2 }), g) // after itself: a pane alone moves its tab
+  const s = move(g, 'b', true, { pane: 'a', edge: 'right' }) // [a|b], [c]
+  assert.deepEqual(move(s, 'b', false, { bar: 0 }).map(tabsOf), [['b'], ['a'], ['c']])
+  assert.deepEqual(move(s, 'b', false, { bar: 2 }).map(tabsOf), [['a'], ['c'], ['b']])
+  assert.deepEqual(move(s, 'a', false, { pane: 'b', edge: 'center' }), [{ dir: 'row', a: { tab: 'b' }, b: { tab: 'a' }, at: 0.5 }, { tab: 'c' }])
+  assert.deepEqual(move(s, 'c', true, { pane: 'a', edge: 'center' }), [{ dir: 'row', a: { tab: 'c' }, b: { tab: 'b' }, at: 0.5 }, { tab: 'a' }])
+  assert.equal(move(s, 'a', false, { pane: 'a', edge: 'center' }), s) // onto itself
+  assert.equal(move(s, 'a', true, { pane: 'b', edge: 'left' }), s) // its tab onto its own pane
+})

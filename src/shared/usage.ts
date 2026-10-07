@@ -22,6 +22,10 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
+  laki widget [ls] | reload                   the sidebar's widgets | read their folders again and fetch
+  laki widget on|off|run <id>                 show or hide one | run its fetch now
+  laki widget render <id> [--full]            the HTML it shows now, filled from its data
+  laki widget action <id> <action> [arg]      run one of its widget.json actions
   laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
   laki daemon | stop                          run the daemon in the foreground | stop it
   --json prints machine-readable output`

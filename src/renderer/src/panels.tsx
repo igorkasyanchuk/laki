@@ -5,8 +5,8 @@ import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { type Img, PromptInput, TemplatePick, withImages } from './PromptInput'
-import { clock, nameOf, templated, templatesFor } from './text'
-import { Icon, IconButton, type IconName, Page, useMenu } from './ui'
+import { clock, nameOf, parseDuration, prRef, templated, templatesFor } from './text'
+import { Icon, IconButton, type IconName, Page, Switch, useMenu } from './ui'
 
 function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
@@ -214,9 +214,9 @@ const keep = (key: string, v: unknown) => {
 export function NewWorkspace({ view, project, agent, initial, images: shots, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Img[]; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
   const [p, setP] = useState<NewWsParams>(() => {
-    const names = [...view.presets.map(x => x.name), 'shell', 'custom', 'none']
+    const names = [...view.presets.filter(x => !x.off).map(x => x.name), 'shell', 'custom', 'none']
     // the last agent, unless Settings › New workspaces start changed since: then that one
-    const preset = initial?.preset ?? (last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent || 'claude')
+    const preset = initial?.preset ?? (last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent && names.includes(agent) ? agent : (names[0] ?? 'claude')) // a default that's off: the first that's on
     const same = preset === last.preset // the model and effort are that agent's
     const proj = project ?? (view.projects.some(x => x.id === last.project) ? last.project! : view.projects[0]?.id ?? '')
     return {
@@ -248,11 +248,11 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   const templates = templatesFor(view.settings.templates, proj?.config?.templates)
   const ti = templates.findIndex(t => t.name === tplName)
   const tpl = ti < 0 ? '' : String(ti)
-  const filled = templated(templates[ti], p.prompt ?? '', { project: proj?.name, base: p.base })
+  const filled = templated(templates[ti], p.prompt ?? '', { project: proj?.name, base: p.base, pr: prRef(p.pr, p.prompt) })
   const plain = proj?.git === false // a folder without git: local only
   const starts = view.presets.find(x => x.name === p.preset)?.agent // what the preset starts: its model and effort flags
   const [rivals, setRivals] = useState<string[]>([]) // a race: the other presets on the same prompt
-  const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command').map(x => x.name)
+  const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command' && !x.off).map(x => x.name)
   const racing = !p.local && !plain && !p.pr?.trim() && isAgent(starts) && rivals.some(r => racers.includes(r)) // a PR's branch is checked out once
   const fan = racing ? [p.preset, ...rivals.filter(r => racers.includes(r))] : undefined
   useEffect(() => {
@@ -330,7 +330,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
                   <option value="">First in {proj.name}</option>
                   {proj.seps.map(s => (
                     <option key={s.id} value={s.id}>
-                      Under {s.name}
+                      In group {s.name}
                     </option>
                   ))}
                 </select>
@@ -340,7 +340,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
           <div className="field">
             <span>Agent</span>
             <div className="seg wrap">
-              {[...view.presets.map(x => x.name), 'shell', 'custom', 'none'].map(x => (
+              {[...view.presets.filter(x => !x.off || x.name === p.preset).map(x => x.name), 'shell', 'custom', 'none'].map(x => (
                 <button type="button" key={x} className={p.preset === x ? 'on' : ''} onClick={() => set({ preset: x, model: undefined, effort: undefined }) /* another agent's names */}>
                   {x}
                 </button>
@@ -560,6 +560,83 @@ export function Prompt({ title, hint, placeholder, initial = '', onClose, onSubm
   )
 }
 
+// a new timer: how long and, with its switch, a command it runs as it ends (in the workspace in front: where, its name)
+export function TimerDialog({ where, onClose, onStart }: { where?: string; onClose: () => void; onStart: (ms: number, cmd?: string) => void }) {
+  const [len, setLen] = useState('')
+  const [run, setRun] = useState(false)
+  const [cmd, setCmd] = useState('')
+  const ms = parseDuration(len)
+  const ok = !!ms && (!run || !!cmd.trim())
+  return (
+    <Modal title="New timer" onClose={onClose}>
+      <form className="form" onSubmit={e => (e.preventDefault(), ok && onStart(ms!, run ? cmd.trim() : undefined))}>
+        <input value={len} autoFocus placeholder="25 · 1h 30m · 90s" onChange={e => setLen(e.target.value)} />
+        <div className="muted small">{len.trim() && !ms ? 'A length like 25, 1h 30m or 90s, up to 24 hours.' : 'Minutes, or with units (h, m, s); up to a day. It starts at once.'}</div>
+        {where && (
+          <Switch on={run} onChange={setRun} tip="As it ends, a command runs in a tab of its own">
+            Then run a command
+          </Switch>
+        )}
+        {run && <input value={cmd} placeholder="say 'time is up' · npm test · open https://…" spellCheck={false} onChange={e => setCmd(e.target.value)} />}
+        {run && <div className="muted small">Runs through your login shell in {where}, in a tab of its own (it closes when the command succeeds).</div>}
+        <div className="buttons">
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={!ok}>
+            Start
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
+// tomorrow at 9:00, in ms from now
+const tomorrow9 = () => {
+  const d = new Date()
+  d.setDate(d.getDate() + 1)
+  d.setHours(9, 0, 0, 0)
+  return d.getTime() - Date.now()
+}
+
+// Remind me (a workspace's menu, as Slack's): a notification about it later; a timer underneath
+export function RemindDialog({ name, onClose, onPick }: { name: string; onClose: () => void; onPick: (ms: number) => void }) {
+  const [len, setLen] = useState('')
+  const ms = parseDuration(len)
+  const quick: [string, number][] = [
+    ['In 20 minutes', 1200000],
+    ['In 1 hour', 3600000],
+    ['In 3 hours', 10800000],
+    ['Tomorrow at 9:00', tomorrow9()],
+  ]
+  return (
+    <Modal title={`Remind me about ${name}`} onClose={onClose}>
+      <form className="form" onSubmit={e => (e.preventDefault(), ms && onPick(ms))}>
+        <div className="remind-quick">
+          {quick.map(([label, q], i) => (
+            <button key={label} type="button" autoFocus={i === 1} onClick={() => onPick(q)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <input value={len} placeholder="Or in: 45 · 2h 30m" onChange={e => setLen(e.target.value)} />
+        <div className="muted small">{len.trim() && !ms ? 'A length like 45, 2h 30m or 90s, up to 24 hours.' : 'A notification then; Laki must be running (one missed while it was closed comes as it opens).'}</div>
+        <div className="buttons">
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={!ms}>
+            Remind me
+          </button>
+        </div>
+      </form>
+    </Modal>
+  )
+}
+
 export type PaletteItem = { label: string; hint?: string; glyph?: string; icon?: IconName; run: () => void }
 
 // fuzzy: the query's characters in order; contiguous runs and word starts score higher
@@ -645,7 +722,7 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
   )
 }
 
-const REPO = 'https://github.com/igorkasyanchuk/laki'
+export const REPO = 'https://github.com/igorkasyanchuk/laki'
 
 // a nudge to star the repo, at the foot of the empty pages
 export const StarLaki = () => (

@@ -6,6 +6,8 @@ import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { USAGE } from '../shared/usage.ts'
 import { cliArgv, cliEnv, dir, q } from './core.ts'
+import { widgetFormat } from '../shared/widgetGuide.ts'
+import { BUILTIN } from './widgets.ts'
 
 // home: the agent's folder in ~ (its skills/ is where it looks); add: its `mcp add` for the user's scope, before the
 // command (gemini's takes no --: the command's arguments follow its name)
@@ -17,20 +19,25 @@ const AGENTS = {
   opencode: { name: 'OpenCode', home: '.config/opencode', add: '' }, // ponytail: ~/.config, not $XDG_CONFIG_HOME
 }
 export type SkillAgent = keyof typeof AGENTS
-// mcp: what adds Laki as the agent's MCP server, which the user runs or pastes (we never write the agents' config):
-// a command, or for opencode (its `mcp add` only asks questions) the lines for mcpIn, its config file
-export type SkillInfo = { agent: SkillAgent; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp: string; mcpIn?: string }
+// the skills, each installed on its own: laki (drive Laki) and laki-widget (make widgets)
+const SKILLS = ['laki', 'laki-widget'] as const
+export type SkillName = (typeof SKILLS)[number]
+// mcp: what adds Laki as the agent's MCP server (laki's rows), which the user runs or pastes (we never write the
+// agents' config): a command, or for opencode (its `mcp add` only asks questions) the lines for mcpIn, its config file
+export type SkillInfo = { agent: SkillAgent; skill: SkillName; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp: string; mcpIn?: string }
 
-const skillDir = (a: SkillAgent) => join(homedir(), AGENTS[a].home, 'skills', 'laki')
+const skillDir = (a: SkillAgent, k: SkillName) => join(homedir(), AGENTS[a].home, 'skills', k)
 const mcpArgv = () => ['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp']
 const mcpCmd = (a: SkillAgent) =>
   AGENTS[a].add ? `${AGENTS[a].add} ${mcpArgv().map(q).join(' ')}` : JSON.stringify({ mcp: { laki: { type: 'local', command: mcpArgv() } } }, null, 2)
 
 // the files, as they'd be written now: the launcher holds this install's paths
-function files(at: string): Record<string, string> {
+function files(at: string, k: SkillName): Record<string, string> {
   const cli = join(at, 'laki')
+  const laki = `#!/bin/sh\n# the laki CLI, for agents (written by laki: Settings → Agent skill)\nexec /usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')} "$@"\n`
+  if (k === 'laki-widget') return { laki, 'SKILL.md': widgetSkill(cli) }
   return {
-    'laki': `#!/bin/sh\n# the laki CLI, for agents (written by laki: Settings → Agent skill)\nexec /usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')} "$@"\n`,
+    laki,
     'SKILL.md': `---
 name: laki
 description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki.
@@ -133,21 +140,56 @@ more than 30 minutes late is skipped and logged as missed).
   }
 }
 
-function info(a: SkillAgent): SkillInfo {
-  const at = skillDir(a)
-  const want = Object.entries(files(at))
+// laki-widget: the widget creator, a skill of its own
+const widgetSkill = (cli: string) => `---
+name: laki-widget
+description: Make Laki widgets, the small live pages in the Laki app's sidebar (a count of PRs, a chart, a table) with a full view a click away, each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki widget or extension.
+---
+
+# Making a Laki widget
+
+A widget is a folder; its name is the widget's id. Make new ones in Laki's own folder:
+
+    ${join(dir, 'widgets')}/<id>/
+
+(the user can add more folders in Settings › Widgets). Two complete examples come with Laki, read them first:
+${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq, counts and groups, a template) and \`${join(BUILTIN, 'team-prs')}\` (a JS fetch script, a JS page with a chart, a filter and an action)` : 'my-prs and team-prs in the app'}.
+Don't edit those: copy one to a new id.
+
+${widgetFormat()}
+## Check your work
+
+Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`. Below, \`laki\` stands for it.
+
+    laki widget reload               # read the folders again (after any change) and fetch
+    laki widget run <id>             # fetch now: "fetched" or the error
+    laki widget render <id> [--full] # the HTML it shows now
+    laki widget ls                   # each one: on or off, size, schedule, last error
+
+A new widget in Laki's folder is on as soon as it's found. Tell the user which settings to fill in (Settings ›
+Widgets) and what it fetches how often: each fetch may call an API.
+`
+
+function info(a: SkillAgent, k: SkillName): SkillInfo {
+  const at = skillDir(a, k)
+  const want = Object.entries(files(at, k))
   const have = want.filter(([f]) => existsSync(join(at, f)))
   const state = !have.length ? 'missing' : have.length === want.length && want.every(([f, t]) => readFileSync(join(at, f), 'utf8') === t) ? 'installed' : 'outdated'
-  return { agent: a, name: AGENTS[a].name, path: at, state, mcp: mcpCmd(a), ...(!AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, 'opencode.json') }) }
+  const mcp = k === 'laki' ? mcpCmd(a) : ''
+  return { agent: a, skill: k, name: AGENTS[a].name, path: at, state, mcp, ...(mcp && !AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, 'opencode.json') }) }
 }
 
-export const skills = () => (Object.keys(AGENTS) as SkillAgent[]).map(info)
+// laki's rows first, one per agent, then laki-widget's
+export const skills = () => SKILLS.flatMap(k => (Object.keys(AGENTS) as SkillAgent[]).map(a => info(a, k)))
 
-// install (or update) the skill for an agent, or remove it: only our files, and the folder if that empties it
-export function skillSet(o: { agent: SkillAgent; on: boolean }) {
+// install (or update) a skill (laki unless said) for an agent, or remove it: only our files, and the folder if that
+// empties it
+export function skillSet(o: { agent: SkillAgent; on: boolean; skill?: SkillName }) {
   if (!Object.hasOwn(AGENTS, o.agent)) throw new Error(`no agent ${o.agent}`)
-  const at = skillDir(o.agent)
-  const fs = files(at)
+  const k = o.skill ?? 'laki'
+  if (!SKILLS.includes(k)) throw new Error(`no skill ${k}`)
+  const at = skillDir(o.agent, k)
+  const fs = files(at, k)
   if (o.on) {
     mkdirSync(at, { recursive: true })
     for (const [f, t] of Object.entries(fs)) writeFileSync(join(at, f), t)

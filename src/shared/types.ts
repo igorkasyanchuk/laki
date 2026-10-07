@@ -1,5 +1,5 @@
 // Shapes shared by the daemon, the CLI and the renderer.
-import type { Rule } from './when.ts'
+import { type Rule, stamp } from './when.ts'
 
 // the coding agents Laki starts by name (a preset's agent; the command is the id), and what they're called
 export const AGENTS = ['claude', 'codex', 'gemini', 'grok', 'opencode'] as const
@@ -35,7 +35,7 @@ export type Project = {
   seps?: Sep[] // the sidebar's named lines between its workspaces
   rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
 }
-export type Sep = { id: string; name: string }
+export type Sep = { id: string; name: string; color?: string } // color: TAB_COLORS' name, its label's tint
 // a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others
 // after, seps first); the app's sidebar and the daemon's placeWs
 export const rowsOf = <W extends { id: string; project: string }>(p: Pick<Project, 'id' | 'seps' | 'rows'>, ws: W[]): (W | Sep)[] => {
@@ -89,12 +89,14 @@ export const PR_PROMPTS: Record<FixWhat, string> = {
   conflict:
     'PR #{{pr}} ({{url}}) has merge conflicts with {{base}}. Merge it in (git fetch origin {{base}}, then git merge origin/{{base}}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, then commit and push the merge, then say what you changed.',
 }
-// {{name}} (spaces inside allowed) as vars say; an unknown one stays as it is (not {{constructor}}): prompt templates', PR_PROMPTS'
 // the first GitHub PR a prompt names ("review https://github.com/o/r/pull/12"): the new workspace is named after it
 // and linked to it
 export const prIn = (text = '') => /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/.exec(text)?.[0]
 
-export const fillTemplate = (text: string, vars: Record<string, string | undefined>) => text.replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
+// {{name}} (spaces inside allowed) as vars say; an unknown one stays as it is (not {{constructor}}): prompt templates', PR_PROMPTS'.
+// The template's dates ({{DD-MM-YY HH:MM}}, when.ts' stamp) are now's; what vars bring in (a typed prompt) isn't stamped
+export const fillTemplate = (text: string, vars: Record<string, string | undefined>, at = Date.now()) =>
+  stamp(text, at).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
 // a webhook's URL as pushes take it (push.ts; Settings says why not as you type)
 export function webhookUrl(url?: string) {
   let u: URL
@@ -131,7 +133,8 @@ export type Tab = {
 }
 
 // how an agent starts: one of AGENTS with extra args, or any command; env on top of the project's
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string> }
+// off: switched off in Settings: out of the pickers (new tab, new workspace, races, scheduled tasks); its tabs still start
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean }
 
 // what a notification is about: an agent waiting for you, done with its turn, at a usage limit
 export type NotifyKind = 'waiting' | 'done' | 'limit'
@@ -178,7 +181,8 @@ export type Settings = {
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
-  fun?: boolean // the tab bar's smiley: a meme for a break (unset: on)
+  fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
+  widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
 }
 
 // Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
@@ -214,7 +218,7 @@ export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[];
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
-export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string }
+export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string; took?: number } // took: seconds, a finished one's
 
 // checks: all of them in one word; list: each one. head: the commit the checks ran on.
 export type PR = {
@@ -225,6 +229,7 @@ export type PR = {
   list?: Check[]
   title?: string
   author?: string
+  mine?: boolean // its author is you (gh api user): no avatar, no Approve
   draft?: boolean
   head?: string
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
@@ -254,12 +259,23 @@ export type Proc = { pid: number; cmd: string }
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; agents: { id: Agent; found: boolean }[] }
 
+// a widget (daemon/widgets.ts): a folder with widget.json and widget.html; on: in the sidebar, fetching every `every`
+// minutes (none: no fetch command or script); size: cells, 1–3 across the sidebar's grid by 1–4 down; full: it has a
+// full view (a dialog); js: its page has scripts, so it runs in a sandboxed frame; config: its settings; at, error:
+// the last fetch; rev: changes on each reload
+// a widget's setting (widget.json config): its kind (text, number, bool: an on/off, choice: one of choices, list: words
+// or names, kept joined by commas), what Settings calls it and says under it
+export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'choice' | 'list'; label?: string; hint?: string; choices?: string[] }
+// view: the full view's dialog, small, medium or large; config: each setting as text (a bool's '1' or '')
+export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; rev: number }
+export type WidgetSize = 's' | 'm' | 'l'
+
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; api?: number }
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; api?: number }
 
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 24
+export const API = 27

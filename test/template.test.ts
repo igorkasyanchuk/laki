@@ -1,10 +1,13 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { fillTemplate, importable, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock } from '../src/renderer/src/text.ts'
+import { fillTemplate, importable, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
   assert.equal(fillTemplate('{{constructor}}', {}), '{{constructor}}')
+  // the template's dates are now's; a typed prompt's braces stay
+  const at = new Date(2026, 9, 5, 7, 5).getTime()
+  assert.equal(fillTemplate('{{YYYY-MM-DD HH:MM}} {{prompt}}', { prompt: 'keep {{HH}}' }, at), '2026-10-05 07:05 keep {{HH}}')
   const fix = { name: 'fix', text: 'Investigate and fix: {{prompt}}\nAdd a test.' }
   assert.equal(templated(fix, 'the redirect'), 'Investigate and fix: the redirect\nAdd a test.')
   assert.equal(templated({ name: 'tests', text: 'Write tests first.' }, 'for parse()'), 'Write tests first.\n\nfor parse()')
@@ -142,4 +145,37 @@ test('a settings file from another version: fields of the wrong kind left out, t
     ok: { theme: 'starship', presets: null, gone: 1, env: { A: '1' } },
     bad: ['fontSize', 'actions'],
   })
+})
+
+test("{{pr}}: the PR field, else a PR link in the prompt, else a prompt of only #n; a prompt it took isn't added again", () => {
+  assert.equal(prRef('#5', 'https://github.com/o/r/pull/7'), '#5')
+  assert.equal(prRef(' https://github.com/o/r/pull/5 ', ''), 'https://github.com/o/r/pull/5')
+  assert.equal(prRef('', 'look at https://github.com/o/r/pull/7 please'), 'https://github.com/o/r/pull/7')
+  assert.equal(prRef('', ' 77 '), '#77')
+  assert.equal(prRef('', 'fix 77 things'), undefined)
+  const t = { name: 'review', text: 'Review {{pr}} closely' }
+  assert.equal(templated(t, '#77', { pr: prRef('', '#77') }), 'Review #77 closely')
+  assert.equal(templated(t, '77', { pr: prRef('', '77') }), 'Review #77 closely')
+  assert.equal(templated(t, 'and its tests', { pr: '#5' }), 'Review #5 closely\n\nand its tests')
+  assert.equal(templated(t, 'x', {}), 'Review {{pr}} closely\n\nx') // none: left as it is
+})
+
+test("the preview's address bar: a path on the port, another port, this Mac's, any site, a whole URL; sizes typed", () => {
+  assert.equal(previewUrl('/a?b', 3000), 'http://localhost:3000/a?b')
+  assert.equal(previewUrl('a', 3000), 'http://localhost:3000/a')
+  assert.equal(previewUrl('', 3000), 'http://localhost:3000/')
+  assert.equal(previewUrl(':5173/x', 3000), 'http://localhost:5173/x')
+  assert.equal(previewUrl('localhost:8080', 3000), 'http://localhost:8080')
+  assert.equal(previewUrl('127.0.0.1:9/x', 3000), 'http://127.0.0.1:9/x')
+  assert.equal(previewUrl('example.com/docs', 3000), 'https://example.com/docs')
+  assert.equal(previewUrl(' https://github.com/o ', 3000), 'https://github.com/o')
+  assert.equal(previewUrl('http://example.com', 3000), 'http://example.com')
+  assert.equal(previewUrl('HTTPS://Example.com', 3000), 'https://Example.com')
+  assert.equal(previewAddr('http://localhost:3000/a'), 'localhost:3000/a')
+  assert.equal(previewAddr('https://example.com/'), 'https://example.com/')
+  assert.equal(previewAddr('http://localhost.evil.com/'), 'http://localhost.evil.com/')
+  assert.deepEqual(parseSize('1440x900'), [1440, 900])
+  assert.deepEqual(parseSize(' 375 × 667 '), [375, 667])
+  assert.equal(parseSize('100x100'), null)
+  assert.equal(parseSize('wide'), null)
 })

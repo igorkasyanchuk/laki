@@ -1,0 +1,51 @@
+<style>
+  .stats { display: flex; flex-wrap: wrap; align-content: center; gap: 0 9px; height: 100%; padding: 2px 6px; overflow: hidden; }
+  .stat { display: flex; align-items: baseline; gap: 4px; min-width: 0; white-space: nowrap; }
+  .stat b { font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .stat span { color: var(--muted); font-size: 11px; max-width: 46px; overflow: hidden; text-overflow: ellipsis; } /* a label's name: its start */
+  .stat i { flex: none; align-self: center; width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+  .stat.bad b { color: var(--error); }
+  .stats.big { height: auto; padding: 0 0 6px; gap: 4px 22px; }
+  .stats.big b { font-size: 26px; }
+  .stats.big span { font-size: 12px; max-width: none; }
+  tr.group td { padding-top: 14px; font-weight: 600; }
+  .ci-failing { color: var(--error); } .ci-passing { color: var(--done); } .ci-pending { color: var(--waiting); }
+</style>
+<template preview>
+  {{#if data}}
+  <div class="stats">
+    {{#each data.stats}}<div class="stat{{#if bad}} bad{{/if}}" title="{{n}} {{name}}"><b>{{n}}</b>{{#if color}}<i style="background: #{{color}}"></i>{{/if}}<span>{{name}}</span></div>{{/each}}
+  </div>
+  {{else}}
+  <div class="tile"><div class="num muted">–</div><div class="label">my PRs</div></div>
+  {{/if}}
+</template>
+<template full>
+  {{#if data}}
+  <div class="stats big">
+    {{#each data.stats}}<div class="stat{{#if bad}} bad{{/if}}" title="{{n}} {{name}}"><b>{{n}}</b>{{#if color}}<i style="background: #{{color}}"></i>{{/if}}<span>{{name}}</span></div>{{/each}}
+  </div>
+  <p class="muted small">{{config.repo}} · by {{#if config.author}}{{config.author}}{{else}}@me{{/if}}{{#if at}} · checked {{ago at}}{{/if}}</p>
+  <table>
+    <thead><tr><th>Title</th><th>Labels</th><th>CI</th><th>Review</th><th>Created</th></tr></thead>
+    {{#each data.groups}}
+    <tbody>
+      <tr class="group"><td colspan="5">{{name}} <span class="muted">{{prs.length}}</span></td></tr>
+      {{#each prs}}
+      <tr>
+        <td><a href="{{url}}">#{{number}} {{title}}</a>{{#if draft}}{{#if conflict}} <span class="tag bad">conflict</span>{{/if}}{{/if}}</td>
+        <td>{{#each labels}}<span class="tag" style="border-color: #{{color}}">{{name}}</span>{{/each}}</td>
+        <td class="nowrap ci-{{ci}}">{{ci}}</td>
+        <td class="nowrap">{{#if approved}}<span class="good">✓ approved</span>{{else}}{{#if changes}}<span class="bad">changes asked</span>{{else}}<span class="muted">waiting</span>{{/if}}{{/if}}</td>
+        <td class="nowrap">{{date createdAt}}</td>
+      </tr>
+      {{/each}}
+    </tbody>
+    {{else}}
+    <tbody><tr><td colspan="5" class="muted">No open PRs.</td></tr></tbody>
+    {{/each}}
+  </table>
+  {{else}}
+  <p class="muted">{{#if error}}{{error}}{{else}}Not fetched yet.{{/if}}</p>
+  {{/if}}
+</template>

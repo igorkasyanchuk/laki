@@ -10,6 +10,8 @@ const root = fileURLToPath(new URL('..', import.meta.url))
 const home = process.argv[2] ?? mkdtempSync('/tmp/laki-demo-')
 mkdirSync(home, { recursive: true })
 const repo = join(home, 'shop')
+// LAKI_DEV_ORIGIN: another renderer port than 5199 (the URL printed is its first)
+const origins = process.env.LAKI_DEV_ORIGIN || 'http://127.0.0.1:5199,http://localhost:5199'
 Object.assign(process.env, {
   HOME: home,
   LAKI_HOME: join(home, 'data'),
@@ -19,7 +21,7 @@ Object.assign(process.env, {
   FAKE_LOG: join(home, 'fake.log'),
   FAKE_TURN_MS: '4000',
   FAKE_GH: join(home, 'gh'),
-  LAKI_DEV_ORIGIN: 'http://127.0.0.1:5199,http://localhost:5199',
+  LAKI_DEV_ORIGIN: origins,
   GIT_AUTHOR_NAME: 'demo',
   GIT_AUTHOR_EMAIL: 'demo@example.invalid',
   GIT_COMMITTER_NAME: 'demo',
@@ -31,23 +33,24 @@ const { ensureDaemon, rpc } = await import('../src/shared/conn.ts')
 const git = (...a: string[]) => execFileSync('git', a, { cwd: repo })
 // a PR with a failing check, for the status bar and the info panel
 mkdirSync(join(home, 'gh'), { recursive: true })
-const check = (name: string, conclusion: string, status = 'COMPLETED') => ({ __typename: 'CheckRun', name, status, conclusion, detailsUrl: `https://github.com/acme/shop/actions/runs/1/job/${name.length}` })
+const ago = (s: number) => new Date(Date.now() - s * 1000).toISOString()
+const check = (name: string, conclusion: string, status = 'COMPLETED', secs = 0) => ({ __typename: 'CheckRun', name, status, conclusion, detailsUrl: `https://github.com/acme/shop/actions/runs/1/job/${name.length}`, startedAt: ago(600), completedAt: status === 'COMPLETED' ? ago(600 - secs) : '0001-01-01T00:00:00Z' })
 writeFileSync(
   join(home, 'gh/pr.json'),
   JSON.stringify({
     number: 42, state: 'OPEN', url: 'https://github.com/acme/shop/pull/42', title: 'Cart: totals with discounts', author: { login: 'ann' }, isDraft: false,
-    headRefOid: 'abc123', reviewDecision: 'CHANGES_REQUESTED', additions: 120, deletions: 14, updatedAt: new Date(Date.now() - 3600e3).toISOString(),
-    body: 'Adds discount codes to the cart.\n\n- percent and fixed discounts\n- tests for both',
-    statusCheckRollup: [check('lint', 'SUCCESS'), check('test (node 22)', 'FAILURE'), check('build', 'SUCCESS'), check('e2e', '', 'IN_PROGRESS')],
+    headRefOid: 'abc123', reviewDecision: 'CHANGES_REQUESTED', mergeable: 'CONFLICTING', additions: 120, deletions: 14, updatedAt: ago(3600),
+    body: '## Summary\n\nAdds **discount codes** to the cart, checked at `total()`.\n\n- percent and fixed discounts\n- one code per order\n- tests for both\n\n## Testing\n\n```sh\nnpm test\n```\n\nSee [the design doc](https://example.invalid/design) for the rules.',
+    statusCheckRollup: [check('lint', 'SUCCESS', 'COMPLETED', 18), check('test (node 22)', 'FAILURE', 'COMPLETED', 72), check('build', 'SUCCESS', 'COMPLETED', 141), check('e2e', '', 'IN_PROGRESS'), check('deploy preview', 'SKIPPED')],
   }),
 )
 // review threads, for the side panel's Review tab
-const said = (login: string, body: string) => ({ author: { login, __typename: 'User' }, authorAssociation: 'MEMBER', body })
+const said = (login: string, body: string, secs = 7200) => ({ author: { login, __typename: 'User' }, authorAssociation: 'MEMBER', body, createdAt: ago(secs) })
 writeFileSync(
   join(home, 'gh/graphql.json'),
   JSON.stringify({ data: { viewer: { login: 'demo' }, repository: { pullRequest: { reviewThreads: { nodes: [
-    { id: 't1', isResolved: false, isOutdated: false, path: 'src/cart.js', line: 2, comments: { nodes: [said('ann', 'Round to cents before summing, or 0.1 + 0.2 shows up in totals.')] } },
-    { id: 't2', isResolved: false, isOutdated: true, path: 'src/cart.test.js', line: 5, comments: { nodes: [said('bob', 'Add a case for an empty cart.'), said('demo', 'On it.')] } },
+    { id: 't1', isResolved: false, isOutdated: false, path: 'src/cart.js', line: 2, comments: { nodes: [said('ann', 'Round to cents before summing, or `0.1 + 0.2` shows up in totals:\n\n```suggestion\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100), 0)\n```')] } },
+    { id: 't2', isResolved: false, isOutdated: true, path: 'src/cart.test.js', line: 5, comments: { nodes: [said('bob', 'Add a case for an empty cart.'), said('demo', 'On it.', 600)] } },
     { id: 't3', isResolved: true, isOutdated: false, path: 'README.md', line: 1, comments: { nodes: [said('ann', 'Typo.')] } },
   ] } } } } }),
 )
@@ -74,4 +77,4 @@ writeFileSync(join(a.path, 'src/cart.js'), 'export function total(items) {\n  co
 writeFileSync(join(a.path, 'src/cart.test.js'), "import { total } from './cart.js'\nconsole.assert(total([{ price: 0.1 }, { price: 0.2 }]) === 0.3)\n")
 await rpc('run', { ws: a.id })
 await rpc('send', { target: c.id, text: 'ask before deleting' })
-console.log(JSON.stringify({ home, url: `http://127.0.0.1:5199/#port=${info.port}&token=${info.token}` }))
+console.log(JSON.stringify({ home, url: `${origins.split(',')[0]}/#port=${info.port}&token=${info.token}` }))

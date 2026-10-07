@@ -121,16 +121,46 @@ export function describe(r: Rule): string {
   return r.once ? `Once, ${days === 'Every day' ? '' : `${days} `}${times}` : `${days} ${times}`
 }
 
-// a run's date in a task's name or prompt: {{DD-MM-YY}} · {{YYYY-MM-DD}} · {{HH:mm}} · {{ddd D MMM}}. Only braces of
-// these tokens and separators change: {{project}} and the like stay as they are.
+// a date in a task's name or prompt, a prompt template or an action: any of these tokens, in any order, with any of
+// the separators between them: {{DD-MM-YY}} · {{YYYY-MM-DD}} · {{HH:mm}} · {{ddd D MMM}} · {{DDMMYY HH-MM}}. MM is the
+// month, but right after an hour (HH, H, hh) it's the minutes, as people write it; mm always is. Only braces of these
+// tokens and separators change: {{project}} and the like stay as they are.
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-const TOKEN = /YYYY|YY|MMM|MM|DD|D|ddd|HH|H|mm/g
-const STAMP = /\{\{((?:YYYY|YY|MMM|MM|DD|D|ddd|HH|H|mm|[ \-:./,_])+)\}\}/g
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+const TOKENS = 'YYYY|YY|MMMM|MMM|MM|DD|D|dddd|ddd|HH|H|hh|mm|ss|A'
+const TOKEN = new RegExp(TOKENS, 'g')
+const STAMP = new RegExp(`\\{\\{((?:${TOKENS}|[ \\-:./,_])+)\\}\\}`, 'g')
 export function stamp(text: string, at: number): string {
   const d = new Date(at)
   const p = (n: number) => String(n).padStart(2, '0')
-  const part: Record<string, string> = { YYYY: String(d.getFullYear()), YY: p(d.getFullYear() % 100), MMM: MONTHS[d.getMonth()], MM: p(d.getMonth() + 1), DD: p(d.getDate()), D: String(d.getDate()), ddd: DAY_LABEL[d.getDay()], HH: p(d.getHours()), H: String(d.getHours()), mm: p(d.getMinutes()) }
-  return text.replace(STAMP, (all, f: string) => (/[YMDdHm]/.test(f) ? f.trim().replace(TOKEN, k => part[k]) : all))
+  const h12 = d.getHours() % 12 || 12
+  const part: Record<string, string> = {
+    YYYY: String(d.getFullYear()),
+    YY: p(d.getFullYear() % 100),
+    MMMM: MONTH_NAMES[d.getMonth()],
+    MMM: MONTHS[d.getMonth()],
+    MM: p(d.getMonth() + 1),
+    DD: p(d.getDate()),
+    D: String(d.getDate()),
+    dddd: DAY_NAMES[d.getDay()],
+    ddd: DAY_LABEL[d.getDay()],
+    HH: p(d.getHours()),
+    H: String(d.getHours()),
+    hh: p(h12),
+    mm: p(d.getMinutes()),
+    ss: p(d.getSeconds()),
+    A: d.getHours() < 12 ? 'AM' : 'PM',
+  }
+  return text.replace(STAMP, (all, f: string) => {
+    if (!/[YMDdHhmsA]/.test(f)) return all
+    let prev = ''
+    return f.trim().replace(TOKEN, k => {
+      const v = k === 'MM' && /^(HH|H|hh)$/.test(prev) ? part.mm : part[k]
+      prev = k
+      return v
+    })
+  })
 }
 
 // a scheduled run's new workspace: the task's name with the run's date; no name: the date, then the prompt's first

@@ -1,0 +1,17 @@
+{
+  "name": "My PRs",
+  "description": "Your open pull requests in a repo (or someone's): how many, drafts, conflicts and up to 3 labels you count; a click groups them: conflicts, failing CI, changes asked, approved, in review, drafts.",
+  "size": [3, 1],
+  "every": 5,
+  "view": "l",
+  "config": {
+    "repo": { "label": "Repo", "hint": "owner/name, or its GitHub link" },
+    "author": { "label": "Author", "hint": "a GitHub login; empty: you", "default": "@me" },
+    "label1": { "label": "Count label 1", "hint": "e.g. bug" },
+    "label2": { "label": "Count label 2", "hint": "e.g. needs-review" },
+    "label3": { "label": "Count label 3", "hint": "e.g. p1" },
+    "only": { "type": "list", "label": "Only with labels", "hint": "any of these; empty: all" },
+    "hide": { "type": "list", "label": "Hide with labels", "hint": "e.g. wip, do-not-merge" }
+  },
+  "fetch": "sh fetch.sh"
+}

@@ -2,8 +2,10 @@
 // the settings.
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
-import { type CSSProperties, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook, type Webhook, webhookUrl } from '../../shared/types'
+import { type CSSProperties, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type ProjectLook, type SideLook, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { ago } from '../../shared/widget'
+import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import { Icon, IconButton, type IconName, Switch } from './ui'
@@ -89,7 +91,8 @@ export type AppSettings = Paint & {
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   menuBar?: boolean // the menu bar's item (unset: on)
-  fun?: boolean // the tab bar's smiley (unset: on)
+  fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
+  widgetDirs?: string[] // folders of widgets, besides Laki's own
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -358,6 +361,8 @@ const TEMPLATE_VARS: [string, string][] = [
   ['{{prompt}}', 'what you type on the new-workspace page (without it, the typed text goes after the template)'],
   ['{{project}}', "the project's name"],
   ['{{base}}', 'the base branch'],
+  ['{{pr}}', 'the PR: the Pull request field (#123 or its URL), else a PR link in the prompt, or a prompt of only #123'],
+  ['{{DD-MM-YY HH:MM}}', "now: any of YYYY YY MMMM MMM MM DD D dddd ddd HH H hh mm ss A, in any order (MM after an hour is minutes)"],
 ]
 const ENV_VARS: [string, string][] = [
   ['$PORT', "the workspace's port, for a dev server"],
@@ -570,6 +575,9 @@ const FIND: [string, string, string?][] = [
   ['templates', 'Prompt templates', 'prompt'],
   ['actions', 'Actions', 'run menu prompt command'],
   ['skill', 'Agent skill', 'mcp server laki cli'],
+  ['skill', 'Widget creator', 'agent skill widgets laki-widget make extension ai'],
+  ['widgets', 'Widgets', 'sidebar extensions plugins folder reload fetch schedule'],
+  ['widgets', 'More folders', 'widgets extensions'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
 ]
 
@@ -584,6 +592,7 @@ const SECTIONS: { id: string; label: string; icon: IconName }[] = [
   { id: 'templates', label: 'Prompt templates', icon: 'pencil' },
   { id: 'actions', label: 'Actions', icon: 'run' },
   { id: 'skill', label: 'Agent skill', icon: 'import' },
+  { id: 'widgets', label: 'Widgets', icon: 'panel' },
   { id: 'remote', label: 'Remote access', icon: 'globe' },
 ]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
@@ -676,9 +685,14 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
   )
 }
 
-export type SkillInfo = { agent: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in
+export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's) or laki-widget
 // how an app reads and writes its skill; app: its name, for the text
-export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean) => Promise<SkillInfo[]> }
+export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean, skill?: string) => Promise<SkillInfo[]> }
+// the skills Settings offers, in its order: what each teaches
+const SKILL_KINDS: [string, string, string][] = [
+  ['laki', 'Laki', 'list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all through the command line'],
+  ['laki-widget', 'Widget creator', "make and change the sidebar's widgets: the files, the template language, JS widgets, actions, checking them with laki widget"],
+]
 
 // the skill that teaches the agents about the app, in each one's folder in the user's home
 function SkillSection({ api }: { api: SkillApi }) {
@@ -688,39 +702,42 @@ function SkillSection({ api }: { api: SkillApi }) {
   const [copied, setCopied] = useState('')
   const fail = (e: any) => setErr(String(e?.message ?? e))
   useEffect(() => void api.load().then(setRows, fail), [])
-  const set = (agent: string, on: boolean) => {
+  const set = (agent: string, on: boolean, skill?: string) => {
     setBusy(true)
     setErr('')
-    api.set(agent, on).then(setRows, fail).finally(() => setBusy(false))
+    api.set(agent, on, skill).then(setRows, fail).finally(() => setBusy(false))
   }
   return (
     <>
       <h2>Agent skill</h2>
       <p className="muted">
-        Teaches your agents about {api.app}: list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all
-        through the {api.app} command line. It goes in your home folder, so every session has it, in {api.app} or not.
+        Teaches your agents about {api.app}, each skill installed on its own. It goes in your home folder, so every session has it, in {api.app} or not.
       </p>
       {err && <div className="warn small">{err}</div>}
       {!rows && !err && <div className="muted small">Loading…</div>}
-      {rows?.map(r => (
-        <div key={r.agent} className="preset">
-          <div className="row">
-            <b>{r.name}</b>
-            <span className={r.state === 'installed' ? 'small' : 'muted small'}>{r.state === 'installed' ? 'installed' : r.state === 'outdated' ? 'out of date' : 'not installed'}</span>
-            <span className="grow" />
-            {r.state !== 'installed' && (
-              <button className="primary" disabled={busy} onClick={() => set(r.agent, true)}>
-                {r.state === 'missing' ? 'Install' : 'Update'}
-              </button>
-            )}
-            {r.state !== 'missing' && (
-              <button disabled={busy} onClick={() => set(r.agent, false)}>
-                Remove
-              </button>
-            )}
-          </div>
-          <div className="muted small mono">{r.path}</div>
-        </div>
+      {SKILL_KINDS.filter(([k]) => rows?.some(r => (r.skill ?? 'laki') === k)).map(([k, title, what]) => (
+        <Group key={k} title={title} hint={`Teaches them to ${what}.`}>
+          {rows!.filter(r => (r.skill ?? 'laki') === k).map(r => (
+            <div key={r.agent} className="preset">
+              <div className="row">
+                <b>{r.name}</b>
+                <span className={r.state === 'installed' ? 'small' : 'muted small'}>{r.state === 'installed' ? 'installed' : r.state === 'outdated' ? 'out of date' : 'not installed'}</span>
+                <span className="grow" />
+                {r.state !== 'installed' && (
+                  <button className="primary" disabled={busy} onClick={() => set(r.agent, true, r.skill)}>
+                    {r.state === 'missing' ? 'Install' : 'Update'}
+                  </button>
+                )}
+                {r.state !== 'missing' && (
+                  <button disabled={busy} onClick={() => set(r.agent, false, r.skill)}>
+                    Remove
+                  </button>
+                )}
+              </div>
+              <div className="muted small mono">{r.path}</div>
+            </div>
+          ))}
+        </Group>
       ))}
       <p className="muted small">It holds where {api.app} is installed: after moving the app, update it here.</p>
       {rows?.some(r => r.mcp) && (
@@ -750,6 +767,214 @@ function SkillSection({ api }: { api: SkillApi }) {
   )
 }
 
+// Widgets (daemon/widgets.ts): a prompt to make one with any AI, the folders they're found in, Reload, and each one's
+// switch, size, schedule, full view's size and settings
+export type WidgetsApi = {
+  list: WidgetView[]
+  home?: string // Laki's own widgets folder
+  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; config?: Record<string, string> }) => Promise<unknown>
+  run: (id: string) => Promise<unknown>
+  reload: () => Promise<unknown>
+  open: (id: string) => void // its full view
+  folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
+}
+
+const SIZES: [number, number][] = [1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number]))
+const VIEWS: [WidgetSize, string][] = [
+  ['s', 'Small'],
+  ['m', 'Medium'],
+  ['l', 'Large'],
+]
+const enter = (e: KeyEvent<HTMLInputElement>) => e.key === 'Enter' && e.currentTarget.blur()
+
+// a list setting (logins, labels): each item a chip; Enter, a comma or leaving the box adds what's typed, ⌫ in an
+// empty box takes the last one back
+function ChipsInput({ value, onChange: save, placeholder }: { value: string; onChange: (v: string) => void; placeholder?: string }) {
+  // what was sent, until the daemon's view brings it back: a second chip added meanwhile keeps the first
+  const [mine, setMine] = useState(value)
+  useEffect(() => setMine(value), [value])
+  const items = mine ? mine.split(',') : []
+  const onChange = (v: string) => (setMine(v), save(v))
+  const [draft, setDraft] = useState('')
+  const add = (t: string) => {
+    const more = [...new Set(t.split(/[,\n]/).map(x => x.trim()))].filter(x => x && !items.includes(x))
+    setDraft('')
+    if (more.length) onChange([...items, ...more].join(','))
+  }
+  return (
+    <div className="chips-input" onClick={e => (e.currentTarget.querySelector('input') as HTMLInputElement | null)?.focus()}>
+      {items.map(x => (
+        <span key={x} className="chip">
+          {x}
+          <button type="button" aria-label={`Remove ${x}`} onClick={() => onChange(items.filter(y => y !== x).join(','))}>
+            <Icon name="x" size={10} />
+          </button>
+        </span>
+      ))}
+      <input
+        value={draft}
+        spellCheck={false}
+        placeholder={items.length ? '' : placeholder}
+        onChange={e => (/[,\n]/.test(e.target.value) ? add(e.target.value) : setDraft(e.target.value))}
+        onKeyDown={e => {
+          if (e.key === 'Enter') e.preventDefault(), add(draft)
+          else if (e.key === 'Backspace' && !draft && items.length) onChange(items.slice(0, -1).join(','))
+        }}
+        onBlur={() => draft.trim() && add(draft)}
+        onPaste={e => {
+          const t = e.clipboardData.getData('text') // a one-line box would drop the line breaks between them
+          if (/[,\n]/.test(t)) e.preventDefault(), add(draft + t)
+        }}
+      />
+    </div>
+  )
+}
+
+// one setting of a widget, as its kind takes it, its hint in the empty box (and the name's tooltip); saved as it
+// changes (text and numbers as you leave the box)
+function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string; onSet: (v: string) => void }) {
+  const name = o.label || o.key
+  if (o.type === 'bool')
+    return (
+      <div className="wo wo-bool" data-tip={o.hint}>
+        <Switch on={value === '1'} onChange={on => onSet(on ? '1' : '')}>
+          <span>{name}</span>
+        </Switch>
+      </div>
+    )
+  return (
+    <label className="wo">
+      <span data-tip={o.hint}>{name}</span>
+      {o.type === 'choice' ? (
+        <select value={value} onChange={e => onSet(e.target.value)}>
+          {(o.choices ?? []).map(c => (
+            <option key={c}>{c}</option>
+          ))}
+        </select>
+      ) : o.type === 'list' ? (
+        <ChipsInput value={value} onChange={onSet} placeholder={o.hint ?? 'Type, then Enter'} />
+      ) : (
+        <input key={value} className={o.type === 'number' ? '' : 'mono'} type={o.type === 'number' ? 'number' : 'text'} defaultValue={value} placeholder={o.hint} spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value !== value && onSet(e.target.value)} />
+      )}
+    </label>
+  )
+}
+
+function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
+  const options = w.options ?? Object.keys(w.config).map(key => ({ key, type: 'text' as const })) // an older daemon's: text only
+  return (
+    <div className={`preset widget-card ${w.on ? '' : 'off'}`}>
+      <div className="row wc-head">
+        <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? `${w.name}: in the sidebar` : `${w.name}: off`} />
+        <b>{w.name}</b>
+        {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
+        <span className="grow" />
+        <select className="wc-size" value={w.size.join('x')} data-tip="Size in the sidebar: cells across × down" onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
+          {SIZES.map(([a, d]) => (
+            <option key={`${a}x${d}`} value={`${a}x${d}`}>
+              {a}×{d}
+            </option>
+          ))}
+        </select>
+        {w.every !== undefined && (
+          <label className="wc-every" data-tip="Fetches every this many minutes, while the app is open">
+            <input
+              key={w.every}
+              type="number"
+              min={1}
+              max={1440}
+              defaultValue={w.every}
+              onKeyDown={enter}
+              onBlur={e => {
+                const n = e.target.value.trim() ? Number(e.target.value) : NaN
+                if (!(n >= 1)) e.target.value = String(w.every) // empty or below 1: as it was, not every minute
+                else if (n !== w.every) void api.set(w.id, { every: n })
+              }}
+            />
+            <span className="muted small">min</span>
+          </label>
+        )}
+        {w.full && (
+          <select className="wc-view" value={w.view ?? 'm'} data-tip="The full view's size" onChange={e => void api.set(w.id, { view: e.target.value as WidgetSize })}>
+            {VIEWS.map(([v, n]) => (
+              <option key={v} value={v}>
+                {n} view
+              </option>
+            ))}
+          </select>
+        )}
+        {w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
+        {w.full && <button onClick={() => api.open(w.id)}>Open</button>}
+        {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
+      </div>
+      {w.description && <div className="muted small">{w.description}</div>}
+      {options.length > 0 && (
+        <div className="wc-opts">
+          {options.map(o => (
+            <WidgetOptionField key={o.key} o={o} value={w.config[o.key] ?? ''} onSet={v => void api.set(w.id, { config: { [o.key]: v } })} />
+          ))}
+        </div>
+      )}
+      {w.every !== undefined && <div className={`small ${w.error && !w.running ? 'warn' : 'muted'}`}>{w.running ? 'Fetching…' : w.error ? `Last fetch failed: ${w.error}` : w.at ? `Fetched ${ago(w.at)}` : 'Not fetched yet'}</div>}
+    </div>
+  )
+}
+
+// the prompt that makes a widget in any AI chat: what's wanted, then the whole format
+function WidgetPrompt({ home }: { home: string }) {
+  const [want, setWant] = useState('')
+  const [copied, setCopied] = useState(false)
+  const text = widgetPrompt(want, home.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')) // ~, not your account's name, to a chat elsewhere
+  const copy = () => navigator.clipboard.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 2000)))
+  return (
+    <Group title="Make one with AI" hint="Describe it, copy the prompt, paste it into any AI chat, then save the files it gives you in Laki's folder and press Reload.">
+      <label>
+        What should it show?
+        <input value={want} onChange={e => setWant(e.target.value)} placeholder="e.g. open Sentry issues of my project, by count; a table in the full view" />
+      </label>
+      <div className="prompt-box">
+        <textarea className="mono" readOnly rows={6} value={text} onFocus={e => e.currentTarget.select()} />
+        <IconButton icon={copied ? 'check' : 'copy'} title={copied ? 'Copied' : 'Copy the prompt'} className="prompt-copy" onClick={() => void copy()} />
+      </div>
+    </Group>
+  )
+}
+
+function WidgetsSection({ api, dirs, onDirs }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void }) {
+  const [busy, setBusy] = useState(false)
+  return (
+    <>
+      <h2>Widgets</h2>
+      <p className="muted">
+        Small pages in the sidebar, above its buttons, in a grid 3 cells across: each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
+        schedule) and widget.html (what it shows, and its full view, a click away). Ask an agent with the Widget creator skill (Agent skill) to make one, or any AI with the prompt below.
+      </p>
+      {api.home && <WidgetPrompt home={api.home} />}
+      <Group title="Folders">
+        <div className="muted small">
+          Laki's own: <span className="mono">{api.home}</span>
+        </div>
+        <label>
+          <span>
+            More folders <span className="muted">· one per line: a widget's folder, or a folder of them</span>
+          </span>
+          <textarea className="mono" rows={2} spellCheck={false} value={dirs.join('\n')} placeholder="~/code/my-widgets" onChange={e => onDirs(e.target.value.split('\n'))} />
+        </label>
+        <div className="row">
+          <button disabled={busy} onClick={() => (setBusy(true), api.reload().finally(() => setBusy(false)))}>
+            {busy ? 'Reloading…' : 'Reload widgets'}
+          </button>
+          <span className="muted small">Reads the folders again and fetches each widget that's on: changes show without a restart.</span>
+        </div>
+      </Group>
+      {api.list.map(w => (
+        <WidgetCard key={w.id} w={w} api={api} />
+      ))}
+      {!api.list.length && <p className="muted">No widgets in these folders yet.</p>}
+    </>
+  )
+}
+
 export function SettingsPage(p: {
   settings: AppSettings
   apps: AppInfo[]
@@ -763,6 +988,7 @@ export function SettingsPage(p: {
   script?: keyof Scripts // a project's script tab to show
   skill?: SkillApi
   remote?: RemoteApi
+  widgets?: WidgetsApi
   webhookTest?: (w: Webhook) => Promise<unknown> // Notifications webhook's Send test
   presets: Preset[] // the daemon's: the settings', or its defaults
 }) {
@@ -893,7 +1119,7 @@ export function SettingsPage(p: {
     )
   }
   // Find a setting: every word typed in a setting's title, words or section (and projects by name)
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote))
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets))
   const words = findQ.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const hits = (text: string) => words.every(w => text.toLowerCase().includes(w))
   const found = !words.length
@@ -937,7 +1163,7 @@ export function SettingsPage(p: {
               {!found.length && <div className="muted small pad">Nothing called that.</div>}
             </>
           )}
-          {!findQ.trim() && SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote)).map(x => (
+          {!findQ.trim() && sections.map(x => (
             <button key={x.id} className={sec === x.id ? 'on' : ''} onClick={() => openSec(x.id)}>
               <Icon name={x.icon} /> {x.label}
             </button>
@@ -967,7 +1193,7 @@ export function SettingsPage(p: {
               <label>
                 New workspaces start
                 <select value={s.agent || 'claude'} onChange={e => set({ agent: e.target.value })}>
-                  {presets.map(p => (
+                  {presets.filter(p => !p.off || p.name === s.agent).map(p => (
                     <option key={p.name}>{p.name}</option>
                   ))}
                   <option value="shell">shell</option>
@@ -1010,7 +1236,7 @@ export function SettingsPage(p: {
               <Group title="What the window shows">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
-                  <Says title="Fun button" hint="The smiley in the tab bar: a random meme from r/memes for a break (→ or N for another)" />
+                  <Says title="Fun button" hint="The smiley at the bottom of the sidebar: a random meme from r/memes for a break (→ or N for another)" />
                 </Switch>
                 <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
                   <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
@@ -1305,6 +1531,7 @@ export function SettingsPage(p: {
             </>
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
+          {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} />}
           {sec === 'remote' && p.remote && <RemoteSection api={p.remote} mail={s.remoteMail ?? ''} onMail={remoteMail => set({ remoteMail })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (
@@ -1372,12 +1599,14 @@ export function SettingsPage(p: {
             <>
               <h2>Agent presets</h2>
               <p className="muted small">
-                How agents start. Each preset is in the new-tab menu and the new-workspace dialog. Args go after the command, before the prompt, through
-                the shell (so the variables work); env goes on top of the project's.
+                How agents start. Each preset that's on is in the new-tab menu, the new-workspace page and scheduled tasks; switch off the ones you don't use
+                (their tabs still start). Args go after the command, before the prompt, through the shell (so the variables work); env goes on top of the
+                project's.
               </p>
               {presets.map((p, i) => (
-                <div key={keys.current[i]} className="preset">
-                  <div className="row">
+                <div key={keys.current[i]} className={`preset ${p.off ? 'off' : ''}`}>
+                  <div className="row preset-head">
+                    <Switch on={!p.off} onChange={on => setPreset(i, { off: on ? undefined : true })} tip={p.off ? `${p.name}: off, not in the pickers` : `${p.name}: on`} />
                     <input className="mono" value={p.name} placeholder="name" onChange={e => setPreset(i, { name: e.target.value.replace(/\s+/g, '-') })} />
                     <select value={p.agent} onChange={e => setPreset(i, { agent: e.target.value as Preset['agent'] })}>
                       {AGENTS.map(a => (

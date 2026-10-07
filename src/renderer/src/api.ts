@@ -50,6 +50,12 @@ async function wsURL() {
   return { url: `${at}/ws?token=${encodeURIComponent(token)}`, token, remote: !port }
 }
 
+// the daemon's address for a frame (a JS widget's page): its port here, or none: the page's own daemon (remote access)
+export async function daemonBase() {
+  const port = bridge ? (await bridge.conn()).port : new URLSearchParams(location.hash.slice(1)).get('port')
+  return port ? `http://127.0.0.1:${port}` : ''
+}
+
 // remote access, when the socket won't open (a browser can't read why): Cloudflare's sign-in ran out (its redirect:
 // a reload signs in again, the token stays in the tab), or the link did (remote access stopped or started again)
 async function whyNot(token: string): Promise<string | undefined> {

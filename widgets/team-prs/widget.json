@@ -1,0 +1,18 @@
+{
+  "name": "Team PRs",
+  "description": "Your team's open pull requests in a repo: how many, and each one's labels, CI and review.",
+  "size": [1, 1],
+  "every": 5,
+  "view": "l",
+  "config": {
+    "repo": { "label": "Repo", "hint": "owner/name, or its GitHub link" },
+    "logins": { "type": "list", "label": "GitHub logins", "hint": "whose PRs it lists" },
+    "only": { "type": "list", "label": "Only with labels", "hint": "any of these; empty: all" },
+    "hide": { "type": "list", "label": "Hide with labels", "hint": "e.g. wip, do-not-merge" },
+    "project": { "label": "Laki project", "hint": "the repo's, by name: for Review in Laki" }
+  },
+  "script": "fetch.mjs",
+  "actions": {
+    "review": "[ -n \"$WIDGET_PROJECT\" ] || { echo 'Set Laki project in Settings › Widgets' >&2; exit 1; }; \"$LAKI_CLI\" new \"$WIDGET_PROJECT\" --pr \"$WIDGET_ARG\" --prompt 'Review this pull request: read the diff, run what you can, and list what you would change and why.'"
+  }
+}

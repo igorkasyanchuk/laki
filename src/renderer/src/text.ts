@@ -1,19 +1,29 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { fillTemplate, type RunAction, type Template } from '../../shared/types.ts'
+import { fillTemplate, prIn, type RunAction, type Template } from '../../shared/types.ts'
 export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
-// {{base}} the new workspace's; an unknown {{name}} stays as it is
+// {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
 export { fillTemplate }
 
 // a project's templates first, then the global ones it doesn't replace (one of the same name)
 export const templatesFor = (global: Template[] = [], project: Template[] = []) => [...project, ...global.filter(g => !project.some(t => t.name.trim() === g.name.trim()))]
 
-// the prompt through a template; one without {{prompt}} gets the typed text after it
+// a PR as the new-workspace page has it: the PR field (#123 or its URL), else a PR's URL in the prompt, else a prompt
+// that is only #123 or 123
+export function prRef(field = '', prompt = '') {
+  const ref = (s: string) => /^https?:\/\//.test(s) ? s : /^#?\d+$/.test(s) ? `#${s.replace('#', '')}` : undefined
+  return ref(field.trim()) ?? prIn(prompt) ?? ref(prompt.trim())
+}
+
+// the prompt through a template; one without {{prompt}} gets the typed text after it, unless that text is only the
+// PR its {{pr}} took
 export function templated(t: Template | undefined, prompt: string, vars: Record<string, string | undefined> = {}) {
   if (!t) return prompt
   const text = fillTemplate(t.text, { ...vars, prompt })
-  return /\{\{\s*prompt\s*\}\}/.test(t.text) || !prompt.trim() ? text : `${text}\n\n${prompt}`
+  const uses = (k: string) => new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`).test(t.text)
+  const taken = uses('pr') && !!vars.pr && [vars.pr, vars.pr.replace('#', '')].includes(prompt.trim())
+  return uses('prompt') || !prompt.trim() || taken ? text : `${text}\n\n${prompt}`
 }
 
 // a workspace's name from what was typed, not the template around it (as the daemons do: its first words)
@@ -98,11 +108,44 @@ export function clock(ms: number) {
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {
   const kind = (x: unknown) => (x === null ? 'null' : Array.isArray(x) ? 'array' : typeof x)
   const bad = Object.keys(v).filter(k => KINDS[k] && v[k] !== undefined && !KINDS[k].split(' ').includes(kind(v[k])))
   return { ok: Object.fromEntries(Object.entries(v).filter(([k]) => !bad.includes(k))), bad }
+}
+
+// the preview's address bar: a path on the port (/x), :5173/x, localhost:5173/x, a whole URL, or a site's address
+// (example.com/x, docs.example.com:8080: https). ponytail: index.html typed bare reads as a site; /index.html is the path
+const SITE = /^[\w-]+(\.[\w-]+)+(:\d+)?([/?#]|$)/
+const LOCAL_HOST = /^(localhost|127\.0\.0\.1)(:\d+)?([/?#]|$)/
+export function previewUrl(typed: string, port: number) {
+  const a = typed.trim()
+  if (/^https?:\/\//i.test(a)) return a.replace(/^https?/i, x => x.toLowerCase()) // HTTP://: load takes it lowercase
+  if (/^:\d+([/?#]|$)/.test(a)) return `http://localhost${a}`
+  if (LOCAL_HOST.test(a)) return `http://${a}`
+  if (SITE.test(a)) return `https://${a}`
+  return `http://localhost:${port}${a.startsWith('/') ? a : `/${a}`}`
+}
+// and what it shows for a URL: this Mac's without the http://
+export const previewAddr = (url: string) => url.replace(/^http:\/\/(?=(localhost|127\.0\.0\.1)(:\d+)?([/?#]|$))/, '')
+
+// the preview's sizes (Preview's devices bar): the page laid out at that width and height, scaled down to fit the panel
+export const SIZES: [string, number, number][] = [
+  ['iPhone SE', 375, 667],
+  ['iPhone', 393, 852],
+  ['Android', 412, 915],
+  ['iPad', 768, 1024],
+  ['Laptop', 1366, 768],
+  ['HD', 1280, 720],
+  ['Full HD', 1920, 1080],
+]
+// a typed size: 1440x900, 1440×900, 1440 900 (each 200 to 4000 px)
+export function parseSize(s: string): [number, number] | null {
+  const m = /^\s*(\d{3,4})\s*[x×*, ]\s*(\d{3,4})\s*$/i.exec(s)
+  if (!m) return null
+  const [w, h] = [Number(m[1]), Number(m[2])]
+  return w >= 200 && h >= 200 && w <= 4000 && h <= 4000 ? [w, h] : null
 }

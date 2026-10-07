@@ -10,11 +10,19 @@ case "$*" in
   "pr checkout "*) b=$(f checkout) || exit 1; a="$*"; case "$a" in *" --branch "*) b=${a##* --branch }; esac; git checkout -q "$b" 2>/dev/null || git checkout -q -b "$b"; exit $? ;;
 esac
 case "$1 $2" in
+  "pr list") # the widgets' (widgets/): $FAKE_GH/prlist.json, --jq applied with the real jq
+    j=; au=; p=; for a in "$@"; do [ "$p" = --jq ] && j=$a; [ "$p" = --author ] && au=$a; p=$a; done
+    out=$(f prlist.json || echo '[]')
+    # --author: that login's (any case, as GitHub's search); @me: anyone's here
+    [ -n "$au" ] && [ "$au" != @me ] && out=$(printf '%s' "$out" | jq --arg a "$au" '[.[] | select((.author.login | ascii_downcase) == ($a | ascii_downcase))]')
+    if [ -n "$j" ]; then printf '%s' "$out" | jq "$j"; else printf '%s\n' "$out"; fi ;;
   "pr view") f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;
   "pr checks") f checks.json || echo '[]'; exit 8 ;;
   "pr review"|"pr close") f refuse >&2 && exit 1; exit 0 ;;
   "run view") f run.log ;;
   "api graphql") f graphql.json || exit 1 ;;
+  "api user") f user || echo me ;;
+  "pr diff") f pr.diff || exit 1 ;;
   "auth status") f auth || exit 1 ;;
   "issue view") f issue.json || { echo "GraphQL: Could not resolve to an issue" >&2; exit 1; } ;;
   "api repos/"*) f comment.json || { echo 'HTTP 422: Unprocessable Entity' >&2; exit 1; } ;;

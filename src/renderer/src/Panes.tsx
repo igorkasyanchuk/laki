@@ -1,53 +1,86 @@
 // A tab's terminal area split into panes (layout.ts), panes and tabs dragged around, and the sidebar's
 // resize handle. Panes are absolutely placed siblings keyed by session, so splitting never remounts a terminal.
 import { useRef, useState, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
-import { type Bar, type Edge, type Layout, place } from './layout'
+import { type Bar, type Layout, place, type Spot } from './layout'
 import { colorVar } from './ui'
 
-export type Over = { pane: string; edge: Edge } | 'bar'
-export type Drag = { tab: string; whole: boolean; x: number; y: number; over?: Over }
+export type Drag = { tab: string; whole: boolean; x: number; y: number; over?: Spot; line?: { left: number; top: number; width: number; height: number } }
 
-// what's under the pointer: the tab bar ([data-tabbar]), or a pane ([data-pane]) and its nearest edge
-function overAt(x: number, y: number): Over | undefined {
+const ZONE = 0.3 // a pane's edge band, of its width or height: a split there; inside it, the center
+
+// what's under the pointer: a tab bar ([data-tabbar]) with tabs, the index between them and a line there (fixed), or
+// a pane ([data-pane]): its edge within ZONE, or its center
+function overAt(x: number, y: number): Pick<Drag, 'over' | 'line'> | undefined {
   const el = document.elementFromPoint(x, y)
-  if (el?.closest('[data-tabbar]')) return 'bar'
+  const bar = el?.closest<HTMLElement>('[data-tabbar]')
+  if (bar) {
+    const rs = [...bar.querySelectorAll(':scope > .tab')].map(t => t.getBoundingClientRect()) // groups' order
+    if (!rs.length) return undefined // the top bar while tabs are elsewhere
+    const col = getComputedStyle(bar).flexDirection.startsWith('column')
+    const i = rs.filter(r => (col ? y > r.top + r.height / 2 : x > r.left + r.width / 2)).length
+    const r = rs[Math.min(i, rs.length - 1)]
+    const at = i < rs.length ? (col ? r.top : r.left) : col ? r.bottom : r.right
+    return { over: { bar: i }, line: col ? { left: r.left, top: at - 1, width: r.width, height: 2 } : { left: at - 1, top: r.top, width: 2, height: r.height } }
+  }
   const p = el?.closest<HTMLElement>('[data-pane]')
   if (!p) return undefined
   const r = p.getBoundingClientRect()
   const fx = (x - r.left) / r.width
   const fy = (y - r.top) / r.height
-  const [edge] = ([['left', fx], ['right', 1 - fx], ['top', fy], ['bottom', 1 - fy]] as const).reduce((m, e) => (e[1] < m[1] ? e : m))
-  return { pane: p.dataset.pane!, edge }
+  const [edge, d] = ([['left', fx], ['right', 1 - fx], ['top', fy], ['bottom', 1 - fy]] as const).reduce((m, e) => (e[1] < m[1] ? e : m))
+  return { over: { pane: p.dataset.pane!, edge: d < ZONE ? edge : 'center' } }
 }
 
 // a text field outside the panes has the keyboard (a terminal's own textarea is inside one): hover focus waits
 const typing = () => !!document.activeElement?.matches('input, textarea, select, [contenteditable]') && !document.activeElement.closest('.pane')
 
-// a pane header (one session) or a tab (whole: all its panes) dragged more than a few pixels; on release
-// over a target, onDrop
-export function useTabDrag(onDrop: (tab: string, whole: boolean, over: Over) => void) {
+// a pane header (one session) or a tab (whole: all its panes) dragged past 4px (less: a click), VS Code style: a
+// target only where ok says the drop changes something; a release there, onDrop; Esc, a release elsewhere, losing
+// the window or the pointer: nothing
+export function useTabDrag(onDrop: (tab: string, whole: boolean, over: Spot) => void, ok: (tab: string, whole: boolean, over: Spot) => boolean) {
   const [drag, setDrag] = useState<Drag | null>(null)
-  const done = useRef(onDrop)
-  done.current = onDrop
+  const cb = useRef({ onDrop, ok })
+  cb.current = { onDrop, ok }
   const start = (e: PE, tab: string, whole: boolean) => {
     if (e.button !== 0) return
-    e.preventDefault() // no text selection on the way
+    e.preventDefault() // no text selection, and the keyboard stays where it is
     const x0 = e.clientX
     const y0 = e.clientY
     let cur: Drag | null = null
     const move = (ev: PointerEvent) => {
-      if (!cur && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return
-      cur = { tab, whole, x: ev.clientX, y: ev.clientY, over: overAt(ev.clientX, ev.clientY) }
+      if (!cur && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 4) return
+      if (!cur) document.documentElement.classList.add('tab-dragging') // grabbing everywhere, no selection
+      const at = overAt(ev.clientX, ev.clientY)
+      cur = { tab, whole, x: ev.clientX, y: ev.clientY, ...(at?.over && cb.current.ok(tab, whole, at.over) && at) }
       setDrag(cur)
     }
-    const up = () => {
+    const key = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape' || !cur) return
+      ev.preventDefault()
+      ev.stopPropagation() // not the terminal's Esc
+      stop()
+    }
+    const up = (ev: PointerEvent) => {
+      if (cur) move(ev) // where it's released
+      const over = cur?.over
+      stop()
+      if (over) cb.current.onDrop(tab, whole, over)
+    }
+    const stop = () => {
       window.removeEventListener('pointermove', move)
       window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', stop)
+      window.removeEventListener('blur', stop)
+      window.removeEventListener('keydown', key, true)
+      document.documentElement.classList.remove('tab-dragging')
+      cur = null
       setDrag(null)
-      if (cur?.over) done.current(tab, whole, cur.over)
     }
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', stop)
+    window.addEventListener('blur', stop)
+    window.addEventListener('keydown', key, true)
   }
   return { drag, start }
 }
@@ -83,7 +116,7 @@ export function Panes(p: {
   }
   const over = p.drag?.over
   return (
-    <div className={`panes ${p.drag ? 'dragging' : ''}`} ref={area}>
+    <div className="panes" ref={area}>
       {panes.map(({ tab, box }) => (
         <div
           key={tab}
@@ -102,7 +135,7 @@ export function Panes(p: {
             </div>
           )}
           <div className="pane-body">{p.render(tab)}</div>
-          {over && over !== 'bar' && over.pane === tab && <div className={`drop-zone ${over.edge}`} />}
+          {over && 'pane' in over && over.pane === tab && <div className={`drop-zone ${over.edge}`} />}
         </div>
       ))}
       {bars.map(b => (
@@ -119,10 +152,11 @@ export function Panes(p: {
         />
       ))}
       {p.drag && (
-        <div className="drag-ghost" style={{ left: p.drag.x + 12, top: p.drag.y + 10 }}>
+        <div className="drag-ghost" style={{ left: Math.min(p.drag.x + 12, innerWidth - 272), top: Math.min(p.drag.y + 10, innerHeight - 32) /* in the window: 260 wide at most */ }}>
           {p.ghost}
         </div>
       )}
+      {p.drag?.line && <div className="drop-line" style={p.drag.line} />}
     </div>
   )
 }

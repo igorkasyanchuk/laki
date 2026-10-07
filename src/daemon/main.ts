@@ -12,6 +12,7 @@ import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { skills, skillSet } from './skill.ts'
 import { usage } from './usage.ts'
+import { scanWidgets, widgetAction, widgetPage, widgetReload, widgetRender, widgetRun, widgetSet, widgetTick } from './widgets.ts'
 
 const { dir } = core
 mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -62,6 +63,7 @@ if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 core.load()
 core.writeHooks()
 core.restoreAll()
+scanWidgets()
 
 const token = randomBytes(32).toString('hex')
 // Browsers always send Origin on a WebSocket; node clients (CLI, hooks, Electron main) send none.
@@ -146,6 +148,7 @@ const api: Record<string, Handler> = {
   prComment: p => core.prComment(p),
   prAct: p => core.prAct(p),
   prThreads: p => core.prThreads(p.ws),
+  prDiff: p => core.prDiff(p.ws),
   run: p => core.runDev(p.ws),
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
   usage: () => usage(core.state.settings?.usage),
@@ -165,6 +168,12 @@ const api: Record<string, Handler> = {
   remoteStart: p => core.remoteStart(p),
   remoteStop: () => core.remoteStop(),
   remoteTick: p => core.remoteTick(p.now), // tests move the clock
+  widgetRender: p => widgetRender(p),
+  widgetSet: p => widgetSet(p),
+  widgetRun: p => widgetRun(p),
+  widgetAction: p => widgetAction(p),
+  widgetReload: () => widgetReload(),
+  widgetTick: p => widgetTick(p.now), // tests move the clock
   shutdown: () => void setTimeout(shutdown, 50),
 }
 
@@ -180,7 +189,14 @@ const server = createServer(async (req, res) => {
     res.writeHead(code, { 'content-type': 'application/json' })
     res.end(text)
   }
-  if (req.method === 'GET') return page(new URL(req.url ?? '/', 'http://x').pathname, res) // no secrets: any origin
+  if (req.method === 'GET') {
+    const u = new URL(req.url ?? '/', 'http://x')
+    const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
+    if (!w) return page(u.pathname, res) // no secrets: any origin
+    const r = widgetPage(w[1], u.searchParams)
+    res.writeHead(r.code, r.headers)
+    return res.end(r.body)
+  }
   if (!originOk(req.headers.origin)) return reply(403, { error: 'origin not allowed' })
   if (req.method !== 'POST' || req.url !== '/rpc') return reply(404, { error: 'not found' })
   if (!tokenOk(req.headers.authorization?.replace(/^Bearer /, ''), req.headers.origin)) return reply(401, { error: 'bad token' })
@@ -219,6 +235,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     }
     core.clients.add(c)
     c.send({ ev: 'state', view: core.view() })
+    if (core.clients.size === 1) widgetTick() // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }
       try {
@@ -266,6 +283,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => core.watchLimits())
   every(15000, () => core.remoteTick())
   every(30000, () => core.scheduleTick())
+  every(30000, () => widgetTick())
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)
 })
 

@@ -401,7 +401,7 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   const rig = await fresh(t)
   await rig.rpc('projectAdd', { path: rig.repo })
   const states = (s: { state: string }[]) => s.map(x => x.state)
-  assert.deepEqual(states(await rig.rpc('skills')), ['missing', 'missing', 'missing', 'missing', 'missing'])
+  assert.deepEqual(states(await rig.rpc('skills')), Array(10).fill('missing')) // laki's, then laki-widget's
   assert.deepEqual(states((await rig.rpc('skillSet', { agent: 'claude', on: true })).slice(0, 2)), ['installed', 'missing'])
   const at = join(rig.home, '.claude/skills/laki')
   assert.match(readFileSync(join(at, 'SKILL.md'), 'utf8'), /^---\nname: laki\ndescription: /)
@@ -420,13 +420,19 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   // the others' folders, and how each adds Laki's MCP server (opencode: lines for its config)
   const all = await rig.rpc('skillSet', { agent: 'opencode', on: true })
   assert.ok(existsSync(join(rig.home, '.config/opencode/skills/laki/SKILL.md')))
-  assert.deepEqual(all.map((x: { path: string }) => x.path.slice(rig.home.length)), ['/.claude/skills/laki', '/.codex/skills/laki', '/.gemini/skills/laki', '/.grok/skills/laki', '/.config/opencode/skills/laki'])
-  const mcp = Object.fromEntries(all.map((x: { agent: string; mcp: string }) => [x.agent, x.mcp]))
+  assert.deepEqual(all.map((x: { path: string }) => x.path.slice(rig.home.length)).slice(0, 6), ['/.claude/skills/laki', '/.codex/skills/laki', '/.gemini/skills/laki', '/.grok/skills/laki', '/.config/opencode/skills/laki', '/.claude/skills/laki-widget'])
+  const mcp = Object.fromEntries(all.filter((x: { skill: string }) => x.skill === 'laki').map((x: { agent: string; mcp: string }) => [x.agent, x.mcp]))
   assert.match(mcp.gemini, /^gemini mcp add -s user laki '\/usr\/bin\/env' /)
   assert.match(mcp.grok, /^grok mcp add -s user laki -- '\/usr\/bin\/env' /)
   assert.equal(JSON.parse(mcp.opencode).mcp.laki.command.at(-1), 'mcp')
-  assert.equal(all.at(-1).mcpIn, '~/.config/opencode/opencode.json')
+  assert.equal(all[4].mcpIn, '~/.config/opencode/opencode.json')
   await rig.rpc('skillSet', { agent: 'opencode', on: false })
+  // the widget creator: a skill of its own, its own launcher, no MCP
+  const wid = (await rig.rpc('skillSet', { agent: 'claude', on: true, skill: 'laki-widget' })).find((x: { skill: string; agent: string }) => x.skill === 'laki-widget' && x.agent === 'claude')
+  assert.deepEqual([wid.state, wid.mcp], ['installed', ''])
+  assert.match(readFileSync(join(rig.home, '.claude/skills/laki-widget/SKILL.md'), 'utf8'), /^---\nname: laki-widget\n[\s\S]*laki widget reload/)
+  assert.ok(!existsSync(join(rig.home, '.claude/skills/laki/SKILL.md')), 'laki stays out')
+  await assert.rejects(rig.rpc('skillSet', { agent: 'claude', on: true, skill: 'nope' }), /no skill/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key
 })
@@ -627,6 +633,13 @@ test('presets: args and env on top of the project env; Esc ends a turn; reorder;
   await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: '  Later  ' }, { id: 'bad id', name: 'x' }, { id: 'sep-b2', name: ' ' }, { id: 'sep-a1', name: 'again' }], rows: [ws2.id, 'sep-a1', ws.id, 7] })
   let pr = (await rig.rpc('state')).projects[0]
   assert.deepEqual(pr.seps, [{ id: 'sep-a1', name: 'Later' }])
+  // a sep's color: a color's name, kept; none or a bad one, none
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later', color: 'teal' }] })
+  assert.deepEqual((await rig.rpc('state')).projects[0].seps, [{ id: 'sep-a1', name: 'Later', color: 'teal' }])
+  for (const color of ['none', 'url(x)', 7]) {
+    await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later', color }] })
+    assert.deepEqual((await rig.rpc('state')).projects[0].seps, [{ id: 'sep-a1', name: 'Later' }])
+  }
   assert.deepEqual(pr.rows, [ws2.id, 'sep-a1', ws.id])
   await rig.rpc('reorder', { workspaces: ['sep-a1', ws.id, ws2.id] })
   const v2 = await rig.rpc('state')
