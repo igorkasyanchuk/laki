@@ -614,7 +614,7 @@ settings) and shows a server icon; the status bar shows `devbox:` before the pat
 | ⌘I | workspace info |
 | ⌘F | find in the terminal |
 | ⌘S | save the file you're editing in the preview |
-| ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it) |
+| ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
 | ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app or a script: shown in Finder) |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | ⌘E | open in the editor |

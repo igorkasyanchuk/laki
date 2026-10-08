@@ -657,7 +657,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
   xterm's textarea; its buttons never take the focus). Traffic-light paddings are `.electron` only.
-- **`Term.tsx`**: one xterm per pane. In an agent's (`newline`), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
+- **`Term.tsx`**: one xterm per pane. In any tab (claude started in a terminal tab too; a shell runs the line on ⌃J), ⌘⏎ and ⇧⏎ send ⌃J (`\n`): a new line in claude's,
   codex's and opencode's prompt, where xterm would send ⏎. It attaches on mount and detaches on unmount, and swallows terminal
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a

@@ -35,7 +35,6 @@ export function Term({
   editKeys = true,
   theme = '',
   look = termLook({}),
-  newline = false,
   onFile,
 }: {
   tab: string
@@ -48,10 +47,7 @@ export function Term({
   theme?: string // the app's (themes.ts): the colors come from its CSS
   look?: ReturnType<typeof termLook> // line height, weight, cursor… (Settings)
   onFile?: (path: string) => void // a ⌘-clicked file:// link's path
-  newline?: boolean // an agent's: ⌘⏎ and ⇧⏎ make a new line in its prompt
 }) {
-  const nl = useRef(newline)
-  nl.current = newline
   const copy = useRef(copyOnSelect)
   copy.current = copyOnSelect
   const edit = useRef(editKeys)
@@ -132,8 +128,9 @@ export function Term({
     let down = false
     term.textarea?.addEventListener('focus', () => (down = false))
     term.attachCustomKeyEventHandler(e => {
-      // ⌘⏎ / ⇧⏎ in an agent: ⌃J, a new line in claude's, codex's and opencode's prompt (xterm would send ⏎: submit)
-      if (nl.current && e.key === 'Enter' && (e.metaKey || e.shiftKey) && !e.ctrlKey && !e.altKey) {
+      // ⌘⏎ / ⇧⏎: ⌃J, a new line in claude's, codex's and opencode's prompt (xterm would send ⏎: submit), in any tab: claude
+      // started in a terminal tab too; a shell runs the line on ⌃J as on ⏎. ponytail: a TUI that reads ⌃J as ↓ (fzf) gets ↓
+      if (e.key === 'Enter' && (e.metaKey || e.shiftKey) && !e.ctrlKey && !e.altKey && !e.isComposing) {
         if (e.type === 'keydown') api.send('input', { tab, data: '\n' })
         return false
       }

@@ -1665,7 +1665,6 @@ export function App() {
                     editKeys={settings.editKeys !== false}
                     theme={theme}
                     look={termLook(settings)}
-                    newline={byId(id)?.kind === 'agent'}
                     onFile={path => openPath(id, path)}
                   />
                 )}

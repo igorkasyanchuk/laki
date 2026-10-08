@@ -1784,7 +1784,7 @@ export function input(id: string, data: string, c?: Client) {
   if (!s) return
   if (c) s.follow(c)
   const tab = state.tabs.find(t => t.id === id)
-  if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev' || (tab.kind === 'shell' && state.workspaces.find(w => w.id === tab.workspace)?.host)) && data.includes('\r')) {
+  if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev' || (tab.kind === 'shell' && state.workspaces.find(w => w.id === tab.workspace)?.host)) && /[\r\n]/.test(data)) {
     spawnTab(tab, { resume: true }) // Enter on an ended agent or dev server (or a host's shell) starts it again
     if (tracked(tab) && tab.queue?.length) rtOf(id).status = 'running' // what waits for it goes once it's up (sweepRunning)
     return
