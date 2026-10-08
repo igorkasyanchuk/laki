@@ -9,6 +9,7 @@ import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, parseMails, type RunAction, type Template } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge } from './api'
+import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
 import { Icon, IconButton, type IconName, keep, load, Switch } from './ui'
@@ -123,14 +124,15 @@ export type AppSettings = Paint & {
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   menuBar?: boolean // the menu bar's item (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
-  floaterStyle?: FloaterStyle // a working agent's bubble (unset: glow)
-  floaterRecent?: number // the bubbles' recent agents, idle or done, after the ones at work (unset: 0)
+  floaterStyle?: FloaterStyle // a working agent's bubble (unset: gradient)
+  floaterRecent?: number // the bubbles' recent agents, idle or done, after the ones at work (unset: 3)
   floaterRecentHours?: number // a recent one drops out after this many hours idle; 0: never (unset: 4)
   floaterVoiceTo?: 'pick' | 'new' // the voice prompt: an agent picked each time, or always a new session (unset: pick)
   floaterMax?: number // the bubbles at most (unset: 12)
   floaterCards?: boolean // a bubble's card on hover (unset: on)
-  floaterNew?: boolean // the bubbles' + Session button (unset: off)
+  floaterNew?: boolean // the bubbles' + Session button (unset: on)
   floaterMic?: boolean // the bubbles' voice prompt button (unset: on)
+  dockIcon?: string // the Dock's icon while Laki runs (dock.ts DOCK_ICONS; unset: the app's own)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
@@ -701,6 +703,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
+  ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus microphone voice dictation record'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
@@ -788,6 +791,9 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
   const live = (r?.tabs ?? []).filter(x => tabOf(x.tab))
   const rows = live.filter(x => !tabOf(x.tab)!.asleep).sort((a, b) => b.rss - a.rss) // an asleep one still exiting: its own row, below
   const all = own + total(held) + total(live)
+  // what the sidebar's Terminals and Browsers hold: shell tabs (anywhere), Browsers pages and their sign-in windows
+  const shells = total(live.filter(x => tabOf(x.tab)!.kind === 'shell'))
+  const browsers = total(held.filter(p => p.name.includes('Browser: ')))
   const canSleep = (t: TabView) => (t.preset === 'claude' || t.preset === 'codex') && !!t.resumeId && t.status === 'idle'
   const row = (key: string, name: ReactNode, kb: number, cpu: number, acts?: ReactNode) => (
     <div className={`res-row${open === key ? ' open' : ''}`} onClick={() => setOpen(open === key ? null : key)}>
@@ -808,8 +814,9 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
       <h2>Resources</h2>
       <p className="muted small">
         Memory and CPU now, every 3 seconds while this is open. macOS counts every process Laki starts as Laki's: each agent, its MCP servers, the dev
-        servers in its tabs. An agent grows the longer it runs; sleeping it gives that back. The video, JS widgets, the preview, the floating bubbles and
-        an agent browser each run in a process of their own: Stop frees one until it's opened again.
+        servers in its tabs. An agent grows the longer it runs; sleeping it gives that back. The video, JS widgets, the preview, the floating bubbles,
+        an agent browser and the sidebar's browser pages each run in a process of their own: Stop frees one until it's opened again (a browser's: the
+        pages you aren't on).
       </p>
       <Group title="Memory">
         {!r ? (
@@ -819,7 +826,9 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
             <div className="res-total">
               <b>{size(all)}</b>
               <span className="muted">
-                Laki itself {size(own + total(held))} · tabs {size(total(live))}
+                Laki itself {size(own + total(held) - browsers)} · agents and tabs {size(total(live) - shells)}
+                {shells > 0 && ` · shells ${size(shells)}`}
+                {browsers > 0 && ` · browsers ${size(browsers)}`}
               </span>
             </div>
             <div className="res-rows">
@@ -905,9 +914,10 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
   )
 }
 
-// remote access: this app in a browser elsewhere, through cloudflared, for one email; no link yet: starting
-export type Remote = { mail: string; until?: number; url?: string; link?: string }
-export type RemoteApi = { state?: Remote; start: (hours: number, mail: string) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+// remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
+// link, after a typed confirm); no link yet: starting
+export type Remote = { mail: string; open?: boolean; until?: number; url?: string; link?: string }
+export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
@@ -915,14 +925,16 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
   const [hours, setHours] = useState(1)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [sure, setSure] = useState('') // no email: confirm, typed
   const r = api.state
-  const ok = ONE_MAIL.test(mail.trim())
+  const open = !mail.trim()
+  const ok = open ? sure.trim().toLowerCase() === 'confirm' : ONE_MAIL.test(mail.trim())
   const fail = (e: unknown) => setErr(String((e as Error).message ?? e))
   const start = async () => {
     if (busy || !ok) return
     setBusy(true)
     setErr('')
-    await api.start(hours, mail.trim()).catch(fail)
+    await api.start(hours, mail.trim(), open).then(() => setSure(''), fail) // the next start without an email asks again
     setBusy(false)
   }
   const stop = () => (setErr(''), api.stop().catch(fail))
@@ -933,7 +945,7 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
       <p className="muted small">
         This app in a browser on another computer or a phone: its terminals and agents, as if you sat here. cloudflared publishes Laki's daemon at a
         random trycloudflare.com address; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of
-        its own. It stops after the time you pick (or never: Forever), when you stop it, or with the daemon, and a stopped link never works again.
+        its own (without an email, that key is the only lock). It stops after the time you pick (or never: Forever), when you stop it, or with the daemon, and a stopped link never works again.
       </p>
       <p className="warn-soft small">Whoever gets in has a shell on this Mac as you: use an address only you read.</p>
       {r?.link ? (
@@ -945,9 +957,19 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
               <IconButton icon="copy" title="Copy the link" onClick={() => api.copy(r.link!)} />
               <IconButton icon="link" title="Open" onClick={() => api.open(r.link!)} />
             </div>
-            <p className="muted small">
-              Only <b>{r.mail}</b> gets in. Scan it with a phone, or send the link to yourself. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
-            </p>
+            {r.open ? (
+              <div className="remote-risk" role="alert">
+                <b>Anyone with this link gets in.</b>
+                <span className="small">
+                  No email check: a shell on this Mac as you. Don't paste it where others read; stop it as soon as you're done.{' '}
+                  {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
+                </span>
+              </div>
+            ) : (
+              <p className="muted small">
+                Only <b>{r.mail}</b> gets in. Scan it with a phone, or send the link to yourself. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
+              </p>
+            )}
             <div className="row">
               <button className="danger" onClick={stop}>
                 Stop remote access
@@ -958,6 +980,7 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
       ) : r ? (
         <>
           <p className="muted">Starting cloudflared… it takes a few seconds.</p>
+          {r.open && <p className="field-err">Without an email: anyone with the link will get in.</p>}
           <div className="row">
             <button onClick={stop}>Cancel</button>
           </div>
@@ -966,11 +989,26 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
         <form className="remote-form" onSubmit={e => (e.preventDefault(), start())}>
           <label>
             <span>
-              Email <span className="muted">· the only one let in</span>
+              Email <span className="muted">· the only one let in (optional, but leave it out only if you must)</span>
             </span>
             <input value={mail} inputMode="email" autoComplete="email" spellCheck={false} placeholder="you@example.com" onChange={e => onMail(e.target.value)} />
           </label>
-          {mail.trim() && !ok && <span className="field-err">One email address, like you@example.com</span>}
+          {!open && !ok && <span className="field-err">One email address, like you@example.com</span>}
+          {open && (
+            <div className="remote-risk" role="alert">
+              <b>No email: anyone who gets the link gets in.</b>
+              <span className="small">
+                There's no Cloudflare sign-in then: the link alone opens a shell on this Mac as you, with your files, keys, and agents. A link in a chat,
+                a screenshot or a browser's history is enough. Prefer an email; if you go on, pick a short time and stop it when you're done.
+              </span>
+              <label>
+                <span className="small">
+                  Type <b>confirm</b> to start without an email
+                </span>
+                <input value={sure} spellCheck={false} autoComplete="off" autoCapitalize="off" placeholder="confirm" onChange={e => setSure(e.target.value)} />
+              </label>
+            </div>
+          )}
           <div className="field">
             <span>For</span>
             <div className="seg" role="radiogroup" aria-label="For how long">
@@ -982,8 +1020,8 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
             </div>
           </div>
           <div className="row">
-            <button type="submit" className="primary" disabled={!ok || busy}>
-              {busy ? 'Starting…' : 'Start remote access'}
+            <button type="submit" className={open ? 'danger' : 'primary'} disabled={!ok || busy}>
+              {busy ? 'Starting…' : open ? 'Start without an email' : 'Start remote access'}
             </button>
           </div>
         </form>
@@ -1313,13 +1351,17 @@ export function SettingsPage(p: {
   webhookTest?: (w: Webhook) => Promise<unknown> // Notifications webhook's Send test
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   presets: Preset[] // the daemon's: the settings', or its defaults
+  onSection?: (id: string) => void // each section it shows (Get started's steps)
 }) {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
   const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
   const [sec, setSec] = useState(() => p.section ?? (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(load('laki.settingsSec', 'general')))
-  useEffect(() => keep('laki.settingsSec', sec), [sec])
+  useEffect(() => {
+    keep('laki.settingsSec', sec)
+    p.onSection?.(sec)
+  }, [sec])
   const [themeQ, setThemeQ] = useState('') // the themes' name filter
   const [findQ, setFindQ] = useState('') // Find a setting
   const findRef = useRef(findQ)
@@ -1739,7 +1781,7 @@ export function SettingsPage(p: {
                     <div className="switch-row sub fl-styles" role="radiogroup" aria-label="A working agent's bubble">
                       <span className="muted small">While working</span>
                       {FLOATER_STYLES.map(([k, name, what]) => (
-                        <button key={k} role="radio" aria-checked={(s.floaterStyle ?? 'glow') === k} className={(s.floaterStyle ?? 'glow') === k ? 'on' : ''} data-tip={what} data-fstyle={k} onClick={() => set({ floaterStyle: k })}>
+                        <button key={k} role="radio" aria-checked={(s.floaterStyle ?? 'gradient') === k} className={(s.floaterStyle ?? 'gradient') === k ? 'on' : ''} data-tip={what} data-fstyle={k} onClick={() => set({ floaterStyle: k })}>
                           <span className="fl-dot running">FC</span>
                           {name}
                         </button>
@@ -1750,7 +1792,7 @@ export function SettingsPage(p: {
                       </button>
                     </div>
                     <label className="switch-row">
-                      <select value={s.floaterRecent ?? 0} onChange={e => set({ floaterRecent: Number(e.target.value) })}>
+                      <select value={s.floaterRecent ?? 3} onChange={e => set({ floaterRecent: Number(e.target.value) })}>
                         {[0, 1, 2, 3, 4, 5].map(n => (
                           <option key={n} value={n}>
                             {n ? `The last ${n}` : 'None'}
@@ -1759,7 +1801,7 @@ export function SettingsPage(p: {
                       </select>
                       <Says title="Recent sessions too" hint="Agents you used last, idle or finished, after the ones at work: a dimmer circle each, finished ones you haven't seen first" />
                     </label>
-                    {(s.floaterRecent ?? 0) > 0 && (
+                    {(s.floaterRecent ?? 3) > 0 && (
                       <label className="switch-row sub">
                         <select value={s.floaterRecentHours ?? 4} onChange={e => set({ floaterRecentHours: Number(e.target.value) })}>
                           {[1, 4, 8, 24, 0].map(n => (
@@ -1784,7 +1826,7 @@ export function SettingsPage(p: {
                     <Switch className="switch-row" on={s.floaterCards !== false} onChange={v => set({ floaterCards: v })}>
                       <Says title="Card on hover" hint="Its name, project and what it asked or last said, beside the drop" />
                     </Switch>
-                    <Switch className="switch-row" on={!!s.floaterNew} onChange={v => set({ floaterNew: v })}>
+                    <Switch className="switch-row" on={s.floaterNew !== false} onChange={v => set({ floaterNew: v })}>
                       <Says title="+ Session" hint="A + under the circles: Laki's new-workspace page. With it the drop stays when no agent is at work" />
                     </Switch>
                     <Switch className="switch-row" on={s.floaterMic !== false} onChange={v => set({ floaterMic: v })}>
@@ -1803,6 +1845,20 @@ export function SettingsPage(p: {
                 )}
               </div>
               </Group>
+              {bridge?.dockIcon && (
+                <Group title="Dock icon" hint="Laki's icon in the Dock and the app switcher, kept after a restart or an update; Finder keeps the app's own">
+                  <div className="setting-box">
+                    <div className="switch-row dock-icons" role="radiogroup" aria-label="Dock icon">
+                      {DOCK_ICONS.map(([id, name, src]) => (
+                        <button key={id} role="radio" aria-checked={(s.dockIcon ?? 'laki') === id} className={(s.dockIcon ?? 'laki') === id ? 'on' : ''} onClick={() => set({ dockIcon: id })}>
+                          <img src={src} width={48} height={48} alt="" />
+                          {name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </Group>
+              )}
               <Group title="Project names" hint="The projects' heads in the sidebar, over the theme's">
                 {lookGrid('projectLook', PROJECT_LOOK)}
               </Group>

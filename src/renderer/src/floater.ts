@@ -7,8 +7,10 @@
 // under the mouse. #voice: the microphone's prompt, dictated (macOS's), sent to an agent of the list or a new session.
 // The bar opens the other two (window.open): one renderer process for all three.
 import './floater.css'
+import { initials } from './text'
 
-export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string }
+// branch, agents, pr, lines: the card's more, as the sidebar's hover card has them
+export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[] }
 type Colors = Record<string, string>
 type Bridge = {
   dictate?: () => void
@@ -35,11 +37,6 @@ const card = document.getElementById('card')!
 const mode = /^#(card|voice)$/.exec(location.hash)?.[1] ?? 'bar'
 const page = (hash: string) => window.open(`${location.href.split('#')[0]}#${hash}`) // main allows #card and #voice
 
-// two letters: the first two words' (fix-cart-total: FC), else the name's first two
-const initials = (name: string) => {
-  const w = name.split(/[\s_./-]+/).filter(Boolean)
-  return (w.length > 1 ? w[0][0] + w[1][0] : (w[0] ?? '?').slice(0, 2)).toUpperCase()
-}
 const paint = (colors: Colors) => {
   for (const [k, v] of Object.entries(colors)) if (/^[a-z]+$/.test(k) && typeof v === 'string') document.documentElement.style.setProperty(`--${k}`, v)
 }
@@ -63,7 +60,16 @@ if (mode === 'card')
     card.style.setProperty('--c', `var(--${f.status})`)
     const meta = el('div', '', 'meta')
     meta.append(el('i', WORDS[f.status] ?? f.status), ` · ${f.project} · click to open`)
-    card.replaceChildren(el('b', f.name), meta, ...(f.last ? [el('div', f.last, 'last')] : []))
+    const pr = f.pr && el('div', '', 'pr')
+    if (pr && f.pr) pr.append(el('span', f.pr.state, `st ${/^[a-z]+$/.test(f.pr.state) ? f.pr.state : ''}`), el('span', f.pr.text, 'title'), ...(f.pr.meta ? [el('div', f.pr.meta, 'sub')] : []))
+    card.replaceChildren(
+      el('b', f.name),
+      meta,
+      ...[f.branch, f.agents].flatMap(x => (x ? [el('div', x, 'row')] : [])),
+      ...(f.last ? [el('div', f.last, 'last')] : []),
+      ...(pr ? [pr] : []),
+      ...(f.lines ?? []).map(x => el('div', x, 'row')),
+    )
     bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
   })
 else if (mode === 'voice') voicePage()
@@ -102,10 +108,11 @@ else {
     paint(colors)
     document.body.dataset.fstyle = style || 'glow'
     bar.querySelectorAll('.fl-dot, .fl-btns').forEach(d => d.remove())
-    for (const f of items) {
+    const labels = initials(items.map(f => f.name))
+    for (const [i, f] of items.entries()) {
       const d = document.createElement('div')
       d.className = `fl-dot ${WORDS[f.status] ? f.status : 'running'}`
-      d.textContent = initials(f.name)
+      d.textContent = labels[i]
       d.dataset.tab = f.tab
       if (f.color && /^[a-z]+$/.test(f.color)) d.style.setProperty('--ink', `var(--tc${f.color})`)
       d.onmouseenter = () => !drag?.moved && hover(f.tab, d.getBoundingClientRect().top)

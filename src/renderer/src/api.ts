@@ -10,6 +10,7 @@ type Bridge = {
   sound?(name: string): void
   browse?(r: object): Promise<unknown>
   onFocusTab(cb: (tab: string) => void): void
+  onBrowserTab?(cb: (url: string, front: boolean) => void): void // a Browsers page's link to a new tab: front, or in the background
   pickFolder(): Promise<string | null>
   pathOf?(f: File): string
   openExternal(url: string): void
@@ -17,6 +18,7 @@ type Bridge = {
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void
+  dockIcon?(png: string): void // Settings' Dock icon, a PNG data URL (main's app.dock.setIcon)
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; mic: boolean; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>

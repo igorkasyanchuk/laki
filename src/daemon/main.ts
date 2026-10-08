@@ -111,6 +111,7 @@ const api: Record<string, Handler> = {
   projectFile: p => core.projectFileConfig(p.id),
   branches: p => core.branches(p.project),
   wsNew: p => core.wsNew(p),
+  quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean }),
   doctor: () => core.doctor(),
@@ -294,6 +295,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const prMs = Number(process.env.LAKI_PR_SCAN_MS) // tests' pace; else each minute, scanning every settings.prScan minutes
   every(prMs || 60000, () => (prMs ? core.scanPRs() : core.prTick()))
   every(2000, core.sweepRunning)
+  every(2000, core.shellTick)
   every(60000, () => core.sleepTick())
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
   every(30000, () => core.watchLimits())

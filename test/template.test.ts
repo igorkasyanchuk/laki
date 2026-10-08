@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { csvSep, fillTemplate, importable, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
+import { browserUrl, csvSep, fillTemplate, importable, initials, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -220,4 +220,22 @@ test('csv: parsed and written back as it was; quotes, newlines, separators', () 
   assert.equal(csvSep('a.csv', '"x,y";b\n'), ';', 'commas in quotes do not count')
   assert.equal(csvSep('a.tsv', 'a,b'), '\t')
   assert.equal(csvSep('a.csv', 'single'), ',')
+})
+
+test("the bubbles' initials: words without pr, issue and numbers, none the same", () => {
+  assert.deepEqual(initials(['fix-cart-total']), ['FC'])
+  assert.deepEqual(initials(['pr-14162-sq3-3888-buy-fanclub', 'pr-14176-engr-1608-bound-regener', 'pr-14075-sq3-3865-resume-the-blo']), ['SB', 'EB', 'SR'])
+  assert.deepEqual(initials(['dark-mode', 'dark-mode', 'dark-mode']), ['DM', 'DA', 'MO'])
+  assert.deepEqual(initials(['x', 'x', 'x']), ['X', 'X2', 'X3'])
+  assert.deepEqual(initials(['pr-42', '']), ['P4', '?']) // only those: all its words
+})
+
+test("a Browsers page's address bar: URLs, sites, else a search", () => {
+  assert.equal(browserUrl(' https://a.com/x '), 'https://a.com/x')
+  assert.equal(browserUrl('example.com/docs?q=1'), 'https://example.com/docs?q=1')
+  assert.equal(browserUrl('localhost:3000/x'), 'http://localhost:3000/x')
+  assert.equal(browserUrl('192.168.1.1'), 'http://192.168.1.1')
+  assert.equal(browserUrl('how to tar'), 'https://duckduckgo.com/?q=how%20to%20tar')
+  assert.equal(browserUrl('javascript:alert(1)'), 'https://duckduckgo.com/?q=javascript%3Aalert(1)')
+  assert.equal(browserUrl(''), '')
 })

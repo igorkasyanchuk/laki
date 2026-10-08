@@ -22,7 +22,7 @@ const TODO = 'text/x-laki-todo' // a dragged to-do's id
 // where a workspace is: what its agents do first (a usage limit resumes by itself: still running; a failed one needs
 // you), then its PR
 function columnOf(w: WorkspaceView, tabs: TabView[]): Column {
-  const s = w.setup ? 'running' : rollup(tabs)
+  const s = w.setup ? 'running' : rollup(tabs.filter(t => t.kind === 'agent')) // agents' turns: a shell's dev server isn't one
   if (s === 'waiting' || tabs.some(t => t.kind === 'agent' && t.status === 'exited' && t.code !== 0)) return 'waiting' // a failed agent stays to read
   if (s === 'running' || s === 'limit') return 'running'
   return w.pr?.state === 'MERGED' ? 'merged' : w.pr?.state === 'OPEN' ? 'pr' : 'done'

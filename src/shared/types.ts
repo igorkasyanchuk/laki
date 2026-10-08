@@ -42,6 +42,7 @@ export type Project = {
   seps?: Sep[] // the sidebar's named lines between its workspaces
   rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
   notes?: string // Project notes: the user's Markdown (links, how-tos), its ⋯ menu's Notes and Settings; never agents'
+  kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
 }
 export type Sep = { id: string; name: string; color?: string; template?: string } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with
 // a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others
@@ -82,6 +83,7 @@ export type Workspace = {
   prSaid?: boolean // prUrl a PR its agent named (prFromSaid): one on its own branch, once there, replaces it
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
+  browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
@@ -199,14 +201,15 @@ export type Settings = {
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
   floater?: boolean // the floating bubbles over other apps: agents working or waiting (unset: on)
-  floaterStyle?: 'glow' | 'gradient' | 'arc' | 'bricks' | 'comet' | 'wave' | 'still' // how a working agent's bubble looks (unset: glow)
-  floaterRecent?: number // the bubbles' agents used last, idle or done, after the ones at work: 0-5 (unset: 0)
+  floaterStyle?: 'glow' | 'gradient' | 'arc' | 'bricks' | 'comet' | 'wave' | 'still' // how a working agent's bubble looks (unset: gradient)
+  floaterRecent?: number // the bubbles' agents used last, idle or done, after the ones at work: 0-5 (unset: 3)
   floaterRecentHours?: number // a recent one drops out after this many hours idle; 0: never (unset: 4)
   floaterVoiceTo?: 'pick' | 'new' // the voice prompt goes to: an agent you pick each time, or always a new session (unset: pick)
   floaterMax?: number // the bubbles at most (unset: 12)
   floaterCards?: boolean // a bubble's card on hover (unset: on)
-  floaterNew?: boolean // the bubbles' + Session: the new-workspace page (unset: off)
+  floaterNew?: boolean // the bubbles' + Session: the new-workspace page (unset: on)
   floaterMic?: boolean // the bubbles' microphone: a prompt by voice to an agent or a new session (unset: on)
+  dockIcon?: string // the Dock's icon while Laki runs: laki, dawn, terminal, glacier, bubbles, neon (unset: the app's own, laki)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
@@ -234,7 +237,7 @@ export type Todo = { id: string; project: string; text: string; at: number }
 
 // remote access (core.ts): who may open it, until when (ms; none: until stopped), and once cloudflared has one, its URL and the link
 // with the token
-export type Remote = { mail: string; until?: number; url?: string; link?: string }
+export type Remote = { mail: string; open?: boolean; until?: number; url?: string; link?: string } // open: no email (mail ''), anyone with the link
 
 // a plan's limit (daemon/usage.ts): used %, when it resets (ms); note: what the % is of, for an amount (extra usage)
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
@@ -321,4 +324,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 33
+export const API = 36

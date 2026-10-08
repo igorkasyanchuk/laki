@@ -220,3 +220,30 @@ export function parseSize(s: string): [number, number] | null {
   const [w, h] = [Number(m[1]), Number(m[2])]
   return w >= 200 && h >= 200 && w <= 4000 && h <= 4000 ? [w, h] : null
 }
+
+// the floating bubbles' labels: two letters per bubble, none the same: a name's words without pr, issue and numbers (pr-14176-bound-regen: BR),
+// the first two words' initials first (fix-cart-total: FC), then other pairs, then a word's first two letters, then
+// its initial and a digit
+export const initials = (names: string[]) => {
+  const used = new Set<string>()
+  return names.map(name => {
+    const all = name.split(/[\s_./-]+/).filter(Boolean)
+    const w = all.filter(x => !/^(\d+|pr|issue)$/i.test(x))
+    const ws = (w.length ? w : all.length ? all : ['?']).map(x => [...x])
+    const pairs = ws.flatMap((a, i) => ws.slice(i + 1).map(b => a[0] + b[0]))
+    const tries = [...pairs, ...ws.map(a => a.slice(0, 2).join('')), ...[2, 3, 4, 5, 6, 7, 8, 9].map(d => ws[0][0] + d)].map(x => x.toUpperCase())
+    const pick = tries.find(x => !used.has(x)) ?? tries[0]
+    used.add(pick)
+    return pick
+  })
+}
+
+// a Browsers page's address bar: a URL as it is, a site (example.com, localhost:3000/x, 192.168.1.1) on http(s), else a search
+export const browserUrl = (s: string) => {
+  const t = s.trim()
+  if (!t) return ''
+  if (/^(https?:\/\/|about:blank$)/i.test(t)) return t
+  if (/^(localhost|\d{1,3}(\.\d{1,3}){3})(:\d+)?(\/\S*)?$/i.test(t)) return `http://${t}` // this Mac, or a device on the network (a router): plain http
+  if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(t)) return `https://${t}`
+  return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`
+}

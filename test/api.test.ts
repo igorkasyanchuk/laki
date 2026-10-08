@@ -422,6 +422,23 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   await rig.rpc('remoteStop')
   await until(() => stops() === 3, 'cloudflared stopped')
 
+  // no email: only asked for (open), cloudflared with no --allowed-mail, the token still the lock, the saved email kept
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: '' }), /the email that may open it/)
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1, mail: '', open: 'yes' }), /the email that may open it/)
+  const pub = await rig.rpc('remoteStart', { hours: 1, mail: '', open: true })
+  assert.deepEqual([pub.mail, pub.open], ['', true])
+  assert.match(log(), new RegExp(`cloudflared tunnel --url http://127\\.0\\.0\\.1:${port}\n`))
+  assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
+  assert.equal(await ping(pub.link.split('?token=')[1], url), 200)
+  assert.equal(await ping('nope', url), 401)
+  await rig.rpc('remoteStop')
+  await until(() => stops() === 4, 'cloudflared stopped')
+  // an email given wins over open
+  const mailed = await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev', open: true })
+  assert.deepEqual([mailed.mail, mailed.open], ['me@x.dev', undefined])
+  await rig.rpc('remoteStop')
+  await until(() => stops() === 5, 'cloudflared stopped')
+
   // cloudflared failing; stopped while starting
   writeFileSync(join(rig.home, 'cf-fail'), '429 Too Many Requests')
   await assert.rejects(rig.rpc('remoteStart', { hours: 1 }), /cloudflared ended \(exit 1\)[^]*429 Too Many Requests/)
@@ -593,4 +610,53 @@ test("project notes: projectSet keeps them, blank drops them; ls --json leaves t
   assert.ok(!ls.out.includes('staging.example'), 'agents never see them')
   await rig.rpc('projectSet', { id: p.id, notes: '  \n ' })
   assert.equal((await rig.rpc('state')).projects[0].notes, undefined)
+})
+
+test('a shell tab running a command is running until its prompt is back', async t => {
+  const rig = await fresh(t)
+  const c = await rig.connect() // shells are checked only while someone looks
+  t.after(() => c.ws.close())
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'sh' })
+  const shell = await until(() => rig.tab(w.id, 'shell'), 'the shell tab')
+  await until(async () => (await rig.screen(shell.id)).includes('$'), 'its prompt')
+  assert.equal((await rig.tab(w.id, 'shell')).status, 'idle')
+  await rig.rpc('input', { tab: shell.id, data: 'sleep 3\r' })
+  await until(async () => (await rig.tab(w.id, 'shell')).status === 'running', 'running while sleep runs', 5000)
+  await until(async () => (await rig.tab(w.id, 'shell')).status === 'idle', 'idle once it ends', 8000)
+})
+
+test('Terminals and Browsers: a project each in the home folder, a workspace per terminal or page', async t => {
+  const rig = await fresh(t)
+  const [a, b] = await Promise.all([rig.rpc('quickNew', { kind: 'shells' }), rig.rpc('quickNew', { kind: 'shells' })]) // at once: one after the other
+  const web = await rig.rpc('quickNew', { kind: 'browsers', url: 'https://example.com/' })
+  await assert.rejects(rig.rpc('quickNew', { kind: 'browsers', url: 'file:///etc/passwd' }), /http\(s\) only/)
+  await assert.rejects(rig.rpc('quickNew', { kind: 'nope' }), /shells or browsers/)
+  const v = await rig.rpc('state')
+  const shells = v.projects.find((p: any) => p.kind === 'shells')
+  assert.deepEqual([shells.name, shells.path, shells.git], ['Terminals', rig.home, false])
+  assert.deepEqual([a.name, b.name, a.kind, a.path, a.project, b.project], ['terminal 1', 'terminal 2', 'local', rig.home, shells.id, shells.id])
+  assert.equal(v.tabs.filter((x: any) => x.workspace === a.id && x.kind === 'shell').length, 1)
+  assert.deepEqual([web.name, web.browser, v.tabs.some((x: any) => x.workspace === web.id)], ['example.com', 'https://example.com/', false]) // the site, until its title
+  assert.equal((await rig.rpc('quickNew', { kind: 'browsers' })).name, 'browser 1')
+  await rig.rpc('wsSet', { id: web.id, browser: 'https://example.org/a', name: 'Example' })
+  await assert.rejects(rig.rpc('wsSet', { id: web.id, browser: 'javascript:alert(1)' }), /http\(s\) page/)
+  await assert.rejects(rig.rpc('wsSet', { id: a.id, browser: 'https://example.com/' }), /Browsers workspace/)
+  await assert.rejects(rig.rpc('tabNew', { ws: web.id }), /a browser page: it has no tabs/)
+  const w = (await rig.rpc('state')).workspaces.find((x: any) => x.id === web.id)
+  assert.deepEqual([w.browser, w.name], ['https://example.org/a', 'Example'])
+  assert.deepEqual((await rig.rpc('files', { ws: a.id })).files, []) // the home folder isn't walked
+  // agents see which projects are Terminals and Browsers (the skill tells them to keep out)
+  const ls = JSON.parse((await rig.cli('ls', '--json')).out)
+  assert.deepEqual(ls.projects.map((p: any) => p.kind).sort(), ['browsers', 'shells'])
+  // the home folder added as a project of its own isn't Terminals
+  const home = await rig.rpc('projectAdd', { path: rig.home })
+  assert.notEqual(home.id, shells.id)
+  // a Shells project from 0.7 is Terminals after a restart; one you named stays
+  await rig.rpc('projectSet', { id: shells.id, name: 'Shells' })
+  await rig.rpc('projectSet', { id: (v.projects.find((p: any) => p.kind === 'browsers')).id, name: 'Shells' })
+  await rig.stop()
+  await rig.start()
+  const names = (await rig.rpc('state')).projects.map((p: any) => `${p.kind}:${p.name}`).sort()
+  assert.deepEqual(names.filter((x: string) => !x.startsWith('undefined')), ['browsers:Shells', 'shells:Terminals'])
 })

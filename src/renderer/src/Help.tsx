@@ -116,7 +116,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
       title: 'Start',
       kind: 'list',
       items: [
-        'Open a project: ⌘O, the folder icon at the top of the sidebar, or drop a folder on the sidebar. One on another machine: ⌘K › Open a project over SSH… (host:path).',
+        'Open a project: ⌘O, + at the top of the sidebar › Project folder…, or drop a folder on the sidebar. One on another machine: ⌘K › Open a project over SSH… (host:path).',
         'New workspace (⌘N): a git worktree and branch of its own (or the repo itself, with Local), an agent and a first prompt.',
         'Watch the sidebar: each workspace shows its most urgent tab. Click one to step in; ⌘K jumps anywhere.',
         'When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.',
@@ -160,7 +160,9 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
             </>
           ),
         },
-        { id: 'sidebar', k: 'Sidebar', v: "Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag to reorder. A project's ⋯ › Notes: your Markdown notes for it. A workspace with no PR found: ⋯ › Attach a PR… (or + PR in the status bar). Pin to top (its menu) keeps one under Pinned, above the projects. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts), with its author's picture when it isn't yours. Archiving a clean workspace is at once, with Undo. The funnel at the top filters them (words, needs you, working, with a PR); a group (a project's ⋯ › Add a group) holds the workspaces under it, folds with a click, takes a workspace dropped on its head, and its ⋯ gives it a color and makes a new workspace in it; a workspace's Remind me… notifies you about it later." },
+        { id: 'shells', k: 'Terminals and browsers', v: "+ at the top of the sidebar › Terminal: a shell in your home folder, under Terminals; › Browser: any website under Browsers, with an address bar (a site, or words to search), its sign-ins kept. A shell running a command spins until its prompt is back." },
+        { id: 'start', k: 'Get started', v: "The first steps, shown once: each ticks itself as you do it (or click its circle). What's left stays at the bottom of the sidebar; ⌘K › Get started opens it again." },
+        { id: 'sidebar', k: 'Sidebar', v: "Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag a workspace or a project to reorder. A project's ⋯ › Notes: your Markdown notes for it. A workspace with no PR found: ⋯ › Attach a PR… (or + PR in the status bar). Pin to top (its menu) keeps one under Pinned, above the projects. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts), with its author's picture when it isn't yours. Archiving a clean workspace is at once, with Undo. The funnel at the top filters them (words, needs you, working, with a PR); a group (a project's ⋯ › Add a group) holds the workspaces under it, folds with a click, takes a workspace dropped on its head, and its ⋯ gives it a color and makes a new workspace in it; a workspace's Remind me… notifies you about it later." },
         {
           id: 'templates',
           k: 'Templates',

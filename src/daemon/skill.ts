@@ -47,7 +47,8 @@ description: Drive Laki, the desktop app that runs coding agents (Claude Code, C
 
 Laki runs each task in a **workspace**: a git worktree on its own branch (\`laki/<id>\`), or the repo itself
 (\`--local\`), with tabs for agents (claude, codex, gemini, grok, opencode), shells and a dev server. A **project** is a repo (or a
-folder) added to Laki. The app shows all of it live; the CLI drives the same daemon.
+folder) added to Laki; \`Terminals\` and \`Browsers\` (\`kind\` shells or browsers in \`ls --json\`) are the user's own terminals and web pages,
+not for new workspaces. The app shows all of it live; the CLI drives the same daemon.
 
 Run the CLI through this launcher (an absolute path: it works from any shell; keep the quotes):
 
@@ -140,8 +141,8 @@ more than 30 minutes late is skipped and logged as missed).
 
     # the tabs waiting for an answer (a permission prompt)
     laki ls --json | jq -r '.tabs[] | select(.status == "waiting") | "\\(.workspace)/\\(.name)"'
-    # wait for a workspace's agents to finish their turn
-    while laki ls --json | jq -e '.tabs[] | select(.workspace == "<ws>" and .status == "running")' >/dev/null; do sleep 10; done
+    # wait for a workspace's agents to finish their turn (a shell is running too while a command runs: a dev server)
+    while laki ls --json | jq -e '.tabs[] | select(.workspace == "<ws>" and .kind == "agent" and .status == "running")' >/dev/null; do sleep 10; done
 
 ## Rules
 

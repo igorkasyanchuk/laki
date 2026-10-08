@@ -1,7 +1,7 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, BrowserWindow, type BrowserWindowConstructorOptions, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
+import { app, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
@@ -45,21 +45,72 @@ ipcMain.on('deep-link-ready', () => {
 // the preview pane's <webview>: it starts on this Mac's localhost and can go to any website (the address bar, links),
 // in its own session, without node or a preload (and, with no allowpopups, without popups)
 const PREVIEW = 'persist:preview'
+const BROWSER = 'persist:browser' // the sidebar's Browsers: any site, its sign-ins kept between runs
 const local = (u: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)
 app.on('web-contents-created', (_e, wc) => {
   wc.on('will-attach-webview', (e, prefs, params) => {
     delete prefs.preload
     Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true })
-    if (!local(params.src) || params.partition !== PREVIEW) e.preventDefault()
+    if (params.partition === BROWSER ? !/^(https?:\/\/|about:blank$)/.test(params.src) : !local(params.src) || params.partition !== PREVIEW) e.preventDefault()
+  })
+  // a Browsers page's link to a new tab opens in that page; a window.open popup (a sign-in's: Google, GitHub) gets a
+  // small window of its own, in the same session with its opener kept, sandboxed, no node (else it can't hand back)
+  wc.on('did-attach-webview', (_e, guest) => {
+    if (guest.session !== session.fromPartition(BROWSER)) return
+    // a page's script can call window.open in a loop (no click needed here): at most 5 new tabs or popups in 10 s
+    let opened: number[] = []
+    const tooMany = () => ((opened = [...opened.filter(t => Date.now() - t < 10000), Date.now()]), opened.length > 5)
+    guest.setWindowOpenHandler(({ url, disposition }) => {
+      if ((disposition === 'new-window' || disposition === 'foreground-tab' || disposition === 'background-tab') && tooMany()) return { action: 'deny' }
+      if (disposition === 'new-window' && /^(https?:\/\/|about:blank$)/.test(url))
+        return { action: 'allow', overrideBrowserWindowOptions: { width: 520, height: 720, autoHideMenuBar: true, webPreferences: { sandbox: true, contextIsolation: true, nodeIntegration: false } } }
+      // a new tab (a middle click or ⌘-click: in the background; target=_blank: in front) is a Browsers workspace of its
+      // own, which the app makes (browser-tab); anything else loads here (a failed load shows in the page)
+      if (/^https?:\/\//.test(url))
+        disposition === 'background-tab' || disposition === 'foreground-tab' ? wc.send('browser-tab', url, disposition === 'foreground-tab') : guest.loadURL(url).catch(() => {})
+      return { action: 'deny' }
+    })
+    // the popup itself opens no more windows: its links to a new one load in it
+    guest.on('did-create-window', w => w.webContents.setWindowOpenHandler(({ url }) => (/^https?:\/\//.test(url) && w.webContents.loadURL(url).catch(() => {}), { action: 'deny' })))
+    guest.on('context-menu', (_e, p) => pageMenu(guest, p, wc).popup({ window: BrowserWindow.fromWebContents(wc) ?? undefined }))
   })
 })
+// a Browsers page's right click: its link, image, selection or field, back, forward, reload, and Inspect Element (the
+// page's DevTools). ponytail: no spelling suggestions
+function pageMenu(g: Electron.WebContents, p: Electron.ContextMenuParams, app: Electron.WebContents) {
+  const items: MenuItemConstructorOptions[] = []
+  const add = (...x: MenuItemConstructorOptions[]) => items.push(...x, { type: 'separator' })
+  if (/^https?:\/\//.test(p.linkURL))
+    add(
+      { label: 'Open Link in New Tab', click: () => app.send('browser-tab', p.linkURL, false) },
+      { label: 'Open Link in Your Browser', click: () => shell.openExternal(p.linkURL) },
+      { label: 'Copy Link Address', click: () => clipboard.writeText(p.linkURL) },
+    )
+  if (p.mediaType === 'image' && p.srcURL) add({ label: 'Copy Image', click: () => g.copyImageAt(p.x, p.y) }, { label: 'Copy Image Address', click: () => clipboard.writeText(p.srcURL) })
+  if (p.isEditable)
+    add(
+      { label: 'Cut', enabled: p.editFlags.canCut, click: () => g.cut() },
+      { label: 'Copy', enabled: p.editFlags.canCopy, click: () => g.copy() },
+      { label: 'Paste', enabled: p.editFlags.canPaste, click: () => g.paste() },
+      { label: 'Select All', click: () => g.selectAll() },
+    )
+  else if (p.selectionText.trim()) add({ label: 'Copy', click: () => g.copy() })
+  const h = g.navigationHistory
+  add({ label: 'Back', enabled: h.canGoBack(), click: () => h.goBack() }, { label: 'Forward', enabled: h.canGoForward(), click: () => h.goForward() }, { label: 'Reload', click: () => g.reload() })
+  items.push({ label: 'Inspect Element', click: () => g.inspectElement(p.x, p.y) })
+  return Menu.buildFromTemplate(items)
+}
 // Electron grants a page every permission by default: the preview (which links can take anywhere) gets none of the
 // sensitive ones (camera, microphone, location, clipboard reads, notifications…)
 const PREVIEW_OK = new Set(['fullscreen', 'clipboard-sanitized-write', 'pointerLock'])
 app.whenReady().then(() => {
-  const s = session.fromPartition(PREVIEW)
-  s.setPermissionRequestHandler((_wc, perm, cb) => cb(PREVIEW_OK.has(perm)))
-  s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
+  for (const s of [session.fromPartition(PREVIEW), session.fromPartition(BROWSER)]) {
+    s.setPermissionRequestHandler((_wc, perm, cb) => cb(PREVIEW_OK.has(perm)))
+    s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
+  }
+  // Browsers: Chrome's user agent without Laki's and Electron's names (sites that turn away an app's web view)
+  const b = session.fromPartition(BROWSER)
+  b.setUserAgent(b.getUserAgent().replace(/ (laki|Laki|Electron)\/\S+/g, ''))
   // the sidebar's video: YouTube's embed plays only with a Referer, and a file:// page sends none (its Error 153);
   // the app's id, as YouTube asks of apps
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (d, cb) =>
@@ -243,6 +294,23 @@ ipcMain.on('glass', (_e, on: boolean) => {
   win?.setVibrancy(on ? 'under-window' : null)
   win?.setBackgroundColor(on ? '#00000000' : '#0e1014')
 })
+// Settings' Dock icon: the window's renderer draws it (a PNG data URL), kept in userData so the next start (an
+// update too) shows it at once, before the window loads. ponytail: the bundle's own still shows in Finder and in a
+// pinned Dock tile while Laki isn't running (changing the bundle would break its signature)
+const dockFile = () => join(app.getPath('userData'), 'dock-icon.png')
+app.whenReady().then(() => {
+  const img = nativeImage.createFromPath(dockFile()) // empty when there's none
+  if (!img.isEmpty()) app.dock?.setIcon(img)
+})
+ipcMain.on('dock-icon', (e, png: unknown) => {
+  if (e.sender !== win?.webContents || typeof png !== 'string' || !png.startsWith('data:image/png;base64,') || png.length > 8e6) return
+  const img = nativeImage.createFromDataURL(png)
+  if (img.isEmpty()) return
+  app.dock?.setIcon(img)
+  try {
+    writeFileSync(dockFile(), img.toPNG())
+  } catch {}
+})
 // the Dock icon's count: agents waiting for you or done while you looked away (none: no badge); and the menu bar's
 // item, from the same message so the two never disagree: the count, a menu of those tabs (a click shows one, as a
 // notification's does), Open and Quit. tray false: Settings › General hid it
@@ -317,10 +385,11 @@ const floatOpts = (width: number, height: number, focusable = true): BrowserWind
   show: false,
   webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
 })
-const pin = (f: BrowserWindow) => {
+// to: a window.open'd one's own page, whose first load is a navigation too (blocked, it stayed about:blank)
+const pin = (f: BrowserWindow, to?: string) => {
   f.setAlwaysOnTop(true, 'floating')
   f.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
-  f.webContents.on('will-navigate', e => e.preventDefault())
+  f.webContents.on('will-navigate', (e, url) => url !== to && e.preventDefault())
 }
 // the bar; its page opens the card and the voice window (#card, #voice), only those, as one of each
 function barWin() {
@@ -331,10 +400,10 @@ function barWin() {
     const k = kind(url)
     if (k === 'voice' && voice && !voice.isDestroyed()) voice.focus()
     if (!k || (k === 'card' ? card : voice)?.isDestroyed() === false) return { action: 'deny' }
-    return { action: 'allow', overrideBrowserWindowOptions: k === 'card' ? floatOpts(240, 60, false) : floatOpts(VOICE.width, VOICE.height) }
+    return { action: 'allow', overrideBrowserWindowOptions: k === 'card' ? floatOpts(280, 60, false) : floatOpts(VOICE.width, VOICE.height) }
   })
   f.webContents.on('did-create-window', (w, { url }) => {
-    pin(w)
+    pin(w, url)
     w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
     if (kind(url) === 'card') {
       card = w
@@ -426,7 +495,13 @@ ipcMain.handle('procs', e => {
     else if (u.hostname.endsWith('youtube-nocookie.com')) add(f.osProcessId, 'The video', 'video')
     else add(f.osProcessId, u.host)
   }
-  for (const wc of webContents.getAllWebContents()) if (wc.getType() === 'webview' && !wc.isDestroyed()) add(wc.getOSProcessId(), 'The preview', 'preview')
+  // a Browsers page (its Stop: the pages you aren't on unloaded, App's laki-stop) or its sign-in popup; the preview
+  for (const wc of webContents.getAllWebContents()) {
+    if (wc.isDestroyed()) continue
+    const page = wc.getType() === 'webview'
+    if (wc.session === session.fromPartition(BROWSER)) add(wc.getOSProcessId(), `Browser: ${new URL(wc.getURL() || 'about:blank').host || 'a page'}${page ? '' : ' (sign-in window)'}`, page ? 'browsers' : undefined)
+    else if (page) add(wc.getOSProcessId(), 'The preview', 'preview')
+  }
   for (const [ws, a] of agentWins) if (!a.w.isDestroyed()) add(a.w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
   for (const f of [floater, card, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
   if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
@@ -623,7 +698,7 @@ ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
 // Quit Completely: the daemon too, so every agent stops (they resume when the app opens again)
 async function quitCompletely() {
   const v = await rpc<View>('state', {}, 3000).catch(() => null)
-  const n = v?.tabs.filter(t => t.status === 'running').length ?? 0
+  const n = v?.tabs.filter(t => t.status === 'running' && t.kind === 'agent').length ?? 0 // a shell's command isn't a turn
   if (n) {
     const r = await dialog.showMessageBox({
       type: 'question',

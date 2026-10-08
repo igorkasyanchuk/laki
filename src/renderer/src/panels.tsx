@@ -1,4 +1,4 @@
-import { type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
 import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, type LogLine, MODELS, prIn, type View } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
@@ -158,6 +158,69 @@ export function TimerBar({ end, left, label, tip, onMenu, onPause, onStop }: { e
       {onPause && <IconButton icon={left !== undefined ? 'run' : 'pause'} title={left !== undefined ? 'Go on' : 'Pause'} onClick={onPause} />}
       <IconButton icon="pencil" title="Change it: more time, a new length, what happens as it ends" onClick={onMenu} />
       <IconButton icon="x" title="Stop it" onClick={onStop} />
+    </div>
+  )
+}
+
+// Get started: the steps a new Laki takes, shown once as it opens (App's laki.onboard). Each is done by itself as it
+// happens (App's onboardDone: a project added, Settings' sections seen…) or ticked by hand; Go does it. Skip for now
+// closes it and leaves what's left at the sidebar's foot (OnboardBar); Don't show again hides both
+export const STEPS: { id: string; title: string; hint: string; go: string }[] = [
+  { id: 'project', title: 'Add a project', hint: "A git repository or any folder: + at the sidebar's top, ⌘O, or drop a folder on the window", go: 'Add one' },
+  { id: 'workspace', title: 'Start a workspace', hint: 'An agent and a prompt, in a git worktree of its own, so agents never step on each other (⌘N)', go: 'New workspace' },
+  { id: 'settings', title: 'Look around Settings', hint: 'Themes, fonts, notifications, your agents and how they start (⌘,)', go: 'Settings' },
+  { id: 'widgets', title: 'Turn on a widget', hint: "Small live pages in the sidebar: your PRs, your team's, your links", go: 'Widgets' },
+  { id: 'actions', title: 'Set up actions', hint: 'Run ▾: the prompts and commands you send often, a click away', go: 'Actions' },
+  { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
+  { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
+]
+
+export function Onboarding({ done, onGo, onTick, onSkip, onOff }: { done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void }) {
+  const n = STEPS.filter(x => done.has(x.id)).length
+  return (
+    <Modal title="Get started with Laki" onClose={onSkip} wide>
+      <div className="onboard">
+        <div className="ob-bar" style={{ '--p': `${(n / STEPS.length) * 100}%` } as CSSProperties} />
+        <p className="muted small">{n === STEPS.length ? 'All done. Enjoy Laki!' : `${n} of ${STEPS.length} done. A step ticks itself as you do it; click its circle to tick it yourself.`}</p>
+        <div className="ob-steps">
+        {STEPS.map(x => (
+          <div key={x.id} className={`ob-step ${done.has(x.id) ? 'done' : ''}`}>
+            <button className="ob-tick" aria-pressed={done.has(x.id)} disabled={done.has(x.id)} data-tip={done.has(x.id) ? 'Done' : 'Mark it done'} onClick={() => onTick(x.id)}>
+              {done.has(x.id) && <Icon name="check" size={12} />}
+            </button>
+            <div className="ob-what">
+              <b>{x.title}</b>
+              <span className="muted small">{x.hint}</span>
+            </div>
+            <button className={done.has(x.id) ? '' : 'primary'} onClick={() => onGo(x.id)}>
+              {x.go}
+            </button>
+          </div>
+        ))}
+        </div>
+        <div className="row">
+          <button onClick={onOff}>Don't show again</button>
+          <span className="grow" />
+          <button className="primary" onClick={onSkip}>
+            {n === STEPS.length ? 'Close' : 'Skip for now'}
+          </button>
+        </div>
+      </div>
+    </Modal>
+  )
+}
+
+// what's left of Get started, at the sidebar's foot: a click opens it again, × hides it for good
+export function OnboardBar({ done, onOpen, onOff }: { done: number; onOpen: () => void; onOff: () => void }) {
+  return (
+    <div className="timer-bar onboard-bar" onClick={onOpen} data-tip="Get started: the steps left">
+      <Icon name="check" size={13} />
+      <span className="timer-what">Get started</span>
+      <span className="muted small">
+        {done} of {STEPS.length}
+      </span>
+      <span className="ob-mini" style={{ '--p': `${(done / STEPS.length) * 100}%` } as CSSProperties} />
+      <IconButton icon="x" title="Hide it (⌘K › Get started brings it back)" onClick={e => (e.stopPropagation(), onOff())} />
     </div>
   )
 }

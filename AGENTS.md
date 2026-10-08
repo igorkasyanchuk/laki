@@ -76,7 +76,8 @@ board's `todoAdd`/`todoRm`; 12: `doctor`, `wsArchive` `ifClean`, a workspace's `
 workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `projectAdd` `host:path`, a project's and
 workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
 `progress`; 31: a sep's `template`, kept by `projectSet`; 32: `prAttach`, a project's `notes`, kept by `projectSet`; 33: `prAct` `merge`, a workspace's `autoLand`, a project's `pr` and
-`mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`). A
+`mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`; 34: `quickNew`, a project's `kind`,
+a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -88,6 +89,11 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   beside it (named by the prompt's first words); none gives it back as it is (scheduled tasks' `local`). In development
   mode each step goes to `devLog('new', …)` (Settings › General › *Creation log*) and, once it has an id, the
   workspace's own log; `spawnTab` logs each tab's command line there;
+- `quickNew` (`kind` shells or browsers, a browser's `url`; the sidebar's + › Terminal and Browser): the `Terminals` (`load` renames a `Shells` from 0.7) or
+  `Browsers` project (`kind`, your home folder, `git: false`; made by the first one; never the home folder's own
+  project: `projectAdd` and `findProject`'s path match skip it), then `wsNew` `local` `another` named `terminal <n>` (a
+  shell tab) or `browser <n>` (no tabs, the workspace's `browser`: the page, `URL_OK`, http(s) or about:blank; `wsSet`
+  `browser` and `name` follow the page and its title); one at a time (`quick`: two clicks would pick the same id);
 - `wsNew`/`wsFan` `place` (`placeWs`, as a drag would: `top`, first in the project, or a sep's id, first under it; a
   race in its order; none: last, as the CLI's and scheduled runs are);
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
@@ -143,7 +149,9 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
 - resources and sleep (Settings › Resources): `resources` (one `ps -axo pid,ppid,rss,%cpu,command`: `app`, the app
   bundle's processes by `--type`, none on plain node, which the renderer names by main's `procs` IPC (each pid's
   holder: the window, a JS widget's or the video's frame (`framesInSubtree`: JS widgets share one process, one site),
-  the preview's webview, an agent browser, the bubbles, the editor) with a Stop each: main's `proc-stop` (the
+  the preview's webview, a Browsers page (`Browser: <host>`, stop `browsers`: App unloads the pages not selected,
+  `browsed`) or its sign-in window, an agent browser, the bubbles, the editor; the total splits out shell tabs and
+  browsers) with a Stop each: main's `proc-stop` (the
   bubbles' windows destroyed until `floats` changes state, `parked`; an agent browser closed) or the page's own
   `laki-stop` event (the video closed, a widget unloaded until a click or the grid folds, the preview unloaded until
   *Load it again*); `daemon` with its heap; `tabs`, each live session's process
@@ -337,6 +345,9 @@ empty over it). `daemon.log` goes to `daemon.log.1` past 10 MB when a daemon sta
 
 ### Scans
 
+- Shells (`shellTick`, every 2 s): a local shell tab whose terminal's foreground process group (`ps -o pid=,tpgid=`,
+  one call for all) isn't the shell's own is `running` in `view` (`busyShells`): the spinner while a command runs, not
+  `worked()` (an agent's turn, for review comments) nor notifications.
 - Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN -Fpcn`, every 5s
   (`procs`: each port's pid and command, `WorkspaceView.procs`; `.laki.json` `ports`, strings only, as `portNames`).
   `portKill` (the status bar's ✕, after `ask`): that pid, if it still listens there and is yours (uid), gets SIGTERM,
@@ -389,8 +400,9 @@ cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. T
 ### Remote access
 
 `core.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
-(`http://127.0.0.1:<daemon port>`), always with one `--allowed-mail` (`ONE_MAIL`: an address, never a
-`*@domain`; kept as `settings.remoteMail`), for `REMOTE_HOURS` (1, 2, 4, 8, 12, 24, 48, 72, or 0: forever, no `until`). Each start makes a
+(`http://127.0.0.1:<daemon port>`), with one `--allowed-mail` (`ONE_MAIL`: an address, never a
+`*@domain`; kept as `settings.remoteMail`), or none only with `open: true` and no mail (Settings asks for *confirm*
+typed, in a red box; `view.remote.open`, a red status bar badge: the token is then the only lock), for `REMOTE_HOURS` (1, 2, 4, 8, 12, 24, 48, 72, or 0: forever, no `until`). Each start makes a
 `remoteToken`; `remoteView` (`view.remote`) gives the link, `<url>/?token=<token>` (a query: Cloudflare's email sign-in drops a
 hash), which the renderer (`api.ts`: no port) uses on the page's own origin, then takes out of the address bar
 (`pageToken`: `replaceState`, kept in the tab's `sessionStorage` `laki.token` for reconnects; Cloudflare's sign-in page,
@@ -460,6 +472,17 @@ page's width, the URL), or null on Esc (`window.__lakiPick(null)` cancels it fro
 webview and `crop`s it to the element (a canvas, scaled by the image's width over the page's), saves it, and
 `PanelApi.toPrompt` types all of it, with the screenshot's path, into the focused agent tab, else the first live one
 (`send` `enter: false`: no Enter, no turn). In a browser on the Mac it's an iframe (the CSP's `frame-src`); elsewhere, a note.
+
+A Browsers workspace's page (`Browser.tsx` `BrowserPane`, over `.term-wrap` in place of the terminals; App's `browsed`:
+ones opened since start stay mounted, `visibility: hidden`) is a `<webview>` in `persist:browser`: main's
+`will-attach-webview` lets it start on any http(s) page, `did-attach-webview` turns a link to a new tab into a load in
+place and gives a `window.open` popup (`disposition` new-window: a sign-in's) a small sandboxed window in the same
+session, its opener kept (`allowpopups` plus `setWindowOpenHandler`), a link to a new tab (`disposition` background-tab: a middle click or ⌘-click, or the menu's *Open Link in New Tab*;
+foreground-tab: target=_blank, selected) goes to the app as `browser-tab` (preload's `onBrowserTab`), App's `quickNew`
+with its `url`: a Browsers workspace of its own, named by its host until its title (⌘T or the tab bar's + there: an
+empty one); a right click is main's `pageMenu` (link, image, selection or field, back, forward, reload, Inspect Element: `inspectElement`; the toolbar's `</>`: the webview's `openDevTools`), its session gets `PREVIEW_OK` permissions only and Chrome's user
+agent without Laki's and Electron's names. `text.ts` `browserUrl` reads the address bar (a URL, a site, else a
+DuckDuckGo search).
 
 The agent browser (`browse` above) is main's: a hidden `BrowserWindow` per workspace (1280×800, the preview's
 partition, sandboxed, no popups, navigation and redirects kept to local URLs), destroyed after 10 idle minutes;
@@ -592,6 +615,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       submit on Enter (`onSubmit` prevents it; ⌘⏎ or the button), and `Page`'s and `Modal`'s Esc is `escapes` (not one
       a menu or field took, nor an IME's); a `Modal` with something typed in it nods at a click outside instead of closing
       (`loose`: the palette closes anyway).
+    - `laki.onboard`: Get started (`panels.tsx` `Onboarding`, `STEPS`): `done` (ticked, or seen done by App's
+      `onboardDone`: a project, a workspace, Settings' sections through `SettingsPage` `onSection`, Shells or Browsers),
+      `seen` (it opened once by itself), `off` (Don't show again: no `OnboardBar` at the sidebar's foot either).
     - `laki.newWs`: the new-workspace page's last choices (`LastNew`: project, preset, cmd, local, model, effort,
       base, place (that project's), template name, and Settings' default agent then: a new default wins; never the prompt, name, PR or a race); `laki.newAdv`: its Advanced open.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
@@ -601,7 +627,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
-  - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one.
+  - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one; a Terminals
+    workspace's leaves out `$PORT` and the path (its listening ports as any), a Browsers one has no status bar (unless
+    the daemon is stale or the connection is down).
   - Resting on a row (`peek`, 550 ms; 120 ms once one shows) shows `peekCard` beside the sidebar instead of a
     tooltip: state and agents, the last answer or the ask, the PR (avatar, state, title, author, checks, review,
     conflicts, size), `statText`, ports and marks, *Open*, the PR, ⋯; it stays while the mouse is on it (250 ms to get
@@ -612,7 +640,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     rounded (hover and selection one item each), the selected one with a short bar (`--ws-bar`: its color or the accent; a
     look's `.ws.sel` background replaces it), `.needs` (a tab of `needsYou`) a bold name; a project with none shows
     *New workspace* (`.ws-new`). A row shows
-    `stat` (`.ws-stat`, with `settings.diffStat`) and, on hover, `.ws-acts` (its ⋯ menu) over its marks. The PR mark is red
+    `stat` (`.ws-stat`, with `settings.diffStat`) and, on hover, `.ws-acts` (its ⋯ menu) growing in after its marks, which slide left. The PR mark is red
     for an open PR's failing checks only: a merged one stays purple.
   - The sidebar's filter (`find`, the head's funnel, ⌘K): `shows` (words in a name, branch, PR title, author or
     `#n`, and `ONLY`: needs you, working, with a PR); matching rows only, flat (no seps), no drag meanwhile.
@@ -688,15 +716,16 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   server) a stand-in picture.
 - **`floater.ts`** (`floater.html`, the third renderer entry): the floating bubbles (Settings › Appearance;
   `settings.floater`, unset: on). App's `floats` (each workspace whose agent tab works or waits, waiting first, then
-  `floaterRecent` (0-5) workspaces whose agent worked last, by `laki.active`, as `idle` or `done` (done first; idle
+  `floaterRecent` (0-5, 3 unset) workspaces whose agent worked last, by `laki.active`, as `idle` or `done` (done first; idle
   longer than `floaterRecentHours`, 4 unset, 0 never: out, a minute's tick ages them); at most `floaterMax`:
-  `tab`, name, project, status, its color, what it asked or last said), the theme's colors and the options (`style`:
+  `tab`, name, project, status, its color, what it asked or last said, and `floatMore`'s branch, agents, PR and
+  lines for the card), the theme's colors and the options (`style`:
   `floaterStyle`, `cards`: `floaterCards`, `add`: `floaterNew`, `mic`: `floaterMic`, `voiceTo`: `floaterVoiceTo`) go to
   main (`bridge.floats`);
   main's `placeFloater` shows the bar while Laki isn't in front (`front`: one of its own windows has the focus, not the
   drop, its card or the voice window: a press on the drop makes Laki the active app, and the drop would hide under the
   pointer), and with + on even with no circles; `type: 'panel'` windows over every Space and
-  full-screen app: `#bar` (a drop against the screen's left or right edge, `data-side` from main's `floater-side`:
+  full-screen app: `#bar` (labels: `text.ts` `initials`, two letters, unique, `pr`/`issue`/numbers skipped; a drop against the screen's left or right edge, `data-side` from main's `floater-side`:
   `.shape` with its flares, a slow wobble, a round blob while dragged; the circles; `.fl-btns`: + is `floater-act`
   `new` (`laki://new`), the microphone opens `#voice`; a click on a circle is `floater-open`: `show(tab)`; a drag from
   anywhere on it past 4px is `floater-drag` start/move/end with the pointer's screen offset, so its cursors (grab,
@@ -710,8 +739,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   after the focus; `voiceTo` pick: a "Pick who gets it" row first, nothing sent until one is; new: no list, always a
   new session; `voice-send`: `rpc('send', { whenIdle })` to a tab of the list, or `laki://new?prompt=`). The card
   and voice windows are the bar page's `window.open` (main's `setWindowOpenHandler` allows only `#card` and `#voice`
-  of the same page, one each; `did-create-window` pins them): one renderer process, one row in Settings › Resources.
-  `floater.css`: the circles' styles (`[data-fstyle]`: glow, the default; gradient; arc; bricks, box-shadow pixel bars stepped behind the initials; comet; wave, two turning rounded squares as a tide; still; idle and done dimmer),
+  of the same page, one each; `did-create-window` pins them, `pin`'s `to`: their own page's load is a navigation too,
+  which `will-navigate` would block): one renderer process, one row in Settings › Resources.
+  `floater.css`: the circles' styles (`[data-fstyle]`: glow; gradient, the default; arc; bricks, box-shadow pixel bars stepped behind the initials; comet; wave, two turning rounded squares as a tide; still; idle and done dimmer),
   also Settings › Appearance's live previews.
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
   terminal's `minimumContrastRatio` keeps their text readable.
@@ -870,6 +900,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/shared/widget.ts` | widgets' template language, views, base CSS, a JS widget's page |
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |
+| `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
+| `src/renderer/src/dock.ts` | Settings › Appearance › Dock icon: the mark and `icons/*.svg`, drawn to a PNG for main's `dock-icon` IPC (`app.dock.setIcon`; kept as userData's `dock-icon.png`, set as the next start begins) |
 | `widgets/` | the widgets that come with Laki (packaged with the app) |
 | `src/daemon/session.ts` | node-pty + headless mirror, snapshot, attach/detach, responder |
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
@@ -894,8 +926,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 - **Never write** `~/.claude/settings.json` or `~/.codex/*`. Agents get settings and notify through
   flags only.
 - **The daemon only listens on 127.0.0.1**, behind the token and the Origin check. Keep both on any new
-  endpoint. Remote access reaches it through cloudflared on this Mac, for one email, with a token and an
-  origin of its own that end with it; only the page's static files skip the checks.
+  endpoint. Remote access reaches it through cloudflared on this Mac, for one email (or, asked for with a typed
+  confirm, anyone with the link), with a token and an origin of its own that end with it; only the page's static files skip the checks.
 - **Colors** come from CSS variables in `styles.css` (`:root`). The terminal theme reads them through `css('--…')`.
 - **`asar` is off**, because node-pty's helper must be a real file. The packaged daemon runs on Electron's node.
 - **Intel**: node-pty is `@lydell/node-pty`, a prebuilt binary per platform in an optional package; npm installs only

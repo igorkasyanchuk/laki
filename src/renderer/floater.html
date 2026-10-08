@@ -32,10 +32,18 @@
       .fl-btn { width: 26px; height: 26px; box-sizing: border-box; display: grid; place-items: center; border-radius: 50%; color: var(--muted); border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); background: var(--bg); }
       .fl-btn:hover { color: var(--fg); border-style: solid; border-color: var(--accent); transform: scale(1.1); }
       .fl-btn svg { width: 14px; height: 14px; }
-      #card { width: 240px; box-sizing: border-box; padding: 9px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+      #card { width: 280px; box-sizing: border-box; padding: 9px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
       #card b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #card .meta { color: var(--muted); font-size: 11px; margin-top: 1px; }
       #card .meta i { font-style: normal; color: var(--c); }
+      #card .row { margin-top: 3px; color: var(--muted); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #card .pr { margin-top: 7px; padding-top: 6px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 6px; }
+      #card .pr .title { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      #card .pr .sub { flex-basis: 100%; color: var(--muted); font-size: 11px; }
+      #card .st { font-size: 10px; padding: 0 5px; border-radius: 8px; border: 1px solid currentColor; color: var(--muted); }
+      #card .st.open { color: var(--tcgreen, var(--done)); }
+      #card .st.merged { color: var(--tcpurple, var(--accent)); }
+      #card .st.closed { color: var(--tcred, var(--waiting)); }
       #card .last { margin-top: 6px; color: var(--fg); opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
       /* the voice prompt (main's VOICE: 320 by 186) */
       #voice { box-sizing: border-box; height: 186px; display: flex; flex-direction: column; gap: 7px; padding: 10px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; user-select: text; -webkit-user-select: text; }

@@ -10,7 +10,8 @@ worktree. Agents keep running when the window is closed.
   messages sent later (in 2h, at 3pm). Agents resume after a
   restart or a usage limit.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
-- **Terminals**: tabs and tmux-style splits, kept alive by a daemon.
+- **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command. Terminals in
+  your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
 - **PRs**: CI and reviews in the status bar, sent to the agent if you like; ship (commit, push, PR) in one step; merge
@@ -20,10 +21,12 @@ worktree. Agents keep running when the window is closed.
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`).
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
-- **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only.
+- **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only (or anyone with the
+  link, if you type *confirm*: a red warning says what that risks).
 - **Resources**: memory and CPU for Laki and each agent; put an idle agent to sleep (now, or after a while) and it wakes as you
   look; the video, widgets, the preview or the floating bubbles stop with a click.
-- **Looks**: 86 themes, 68 of which change shapes and type too (some after films' and games' screens); glass; your
+- **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
+- **Looks**: six Dock icons to pick from; 86 themes, 68 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
 - **Widgets**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
   with an agent or any AI chat: Settings has the prompt), each fed by a command on a schedule (within working hours, if

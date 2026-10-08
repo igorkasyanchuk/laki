@@ -2,8 +2,10 @@ import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, u
 import { API, rowsOf, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, type NotifyAction, openExternal } from './api'
+import { DOCK_ICONS, dockPng } from './dock'
+import { BrowserPane } from './Browser'
 import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, type WsInfo } from './Info'
-import { About, AddProject, Fun, Logs, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { About, AddProject, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
@@ -22,9 +24,9 @@ import { actionsFor, clock, nameOf, parseDuration, type RunAction, shortPath, te
 import { applyTheme, css, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, load, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
+import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -342,6 +344,12 @@ export function App() {
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
+  // Settings' Dock icon (unset: the app's own, nothing to send)
+  const dockIcon = view?.settings.dockIcon
+  useEffect(() => {
+    const d = DOCK_ICONS.find(x => x[0] === dockIcon)
+    if (d && bridge?.dockIcon) dockPng(d[2]).then(bridge.dockIcon).catch(() => {})
+  }, [dockIcon])
   // Settings › Resources' Stop on the video: closed
   useEffect(() => {
     const f = (e: Event) => (e as CustomEvent).detail === 'video' && setVideo(null)
@@ -354,15 +362,28 @@ export function App() {
   const active = useRef<Record<string, number>>((a => (a && typeof a === 'object' && !Array.isArray(a) ? a : {}))(load<unknown>('laki.active', {})) as Record<string, number>)
   for (const t of view?.tabs ?? []) if (t.kind === 'agent' && (t.status === 'running' || t.status === 'waiting' || (t.done && !active.current[t.id]))) active.current[t.id] = Date.now() // done unseen with no stamp: it ran while the app was closed
   const fs = view?.settings
+  // a bubble's card says what the sidebar's hover card does: the branch, the agents, the PR, the diff, the ports
+  const floatMore = (w: WorkspaceView) => {
+    const pr = w.pr
+    return {
+      branch: `${w.branch || w.path.split('/').pop()} · $PORT ${w.port}`,
+      agents: view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent').map(t => `${t.name}${t.progress ? ` ${t.progress.pct}%` : ''}`).join(' · '),
+      pr: pr && { state: prState(pr), text: `#${pr.number} ${pr.title}`, meta: [pr.author && !pr.mine && `by ${pr.author}`, (pr.list?.length || pr.checks) && ciText(pr), pr.review && REVIEW[pr.review], pr.conflict && pr.state === 'OPEN' && 'conflicts'].filter(Boolean).join(' · ') },
+      lines: [
+        w.stat && (w.stat.add > 0 || w.stat.del > 0 || w.stat.dirty > 0) && `+${w.stat.add} −${w.stat.del} in ${w.stat.files} ${w.stat.files === 1 ? 'file' : 'files'}${w.stat.dirty ? `, ${w.stat.dirty} not committed` : ''}`,
+        w.ports.length > 0 && `listening on ${w.ports.map(p => `:${p}`).join(' ')}`,
+      ].filter((x): x is string => !!x),
+    }
+  }
   const atWork = fs?.floater === false ? [] : live.flatMap(w => {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
     const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
-    return t ? [{ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: last?.replace(/\s+/g, ' ').trim().slice(0, 300) }] : []
+    return t ? [{ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: last?.replace(/\s+/g, ' ').trim().slice(0, 300), ...floatMore(w) }] : []
   }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
   // Settings' Recent sessions too: the workspaces whose agent worked last, one bubble each, after the ones at work
   // (finished ones you haven't seen first, then by when; one idle longer than floaterRecentHours drops out)
-  const recentN = Math.min(5, Math.max(0, Math.floor(fs?.floaterRecent ?? 0)))
+  const recentN = Math.min(5, Math.max(0, Math.floor(fs?.floaterRecent ?? 3)))
   const recentFor = (fs?.floaterRecentHours ?? 4) * 3600e3
   const [, minute] = useState(0)
   useEffect(() => {
@@ -378,10 +399,10 @@ export function App() {
     })
     .sort((a, b) => Number(b.t.done) - Number(a.t.done) || b.at - a.at)
     .slice(0, recentN)
-    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}` }))
+    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...floatMore(w) }))
   const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatOpts = { style: fs?.floaterStyle ?? 'glow', cards: fs?.floaterCards !== false, add: fs?.floater !== false && !!fs?.floaterNew, mic: fs?.floater !== false && fs?.floaterMic !== false, voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick' }
+  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, mic: fs?.floater !== false && fs?.floaterMic !== false, voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick' }
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
   useEffect(() => {
     bridge?.floats?.(floats, floatColors, floatOpts)
@@ -1000,6 +1021,73 @@ export function App() {
     const p = await call<Project>('projectAdd', { path }).catch(() => null) // the toast says why
     if (p) newWs(p.id)
   }
+  // Browsers workspaces opened since the app started: their pages stay loaded (hidden) as you move between them
+  const [browsed, setBrowsed] = useState<string[]>([])
+  useEffect(() => {
+    if (ws?.browser !== undefined && !browsed.includes(ws.id)) setBrowsed(b => [...b, ws.id])
+  }, [ws?.id])
+  // Settings › Resources' Stop on a browser: the pages you aren't on unloaded (each loads again as you open it)
+  const wsNow = useRef(ws?.id)
+  wsNow.current = ws?.id
+  useEffect(() => {
+    const f = (e: Event) => (e as CustomEvent).detail === 'browsers' && setBrowsed(b => b.filter(id => id === wsNow.current))
+    window.addEventListener('laki-stop', f)
+    return () => window.removeEventListener('laki-stop', f)
+  }, [])
+  // a page's address and title: the workspace's (its sidebar name), once it settles
+  const pageTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({})
+  const pageSeen = (id: string, url: string, title: string) => {
+    clearTimeout(pageTimers.current[id])
+    pageTimers.current[id] = setTimeout(() => void api.call('wsSet', { id, browser: url, ...(title.trim() && { name: title }) }).catch(() => {}), 400)
+  }
+  // Get started (panels.tsx Onboarding): shown once as Laki opens (seen), its steps done by hand (done) or by
+  // themselves (onboardDone, kept as they happen); off: Don't show again, and no bar at the sidebar's foot
+  const [onboard, setOnboard] = useState<{ done: string[]; seen?: boolean; off?: boolean }>(() => load('laki.onboard', { done: [] }))
+  useEffect(() => store('laki.onboard', onboard), [onboard])
+  const [seenSecs, setSeenSecs] = useState<string[]>([]) // Settings' sections opened since the app started
+  const onboardDone = new Set([
+    ...onboard.done,
+    ...(view?.projects.some(p => !p.kind) ? ['project'] : []),
+    ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
+    ...(seenSecs.length ? ['settings'] : []),
+    ...['widgets', 'actions', 'templates'].filter(x => seenSecs.includes(x)),
+    ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
+  ])
+  const onboardKey = [...onboardDone].sort().join()
+  useEffect(() => {
+    if (view && onboardDone.size > onboard.done.length) setOnboard(o => ({ ...o, done: [...onboardDone] })) // kept: a project removed later doesn't undo it
+  }, [onboardKey])
+  useEffect(() => {
+    if (!view || onboard.seen || dialog) return // a link's page first: it comes as that closes
+    setOnboard(o => ({ ...o, seen: true }))
+    setDialog('onboard') // once, as it opens: everyone, this update's users too
+  }, [!!view, !dialog])
+  const onboardGo = (id: string) => {
+    setDialog(null)
+    if (id === 'project') openProject()
+    else if (id === 'workspace') view?.projects.some(p => !p.kind) ? newWs() : openProject()
+    else if (id === 'settings') setDialog('settings')
+    else if (id === 'shell') quickNew('shells')
+    else setDialog({ section: id })
+  }
+  // the sidebar's + › Terminal or Browser: a new one in the Terminals or Browsers project (the first makes it), selected
+  // a page's link to a new tab (url; front: target=_blank, else a middle click, ⌘-click or its menu): one more, selected or not
+  const quickNew = async (kind: 'shells' | 'browsers', url?: string, front = true) => {
+    const w = await call<WorkspaceView>('quickNew', { kind, ...(url && { url }) }).catch(() => null) // the toast says why
+    if (w && front) (showNew(w.id), setDialog(null))
+  }
+  const quickRef = useRef(quickNew)
+  quickRef.current = quickNew
+  useEffect(() => {
+    bridge?.onBrowserTab?.((url, front) => void quickRef.current('browsers', url, front))
+  }, [])
+  const addMenu = (): MenuItem[] => [
+    { label: 'Project folder…', icon: 'folderPlus', hint: '⌘O', key: 'p', run: openProject },
+    { label: 'Terminal', icon: 'terminal', key: 't', hint: 'in your home folder', run: () => quickNew('shells') },
+    { label: 'Browser', icon: 'globe', key: 'b', hint: 'any website', run: () => quickNew('browsers') },
+  ]
+  const newIn = (p: Project) => (p.kind ? quickNew(p.kind) : newWs(p.id)) // a project head's +
+  const newWord = (p: Project) => (p.kind === 'shells' ? 'New terminal' : p.kind === 'browsers' ? 'New browser' : 'New workspace')
 
   // keys: capture phase, before xterm.js sees them
   const keys = useRef<(e: KeyboardEvent) => void>(() => {})
@@ -1019,7 +1107,7 @@ export function App() {
       '0': () => zoom(0),
       o: openProject,
       f: () => dialog || (tab && setFinds(m => ({ ...m, [tab.id]: (m[tab.id] ?? 0) + 1 }))), // not over a dialog
-      t: () => newTab('shell'),
+      t: () => (ws?.browser !== undefined ? quickNew('browsers') : newTab('shell')), // a browser's: another browser
       w: () => (previewed ? closePreview() : tab && closeTabs([tab])), // the file preview first
       k: () => setDialog(d => (d === 'palette' ? null : 'palette')),
       p: () => ws && setDialog(d => (d === 'files' ? null : 'files')),
@@ -1075,7 +1163,7 @@ export function App() {
   const projectActions = (p: Project): MenuItem[] => {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
-      { label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(p.id) },
+      { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : '⌘N', run: () => newIn(p) },
       { label: 'Add a group', icon: 'sep', run: () => setDialog({ sep: p.id }) },
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', run: () => setDialog({ notes: p.id }) },
@@ -1105,6 +1193,9 @@ export function App() {
     }
     a({ label: 'New workspace', icon: 'plus', hint: '⌘N', run: () => newWs(ws?.project) })
     a({ label: 'Open project folder…', icon: 'folderPlus', hint: '⌘O', run: openProject })
+    a({ label: 'New terminal (in your home folder)', icon: 'terminal', run: () => quickNew('shells') })
+    a({ label: 'Get started: the first steps', icon: 'check', run: () => (setOnboard(o => ({ ...o, off: false })), setDialog('onboard')) })
+    a({ label: 'New browser', icon: 'globe', run: () => quickNew('browsers') })
     a({ label: 'Open a project over SSH…', icon: 'server', run: () => setDialog('project') })
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
@@ -1169,7 +1260,7 @@ export function App() {
   const settingsFor = dialog && typeof dialog === 'object' && 'settings' in dialog ? view.projects.find(p => p.id === dialog.settings) : undefined
   const section = dialog && typeof dialog === 'object' && 'section' in dialog ? dialog.section : undefined // a Settings section asked for
   const schedulesFor = schedulesOf(dialog)
-  const ports = ws ? portsOf(ws.ports, ws.tunnels).filter(p => p !== ws.port) : [] // $PORT has its own, always
+  const ports = ws ? portsOf(ws.ports, ws.tunnels).filter(p => p !== ws.port || !!project?.kind) : [] // $PORT has its own, always (a terminal: none, its ports as any)
   // ✕ beside a port something of the workspace listens on: stops it, once you say so
   const portStop = (ws: WorkspaceView, port: number) => {
     const p = ws.procs?.[port]
@@ -1228,7 +1319,7 @@ export function App() {
         onClick={() => (setWsId(w.id), (!pin && !find && rows.dragged()) || setDialog(null), narrow && setSideOpen(false)) /* a page over the main area (Settings, the new-workspace page…) gives way to it, not to a drag's end */}
         onContextMenu={e => (setPeek(null), openMenu(e, wsMenu(w)))}
       >
-        <Glyph s={w.setup || going[w.id] ? 'running' : rollup(wt)} />
+        {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : rollup(wt)} />}
         <span className="ws-name">{wsName(w)}</span>
         {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
@@ -1277,7 +1368,7 @@ export function App() {
             <Icon name="github" size={11} />
           </span>
         )}
-        {/* on hover, over the marks: its menu */}
+        {/* on hover, after the marks (they slide left): its menu */}
         <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()}>
           <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
         </span>
@@ -1473,7 +1564,7 @@ export function App() {
           </div>
         )
       })}
-      {ws && <IconButton icon="plus" title="New tab" className="nodrag" onClick={e => openMenu(e, newTabActions)} />}
+      {ws && (ws.browser === undefined ? <IconButton icon="plus" title="New tab" className="nodrag" onClick={e => openMenu(e, newTabActions)} /> : <IconButton icon="plus" title="New browser tab (⌘T)" className="nodrag" onClick={() => quickNew('browsers')} />)}
     </>
   )
   const tabStrip = tabsAt !== 'top' && (
@@ -1489,7 +1580,7 @@ export function App() {
           <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
           <span className="spacer" />
           <IconButton icon="filter" title={find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR'} on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
-          <IconButton icon="folderPlus" title="Open a project folder (⌘O), or drop one on the window" onClick={openProject} />
+          <IconButton icon="plus" title="Add: a project folder (⌘O, or drop one on the window), a terminal or a browser" onClick={e => openMenu(e, addMenu())} />
           <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
         </div>
         {find && (
@@ -1527,11 +1618,10 @@ export function App() {
             const shut = !hits && folded.includes(p.id)
             const sum = shut ? busiest(mine) : 'idle'
             return (
-            <div key={p.id} className="project">
+            <div key={p.id} className={`project ${rows.at('project', p.id)}`} data-row={`project:${p.id}` /* the whole block: a project dropped anywhere on it */}>
               <div
-                className={`project-head ${rows.at('project', p.id)}`}
-                data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · click to ${shut ? 'expand' : 'collapse'}`}
-                data-row={`project:${p.id}`}
+                className="project-head"
+                data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · click to ${shut ? 'expand' : 'collapse'} · drag to move`}
                 onPointerDown={e => rows.start(e, 'project', p.id)}
                 onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(p.id)}
                 onContextMenu={e => openMenu(e, projectActions(p))}
@@ -1540,7 +1630,7 @@ export function App() {
                   <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
                 </span>
                 <span className="project-icon">
-                  <Icon name={p.host ? 'server' : p.git === false ? 'folder' : 'fork'} size={12} />
+                  <Icon name={p.kind === 'shells' ? 'terminal' : p.kind === 'browsers' ? 'globe' : p.host ? 'server' : p.git === false ? 'folder' : 'fork'} size={12} />
                 </span>
                 <span className="project-name">{p.name}</span>
                 {shut && mine.length > 0 && (
@@ -1550,15 +1640,15 @@ export function App() {
                   </>
                 )}
                 <span className="spacer" />
-                <IconButton icon="plus" title="New workspace" onClick={() => newWs(p.id)} />
+                <IconButton icon="plus" title={newWord(p)} onClick={() => newIn(p)} />
                 <IconButton icon="more" title="Project" onClick={e => openMenu(e, projectActions(p))} />
               </div>
               <div className="project-ws">{/* under its project, on a guide line */}
               {hits ? hits.map(w => wsRow(w)) : shut ? [...makingRows(p, ''), ...(p.seps ?? []).flatMap(s => makingRows(p, s.id))] : shownRows(p, mine)}{/* folded: only one on its way stays */}
               {!shut && !hits && !live.some(w => w.project === p.id) && !making.some(m => m.project === p.id) && ( // nothing here yet (none pinned either): the way to start
-                <div className="ws ws-new" onClick={() => newWs(p.id)}>
+                <div className="ws ws-new" onClick={() => newIn(p)}>
                   <Icon name="plus" size={12} />
-                  <span className="ws-name">New workspace</span>
+                  <span className="ws-name">{newWord(p)}</span>
                 </div>
               )}
               </div>
@@ -1591,6 +1681,7 @@ export function App() {
           />
         ))}
         <WidgetGrid widgets={view.widgets ?? []} api={widgetApi} shut={widgetsShut} onShut={setWidgetsShut} />
+        {!onboard.off && onboardDone.size < STEPS.length && dialog !== 'onboard' && <OnboardBar done={STEPS.filter(x => onboardDone.has(x.id)).length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />}
         <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
           <IconButton
             icon="clock"
@@ -1616,7 +1707,12 @@ export function App() {
           {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
-          {ws && (
+          {ws && ws.browser !== undefined && (
+            <div className="actions nodrag">
+              <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
+            </div>
+          )}
+          {ws && ws.browser === undefined && (
             <div className="actions nodrag">
               {!narrow && ( // a phone: in ⌘K's palette (the search button)
                 <>
@@ -1677,9 +1773,7 @@ export function App() {
             ) : (
               <div className="empty">
                 {ws ? (
-                  <>
-                    <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} actions={newTabActions.filter(x => x.label !== 'Command…')} />
-                  </>
+                  ws.browser === undefined && <Ready name={wsName(ws)} branch={ws.kind === 'worktree' ? ws.branch : undefined} actions={newTabActions.filter(x => x.label !== 'Command…')} />
                 ) : (
                   view.projects.length ? (
                     <>
@@ -1693,6 +1787,10 @@ export function App() {
                 )}
               </div>
             )}
+            {browsed.flatMap(id => {
+              const w = live.find(x => x.id === id)
+              return w?.browser !== undefined ? [<BrowserPane key={id} url={w.browser} hidden={id !== ws?.id || !!dialog} onPage={(url, title) => pageSeen(id, url, title)} onOpen={openExternal} />] : []
+            })}
           </div>
           {tabsAt === 'right' && tabStrip}
           {previewed && ws && (
@@ -1763,6 +1861,7 @@ export function App() {
             presets={view.presets}
             apps={apps}
             onClose={() => setDialog(null)}
+            onSection={id => setSeenSecs(l => (l.includes(id) ? l : [...l, id]))}
             onSave={s => call('settingsSet', s).catch(() => {})}
             projects={view.projects.map(p => ({ ...p, git: p.git !== false }))}
             projectFile={id => api.call<ProjectConfig>('projectFile', { id })}
@@ -1781,7 +1880,7 @@ export function App() {
               stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
               widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
             }}
-            remote={{ state: view.remote, start: (hours, mail) => api.call('remoteStart', { hours, mail }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+            remote={{ state: view.remote, start: (hours, mail, open) => api.call('remoteStart', { hours, mail, open }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             widgets={{
               list: view.widgets ?? [],
               home: view.widgetHome,
@@ -1803,6 +1902,15 @@ export function App() {
         {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? view.widgets?.find(x => x.id === dialog.widget) : undefined)}
         {dialog === 'help' && <HelpPage cli="laki" ship zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
+        {dialog === 'onboard' && (
+          <Onboarding
+            done={onboardDone}
+            onGo={onboardGo}
+            onTick={id => setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] }))}
+            onSkip={() => setDialog(null)}
+            onOff={() => (setOnboard(o => ({ ...o, off: true })), setDialog(null))}
+          />
+        )}
         {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.logs.startsWith('widget:') ? { section: 'widgets' } : dialog.logs === 'new' ? { section: 'general' } : null)} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
         {dialog === 'board' && (
@@ -1866,8 +1974,8 @@ export function App() {
         {dialog === 'new' && (
           <NewWorkspace
             key={`${newFor}${JSON.stringify(newInit ?? '')}`} // another project asked for while it's open (＋, a dropped folder, a link)
-            view={view}
-            project={newFor ?? ws?.project}
+            view={{ ...view, projects: view.projects.filter(p => !p.kind) } /* Terminals and Browsers make theirs with + */}
+            project={[newFor, ws?.project].find(id => view.projects.some(p => p.id === id && !p.kind))}
             agent={settings.agent}
             initial={newInit}
             images={newImages}
@@ -1908,9 +2016,10 @@ export function App() {
             }}
           />
         )}
+        {(ws?.browser === undefined || !connected || (view.api ?? 0) < API) && ( // a browser page: none, unless something's wrong
         <div className="status">
-          {tracked.length > 0 && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage')} /> /* remounts as agents are turned on or off */}
-          {ws && (
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage')} /> /* remounts as agents are turned on or off */}
+          {ws && ws.browser === undefined && ( // a page: no port, branch or folder of its own
             <>
               {git && (
                 <span title={ws.kind === 'worktree' ? `branch ${ws.branch}, from ${ws.base}` : 'the repo itself'}>
@@ -1918,6 +2027,7 @@ export function App() {
                   {ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
                 </span>
               )}
+              {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
               <span className="port-item">
                 <button
                   className={`listen ${portUp ? '' : 'port-main'}`}
@@ -1930,6 +2040,7 @@ export function App() {
                 <TunnelButton key={ws.id} port={ws.port} tunnel={ws.tunnels?.find(t => t.port === ws.port)} api={tunnelApi(ws)} />
                 {portStop(ws, ws.port)}
               </span>
+              )}
               {ports.map(port => (
                 <span key={`${ws.id}:${port}`} className="port-item">
                   <button className="listen" data-tip={ws.ports.includes(port) ? `listening · open http://localhost:${port}` : 'not listening now'} onClick={() => openPort(port)}>
@@ -1950,16 +2061,16 @@ export function App() {
             </>
           )}
           <span className="spacer" />
-          {view.remote && (
+          {view.remote && ws?.browser === undefined && (
             <button
-              className={`remote-badge ${view.remote.url ? '' : 'starting'}`}
-              data-tip={`Remote access for ${view.remote.mail}: Settings › Remote access`}
+              className={`remote-badge ${view.remote.url ? '' : 'starting'} ${view.remote.open ? 'open' : ''}`}
+              data-tip={view.remote.open ? 'Remote access for anyone with the link (no email): Settings › Remote access' : `Remote access for ${view.remote.mail}: Settings › Remote access`}
               onClick={() => setDialog({ section: 'remote' })}
             >
-              {!view.remote.url ? 'Remote starting…' : view.remote.until ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote on'}
+              {!view.remote.url ? 'Remote starting…' : view.remote.open ? 'Remote: open to anyone with the link' : view.remote.until ? `Remote until ${new Date(view.remote.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : 'Remote on'}
             </button>
           )}
-          {ws && (
+          {ws && !project?.kind && ( // Terminals and Browsers: your home folder, nothing to say
             <>
               <span className="path" data-tip={(ws.host ? `${ws.host}:` : '') + ws.path}>
                 {'\u200e' + (ws.host ? `${ws.host}:` : '') + shortPath(ws.path) /* keeps the leading ~ in the right-to-left truncation */}
@@ -1970,6 +2081,7 @@ export function App() {
           {connected && (view.api ?? 0) < API && <StaleDaemon restart={() => api.call('shutdown')} />}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
         </div>
+        )}
       </main>
 
       {menu}

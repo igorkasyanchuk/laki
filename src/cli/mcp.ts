@@ -13,7 +13,7 @@ const obj = (properties: Record<string, object>, required: string[] = []) => ({ 
 export async function state() {
   const v: View = await rpc('state')
   return {
-    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false })),
+    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind })), // kind: shells (the Terminals project) or browsers, the user's own
     workspaces: v.workspaces
       .filter(w => !w.archived)
       .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url } })),
@@ -24,7 +24,7 @@ export async function state() {
 const TOOLS: Tool[] = [
   {
     name: 'laki_state',
-    description: "Laki's projects, workspaces (a git worktree per task, or a folder) and tabs, with each agent's status: running, waiting (for a permission), idle or exited; done: finished while nobody looked.",
+    description: "Laki's projects, workspaces (a git worktree per task, or a folder) and tabs, with each tab's status: running (an agent's turn, or a shell's command), waiting (for a permission), idle or exited; done: finished while nobody looked. Terminals and Browsers (a project's kind shells or browsers) are the user's own terminals and web pages.",
     inputSchema: obj({}),
     run: state,
   },

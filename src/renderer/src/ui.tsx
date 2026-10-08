@@ -282,6 +282,7 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
   const start = (e: PE, kind: string, id: string, group = '', head = false) => {
     if (e.button !== 0) return
     const y0 = e.clientY
+    const list = (e.currentTarget as Element).closest('.side-scroll') // the list it's in: it scrolls near (or past) its edges
     let cur: RowDrop | null = null
     let moved = false
     dragged.current = false
@@ -289,6 +290,9 @@ export function useRowDrag(onDrop: (d: RowDrop) => void) {
       if (!moved && Math.abs(ev.clientY - y0) < 5) return
       moved = true
       document.getSelection()?.removeAllRanges()
+      // near the list's top or bottom edge, or past it: it scrolls (ponytail: only as the pointer moves)
+      const box = list?.getBoundingClientRect()
+      if (box) list!.scrollBy(0, ev.clientY < box.top + 30 ? -12 : ev.clientY > box.bottom - 30 ? 12 : 0)
       const el = document.elementFromPoint(ev.clientX, ev.clientY)?.closest<HTMLElement>(`[data-row^="${kind}:"]`)
       const target = el && (el.dataset.group ?? '') === group ? el.dataset.row!.slice(kind.length + 1) : ''
       const r = el?.getBoundingClientRect()

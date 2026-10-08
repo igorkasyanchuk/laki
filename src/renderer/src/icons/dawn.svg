@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="100 100 824 824">
+  <!-- Dawn: the summit's caret against a sunrise -->
+  <defs><clipPath id="t"><rect x="100" y="100" width="824" height="824" rx="186"/></clipPath>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1d1747"/><stop offset=".58" stop-color="#6d3a86"/><stop offset="1" stop-color="#f2875b"/></linearGradient>
+    <linearGradient id="s" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffe08a"/><stop offset="1" stop-color="#ff7a45"/></linearGradient>
+  </defs>
+  <g clip-path="url(#t)">
+    <rect x="100" y="100" width="824" height="824" fill="url(#g)"/>
+    <circle cx="512" cy="560" r="200" fill="url(#s)"/>
+    <path d="M100 800 L270 724 L390 772 L520 706 L660 774 L790 722 L924 790 V924 H100Z" fill="#241a4a"/>
+    <path d="M262 660 L512 394 L762 660" fill="none" stroke="#ffffff" stroke-width="92" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <rect x="101" y="101" width="822" height="822" rx="185" fill="none" stroke="#ffffff" stroke-opacity="0.14" stroke-width="2"/>
+</svg>

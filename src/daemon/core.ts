@@ -108,6 +108,7 @@ export function load() {
   state.schedules ??= []
   state.runs ??= []
   state.todos ??= []
+  for (const p of state.projects) if (p.kind === 'shells' && p.name === 'Shells') p.name = 'Terminals' // its first name (0.7)
 }
 
 export function save() {
@@ -283,7 +284,7 @@ export function view(): View {
   const tabs: TabView[] = state.tabs.map(t => {
     const s = sessions.get(t.id)
     const r = rtOf(t.id)
-    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : 'idle'
+    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : busyShells.has(t.id) ? 'running' : 'idle'
     // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
     if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
     else r.runAt = undefined
@@ -323,7 +324,7 @@ export function changed() {
     pending = null
     const v = view()
     for (const t of v.tabs) rtOf(t.id).askKey = JSON.stringify(t.ask ?? null) // what the clients were given
-    for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running'))
+    for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running' && tracked(t))) // an agent's: a shell's command isn't
     for (const c of clients) c.send({ ev: 'state', view: v })
   }, 30)
 }
@@ -367,7 +368,7 @@ export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focus
 
 export function findProject(ref: string): Project {
   const abs = resolve(ref)
-  const p = state.projects.find(p => p.id === ref || p.name === ref || (p.host ? `${p.host}:${p.path}` === ref : p.path === abs))
+  const p = state.projects.find(p => p.id === ref || p.name === ref || (p.host ? `${p.host}:${p.path}` === ref : p.path === abs && !p.kind)) // Terminals and Browsers: home, not that folder's project
   if (!p) throw new Error(`no project ${ref}`)
   return p
 }
@@ -578,9 +579,34 @@ export async function projectAdd(path: string): Promise<Project> {
   if (!statSync(abs, { throwIfNoEntry: false })?.isDirectory()) throw new Error(`${path} is not a folder`)
   const top = await git({ path: abs }, 'rev-parse', '--show-toplevel').catch(() => '')
   const root = top || realpathSync(abs)
-  const existing = state.projects.find(p => !p.host && p.path === root)
+  const existing = state.projects.find(p => !p.host && !p.kind && p.path === root)
   if (existing) return existing
   return projectPush({ id: '', name: basename(root), path: root, git: !!top })
+}
+
+// the sidebar's + › Shell and Browser: a new shell in your home folder, or a page in a browser, each a workspace of
+// the Terminals (kind shells) or Browsers project (made by the first one; a project like any other: dragged, folded, removed)
+const URL_OK = /^(https?:\/\/\S+|about:blank)$/
+let quick: Promise<unknown> = Promise.resolve()
+// one at a time: two quick clicks would both pick terminal 1 (an id is taken only once its workspace is pushed)
+export function quickNew(o: { kind: 'shells' | 'browsers'; url?: string }) {
+  const r = quick.then(() => quickMake(o))
+  quick = r.catch(() => {})
+  return r
+}
+async function quickMake(o: { kind: 'shells' | 'browsers'; url?: string }) {
+  if (o.kind !== 'shells' && o.kind !== 'browsers') throw new Error('kind: shells or browsers')
+  if (o.url !== undefined && !URL_OK.test(o.url)) throw new Error('url: http(s) only')
+  const p = state.projects.find(p => p.kind === o.kind && !p.host) ?? projectPush({ id: '', name: o.kind === 'shells' ? 'Terminals' : 'Browsers', path: homedir(), git: false, kind: o.kind })
+  const word = o.kind === 'shells' ? 'terminal' : 'browser'
+  const names = new Set(state.workspaces.filter(w => w.project === p.id).map(w => w.name ?? w.id))
+  let n = 1
+  while (names.has(`${word} ${n}`)) n++
+  const ws = await wsNew({ project: p.id, local: true, another: true, name: `${word} ${n}`, preset: o.kind === 'shells' ? 'shell' : 'none', ...(o.kind === 'browsers' && { browser: o.url ?? 'about:blank' }) })
+  ws.name = o.url && o.url !== 'about:blank' ? new URL(o.url).host : `${word} ${n}` // its id is terminal-1: the name with its space; a page's site until its title comes
+  save()
+  changed()
+  return ws
 }
 
 // a folder on an SSH host (host:path; a relative path or ~ is from its home): a repository's top level, or the folder
@@ -1019,6 +1045,7 @@ function modelCheck(agent: string, model?: string, effort?: string) {
 
 export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string }): Tab {
   const ws = findWs(wsRef)
+  if (ws.browser !== undefined) throw new Error(`${ws.name ?? ws.id} is a browser page: it has no tabs`) // its page covers the terminals' place
   if (!o.kind) presetCheck(o.preset, o.cmd)
   const pr = o.kind ? undefined : presetNamed(o.preset)
   if (pr?.agent === 'command') o = { ...o, cmd: pr.cmd || 'true' }
@@ -1092,8 +1119,10 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 }
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; browser?: string }) {
   const w = findWs(o.id)
+  if (o.browser !== undefined && (w.browser === undefined || !URL_OK.test(o.browser))) throw new Error('browser: a Browsers workspace and an http(s) page')
+  if (o.browser !== undefined) w.browser = o.browser
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.name !== undefined) {
@@ -1256,7 +1285,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string }
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1416,6 +1445,9 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
   if (o.linked && !ws.prUrl) Object.assign(ws, { prUrl: o.linked, prLinked: true })
+  if (o.browser !== undefined && proj.kind === 'browsers' && URL_OK.test(o.browser)) ws.browser = o.browser
+  // a local one's id names nothing on disk: one taken meanwhile (another wsNew between uniqueWsId and here) gets a tail
+  for (const base = ws.id; ws.kind === 'local' && state.workspaces.some(w => w.id === ws.id); ) ws.id = `${base}-${tail()}`
   state.workspaces.push(ws)
   placeWs(ws, o.place)
   save()
@@ -2106,7 +2138,8 @@ export function stopTunnels(ws?: string) {
 }
 
 // ---------- remote access: this daemon, and the app's page it serves (main.ts), at a trycloudflare.com URL for the
-// one email in Settings: Cloudflare Access sends it a one-time code, and the link carries a token of its own. It
+// one email in Settings: Cloudflare Access sends it a one-time code, and the link carries a token of its own (open:
+// no email, asked for in so many words (Settings' typed confirm), the token the only lock: anyone with the link). It
 // ends after the hours asked for (remoteTick; 0: forever, no until), on remoteStop, or with the daemon; a new token each
 // time, so a stopped link is dead.
 export const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0]
@@ -2118,18 +2151,19 @@ export const setDaemonPort = (p: number) => (daemonPort = p)
 export const remoteToken = () => remote?.token
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
+  remote && { mail: remote.mail, ...(!remote.mail && { open: true }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
 
-export async function remoteStart(o: { hours: number; mail?: string }): Promise<Remote | undefined> {
+export async function remoteStart(o: { hours: number; mail?: string; open?: boolean }): Promise<Remote | undefined> {
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
-  const mail = (o.mail ?? state.settings?.remoteMail ?? '').trim()
-  if (!ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
-  if (mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail })
+  const open = o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
+  const mail = open ? '' : (o.mail ?? state.settings?.remoteMail ?? '').trim()
+  if (!open && !ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
+  if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open keeps the saved one
   if (remote) return remoteView()
-  await cfReady(true)
+  await cfReady(!open)
   if (remote) return remoteView() // started meanwhile
-  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, [mail], why => (log(`remote access ended (${why})`), remoteStop()))
+  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, open ? [] : [mail], why => (log(`remote access ended (${why})`), remoteStop()))
   const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf }
   remote = r
   changed()
@@ -2140,7 +2174,7 @@ export async function remoteStart(o: { hours: number; mail?: string }): Promise<
     throw e
   }
   if (remote !== r) return undefined // stopped meanwhile
-  log(`remote access at ${r.url} for ${mail}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
+  log(`remote access at ${r.url} for ${mail || 'anyone with the link (no email)'}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
   return remoteView()
 }
@@ -2646,6 +2680,30 @@ export function sweepRunning(now = Date.now()) {
   }
 }
 
+// a shell tab running a command (the terminal's foreground process group isn't the shell's own): running, its
+// spinner, until the prompt is back. Every 2 s, one ps for all of them; not on a host (its PTY runs ssh)
+const busyShells = new Set<string>()
+export async function shellTick() {
+  if (!clients.size) return // no one sees the spinner (the next tick after one connects does)
+  const live = state.tabs.flatMap(t => {
+    const s = sessions.get(t.id)
+    return t.kind === 'shell' && s && !s.exited && !state.workspaces.find(w => w.id === t.workspace)?.host ? [[t.id, s.pty.pid] as const] : []
+  })
+  const fg = new Map<number, number>()
+  if (live.length) {
+    const { stdout } = await run('ps', ['-o', 'pid=,tpgid=', '-p', live.map(([, pid]) => pid).join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') })) // ps exits 1 when one's gone
+    for (const l of stdout.split('\n')) {
+      const [pid, tpgid] = l.trim().split(/\s+/).map(Number)
+      if (pid > 0) fg.set(pid, tpgid)
+    }
+  }
+  const now = new Set(live.flatMap(([id, pid]) => (fg.get(pid) ?? 0) > 0 && fg.get(pid) !== pid ? [id] : []))
+  if (now.size === busyShells.size && [...now].every(id => busyShells.has(id))) return
+  busyShells.clear()
+  for (const id of now) busyShells.add(id)
+  changed()
+}
+
 // ---------- resources (Settings): memory and CPU by process; idle agents put to sleep
 
 type PsRow = ProcUse & { ppid: number }
@@ -2953,6 +3011,8 @@ const MAX_FILES = 50000
 // but dependencies), and how the changed ones changed: M, A (new), D, R
 export async function files(ref: string) {
   const ws = findWs(ref)
+  // Terminals and Browsers: your home folder, whose walk would be junk and macOS's prompts (Desktop, Documents…)
+  if (state.projects.find(p => p.id === ws.project)?.kind) return { files: [], changed: {}, cut: false }
   if (ws.host && state.projects.find(p => p.id === ws.project)?.git === false) {
     const skip = [...SKIP_DIRS].flatMap((d, i) => [...(i ? ['-o'] : []), '-name', d])
     const { stdout } = await exec(ws, 'find', ['.', '(', ...skip, ')', '-prune', '-o', '-type', 'f', '-print'])

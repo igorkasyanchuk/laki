@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('laki', {
   sound: (name: string) => ipcRenderer.send('sound', name), // a timer's end: a macOS sound
   browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
   onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),
+  onBrowserTab: (cb: (url: string, front: boolean) => void) => ipcRenderer.on('browser-tab', (_e, url: string, front: boolean) => cb(url, front)), // a Browsers page's link to a new tab
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
@@ -14,6 +15,7 @@ contextBridge.exposeInMainWorld('laki', {
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
   glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
+  dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
   badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean) => ipcRenderer.send('badge', n, items, tray),
   onDeepLink: (cb: (url: string) => void) => {

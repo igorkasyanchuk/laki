@@ -64,7 +64,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   Inconsolata, Roboto Mono, Victor Mono); tab and
   workspace colors.
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
-  tunnel that lets in one email address, for 1 hour to 3 days or until you stop it; a QR code to open it.
+  tunnel that lets in one email address (or, if you type *confirm*, anyone with the link), for 1 hour to 3 days or
+  until you stop it; a QR code to open it.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the bottom of the sidebar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
   one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › General hides it.
@@ -123,9 +124,14 @@ npm link
 1. Open the app. It starts its background daemon if one isn't running. With no project yet it says what it found:
    git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
    links and remote access) and which agents are on your PATH.
-2. Add a project: **⌘O**, the folder icon at the top of the sidebar, or drag a folder from Finder onto the
+2. *Get started* opens once (everyone sees it once, after an update too): the first steps (add a project, start a
+   workspace, Settings, a widget, actions, a prompt template, a terminal or a browser), each with a button that does it.
+   A step ticks itself as you do it, or click its circle to tick it yourself. *Skip for now* closes it: what's left
+   stays as a bar at the sidebar's bottom (a click opens it again, ✕ hides it; *Get started* in ⌘K brings it back);
+   *Don't show again* hides both.
+3. Add a project: **⌘O**, + at the top of the sidebar › *Project folder…*, or drag a folder from Finder onto the
    window. It can be a git repository or any other folder.
-3. The new-workspace page opens. Pick an agent (claude, codex, gemini, grok, opencode, shell, or a custom command) and,
+4. The new-workspace page opens. Pick an agent (claude, codex, gemini, grok, opencode, shell, or a custom command) and,
    optionally, a first prompt.
    - For a git repository, also pick a base branch. The workspace gets a worktree in
      `~/.laki/worktrees/<project>/<id>` (or the folder you pick in Settings › General › *Worktrees*, or in the
@@ -141,8 +147,8 @@ or an open one's failing checks; a yellow ⚠ beside it: merge conflicts with it
 selected workspace's PR is in the status bar.
 - A line divides the projects; each one's workspaces hang under it, indented on a guide line.
 - *Diff size in the sidebar* (Settings › General, off by default) puts each workspace's diff size on its row
-  (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover the row
-  shows ⋯, its menu.
+  (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
+  menu, slides in at the row's end and its marks move left to make room.
 - Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
   agent's last answer (or what it asks), its PR (author, state, checks, review, conflicts, lines added and removed),
   its diff size, ports and marks (from a scheduled task, muted, a reminder, a race). Move onto the card to click it:
@@ -152,6 +158,23 @@ selected workspace's PR is in the status bar.
 - Click a project to fold its workspaces away (its busiest status and their count stay), again to unfold;
   *Collapse all projects* and *Expand all projects* are in ⌘K.
 - ＋ on a project creates a new workspace in it.
+- ＋ at the sidebar's top: *Project folder…* (⌘O), *Terminal* or *Browser*. *Terminal* opens a shell in your home
+  folder, without a terminal app: a workspace of the *Terminals* project (made by the first one; terminal 1, terminal
+  2…). *Browser* opens any website in Laki: a workspace of the *Browsers* project, with back, forward, reload and an
+  address bar (a site, a URL, or words to search); the page's title names its row, and it opens on the same page after
+  a restart. Sign-ins are kept between runs (its own cookies, apart from the preview's), and a sign-in's popup (Google,
+  GitHub) gets a small window of its own. A page you opened stays loaded as you move to other workspaces.
+  - Tabs are rows too: a middle click or ⌘-click on a link (or its right click › *Open Link in New Tab*) adds one
+    under *Browsers* in the background, named after the site until you open it; a link that opens a new tab adds one
+    and goes there; ⌘T or + in its tab bar opens an empty one.
+  - A right click on a page: open or copy a link, copy an image or text, back, forward, reload, *Inspect Element*; the
+    `</>` button opens its developer tools.
+  - Terminals and Browsers are projects like the others: drag them, fold them, remove them (your home folder stays),
+    though the new-workspace page leaves them out and Files lists nothing for them (your home folder). ⌘K has *New
+    terminal* and *New browser*. (A *Shells* project from before is renamed *Terminals*.) Their status bar: a terminal's
+    shows only the ports something in it listens on (no `$PORT`, no folder); a browser has none.
+- A shell tab running a command (a `git push`, `npm install`, a dev server) has the spinner, on its tab and its row,
+  until its prompt is back.
 - *Meme* (the smiley) at its bottom, beside *Video*: a random meme from r/memes, r/ProgrammerHumor or
   r/wholesomememes, pictures only, for a break (*Next*, → or N; a right click: copy, download, open on
   Reddit; Esc closes it); one you've seen comes again only when nothing new is left. Fetched only when you click:
@@ -205,7 +228,8 @@ selected workspace's PR is in the status bar.
   workspace: the flag on its row), *Open in*, fork, archive and delete. While a workspace is archived or deleted its row
   shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
   *Mark as unread* (its ● again, until you look at it) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
-- Drag projects, and workspaces within a project, to reorder them.
+- Drag projects, and workspaces within a project, to reorder them; a project drops anywhere on another one (its top
+  half: before it), and the list scrolls as you near its top or bottom.
 - Groups: a project's ⋯ › *Add a group*, or a workspace's *Add a group below*, puts a named head over its
   workspaces, up to the next group; it shows how many it holds. A click folds it: they hide, the selected one too (the
   busiest one's mark stays on it), until another click. Drop a workspace on a group's head to put it first in
@@ -287,13 +311,18 @@ the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a 
 
 **Remote access** (Settings › *Remote access*): Laki in a browser on another computer or your phone, with
 its terminals and agents, as if you sat at this Mac. Whoever gets in has a shell here as you, so it lets in one
-email address only.
+email address only, unless you leave the email out on purpose (below).
 - Set the email (kept in the app's settings for next time), pick how long (1, 2, 4, 8, 12, 24, 48 or 72 hours, or Forever: until you stop it or the daemon) and click
   *Start remote access*. It needs `cloudflared` 2026.9.3 or newer (`brew install cloudflared`), like *Expose
   to the world*.
 - cloudflared publishes the daemon at a random `https://….trycloudflare.com` link; the daemon serves the app's
   page there. Cloudflare asks for that email and sends it a one-time code, and the link also carries a key of
   its own (`?token=…`: it survives Cloudflare's sign-in, which drops anything after `#`).
+- Without an email (a real risk): leave the field empty, and a red box says what it means: no Cloudflare
+  sign-in, the link alone opens a shell on this Mac as you, and a link in a chat, a screenshot or a browser's history
+  is enough. Type *confirm* to start it (*Start without an email*), and every start asks again. While it runs, the
+  page says *Anyone with this link gets in* and the status bar's badge turns red: *Remote: open to anyone with the
+  link*. The link's key still has to be right; pick a short time and stop it when you're done.
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.
@@ -644,7 +673,8 @@ lit for a moment.
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
   reads it back (projects and their own settings don't move). A file from another version comes in too: a setting
   this one keeps in another shape is left out (Import names it), the rest applies.
-- *Appearance*: the interface font (Inter by default, SF Pro, or a few more), *Settings & Help size* (90% to 150%,
+- *Appearance*: *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
+  from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), the interface font (Inter by default, SF Pro, or a few more), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
   over the theme's: every corner it draws, its selected row, buttons and dialogs too; pills and circles stay round), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
@@ -656,14 +686,15 @@ lit for a moment.
   it that fills as the agent reports its progress, or sweeps while it works without reporting), above; *Button labels*: words
   beside Scheduled, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit),
   *Floating bubbles* (while you're in another app, a drop stuck to the screen's right or left edge, over every app and
-  Space, with a circle per agent working or waiting for you (a pulse), its workspace's initials inside: hover one for
-  its name, project and what it asked or last said, click to open it in Laki; drag it from anywhere on it (a circle too)
+  Space, with a circle per agent working or waiting for you (a pulse), two letters from its workspace's name inside (none the same; pr-, issue- and numbers skipped): hover one for
+  its card, as the sidebar's: its name, project, branch and `$PORT`, its agents, what it asked or last said, its PR
+  (state, checks, review, conflicts), diff size and ports; click to open it in Laki; drag it from anywhere on it (a circle too)
   up and down or to the other side, and it sticks to the nearer edge as you let go, where it stays; hidden while Laki is
   in front; on by default. *While working* picks how a working agent's circle looks, each shown live: *Glow* (a soft
-  halo, the default), *Gradient* (its color turning slowly inside), *Arc* (an arc going round), *Bricks* (pixel bars rising and falling inside it), *Comet* (a bright head going round, its tail fading behind), *Wave* (filled with its color, a slow tide rolling over) or *Still*; *Recent
-  sessions too*: the last 1 to 5 agents you used, idle or finished, as dimmer circles after the ones at work (finished
+  halo), *Gradient* (its color turning slowly inside, the default), *Arc* (an arc going round), *Bricks* (pixel bars rising and falling inside it), *Comet* (a bright head going round, its tail fading behind), *Wave* (filled with its color, a slow tide rolling over) or *Still*; *Recent
+  sessions too*: the last 1 to 5 agents you used (3 by default), idle or finished, as dimmer circles after the ones at work (finished
   ones you haven't seen first; one drops out after 1, 4 (the default), 8 or 24 hours idle, or never); *Bubbles
-  at most*: 3, 5, 8 or 12; *Card on hover*; *+ Session*: a + under the circles, Laki's new-workspace page (off by
+  at most*: 3, 5, 8 or 12; *Card on hover*; *+ Session*: a + under the circles, Laki's new-workspace page (on by
   default); *Voice prompt*: a microphone under them (on by default): a small window where macOS dictation starts by
   itself, then ⏎ sends what you said: *It goes to* picks either *An agent I pick each time* (the default: the bubbles'
   agents or a new session, nothing chosen until you do; queued while the agent works) or *Always a new session*
@@ -780,9 +811,11 @@ lit for a moment.
 - *Resources* (also ⌘K *Resources*): memory and CPU now, refreshed every 3 seconds while it's open. macOS counts every
   process Laki starts as Laki's (the Force Quit window's number): each agent, its MCP servers, the dev servers in
   its tabs. *Laki itself* is the app's own processes and the daemon; the video, JS widgets (all in one process: one
-  site), the preview's page, the floating bubbles and an agent browser each get a row of their own with *Stop*, which
-  frees it until it's opened again (a widget: a click on it, or folding and opening the widgets; the preview: *Load it
-  again*; the bubbles: when an agent's state changes). Template widgets and the memes are drawn in the window's own
+  site), the preview's page, the floating bubbles, an agent browser and the sidebar's browser pages (*Browser: site*;
+  a sign-in window too) each get a row of their own with *Stop*, which frees it until it's opened again (a widget: a
+  click on it, or folding and opening the widgets; the preview: *Load it again*; the bubbles: when an agent's state
+  changes; a browser: the pages you aren't on, each back as you open it). The total line splits out *shells* (every
+  shell tab) and *browsers*. Template widgets and the memes are drawn in the window's own
   process. Then each tab, biggest first, with its processes under it (a click). *Sleep* ends an idle Claude or Codex
   tab's process now; *Open* goes to the tab.
   *Sleep idle agents after* (never by default; 15 minutes to 8 hours) does it on its own for an idle Claude or Codex
