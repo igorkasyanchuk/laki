@@ -500,6 +500,31 @@ test('a merged PR archives its workspace once it is clean (archiveMerged), not w
   c.close()
 })
 
+test('a PR its agent names is linked when none is on the branch (a scheduled run that pushed elsewhere): one, of a remote’s repo', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), 'no pull requests found') // none on its branch
+  execFileSync('git', ['remote', 'add', 'origin', 'git@github.com:Acme/Shop.git'], { cwd: rig.repo }) // capitals: GitHub's names any case
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'find a slow query, fix it, open a draft PR' })
+  const tab = (await rig.rpc('state')).tabs.find((x: { workspace: string }) => x.workspace === ws.id)
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 12, title: 'Faster query', url: 'https://github.com/Acme/Shop/pull/12', headRefName: 'perf/faster-query', baseRefName: 'main', isCrossRepository: false }))
+  const prUrl = async () => (await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id).prUrl
+  const turn = async (text: string) => (await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: text } }), await rig.rpc('prRefresh'))
+  await turn('Like https://github.com/Acme/Shop/pull/3 and https://github.com/Acme/Shop/pull/4') // two: which?
+  await turn('Upstream fix: https://github.com/x/y/pull/9') // not this repo's
+  await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith(`gh pr view ${ws.branch}`)).length >= 2, 'scanned twice')
+  assert.equal(await prUrl(), undefined)
+  await turn('Opened a draft PR: https://github.com/acme/shop/pull/12')
+  await until(async () => (await prUrl()) === 'https://github.com/Acme/Shop/pull/12', 'linked') // gh's spelling
+  assert.equal((await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id).prLinked, true) // its branch is perf/faster-query
+  // the agent opens one on the workspace's own branch: that one wins
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 13, state: 'OPEN', url: 'https://github.com/o/r/pull/13', statusCheckRollup: [] }))
+  await rig.rpc('prRefresh')
+  await until(async () => (await prUrl()) === undefined && (await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id).pr?.number === 13, 'its own PR')
+})
+
 test('Attach PR: one by URL or number becomes the workspace’s (asked for by URL); another branch’s only linked; a folder refused', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH

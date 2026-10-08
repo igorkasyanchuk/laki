@@ -36,7 +36,7 @@ const turn = text => {
     hook('Stop', { last_assistant_message: `answer: ${text}` })
   }, Number(process.env.FAKE_TURN_MS || 300))
 }
-const positional = args.filter((a, i) => !a.startsWith('--') && !['--settings', '--resume', '--model', '--plugin-dir'].includes(args[i - 1]))
+const positional = args.filter((a, i) => !a.startsWith('--') && !['--settings', '--resume', '--model', '--plugin-dir', '--append-system-prompt'].includes(args[i - 1]))
 process.stdin.setRawMode(true) // before the first turn's hooks (execSync blocks): a key typed meanwhile stays raw
 if (positional.length) turn(positional.at(-1))
 else process.stdout.write('> ')

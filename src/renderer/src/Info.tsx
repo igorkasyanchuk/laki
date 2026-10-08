@@ -4,9 +4,10 @@
 import { type MouseEvent, type ReactNode } from 'react'
 import { MERGE_METHODS, type MergeMethod, type PRPerm } from '../../shared/types'
 import { Glyph } from './Glyph'
+import { PanelHandle } from './Panes'
 import { Folded } from './MarkdownView'
 import { type Tunnel } from './Tunnel'
-import { Icon, IconButton, type IconName, Switch, useMenu } from './ui'
+import { Icon, IconButton, type IconName, type MenuItem, Switch, useMenu } from './ui'
 
 export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string; took?: number } // took: seconds (an older daemon: none)
 export type PRInfo = {
@@ -21,6 +22,7 @@ export type PRInfo = {
   draft?: boolean
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
   conflict?: boolean // merge conflicts with its base branch
+  ready?: boolean // GitHub would merge it now; false: blocked, behind, unstable…
   base?: string
   additions?: number
   deletions?: number
@@ -205,6 +207,29 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
   const can = (k: PRPerm) => w.allow?.[k] ?? k !== 'land'
   const [menu, openMenu] = useMenu()
   const method = w.method ?? 'squash'
+  const merge = open && can('merge') && !pr?.draft
+  const approve = open && can('approve') && !pr?.mine // GitHub takes no approval of your own
+  // why Merge isn't green (it still merges, after the confirm: GitHub may refuse)
+  const blocked = !pr
+    ? ''
+    : pr.conflict
+      ? 'merge conflicts'
+      : pr.checks === 'fail'
+        ? 'checks failing'
+        : pr.checks === 'pending'
+          ? 'checks running'
+          : pr.review === 'CHANGES_REQUESTED'
+            ? 'changes requested'
+            : pr.ready === false
+              ? 'GitHub would not merge it yet'
+              : ''
+  const more: MenuItem[] = !pr
+    ? []
+    : [
+        { label: 'Open its checks', icon: 'link', run: () => onOpen(`${pr.url}/checks`) },
+        { label: 'Open its files', icon: 'diff', run: () => onOpen(`${pr.url}/files`) },
+        ...(open && can('close') ? [null, { label: 'Close pull request…', icon: 'x', danger: true, run: () => onAct('close') } as MenuItem] : []),
+      ]
   // Send now: what there is to send, by hand (a linked PR, with no switches: each named)
   const send = (what: FixWhat, named = false) => {
     if (!pr || !(what === 'ci' ? pr.checks === 'fail' : what === 'review' ? (threads ?? 1) > 0 : pr.conflict)) return null
@@ -250,34 +275,37 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
             )}
             {pr.updated && <span>updated {ago(pr.updated)}</span>}
           </div>
+          {/* GitHub's order: Merge first (green once it could go in), Approve beside it, the PR on GitHub at the end and
+              closing, rare and lasting, in ⋯; each asks first (App's prAct) */}
           <div className="pr-acts">
-            {open && can('merge') && !pr.draft && (
-              <span className="split">
-                <button className="merge" onClick={() => onAct('merge', method)} data-tip={`${MERGE_WORDS[method]} (gh pr merge), after a confirm; ▾ for another way`}>
-                  <Icon name="pr" /> Merge…
+            {merge && (
+              <span className={`split ${blocked ? '' : 'green'}`}>
+                <button className="merge" onClick={() => onAct('merge', method)} data-tip={`${MERGE_WORDS[method]}, after a confirm${blocked ? ` · ${blocked}` : ''}`}>
+                  <Icon name="pr" /> Merge
                 </button>
                 <button
-                  className="merge more"
+                  className="merge caret"
                   aria-label="Another way to merge"
+                  data-tip="Another way to merge"
                   onClick={e => openMenu(e, MERGE_METHODS.map(m => ({ label: `${MERGE_WORDS[m]}…`, icon: m === method ? 'check' : undefined, run: () => onAct('merge', m) })))}
                 >
-                  ▾
+                  <Icon name="chevron" />
                 </button>
               </span>
             )}
-            {open && can('approve') && !pr.mine /* GitHub takes no approval of your own */ && (
-              <button className="approve" onClick={() => onAct('approve')} data-tip="An approving review, as you (gh pr review --approve)">
-                <Icon name="check" /> Approve…
+            {approve && (
+              <button className="approve" onClick={() => onAct('approve')} data-tip="An approving review, as you (gh pr review --approve), after a confirm">
+                <Icon name="check" /> Approve
               </button>
             )}
-            <button onClick={() => onOpen(pr.url)} data-tip={pr.url}>
-              <Icon name="github" /> <span className="pr-wide">Open on </span>GitHub
+            <span className="spacer" />
+            <button className={merge || approve ? 'square' : ''} aria-label="Open on GitHub" data-tip={`Open on GitHub · ${pr.url}`} onClick={() => onOpen(pr.url)}>
+              <Icon name="github" />
+              {!(merge || approve) && 'Open on GitHub'}
             </button>
-            {open && can('close') && (
-              <button className="close-pr" onClick={() => onAct('close')} data-tip="Closes it without merging (gh pr close); it can be reopened on GitHub">
-                <Icon name="x" /> Close…
-              </button>
-            )}
+            <button className="square" aria-label="More" data-tip="More" onClick={e => openMenu(e, more, 'right')}>
+              <Icon name="more" />
+            </button>
           </div>
           {pr.body?.trim() && <Folded key={pr.url} text={pr.body.trim()} lines={6} />}
           {open && <Checks pr={pr} onOpen={onOpen} />}
@@ -303,8 +331,11 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
   )
 }
 
+export const INFO_WIDTH = 340 // the info panel's first width, and a double-click on its edge's
 export function InfoPanel(p: {
   w: WsInfo
+  width: number
+  onWidth: (w: number) => void
   onClose: () => void
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
@@ -317,7 +348,8 @@ export function InfoPanel(p: {
 }) {
   const { w } = p
   return (
-    <div className="info">
+    <div className="info" style={{ width: p.width }}>
+      <PanelHandle onWidth={p.onWidth} init={INFO_WIDTH} />
       <div className="diff-head">
         <b>{w.name || w.id}</b>
         <IconButton icon="pencil" title="Rename" onClick={p.onRename} />

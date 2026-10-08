@@ -132,7 +132,10 @@ textarea { resize: vertical; font-family: inherit; }
 .chips-input { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 32px; padding: 3px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); cursor: text; }
 .chips-input:focus-within { border-color: var(--accent); }
 .chips-input input { flex: 1; min-width: 80px; width: auto; border: none; padding: 2px; background: transparent; }
-.chips-input .chip { display: inline-flex; align-items: center; gap: 2px; padding: 1px 3px 1px 8px; border-radius: 999px; background: var(--sel); font-size: 12px; }
+.chips-input .chip { display: inline-flex; align-items: center; gap: 2px; max-width: 100%; min-width: 0; padding: 1px 3px 1px 8px; border-radius: 999px; background: var(--sel); font-size: 12px; }
+.chips-input .chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a long one (a URL) cut, whole in its tooltip */
+.chips-input .chip button { flex: none; }
+.wc-opts > .wo:has(.chips-input) { grid-column: 1 / -1; } /* a list: the card's width */
 .chips-input .chip button { display: inline-flex; padding: 2px; border: none; background: none; color: var(--muted); border-radius: 50%; }
 .chips-input .chip button:hover { color: var(--fg); background: var(--hover); }
 .prompt-box { position: relative; }
@@ -469,7 +472,7 @@ textarea { resize: vertical; font-family: inherit; }
 kbd { font-family: var(--mono); }
 
 /* the workspace info panel and the status bar's PR (Info.tsx) */
-.info { width: 340px; flex: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--panel); min-height: 0; }
+.info { position: relative; width: 340px; flex: none; border-left: 1px solid var(--line); display: flex; flex-direction: column; background: var(--panel); min-height: 0; }
 .info .diff-head .ib { width: 20px; height: 20px; }
 .info-body { flex: 1; overflow-y: auto; padding: 4px 12px 20px; user-select: text; }
 .info section, .side-panel section { padding: 10px 0; border-bottom: 1px solid var(--line); display: flex; flex-direction: column; gap: 6px; }
@@ -489,10 +492,8 @@ kbd { font-family: var(--mono); }
 .pr-title:hover { color: var(--accent); }
 .pr-num { color: var(--muted); font-weight: 400; }
 .pr-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; color: var(--muted); margin-top: -4px; }
-.pr-acts { display: flex; flex-wrap: wrap; gap: 6px; container-type: inline-size; }
-.pr-acts button, .pr-sends button, .pr-send { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
-.pr-acts .close-pr { margin-left: auto; }
-@container (max-width: 340px) { .pr-wide { display: none; } } /* Approve, Open on GitHub and Close in one row */
+.pr-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pr-sends button, .pr-send { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; white-space: nowrap; }
 .pr-block { display: flex; flex-direction: column; gap: 4px; }
 .pr-block h4 { margin: 0 0 2px; display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 8px; font-size: 11.5px; font-weight: 600; color: var(--muted); }
 .pr-sum { font-weight: 400; }
@@ -851,19 +852,17 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 /* a row's marks, the PR's author and GitHub's mark alike: one size (Settings › Appearance › Icon size) */
 .ws :is(.ws-pr, .ws-mark, .ws-sched) :is(.icon-svg, .avatar) { width: var(--ws-icon, 13px); height: var(--ws-icon, 13px); }
 .pr-by { display: inline-flex; align-items: center; gap: 4px; }
-/* the PR's own buttons: approve in GitHub's green */
-.pr-acts button.approve { background: color-mix(in srgb, var(--tc-green) 22%, transparent); border-color: color-mix(in srgb, var(--tc-green) 60%, transparent); color: var(--fg); }
-.pr-acts button.approve:hover { background: color-mix(in srgb, var(--tc-green) 34%, transparent); }
-.pr-acts button.approve .icon-svg { color: var(--tc-green); }
-/* Merge ▾: the last way, and a menu of the others */
+/* the PR's own buttons: one height; Merge ▾ green once it could go in (a tint, readable on every theme), else plain;
+   Approve plain with GitHub's green check; GitHub and ⋯ square */
+.pr-acts button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 28px; padding: 0 11px; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.pr-acts button.square { width: 28px; padding: 0; }
+.pr-acts button .icon-svg { flex: none; }
 .pr-acts .split { display: inline-flex; }
-.pr-acts .split button.merge { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: color-mix(in srgb, var(--accent) 55%, transparent); color: var(--fg); }
-.pr-acts .split button.merge:hover { background: color-mix(in srgb, var(--accent) 32%, transparent); }
 .pr-acts .split button.merge:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.pr-acts .split button.more { border-left: 0; border-top-left-radius: 0; border-bottom-left-radius: 0; padding-left: 6px; padding-right: 6px; }
-/* close: quiet until the mouse is on it */
-.pr-acts button.close-pr { background: none; border-color: transparent; color: var(--muted); }
-.pr-acts button.close-pr:hover { color: var(--error); border-color: color-mix(in srgb, var(--error) 50%, transparent); background: color-mix(in srgb, var(--error) 12%, transparent); }
+.pr-acts .split button.caret { width: 24px; padding: 0; border-left-color: transparent; border-top-left-radius: 0; border-bottom-left-radius: 0; box-shadow: inset 1px 0 color-mix(in srgb, var(--fg) 14%, transparent); }
+.pr-acts .split.green button.merge { background: color-mix(in srgb, var(--tc-green) 26%, var(--panel)); border-color: color-mix(in srgb, var(--tc-green) 70%, transparent); font-weight: 600; }
+.pr-acts .split.green button.merge:hover { background: color-mix(in srgb, var(--tc-green) 38%, var(--panel)); }
+.pr-acts .split.green button.merge .icon-svg, .pr-acts button.approve .icon-svg { color: var(--tc-green); }
 /* a row's diff size; on hover its buttons take the marks' place */
 .port-name { margin-left: 4px; color: var(--muted); }
 .port-stop { background: none; border: none; padding: 0 2px; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
@@ -1033,6 +1032,9 @@ button.board-card:hover { border-color: var(--muted); }
 .sidebar[data-style='compact'] .ws :is(.ws-pr, .ws-stat, .ws-mark, .ws-sched, .ws-merged, .elapsed, .ws-proj) { display: none; }
 .sidebar:is([data-style='extended'], [data-style='cards']) .ws { flex-wrap: wrap; height: auto; min-height: var(--ws-h, 28px); padding-block: 4px; row-gap: 1px; }
 .sidebar:is([data-style='extended'], [data-style='cards']) .ws > .ws-stat { display: none; } /* on the second line */
+/* the first line stays one: a long name shrinks (its basis 0, not its width, else it wraps under the glyph) */
+.sidebar:is([data-style='extended'], [data-style='cards']) .ws > .ws-name { flex: 1 1 0; min-width: 0; }
+.sidebar:is([data-style='extended'], [data-style='cards']) .ws > .spacer { display: none; }
 .ws-sub { flex-basis: 100%; display: flex; gap: 6px; min-width: 0; padding-left: 18px; font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; }
 .ws-sub > * { flex: none; }
 .ws-sub > .ws-sub-pr { flex: 0 1 auto; overflow: hidden; text-overflow: ellipsis; }
@@ -1082,3 +1084,25 @@ button.board-card:hover { border-color: var(--muted); }
 .preset { gap: 8px; padding: 12px; }
 .preset > .vars { display: none; }
 .preset:focus-within > .vars { display: flex; }
+/* a workspace's card as the mouse rests on its row (App's peekCard), beside the sidebar: its links and buttons take
+   clicks; the row's color on its left edge */
+.ws-peek { position: fixed; z-index: 150; width: 320px; max-width: calc(100vw - 16px); box-sizing: border-box; display: flex; flex-direction: column; gap: 5px; padding: 10px 12px; background: var(--panel); color: var(--fg); border: 1px solid var(--line); border-left: 3px solid var(--tab-c, var(--line)); border-radius: var(--rs, 8px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font-size: 12px; line-height: 1.35; }
+.wp-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.wp-head b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-head .muted { margin-left: auto; flex: none; max-width: 40%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
+.wp-branch { font-family: var(--mono); font-size: 11px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-agents { display: flex; flex-wrap: wrap; gap: 2px 10px; font-size: 11.5px; }
+.wp-agents .g-waiting { color: var(--waiting); } .wp-agents .g-running { color: var(--running); } .wp-agents .g-done { color: var(--done); } .wp-agents .g-limit { color: var(--error); }
+.wp-agents .elapsed { margin-left: 4px; }
+.wp-last { opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 4; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
+.wp-pr { display: flex; flex-direction: column; gap: 3px; padding-top: 6px; border-top: 1px solid var(--line); }
+.wp-pr a { display: flex; align-items: center; gap: 6px; min-width: 0; color: var(--fg); text-decoration: none; }
+.wp-pr a:hover .wp-pr-title { text-decoration: underline; }
+.wp-pr-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wp-pr-state { flex: none; padding: 0 6px; border: 1px solid currentColor; border-radius: 999px; font-size: 10.5px; line-height: 15px; color: var(--done); }
+.wp-pr-state.draft { color: var(--muted); } .wp-pr-state.merged { color: var(--tc-purple); } .wp-pr-state.closed { color: var(--error); }
+.wp-pr-meta { display: flex; flex-wrap: wrap; gap: 2px 10px; color: var(--muted); font-size: 11px; }
+.wp-pr-meta .ci-fail { color: var(--error); } .wp-pr-meta .ci-pass { color: var(--done); } .wp-pr-meta .ci-pending { color: var(--waiting); }
+.wp-line { color: var(--muted); font-size: 11px; }
+.wp-acts { display: flex; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
+.wp-acts > button { padding: 3px 9px; font-size: 11.5px; }

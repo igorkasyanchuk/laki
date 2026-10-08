@@ -4,11 +4,13 @@ import { contextBridge, ipcRenderer, webUtils } from 'electron'
 contextBridge.exposeInMainWorld('laki', {
   conn: (): Promise<{ port: number; token: string }> => ipcRenderer.invoke('conn'),
   notify: (title: string, body: string, tab: string, sound?: string, actions?: { text: string; n?: number; label?: string; pick?: string }[]) => ipcRenderer.send('notify', title, body, tab, sound, actions),
+  sound: (name: string) => ipcRenderer.send('sound', name), // a timer's end: a macOS sound
   browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
   onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
+  openPath: (path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> => ipcRenderer.invoke('open-path', path, root),
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
   glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
@@ -24,20 +26,26 @@ contextBridge.exposeInMainWorld('laki', {
     ipcRenderer.on('shot', (_e, png: string, note?: string) => cb(png, note))
     ipcRenderer.send('shot-ready') // then main sends one taken before
   },
-  // the floating bubbles: the workspaces whose agent works or waits (none: no bar), in the theme's colors
-  floats: (items: object[], colors: Record<string, string>, style?: string) => ipcRenderer.send('floats', items, colors, style),
+  // the floating bubbles: the workspaces whose agent works or waits, and recent ones (none, no buttons: no bar), in the
+  // theme's colors; opts: the working circles' style, cards on hover, + Session, the microphone
+  floats: (items: object[], colors: Record<string, string>, opts?: object) => ipcRenderer.send('floats', items, colors, opts),
   procs: (): Promise<{ pid: number; name: string; stop?: string }[]> => ipcRenderer.invoke('procs'), // Settings › Resources: what each process holds
   procStop: (what: string) => ipcRenderer.send('proc-stop', what), // the bubbles, an agent browser
   // the bubbles' own windows (floater.html): the bar (the list in; its height, a hover and a click out) and the card
   floater: {
-    onFloats: (cb: (f: { items: object[]; colors: Record<string, string>; style: string }) => void) => ipcRenderer.on('floats', (_e, f) => cb(f)),
+    onFloats: (cb: (f: { items: object[]; colors: Record<string, string>; style: string; add: boolean; mic: boolean }) => void) => ipcRenderer.on('floats', (_e, f) => cb(f)),
     onSide: (cb: (side: 'left' | 'right') => void) => ipcRenderer.on('floater-side', (_e, side) => cb(side)),
     drag: (phase: 'start' | 'move' | 'end', dx = 0, dy = 0) => ipcRenderer.send('floater-drag', phase, dx, dy),
     size: (h: number) => ipcRenderer.send('floater-size', h),
     hover: (tab: string, top: number) => ipcRenderer.send('floater-hover', tab, top),
     open: (tab: string) => ipcRenderer.send('floater-open', tab),
+    act: (what: 'new') => ipcRenderer.send('floater-act', what), // + Session
     onCard: (cb: (f: object, colors: Record<string, string>) => void) => ipcRenderer.on('card', (_e, f, colors) => cb(f, colors)),
     cardSize: (tab: string, w: number, h: number) => ipcRenderer.send('floater-card', tab, w, h),
+    // the voice prompt's window: the agents it can go to, then the text out (no tab: a new session's page)
+    onVoice: (cb: (items: object[], colors: Record<string, string>, to: string) => void) => ipcRenderer.on('voice', (_e, items, colors, to) => cb(items, colors, to)),
+    voiceSend: (tab: string, text: string): Promise<{ error?: string; queued?: boolean }> => ipcRenderer.invoke('voice-send', tab, text),
+    voiceClose: () => ipcRenderer.send('voice-close'),
   },
   // the screenshot's editor window (annotate.html): the picture in, the drawn one and a note out
   annotate: {

@@ -7,16 +7,18 @@ export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'f
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
   notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[]): void
+  sound?(name: string): void
   browse?(r: object): Promise<unknown>
   onFocusTab(cb: (tab: string) => void): void
   pickFolder(): Promise<string | null>
   pathOf?(f: File): string
   openExternal(url: string): void
+  openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
-  floats?(items: object[], colors: Record<string, string>, style?: string): void // the floating bubbles' workspaces (none: hidden)
+  floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; mic: boolean; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void
   onDeepLink?(cb: (url: string) => void): void

@@ -79,6 +79,7 @@ export type Workspace = {
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
   prUrl?: string // the GitHub PR it was started from (laki new --pr, or a prompt naming one): its PR by URL (a fork's, another repo's), until the branch moves
   prLinked?: boolean // prUrl from a prompt: the PR isn't checked out here, so the auto switches (fix and push) stay off
+  prSaid?: boolean // prUrl a PR its agent named (prFromSaid): one on its own branch, once there, replaces it
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
 }
@@ -162,6 +163,8 @@ export type Settings = {
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
+  timerAlert?: 'dialog' | 'notification' // what a sidebar timer's end shows (unset: Laki's dialog)
+  timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   presets?: Preset[] | null // null: the defaults
   theme?: string
   glass?: boolean // a see-through, blurred window
@@ -196,7 +199,14 @@ export type Settings = {
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
   floater?: boolean // the floating bubbles over other apps: agents working or waiting (unset: on)
-  floaterStyle?: 'glow' | 'gradient' | 'arc' | 'still' // how a working agent's bubble looks (unset: glow)
+  floaterStyle?: 'glow' | 'gradient' | 'arc' | 'bricks' | 'comet' | 'wave' | 'still' // how a working agent's bubble looks (unset: glow)
+  floaterRecent?: number // the bubbles' agents used last, idle or done, after the ones at work: 0-5 (unset: 0)
+  floaterRecentHours?: number // a recent one drops out after this many hours idle; 0: never (unset: 4)
+  floaterVoiceTo?: 'pick' | 'new' // the voice prompt goes to: an agent you pick each time, or always a new session (unset: pick)
+  floaterMax?: number // the bubbles at most (unset: 12)
+  floaterCards?: boolean // a bubble's card on hover (unset: on)
+  floaterNew?: boolean // the bubbles' + Session: the new-workspace page (unset: off)
+  floaterMic?: boolean // the bubbles' microphone: a prompt by voice to an agent or a new session (unset: on)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)

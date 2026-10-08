@@ -4,6 +4,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
+import { PanelHandle } from './Panes'
 import { Folded, Markdown } from './MarkdownView'
 import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
@@ -510,13 +511,7 @@ export function SidePanel(p: {
   const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
     <div className="side-panel" style={{ width: p.width }}>
-      <div
-        className="sp-handle"
-        data-tip="Drag to resize · double-click to reset"
-        onPointerDown={e => e.currentTarget.setPointerCapture(e.pointerId)}
-        onPointerMove={e => e.currentTarget.hasPointerCapture(e.pointerId) && p.onWidth(Math.round(Math.min(760, Math.max(240, window.innerWidth - e.clientX))))}
-        onDoubleClick={() => p.onWidth(PANEL_WIDTH)}
-      />
+      <PanelHandle onWidth={p.onWidth} init={PANEL_WIDTH} />
       <div className="sp-tabs">
         {tabs.map(t => (
           <button key={t.id} className={t.id === tab ? 'on' : ''} data-tip={t.label} onClick={() => p.onTab(t.id)}>

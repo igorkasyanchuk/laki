@@ -14,6 +14,17 @@ import { termTheme, transparent } from './themes'
 
 export const xterms = new Map<string, Terminal>() // per tab: the KeyBar asks for its cursor-key mode
 
+// a file:// link's path (any host: claude puts the Mac's name there), or a bare absolute path; '' for any other link
+const filePath = (uri: string) => {
+  if (uri.startsWith('/')) return uri
+  try {
+    const u = new URL(uri)
+    return u.protocol === 'file:' ? decodeURIComponent(u.pathname) : ''
+  } catch {
+    return ''
+  }
+}
+
 export function Term({
   tab,
   active = true,
@@ -25,6 +36,7 @@ export function Term({
   theme = '',
   look = termLook({}),
   newline = false,
+  onFile,
 }: {
   tab: string
   active?: boolean
@@ -35,6 +47,7 @@ export function Term({
   editKeys?: boolean // ⌘← ⌘→ ⌘⌫ ⌥← ⌥→: EDIT_KEYS
   theme?: string // the app's (themes.ts): the colors come from its CSS
   look?: ReturnType<typeof termLook> // line height, weight, cursor… (Settings)
+  onFile?: (path: string) => void // a ⌘-clicked file:// link's path
   newline?: boolean // an agent's: ⌘⏎ and ⇧⏎ make a new line in its prompt
 }) {
   const nl = useRef(newline)
@@ -44,6 +57,8 @@ export function Term({
   const edit = useRef(editKeys)
   edit.current = editKeys
   const box = useRef<HTMLDivElement>(null)
+  const file = useRef(onFile)
+  file.current = onFile
   const [xt, setXt] = useState<{ term: Terminal; search: SearchAddon; fit: FitAddon } | null>(null)
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
   const find = findSeq !== closedAt
@@ -57,8 +72,14 @@ export function Term({
       allowTransparency: transparent(),
       macOptionIsMeta: true,
       theme: termTheme(),
-      // OSC 8 links (claude's PR links): opened at once, as plain URLs are; xterm's own asks first. Main opens http(s) only
-      linkHandler: { activate: (_e, uri) => openExternal(uri) },
+      // OSC 8 links: a web one (claude's PR links) opened at once, as plain URLs are (xterm's own asks first; main opens
+      // http(s) only); a file:// one (claude's paths) on ⌘-click, as a terminal's, so a click to select or focus opens nothing
+      linkHandler: {
+        allowNonHttpProtocols: true,
+        activate: (e, uri) => (/^https?:/i.test(uri) ? openExternal(uri) : filePath(uri) && (e.metaKey || e.ctrlKey) && file.current?.(filePath(uri))),
+        hover: (_e, uri) => box.current && filePath(uri) && (box.current.title = '⌘-click to open'),
+        leave: () => box.current && (box.current.title = ''),
+      },
     })
     const fit = new FitAddon()
     term.loadAddon(fit)

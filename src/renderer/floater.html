@@ -4,9 +4,9 @@
     <meta charset="UTF-8" />
     <title>Laki</title>
     <style>
-      :root { --bg: #161a21; --fg: #d5d9e3; --muted: #7a8294; --line: #232833; --running: #7aa2f7; --waiting: #e0af68; --font: -apple-system, system-ui, sans-serif; color-scheme: dark; }
+      :root { --bg: #161a21; --fg: #d5d9e3; --muted: #7a8294; --line: #232833; --running: #7aa2f7; --waiting: #e0af68; --done: #9ece6a; --idle: var(--muted); --accent: #7aa2f7; --font: -apple-system, system-ui, sans-serif; color-scheme: dark; }
       html, body { margin: 0; background: transparent; overflow: hidden; color: var(--fg); font: 12px/1.35 var(--font); user-select: none; -webkit-user-select: none; }
-      body[data-mode='card'] #bar, body[data-mode='bar'] #card { display: none; }
+      body:not([data-mode='bar']) #bar, body:not([data-mode='card']) #card, body:not([data-mode='voice']) #voice { display: none; }
       /* the drop: 44px wide (main's BAR), against the screen's edge (data-side); its shape (.shape) melts into the edge
          at the top and bottom (the flares), wobbles a little, and is a round blob while it's dragged */
       #bar { position: relative; isolation: isolate; width: 44px; box-sizing: border-box; padding: 20px 0 20px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: grab; touch-action: none; animation: fl-in 0.35s cubic-bezier(0.3, 1.4, 0.5, 1); }
@@ -23,20 +23,54 @@
       @keyframes fl-wobble { 0%, 100% { border-radius: 19px 0 0 19px / 22px 0 0 22px; } 33% { border-radius: 16px 0 0 21px / 19px 0 0 27px; } 66% { border-radius: 21px 0 0 17px / 26px 0 0 20px; } }
       @keyframes fl-in { from { transform: translateX(40px); } }
       @keyframes fl-in-left { from { transform: translateX(-40px); } }
-      .fl-dot { cursor: pointer; }
-      body.dragging .fl-dot { cursor: grabbing; }
-      .fl-dot:hover { filter: brightness(1.35); } /* over any style's background, a gradient's too */
+      .fl-dot, .fl-btn { cursor: pointer; transition: transform 0.12s; }
+      body.dragging :is(.fl-dot, .fl-btn) { cursor: grabbing; }
+      /* hovered: brighter and a little bigger (macOS shows another app's pointer shapes only while it's the active one) */
+      .fl-dot:hover { filter: brightness(1.35); transform: scale(1.1); } /* over any style's background, a gradient's too */
+      .fl-btns { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+      .fl-dot + .fl-btns { margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--line); }
+      .fl-btn { width: 26px; height: 26px; box-sizing: border-box; display: grid; place-items: center; border-radius: 50%; color: var(--muted); border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); background: var(--bg); }
+      .fl-btn:hover { color: var(--fg); border-style: solid; border-color: var(--accent); transform: scale(1.1); }
+      .fl-btn svg { width: 14px; height: 14px; }
       #card { width: 240px; box-sizing: border-box; padding: 9px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
       #card b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #card .meta { color: var(--muted); font-size: 11px; margin-top: 1px; }
       #card .meta i { font-style: normal; color: var(--c); }
       #card .last { margin-top: 6px; color: var(--fg); opacity: 0.85; display: -webkit-box; -webkit-line-clamp: 5; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
-      @media (prefers-reduced-motion: reduce) { #bar, .shape { animation: none; } }
+      /* the voice prompt (main's VOICE: 320 by 186) */
+      #voice { box-sizing: border-box; height: 186px; display: flex; flex-direction: column; gap: 7px; padding: 10px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; user-select: text; -webkit-user-select: text; }
+      .v-head { display: flex; align-items: center; justify-content: space-between; }
+      #voice button, #voice select, #voice textarea { font: inherit; color: var(--fg); background: color-mix(in srgb, var(--fg) 6%, var(--bg)); border: 1px solid var(--line); border-radius: 7px; }
+      #voice button { cursor: pointer; padding: 4px 10px; }
+      #voice button:hover { border-color: var(--muted); }
+      .v-x { border: none !important; background: none !important; color: var(--muted) !important; font-size: 16px !important; line-height: 1; padding: 0 2px !important; }
+      #voice textarea { flex: 1; resize: none; padding: 6px 8px; outline: none; }
+      #voice textarea:focus { border-color: var(--accent); }
+      .v-row { display: flex; gap: 6px; }
+      .v-row select { flex: 1; min-width: 0; padding: 3px 6px; }
+      .v-row select[hidden] + .v-mic { margin-left: auto; } /* always a new session: no list */
+      .v-mic { display: grid; place-items: center; padding: 4px 7px !important; }
+      .v-mic svg { width: 14px; height: 14px; }
+      #voice .v-send { background: var(--accent); border-color: var(--accent); color: var(--bg); font-weight: 600; }
+      #voice .v-send:disabled { opacity: 0.6; cursor: default; }
+      .v-note { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .v-note.bad { color: var(--waiting); white-space: normal; }
+      @media (prefers-reduced-motion: reduce) { #bar, .shape { animation: none; } .fl-dot, .fl-btn { transition: none; } }
     </style>
   </head>
   <body data-side="right" data-fstyle="glow">
     <div id="bar"><div class="shape"></div></div>
     <div id="card"></div>
+    <div id="voice">
+      <div class="v-head"><b>Say a prompt</b><button class="v-x" title="Close (Esc)">×</button></div>
+      <textarea spellcheck="false" placeholder="Speak, or type…"></textarea>
+      <div class="v-row">
+        <select title="Who gets it"></select>
+        <button class="v-mic" title="Dictate again"></button>
+        <button class="v-send">Send</button>
+      </div>
+      <div class="v-note">Dictation starts by itself · ⏎ sends · ⇧⏎ a new line · Esc closes</div>
+    </div>
     <script type="module" src="/src/floater.ts"></script>
   </body>
 </html>

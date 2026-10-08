@@ -2,6 +2,24 @@
 // rows dragged into a new order.
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
 
+// localStorage, per viewer: what's there may be gone, blocked or not JSON; keep(key, undefined) removes it
+export function load<T>(key: string, or: T): T {
+  try {
+    return JSON.parse(localStorage.getItem(key) ?? 'null') ?? or
+  } catch {
+    return or
+  }
+}
+export const keep = (key: string, v: unknown) => {
+  try {
+    if (v === undefined) localStorage.removeItem(key)
+    else localStorage.setItem(key, JSON.stringify(v))
+  } catch {}
+}
+// Esc for a page or a dialog: not one something on it took (a menu, a field's own Esc), nor one that ends dictation or an
+// IME's word
+export const escapes = (e: KeyboardEvent) => e.key === 'Escape' && !e.defaultPrevented && !e.isComposing
+
 const paths = {
   plus: 'M8 3v10M3 8h10',
   x: 'M4 4l8 8M12 4l-8 8',
@@ -209,7 +227,7 @@ export function AskHost() {
 // a page over the main area, as Settings is (the new-workspace form): its title, ✕ and Esc close it
 export function Page({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const f = (e: KeyboardEvent) => escapes(e) && onClose()
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [onClose])

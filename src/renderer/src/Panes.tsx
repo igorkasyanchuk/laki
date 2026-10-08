@@ -161,6 +161,19 @@ export function Panes(p: {
   )
 }
 
+// a right panel's left edge (the side panel's, the info panel's): drag to resize, double-click for the default width
+export function PanelHandle({ onWidth, init }: { onWidth: (w: number) => void; init: number }) {
+  return (
+    <div
+      className="sp-handle"
+      data-tip="Drag to resize · double-click to reset"
+      onPointerDown={grab}
+      onPointerMove={e => held(e) && onWidth(Math.round(Math.min(760, Math.max(240, window.innerWidth - e.clientX))))}
+      onDoubleClick={() => onWidth(init)}
+    />
+  )
+}
+
 // the sidebar's right edge: drag to resize, double-click for the default width
 export function SideHandle({ width, onWidth, init }: { width: number; onWidth: (w: number) => void; init: number }) {
   return (

@@ -151,6 +151,8 @@ function hookFiles(h: Hooks): Record<string, string> {
       Stop: c('idle'),
       StopFailure: c('failed'),
     },
+    // Progress on tabs: claude reports without asking each time (this Mac's CLI only: a host has none)
+    ...(h === localHooks && { permissions: { allow: [`Bash(${LAKI_CLI} progress:*)`] } }),
   }
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
   const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
@@ -188,6 +190,11 @@ another session in it) with an agent started on the task. This session goes on a
 4. Say in one line what it made: the workspace id it printed, and the agent.
 `,
 })
+
+// Progress on tabs (settings.progress): told to claude and codex at every start, since the laki skill loads only for
+// Laki's own tasks
+const PROGRESS_NOTE = () =>
+  `You run in a Laki tab that shows how far along you are. While you work on a task, about every 20-30 seconds of work, run \`${LAKI_CLI} progress <0-100> "<what you're on>"\`: your estimate of the whole task, not the step (weigh the steps by how long they take), never going back down, 100 when it's done. Skip it for a quick answer.`
 
 export function writeHooks() {
   for (const [f, text] of Object.entries({ ...hookFiles(localHooks), ...claudePlugin() })) {
@@ -895,14 +902,17 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   const again = resume && tab.resumeId // its chat, again
   let argv: string[]
   let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
+  const told = h === localHooks && state.settings?.progress // a host has no laki CLI to report with
   if (tab.preset === 'claude') {
     argv = ['claude', '--settings', join(h.dir, 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
+    if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', PROGRESS_NOTE()) // a preset's own wins
   } else if (tab.preset === 'codex') {
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
     argv.push('-c', 'notify=' + JSON.stringify([...h.argv, 'hook', 'done']))
+    if (told && !pr?.args?.includes('developer_instructions')) argv.push('-c', 'developer_instructions=' + JSON.stringify(PROGRESS_NOTE())) // a JSON string is a TOML one
   } else if (tab.preset === 'gemini') {
     argv = again ? ['gemini', '--resume', again] : ['gemini']
     if (ask.length) ask = ['-i', ...ask] // a bare prompt would answer it and exit
@@ -1499,7 +1509,9 @@ async function teardown(ws: Workspace) {
   rmSync(setupMarker(ws), { force: true })
 }
 
+const saidTried = new Map<string, string>() // prFromSaid's: the PR link each workspace's agents named last, tried
 function dropWs(ws: Workspace) {
+  saidTried.delete(ws.id)
   stopTunnels(ws.id)
   forward(ws, false)
   for (const t of tabsOf(ws.id)) {
@@ -1657,6 +1669,8 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       if (!r.limit) phone(tab, 'done', r.last ?? '')
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
       prSoon()
+      const w = state.workspaces.find(x => x.id === tab.workspace)
+      if (last && w?.schedule && w.kind !== 'worktree') void prFromSaid(w) // a scheduled run's own folder session (a worktree's scan, finding none on its branch, does; the project's lasting local one would keep the first PR named)
       break
     }
     case 'interrupted':
@@ -1862,7 +1876,8 @@ function syncBranches() {
 }
 function moveBranch(w: Workspace, b: string) {
   w.branch = b
-  w.prUrl = w.prLinked = undefined // nor the PR it started from
+  w.prUrl = w.prLinked = w.prSaid = undefined // nor the PR it started from, or its agent named
+  saidTried.delete(w.id) // a PR named again is tried again
   prs.delete(w.id) // the old branch's PR isn't this one's
 }
 
@@ -2186,7 +2201,7 @@ export function prTick(now = Date.now()) {
 
 // Attach PR (the app's, for a workspace on a branch with no PR found): a PR by its URL or number in the repo, asked for
 // by URL from then on; only linked (prLinked: no switches, as a prompt's) when its head isn't this workspace's branch
-export async function prAttach(o: { ws: string; pr: string }) {
+export async function prAttach(o: { ws: string; pr: string }, said = false) {
   const w = findWs(o.ws)
   const proj = findProject(w.project)
   if (proj.git === false) throw new Error('a folder has no pull requests: only a git project')
@@ -2195,12 +2210,31 @@ export async function prAttach(o: { ws: string; pr: string }) {
   const head = pr.isCrossRepository && pr.headRepositoryOwner?.login ? `${pr.headRepositoryOwner.login}/${pr.headRefName}` : pr.headRefName
   w.prUrl = pr.url
   w.prLinked = head === w.branch ? undefined : true
+  w.prSaid = said || undefined // yours stays; one its agent named gives way to its branch's
   prs.delete(w.id)
   wsLog(w, `PR: #${pr.number} attached${w.prLinked ? `, only linked (its branch is ${head})` : ''}`)
   save()
   changed()
   void scanPRs()
   return { number: pr.number, url: pr.url, linked: !!w.prLinked }
+}
+
+// a workspace with no PR on its branch (a worktree's scan found none; a scheduled run's local one at its agent's turn
+// end): the PR its
+// agent names in a last answer ("Opened a draft PR: https://github.com/o/r/pull/12"), as an agent that pushed under
+// another branch name, or a scheduled run that reviewed one, leaves it; attached as Attach PR does (only linked when
+// its head isn't this branch). Only a link to a repo of the workspace's remotes, one of them in all its tabs' answers
+// (two: which?), each tried once per workspace (saidTried)
+async function prFromSaid(ws: Workspace) {
+  if (ws.prUrl || ws.archived || state.projects.find(p => p.id === ws.project)?.git === false) return
+  const urls = new Set(tabsOf(ws.id).flatMap(t => (rtOf(t.id).last ?? '').match(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g)?.map(u => u.toLowerCase()) ?? [])) // GitHub's names any case
+  const [url] = urls
+  if (urls.size !== 1 || saidTried.get(ws.id) === url) return
+  saidTried.set(ws.id, url)
+  const repo = url.split('/').slice(3, 5).join('/').toLowerCase()
+  const remotes = (await git(ws, 'remote', '-v').catch(() => '')).toLowerCase() // origin\tgit@github.com:o/r.git (fetch)
+  if (![...remotes.matchAll(/github\.com[:/]([\w.-]+\/[\w.-]+?)(?:\.git)?\/?\s/g)].some(m => m[1] === repo)) return wsLog(ws, `PR: its agent named ${url}, not a repo of its remotes`)
+  await prAttach({ ws: ws.id, pr: url }, true).catch(e => wsLog(ws, `PR: its agent named ${url}: ${firstLine(e)}`))
 }
 
 let prScan: Promise<void> | null = null
@@ -2238,6 +2272,15 @@ function ghLogin(at: At) {
 
 async function scanPR(ws: Workspace) {
   if (ws.host) await hostSync(ws)
+  // linked to a PR its agent named (prFromSaid): one on its own branch, once there, wins (a local one's by its URL:
+  // scans skip a local workspace without one)
+  const own = ws.prLinked && ws.prUrl && ws.prSaid ? await exec(ws, 'gh', ['pr', 'view', ws.branch, '--json', 'url'], { timeout: 20000 }).then(r => String(JSON.parse(r.stdout).url || '')).catch(() => '') : ''
+  if (own) {
+    wsLog(ws, `PR: ${own} on ${ws.branch} now, not ${ws.prUrl} its agent named`)
+    ws.prUrl = ws.kind === 'worktree' ? undefined : own
+    ws.prLinked = ws.prSaid = undefined
+    save()
+  }
   let pr: PR
   try {
     const { stdout } = await exec(ws, 'gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { timeout: 20000 })
@@ -2266,6 +2309,7 @@ async function scanPR(ws: Workspace) {
   } catch (e) {
     wsLog(ws, `PR: gh pr view ${ws.prUrl ?? ws.branch}: ${firstLine(e)}`)
     if (prs.delete(ws.id)) changed()
+    if (!ws.prUrl) await prFromSaid(ws)
     return
   }
   const count = (st: Check['state']) => pr.list?.filter(c => c.state === st).length ?? 0

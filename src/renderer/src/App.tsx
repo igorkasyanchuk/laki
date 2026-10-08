@@ -1,8 +1,8 @@
-import { type CSSProperties, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { type CSSProperties, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { API, rowsOf, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, type NotifyAction, openExternal } from './api'
-import { type AutoKey, Avatar, ciText, type FixWhat, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, type WsInfo } from './Info'
+import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, type WsInfo } from './Info'
 import { About, AddProject, Fun, Logs, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
@@ -18,13 +18,13 @@ import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
+import { actionsFor, clock, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, css, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
+import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, load, type MenuItem, moveId, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run' } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string; after?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -55,7 +55,7 @@ const sideVars = (sl?: SideLook) => Object.fromEntries((Object.keys(SIDE_VARS) a
 
 // the sidebar's timers: what happens as one ends (a notification and a message always); its quick lengths, minutes
 const TIMER_THEN = [
-  ['notify', 'Just notify me', 'bell'],
+  ['notify', 'Just tell me', 'bell'],
   ['pause', 'Pause the video', 'stop'],
   ['play', 'Play the video', 'run'],
   ['close', 'Close the video', 'x'],
@@ -63,8 +63,8 @@ const TIMER_THEN = [
 ] as const
 type Then = (typeof TIMER_THEN)[number][0]
 type Watch = { id: string; ms: number; from?: number } // a stopwatch
-type Timer = { id: string; end: number; ms: number; then: Then | 'remind' | 'send'; cmd?: string; ws?: string; tab?: string; text?: string } // cmd: then's command, run in ws; remind: a notification about ws; send: text to the agent tab (Send later)
-const MINUTES = [5, 10, 15, 25, 30, 45, 60]
+type Timer = { id: string; end: number; ms: number; then: Then | 'remind' | 'send'; cmd?: string; ws?: string; tab?: string; text?: string; left?: number; note?: string } // cmd: then's command, run in ws; remind: a notification about ws; send: text to the agent tab (Send later); left: paused, the ms it has left (end means nothing then); note: what it's for (Go out), on its bar and as it ends
+const MINUTES = [1, 5, 10, 15, 25, 30, 45, 60]
 // the sidebar's filter (its funnel): words in a workspace's name, branch or PR, and at most one of these
 const ONLY = [
   ['needs', 'Needs you'],
@@ -78,14 +78,6 @@ const tabGlyph = (t: TabView) => (t.limit ? 'limit' : t.done && t.status === 'id
 const SIDE = 240 // the sidebar's default width
 let requests = 0
 const wsName = (w: { id: string; name?: string }) => w.name || w.id
-
-const load = <T,>(k: string, d: T): T => {
-  try {
-    return JSON.parse(localStorage.getItem(k) ?? '') ?? d
-  } catch {
-    return d
-  }
-}
 
 // the last theme (and glass, font), until the daemon's settings arrive
 applyTheme(load<string | Paint>('laki.theme', ''))
@@ -143,6 +135,7 @@ export function App() {
   const [panelW, setPanelW] = useState<number>(() => load('laki.panelW', PANEL_WIDTH))
   const [preview, setPreview] = useState<{ ws: string; path: string; line?: number; n: number; edit?: Edit } | null>(null) // a file shown in the app; n: each request reloads it; edit: its unsaved edit
   const [info, setInfo] = useState<boolean>(() => load('laki.info', false)) // the workspace info panel
+  const [infoW, setInfoW] = useState<number>(() => load('laki.infoW', INFO_WIDTH))
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
   const [sideW, setSideW] = useState<number>(() => load('laki.side', SIDE))
@@ -166,6 +159,31 @@ export function App() {
   viewRef.current = view
   const narrow = useSyncExternalStore(NARROW.on, NARROW.now) // a phone: one pane at a time, the sidebar and panels over it
   const touch = useSyncExternalStore(TOUCH.on, TOUCH.now)
+  // a workspace's card as the mouse rests on its row (peekCard): its id, where (the row's top, the sidebar's right
+  // edge); a moment to move onto it, where its links and buttons take clicks; a wheel, a key or leaving the window hides it
+  const [peek, setPeek] = useState<{ id: string; top: number; left: number } | null>(null)
+  const peekTimer = useRef(0)
+  const peekBox = useRef<HTMLDivElement>(null)
+  const peekAt = (id?: string, el?: HTMLElement) => {
+    clearTimeout(peekTimer.current)
+    peekTimer.current = window.setTimeout(() => {
+      if (!id || !el?.isConnected) return setPeek(null)
+      const r = el.getBoundingClientRect()
+      setPeek({ id, top: r.top, left: (el.closest('.sidebar') ?? el).getBoundingClientRect().right + 6 })
+    }, !id ? 250 : peek ? 120 : 550)
+  }
+  useEffect(() => {
+    if (!peek) return
+    const hide = (e: Event) => !(e.type === 'wheel' && peekBox.current?.contains(e.target as Node)) && (clearTimeout(peekTimer.current), setPeek(null))
+    const on = ['wheel', 'keydown'] as const
+    for (const k of on) window.addEventListener(k, hide, true)
+    window.addEventListener('blur', hide) // the window's own (not captured: a button on the card taking the focus would hide it before its click)
+    return () => (on.forEach(k => window.removeEventListener(k, hide, true)), window.removeEventListener('blur', hide))
+  }, [!!peek])
+  useLayoutEffect(() => { // kept inside the window, as its text changes too
+    const el = peekBox.current
+    if (el && peek) el.style.top = `${Math.max(8, Math.min(peek.top - 6, window.innerHeight - el.offsetHeight - 8))}px`
+  })
   const mru = useRef<string[]>([]) // sessions, most recently focused first: which pane a tab focuses
 
   const live = useMemo(() => view?.workspaces.filter(w => !w.archived) ?? [], [view])
@@ -223,8 +241,9 @@ export function App() {
         return ok && t.end! > Date.now() ? [{ id: t.id!, end: t.end!, ms: t.ms!, then: 'send' as const, ws: t.ws, tab: t.tab, text: t.text }] : []
       }
       const remind = t?.then === 'remind' && typeof t.ws === 'string'
-      return typeof t?.id === 'string' && typeof t.end === 'number' && (t.end > Date.now() || remind) && typeof t.ms === 'number' && t.ms > 0
-        ? [{ id: t.id, end: t.end, ms: t.ms, then: remind || (TIMER_THEN.some(x => x[0] === t.then) && (t.then !== 'command' || (typeof t.cmd === 'string' && !!t.cmd.trim() && typeof t.ws === 'string'))) ? t.then! : 'notify', cmd: t.cmd, ws: t.ws }]
+      const left = !remind && typeof t?.left === 'number' && t.left > 0 ? t.left : undefined // paused: kept however long it was closed
+      return typeof t?.id === 'string' && typeof t.end === 'number' && (t.end > Date.now() || remind || left) && typeof t.ms === 'number' && t.ms > 0
+        ? [{ id: t.id, end: t.end, ms: t.ms, then: remind || (TIMER_THEN.some(x => x[0] === t.then) && (t.then !== 'command' || (typeof t.cmd === 'string' && !!t.cmd.trim() && typeof t.ws === 'string'))) ? t.then! : 'notify', cmd: t.cmd, ws: t.ws, left, ...(typeof t.note === 'string' && t.note.trim() && { note: t.note.trim().slice(0, 120) }) }]
         : []
     })
   })
@@ -235,6 +254,8 @@ export function App() {
   const setWatch = (id: string, f: (w: Watch) => Watch | null) => setWatches(l => l.map(w => (w.id === id ? f(w) : w)).filter((w): w is Watch => !!w))
   const addTimer = (ms: number, more: Partial<Timer> = {}) => setTimers(l => [...l, { id: Math.random().toString(36).slice(2, 10), end: Date.now() + ms, ms, then: 'notify', ...more }])
   const setTimer = (id: string, f: (t: Timer) => Timer | null) => setTimers(l => l.map(t => (t.id === id ? f(t) : t)).filter((t): t is Timer => !!t)) // null: gone
+  const pause = (id: string) => setTimer(id, x => (x.left === undefined ? { ...x, left: Math.max(1000, x.end - Date.now()) } : { ...x, end: Date.now() + x.left, left: undefined })) // or go on
+  const restart = (id: string, ms: number) => setTimer(id, x => ({ ...x, end: Date.now() + ms, ms, left: undefined })) // a new length, running
   // one ends: what was picked, then a notification (it's what you asked for: muting doesn't apply) and a message
   const timersRef = useRef(timers)
   timersRef.current = timers
@@ -267,17 +288,24 @@ export function App() {
     else if (then === 'close') setVideo(null)
     else if (then === 'command') call('tabNew', { ws: t.ws, preset: 'custom', cmd: t.cmd }).catch(() => {}) // a tab of its own, not focused: it closes when the command succeeds
     const did = gone ? `: ${t.cmd} didn't run, its workspace is gone` : then === 'notify' ? '' : then === 'command' ? `: ran ${t.cmd}` : `: ${TIMER_THEN.find(x => x[0] === then)![1].toLowerCase()}`
-    notify('Timer', `${span(t.ms)} is up${did}`, '', () => {}, viewRef.current?.settings.notifySound)
-    toast(`Timer: ${span(t.ms)} is up${did}`)
+    // Settings › General › Timers: a sound and the app's dialog (Again starts the same one over), or a notification
+    const s = viewRef.current?.settings
+    const sound = s?.timerSound || 'Glass'
+    const up = t.note ? `${t.note} (${span(t.ms)} is up${did})` : `${span(t.ms)} is up${did}` // its message first: what it was for
+    if (s?.timerAlert === 'notification') return void (notify(t.note || 'Timer', up, '', () => {}, sound), toast(`Timer: ${up}`))
+    if (sound !== 'none') bridge?.sound?.(sound)
+    const again = () => addTimer(t.ms, { then: t.then, cmd: t.cmd, ws: t.ws, note: t.note })
+    if (document.querySelector('.ask-overlay')) return toast(`Timer: ${up}`, again, 'Again') // a dialog would answer the open one with no
+    choose(t.note || `${span(t.ms)} timer is up`, [t.note && `${span(t.ms)} timer is up`, did && did.slice(2).replace(/^./, c => c.toUpperCase())].filter(Boolean).join(' · ') || undefined, [{ label: 'Again' }, { label: 'OK', primary: true }]).then(i => i === 0 && again())
   }
   useEffect(() => {
     const n = missed.current.length
     if (n) toast(n > 1 ? `${n} messages for later weren't sent: Laki was closed when they were due` : `A message for later wasn't sent: Laki was closed at ${new Date(missed.current[0].end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })} (${clip(missed.current[0].text!, 40)})`)
     missed.current = []
   }, [])
-  const ends = timers.map(t => `${t.id}:${t.end}`).join()
+  const ends = timers.map(t => `${t.id}:${t.end}:${t.left}`).join()
   useEffect(() => {
-    const ts = timersRef.current.map(t => setTimeout(() => ring(t.id), t.end - Date.now()))
+    const ts = timersRef.current.filter(t => t.left === undefined).map(t => setTimeout(() => ring(t.id), t.end - Date.now()))
     return () => ts.forEach(clearTimeout)
   }, [ends])
   // the Dock's count: agents waiting for you or done while you looked away, muted ones and archived workspaces aside
@@ -300,7 +328,8 @@ export function App() {
     localStorage.setItem('laki.panel', JSON.stringify(panelOpen))
     localStorage.setItem('laki.panelTab', JSON.stringify(panelTab))
     localStorage.setItem('laki.panelW', JSON.stringify(panelW))
-  }, [panelOpen, panelTab, panelW])
+    localStorage.setItem('laki.infoW', JSON.stringify(infoW))
+  }, [panelOpen, panelTab, panelW, infoW])
 
   // the theme, painted before the terminals read it (their effects run before ours)
   const paint = paintOf(view?.settings)
@@ -313,24 +342,55 @@ export function App() {
     applyTheme(paint)
     localStorage.setItem('laki.theme', JSON.stringify(paint))
   }
-  // the floating bubbles (Settings › General; main shows them while Laki isn't in front): each workspace whose agent
-  // works or waits, the waiting ones first, with what it asked or last said, in the theme's colors
   // Settings › Resources' Stop on the video: closed
   useEffect(() => {
     const f = (e: Event) => (e as CustomEvent).detail === 'video' && setVideo(null)
     window.addEventListener('laki-stop', f)
     return () => window.removeEventListener('laki-stop', f)
   }, [])
-  const floats = view?.settings.floater === false ? [] : live.flatMap(w => {
+  // the floating bubbles (Settings › Appearance; main shows them while Laki isn't in front): each workspace whose agent
+  // works or waits, the waiting ones first, with what it asked or last said, then the recent ones, in the theme's colors
+  // when each agent tab last worked or waited (laki.active, by tab), for the recent ones
+  const active = useRef<Record<string, number>>((a => (a && typeof a === 'object' && !Array.isArray(a) ? a : {}))(load<unknown>('laki.active', {})) as Record<string, number>)
+  for (const t of view?.tabs ?? []) if (t.kind === 'agent' && (t.status === 'running' || t.status === 'waiting' || (t.done && !active.current[t.id]))) active.current[t.id] = Date.now() // done unseen with no stamp: it ran while the app was closed
+  const fs = view?.settings
+  const atWork = fs?.floater === false ? [] : live.flatMap(w => {
     const ag = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent')
     const t = ag.find(t => t.status === 'waiting') ?? ag.find(t => t.status === 'running')
     const last = t && (t.status === 'waiting' ? waits.current.get(t.id) || t.ask?.options.map(o => o.label).join(' / ') : t.last && `Its last turn: ${t.last}`) // working: what it said the turn before
-    return t ? [{ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: t.status as 'running' | 'waiting', color: w.color && w.color !== 'none' ? w.color : undefined, last: last?.replace(/\s+/g, ' ').trim().slice(0, 300) }] : []
+    return t ? [{ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: t.status as 'running' | 'waiting' | 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: last?.replace(/\s+/g, ' ').trim().slice(0, 300) }] : []
   }).sort((a, b) => Number(b.status === 'waiting') - Number(a.status === 'waiting'))
-  const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatStyle = view?.settings.floaterStyle ?? 'glow'
-  const floatKey = JSON.stringify([floats, floatColors, floatStyle])
-  useEffect(() => bridge?.floats?.(floats, floatColors, floatStyle), [floatKey])
+  // Settings' Recent sessions too: the workspaces whose agent worked last, one bubble each, after the ones at work
+  // (finished ones you haven't seen first, then by when; one idle longer than floaterRecentHours drops out)
+  const recentN = Math.min(5, Math.max(0, Math.floor(fs?.floaterRecent ?? 0)))
+  const recentFor = (fs?.floaterRecentHours ?? 4) * 3600e3
+  const [, minute] = useState(0)
+  useEffect(() => {
+    if (!recentN || !recentFor) return
+    const t = setInterval(() => minute(n => n + 1), 60e3) // recent ones age out without a state change
+    return () => clearInterval(t)
+  }, [recentN, recentFor])
+  const recent = !recentN || fs?.floater === false ? [] : live
+    .filter(w => !atWork.some(f => view!.tabs.find(t => t.id === f.tab)?.workspace === w.id))
+    .flatMap(w => {
+      const t = view!.tabs.filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited' && active.current[t.id]).sort((a, b) => active.current[b.id] - active.current[a.id])[0]
+      return t && (!recentFor || Date.now() - active.current[t.id] < recentFor) ? [{ t, w, at: active.current[t.id] }] : []
+    })
+    .sort((a, b) => Number(b.t.done) - Number(a.t.done) || b.at - a.at)
+    .slice(0, recentN)
+    .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}` }))
+  const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
+  const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
+  const floatOpts = { style: fs?.floaterStyle ?? 'glow', cards: fs?.floaterCards !== false, add: fs?.floater !== false && !!fs?.floaterNew, mic: fs?.floater !== false && fs?.floaterMic !== false, voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick' }
+  const floatKey = JSON.stringify([floats, floatColors, floatOpts])
+  useEffect(() => {
+    bridge?.floats?.(floats, floatColors, floatOpts)
+    const keep = new Set(view?.tabs.map(t => t.id))
+    for (const id of Object.keys(active.current)) if (view && !keep.has(id)) delete active.current[id] // closed tabs go
+    try {
+      localStorage.setItem('laki.active', JSON.stringify(active.current))
+    } catch {}
+  }, [floatKey])
 
   const noteTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const archived = useRef<string[]>([]) // workspaces archived for a merged PR, while their toast shows
@@ -631,6 +691,17 @@ export function App() {
   // the file preview goes (closed, or another file shown): an unsaved edit only once you say so
   const leavePreview = async () => !edited(preview?.edit) || ask(`Discard your changes to ${preview!.path.split('/').pop()}?`, { text: "They aren't saved.", ok: 'Discard', danger: true })
   const closePreview = async () => void ((await leavePreview()) && setPreview(null))
+  // a terminal's ⌘-clicked file:// link: a file of the tab's workspace in the preview, anything else as Finder would
+  // (main's open-path, which follows links: a workspace's file by its real path too); a host's only in the preview,
+  // through the daemon; a browser has no Finder
+  const openPath = async (tab: string, path: string) => {
+    const w = view?.workspaces.find(x => x.id === byId(tab)?.workspace)
+    if (!w) return
+    const rel = path.startsWith(`${w.path}/`) ? path.slice(w.path.length + 1).replace(/\/+$/, '') : ''
+    const how = w.host || !bridge?.openPath ? (rel ? { rel } : 'none') : await bridge.openPath(path, w.path)
+    if (typeof how === 'object') panelApi(w).preview(how.rel)
+    else if (how === 'missing') toast(`Not there: ${path}`)
+  }
   const panelApi = (w: WorkspaceView): PanelApi => ({
     files: () => api.call<FileList>('files', { ws: w.id }),
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
@@ -768,7 +839,7 @@ export function App() {
   const startMenu = (): MenuItem[] => [
     { head: 'Start a timer' },
     ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => addTimer(m * 60000) }) as MenuItem),
-    { label: 'Other length, or a command…', icon: 'pencil', key: 'o', run: () => setDialog('timer') },
+    { label: 'Other length, a message or a command…', icon: 'pencil', key: 'o', run: () => setDialog('timer') },
     null,
     { label: 'Stopwatch', icon: 'clock', key: 's', run: () => setWatches(l => [...l, { id: Math.random().toString(36).slice(2, 10), ms: 0, from: Date.now() }]) },
   ]
@@ -788,11 +859,14 @@ export function App() {
     null,
     { label: 'Cancel the reminder', icon: 'stop', key: 'c', danger: true, run: () => setTimer(t.id, () => null) },
   ] : [
-    { head: `Ends at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}` },
-    { label: 'Add 5 minutes', icon: 'plus', key: 'a', run: () => setTimer(t.id, x => ({ ...x, end: x.end + 300000, ms: x.ms + 300000 })) },
+    { head: t.left === undefined ? `Ends at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit', second: '2-digit' })}` : `Paused, ${clock(t.left)} left` },
+    { label: t.left === undefined ? 'Pause' : 'Go on', icon: t.left === undefined ? 'pause' : 'run', key: 'p', run: () => pause(t.id) },
+    { label: 'Add 5 minutes', icon: 'plus', key: 'a', run: () => setTimer(t.id, x => ({ ...x, end: x.end + 300000, ms: x.ms + 300000, ...(x.left !== undefined && { left: x.left + 300000 }) })) },
+    { label: t.note ? 'Change its message…' : 'Add a message…', icon: 'pencil', key: 'm', run: () => setDialog({ timerNote: t.id }) },
+    ...(t.note ? [{ label: 'Remove its message', icon: 'x', run: () => setTimer(t.id, x => ({ ...x, note: undefined })) } as MenuItem] : []),
     null,
     { head: 'Start over with' },
-    ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => setTimer(t.id, x => ({ ...x, end: Date.now() + m * 60000, ms: m * 60000 })) }) as MenuItem),
+    ...MINUTES.map(m => ({ label: span(m * 60000), icon: 'timer', run: () => restart(t.id, m * 60000) }) as MenuItem),
     { label: 'Other length…', icon: 'pencil', key: 'o', run: () => setDialog({ timer: t.id }) },
     null,
     { head: 'When it ends' },
@@ -867,7 +941,8 @@ export function App() {
       return call('prAct', { ws: w.id, act, method, deleteBranch: del.on }).then(() => toast(`Merged PR #${pr.number}`, undefined, undefined, true), () => {})
     }
     const close = act === 'close'
-    if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, close && 'Without merging; GitHub can reopen it.'].filter(Boolean).join(' · '), ok: close ? 'Close PR' : 'Approve', danger: close }))) return
+    const facts = close ? 'Without merging; it can be reopened on GitHub.' : [pr.author && `By ${pr.author}`, `Checks: ${ciText(pr)}`, pr.conflict && 'merge conflicts'].filter(Boolean).join(' · ')
+    if (!(await ask(close ? `Close PR #${pr.number}?` : `Approve PR #${pr.number}?`, { text: [pr.title, facts].filter(Boolean).join('\n'), ok: close ? 'Close pull request' : 'Approve', danger: close }))) return
     call('prAct', { ws: w.id, act }).then(() => toast(close ? `Closed PR #${pr.number}` : `Approved PR #${pr.number}`, undefined, undefined, true), () => {})
   }
   const prMenu = (w: WorkspaceView): MenuItem[] => [
@@ -1147,18 +1222,11 @@ export function App() {
         data-state={status ? (w.setup || going[w.id] ? 'running' : rollup(wt)) : undefined}
         data-row={`ws:${w.id}`}
         data-group={pin ? 'pinned' : w.project}
-        onPointerDown={e => !pin && !find && rows.start(e, 'ws', w.id, w.project) /* filtered: the order isn't all there */}
+        onPointerDown={e => (clearTimeout(peekTimer.current), setPeek(null), !pin && !find && rows.start(e, 'ws', w.id, w.project)) /* filtered: the order isn't all there */}
+        onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && peekAt(w.id, e.currentTarget)}
+        onPointerLeave={() => peekAt()}
         onClick={() => (setWsId(w.id), (!pin && !find && rows.dragged()) || setDialog(null), narrow && setSideOpen(false)) /* a page over the main area (Settings, the new-workspace page…) gives way to it, not to a drag's end */}
-        onContextMenu={e => openMenu(e, wsMenu(w))}
-        data-tip={[
-          `${w.branch || w.path} · $PORT ${w.port}`,
-          w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
-          w.muted && 'notifications muted',
-          ...timers.filter(t => t.then === 'remind' && t.ws === w.id).map(t => `a reminder at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`),
-          w.race && 'in a race: ⋯ › Compare the race',
-          w.stat && settings.diffStat === true && (w.stat.add || w.stat.del) && statText(w),
-          w.pr && `PR #${w.pr.number} ${prState(w.pr)}${w.pr.author && !w.pr.mine ? ` by ${w.pr.author}` : ''}${w.pr.checks ? `, ${ciText(w.pr)}` : ''}${w.pr.title ? `: ${w.pr.title}` : ''}`,
-        ].filter(Boolean).join(' · ') /* what the marks say too: they give way to the buttons on hover */}
+        onContextMenu={e => (setPeek(null), openMenu(e, wsMenu(w)))}
       >
         <Glyph s={w.setup || going[w.id] ? 'running' : rollup(wt)} />
         <span className="ws-name">{wsName(w)}</span>
@@ -1229,6 +1297,76 @@ export function App() {
         )}
         {sideStyle === 'cards' && last && <div className="ws-last">{last}</div>}
         {status && <span className={`ws-line ${pct >= 0 ? 'pct' : ''}`} />}
+      </div>
+    )
+  }
+  // the card over a row (peek): its state and agents, the agent's last answer, its PR (author, checks, review, lines),
+  // its changes, ports and marks; Open, the PR on GitHub, its menu
+  const peekCard = (w: WorkspaceView) => {
+    const wt = view.tabs.filter(t => t.workspace === w.id)
+    const agents = wt.filter(t => t.kind === 'agent')
+    const st = w.setup || going[w.id] ? 'running' : rollup(wt)
+    const last = agents.find(t => t.status === 'waiting' && t.ask)?.ask?.options.map(o => o.label).join(' / ') || agents.find(t => t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 400)
+    const pr = w.pr
+    const marks = [
+      w.schedule && `from the scheduled task ${view.schedules?.find(s => s.id === w.schedule)?.name ?? ''}`.trimEnd(),
+      w.race && 'in a race: ⋯ › Compare the race',
+      w.muted && 'notifications muted',
+      ...timers.filter(t => t.then === 'remind' && t.ws === w.id).map(t => `a reminder at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`),
+      w.ports.length > 0 && `listening on ${w.ports.map(p => `:${p}`).join(' ')}`,
+    ].filter(Boolean)
+    return (
+      <div className="ws-peek" ref={peekBox} style={{ top: peek!.top, left: peek!.left, ...colorVar(w.color) }} onPointerEnter={() => clearTimeout(peekTimer.current)} onPointerLeave={() => peekAt()}>
+        <div className="wp-head">
+          <Glyph s={st} />
+          <b>{wsName(w)}</b>
+          <span className="muted">{view.projects.find(p => p.id === w.project)?.name}</span>
+        </div>
+        <div className="wp-branch">
+          {w.branch || shortPath(w.path)} · $PORT {w.port}
+        </div>
+        <div className="wp-agents">
+          <span className={`g-${st}`}>{w.setup ? 'setting up' : (STATE_WORDS[st] ?? st)}</span>
+          {agents.map(t => (
+            <span key={t.id} className="muted">
+              {t.name}
+              {t.progress ? ` ${t.progress.pct}%` : ''}
+              {settings.timers && <TurnTime tabs={[t]} />}
+            </span>
+          ))}
+        </div>
+        {last && <div className="wp-last">{last}</div>}
+        {pr && (
+          <div className="wp-pr">
+            <a href={pr.url} onClick={e => (e.preventDefault(), openExternal(pr.url))}>
+              {!pr.mine && <Avatar login={pr.author} size={16} />}
+              <span className={`wp-pr-state ${prState(pr)}`}>{prState(pr)}</span>
+              <span className="wp-pr-title">
+                #{pr.number} {pr.title}
+              </span>
+            </a>
+            <div className="wp-pr-meta">
+              {pr.author && !pr.mine && <span>by {pr.author}</span>}
+              {pr.list?.length || pr.checks ? <span className={`ci-${pr.checks}`}>{ciText(pr)}</span> : null}
+              {pr.review && REVIEW[pr.review] && <span>{REVIEW[pr.review]}</span>}
+              {pr.conflict && pr.state === 'OPEN' && <span className="ci-fail">conflicts</span>}
+              {(pr.additions || pr.deletions) ? <span className="ws-stat"><span className="add">+{short(pr.additions ?? 0)}</span> <span className="del">−{short(pr.deletions ?? 0)}</span></span> : null}
+              {w.prLinked && <span>linked</span>}
+            </div>
+          </div>
+        )}
+        {w.stat && (w.stat.add > 0 || w.stat.del > 0 || w.stat.dirty > 0) && <div className="wp-line">{statText(w)}</div>}
+        {marks.map(m => (
+          <div key={String(m)} className="wp-line">
+            {m}
+          </div>
+        ))}
+        <div className="wp-acts">
+          <button onClick={() => (setPeek(null), setWsId(w.id), setDialog(null))}>Open</button>
+          {pr && <button onClick={() => openExternal(pr.url)}>PR #{pr.number} on GitHub</button>}
+          <span className="spacer" />
+          <IconButton icon="more" title="Workspace" onClick={e => (setPeek(null), openMenu(e, wsMenu(w)))} />
+        </div>
       </div>
     )
   }
@@ -1440,7 +1578,7 @@ export function App() {
           />
         )}
         {timers.map(t => (
-          <TimerBar key={t.id} end={t.end} tip={t.then === 'send' ? `To ${sendTo(t)}: ${t.text}` : undefined} label={t.then === 'send' ? `To ${sendTo(t)}: ${clip(t.text ?? '', 80)}` : t.then === 'remind' ? reminder(t) : `${span(t.ms)}${t.then === 'notify' ? '' : t.then === 'command' ? `, then ${t.cmd}` : `, then ${TIMER_THEN.find(x => x[0] === t.then)![1].toLowerCase().replace(' the video', '')}`}`} onMenu={e => openMenu(e, timerMenu(t))} onStop={() => setTimer(t.id, () => null)} />
+          <TimerBar key={t.id} end={t.end} tip={t.then === 'send' ? `To ${sendTo(t)}: ${t.text}` : undefined} label={t.then === 'send' ? `To ${sendTo(t)}: ${clip(t.text ?? '', 80)}` : t.then === 'remind' ? reminder(t) : `${t.note ? `${t.note} · ` : ''}${span(t.ms)}${t.then === 'notify' ? '' : t.then === 'command' ? `, then ${t.cmd}` : `, then ${TIMER_THEN.find(x => x[0] === t.then)![1].toLowerCase().replace(' the video', '')}`}`} onMenu={e => openMenu(e, timerMenu(t))} left={t.left} onPause={t.then === 'send' || t.then === 'remind' ? undefined : () => pause(t.id)} onStop={() => setTimer(t.id, () => null)} />
         ))}
         {watches.map(w => (
           <StopwatchBar
@@ -1465,7 +1603,7 @@ export function App() {
           <IconButton icon="board" title="Board: every workspace by where it is, and to-dos" label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={() => setDialog(d => (d === 'board' ? null : 'board'))} />
           <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › General)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
-          <IconButton icon="timer" title="Timers: a countdown, then a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
+          <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
           <span className="spacer" />
           <IconButton icon="gear" title="Settings (⌘,)" label={labels ? 'Settings' : undefined} on={dialog === 'settings'} onClick={() => setDialog(d => (d === 'settings' ? null : 'settings'))} />
         </div>
@@ -1528,6 +1666,7 @@ export function App() {
                     theme={theme}
                     look={termLook(settings)}
                     newline={byId(id)?.kind === 'agent'}
+                    onFile={path => openPath(id, path)}
                   />
                 )}
                 onFocus={id => id !== tab?.id && selectTab(id)}
@@ -1589,6 +1728,8 @@ export function App() {
           {info && ws && (
             <InfoPanel
               w={infoOf(ws)}
+              width={infoW}
+              onWidth={setInfoW}
               onClose={() => setInfo(false)}
               onOpen={openExternal}
               onToggle={(k, v) => setAuto(ws, k, v)}
@@ -1742,7 +1883,7 @@ export function App() {
               // a row in the sidebar meanwhile (it stays when Esc closes the page: the workspace is still coming)
               const key = ++made.current.key
               const page = made.current.page
-              const pr = p.pr || prIn(p.prompt)
+              const pr = prIn(p.prompt) // a prompt naming a PR: the workspace is named after it
               const name = p.name?.trim() || (pr ? `PR #${pr.replace(/.*\/pull\//, '')}` : nameOf(p.prompt ?? '')) || 'new workspace'
               setMaking(m => [...m, { key, project: p.project, place: p.place, name: p.fan ? `${name} ×${p.fan.length}` : name }])
               const gone = () => setMaking(m => m.filter(x => x.key !== key))
@@ -1834,6 +1975,7 @@ export function App() {
 
       {menu}
       <Tips />
+      {peek && (w => w && peekCard(w))(live.find(w => w.id === peek.id))}
       <AskHost />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {note && (
@@ -1906,8 +2048,8 @@ export function App() {
         <TimerDialog
           where={ws ? wsName(ws) : undefined}
           onClose={() => setDialog(null)}
-          onStart={(ms, cmd) => {
-            addTimer(ms, cmd && ws ? { then: 'command', cmd, ws: ws.id } : {})
+          onStart={(ms, cmd, note) => {
+            addTimer(ms, { ...(cmd && ws && { then: 'command' as const, cmd, ws: ws.id }), ...(note && { note }) })
             setDialog(null)
           }}
         />
@@ -1942,6 +2084,19 @@ export function App() {
           />
         )
       })()}
+      {typeof dialog === 'object' && dialog && 'timerNote' in dialog && (
+        <Prompt
+          title="The timer's message"
+          initial={timers.find(t => t.id === dialog.timerNote)?.note ?? ''}
+          placeholder="Go out · Stretch · Check the oven"
+          hint="On its bar, and what it says as it ends."
+          onClose={() => setDialog(null)}
+          onSubmit={async typed => {
+            setTimer(dialog.timerNote, x => ({ ...x, note: typed.trim().slice(0, 120) || undefined }))
+            setDialog(null)
+          }}
+        />
+      )}
       {typeof dialog === 'object' && dialog && 'timer' in dialog && (
         <Prompt
           title="Start this timer over with"
@@ -1954,7 +2109,7 @@ export function App() {
               toast('A length like 25, 1h 30m or 90s, up to 24 hours')
               throw new Error('no length') // the dialog stays open
             }
-            setTimer(dialog.timer, x => ({ ...x, end: Date.now() + ms, ms }))
+            restart(dialog.timer, ms)
             setDialog(null)
           }}
         />

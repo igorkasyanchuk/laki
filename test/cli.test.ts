@@ -62,6 +62,14 @@ test('cli: laki progress, an agent\'s estimate on its tab until its turn ends; L
   const tab = await until(async () => (await rig.rpc('state')).tabs.find((t: any) => t.workspace === ws.id && t.status === 'running'), 'claude at work')
   const started = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find((l: any) => l.bin === 'claude'), 'claude started')
   assert.equal(started.env.LAKI_PROGRESS, '1')
+  // told at start (the skill loads only for Laki's tasks), and allowed to report without asking
+  const note = started.args[started.args.indexOf('--append-system-prompt') + 1]
+  assert.match(note, /' progress <0-100>/)
+  const allow = JSON.parse(readFileSync(started.args[started.args.indexOf('--settings') + 1], 'utf8')).permissions.allow[0]
+  assert.ok(note.includes(allow.slice(5, -3)), allow)
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
+  const codex = await until(() => rig.fakeLog().find((l: any) => l.bin === 'codex'), 'codex started')
+  assert.ok(codex.args.includes(`developer_instructions=${JSON.stringify(note)}`), 'codex is told the same')
   let r = await rig.cli('progress', '40', 'reading', 'the', 'code', '--tab', tab.id)
   assert.equal(r.out, '40%\n', r.err)
   const cur = async () => (await rig.rpc('state')).tabs.find((t: any) => t.id === tab.id).progress

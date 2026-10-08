@@ -1,10 +1,10 @@
 // Scheduled tasks (the clock at the bottom of the sidebar, or ⌘K): a prompt for an agent at the times a line of English
 // says (shared/when.ts), in a new workspace each run, in the project's folder (no worktree) or in one of its workspaces;
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
-import { ask, Icon, IconButton, Page, Switch } from './ui'
+import { ask, Icon, IconButton, keep, load, Page, Switch } from './ui'
 
 export type SchedulesApi = {
   set(s: Partial<Schedule>): Promise<Schedule>
@@ -17,6 +17,10 @@ export type SchedulesApi = {
 const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, wed and fri at 18:30', 'every 2 hours from 9am to 6pm', 'tomorrow at 7am']
 const at = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string }
+// a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
+// again, until it's saved or discarded
+const DRAFT = 'laki.scheduleDraft'
+type Draft = { form: Form; orig: string | null }
 
 // project: the filter it opens with (a project's ⋯ menu); onSeen: the newest run, once all projects' runs show (the clock's dot)
 export function SchedulesPage({ view, api, project: start = '', onSeen, onClose }: { view: View; api: SchedulesApi; project?: string; onSeen?: (run: string) => void; onClose: () => void }) {
@@ -34,7 +38,22 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     return { name: '', project, preset, ws: where0(project), prompt: '', when: '' }
   }
   const wsOf = (project: string) => view.workspaces.filter(w => w.project === project && !w.archived && w.kind !== 'local') // its folder is 'local'
-  const [form, setForm] = useState<Form | null>(null)
+  const draft = useMemo(() => {
+    const d = load<Draft | null>(DRAFT, null)
+    const f = d?.form
+    return f && view.projects.some(p => p.id === f.project) && (!f.id || view.schedules?.some(s => s.id === f.id)) ? d : null // its project or task gone: none
+  }, [])
+  const [form, setForm] = useState<Form | null>(draft?.form ?? null)
+  const orig = useRef<string | null>(draft?.orig ?? null) // the form as it opened: Cancel asks, and a close keeps it, only when it changed
+  const changed = !!form && JSON.stringify(form) !== orig.current
+  useEffect(() => keep(DRAFT, changed ? ({ form, orig: orig.current } satisfies Draft) : undefined), [form])
+  // a form changed and not saved goes only once you say so
+  const open = async (f: Form | null) => {
+    if (changed && !(await ask(form?.id ? 'Discard your changes to this task?' : 'Discard this task?', { ok: 'Discard', danger: true }))) return
+    orig.current = f && JSON.stringify(f)
+    setErr('')
+    setForm(f)
+  }
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState('')
   const set = (k: Partial<Form>) => setForm(f => f && { ...f, ...k })
@@ -44,9 +63,9 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const first = rule && !('error' in rule) ? nextRun(rule, Date.now()) : undefined // the next run: what the names preview
   const makes = form?.ws === 'new' || form?.ws === 'local-new' // a row of its own each run, named
 
-  const save = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!form || busy) return
+  const ready = !!form && !busy && !!form.prompt.trim() && !!rule && !('error' in rule) && !!form.ws
+  const save = async () => {
+    if (!form || !ready) return
     setBusy('save')
     setErr('')
     await api.set({ ...form, name: form.name.trim() || undefined }).then(() => setForm(null), fail)
@@ -62,8 +81,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     // the project's local workspace is its folder; one that's gone: what the Where select shows, not an id it lacks
     const w = view.workspaces.find(x => x.id === s.ws && x.project === s.project && !x.archived)
     const ws = ['new', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
-    setErr('')
-    setForm({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when })
+    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when })
   }
   const rm = (s: Schedule) => ask(`Delete the scheduled task ${s.name || s.prompt.slice(0, 40)}?`, { ok: 'Delete', danger: true }).then(y => y && api.rm(s.id).catch(fail))
   const where = (s: Schedule) =>
@@ -93,7 +111,8 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
         {err && <div className="field-err">{err}</div>}
 
         {form ? (
-          <form className="form schedule-form" onSubmit={save}>
+          // Enter in a field never saves it (a time typed, a name): ⌘⏎ or the button does
+          <form className="form schedule-form" onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), save())}>
             <div className="row">
               <label>
                 Project
@@ -121,8 +140,8 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               </label>
             </div>
             {form.ws.startsWith('local') && project && <div className="muted small schedule-path">{project.path}</div>}
-            <label>
-              Agent
+            <div className="field">
+              <span>Agent</span>
               <div className="seg">
                 {(agents.includes(form.preset) ? agents : [...agents, form.preset]).map(a => ( // its own, if switched off since
                   <button type="button" key={a} className={form.preset === a ? 'on' : ''} onClick={() => set({ preset: a })}>
@@ -130,7 +149,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                   </button>
                 ))}
               </div>
-            </label>
+            </div>
             <label>
               Prompt
               <textarea rows={4} value={form.prompt} placeholder="Update the dependencies, run the tests, and open a PR if they pass" onChange={e => set({ prompt: e.target.value })} autoFocus />
@@ -172,17 +191,18 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               </div>
             )}
             <div className="buttons">
-              <button type="submit" className="primary" disabled={!!busy || !form.prompt.trim() || !rule || 'error' in rule || !form.ws}>
+              <button type="button" className="primary" onClick={save} disabled={!ready}>
                 {form.id ? 'Save' : 'Schedule it'}
               </button>
-              <button type="button" onClick={() => (setForm(null), setErr(''))}>
+              <button type="button" onClick={() => open(null)}>
                 Cancel
               </button>
+              <span className="muted small">⌘⏎ {form.id ? 'saves' : 'schedules it'} · Esc closes the page, the form stays</span>
             </div>
           </form>
         ) : (
           <div className="buttons">
-            <button className="primary" disabled={!view.projects.length} onClick={() => (setErr(''), setForm(blank()))}>
+            <button className="primary" disabled={!view.projects.length} onClick={() => open(blank())}>
               New scheduled task
             </button>
             {!view.projects.length && <span className="muted small">Open a project first (⌘O).</span>}

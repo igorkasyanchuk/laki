@@ -11,7 +11,7 @@ import { describeHours, parseHours } from '../../shared/when'
 import { bridge } from './api'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
-import { Icon, IconButton, type IconName, Switch } from './ui'
+import { Icon, IconButton, type IconName, keep, load, Switch } from './ui'
 import { QR } from './Tunnel'
 import { USAGE_AGENTS } from './Usage'
 
@@ -55,11 +55,14 @@ const SIDE_LOOK: [Exclude<keyof SideLook, 'labels'>, string, [string, string][]]
   ['icons', 'Icon size', [['theme', 'Default (13)'], ['11px', '11'], ['12px', '12'], ['14px', '14'], ['16px', '16'], ['18px', '18']]],
 ]
 // the floating bubbles' look while an agent works (floater.css draws them, here as previews too)
-type FloaterStyle = 'glow' | 'gradient' | 'arc' | 'still'
+type FloaterStyle = 'glow' | 'gradient' | 'arc' | 'bricks' | 'comet' | 'wave' | 'still'
 const FLOATER_STYLES: [FloaterStyle, string, string][] = [
   ['glow', 'Glow', 'a soft halo, breathing'],
   ['gradient', 'Gradient', 'its color turning slowly inside'],
   ['arc', 'Arc', 'an arc going round'],
+  ['bricks', 'Bricks', 'pixel bars rising and falling inside it'],
+  ['comet', 'Comet', 'a bright head going round, its tail fading behind'],
+  ['wave', 'Wave', 'filled with its color, a slow tide rolling over'],
   ['still', 'Still', 'a ring, nothing moving'],
 ]
 // the sidebar's rows (App.tsx wsRow, styles.css [data-style]): how much each says
@@ -107,6 +110,8 @@ export type AppSettings = Paint & {
   sideLook?: SideLook // the sidebar's lines, rows and button labels
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound, 'none', or unset: the default
+  timerAlert?: 'dialog' | 'notification' // what a timer's end shows (unset: the dialog)
+  timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   remoteMail?: string // the one address remote access lets in
@@ -119,6 +124,13 @@ export type AppSettings = Paint & {
   menuBar?: boolean // the menu bar's item (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
   floaterStyle?: FloaterStyle // a working agent's bubble (unset: glow)
+  floaterRecent?: number // the bubbles' recent agents, idle or done, after the ones at work (unset: 0)
+  floaterRecentHours?: number // a recent one drops out after this many hours idle; 0: never (unset: 4)
+  floaterVoiceTo?: 'pick' | 'new' // the voice prompt: an agent picked each time, or always a new session (unset: pick)
+  floaterMax?: number // the bubbles at most (unset: 12)
+  floaterCards?: boolean // a bubble's card on hover (unset: on)
+  floaterNew?: boolean // the bubbles' + Session button (unset: off)
+  floaterMic?: boolean // the bubbles' voice prompt button (unset: on)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
@@ -438,7 +450,7 @@ const TEMPLATE_VARS: [string, string][] = [
   ['{{prompt}}', 'what you type on the new-workspace page (without it, the typed text goes after the template)'],
   ['{{project}}', "the project's name"],
   ['{{base}}', 'the base branch'],
-  ['{{pr}}', 'the PR: the Pull request field (#123 or its URL), else a PR link in the prompt, or a prompt of only #123'],
+  ['{{pr}}', 'the PR: a PR link in the prompt, or a prompt of only #123'],
   ['{{DD-MM-YY HH:MM}}', "now: any of YYYY YY MMMM MMM MM DD D dddd ddd HH H hh mm ss A, in any order (MM after an hour is minutes)"],
 ]
 const ENV_VARS: [string, string][] = [
@@ -637,7 +649,6 @@ const FIND: [string, string, string?][] = [
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['general', 'Menu bar item', 'tray status count waiting needs you'],
-  ['general', 'Floating bubbles', 'floating window overlay always on top worktrees agents working waiting circles bar'],
   ['general', 'Fun button', 'meme reddit smiley break joke'],
   ['general', 'Pull requests in the sidebar', 'pr github icon'],
   ['general', 'Turn timers', 'elapsed time'],
@@ -686,10 +697,11 @@ const FIND: [string, string, string?][] = [
   ['widgets', 'Widgets', 'sidebar extensions plugins folder reload fetch schedule'],
   ['widgets', 'More folders', 'widgets extensions'],
   ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
+  ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
   ['general', 'Worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
-  ['general', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working'],
+  ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus microphone voice dictation record'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
@@ -1101,8 +1113,8 @@ function ChipsInput({ value, onChange: save, placeholder }: { value: string; onC
   return (
     <div className="chips-input" onClick={e => (e.currentTarget.querySelector('input') as HTMLInputElement | null)?.focus()}>
       {items.map(x => (
-        <span key={x} className="chip">
-          {x}
+        <span key={x} className="chip" data-tip={x.length > 40 ? x : undefined}>
+          <span>{x}</span>
           <button type="button" aria-label={`Remove ${x}`} onClick={() => onChange(items.filter(y => y !== x).join(','))}>
             <Icon name="x" size={10} />
           </button>
@@ -1304,7 +1316,10 @@ export function SettingsPage(p: {
 }) {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
-  const [sec, setSec] = useState(p.section ?? 'general')
+  // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
+  const [sec, setSec] = useState(() => p.section ?? (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(load('laki.settingsSec', 'general')))
+  useEffect(() => keep('laki.settingsSec', sec), [sec])
   const [themeQ, setThemeQ] = useState('') // the themes' name filter
   const [findQ, setFindQ] = useState('') // Find a setting
   const findRef = useRef(findQ)
@@ -1430,7 +1445,6 @@ export function SettingsPage(p: {
     )
   }
   // Find a setting: every word typed in a setting's title, words or section (and projects by name)
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
   const words = findQ.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const hits = (text: string) => words.every(w => text.toLowerCase().includes(w))
   const found = !words.length
@@ -1547,6 +1561,26 @@ export function SettingsPage(p: {
                 )}
               </div>
               </Group>
+              <Group title="Timers" hint="As a timer in the sidebar ends">
+              <div className="setting-box">
+                <label className="switch-row">
+                  <select value={s.timerAlert ?? 'dialog'} onChange={e => set({ timerAlert: e.target.value as 'dialog' | 'notification' })}>
+                    <option value="dialog">A dialog</option>
+                    <option value="notification">A notification</option>
+                  </select>
+                  <Says title="Show" hint="A dialog in Laki stays until you close it (Again starts the timer over); a notification is macOS's" />
+                </label>
+                <label className="switch-row">
+                  <select value={s.timerSound ?? 'Glass'} onChange={e => (set({ timerSound: e.target.value }), e.target.value !== 'none' && bridge?.sound?.(e.target.value))}>
+                    <option value="none">None</option>
+                    {SOUNDS.map(x => (
+                      <option key={x}>{x}</option>
+                    ))}
+                  </select>
+                  <Says title="Sound" hint="Played as it ends, whatever the notifications' settings; picking one plays it" />
+                </label>
+              </div>
+              </Group>
               <Group title="Worktrees" hint="Where new workspaces' git worktrees go, a folder per project inside it; a project can pick its own (Settings › the project). Ones made already stay where they are">
                 <FolderField value={s.worktrees} label="Folder for worktrees" placeholder="Laki's data folder: ~/.laki/worktrees" onChange={v => set({ worktrees: v })} />
               </Group>
@@ -1565,24 +1599,6 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
                   <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
                 </Switch>
-                <Switch className="switch-row" on={s.floater !== false} onChange={v => set({ floater: v })}>
-                  <Says title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent working or waiting for you; hover one to see what it said, click to open it, drag it to the other edge or up and down" />
-                </Switch>
-                {s.floater !== false && (
-                  <div className="switch-row sub fl-styles" role="radiogroup" aria-label="A working agent's bubble">
-                    <span className="muted small">While working</span>
-                    {FLOATER_STYLES.map(([k, name, what]) => (
-                      <button key={k} role="radio" aria-checked={(s.floaterStyle ?? 'glow') === k} className={(s.floaterStyle ?? 'glow') === k ? 'on' : ''} data-tip={what} data-fstyle={k} onClick={() => set({ floaterStyle: k })}>
-                        <span className="fl-dot running">FC</span>
-                        {name}
-                      </button>
-                    ))}
-                    <button className="fl-wait" data-tip="Waiting for you: a pulse, in every style" disabled>
-                      <span className="fl-dot waiting">FC</span>
-                      waiting
-                    </button>
-                  </div>
-                )}
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
                 </Switch>
@@ -1590,7 +1606,7 @@ export function SettingsPage(p: {
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
                 <Switch className="switch-row" on={!!s.progress} onChange={v => set({ progress: v })}>
-                  <Says title="Progress on tabs" hint="Agents estimate how far along their task is and report it every 20-30 seconds (LAKI_PROGRESS=1; needs the laki skill up to date, Settings › Agent skill: Update if it says outdated); new sessions get it" />
+                  <Says title="Progress on tabs" hint="Claude and Codex estimate how far along their task is and report it every 20-30 seconds, shown on the tab; agents started from now on (other agents need the laki skill, Settings › Agent skill)" />
                 </Switch>
                 <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
                   <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
@@ -1712,6 +1728,80 @@ export function SettingsPage(p: {
               <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
                 <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled, Board, Video, Timer, Settings; the last ones drop theirs when the row is too narrow" />
               </Switch>
+              </Group>
+              <Group title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent; hover one to see what it said, click to open it, drag it to the other edge or up and down">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.floater !== false} onChange={v => set({ floater: v })}>
+                  <Says title="Show them" hint="A circle per agent working or waiting for you" />
+                </Switch>
+                {s.floater !== false && (
+                  <>
+                    <div className="switch-row sub fl-styles" role="radiogroup" aria-label="A working agent's bubble">
+                      <span className="muted small">While working</span>
+                      {FLOATER_STYLES.map(([k, name, what]) => (
+                        <button key={k} role="radio" aria-checked={(s.floaterStyle ?? 'glow') === k} className={(s.floaterStyle ?? 'glow') === k ? 'on' : ''} data-tip={what} data-fstyle={k} onClick={() => set({ floaterStyle: k })}>
+                          <span className="fl-dot running">FC</span>
+                          {name}
+                        </button>
+                      ))}
+                      <button className="fl-wait" data-tip="Waiting for you: a pulse, in every style" disabled>
+                        <span className="fl-dot waiting">FC</span>
+                        waiting
+                      </button>
+                    </div>
+                    <label className="switch-row">
+                      <select value={s.floaterRecent ?? 0} onChange={e => set({ floaterRecent: Number(e.target.value) })}>
+                        {[0, 1, 2, 3, 4, 5].map(n => (
+                          <option key={n} value={n}>
+                            {n ? `The last ${n}` : 'None'}
+                          </option>
+                        ))}
+                      </select>
+                      <Says title="Recent sessions too" hint="Agents you used last, idle or finished, after the ones at work: a dimmer circle each, finished ones you haven't seen first" />
+                    </label>
+                    {(s.floaterRecent ?? 0) > 0 && (
+                      <label className="switch-row sub">
+                        <select value={s.floaterRecentHours ?? 4} onChange={e => set({ floaterRecentHours: Number(e.target.value) })}>
+                          {[1, 4, 8, 24, 0].map(n => (
+                            <option key={n} value={n}>
+                              {n ? `After ${n}h idle` : 'Never'}
+                            </option>
+                          ))}
+                        </select>
+                        <Says title="Drop a recent one" hint="How long an idle agent stays a bubble after its last turn" />
+                      </label>
+                    )}
+                    <label className="switch-row">
+                      <select value={s.floaterMax ?? 12} onChange={e => set({ floaterMax: Number(e.target.value) })}>
+                        {[3, 5, 8, 12].map(n => (
+                          <option key={n} value={n}>
+                            {n}
+                          </option>
+                        ))}
+                      </select>
+                      <Says title="Bubbles at most" hint="Waiting ones first, then working, then recent" />
+                    </label>
+                    <Switch className="switch-row" on={s.floaterCards !== false} onChange={v => set({ floaterCards: v })}>
+                      <Says title="Card on hover" hint="Its name, project and what it asked or last said, beside the drop" />
+                    </Switch>
+                    <Switch className="switch-row" on={!!s.floaterNew} onChange={v => set({ floaterNew: v })}>
+                      <Says title="+ Session" hint="A + under the circles: Laki's new-workspace page. With it the drop stays when no agent is at work" />
+                    </Switch>
+                    <Switch className="switch-row" on={s.floaterMic !== false} onChange={v => set({ floaterMic: v })}>
+                      <Says title="Voice prompt" hint="A microphone under the circles: say a prompt (macOS dictation), then send it to one of the agents, or start a new session with it" />
+                    </Switch>
+                    {s.floaterMic !== false && (
+                      <label className="switch-row sub">
+                        <select value={s.floaterVoiceTo ?? 'pick'} onChange={e => set({ floaterVoiceTo: e.target.value as 'pick' | 'new' })}>
+                          <option value="pick">An agent I pick each time</option>
+                          <option value="new">Always a new session</option>
+                        </select>
+                        <Says title="It goes to" hint="Pick each time: the bubbles' agents or a new session, nothing chosen until you do; a new session: Laki's new-workspace page with what you said" />
+                      </label>
+                    )}
+                  </>
+                )}
+              </div>
               </Group>
               <Group title="Project names" hint="The projects' heads in the sidebar, over the theme's">
                 {lookGrid('projectLook', PROJECT_LOOK)}

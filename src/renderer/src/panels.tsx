@@ -7,17 +7,22 @@ import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
 import { type Img, PromptInput, TemplatePick, withImages } from './PromptInput'
 import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor } from './text'
-import { Icon, IconButton, type IconName, Page, Switch, useMenu } from './ui'
+import { escapes, Icon, IconButton, type IconName, keep, load, Page, Switch, useMenu } from './ui'
 
-function Modal({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+// a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
+// loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
+function Modal({ title, onClose, children, wide, loose }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean }) {
+  const typed = useRef(false)
+  const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && onClose()
+    const f = (e: KeyboardEvent) => escapes(e) && onClose()
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [onClose])
+  const outside = () => (typed.current && !loose ? box.current?.animate([{ scale: 1 }, { scale: 1.02 }, { scale: 1 }], { duration: 200, easing: 'ease-out' }) : onClose())
   return (
-    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
-      <div className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title}>
+    <div className="overlay" onMouseDown={e => e.target === e.currentTarget && outside()}>
+      <div ref={box} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title} onInput={() => (typed.current = true)}>
         <div className="modal-title">{title}</div>
         {children}
       </div>
@@ -31,7 +36,7 @@ export function ProjectNotes({ name, notes, onSave, onClose }: { name: string; n
   const [edit, setEdit] = useState<string | null>(notes.trim() ? null : '')
   const save = (then: () => void) => (edit !== null && edit !== notes ? onSave(edit).then(then, () => {}) : then())
   return (
-    <Modal title={`Notes · ${name}`} onClose={() => save(onClose)} wide>
+    <Modal title={`Notes · ${name}`} onClose={() => save(onClose)} wide loose /* closing saves */>
       {edit === null ? (
         <div className="notes-view">
           <Markdown src={notes} />
@@ -137,18 +142,20 @@ export function Video({ src, min, onMin, onChange, onClose }: { src: string; min
 
 // a running timer, a bar over the sidebar's foot like the minimized video: the time left, ticking, and what it was set
 // for; its menu changes it (more time, a new length, what happens as it ends)
-export function TimerBar({ end, label, tip, onMenu, onStop }: { end: number; label: string; tip?: string; onMenu: (e: MouseEvent<HTMLElement>) => void; onStop: () => void }) {
+export function TimerBar({ end, left, label, tip, onMenu, onPause, onStop }: { end: number; left?: number; label: string; tip?: string; onMenu: (e: MouseEvent<HTMLElement>) => void; onPause?: () => void; onStop: () => void }) {
   const [, tick] = useState(0)
   useEffect(() => {
+    if (left !== undefined) return // paused: nothing moves
     const t = setInterval(() => tick(n => n + 1), 1000)
     return () => clearInterval(t)
-  }, [])
+  }, [left])
   return (
-    <div className="timer-bar" onContextMenu={onMenu} data-tip={tip}>
+    <div className={`timer-bar ${left !== undefined ? 'paused' : ''}`} onContextMenu={onMenu} data-tip={tip}>
       <Icon name="timer" size={13} />
-      <span className="timer-left">{clock(end - Date.now())}</span>
-      <span className="muted small timer-what">{label}</span>
+      <span className="timer-left">{clock(left ?? end - Date.now())}</span>
+      <span className="muted small timer-what">{left !== undefined ? `${label}, paused` : label}</span>
       <span className="spacer" />
+      {onPause && <IconButton icon={left !== undefined ? 'run' : 'pause'} title={left !== undefined ? 'Go on' : 'Pause'} onClick={onPause} />}
       <IconButton icon="pencil" title="Change it: more time, a new length, what happens as it ends" onClick={onMenu} />
       <IconButton icon="x" title="Stop it" onClick={onStop} />
     </div>
@@ -298,19 +305,11 @@ export type NewWsParams = { project: string; base?: string; preset: string; cmd?
 // kept would make several worktrees from a folded Advanced)
 type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'base' | 'place'>> & { tpl?: string; agent?: string }
 const LAST_NEW = 'laki.newWs'
+// what the page held as it closed without making it (Esc, ✕, a click in the sidebar): back as it opens again, until it's
+// made or cleared
+const DRAFT = 'laki.newDraft'
+type Draft = { p: NewWsParams; images: Img[]; rivals: string[]; tpl: string; prev?: string } // prev: an earlier prompt a link's replaced
 const ADV_OPEN = 'laki.newAdv'
-function load<T>(key: string, or: T): T {
-  try {
-    return JSON.parse(localStorage.getItem(key) ?? 'null') ?? or
-  } catch {
-    return or
-  }
-}
-const keep = (key: string, v: unknown) => {
-  try {
-    localStorage.setItem(key, JSON.stringify(v))
-  } catch {}
-}
 
 // initial: a laki://new link's prompt, preset and name; project and initial win over the last choices; images: the menu
 // bar's screenshots
@@ -318,12 +317,15 @@ const notesOf = (s?: Shot[]) => (s ?? []).flatMap(x => (x.note ? [x.note] : []))
 export type Shot = Img & { note?: string } // the menu bar's screenshot, and what to do with it (the editor's note)
 export function NewWorkspace({ view, project, agent, initial, images: shots, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Shot[]; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
+  const draft = useMemo(() => load<Draft | null>(DRAFT, null), [])
   const [p, setP] = useState<NewWsParams>(() => {
     const names = [...view.presets.filter(x => !x.off).map(x => x.name), 'shell', 'custom', 'none']
-    // the last agent, unless Settings › New workspaces start changed since: then that one
-    const preset = initial?.preset ?? (last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent && names.includes(agent) ? agent : (names[0] ?? 'claude')) // a default that's off: the first that's on
+    const d = draft?.p
+    // the draft's agent, else the last one, unless Settings › New workspaces start changed since: then that one
+    const preset = initial?.preset ?? (d?.preset && names.includes(d.preset) ? d.preset : last.preset && names.includes(last.preset) && last.agent === agent ? last.preset : agent && names.includes(agent) ? agent : (names[0] ?? 'claude')) // a default that's off: the first that's on
     const same = preset === last.preset // the model and effort are that agent's
-    const proj = project ?? (view.projects.some(x => x.id === last.project) ? last.project! : view.projects[0]?.id ?? '')
+    const there = d && view.projects.some(x => x.id === d.project) && (!project || project === d.project) // the draft's project: its base and group too
+    const proj = project ?? (there ? d.project : view.projects.some(x => x.id === last.project) ? last.project! : (view.projects[0]?.id ?? ''))
     return {
       project: proj,
       place: proj === last.project ? last.place : undefined, // that project's sep, if it's still there (submit checks)
@@ -333,13 +335,14 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       model: same ? last.model : undefined,
       effort: same ? last.effort : undefined,
       base: '',
+      ...(d && { ...d, project: proj, preset, ...(preset !== d.preset && { model: undefined, effort: undefined }), ...(!there && { place: undefined, base: '' }) }),
       ...initial,
-      ...(notesOf(shots).length && { prompt: [initial?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
+      ...(notesOf(shots).length && { prompt: [initial?.prompt ?? d?.prompt, ...notesOf(shots)].filter(Boolean).join('\n\n') }),
     }
   })
   const [branches, setBranches] = useState<string[]>([])
   const [busy, setBusy] = useState(false)
-  const [images, setImages] = useState<Img[]>(shots ?? [])
+  const [images, setImages] = useState<Img[]>(() => [...(draft?.images ?? []), ...(shots ?? [])])
   const had = useRef(new Set((shots ?? []).map(s => s.path))) // screenshots given so far: one taken out stays out
   useEffect(() => {
     const more = (shots ?? []).filter(s => !had.current.has(s.path))
@@ -352,27 +355,29 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   const [tplName, setTplName] = useState(() => {
     const pr = view.projects.find(x => x.id === project)
     const t = pr?.seps?.find(s => s.id === initial?.place)?.template
-    return (t && templatesFor(view.settings.templates, pr?.config?.templates).some(x => x.name === t) ? t : last.tpl) || ''
+    return (t && templatesFor(view.settings.templates, pr?.config?.templates).some(x => x.name === t) ? t : draft ? draft.tpl : last.tpl) || ''
   })
-  const [adv, setAdv] = useState(() => load(ADV_OPEN, false) || !!initial?.name || !!initial?.pr)
+  const [adv, setAdv] = useState(() => load(ADV_OPEN, false) || !!initial?.name)
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
   const proj = view.projects.find(x => x.id === p.project)
   const templates = templatesFor(view.settings.templates, proj?.config?.templates)
   const ti = templates.findIndex(t => t.name === tplName)
   const tpl = ti < 0 ? '' : String(ti)
-  const filled = templated(templates[ti], p.prompt ?? '', { project: proj?.name, base: p.base, pr: prRef(p.pr, p.prompt) })
+  const filled = templated(templates[ti], p.prompt ?? '', { project: proj?.name, base: p.base, pr: prRef('', p.prompt) })
   const plain = proj?.git === false // a folder without git: local only
   const starts = view.presets.find(x => x.name === p.preset)?.agent // what the preset starts: its model and effort flags
-  const [rivals, setRivals] = useState<string[]>([]) // a race: the other presets on the same prompt
+  const [rivals, setRivals] = useState<string[]>(() => draft?.rivals ?? []) // a race: the other presets on the same prompt
+  // a draft's prompt a link's replaced (the bubbles' voice prompt to a new session): kept, a click swaps it back
+  const [prev, setPrev] = useState<string | undefined>(() => (initial?.prompt?.trim() && draft?.p.prompt?.trim() && draft.p.prompt !== initial.prompt ? draft.p.prompt : draft?.prev))
   const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command' && !x.off).map(x => x.name)
-  const racing = !p.local && !plain && !p.pr?.trim() && isAgent(starts) && rivals.some(r => racers.includes(r)) // a PR's branch is checked out once
+  const racing = !p.local && !plain && isAgent(starts) && rivals.some(r => racers.includes(r))
   const fan = racing ? [p.preset, ...rivals.filter(r => racers.includes(r))] : undefined
   useEffect(() => {
     if (!p.project) return
     api.call('branches', { project: p.project }).then(
       r => {
         setBranches(r.branches)
-        setP(x => ({ ...x, base: x.project === last.project && last.base && r.branches.includes(last.base) ? last.base : r.current }))
+        setP(x => ({ ...x, base: x.base && r.branches.includes(x.base) ? x.base : x.project === last.project && last.base && r.branches.includes(last.base) ? last.base : r.current })) // a draft's, if the branch is still there
       },
       () => setBranches([]),
     )
@@ -389,24 +394,28 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   }, [busy])
   const doing = fan
     ? `Making ${fan.length} worktrees, one after another`
-    : p.pr?.trim() && !p.local && !plain
-      ? `Checking out PR #${p.pr.trim().replace(/.*\/pull\//, '')} into a worktree`
-      : p.local || plain
+    : p.local || plain
         ? `Opening ${proj?.name ?? 'the folder'}`
         : `Making a worktree off ${p.base || 'the current branch'}`
   const then = p.local || plain ? 'then its tabs start' : secs < 12 ? 'then the files git ignores (.env…) are copied and the agent starts' : 'still going: a big repo takes a while'
-  const submit = async (e?: React.FormEvent) => {
-    e?.preventDefault()
+  // something typed or picked that a close shouldn't lose
+  const dirty = !!(p.prompt?.trim() || p.name?.trim() || (p.preset === 'custom' && p.cmd?.trim()) || images.length || rivals.length || prev)
+  useEffect(() => void (busy || keep(DRAFT, dirty ? ({ p, images, rivals, tpl: tplName, prev } satisfies Draft) : undefined)), [p, images, rivals, tplName, prev]) // while it's made: submit dropped it
+  const clear = () => (set({ prompt: '', name: '' }), setImages([]), setRivals([]), setPrev(undefined))
+  const submit = async () => {
     if (busy || saving) return
     setBusy(true)
     keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, base: p.base, place: p.place, tpl: tplName, agent } satisfies LastNew)
+    const mine = load<Draft | null>(DRAFT, null)
+    keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
-      await onCreate({ ...p, place, pr: p.local || plain ? undefined : p.pr?.trim() || undefined, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
+      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
     } catch {
       setBusy(false)
+      if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
     }
   }
   if (!view.projects.length)
@@ -417,17 +426,18 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     )
   const prompting = view.presets.some(x => x.name === p.preset && x.agent !== 'command')
   // what Advanced holds, in words, so a closed one still says it
-  const where = plain || p.local ? 'in the folder itself' : p.pr?.trim() ? `on PR #${p.pr.trim().replace(/.*\/pull\//, '')}` : `a worktree off ${p.base || '…'}`
+  const where = plain || p.local ? 'in the folder itself' : `a worktree off ${p.base || '…'}`
   const said = [where, p.name?.trim() && `named ${p.name.trim()}`, fan && `race of ${fan.length}`, isAgent(starts) && !racing && p.model?.trim(), isAgent(starts) && !racing && p.effort && `${p.effort} effort`].filter(Boolean).join(' · ')
   const toggle = () => setAdv(o => (keep(ADV_OPEN, !o), !o))
   return (
     <Page title="New workspace" onClose={onClose}>
-      <form onSubmit={submit} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy}>
+      {/* Enter in a field never makes it (a branch picked, a name typed): ⌘⏎ or Create does */}
+      <form onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && (e.preventDefault(), submit())} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy}>
         <div className="nw-card">
           <div className="row">
             <label>
               Project
-              <select value={p.project} onChange={e => set({ project: e.target.value, place: undefined })}>
+              <select value={p.project} onChange={e => set({ project: e.target.value, place: undefined, base: '' })}>
                 {view.projects.map(x => (
                   <option key={x.id} value={x.id}>
                     {x.name}
@@ -504,14 +514,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
               {!p.local && !plain && (
                 <div className="row">
                   <label>
-                    <span>
-                      Pull request <span className="muted">(optional)</span>
-                    </span>
-                    <input value={p.pr ?? ''} placeholder="#123 or its URL" spellCheck={false} onChange={e => set({ pr: e.target.value.replace(/^#/, '') })} />
-                  </label>
-                  <label>
                     Base branch
-                    <input list="branches" value={p.pr?.trim() ? "the PR's" : p.base} disabled={!!p.pr?.trim()} onChange={e => set({ base: e.target.value })} />
+                    <input list="branches" value={p.base} onChange={e => set({ base: e.target.value })} />
                     <datalist id="branches">
                       {branches.map(b => (
                         <option key={b} value={b} />
@@ -522,7 +526,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
                     <span>
                       Name <span className="muted">(optional)</span>
                     </span>
-                    <input value={p.name ?? ''} placeholder={p.pr?.trim() ? 'pr-<number>-<title>' : 'from the prompt'} onChange={e => set({ name: e.target.value })} />
+                    <input value={p.name ?? ''} placeholder="from the prompt" onChange={e => set({ name: e.target.value })} />
                   </label>
                 </div>
               )}
@@ -554,7 +558,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
                   )}
                 </div>
               )}
-              {!p.local && !plain && !p.pr?.trim() && isAgent(starts) && racers.length > 0 && (
+              {!p.local && !plain && isAgent(starts) && racers.length > 0 && (
                 <div className="field">
                   <span>
                     Race <span className="muted">· the same prompt to more agents, each in a worktree of its own; Compare keeps the best</span>
@@ -584,12 +588,22 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
           </div>
         )}
         <div className="buttons">
-          <span className="muted">⌘⏎ create · esc cancel</span>
+          <span className="muted">⌘⏎ create · esc closes{dirty && !busy ? ', the draft stays' : ''}</span>
+          {dirty && !busy && (
+            <button type="button" className="link" onClick={clear} data-tip="Empty the prompt, name, images and race">
+              Clear
+            </button>
+          )}
+          {prev && !busy && (
+            <button type="button" className="link" onClick={() => (set({ prompt: prev }), setPrev(p.prompt?.trim() ? p.prompt : undefined))} data-tip={`Swap in the prompt you had before: ${prev.slice(0, 160)}`}>
+              Earlier draft
+            </button>
+          )}
           <span className="spacer" />
           <button type="button" onClick={onClose}>
-            {busy ? 'Close' : 'Cancel'}
+            Close
           </button>
-          <button type="submit" className="primary" disabled={busy || saving || !p.project}>
+          <button type="button" className="primary" onClick={submit} disabled={busy || saving || !p.project}>
             {busy ? (
               <>
                 <span className="btn-spin" /> Creating…
@@ -687,18 +701,21 @@ export function Prompt({ title, hint, placeholder, initial = '', pick, onClose, 
   )
 }
 
-// a new timer: how long and, with its switch, a command it runs as it ends (in the workspace in front: where, its name)
-export function TimerDialog({ where, onClose, onStart }: { where?: string; onClose: () => void; onStart: (ms: number, cmd?: string) => void }) {
+// a new timer: how long, a message (what it's for: Go out; on its bar and as it ends) and, with its switch, a command it
+// runs as it ends (in the workspace in front: where, its name)
+export function TimerDialog({ where, onClose, onStart }: { where?: string; onClose: () => void; onStart: (ms: number, cmd?: string, note?: string) => void }) {
   const [len, setLen] = useState('')
+  const [note, setNote] = useState('')
   const [run, setRun] = useState(false)
   const [cmd, setCmd] = useState('')
   const ms = parseDuration(len)
   const ok = !!ms && (!run || !!cmd.trim())
   return (
     <Modal title="New timer" onClose={onClose}>
-      <form className="form" onSubmit={e => (e.preventDefault(), ok && onStart(ms!, run ? cmd.trim() : undefined))}>
+      <form className="form" onSubmit={e => (e.preventDefault(), ok && onStart(ms!, run ? cmd.trim() : undefined, note.trim().slice(0, 120) || undefined))}>
         <input value={len} autoFocus placeholder="25 · 1h 30m · 90s" onChange={e => setLen(e.target.value)} />
         <div className="muted small">{len.trim() && !ms ? 'A length like 25, 1h 30m or 90s, up to 24 hours.' : 'Minutes, or with units (h, m, s); up to a day. It starts at once.'}</div>
+        <input value={note} maxLength={120} placeholder="A message, if you like: Go out · Stretch · Check the oven" onChange={e => setNote(e.target.value)} />
         {where && (
           <Switch on={run} onChange={setRun} tip="As it ends, a command runs in a tab of its own">
             Then run a command
@@ -873,7 +890,7 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
     x.run()
   }
   return (
-    <Modal title="Go to" onClose={onClose} wide>
+    <Modal title="Go to" onClose={onClose} wide loose>
       <input
         className="palette-input"
         value={q}

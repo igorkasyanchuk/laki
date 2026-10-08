@@ -27,7 +27,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Race**: one prompt to several agents (claude, codex…), each in its own worktree; *Compare* lays them side by
   side (status, diff size, what each said last, the files it changed) and *Keep this one* archives the rest.
 - **Issues and PRs**: `laki new <project> --issue <url>` starts a workspace on a GitHub issue (its title and text as
-  the prompt); `--pr <url>` (or the new-workspace page's *Pull request*) on a PR's branch, a fork's too. A prompt
+  the prompt); `--pr <url>` on a PR's branch, a fork's too. A prompt
   that names a PR (`review https://github.com/o/r/pull/12`) names the workspace after it (`pr-12-<title>`) and links
   it to that PR: its status and checks, without checking it out (so no fix/review switches: the agent couldn't push
   to it; `--pr` gives those).
@@ -68,8 +68,9 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the bottom of the sidebar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
   one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › General hides it.
-- **Timers**: the stopwatch at the bottom of the sidebar starts a countdown, 5 minutes to an hour (or any length), as
-  many as you like; each shows as a bar over the bottom buttons and then notifies you, and pauses, plays or closes the
+- **Timers**: the stopwatch at the bottom of the sidebar starts a countdown, 1 minute to an hour (or any length), as
+  many as you like; each shows as a bar over the bottom buttons (⏸ pauses it) and then rings: a sound and a dialog,
+  or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
 - **Widgets**: small live pages at the bottom of the sidebar, in a grid 3 cells across: a count, a chart, a table,
   each fed by a command or a script on a schedule, with a full view a click away (below: Widgets). Two come with
@@ -142,6 +143,10 @@ selected workspace's PR is in the status bar.
 - *Diff size in the sidebar* (Settings › General, off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover the row
   shows ⋯, its menu.
+- Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
+  agent's last answer (or what it asks), its PR (author, state, checks, review, conflicts, lines added and removed),
+  its diff size, ports and marks (from a scheduled task, muted, a reminder, a race). Move onto the card to click it:
+  *Open*, *PR #n on GitHub* (or the PR's title), ⋯ its menu.
 - Archiving with nothing uncommitted happens at once, with *Undo* in the message that follows; with uncommitted
   changes it asks first (they go with the worktree; the branch stays).
 - Click a project to fold its workspaces away (its busiest status and their count stay), again to unfold;
@@ -154,11 +159,14 @@ selected workspace's PR is in the status bar.
 - *Video* at its bottom: a YouTube video under the projects, as wide as the sidebar (*YouTube* above it: the chevron
   minimizes it to that bar, playing on, and shows it again; the pencil asks for another, ✕ closes it; these are in ⌘K
   too). Hiding the sidebar (⌘B) keeps it playing; it's back, paused, after a restart.
-- *Timer* at its bottom starts a countdown (5, 10, 15, 25, 30, 45 minutes, 1 hour, or *Other length, or a command…*:
-  25, 1h 30m, 90s, and its *Then run a command* switch with the command, run as it ends in the workspace in front);
+- *Timer* at its bottom starts a countdown (1, 5, 10, 15, 25, 30, 45 minutes, 1 hour, or *Other length, a message or a
+  command…*: 25, 1h 30m, 90s, a message if you like (*Go out*: on its bar, and the title of what it says as it ends),
+  and its *Then run a command* switch with the command, run as it ends in the workspace in front);
   start as many as you like. Each is a bar above the bottom buttons, like the minimized video, with its time left;
-  its pencil (or a right click) adds 5 minutes, starts it over with another length and picks what happens as it ends: a
-  notification always (with your sound), and the video paused, played or closed, or a command run (*Run a command…*:
+  ⏸ pauses it and ▷ goes on (a paused one stays paused across a restart); its pencil (or a right click) pauses it too,
+  adds 5 minutes, adds or changes its message, starts it over with another length and picks what happens as it ends: a sound and Laki's dialog
+  (*Again* starts the same timer over), or a macOS notification instead (Settings › General › Timers: what it shows
+  and its sound, Glass unless you pick another or none), and the video paused, played or closed, or a command run (*Run a command…*:
   through your login shell, in a tab of the workspace selected then, not focused; it closes when the command succeeds),
   if you like; ✕ stops it. *Stopwatch* in the same menu counts up from 0:00 in a bar of its own: ▷/⏸ starts and
   pauses it, ↻ resets it, ✕ closes it; it keeps counting across a reload. *Start a
@@ -190,7 +198,9 @@ selected workspace's PR is in the status bar.
   *Info*, *Mute notifications*, *Remind me…*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
   *Mark as unread*, *Copy branch name*, *Refresh PR status* (asks GitHub now, not at the next check), *Attach a PR…* (a
   git workspace on a branch with no PR found: one opened another way, by its URL or number; also the status bar's
-  *+ PR* and the info panel's PR section; a PR whose branch is another one is only linked: its status, no PR switches),
+  *+ PR* and the info panel's PR section; a PR whose branch is another one is only linked: its status, no PR switches;
+  one with no PR on its branch gets the PR its agent names in its last answer by itself, as a scheduled run's that
+  pushed under another branch name: one link of the repo's own remotes),
   *Approve PR #n…* (someone else's open PR), *Compare the race* (a race's
   workspace: the flag on its row), *Open in*, fork, archive and delete. While a workspace is archived or deleted its row
   shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
@@ -303,7 +313,8 @@ workspace. *To do* holds prompts for later: write one (⌘⏎ adds it) for a pro
 column) starts a workspace on it with the default agent, and the to-do goes.
 
 **Scheduled tasks** (the clock at the bottom of the sidebar, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
-times you write in plain English.
+times you write in plain English. A form you leave (Esc, a click elsewhere) is there when the page opens again;
+*Cancel* asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't).
 - Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
   OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
   project's own checkout or folder, a new agent and sidebar row every run; *In its folder, one session*: the same
@@ -352,7 +363,7 @@ until the agent's next run renews it. Settings › General turns each agent off 
   (when its turn ends). ⌘⏎ does the first that applies, Esc closes it. A changed image (PNG, JPEG, GIF, WebP, SVG)
   shows before and after side by side, each with its size in pixels and bytes (one side when it's new or deleted);
   click one for full size.
-- *Review*: the PR: its title, state, author and size; *Approve…*, *Open on GitHub* and *Close…*; its description,
+- *Review*: the PR: its title, state, author and size; *Merge* ▾, *Approve*, GitHub and ⋯; its description,
   rendered, a few lines of it until *Show more*; its checks, failing first, each with how long it ran and a click to its
   log; *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
   there's something to send. Then the review threads as cards (from reviewers with write access and bots: what the
@@ -380,7 +391,7 @@ its quotes and line ends stay as they were. The first 2,000 rows show; Raw has t
 **Find files** (*Find files…*, first in ⌘K; or ⌘P): type parts of a path (`crt` finds `src/cart.ts`); names match
 before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 
-**Info panel** (ⓘ or ⌘I): the workspace's name, branch, path and `$PORT`; each public link (Expose to the
+**Info panel** (ⓘ or ⌘I; drag its left edge to make it wider, double-click it for the default): the workspace's name, branch, path and `$PORT`; each public link (Expose to the
 world: open, copy, and who can open it); its PR's title, author, state,
 review decision, size, checks (each links to its run) and description, as in *Review*; the PR switches, with a note
 when *failing CI* or *conflicts* gave up (turn it off and on to try again), and *Send now* beside one when there's
@@ -408,9 +419,11 @@ with no agent running nothing is sent, and the next check tries again.
   you. Right after a push GitHub doesn't know yet whether it conflicts: that keeps the count; no conflicts, or the
   switch turned off and on, starts it over.
 
-*Merge…* ▾, *Approve…* (green) and *Close…* (red on hover), under the PR's title (the side panel's *Review*, the info
-panel), in the status bar PR's right click and (approve) a workspace's right click, merge, approve or close the open
-PR with `gh`, as you, after you confirm. Your own PR has no *Approve* (GitHub refuses it). *Merge…* uses the way you
+*Merge* ▾ (green once it could go in: checks passing, no conflicts, no changes requested; plain otherwise, its
+tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Close pull request…*), under the PR's title (the
+side panel's *Review*, the info panel), in the status bar PR's right click and (approve) a workspace's right click,
+merge, approve or close the open PR with `gh`, as you, after you confirm (each question names the PR; Approve's its
+author and checks). Your own PR has no *Approve* (GitHub refuses it). *Merge* uses the way you
 merged last in this project (*Squash and merge* at first); ▾ picks *Create a merge commit* or *Rebase and merge*,
 which becomes the next default. Its question shows the checks and the review, and *Delete the branch on GitHub* (on
 by default). A draft has no *Merge*.
@@ -435,14 +448,13 @@ back. *Send now* beside each switch (*Review*, the info panel) sends the same pr
 only when there's something to send: failing checks, open review threads, merge conflicts.
 
 **New workspace** (a page, like Settings; Esc closes it): pick the project and the agent, then write the prompt.
+Closing it (Esc, ✕, a click in the sidebar) keeps what you typed as a draft: it's there when the page opens again,
+until you create it or *Clear* it. Enter in a field never creates it; ⌘⏎ or *Create* does.
 It goes first in its project in the sidebar or, when the project has groups, first in the one you pick in
 *In the sidebar*.
 It starts from your last choices (project, its group, agent, template, and what's under *Advanced*), never the last prompt.
 *Advanced* (folded; its line says what it holds, like *a worktree off main · high effort*) has *Local* (the repo itself,
-no worktree), *Pull request* (optional: a PR's number
-or URL; the worktree is on its branch through `gh pr checkout`, a fork's as `<owner>/<branch>`, its base the PR's,
-named `pr-<n>-<title>`; a fork's own `.laki.json` is ignored, so its setup never runs a stranger's code: the repo's
-is used; when a workspace has that branch already, the message offers *Open it*), base branch, name, the agent's
+no worktree), base branch, name, the agent's
 model (like `opus` or a full name) and, for Claude Code and Codex, its effort (both blank: the agent's
 default, kept for its restarts and forks), and *Race* (below). In a plain folder (or with *Local*), whose own
 workspace is there already, an agent or a prompt makes another session beside it, in the same folder, named after
@@ -494,9 +506,10 @@ project (`laki new .`), with that agent; it doesn't do the task itself. Laki giv
 through a plugin of its own (`--plugin-dir`, nothing written to `~/.claude`); other agents with the laki skill
 installed (Settings › Agent skill) take `/laki:new …` in a prompt the same way. Not in SSH hosts' tabs.
 
-With *Progress on tabs* on (Settings › General) and the laki skill installed (Settings › Agent skill), agents get
-`LAKI_PROGRESS=1` and report how far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`, or
-MCP's `laki_progress`): the tab shows `40%` over a bar, its tooltip what they're on, until the turn ends.
+With *Progress on tabs* on (Settings › General), Claude and Codex tabs started from then on are told to report how
+far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
+the tab shows `40%` over a bar, its tooltip what they're on, until the turn ends. Other agents get `LAKI_PROGRESS=1`
+and report through the laki skill (Settings › Agent skill) or MCP's `laki_progress`.
 
 **The sidebar's style** (Settings › Appearance › Sidebar): *Compact* (a short line: the state and the name),
 *Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
@@ -602,6 +615,7 @@ settings) and shows a server icon; the status bar shows `devbox:` before the pat
 | ⌘F | find in the terminal |
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it) |
+| ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app or a script: shown in Finder) |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
@@ -619,9 +633,9 @@ lit for a moment.
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
   Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
-  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Floating bubbles* (while you're in another app, a drop stuck to the screen's right or left edge, over every app and Space, with a circle per agent working or waiting for you (a pulse), its workspace's initials inside: hover one for its name, project and what it asked or last said, click to open it in Laki; drag it from anywhere on it (a circle too) up and down or to the other side, and it sticks to the nearer edge as you let go, where it stays; hidden while Laki is in front; on by default; *While working* picks how a working agent's circle looks, each shown live: *Glow* (a soft halo, the default), *Gradient* (its color turning slowly inside), *Arc* (an arc going round) or *Still*), *Fun button* (the smiley at the bottom of the sidebar; on by default), *Turn
+  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Fun button* (the smiley at the bottom of the sidebar; on by default), *Turn
   timers* (off by default), *Diff size in the sidebar* (off by default), *Progress on tabs* (agents report how far
-  along they are; off by default), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
+  along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
   making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; and per widget, *Logs* in Settings › Widgets: each fetch, how
@@ -640,7 +654,22 @@ lit for a moment.
   double or nothing; the indent, row height, text size and icon size, each the theme's unless you pick one; the style:
   Compact, Default, Extended, Cards or Status (the row's edge in the color of what its agent is doing, and a line under
   it that fills as the agent reports its progress, or sweeps while it works without reporting), above; *Button labels*: words
-  beside Scheduled, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit), *Glass* (a see-through
+  beside Scheduled, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit),
+  *Floating bubbles* (while you're in another app, a drop stuck to the screen's right or left edge, over every app and
+  Space, with a circle per agent working or waiting for you (a pulse), its workspace's initials inside: hover one for
+  its name, project and what it asked or last said, click to open it in Laki; drag it from anywhere on it (a circle too)
+  up and down or to the other side, and it sticks to the nearer edge as you let go, where it stays; hidden while Laki is
+  in front; on by default. *While working* picks how a working agent's circle looks, each shown live: *Glow* (a soft
+  halo, the default), *Gradient* (its color turning slowly inside), *Arc* (an arc going round), *Bricks* (pixel bars rising and falling inside it), *Comet* (a bright head going round, its tail fading behind), *Wave* (filled with its color, a slow tide rolling over) or *Still*; *Recent
+  sessions too*: the last 1 to 5 agents you used, idle or finished, as dimmer circles after the ones at work (finished
+  ones you haven't seen first; one drops out after 1, 4 (the default), 8 or 24 hours idle, or never); *Bubbles
+  at most*: 3, 5, 8 or 12; *Card on hover*; *+ Session*: a + under the circles, Laki's new-workspace page (off by
+  default); *Voice prompt*: a microphone under them (on by default): a small window where macOS dictation starts by
+  itself, then ⏎ sends what you said: *It goes to* picks either *An agent I pick each time* (the default: the bubbles'
+  agents or a new session, nothing chosen until you do; queued while the agent works) or *Always a new session*
+  (Laki's new-workspace page with it). With + the drop stays even when no agent is at work. macOS shows
+  another app's pointer shapes only while it's the active one, so a hovered circle or button grows a little instead),
+  *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window, the sidebar and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it), and the theme (newest first; yours is outlined and checked; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds
@@ -722,8 +751,8 @@ lit for a moment.
   conflicts* get (3), *Archive workspace when its PR merges* (off), and the prompts the PR switches send (above, in
   *PRs*).
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
-  `{{base}}` the workspace's project and base branch, `{{pr}}` its PR (the *Pull request* field, else a PR link in
-  the prompt, or a prompt of only `#123`: *Review {{pr}}, list what's risky* then takes just the number); a template
+  `{{base}}` the workspace's project and base branch, `{{pr}}` its PR (a PR link in the prompt, or a prompt of
+  only `#123`: *Review {{pr}}, list what's risky* then takes just the number); a template
   without `{{prompt}}` gets the prompt after it (not a prompt `{{pr}}` took). Dates are the time you use it, any
   tokens in any order between `{{` and `}}`: `YYYY` `YY`, `MMMM` (October) `MMM` (Oct) `MM`, `DD` `D`, `dddd`
   (Monday) `ddd`, `HH` `H` `hh` (12-hour), `mm` `ss`, `A` (AM/PM), with `-:./,_` or spaces between: `{{DDMMYY

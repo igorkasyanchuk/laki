@@ -1,7 +1,10 @@
 /* the floating bubbles' circles (floater.html), also Settings' previews of their styles: [data-fstyle] on a parent
-   says how a working agent's circle looks (glow, the default; gradient; arc; still); a waiting one pulses in each */
+   says how a working agent's circle looks (glow, the default; gradient; arc; bricks; comet; wave; still); a waiting one pulses in each */
 .fl-dot { --c: var(--running); position: relative; width: 28px; height: 28px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 55%, transparent); display: grid; place-items: center; font: 600 10px/1 var(--font, var(--ui-font, system-ui)); letter-spacing: 0.02em; color: var(--ink, var(--fg)); background: color-mix(in srgb, var(--c) 12%, var(--bg)); }
 .fl-dot.waiting { --c: var(--waiting); border-color: var(--c); animation: fl-pulse 1.8s ease-in-out infinite; }
+/* recent ones (Settings' Recent sessions too): idle or finished, dimmer and still */
+.fl-dot:is(.idle, .done) { --c: var(--idle, var(--muted)); opacity: 0.72; }
+.fl-dot.done { --c: var(--done); }
 @keyframes fl-pulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); } }
 /* glow: a soft halo, breathing */
 [data-fstyle='glow'] .fl-dot.running { animation: fl-glow 2.8s ease-in-out infinite; }
@@ -13,5 +16,17 @@
 /* arc: an arc going round */
 [data-fstyle='arc'] .fl-dot.running::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid transparent; border-top-color: var(--c); animation: fl-spin 1.4s linear infinite; }
 @keyframes fl-spin { to { transform: rotate(360deg); } }
+/* bricks: pixel bars rising and falling inside it, an equalizer of its color behind the initials */
+[data-fstyle='bricks'] .fl-dot.running { --fl-b: color-mix(in srgb, var(--c) 40%, var(--bg)); --fl-t: color-mix(in srgb, var(--c) 75%, var(--bg)); overflow: hidden; isolation: isolate; text-shadow: 0 0 3px var(--bg), 0 0 1px var(--bg); }
+[data-fstyle='bricks'] .fl-dot.running::before { content: ''; position: absolute; z-index: -1; left: calc(50% - 12px); bottom: 0.5px; width: 4px; height: 4px; background: var(--fl-b); animation: fl-bricks 1.5s steps(1) infinite; }
+@keyframes fl-bricks { 0.0% { box-shadow: 0px -5px var(--fl-t), 5px 0px var(--fl-b), 5px -5px var(--fl-b), 5px -10px var(--fl-b), 5px -15px var(--fl-t), 10px 0px var(--fl-b), 10px -5px var(--fl-b), 10px -10px var(--fl-t), 15px 0px var(--fl-b), 15px -5px var(--fl-b), 15px -10px var(--fl-b), 15px -15px var(--fl-b), 15px -20px var(--fl-t), 20px 0px var(--fl-t); } 16.67% { box-shadow: 0px -5px var(--fl-b), 0px -10px var(--fl-t), 5px 0px var(--fl-b), 5px -5px var(--fl-t), 10px 0px var(--fl-b), 10px -5px var(--fl-b), 10px -10px var(--fl-b), 10px -15px var(--fl-b), 10px -20px var(--fl-t), 15px 0px var(--fl-b), 15px -5px var(--fl-b), 15px -10px var(--fl-t), 20px 0px var(--fl-b), 20px -5px var(--fl-t); } 33.33% { box-shadow: 0px -5px var(--fl-b), 0px -10px var(--fl-b), 0px -15px var(--fl-b), 0px -20px var(--fl-t), 5px 0px var(--fl-b), 5px -5px var(--fl-b), 5px -10px var(--fl-t), 10px 0px var(--fl-b), 10px -5px var(--fl-t), 15px 0px var(--fl-b), 15px -5px var(--fl-b), 15px -10px var(--fl-b), 15px -15px var(--fl-t), 20px 0px var(--fl-b), 20px -5px var(--fl-b), 20px -10px var(--fl-t); } 50.0% { box-shadow: 5px 0px var(--fl-b), 5px -5px var(--fl-b), 5px -10px var(--fl-b), 5px -15px var(--fl-b), 5px -20px var(--fl-t), 10px 0px var(--fl-b), 10px -5px var(--fl-b), 10px -10px var(--fl-b), 10px -15px var(--fl-t), 15px 0px var(--fl-b), 15px -5px var(--fl-t), 20px 0px var(--fl-b), 20px -5px var(--fl-b), 20px -10px var(--fl-b), 20px -15px var(--fl-t); } 66.67% { box-shadow: 0px -5px var(--fl-b), 0px -10px var(--fl-t), 5px 0px var(--fl-b), 5px -5px var(--fl-b), 5px -10px var(--fl-b), 5px -15px var(--fl-t), 10px 0px var(--fl-t), 15px 0px var(--fl-b), 15px -5px var(--fl-b), 15px -10px var(--fl-t), 20px 0px var(--fl-b), 20px -5px var(--fl-b), 20px -10px var(--fl-b), 20px -15px var(--fl-b), 20px -20px var(--fl-t); } 83.33% { box-shadow: 0px -5px var(--fl-b), 0px -10px var(--fl-b), 0px -15px var(--fl-t), 5px 0px var(--fl-t), 10px 0px var(--fl-b), 10px -5px var(--fl-b), 10px -10px var(--fl-t), 15px 0px var(--fl-b), 15px -5px var(--fl-b), 15px -10px var(--fl-b), 15px -15px var(--fl-b), 15px -20px var(--fl-t), 20px 0px var(--fl-b), 20px -5px var(--fl-t); } }
+/* comet: a bright head going round with its tail fading behind it */
+[data-fstyle='comet'] .fl-dot.running::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: conic-gradient(transparent 0 50%, color-mix(in srgb, var(--c) 80%, transparent)); mask: radial-gradient(farthest-side, transparent calc(100% - 2px), #000 calc(100% - 1.5px)); animation: fl-spin 1.6s linear infinite; }
+[data-fstyle='comet'] .fl-dot.running::before { content: ''; position: absolute; inset: -4px; border-radius: 50%; background: radial-gradient(circle at 50% 1.2px, var(--c) 0 1.8px, transparent 2.6px); filter: drop-shadow(0 0 2px var(--c)); animation: fl-spin 1.6s linear infinite; }
+/* wave: it fills with its color, a slow tide rolling over the top */
+[data-fstyle='wave'] .fl-dot.running { overflow: hidden; isolation: isolate; text-shadow: 0 0 3px var(--bg); }
+[data-fstyle='wave'] .fl-dot.running::before, [data-fstyle='wave'] .fl-dot.running::after { content: ''; position: absolute; z-index: -1; left: -50%; width: 200%; height: 200%; top: 48%; border-radius: 42%; background: color-mix(in srgb, var(--c) 30%, var(--bg)); animation: fl-spin 6s linear infinite, fl-tide 4s ease-in-out infinite; }
+[data-fstyle='wave'] .fl-dot.running::after { top: 56%; border-radius: 38%; background: color-mix(in srgb, var(--c) 50%, var(--bg)); animation-duration: 4.5s, 5s; animation-direction: reverse, normal; }
+@keyframes fl-tide { 50% { translate: 0 -12%; } }
 /* still: the ring, nothing moving */
-@media (prefers-reduced-motion: reduce) { .fl-dot, .fl-dot::after { animation: none !important; } }
+@media (prefers-reduced-motion: reduce) { .fl-dot, .fl-dot::before, .fl-dot::after { animation: none !important; } }

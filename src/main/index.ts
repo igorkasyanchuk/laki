@@ -1,9 +1,10 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, BrowserWindow, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
+import { app, BrowserWindow, type BrowserWindowConstructorOptions, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -162,6 +163,11 @@ ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: stri
   n.show()
 })
 
+// a timer's end with its dialog (Settings › General › Timers): one of macOS's sounds, whatever notifications say
+ipcMain.on('sound', (_e, name: string) => {
+  if (typeof name === 'string' && /^[A-Za-z]+$/.test(name)) execFile('afplay', [`/System/Library/Sounds/${name}.aiff`], () => {})
+})
+
 // the agent browser (laki browser, MCP's laki_browser): a hidden window per workspace in the preview's session, kept
 // to this Mac's localhost as the preview is, gone after 10 idle minutes; ops come from the daemon through the renderer
 type Browse = { ws: string; home: string; op: string; url?: string; selector?: string; text?: string }
@@ -262,18 +268,25 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
   )
 })
 
-// the floating bubbles (Settings › General): a drop stuck to the screen's left or right edge, over every app and Space,
-// with a circle per workspace whose agent works or waits, from the app window's list; hidden while Laki is in front.
-// A circle's click shows its tab; a hover shows its card in a window of its own beside the drop, toward the screen's
-// middle, that takes no clicks (the drop never moves under the mouse). Dragged anywhere (floater-drag: the page sends
-// how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the nearer edge as
-// it's let go, and stays there
-type Float = { tab: string }
+// the floating bubbles (Settings › Appearance): a drop stuck to the screen's left or right edge, over every app and
+// Space, with a circle per workspace whose agent works or waits (and the last ones used: floaterRecent), from the app
+// window's list, then + Session and the microphone (floaterNew, floaterMic; with +, the drop stays when no agent is at
+// work); hidden while Laki is in front. A circle's click shows its tab; a hover shows its card in a window of its
+// own beside the drop, toward the screen's middle, that takes no clicks (the drop never moves under the mouse). The
+// microphone's window (#voice) takes a prompt by dictation, for an agent of the list or a new session. The card and the
+// voice window are the bar's window.open: the three share one renderer process. Dragged anywhere (floater-drag: the
+// page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
+// nearer edge as it's let go, and stays there
+type Float = { tab: string; status?: string }
+type FloatOpts = { style: string; cards: boolean; add: boolean; mic: boolean; voiceTo: 'pick' | 'new' }
 const BAR = 44 // the drop's window width; floater.html's too
-const STYLES = ['glow', 'gradient', 'arc', 'still'] // a working agent's circle (Settings' previews: floater.css)
-let floats: { items: Float[]; colors: Record<string, string>; style: string } = { items: [], colors: {}, style: 'glow' }
+const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
+const STYLES = ['glow', 'gradient', 'arc', 'bricks', 'comet', 'wave', 'still'] // a working agent's circle (Settings' previews: floater.css)
+let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, mic: false, voiceTo: 'pick' }
 let floater: BrowserWindow | null = null
 let card: BrowserWindow | null = null
+let voice: BrowserWindow | null = null
+let voiceTabs = new Set<string>() // the agents the voice window offered (one may finish, and leave the list, meanwhile)
 let hover: { tab: string; top: number } | null = null // the circle under the mouse: its tab, its top in the bar
 let front = false // Laki is the front app (a launch makes it so; one in the background doesn't)
 const floaterFile = () => join(app.getPath('userData'), 'floater.json') // where the bar was left: its top left corner
@@ -285,31 +298,67 @@ const barSide = () => { // where the card goes: toward the middle of the bar's s
   const d = screen.getDisplayNearestPoint(barAt).workArea
   return barAt.x + BAR / 2 > d.x + d.width / 2 ? 'left' : 'right'
 }
-const floatWin = (hash: 'bar' | 'card', width: number) => {
-  const f = new BrowserWindow({
-    ...barAt,
-    width,
-    height: 60,
-    type: 'panel', // an NSPanel: over full-screen apps, and a click doesn't bring Laki forward
-    frame: false,
-    transparent: true,
-    hasShadow: false,
-    resizable: false,
-    minimizable: false,
-    maximizable: false,
-    fullscreenable: false,
-    skipTaskbar: true,
-    hiddenInMissionControl: true,
-    acceptFirstMouse: true, // a click while another app is in front lands on the circle
-    show: false,
-    webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
-  })
+const floatOpts = (width: number, height: number, focusable = true): BrowserWindowConstructorOptions => ({
+  ...barAt,
+  width,
+  height,
+  type: 'panel', // an NSPanel: over full-screen apps, and a click doesn't bring Laki forward
+  frame: false,
+  transparent: true,
+  hasShadow: false,
+  resizable: false,
+  minimizable: false,
+  maximizable: false,
+  fullscreenable: false,
+  skipTaskbar: true,
+  hiddenInMissionControl: true,
+  acceptFirstMouse: true, // a click while another app is in front lands on the circle
+  focusable,
+  show: false,
+  webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
+})
+const pin = (f: BrowserWindow) => {
   f.setAlwaysOnTop(true, 'floating')
   f.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
-  f.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   f.webContents.on('will-navigate', e => e.preventDefault())
-  if (dev) f.loadURL(`${new URL('floater.html', `${process.env.ELECTRON_RENDERER_URL}/`).href}#${hash}`)
-  else f.loadFile(fileURLToPath(new URL('../renderer/floater.html', import.meta.url)), { hash })
+}
+// the bar; its page opens the card and the voice window (#card, #voice), only those, as one of each
+function barWin() {
+  const f = new BrowserWindow(floatOpts(BAR, 60))
+  pin(f)
+  const kind = (url: string) => (url.split('#')[0] === f.webContents.getURL().split('#')[0] ? /#(card|voice)$/.exec(url)?.[1] : undefined)
+  f.webContents.setWindowOpenHandler(({ url }) => {
+    const k = kind(url)
+    if (k === 'voice' && voice && !voice.isDestroyed()) voice.focus()
+    if (!k || (k === 'card' ? card : voice)?.isDestroyed() === false) return { action: 'deny' }
+    return { action: 'allow', overrideBrowserWindowOptions: k === 'card' ? floatOpts(240, 60, false) : floatOpts(VOICE.width, VOICE.height) }
+  })
+  f.webContents.on('did-create-window', (w, { url }) => {
+    pin(w)
+    w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+    if (kind(url) === 'card') {
+      card = w
+      w.setIgnoreMouseEvents(true)
+      w.on('closed', () => card === w && (card = null))
+      return
+    }
+    voice = w
+    w.on('closed', () => voice === w && (voice = null))
+    w.webContents.on('did-finish-load', () => {
+      voiceTabs = new Set(floats.voiceTo === 'new' ? [] : floats.items.map(x => x.tab))
+      w.webContents.send('voice', floats.voiceTo === 'new' ? [] : floats.items, floats.colors, floats.voiceTo) // always a new session: no agents to pick
+      if (barAt) {
+        const d = screen.getDisplayNearestPoint(barAt).workArea
+        const [, h] = f.getSize()
+        const y = Math.max(d.y, Math.min(barAt.y + h - VOICE.height, d.y + d.height - VOICE.height))
+        w.setPosition(barSide() === 'left' ? barAt.x - 6 - VOICE.width : barAt.x + BAR + 6, Math.round(y))
+      }
+      w.show()
+      w.focus() // the key window without bringing Laki's own forward (a panel): dictation and the keys go to it
+    })
+  })
+  if (dev) f.loadURL(`${new URL('floater.html', `${process.env.ELECTRON_RENDERER_URL}/`).href}#bar`)
+  else f.loadFile(fileURLToPath(new URL('../renderer/floater.html', import.meta.url)), { hash: 'bar' })
   return f
 }
 // the drop against the nearer edge (left or right) of the screen it's on (its spot's, or the main one's when that's on
@@ -328,30 +377,37 @@ function snap(animate = false) {
 }
 app.whenReady().then(() => screen.on('display-removed', () => snap()))
 function placeFloater() {
-  if (!floats.items.length || front || parked) return void (floater?.hide(), card?.hide(), (hover = null))
+  if ((!floats.items.length && !floats.add) || front || parked) return void (floater?.hide(), card?.hide(), (hover = null))
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
     } catch {}
-    const f = (floater = floatWin('bar', BAR))
+    const f = (floater = barWin())
     f.webContents.on('did-finish-load', () => (snap(), sendFloats()))
     f.on('closed', () => floater === f && ((floater = null), (dragFrom = null)))
-    const c = (card = floatWin('card', 240))
-    c.setIgnoreMouseEvents(true)
-    c.on('closed', () => card === c && (card = null))
   } else sendFloats()
   if (!floater.isVisible()) floater.showInactive()
 }
 const sendFloats = () => floater?.webContents.send('floats', floats)
-ipcMain.on('floats', (e, items: unknown, colors: unknown, style: unknown) => {
+ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
   if (e.sender !== win?.webContents) return
-  floats = { items: Array.isArray(items) ? items.slice(0, 12) : [], colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {}, style: STYLES.includes(style as string) ? (style as string) : 'glow' }
+  const o = (opts && typeof opts === 'object' ? opts : {}) as Partial<FloatOpts>
+  floats = {
+    items: Array.isArray(items) ? items.slice(0, 12) : [],
+    colors: colors && typeof colors === 'object' ? (colors as Record<string, string>) : {},
+    style: STYLES.includes(o.style as string) ? o.style! : 'glow',
+    cards: o.cards !== false,
+    add: o.add === true,
+    mic: o.mic === true,
+    voiceTo: o.voiceTo === 'new' ? 'new' : 'pick',
+  }
+  if (!floats.cards) (hover = null), card?.hide()
   if (parked && floatState() !== parked) parked = ''
   placeFloater()
 })
 // Stop (Settings › Resources): the bubbles' windows closed, until an agent's state changes
 let parked = ''
-const floatState = () => JSON.stringify(floats.items.map(x => [x.tab, (x as { status?: string }).status]))
+const floatState = () => JSON.stringify(floats.items.map(x => [x.tab, x.status]))
 
 // what each of the app's processes holds, for Settings › Resources (by pid; ps has the memory): the window, the frames
 // in it of their own (a JS widget, the video), the preview's page, an agent browser's, the bubbles, the editor. stop:
@@ -372,7 +428,7 @@ ipcMain.handle('procs', e => {
   }
   for (const wc of webContents.getAllWebContents()) if (wc.getType() === 'webview' && !wc.isDestroyed()) add(wc.getOSProcessId(), 'The preview', 'preview')
   for (const [ws, a] of agentWins) if (!a.w.isDestroyed()) add(a.w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
-  for (const f of [floater, card]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater')
+  for (const f of [floater, card, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
   if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
   return out
 })
@@ -381,7 +437,7 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
   if (what === 'floater') {
     parked = floatState()
     hover = null
-    for (const f of [floater, card]) if (f && !f.isDestroyed()) f.destroy()
+    for (const f of [floater, card, voice]) if (f && !f.isDestroyed()) f.destroy()
   } else if (what.startsWith('browse:')) {
     const a = agentWins.get(what.slice(7))
     if (!a) return
@@ -392,6 +448,25 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
 })
 ipcMain.on('floater-size', (e, h: number) => floater && e.sender === floater.webContents && h > 0 && h < 1200 && Math.round(h) !== floater.getSize()[1] && (floater.setSize(BAR, Math.round(h)), dragFrom || snap())) // where it is, kept on screen (a drag may be under way); the same height: nothing, a snap's animation goes on
 ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab)))
+// its buttons: + Session (the new-workspace page); the microphone's window is the page's own window.open
+ipcMain.on('floater-act', (e, what: string) => floater && e.sender === floater.webContents && what === 'new' && (app.focus({ steal: true }), openLink('laki://new')))
+// the voice prompt: to an agent of the list (send, as the app's, queued while it works), or a new session's page
+ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
+  if (!voice || e.sender !== voice.webContents || typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
+  if (text.length > 20000) return { error: 'too long: 20,000 characters at most' }
+  if (typeof tab === 'string' && tab) {
+    if (!voiceTabs.has(tab)) return { error: 'not an agent this window offered' }
+    const r = await rpc<{ queued?: number }>('send', { target: tab, text: text.trim(), whenIdle: true }).catch((err: Error) => ({ error: err.message }))
+    if ('error' in r) return r
+    voice?.close() // (it may have shut meanwhile)
+    return { queued: !!r?.queued }
+  }
+  voice.close()
+  app.focus({ steal: true })
+  openLink(`laki://new?prompt=${encodeURIComponent(text.trim())}`)
+  return {}
+})
+ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.close())
 ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
   if (!floater || e.sender !== floater.webContents) return
   if (phase === 'start') {
@@ -412,15 +487,24 @@ ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
   }
 })
 // a hover: the card's text goes to its window, which says its size; then it's placed beside the circle and shown
+// (only while the mouse is over the bar: a page shown again keeps the circle it had under the mouse, which would
+// bring a card back by itself)
+const overBar = () => {
+  if (!floater?.isVisible()) return false
+  const p = screen.getCursorScreenPoint()
+  const b = floater.getBounds()
+  return p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height
+}
 ipcMain.on('floater-hover', (e, tab: string, top: number) => {
   if (!floater || e.sender !== floater.webContents || dragFrom) return
   const f = floats.items.find(x => x.tab === tab)
-  hover = f && Number.isFinite(top) ? { tab, top } : null
+  hover = f && Number.isFinite(top) && floats.cards && !front && overBar() ? { tab, top } : null
   if (hover) card?.webContents.send('card', f, floats.colors)
   else card?.hide()
 })
 ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
   if (!card || !barAt || e.sender !== card.webContents || hover?.tab !== tab || !(w > 0 && w < 800 && h > 0 && h < 800)) return
+  if (front || !overBar()) return void ((hover = null), card.hide()) // gone meanwhile (a click that brought Laki forward)
   const d = screen.getDisplayNearestPoint(barAt).workArea
   const y = Math.max(d.y, Math.min(barAt.y + hover.top - 6, d.y + d.height - h))
   card.setBounds({ x: barSide() === 'left' ? barAt.x - 6 - Math.round(w) : barAt.x + BAR + 6, y: Math.round(y), width: Math.round(w), height: Math.round(h) })
@@ -428,7 +512,7 @@ ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
 })
 // in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
 // takes the click), so being active alone isn't it: the drop would hide under the pointer as a drag starts
-const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card
+const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== voice
 const setFront = (on: boolean) => on !== front && ((front = on), placeFloater())
 app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
 app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after
@@ -518,6 +602,22 @@ ipcMain.handle('capture', async (e, id: number) => {
 })
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url)
+})
+// a terminal's ⌘-clicked file:// link (claude's paths), the app window's only: { rel } for a file inside root (the
+// workspace: the app's preview), a folder in Finder, a document in its app; anything that could run (an app, a script, no
+// extension) only shown in Finder. Links followed first: their target's name is what counts
+const DOCS = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|html?|pdf|png|jpe?g|gif|webp|svg|heic|mp4|mov|webm|mp3|m4a|wav)$/i
+const BUNDLE = /\.(app|bundle|framework|plugin|kext|pkg|mpkg|prefpane|workflow|action|saver|appex)\/?$/i
+ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
+  if (!win || e.sender !== win.webContents || typeof path !== 'string' || !path.startsWith('/')) return 'missing'
+  const real = await realpath(path).catch(() => '')
+  const st = real && (await stat(real).catch(() => null))
+  if (!st) return 'missing'
+  const top = typeof root === 'string' && root.startsWith('/') ? await realpath(root).catch(() => '') : ''
+  if (st.isFile() && top && real.startsWith(`${top}/`)) return { rel: real.slice(top.length + 1) }
+  if (st.isDirectory() ? !BUNDLE.test(real) : st.isFile() && DOCS.test(real)) await shell.openPath(real)
+  else shell.showItemInFolder(real)
+  return 'opened'
 })
 
 // Quit Completely: the daemon too, so every agent stops (they resume when the app opens again)
