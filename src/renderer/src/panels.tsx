@@ -5,9 +5,9 @@ import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
-import { type Img, PromptInput, TemplatePick, withImages } from './PromptInput'
+import { type Img, PromptInput, withImages } from './PromptInput'
 import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor } from './text'
-import { escapes, Icon, IconButton, type IconName, keep, load, Page, Switch, useMenu } from './ui'
+import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
@@ -365,14 +365,16 @@ export function About({ onClose }: { onClose: () => void }) {
 export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[]; pr?: string; place?: string }
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
-// kept would make several worktrees from a folded Advanced)
+// kept would make several worktrees from a folded More)
 type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'base' | 'place'>> & { tpl?: string; agent?: string }
 const LAST_NEW = 'laki.newWs'
 // what the page held as it closed without making it (Esc, ✕, a click in the sidebar): back as it opens again, until it's
 // made or cleared
 const DRAFT = 'laki.newDraft'
 type Draft = { p: NewWsParams; images: Img[]; rivals: string[]; tpl: string; prev?: string } // prev: an earlier prompt a link's replaced
-const ADV_OPEN = 'laki.newAdv'
+const ADV_OPEN = 'laki.newAdv' // More open (the key from when it was Advanced)
+// the agent menu's choices after the presets: what each says, its icon
+const OTHER_AGENTS: [string, string, IconName][] = [['shell', 'Shell', 'terminal'], ['custom', 'Custom command…', 'code'], ['none', 'No agent', 'minus']]
 
 // initial: a laki://new link's prompt, preset and name; project and initial win over the last choices; images: the menu
 // bar's screenshots
@@ -404,6 +406,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     }
   })
   const [branches, setBranches] = useState<string[]>([])
+  const [current, setCurrent] = useState('') // the repo's own branch: a local workspace's
+  const [menu, openMenu] = useMenu()
+  const modelBox = useRef<HTMLInputElement>(null) // More's model: Another model… goes there
   const [busy, setBusy] = useState(false)
   const [images, setImages] = useState<Img[]>(() => [...(draft?.images ?? []), ...(shots ?? [])])
   const had = useRef(new Set((shots ?? []).map(s => s.path))) // screenshots given so far: one taken out stays out
@@ -420,7 +425,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     const t = pr?.seps?.find(s => s.id === initial?.place)?.template
     return (t && templatesFor(view.settings.templates, pr?.config?.templates).some(x => x.name === t) ? t : draft ? draft.tpl : last.tpl) || ''
   })
-  const [adv, setAdv] = useState(() => load(ADV_OPEN, false) || !!initial?.name)
+  const [adv, setAdv] = useState(() => load(ADV_OPEN, false))
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
   const proj = view.projects.find(x => x.id === p.project)
   const templates = templatesFor(view.settings.templates, proj?.config?.templates)
@@ -440,6 +445,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     api.call('branches', { project: p.project }).then(
       r => {
         setBranches(r.branches)
+        setCurrent(r.current)
         setP(x => ({ ...x, base: x.base && r.branches.includes(x.base) ? x.base : x.project === last.project && last.base && r.branches.includes(last.base) ? last.base : r.current })) // a draft's, if the branch is still there
       },
       () => setBranches([]),
@@ -451,7 +457,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   useEffect(() => {
     if (!busy) return
     setSecs(0)
-    strip.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) // in sight under an open Advanced
+    strip.current?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }) // in sight under an open More
     const t = setInterval(() => setSecs(n => n + 1), 1000)
     return () => clearInterval(t)
   }, [busy])
@@ -488,156 +494,193 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       </Page>
     )
   const prompting = view.presets.some(x => x.name === p.preset && x.agent !== 'command')
-  // what Advanced holds, in words, so a closed one still says it
-  const where = plain || p.local ? 'in the folder itself' : `a worktree off ${p.base || '…'}`
-  const said = [where, p.name?.trim() && `named ${p.name.trim()}`, fan && `race of ${fan.length}`, isAgent(starts) && !racing && p.model?.trim(), isAgent(starts) && !racing && p.effort && `${p.effort} effort`].filter(Boolean).join(' · ')
+  const sep = proj?.seps?.find(s => s.id === p.place)
+  const canName = !p.local && !plain
+  const canModel = isAgent(starts) && !racing // a race's agents keep their own
+  const canRace = !p.local && !plain && isAgent(starts) && racers.length > 0
+  // the project and its groups in one menu: a group's items under its project
+  const placeMenu = (e: MouseEvent) =>
+    openMenu(
+      e,
+      view.projects.flatMap(x => [
+        { label: x.name, icon: x.git === false ? 'folder' : 'fork', hint: x.id === p.project && !sep ? ON : undefined, run: () => set({ project: x.id, place: undefined, ...(x.id !== p.project && { base: '' }) }) } as MenuItem,
+        ...(x.seps ?? []).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', indent: true, hint: x.id === p.project && sep?.id === s.id ? ON : undefined, run: () => set({ project: x.id, place: s.id, ...(x.id !== p.project && { base: '' }) }) }) as MenuItem),
+      ]),
+    )
+  const agentMenu = (e: MouseEvent) =>
+    openMenu(
+      e,
+      [
+        { head: 'Agent' },
+        ...view.presets.filter(x => !x.off || x.name === p.preset).map(x => ({ label: x.name, icon: 'agent', hint: p.preset === x.name ? ON : undefined, run: () => set({ preset: x.name, model: undefined, effort: undefined }) }) as MenuItem), // another agent's names
+        null,
+        ...OTHER_AGENTS.map(([x, label, icon]) => ({ label, icon, hint: p.preset === x ? ON : undefined, run: () => set({ preset: x, model: undefined, effort: undefined }) }) as MenuItem),
+      ],
+      'right',
+    )
+  const ag = isAgent(starts) ? starts : undefined // an agent's model and effort flags
+  const models = (ag && MODELS[ag]) ?? []
+  const efforts = ag && EFFORTS[ag]
+  const typed = p.model?.trim()
+  const modelMenu = (e: MouseEvent) =>
+    openMenu(
+      e,
+      [
+        { head: 'Model' },
+        { label: "The agent's default", hint: !typed ? ON : undefined, run: () => set({ model: undefined }) },
+        ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => ({ label: m, hint: typed === m ? ON : undefined, run: () => set({ model: m }) }) as MenuItem),
+        { label: 'Another model…', icon: 'pencil', run: () => (setAdv(true), keep(ADV_OPEN, true), setTimeout(() => modelBox.current?.focus())) },
+        ...(efforts
+          ? [null, { head: 'Effort' }, { label: "The agent's default", hint: !p.effort ? ON : undefined, run: () => set({ effort: '' }) } as MenuItem, ...efforts.map(x => ({ label: x, hint: p.effort === x ? ON : undefined, run: () => set({ effort: x }) }) as MenuItem)]
+          : []),
+      ],
+      'right',
+    )
+  const tplMenu = (e: MouseEvent) =>
+    openMenu(
+      e,
+      [
+        { head: 'Prompt template' },
+        { label: 'None: the prompt as typed', hint: !tpl ? ON : undefined, run: () => setTplName('') },
+        ...templates.map((t, i) => ({ label: t.name || '(no name)', icon: 'file', hint: String(i) === tpl ? ON : undefined, run: () => setTplName(t.name) }) as MenuItem),
+      ],
+      'right',
+    )
+  const other = OTHER_AGENTS.find(o => o[0] === p.preset)
+  const pickers = (
+    <>
+      {prompting && templates.length > 0 && (
+        <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="A prompt template: your words go into it" onClick={tplMenu}>
+          <Icon name="file" />
+          <span>{tpl ? templates[ti].name || '(no name)' : 'Template'}</span>
+          <Icon name="chevron" size={11} />
+        </button>
+      )}
+      <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="What starts in its first tab" onClick={agentMenu}>
+        <Icon name={other?.[2] ?? 'agent'} />
+        <span>{other?.[1] ?? p.preset}</span>
+        <Icon name="chevron" size={11} />
+      </button>
+      {canModel && (
+        <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Its model and effort" onClick={modelMenu}>
+          <span>{[typed || 'default model', p.effort].filter(Boolean).join(' · ')}</span>
+          <Icon name="chevron" size={11} />
+        </button>
+      )}
+    </>
+  )
+  const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`].filter(Boolean).join(' · ')
   const toggle = () => setAdv(o => (keep(ADV_OPEN, !o), !o))
   return (
     <Page title="New workspace" onClose={onClose}>
       {/* Enter in a field never makes it (a branch picked, a name typed): ⌘⏎ or Create does */}
       <form onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !e.defaultPrevented && (e.preventDefault(), submit())} className={`form new-ws ${busy ? 'busy' : ''}`} aria-busy={busy}>
-        <div className="nw-card">
-          <div className="row">
-            <label>
-              Project
-              <select value={p.project} onChange={e => set({ project: e.target.value, place: undefined, base: '' })}>
-                {view.projects.map(x => (
-                  <option key={x.id} value={x.id}>
-                    {x.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {!!proj?.seps?.length && (
-              <label>
-                In the sidebar
-                <select value={p.place ?? ''} onChange={e => set({ place: e.target.value || undefined })}>
-                  <option value="">First in {proj.name}</option>
-                  {proj.seps.map(s => (
-                    <option key={s.id} value={s.id}>
-                      In group {s.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-          </div>
-          <div className="field">
-            <span>Agent</span>
-            <div className="seg wrap">
-              {[...view.presets.filter(x => !x.off || x.name === p.preset).map(x => x.name), 'shell', 'custom', 'none'].map(x => (
-                <button type="button" key={x} className={p.preset === x ? 'on' : ''} onClick={() => set({ preset: x, model: undefined, effort: undefined }) /* another agent's names */}>
-                  {x}
-                </button>
-              ))}
-            </div>
-          </div>
-          {p.preset === 'custom' && (
-            <label>
-              Command
-              <input value={p.cmd ?? ''} placeholder="aider --model …" onChange={e => set({ cmd: e.target.value })} autoFocus />
-            </label>
-          )}
-          {prompting && (
-            <div className="field">
-              <span>
-                Prompt <span className="muted">(optional)</span>
-              </span>
-              <PromptInput
-                value={p.prompt ?? ''}
-                onChange={prompt => set({ prompt })}
-                images={images}
-                onImages={setImages}
-                save={(data, ext) => api.call<string>('imageSave', { data, ext })}
-                dictate={bridge?.dictate}
-                dictationSettings={bridge?.dictationSettings}
-                onSubmit={submit}
-                onBusy={setSaving}
-                rows={10}
-              />
-              <TemplatePick templates={templates} value={tpl} onChange={i => setTplName(i ? templates[Number(i)].name : '')} preview={filled} />
-            </div>
-          )}
-        </div>
-        <div className={`nw-card nw-adv ${adv ? 'open' : ''}`}>
-          <button type="button" className="nw-adv-head" aria-expanded={adv} onClick={toggle}>
-            <Icon name={adv ? 'chevron' : 'chevronRight'} />
-            <b>Advanced</b>
-            <span className="muted">{said}</span>
-          </button>
-          {adv && (
+        <div className="nw-card nw-composer">
+          {prompting ? (
+            <PromptInput
+              value={p.prompt ?? ''}
+              onChange={prompt => set({ prompt })}
+              images={images}
+              onImages={setImages}
+              save={(data, ext) => api.call<string>('imageSave', { data, ext })}
+              dictate={bridge?.dictate}
+              dictationSettings={bridge?.dictationSettings}
+              onSubmit={submit}
+              onBusy={setSaving}
+              rows={8}
+              tools={pickers}
+            />
+          ) : (
             <>
-              {plain ? (
-                <div className="muted small">A folder without git: the workspace runs in the folder itself.</div>
+              {p.preset === 'custom' ? (
+                <input className="nw-cmd" value={p.cmd ?? ''} placeholder="The command to run: aider --model …" aria-label="Command" spellCheck={false} onChange={e => set({ cmd: e.target.value })} autoFocus />
               ) : (
-                <label className="check">
-                  <input type="checkbox" checked={!!p.local} onChange={e => set({ local: e.target.checked })} /> Local: work in the repo itself (no worktree)
-                </label>
+                <div className="nw-quiet">{p.preset === 'shell' ? 'A shell tab, in the workspace’s folder.' : p.preset === 'none' ? 'No tabs: the workspace opens empty, for you to start what you like.' : `${p.preset} runs its own command: no prompt.`}</div>
               )}
-              {!p.local && !plain && (
-                <div className="row">
-                  <label>
-                    Base branch
-                    <input list="branches" value={p.base} onChange={e => set({ base: e.target.value })} />
-                    <datalist id="branches">
-                      {branches.map(b => (
-                        <option key={b} value={b} />
-                      ))}
-                    </datalist>
-                  </label>
-                  <label>
-                    <span>
-                      Name <span className="muted">(optional)</span>
-                    </span>
-                    <input value={p.name ?? ''} placeholder="from the prompt" onChange={e => set({ name: e.target.value })} />
-                  </label>
-                </div>
-              )}
-              {isAgent(starts) && !racing && (
-                <div className="row">
-                  <label>
-                    <span>
-                      Model <span className="muted">(optional)</span>
-                    </span>
-                    <input list="models" value={p.model ?? ''} spellCheck={false} placeholder={starts === 'opencode' ? 'provider/model' : "the agent's default"} onChange={e => set({ model: e.target.value })} />
-                    <datalist id="models">
-                      {(MODELS[starts] ?? []).map(m => (
-                        <option key={m} value={m} />
-                      ))}
-                    </datalist>
-                  </label>
-                  {EFFORTS[starts] && (
-                    <label>
-                      Effort
-                      <select value={p.effort ?? ''} onChange={e => set({ effort: e.target.value })}>
-                        <option value="">the agent's default</option>
-                        {EFFORTS[starts]!.map(x => (
-                          <option key={x} value={x}>
-                            {x}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  )}
-                </div>
-              )}
-              {!p.local && !plain && isAgent(starts) && racers.length > 0 && (
-                <div className="field">
-                  <span>
-                    Race <span className="muted">· the same prompt to more agents, each in a worktree of its own; Compare keeps the best</span>
-                  </span>
-                  <div className="seg wrap">
-                    {racers.map(x => (
-                      <button type="button" key={x} className={rivals.includes(x) ? 'on' : ''} disabled={!rivals.includes(x) && rivals.filter(r => racers.includes(r)).length >= 5 /* six agents at most */} onClick={() => setRivals(r => (r.includes(x) ? r.filter(y => y !== x) : [...r, x]))}>
-                        + {x}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
+              <div className="prompt-tools">
+                <span className="prompt-tools-end">{pickers}</span>
+              </div>
             </>
           )}
         </div>
+        {tpl && prompting && <div className="template-preview muted small">{filled || ' '}</div>}
+        <div className="nw-card nw-chips">
+          <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Its project, and where in the sidebar: first in it, or in one of its groups" onClick={placeMenu}>
+            <Icon name={plain ? 'folder' : 'fork'} />
+            <span className="nw-chip-text">
+              {proj?.name}
+              {sep && <span className="muted"> › {sep.name || 'Unnamed group'}</span>}
+            </span>
+            <Icon name="chevron" size={11} />
+          </button>
+          {plain ? (
+            <span className="nw-chip quiet" data-tip="A folder without git: the workspace runs in the folder itself">
+              in the folder itself
+            </span>
+          ) : (
+            <span className={`nw-chip ${p.local ? 'quiet' : ''}`}>
+              <Icon name="pr" />
+              {p.local ? (
+                <span className="nw-chip-text" data-tip="Local: in the repo itself, on the branch it's on">
+                  {current || 'its branch'}
+                </span>
+              ) : (
+                <>
+                  <input className="nw-chip-input" list="branches" value={p.base} aria-label="Base branch" data-tip="The base branch: the worktree starts off it" spellCheck={false} onChange={e => set({ base: e.target.value })} />
+                  <datalist id="branches">
+                    {branches.map(b => (
+                      <option key={b} value={b} />
+                    ))}
+                  </datalist>
+                </>
+              )}
+              <span className="nw-chip-sep" />
+              <label data-tip="A git worktree of its own, off the base branch; off: work in the repo itself">
+                <input type="checkbox" checked={!p.local} onChange={e => set({ local: !e.target.checked })} /> worktree
+              </label>
+            </span>
+          )}
+          {canName && (
+            <label className="nw-chip">
+              <Icon name="pencil" />
+              <input className="nw-chip-input" value={p.name ?? ''} placeholder={prompting && p.prompt?.trim() ? 'name: from the prompt' : 'name'} aria-label="Name" spellCheck={false} onChange={e => set({ name: e.target.value })} />
+            </label>
+          )}
+          {(canModel || canRace) && (
+            <button type="button" className={`nw-chip ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race" onClick={toggle}>
+              <span className="nw-chip-text">More{more && <span className="muted"> · {more}</span>}</span>
+              <Icon name={adv ? 'chevronUp' : 'chevron'} size={11} />
+            </button>
+          )}
+        </div>
+        {adv && (canModel || canRace) && (
+          <div className="nw-card nw-more">
+            {canModel && (
+              <label className="nw-line">
+                <span>Model</span>
+                <input ref={modelBox} list="models" value={p.model ?? ''} spellCheck={false} placeholder={starts === 'opencode' ? 'provider/model' : "the agent's default"} onChange={e => set({ model: e.target.value })} />
+                <datalist id="models">
+                  {models.map(m => (
+                    <option key={m} value={m} />
+                  ))}
+                </datalist>
+              </label>
+            )}
+            {canRace && (
+              <div className="nw-line">
+                <span>Race</span>
+                <div className="seg wrap">
+                  {racers.map(x => (
+                    <button type="button" key={x} className={rivals.includes(x) ? 'on' : ''} disabled={!rivals.includes(x) && rivals.filter(r => racers.includes(r)).length >= 5 /* six agents at most */} onClick={() => setRivals(r => (r.includes(x) ? r.filter(y => y !== x) : [...r, x]))}>
+                      + {x}
+                    </button>
+                  ))}
+                </div>
+                <span className="muted small">the same prompt to each, a worktree each; Compare keeps the best</span>
+              </div>
+            )}
+          </div>
+        )}
         {busy && (
           <div className="nw-making" role="status" ref={strip}>
             <span className="glyph spin" />
@@ -681,6 +724,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
           </button>
         </div>
       </form>
+      {menu}
     </Page>
   )
 }

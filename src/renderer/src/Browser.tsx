@@ -3,7 +3,8 @@
 // reload and an address bar (text.ts browserUrl: a site, or a search). The page it's on and its title go to the
 // workspace (onPage: wsSet's browser and name), so the sidebar names it and a restart opens it again. A right click
 // is main's pageMenu (link, image, text, back, forward, reload, Inspect Element); the code button opens DevTools.
-// ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them), as in the preview
+// ponytail: ⌘ keys don't reach the app while the page has the focus (the guest gets them), as in the preview; only
+// ⌘W and ⌘T do (main's before-input-event sends them as browser-key: App's keys, as if typed there)
 import { useEffect, useRef, useState } from 'react'
 import { bridge } from './api'
 import { browserUrl } from './text'

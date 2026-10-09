@@ -17,7 +17,7 @@ const GUIDE = `${REPO}/blob/main/docs/guide.md`
 const KEYS: [string, string][] = [
   ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
   ['⌘N', 'new workspace'],
-  ['⌘T / ⌘W', 'new shell tab / close the tab (or the file preview)'],
+  ['⌘T / ⌘W', 'new shell tab / close the tab (or the file preview); in a browser: a new page / close it'],
   ['⌘1…⌘9', 'go to a tab'],
   ['⌘↑ / ⌘↓', 'previous / next workspace'],
   ['⌘J', 'the next tab that needs you, in any workspace'],
@@ -117,7 +117,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
       kind: 'list',
       items: [
         'Open a project: ⌘O, + at the top of the sidebar › Project folder…, or drop a folder on the sidebar. One on another machine: ⌘K › Open a project over SSH… (host:path).',
-        'New workspace (⌘N): a git worktree and branch of its own (or the repo itself, with Local), an agent and a first prompt.',
+        'New workspace (⌘N): a git worktree and branch of its own (or the repo itself: untick worktree), an agent and a first prompt.',
         'Watch the sidebar: each workspace shows its most urgent tab. Click one to step in; ⌘K jumps anywhere.',
         'When it’s done: Ship (the arrow up in the tab bar) commits, pushes and opens a PR.',
       ].map((v, i) => ({ v, n: i + 1 })),
@@ -147,7 +147,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
           k: 'Status bar',
           v: (
             <>
-              The plan-limits ring (the 5-hour limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review / fix conflicts switches (their prompts, how often they check and how many tries: Settings › Pull requests), and merge when green where the project allows it (its settings › Pull requests: merge, merge when green, approve, close). <i>daemon older than the app · restart</i> shows up after an update: click twice to restart the daemon (agents resume; a turn in progress is cut off).
+              The plan-limits ring (the 5-hour limit of Claude Code’s and Codex’s plans; click for each window and when it resets), branch ← base, $PORT (green while something listens on it), the other listening ports (click to open), the PR and its checks, and the fix CI / review / fix conflicts switches (their prompts, how often they check and how many tries: Settings › Pull requests), and merge when green where the project allows it (its settings › Pull requests: merge, merge when green, approve, close). After an update, a yellow bar at the top may say <i>Restart Laki's daemon</i>: click its button twice to restart it (agents resume; a turn in progress is cut off).
             </>
           ),
         },
@@ -160,9 +160,18 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
             </>
           ),
         },
+        {
+          id: 'remote',
+          k: 'Remote access',
+          v: (
+            <>
+              Settings › Remote access: this app in a browser on your phone or another computer, for one email (or, if you confirm it, anyone with the link), through cloudflared (2026.9.3 or newer for an email). It won't start, or Cloudflare's sign-in won't let you in? Run <code>cloudflared tunnel login</code> once in a terminal: it signs cloudflared in to your Cloudflare account.
+            </>
+          ),
+        },
         { id: 'shells', k: 'Terminals and browsers', v: "+ at the top of the sidebar › Terminal: a shell in your home folder, under Terminals; › Browser: any website under Browsers, with an address bar (a site, or words to search), its sign-ins kept. A shell running a command spins until its prompt is back." },
         { id: 'start', k: 'Get started', v: "The first steps, shown once: each ticks itself as you do it (or click its circle). What's left stays at the bottom of the sidebar; ⌘K › Get started opens it again." },
-        { id: 'sidebar', k: 'Sidebar', v: "Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag a workspace or a project to reorder. A project's ⋯ › Notes: your Markdown notes for it. A workspace with no PR found: ⋯ › Attach a PR… (or + PR in the status bar). Pin to top (its menu) keeps one under Pinned, above the projects. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts), with its author's picture when it isn't yours. Archiving a clean workspace is at once, with Undo. The funnel at the top filters them (words, needs you, working, with a PR); a group (a project's ⋯ › Add a group) holds the workspaces under it, folds with a click, takes a workspace dropped on its head, and its ⋯ gives it a color and makes a new workspace in it; a workspace's Remind me… notifies you about it later." },
+        { id: 'sidebar', k: 'Sidebar', v: "Click a project to fold its workspaces away; hover a workspace for ⋯, its menu (right click too); drag a workspace or a project to reorder. A project's ⋯ › Notes: your Markdown notes for it. A workspace with no PR found: ⋯ › Attach a PR… (or + PR in the status bar). Pin to top (its menu) keeps one under Pinned, above the projects. +12 −3 (Settings › General › Diff size): its lines changed against the base. GitHub's mark: the workspace has a PR (gray: draft; purple: merged; red: closed, or failing checks; a yellow ⚠ beside it: merge conflicts), with its author's picture when it isn't yours. Archiving a clean workspace is at once, with Undo. The funnel at the top filters them (words, needs you, working, with a PR); a group (a project's ⋯ › Add a group; a workspace's ⋯ › Move to group) holds the workspaces under it, folds with a click, takes a workspace dropped on its head, and its ⋯ gives it a color and makes a new workspace in it; a workspace's Remind me… notifies you about it later. Settings › Appearance › Layout: Rail and list (the default) puts Projects, Board, Schedule, Terminal and Browser on a rail of their own (Slack's), each with what needs you (Board and Schedule: a page over the list), Settings at its bottom, and lists the one you pick (its Labels switch: words under the icons, or icons only)." },
         {
           id: 'templates',
           k: 'Templates',
@@ -173,13 +182,13 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
           ),
         },
         { id: 'actions', k: 'Actions', v: "Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in." },
-        { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent's model and effort. The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › General › Turn timers: how long each turn has gone. In a Claude Code tab, /laki:new <the task> with codex starts it in a new workspace of the project." },
+        { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent, its model and effort under the prompt. The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › General › Turn timers: how long each turn has gone. In a Claude Code tab, /laki:new <the task> with codex starts it in a new workspace of the project." },
         { id: 'widgets', k: 'Widgets', v: 'Live tiles at the bottom of the sidebar (a click opens the full view): each a folder with widget.json and widget.html, fed by a command on a schedule while the app is open. Settings › Widgets turns them on, sizes them (and their full view: small, medium, large), sets them up and opens their folders; the Widget creator skill (Settings › Agent skill) has your agent make new ones, or Make one with AI there gives a prompt for any AI chat.' },
         { id: 'board', k: 'Board', v: 'The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.' },
         {
           id: 'scheduled',
           k: 'Scheduled',
-          v: "The clock at the bottom of the sidebar (or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {{DD-MM-YY}} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.",
+          v: "The clock at the bottom of the sidebar (Rail and list: the rail's Schedule; or ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at times you write, like “every day at 2am except weekends”, in a new workspace each run, its folder (a new session each run, or one) or a workspace you pick. {{DD-MM-YY}} and the like in the name or prompt become the run's date. The log lists each run; the clock gets a dot when one failed.",
         },
         { id: 'look', k: 'Look', v: "Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow), the interface font, how project names look and the sidebar's lines, rows and button labels. Settings › General exports every setting to a file, to import on another Mac. Accent and corners go over the theme's (every corner it draws); Settings & Help size: ⌘+ / ⌘− while either is open." },
         { id: 'resources', k: 'Resources', v: "Settings › Resources: memory and CPU, Laki's own and each tab's. Sleep an idle agent (it wakes as you look at it; Settings can sleep them after a while); Stop the video, a widget, the preview, an agent browser or the floating bubbles until they're opened again." },

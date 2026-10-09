@@ -1,33 +1,14 @@
 // A prompt for an agent: text, screenshots pasted or dropped in (the daemon saves them; their paths go
-// after the text, and the agent opens them), and macOS dictation. App.tsx passes
+// after the text, and the agent opens them), and macOS dictation. Its toolbar, as Claude's: + (images), the mic and
+// its ⌄ (dictation: start, microphone and language), then tools (the caller's pickers) on the right. App.tsx passes
 // in how the daemon saves an image and how dictation starts.
-import { useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
-import type { Template } from './text'
-import { Icon } from './ui'
+import { type ReactNode, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { Icon, useMenu } from './ui'
 
 export type Img = { path: string; url: string } // saved file, and a data: URL for its thumbnail
 
 // the prompt the agent gets
 export const withImages = (text: string, imgs: Img[]) => [text.trim(), imgs.map(i => i.path).join('\n')].filter(Boolean).join('\n\n')
-
-// the template picker under a new workspace's prompt, and what the agent will get; value: the template's
-// index ('' none), so names may repeat or be blank
-export function TemplatePick(p: { templates: Template[]; value: string; onChange: (i: string) => void; preview: string }) {
-  if (!p.templates.length) return null
-  return (
-    <>
-      <select className="template-pick" value={p.value} onChange={e => p.onChange(e.target.value)} aria-label="Prompt template">
-        <option value="">No template: the prompt as typed</option>
-        {p.templates.map((t, i) => (
-          <option key={i} value={String(i)}>
-            {t.name || '(no name)'}
-          </option>
-        ))}
-      </select>
-      {p.value && <div className="template-preview muted small">{p.preview || ' '}</div>}
-    </>
-  )
-}
 
 // what agents read (claude, codex): other images (HEIC, SVG, …) are refused
 const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }
@@ -52,9 +33,14 @@ export function PromptInput(p: {
   onBusy?: (busy: boolean) => void // images still saving: their paths aren't in yet
   placeholder?: string
   rows?: number
+  tools?: ReactNode // the toolbar's right end
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const [err, setErr] = useState('')
+  const [menu, openMenu] = useMenu()
+  // dictation types into what macOS sees as the text field, which it learns from the web view a moment after focus:
+  // started at once, it finds none and stops (the start sound, then nothing)
+  const dictate = () => (box.current?.focus(), setTimeout(() => p.dictate!(), 150))
   const saving = useRef(0)
   const add = async (files: File[]) => {
     setErr('')
@@ -117,33 +103,40 @@ export function PromptInput(p: {
         </div>
       )}
       <div className="prompt-tools">
-        {p.dictate && (
-          <button
-            type="button"
-            className="ib"
-            data-tip="Dictate (macOS dictation; or press Fn twice)"
-            onMouseDown={e => e.preventDefault()} // the text box keeps the focus
-            onClick={() => {
-              box.current?.focus()
-              // dictation types into what macOS sees as the text field, which it learns from the web view a
-              // moment after focus: started at once, it finds none and stops (the start sound, then nothing)
-              setTimeout(() => p.dictate!(), 150)
-            }}
-          >
-            <Icon name="mic" />
-          </button>
-        )}
-        {p.dictationSettings && (
-          <button type="button" className="link small" data-tip="Microphone and languages, in System Settings → Keyboard → Dictation" onClick={p.dictationSettings}>
-            mic & language…
-          </button>
-        )}
-        <label className="ib" data-tip="Attach images">
-          <Icon name="image" />
+        <label className="ib" data-tip="Attach images (or paste or drop them in)">
+          <Icon name="plus" />
           <input type="file" accept="image/*" multiple hidden onChange={e => (add(images(e.target.files!)), (e.target.value = ''))} />
         </label>
+        {p.dictate && (
+          <span className="mic-split">
+            <button type="button" className="ib" aria-label="Dictate" data-tip="Dictate (macOS dictation; or press Fn twice)" onMouseDown={e => e.preventDefault() /* the text box keeps the focus */} onClick={dictate}>
+              <Icon name="mic" />
+            </button>
+            {p.dictationSettings && (
+              <button
+                type="button"
+                className="ib caret"
+                aria-label="Dictation options"
+                aria-haspopup="menu"
+                data-tip="Dictation: microphone and language"
+                onMouseDown={e => e.preventDefault()}
+                onClick={e =>
+                  openMenu(e, [
+                    { head: 'Dictation · macOS' },
+                    { label: 'Start dictating', icon: 'mic', hint: 'Fn Fn', run: dictate },
+                    { label: 'Microphone and language…', icon: 'settings', hint: 'System Settings › Keyboard', run: p.dictationSettings! },
+                  ])
+                }
+              >
+                <Icon name="chevron" size={11} />
+              </button>
+            )}
+          </span>
+        )}
         {err && <span className="warn small">{err}</span>}
+        {p.tools && <span className="prompt-tools-end">{p.tools}</span>}
       </div>
+      {menu}
     </div>
   )
 }

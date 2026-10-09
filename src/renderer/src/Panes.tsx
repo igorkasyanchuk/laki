@@ -175,14 +175,15 @@ export function PanelHandle({ onWidth, init }: { onWidth: (w: number) => void; i
 }
 
 // the sidebar's right edge: drag to resize, double-click for the default width
-export function SideHandle({ width, onWidth, init }: { width: number; onWidth: (w: number) => void; init: number }) {
+// at: what's left of the sidebar (the layout's rail)
+export function SideHandle({ width, onWidth, init, at = 0 }: { width: number; onWidth: (w: number) => void; init: number; at?: number }) {
   return (
     <div
       className="side-handle"
-      style={{ left: width }}
+      style={{ left: at + width }}
       data-tip="Drag to resize · double-click to reset"
       onPointerDown={grab}
-      onPointerMove={e => held(e) && onWidth(Math.round(Math.min(480, Math.max(160, e.clientX))))}
+      onPointerMove={e => held(e) && onWidth(Math.round(Math.min(480, Math.max(160, e.clientX - at))))}
       onDoubleClick={() => onWidth(init)}
     />
   )

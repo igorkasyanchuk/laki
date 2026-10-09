@@ -73,6 +73,10 @@ app.on('web-contents-created', (_e, wc) => {
     // the popup itself opens no more windows: its links to a new one load in it
     guest.on('did-create-window', w => w.webContents.setWindowOpenHandler(({ url }) => (/^https?:\/\//.test(url) && w.webContents.loadURL(url).catch(() => {}), { action: 'deny' })))
     guest.on('context-menu', (_e, p) => pageMenu(guest, p, wc).popup({ window: BrowserWindow.fromWebContents(wc) ?? undefined }))
+    // ⌘W and ⌘T are the app's (close this page, open another), not the page's: it gets the keys while it has the focus
+    guest.on('before-input-event', (e, i) => {
+      if (i.type === 'keyDown' && i.meta && !i.control && !i.alt && !i.shift && /^[tw]$/i.test(i.key)) e.preventDefault(), wc.send('browser-key', i.key.toLowerCase())
+    })
   })
 })
 // a Browsers page's right click: its link, image, selection or field, back, forward, reload, and Inspect Element (the
@@ -374,6 +378,7 @@ const floatOpts = (width: number, height: number, focusable = true): BrowserWind
   frame: false,
   transparent: true,
   hasShadow: false,
+  roundedCorners: false, // macOS rounds a frameless window's corners: the bar's flares sit in them, and the edge showed through
   resizable: false,
   minimizable: false,
   maximizable: false,

@@ -212,6 +212,8 @@ export type Settings = {
   dockIcon?: string // the Dock's icon while Laki runs: laki, dawn, terminal, glacier, bubbles, neon (unset: the app's own, laki)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
+  layout?: 'one' | 'rail' // one sidebar for everything, or a rail of kinds (Projects, Terminals, Browsers) beside a list of the one picked (unset: rail)
+  railLabels?: boolean // the rail layout's words under its icons; off: icons only, a narrower rail (unset: on)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
   progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)

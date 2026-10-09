@@ -136,7 +136,7 @@ npm link
    - For a git repository, also pick a base branch. The workspace gets a worktree in
      `~/.laki/worktrees/<project>/<id>` (or the folder you pick in Settings › General › *Worktrees*, or in the
      project's settings) on branch `laki/<id>`, its setup command runs, then the
-     agent starts. *Local* works in the repo itself instead.
+     agent starts. Untick *worktree* to work in the repo itself instead.
    - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
 
 ## Using it
@@ -166,7 +166,9 @@ selected workspace's PR is in the status bar.
   GitHub) gets a small window of its own. A page you opened stays loaded as you move to other workspaces.
   - Tabs are rows too: a middle click or ⌘-click on a link (or its right click › *Open Link in New Tab*) adds one
     under *Browsers* in the background, named after the site until you open it; a link that opens a new tab adds one
-    and goes there; ⌘T or + in its tab bar opens an empty one.
+    and goes there; ⌘T or + in its tab bar opens an empty one, and ⌘W closes the page (its row goes, the next one
+    opens; *Undo* in the toast opens its address again), the page in focus or not (not while Settings or another page
+    covers it).
   - A right click on a page: open or copy a link, copy an image or text, back, forward, reload, *Inspect Element*; the
     `</>` button opens its developer tools.
   - Terminals and Browsers are projects like the others: drag them, fold them, remove them (your home folder stays),
@@ -230,8 +232,8 @@ selected workspace's PR is in the status bar.
   *Mark as unread* (its ● again, until you look at it) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
 - Drag projects, and workspaces within a project, to reorder them; a project drops anywhere on another one (its top
   half: before it), and the list scrolls as you near its top or bottom.
-- Groups: a project's ⋯ › *Add a group*, or a workspace's *Add a group below*, puts a named head over its
-  workspaces, up to the next group; it shows how many it holds. A click folds it: they hide, the selected one too (the
+- Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
+  many it holds. A workspace's menu › *Move to group*: one of the project's groups (first in it), or *Out of its group*. A click folds it: they hide, the selected one too (the
   busiest one's mark stays on it), until another click. Drop a workspace on a group's head to put it first in
   that group (a folded one opens). Drag the head like a workspace; double click to rename; right click (or its ⋯)
   for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
@@ -326,6 +328,8 @@ email address only, unless you leave the email out on purpose (below).
 - Once it's up: a QR code to scan with your phone, the link (copy, open), when it ends, and *Stop remote
   access*. The status bar says *Remote until 18:30* (forever: *Remote on*) while it runs; click it to get back here. ⌘K has it too:
   *Start remote access for you@…, 1 hour* (with an email set), *Remote access…*, and *Stop remote access*.
+- It won't start, or Cloudflare's sign-in won't let you in: run `cloudflared tunnel login` once in a terminal (a
+  browser page opens to pick your Cloudflare account). Settings › *Remote access* and Help say so too.
 - When the page can't reach Laki it says why: Cloudflare's sign-in ran out (it reloads, to sign in again), the
   link ended (remote access stopped or started again: open the newest one), or the Mac is out of reach.
 - On a phone the app has its own layout: the sidebar slides over, one pane at a time (split tabs show as
@@ -341,8 +345,9 @@ the column of where it is: *Running* (a usage limit too: it resumes by itself), 
 workspace. *To do* holds prompts for later: write one (⌘⏎ adds it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
-**Scheduled tasks** (the clock at the bottom of the sidebar, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
-times you write in plain English. A form you leave (Esc, a click elsewhere) is there when the page opens again;
+**Scheduled tasks** (the clock at the bottom of the sidebar, *Schedule* on the rail in Rail and list, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
+times you write in plain English. *New task* opens the form: the prompt, with the agent under it, then *When*, then
+the project, where it runs and a name as chips, the way the new-workspace page has them. A form you leave (Esc, a click elsewhere) is there when the page opens again;
 *Cancel* asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't).
 - Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
   OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
@@ -350,14 +355,15 @@ times you write in plain English. A form you leave (Esc, a click elsewhere) is t
   agent gets every run; or one of the project's workspaces: its running agent of that kind gets the prompt, queued
   while it works, or a new tab starts), the prompt, and when: `every day at 2am except weekends`, `weekdays at 9:00`,
   `mon, wed and fri at 18:30`, `every 2 hours from 9am to 6pm`, `every 30 minutes`, `hourly on weekends`,
-  `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). The form says how
-  it read it and the next three runs. Every 5 minutes at most; no "every few days" (name the days).
+  `at 9am and 5pm`, `tomorrow at 7am` or `once at 23:00` (both run one time, then turn off). Until it reads, a few
+  examples sit under *When* (a click fills it in); then the form says how it read it and the next three runs. Every 5 minutes at most; no "every few days" (name the days).
 - Dates in the name or the prompt: `{{DD-MM-YY}}`, `{{YYYY-MM-DD}}`, `{{HH:mm}}`, `{{ddd D MMM}}` (`Nightly deps
   {{DD-MM}}` → *Nightly deps 05-10*) become the run's date and time (any of the tokens, below in *Prompt templates*). A new workspace is named after the task, or
   with no name after the date and the prompt's first words (*05-10 02:00 update the deps and*), and gets a clock
   in the sidebar. A name a workspace already has gets four random characters (*Nightly deps 05-10-k3x9*).
-- *Run now* runs one at once; the switch turns one off; *Runs* lists the last 50 (click one to go to its
-  workspace); *All projects* narrows both lists to one project. The clock gets a red dot when a run failed since you last looked.
+- A task's row: its switch turns it off, a click on it edits it, ▷ runs it now, the bin deletes it. *Runs* shows the
+  last 8 (*Show all* for the rest of the last 50; click one to go to its workspace); the filter at the top (*All
+  projects*) narrows both lists to one project. The clock gets a red dot when a run failed since you last looked.
 - The daemon runs them (closing the window doesn't stop them), in the Mac's time zone. A run more than 30
   minutes late (the Mac asleep, Laki not running) is skipped and logged as missed.
 
@@ -476,25 +482,26 @@ its link, `{{base}}` its base branch; the failing checks or the review threads g
 back. *Send now* beside each switch (*Review*, the info panel) sends the same prompt once, switch or not; it shows
 only when there's something to send: failing checks, open review threads, merge conflicts.
 
-**New workspace** (a page, like Settings; Esc closes it): pick the project and the agent, then write the prompt.
+**New workspace** (a page, like Settings; Esc closes it): write the prompt; the agent and its model are picked
+under it, where the work goes in the row below.
 Closing it (Esc, ✕, a click in the sidebar) keeps what you typed as a draft: it's there when the page opens again,
 until you create it or *Clear* it. Enter in a field never creates it; ⌘⏎ or *Create* does.
-It goes first in its project in the sidebar or, when the project has groups, first in the one you pick in
-*In the sidebar*.
-It starts from your last choices (project, its group, agent, template, and what's under *Advanced*), never the last prompt.
-*Advanced* (folded; its line says what it holds, like *a worktree off main · high effort*) has *Local* (the repo itself,
-no worktree), base branch, name, the agent's
-model (like `opus` or a full name) and, for Claude Code and Codex, its effort (both blank: the agent's
-default, kept for its restarts and forks), and *Race* (below). In a plain folder (or with *Local*), whose own
-workspace is there already, an agent or a prompt makes another session beside it, in the same folder, named after
-the prompt; *none* gives the folder's own back. A new workspace is never hidden: a folded project or
-group holding it, or the one you were on, opens. The prompt:
-- paste a screenshot (⌘V), drop image files on it, or pick them with the image icon; each shows as a
-  thumbnail, and its path goes after your text;
-- the mic starts macOS dictation (or press Fn twice). *mic & language…* opens System Settings → Keyboard →
-  Dictation, where you pick the microphone and the languages;
-- *Template* (under the prompt, once you have one in Settings → *Prompt templates* or in the project's settings;
-  the project's come first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
+It starts from your last choices (project, its group, agent, model, template, worktree), never the last prompt.
+- Under the prompt: ＋ (images), the mic and its ⌄, *Template*, the agent (a preset, *Shell*, *Custom command…* or
+  *No agent*) and the model (the agent's default, one of its models or *Another model…*; for Claude Code and Codex
+  the effort too; both kept for its restarts and forks).
+- The row below: the project and its group in one menu (a group puts it first in that group; the project alone, first
+  in the project), the base branch with *worktree* (untick it to work in the repo itself, on its current branch),
+  the name (from the prompt when blank) and *More*: a model typed by hand (like `opus` or a full name) and *Race*.
+In a plain folder (or without a worktree), whose own workspace is there already, an agent or a prompt makes another
+session beside it, in the same folder, named after the prompt; *No agent* gives the folder's own back. A new
+workspace is never hidden: a folded project or group holding it, or the one you were on, opens. The prompt:
+- paste a screenshot (⌘V), drop image files on it, or pick them with ＋; each shows as a thumbnail, and its path
+  goes after your text;
+- the mic starts macOS dictation (or press Fn twice). Its ⌄ says where the microphone and languages are picked
+  (System Settings › Keyboard › Dictation) and opens it;
+- *Template* (once you have one in Settings → *Prompt templates* or in the project's settings; the project's come
+  first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
 - *Race* (an agent, in a worktree): ＋ adds other presets; each gets a worktree of its own (named
   `<name>-<preset>`) on the same prompt, and Compare opens (also in a race workspace's menu and ⌘K). Compare shows
   each one's status, diff size, last answer and changed files; *Open* goes to it, *Keep this one* archives the
@@ -539,6 +546,15 @@ With *Progress on tabs* on (Settings › General), Claude and Codex tabs started
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
 the tab shows `40%` over a bar, its tooltip what they're on, until the turn ends. Other agents get `LAKI_PROGRESS=1`
 and report through the laki skill (Settings › Agent skill) or MCP's `laki_progress`.
+
+**The layout** (Settings › Appearance › Layout): *Rail and list* (the default) or *One sidebar* (projects, terminals
+and browsers in one list). *Rail and list*, like Slack: a narrow rail on the left with *Projects*, *Board*, *Schedule* (a red dot: a run failed),
+*Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
+*Settings* at its bottom (*Labels*, under the layout, off: icons only and a narrower rail). Board and Schedule are pages
+over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
+list shows the kind you pick, and its rail button goes back to the last workspace you had there.
+A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the
+filter looks through every kind. A phone always has one sidebar.
 
 **The sidebar's style** (Settings › Appearance › Sidebar): *Compact* (a short line: the state and the name),
 *Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
@@ -631,7 +647,7 @@ settings) and shows a server icon; the status bar shows `devbox:` before the pat
 |---|---|
 | ⌘O | open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it |
 | ⌘N | new workspace |
-| ⌘T / ⌘W | new shell tab / close tab (or the file preview, when one is open) |
+| ⌘T / ⌘W | new shell tab / close tab (or the file preview, when one is open); in a browser: a new page / close it |
 | ⌘1…⌘9 | tabs |
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
@@ -684,7 +700,7 @@ lit for a moment.
   double or nothing; the indent, row height, text size and icon size, each the theme's unless you pick one; the style:
   Compact, Default, Extended, Cards or Status (the row's edge in the color of what its agent is doing, and a line under
   it that fills as the agent reports its progress, or sweeps while it works without reporting), above; *Button labels*: words
-  beside Scheduled, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit),
+  beside Schedule, Board, Video, Meme, Timer and Settings at its bottom, in one row: the last ones lose their words when they don't fit),
   *Floating bubbles* (while you're in another app, a drop stuck to the screen's right or left edge, over every app and
   Space, with a circle per agent working or waiting for you (a pulse), two letters from its workspace's name inside (none the same; pr-, issue- and numbers skipped): hover one for
   its card, as the sidebar's: its name, project, branch and `$PORT`, its agents, what it asked or last said, its PR
@@ -1002,8 +1018,8 @@ sidebar for (youtube-nocookie.com).
 ## Updating
 
 After pulling or changing the code, rebuild (`npm run pack`) and reopen the app. The running daemon stays the
-old build until it restarts. When the app relies on something that daemon lacks, the status bar says *daemon
-older than the app · restart*: click it, then again to confirm. Or run `laki stop` and open the app. Agents
+old build until it restarts. When the app relies on something that daemon lacks, a yellow bar at the top says
+*Restart Laki's daemon* (close Settings or any page over it to see it): click *Restart the daemon*, then again to confirm. Or run `laki stop` and open the app. Agents
 come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`);
 shells and dev servers start fresh.
 

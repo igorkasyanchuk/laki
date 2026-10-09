@@ -78,6 +78,18 @@ else {
   // a drag from anywhere on the drop (a circle too: less than 4px is its click); main moves the window, the pointer's
   // screen position stays true while it does
   let drag: { x: number; y: number; moved: boolean; tab?: string; act?: string } | null = null
+  // the circle or button under the mouse: a class set as the mouse really moves, not :hover (or pointerover), which
+  // Chromium sets again at the last place the mouse was (the + just clicked) as the bar comes back after Laki was in
+  // front: hidden, the page hears nothing (no visibilitychange for a hidden panel)
+  const hot = (x?: Element | null) => {
+    const was = bar.querySelector('.hot')
+    if (was !== x) was?.classList.remove('hot'), x?.classList.add('hot')
+  }
+  // a click that brings Laki in front: nothing lights (a twitch of the hand before the bar hides) until the mouse comes
+  // in again
+  let away = false
+  bar.onpointerenter = () => (away = false)
+  bar.onpointerleave = () => hot()
   bar.onpointerdown = e => {
     if (e.button !== 0) return
     bar.setPointerCapture(e.pointerId)
@@ -85,15 +97,16 @@ else {
     drag = { x: e.screenX, y: e.screenY, moved: false, tab: at.closest<HTMLElement>('.fl-dot')?.dataset.tab, act: at.closest<HTMLElement>('.fl-btn')?.dataset.act }
   }
   bar.onpointermove = e => {
-    if (!drag) return
+    if (!drag) return void (away || hot((e.target as HTMLElement).closest('.fl-dot, .fl-btn')))
     const [dx, dy] = [e.screenX - drag.x, e.screenY - drag.y]
     if (!drag.moved && Math.hypot(dx, dy) < 4) return
-    if (!drag.moved) (drag.moved = true), document.body.classList.add('dragging'), (hovered = ''), bridge?.drag('start')
+    if (!drag.moved) (drag.moved = true), document.body.classList.add('dragging'), (hovered = ''), hot(), bridge?.drag('start')
     bridge?.drag('move', dx, dy)
   }
   const done = (click: boolean) => {
     const d = drag
     drag = null
+    if (click && !d?.moved && (d?.tab || d?.act === 'new')) (away = true), hot() // Laki comes in front, the bar hides: not lit as it comes back
     if (d?.moved) document.body.classList.remove('dragging'), bridge?.drag('end')
     else if (click && d?.tab) hover(''), bridge?.open(d.tab)
     else if (click && d?.act === 'new') bridge?.act('new')
@@ -107,6 +120,7 @@ else {
   bridge?.onFloats(({ items, colors, style, add, mic }) => {
     paint(colors)
     document.body.dataset.fstyle = style || 'glow'
+    const was = bar.querySelector<HTMLElement>('.hot')?.dataset // lit again below, made anew
     bar.querySelectorAll('.fl-dot, .fl-btns').forEach(d => d.remove())
     const labels = initials(items.map(f => f.name))
     for (const [i, f] of items.entries()) {
@@ -125,6 +139,7 @@ else {
         if (on) btns.append(button(act, tip))
       bar.append(btns)
     }
+    hot(was && [...bar.querySelectorAll<HTMLElement>('.fl-dot, .fl-btn')].find(x => (was.tab ?? was.act) === (x.dataset.tab ?? x.dataset.act)))
     // a card open across an update: its new text, beside where its circle is now (gone: it shuts)
     const still = hovered && [...bar.querySelectorAll<HTMLElement>('.fl-dot')].find(d => d.dataset.tab === hovered)
     if (still) hover(hovered, still.getBoundingClientRect().top)

@@ -11,6 +11,7 @@ type Bridge = {
   browse?(r: object): Promise<unknown>
   onFocusTab(cb: (tab: string) => void): void
   onBrowserTab?(cb: (url: string, front: boolean) => void): void // a Browsers page's link to a new tab: front, or in the background
+  onBrowserKey?(cb: (key: string) => void): void // ⌘W or ⌘T pressed in a Browsers page (the page gets keys, not the app)
   pickFolder(): Promise<string | null>
   pathOf?(f: File): string
   openExternal(url: string): void
@@ -109,7 +110,7 @@ class Api {
           const w = this.waiting.get(m.id)
           this.waiting.delete(m.id)
           // unknown method: a daemon older than the app, still running (it outlives updates)
-          if (m.error) w?.rej(new Error(/^unknown method /.test(m.error) ? `Laki's daemon is older than the app (no ${m.error.slice(15)}): restart it from the status bar (agents resume)` : m.error))
+          if (m.error) w?.rej(new Error(/^unknown method /.test(m.error) ? `Laki's daemon is older than the app (no ${m.error.slice(15)}): close this page and restart it from the yellow bar at the top (agents resume)` : m.error))
           else w?.res(m.result)
         } else this.emit(m)
       }

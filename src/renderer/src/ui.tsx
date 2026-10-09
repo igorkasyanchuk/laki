@@ -252,15 +252,18 @@ export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
     const t = setTimeout(() => setStep(''), step === 'sure' ? 5000 : 15000) // busy: unless the new daemon answers first (this goes)
     return () => clearTimeout(t)
   }, [step])
+  // a bar across the top of the main area: easy to miss in the status bar, and what's new fails until it's done
   return (
-    <button
-      className="stale"
-      disabled={step === 'busy'}
-      data-tip="Laki's daemon is older than this app: newer things (like expose to the world) fail until it restarts. Restarting stops every agent and resumes it; a turn in progress is cut off."
-      onClick={() => (step === 'sure' ? (setStep('busy'), restart().catch(() => setStep(''))) : setStep('sure'))}
-    >
-      {step === 'busy' ? 'restarting the daemon…' : step === 'sure' ? 'click again to restart it: agents resume' : 'daemon older than the app · restart'}
-    </button>
+    <div className="stale-bar" role="alert">
+      <Icon name="conflict" size={16} />
+      <span>
+        <b>Restart Laki's daemon.</b> It's older than this app, so what's new in it fails until it restarts. Every agent stops and resumes; a turn in
+        progress is cut off.
+      </span>
+      <button disabled={step === 'busy'} onClick={() => (step === 'sure' ? (setStep('busy'), restart().catch(() => setStep(''))) : setStep('sure'))}>
+        {step === 'busy' ? 'Restarting…' : step === 'sure' ? 'Click again to restart' : 'Restart the daemon'}
+      </button>
+    </div>
   )
 }
 
@@ -327,9 +330,11 @@ export const moveId = (ids: string[], d: RowDrop, n = 1) => {
 }
 
 // null is a separator, { head } a section title, { colors } a row of swatches (keys 0-8). An item's key
-// runs it while the menu is open; without one it gets the first free initial of its label's words.
+// runs it while the menu is open; without one it gets the first free initial of its label's words. indent: under the
+// item before it (a project's groups)
+export const ON = '✓' // a menu item's hint: the one picked
 export type MenuItem =
-  | { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; run: () => void }
+  | { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; run: () => void }
   | { head: string }
   | { colors: string[]; value?: string; pick: (c: string) => void }
   | null
@@ -416,7 +421,7 @@ function Menu({ anchor, items, align, onClose }: { anchor: DOMRect; items: MenuI
             <button
               key={i}
               role="menuitem"
-              className={`menu-item ${it.danger ? 'danger' : ''} ${acts[sel] === it ? 'sel' : ''}`}
+              className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${acts[sel] === it ? 'sel' : ''}`}
               onClick={() => pick(it)}
               onPointerMove={() => setSel(-1)}
             >

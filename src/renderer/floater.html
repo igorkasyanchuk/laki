@@ -25,12 +25,13 @@
       @keyframes fl-in-left { from { transform: translateX(-40px); } }
       .fl-dot, .fl-btn { cursor: pointer; transition: transform 0.12s; }
       body.dragging :is(.fl-dot, .fl-btn) { cursor: grabbing; }
-      /* hovered: brighter and a little bigger (macOS shows another app's pointer shapes only while it's the active one) */
-      .fl-dot:hover { filter: brightness(1.35); transform: scale(1.1); } /* over any style's background, a gradient's too */
+      /* hovered (.hot, floater.ts: :hover comes back as the bar does, after a click brought Laki in front): brighter and a
+         little bigger (macOS shows another app's pointer shapes only while it's the active one) */
+      .fl-dot.hot { filter: brightness(1.35); transform: scale(1.1); } /* over any style's background, a gradient's too */
       .fl-btns { display: flex; flex-direction: column; align-items: center; gap: 6px; }
       .fl-dot + .fl-btns { margin-top: 2px; padding-top: 8px; border-top: 1px solid var(--line); }
       .fl-btn { width: 26px; height: 26px; box-sizing: border-box; display: grid; place-items: center; border-radius: 50%; color: var(--muted); border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); background: var(--bg); }
-      .fl-btn:hover { color: var(--fg); border-style: solid; border-color: var(--accent); transform: scale(1.1); }
+      .fl-btn.hot { color: var(--fg); border-style: solid; border-color: var(--accent); transform: scale(1.1); }
       .fl-btn svg { width: 14px; height: 14px; }
       #card { width: 280px; box-sizing: border-box; padding: 9px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
       #card b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -119,6 +119,8 @@ label.switch-row select { flex: none; width: auto; }
 .remote-risk b { color: var(--error); }
 .remote-risk label { display: flex; flex-direction: column; gap: 4px; }
 .remote-risk input { max-width: 220px; }
+.remote-tip { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); max-width: 560px; } /* cloudflared tunnel login */
+.remote-tip .tunnel-code { max-width: 320px; }
 .remote-on { display: flex; gap: 16px; align-items: flex-start; flex-wrap: wrap; }
 .remote-on .tunnel-qr { width: 180px; height: 180px; flex: none; }
 .remote-side { flex: 1; min-width: 220px; display: flex; flex-direction: column; gap: 10px; }

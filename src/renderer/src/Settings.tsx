@@ -74,6 +74,11 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['cards', 'Cards', 'a card each, with the agent’s last answer'],
   ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]
+// the app's layout (App.tsx rail): one sidebar, or a rail of kinds beside a list (Slack's); a picture each
+const LAYOUTS: ['one' | 'rail', string, string][] = [
+  ['rail', 'Rail and list', 'A rail of Projects, Board, Schedule, Terminal and Browser, with what needs you on each (Board and Schedule: a page over the list), Settings at the bottom; the list shows the one you pick'],
+  ['one', 'One sidebar', 'Projects, terminals and browsers in one list'],
+]
 // Appearance's corners (--radius) and where the tabs go
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
@@ -138,6 +143,8 @@ export type AppSettings = Paint & {
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
+  layout?: 'one' | 'rail' // one sidebar, or a rail of kinds beside a list (App.tsx rail; unset: rail)
+  railLabels?: boolean // the rail's words under its icons (unset: on)
   sideStyle?: SideStyle // the sidebar's rows
 }
 
@@ -665,8 +672,9 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Settings & Help size', 'zoom text font size small bigger larger readable page'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Project names', 'sidebar font case letter spacing size weight'],
+  ['appearance', 'Layout', 'one sidebar rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
   ['appearance', 'Sidebar', 'status guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
-  ['appearance', 'Button labels', 'sidebar scheduled board settings words'],
+  ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
   ['appearance', 'Glow', 'glass colors'],
   ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
@@ -1027,6 +1035,16 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
         </form>
       )}
       {err && <p className="field-err">{err}</p>}
+      <div className="remote-tip">
+        <p className="muted small">
+          Won't start, or Cloudflare's sign-in won't let you in? Run this once in a terminal: it signs cloudflared in to your Cloudflare account (a browser
+          page opens to pick one), which can fix it.
+        </p>
+        <div className="tunnel-code">
+          <code>cloudflared tunnel login</code>
+          <IconButton icon="copy" title="Copy the command" onClick={() => api.copy('cloudflared tunnel login')} />
+        </div>
+      </div>
     </>
   )
 }
@@ -1755,6 +1773,26 @@ export function SettingsPage(p: {
                 </label>
               </div>
               </Group>
+              <Group title="Layout" hint="On a phone it's always one sidebar">
+                <div className="layouts" role="radiogroup" aria-label="Layout">
+                  {LAYOUTS.map(([k, name, what]) => (
+                    <button key={k} type="button" role="radio" aria-checked={(s.layout ?? 'rail') === k} className={`layout-pick ${(s.layout ?? 'rail') === k ? 'on' : ''}`} onClick={() => set({ layout: k })}>
+                      <span className="layout-pic" aria-hidden>
+                        {k === 'rail' && <i className="lp-rail" />}
+                        <i className="lp-side" />
+                        <i className="lp-main" />
+                      </span>
+                      <b>{name}</b>
+                      <span className="muted small">{what}</span>
+                    </button>
+                  ))}
+                </div>
+                {(s.layout ?? 'rail') === 'rail' && ( // each layout's own settings, under it
+                  <Switch className="switch-row" on={s.railLabels !== false} onChange={v => set({ railLabels: v })}>
+                    <Says title="Labels" hint="Words under the rail's icons: Projects, Board, Schedule, Terminal, Browser, Settings; off: icons only, and a narrower rail" />
+                  </Switch>
+                )}
+              </Group>
               <Group title="Sidebar" hint="How a workspace's row looks; each choice is over the theme's">
               <div className="field">
                 <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">
@@ -1768,7 +1806,7 @@ export function SettingsPage(p: {
               </div>
               {lookGrid('sideLook', SIDE_LOOK)}
               <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
-                <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Scheduled, Board, Video, Timer, Settings; the last ones drop theirs when the row is too narrow" />
+                <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Schedule, Board, Video, Timer, Settings (Rail and list: Video, Meme, Timer); the last ones drop theirs when the row is too narrow" />
               </Switch>
               </Group>
               <Group title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent; hover one to see what it said, click to open it, drag it to the other edge or up and down">

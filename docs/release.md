@@ -21,10 +21,11 @@ The build is ad-hoc signed (`mac.identity: "-"`; unsigned, a download reads as "
    `dist/release/Laki-<version>-arm64.dmg` (its own folder: a running `dist/mac-arm64/Laki.app` and its daemon stay
    as they are). Each run is a new minor version.
 5. Run `scripts/pack-smoke.sh` once before a release: it runs the packaged app's daemon, CLI and hooks on Electron's
-   node with fake agents, in a temp home, and takes a window screenshot. For the Intel build:
+   node with fake agents, in a temp home, and takes a window screenshot. Quit Laki.app first (the daemon can stay): macOS keeps
+   the app's data folder under the real home, so a running one holds the single-instance lock and the smoke's window quits. For the Intel build:
    `APP=$PWD/dist/mac/Laki.app scripts/pack-smoke.sh` (under Rosetta).
 6. Open the app once by hand: a project, a workspace with an agent, a turn's notification, Settings.
 7. Commit (`Release x.y.z`), tag `vx.y.z`.
 
-Users' daemons outlive app updates: an older one shows *daemon older than the app · restart* in the status bar. Their
+Users' daemons outlive app updates: an older one gets a yellow bar at the top, *Restart Laki's daemon*. Their
 `state.json` carries over; `state.json.bak` is the last one that loaded.

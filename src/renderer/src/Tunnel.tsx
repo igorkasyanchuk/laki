@@ -125,8 +125,8 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
     )
   } else if (!cf) body = <p className="muted">Looking for cloudflared…</p>
   else if (cf === 'failed')
-    // e.g. "unknown method": a daemon older than the app, still running (the status bar offers a restart)
-    body = <p className="muted">Laki's daemon didn't answer. If the status bar says it's older than the app, restart it there (agents resume).</p>
+    // e.g. "unknown method": a daemon older than the app, still running (a bar at the top offers a restart)
+    body = <p className="muted">Laki's daemon didn't answer. If a yellow bar at the top says to restart it, do (agents resume).</p>
   else if (!cf.version)
     body = (
       <>
