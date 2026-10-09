@@ -8,19 +8,27 @@
       * { box-sizing: border-box; }
       html, body { height: 100%; margin: 0; background: var(--bg); color: var(--fg); font: 13px/1.4 -apple-system, system-ui, sans-serif; }
       body { display: flex; flex-direction: column; }
-      .bar { display: flex; align-items: center; gap: 4px; padding: 8px 12px 8px 80px; border-bottom: 1px solid var(--line); -webkit-app-region: drag; flex-wrap: wrap; }
-      .bar > * { -webkit-app-region: no-drag; }
-      button { font: inherit; color: var(--fg); background: none; border: 1px solid transparent; border-radius: 6px; padding: 4px 9px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+      /* one row beside the traffic lights (main's trafficLightPosition): the tools' names go first as it narrows, then
+         the rest stays (main's minWidth fits it) */
+      .bar { flex: none; display: flex; align-items: center; gap: 2px; height: 46px; padding: 0 10px 0 78px; border-bottom: 1px solid var(--line); -webkit-app-region: drag; white-space: nowrap; overflow: hidden; }
+      .bar > * { -webkit-app-region: no-drag; flex: none; }
+      button { font: inherit; color: var(--fg); background: none; border: 1px solid transparent; border-radius: 6px; padding: 4px 8px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; height: 28px; }
       button:hover { background: var(--hover); }
       button.on { background: var(--hover); border-color: var(--line); }
-      button kbd { color: var(--muted); font: 11px ui-monospace, Menlo, monospace; }
+      button svg { width: 16px; height: 16px; flex: none; }
+      button kbd { color: var(--muted); font: 11px ui-monospace, Menlo, monospace; margin-left: 2px; }
+      .bar.bare .lbl { display: none; } /* they don't fit: icons alone (annotate.ts' fit) */
+      .bar.bare .tool { padding: 4px 6px; }
       .sep { width: 1px; height: 20px; background: var(--line); margin: 0 6px; }
-      .color { width: 18px; height: 18px; padding: 0; border-radius: 50%; border: 2px solid transparent; }
+      .colors { display: flex; gap: 2px; }
+      .color { width: 22px; height: 22px; padding: 2px; border-radius: 50%; border: 2px solid transparent; } /* the ring round the dot: the one in use */
+      .color > i { display: block; width: 100%; height: 100%; border-radius: 50%; background: var(--c); }
+      .color:hover { background: none; border-color: var(--line); }
       .color.on { border-color: var(--fg); }
-      .grow { flex: 1; }
-      .primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; padding: 5px 14px; }
+      .grow { flex: 1 1 0 !important; min-width: 8px; height: 100%; -webkit-app-region: drag !important; }
+      .primary { background: var(--accent); color: var(--accent-fg); font-weight: 600; padding: 4px 14px; margin-left: 4px; }
       .primary:hover { background: var(--accent); filter: brightness(1.08); }
-      .stage { flex: 1; min-height: 0; display: grid; place-items: center; padding: 12px; overflow: hidden; position: relative; }
+      .stage { flex: 1; min-height: 0; display: grid; grid-template: minmax(0, 1fr) / minmax(0, 1fr); /* a definite area: the picture's max-height counts */ place-items: center; padding: 12px; overflow: hidden; position: relative; } /* main's annotate() sizes the window by these: the bar, this padding and the foot */
       canvas { max-width: 100%; max-height: 100%; border-radius: 6px; box-shadow: 0 0 0 1px var(--line); cursor: crosshair; touch-action: none; }
       .text-in { position: absolute; min-width: 80px; background: rgba(0, 0, 0, 0.55); border: 1px dashed currentColor; outline: none; font-weight: 700; padding: 0 4px; font-family: -apple-system, system-ui, sans-serif; }
       .foot { display: flex; gap: 8px; padding: 0 12px 12px; }

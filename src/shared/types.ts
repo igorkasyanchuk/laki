@@ -43,8 +43,12 @@ export type Project = {
   rows?: string[] // with seps: its workspaces' and seps' ids in the sidebar's order (others after them)
   notes?: string // Project notes: the user's Markdown (links, how-tos), its ⋯ menu's Notes and Settings; never agents'
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
+  sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
 }
-export type Sep = { id: string; name: string; color?: string; template?: string } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with
+export type Sep = { id: string; name: string; color?: string; template?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; sort: its workspaces' (unset: the project's)
+// the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
+export const WS_SORTS = ['manual', 'created', 'activity', 'name'] as const
+export type WsSort = (typeof WS_SORTS)[number]
 // a project's sidebar rows: its workspaces (of ws) with its seps between them, in the order dragged (rows; others
 // after, seps first); the app's sidebar and the daemon's placeWs
 export const rowsOf = <W extends { id: string; project: string }>(p: Pick<Project, 'id' | 'seps' | 'rows'>, ws: W[]): (W | Sep)[] => {
@@ -84,6 +88,7 @@ export type Workspace = {
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
   browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
+  storage?: string // its tabs' $LAKI_STORAGE_FOLDER (storageOf: made at its first tab, removed with it unless settings.keepStorage)
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
@@ -146,7 +151,7 @@ export type Tab = {
 
 // how an agent starts: one of AGENTS with extra args, or any command; env on top of the project's
 // off: switched off in Settings: out of the pickers (new tab, new workspace, races, scheduled tasks); its tabs still start
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean }
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean } // laki: false: no note about Laki at its starts (unset: told)
 
 // what a notification is about: an agent waiting for you, done with its turn, at a usage limit
 export type NotifyKind = 'waiting' | 'done' | 'limit'
@@ -174,6 +179,7 @@ export type Settings = {
   glassSide?: number
   glassTerm?: number
   glassGlow?: boolean // the theme's colors behind the glass (unset: on)
+  sideClear?: number // without glass: how see-through the sidebar and the rail are, the rest solid: % (unset: 0)
   uiFont?: string // the interface's font
   accent?: string // #rrggbb over the theme's accent (unset: the theme's)
   radius?: string // corners, a CSS length over the theme's (unset: the theme's)
@@ -188,9 +194,12 @@ export type Settings = {
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
   diffStat?: boolean // each workspace's +/- in the sidebar, scanned every 10 s (unset: off; a race's are always)
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
+  termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
   pageZoom?: number // Settings and Help's size (0.9–1.5, renderer's PAGE_ZOOMS; unset: 1)
+  storageDir?: string // where workspaces' storage folders go (unset: <data>/storage; ~ is home)
+  keepStorage?: boolean // a deleted workspace's storage folder stays (unset: removed with it)
   worktrees?: string // where new worktrees go: <it>/<project>/<workspace> (unset: <data>/worktrees; a project's own folder wins)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
@@ -207,8 +216,9 @@ export type Settings = {
   floaterVoiceTo?: 'pick' | 'new' // the voice prompt goes to: an agent you pick each time, or always a new session (unset: pick)
   floaterMax?: number // the bubbles at most (unset: 12)
   floaterCards?: boolean // a bubble's card on hover (unset: on)
-  floaterNew?: boolean // the bubbles' + Session: the new-workspace page (unset: on)
-  floaterMic?: boolean // the bubbles' microphone: a prompt by voice to an agent or a new session (unset: on)
+  floaterDone?: boolean // a finished agent you haven't seen: a green, pulsing bubble until a click or a look (unset: on)
+  floaterNew?: boolean // the bubbles' +: New task, Say it, Screenshot area, Whole screen (unset: on)
+  floaterMenu?: 'stack' | 'card' // the +'s actions: stacked in the drop over it, or a menu beside it (unset: stack)
   dockIcon?: string // the Dock's icon while Laki runs: laki, dawn, terminal, glacier, bubbles, neon (unset: the app's own, laki)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
@@ -326,4 +336,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 36
+export const API = 37

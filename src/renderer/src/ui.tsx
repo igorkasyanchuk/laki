@@ -62,6 +62,8 @@ const paths = {
   pick: 'M8 13.5a5.5 5.5 0 100-11 5.5 5.5 0 000 11zM8 1v3M8 12v3M1 8h3M12 8h3M8 8h.01',
   camera: 'M2.5 5h2.7l1.2-1.8h3.2L10.8 5h2.7v7.5h-11zM8 10.6a1.9 1.9 0 100-3.8 1.9 1.9 0 000 3.8z',
   collapse: 'M8 1.5v4M5.5 3.5L8 6l2.5-2.5M8 14.5v-4M5.5 12.5L8 10l2.5 2.5M2.5 8h11',
+  expand: 'M8 6V1.5M5.5 4L8 1.5 10.5 4M8 10v4.5M5.5 12L8 14.5l2.5-2.5M2.5 8h11',
+  sort: 'M2.5 4h7M2.5 8h5M2.5 12h3M12 3v10M10 11l2 2 2-2',
   changes: 'M4.5 5.6a1.3 1.3 0 100-2.6 1.3 1.3 0 000 2.6zM11.5 13a1.3 1.3 0 100-2.6 1.3 1.3 0 000 2.6zM4.5 5.6V10a2 2 0 002 2H9M11.5 10.4V6a2 2 0 00-2-2H7M8 10.5l1.5 1.5L8 13.5M8 2.5L6.5 4 8 5.5',
   review: 'M2.5 3h11v8H8l-3 2.5V11H2.5z',
   panel: 'M2.5 3h11v10h-11zM9.5 3v10',
@@ -104,9 +106,10 @@ export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
 }
 
 // label: words beside the icon (the sidebar's foot)
-export function IconButton({ icon, title, onClick, on, className = '', label }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string }) {
+// tip false: its name for screen readers only, no tooltip
+export function IconButton({ icon, title, onClick, on, className = '', label, tip = true }: { icon: IconName; title: string; onClick: (e: MouseEvent<HTMLButtonElement>) => void; on?: boolean; className?: string; label?: string; tip?: boolean }) {
   return (
-    <button className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={title} aria-label={title} onClick={onClick}>
+    <button className={`ib ${on ? 'on' : ''} ${label ? 'labeled' : ''} ${className}`} data-tip={tip ? title : undefined} aria-label={title} onClick={onClick}>
       <Icon name={icon} />
       {label && <span className="ib-label">{label}</span>}
     </button>
@@ -353,11 +356,11 @@ function menuKeys(acts: Act[]) {
   })
 }
 
-function Menu({ anchor, items, align, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; onClose: () => void }) {
+function Menu({ anchor, items, align, first, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   const acts = items.filter(isAct)
   const keys = menuKeys(acts)
-  const [sel, setSel] = useState(-1) // ↑↓ moves it, ⏎ runs it
+  const [sel, setSel] = useState(first ? 0 : -1) // ↑↓ moves it, ⏎ runs it; first: opened by a key, ⏎ runs the first
   const pick = (a: Act) => {
     onClose()
     a.run()
@@ -440,12 +443,12 @@ function Menu({ anchor, items, align, onClose }: { anchor: DOMRect; items: MenuI
 // [the open menu (render it somewhere), open(event, items, align)]: under the clicked element, or at the
 // pointer for a right click (contextmenu)
 export function useMenu(): [ReactNode, (e: MouseEvent, items: MenuItem[], align?: 'left' | 'right') => void] {
-  const [m, setM] = useState<{ anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right' } | null>(null)
+  const [m, setM] = useState<{ anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean } | null>(null)
   const open = (e: MouseEvent, items: MenuItem[], align: 'left' | 'right' = 'left') => {
     e.stopPropagation()
     e.preventDefault()
     const anchor = e.type === 'contextmenu' ? new DOMRect(e.clientX, e.clientY - 4, 0, 0) : (e.currentTarget as HTMLElement).getBoundingClientRect()
-    setM({ anchor, items, align: e.type === 'contextmenu' ? 'left' : align })
+    setM({ anchor, items, align: e.type === 'contextmenu' ? 'left' : align, first: e.detail === 0 && e.type === 'click' }) // a key's click (⌘⇧N, Space): the first is picked
   }
   return [m && <Menu {...m} onClose={() => setM(null)} />, open]
 }
@@ -479,13 +482,16 @@ export function Tips() {
         setTip({ text: el.dataset.tip!, x: r.left + r.width / 2, y: below ? r.bottom + 6 : r.top - 6, below })
       }, 350)
     }
+    // pressed: none, and none again until the pointer leaves it (over its icon, a child, would start one: a menu it
+    // opens would have the tip over its first item)
+    const down = (e: PointerEvent) => (hide(), (cur = (e.target as Element | null)?.closest?.<HTMLElement>('[data-tip]') ?? null))
     window.addEventListener('pointerover', over)
-    window.addEventListener('pointerdown', hide, true)
+    window.addEventListener('pointerdown', down, true)
     window.addEventListener('keydown', hide, true)
     return () => {
       hide()
       window.removeEventListener('pointerover', over)
-      window.removeEventListener('pointerdown', hide, true)
+      window.removeEventListener('pointerdown', down, true)
       window.removeEventListener('keydown', hide, true)
     }
   }, [])

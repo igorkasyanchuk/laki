@@ -6,7 +6,7 @@
     <style>
       :root { --bg: #161a21; --fg: #d5d9e3; --muted: #7a8294; --line: #232833; --running: #7aa2f7; --waiting: #e0af68; --done: #9ece6a; --idle: var(--muted); --accent: #7aa2f7; --font: -apple-system, system-ui, sans-serif; color-scheme: dark; }
       html, body { margin: 0; background: transparent; overflow: hidden; color: var(--fg); font: 12px/1.35 var(--font); user-select: none; -webkit-user-select: none; }
-      body:not([data-mode='bar']) #bar, body:not([data-mode='card']) #card, body:not([data-mode='voice']) #voice { display: none; }
+      body:not([data-mode='bar']) #bar, body:not([data-mode='card']) #card, body:not([data-mode='voice']) #voice, body:not([data-mode='menu']) #menu { display: none; }
       /* the drop: 44px wide (main's BAR), against the screen's edge (data-side); its shape (.shape) melts into the edge
          at the top and bottom (the flares), wobbles a little, and is a round blob while it's dragged */
       #bar { position: relative; isolation: isolate; width: 44px; box-sizing: border-box; padding: 20px 0 20px 6px; display: flex; flex-direction: column; align-items: center; gap: 6px; cursor: grab; touch-action: none; animation: fl-in 0.35s cubic-bezier(0.3, 1.4, 0.5, 1); }
@@ -33,7 +33,28 @@
       .fl-btn { width: 26px; height: 26px; box-sizing: border-box; display: grid; place-items: center; border-radius: 50%; color: var(--muted); border: 1.5px dashed color-mix(in srgb, var(--muted) 55%, transparent); background: var(--bg); }
       .fl-btn.hot { color: var(--fg); border-style: solid; border-color: var(--accent); transform: scale(1.1); }
       .fl-btn svg { width: 14px; height: 14px; }
+      /* the +: turns into × while open (its stack, or its menu beside the drop); the stack's actions over it */
+      .fl-btn[data-act='plus'] { transition: transform 0.2s, background 0.2s; }
+      .fl-btn[data-act='plus'].on { transform: rotate(45deg); color: var(--bg); background: var(--accent); border: 1.5px solid var(--accent); }
+      .fl-btn[data-act='plus'].on.hot { transform: rotate(45deg) scale(1.1); }
+      .fl-acts { display: flex; flex-direction: column; align-items: center; gap: 6px; padding-bottom: 8px; margin-bottom: 2px; border-bottom: 1px solid var(--line); }
+      .fl-acts .fl-btn { color: var(--fg); border: 1px solid color-mix(in srgb, var(--muted) 45%, transparent); }
+      .fl-acts .fl-btn svg { width: 13px; height: 13px; }
+      .fl-acts.pop .fl-btn { animation: fl-pop 0.2s cubic-bezier(0.3, 1.4, 0.5, 1) backwards; }
+      .fl-acts.pop .fl-btn:nth-child(3) { animation-delay: 30ms; } .fl-acts.pop .fl-btn:nth-child(2) { animation-delay: 60ms; } .fl-acts.pop .fl-btn:nth-child(1) { animation-delay: 90ms; }
+      @keyframes fl-pop { from { opacity: 0; transform: translateY(8px) scale(0.6); } }
+      /* the + menu beside the drop (main's MENU: 236 by 196; the rows share its height) */
+      #menu { box-sizing: border-box; height: 100vh; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
+      .m-row { flex: 1; display: flex; align-items: center; gap: 10px; width: 100%; padding: 0 8px; border: none; border-radius: 8px; background: transparent; color: var(--fg); text-align: left; cursor: pointer; font: inherit; outline: none; }
+      .m-row:focus { background: color-mix(in srgb, var(--fg) 7%, var(--bg)); }
+      .m-ic { flex: none; width: 28px; height: 28px; border-radius: 8px; display: grid; place-items: center; color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+      .m-ic svg { width: 15px; height: 15px; }
+      .m-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+      .m-t { font-size: 13px; font-weight: 500; line-height: 16px; }
+      .m-h { font-size: 11.5px; line-height: 14px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .m-k { flex: none; font-size: 11px; line-height: 17px; padding: 0 5px; color: var(--muted); border: 1px solid var(--line); border-radius: 5px; }
       #card { width: 280px; box-sizing: border-box; padding: 9px 11px; background: var(--bg); border: 1px solid var(--line); border-radius: 10px; }
+      #card.tip { width: max-content; max-width: 240px; padding: 5px 9px; }
       #card b { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       #card .meta { color: var(--muted); font-size: 11px; margin-top: 1px; }
       #card .meta i { font-style: normal; color: var(--c); }
@@ -64,12 +85,13 @@
       #voice .v-send:disabled { opacity: 0.6; cursor: default; }
       .v-note { color: var(--muted); font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
       .v-note.bad { color: var(--waiting); white-space: normal; }
-      @media (prefers-reduced-motion: reduce) { #bar, .shape { animation: none; } .fl-dot, .fl-btn { transition: none; } }
+      @media (prefers-reduced-motion: reduce) { #bar, .shape, .fl-acts .fl-btn { animation: none; } .fl-dot, .fl-btn { transition: none; } }
     </style>
   </head>
   <body data-side="right" data-fstyle="glow">
     <div id="bar"><div class="shape"></div></div>
     <div id="card"></div>
+    <div id="menu" role="menu" aria-label="New"></div>
     <div id="voice">
       <div class="v-head"><b>Say a prompt</b><button class="v-x" title="Close (Esc)">×</button></div>
       <textarea spellcheck="false" placeholder="Speak, or type…"></textarea>

@@ -10,6 +10,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--pr <url|number>]     a GitHub PR's branch (gh pr checkout, forks too), named pr-<n>-<title>
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
   laki rm <ws> | archive <ws> | restore <ws> | fork <ws>
+  laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
+  laki pr <ws|.> <url|number>                 attach a GitHub PR to a workspace
   laki tab <ws> [--preset p] [--cmd c]        a new tab
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab

@@ -3,6 +3,7 @@
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
+import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
 import { ask, Icon, IconButton, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
 
@@ -19,6 +20,13 @@ const RUNS = 8 // the log's rows until Show all
 // where a run goes: its words, its icon
 const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']]
 const at = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+// how soon a run is: in 5 min, in 3 h, in 2 days
+const soon = (t: number, now = Date.now()) => {
+  const m = Math.max(0, Math.round((t - now) / 60000))
+  const h = Math.round(m / 60)
+  const d = Math.round(m / 60 / 24)
+  return m < 1 ? 'now' : m < 60 ? `in ${m} min` : h < 24 ? `in ${h} h` : d === 1 ? 'in a day' : `in ${d} days`
+}
 type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string }
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
@@ -59,6 +67,11 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   }
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState<string[]>([]) // tasks whose Run now is starting
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const t = setInterval(() => tick(n => n + 1), 30e3) // "next in 3 min" and "2 minutes ago" move on with no state change
+    return () => clearInterval(t)
+  }, [])
   const [saving, setSaving] = useState(false)
   const [allRuns, setAllRuns] = useState(false)
   const [menu, openMenu] = useMenu()
@@ -130,27 +143,53 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
       'right',
     )
   const failed = runs.filter(r => !r.ok).length
+  const next = schedules.reduce((m, x) => (x.on && x.next && (!m || x.next < m) ? x.next : m), 0) // the soonest; 0: none on
   const shown = allRuns ? runs : runs.slice(0, RUNS)
   const valid = !!rule && !('error' in rule)
 
   return (
     <Page title="Scheduled tasks" onClose={onClose}>
       <div className="schedules">
-        <div className="sched-bar">
-          <p className="muted small">A prompt for an agent at the times you write. Laki's daemon runs it, window or not; a run the Mac slept through is skipped.</p>
-          {view.projects.length > 1 && (
-            <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Whose tasks and runs show" onClick={filterMenu}>
-              <Icon name="filter" />
-              <span className="nw-chip-text">{only ? nameOf(only) : 'All projects'}</span>
-              <Icon name="chevron" size={11} />
-            </button>
-          )}
-          {!form && (
-            <button type="button" className="primary" disabled={!view.projects.length} data-tip={view.projects.length ? undefined : 'Open a project first (⌘O)'} onClick={() => open(blank())}>
-              <Icon name="plus" /> New task
-            </button>
-          )}
-        </div>
+        <header className="sched-hero">
+          <span className="sched-hero-icon">
+            <Icon name="clock" size={20} />
+          </span>
+          <p className="muted">A prompt for an agent at the times you write. Laki's daemon runs it, window or not; a run the Mac slept through is skipped.</p>
+          <span className="sched-hero-acts">
+            {view.projects.length > 1 && (
+              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip="Whose tasks and runs show" onClick={filterMenu}>
+                <Icon name="filter" />
+                <span className="nw-chip-text">{only ? nameOf(only) : 'All projects'}</span>
+                <Icon name="chevron" size={11} />
+              </button>
+            )}
+            {!form && (
+              <button type="button" className="primary" disabled={!view.projects.length} data-tip={view.projects.length ? undefined : 'Open a project first (⌘O)'} onClick={() => open(blank())}>
+                <Icon name="plus" /> New task
+              </button>
+            )}
+          </span>
+        </header>
+        {schedules.length > 0 && (
+          <div className="sched-stats">
+            <div>
+              <b>{schedules.length}</b>
+              <span>{schedules.length === 1 ? 'task' : 'tasks'}</span>
+            </div>
+            <div>
+              <b>{schedules.filter(x => x.on).length}</b>
+              <span>on</span>
+            </div>
+            <div data-tip={next ? at(next) : undefined}>
+              <b>{next ? soon(next) : '—'}</b>
+              <span>next run</span>
+            </div>
+            <div className={failed ? 'bad' : ''}>
+              <b>{runs.length ? `${runs.length - failed}/${runs.length}` : '—'}</b>
+              <span>runs ok</span>
+            </div>
+          </div>
+        )}
         {err && <div className="field-err">{err}</div>}
 
         {form && (
@@ -239,20 +278,32 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
             <div className="sched-list">
               {schedules.map(s => (
                 <div key={s.id} className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
-                  <Switch on={s.on} tip={s.on ? 'On: runs at its times' : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
+                  <span className="sched-icon">
+                    <Icon name={s.ws === 'new' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal'} />
+                  </span>
                   <button type="button" className="sched-main" data-tip="Edit" onClick={() => edit(s)}>
                     <span className="sched-name">{s.name || s.prompt}</span>
                     <span className="sched-meta">
-                      {describe(s.rule)} · {s.on && s.next ? `next ${at(s.next)}` : s.rule.once && s.last ? 'ran' : 'off'}
+                      <b>{describe(s.rule)}</b>
+                      {s.on && s.next ? (
+                        <span className="sched-next" data-tip={at(s.next)}>
+                          next {soon(s.next)}
+                        </span>
+                      ) : (
+                        <span>{s.rule.once && s.last ? 'ran' : 'off'}</span>
+                      )}
                     </span>
-                    <span className="sched-meta">
-                      {nameOf(s.project)} · {s.preset} · {where(s.ws)}
+                    <span className="sched-tags">
+                      <span className="tag">{nameOf(s.project)}</span>
+                      <span className="tag">{s.preset}</span>
+                      <span className="tag">{where(s.ws)}</span>
                     </span>
                   </button>
                   <span className="sched-acts">
                     {busy.includes(s.id) ? <span className="btn-spin" role="status" aria-label="Starting" /> : <IconButton icon="run" title="Run now" onClick={() => run(s)} />}
                     <IconButton icon="trash" title="Delete" onClick={() => rm(s)} />
                   </span>
+                  <Switch on={s.on} tip={s.on ? 'On: runs at its times' : 'Off'} onChange={on => api.set({ id: s.id, on }).catch(fail)} />
                 </div>
               ))}
             </div>
@@ -291,10 +342,14 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                     className={`sched-run ${r.ok ? '' : 'failed'} ${live ? 'live' : ''}`}
                     {...(live && { role: 'button', tabIndex: 0, 'data-tip': 'Go to it', onClick: () => api.open(r.ws!, r.tab), onKeyDown: (e: React.KeyboardEvent) => e.key === 'Enter' && api.open(r.ws!, r.tab) })}
                   >
-                    <Icon name={r.ok ? 'check' : 'x'} size={12} />
+                    <span className="sched-run-dot">
+                      <Icon name={r.ok ? 'check' : 'x'} size={11} />
+                    </span>
                     <b>{r.name}</b>
                     <span className="muted">{r.what}</span>
-                    <span className="sched-run-at">{at(r.at)}</span>
+                    <span className="sched-run-at" data-tip={at(r.at)}>
+                      {ago(r.at)}
+                    </span>
                   </div>
                 )
               })}

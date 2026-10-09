@@ -1,13 +1,21 @@
 // The board (the sidebar's ▥, ⌘K, laki://board): every workspace as a card in a column by where it is (its agents
 // at work, waiting for you, done, a PR open, merged), and To do: prompts waiting for a workspace. Start, or a drag
-// onto another column, makes one with the default agent; a click on a card opens its workspace.
-import { type DragEvent, type FormEvent, useState } from 'react'
+// onto another column, makes one with the default agent; a click on a card opens its workspace, a right click (or ⋯)
+// is its menu: open, archive, delete; Merged's ⋯ archives them all.
+import { type DragEvent, type FormEvent, type MouseEvent, useState } from 'react'
 import type { TabView, Todo, View, WorkspaceView } from '../../shared/types'
 import { Glyph, rollup } from './Glyph'
 import { ciText, prState } from './Info'
 import { Icon, IconButton, Page, TurnTime } from './ui'
 
-export type BoardApi = { open: (ws: string) => void; start: (t: Todo) => Promise<unknown>; add: (project: string, text: string) => Promise<unknown>; rm: (id: string) => Promise<unknown> }
+export type BoardApi = {
+  open: (ws: string) => void
+  start: (t: Todo) => Promise<unknown>
+  add: (project: string, text: string) => Promise<unknown>
+  rm: (id: string) => Promise<unknown>
+  menu: (e: MouseEvent, w: WorkspaceView) => void // a card's: open, archive, delete
+  archiveAll: (e: MouseEvent, ws: WorkspaceView[]) => void // Merged's ⋯
+}
 
 const COLUMNS = [
   ['running', 'Running'],
@@ -28,15 +36,16 @@ function columnOf(w: WorkspaceView, tabs: TabView[]): Column {
   return w.pr?.state === 'MERGED' ? 'merged' : w.pr?.state === 'OPEN' ? 'pr' : 'done'
 }
 
-export function BoardPage({ view, timers, api, onClose }: { view: View; timers?: boolean; api: BoardApi; onClose: () => void }) {
+export function BoardPage({ view, timers, going = {}, api, onClose }: { view: View; timers?: boolean; going?: Record<string, string>; api: BoardApi; onClose: () => void }) {
   const [pick, setPick] = useState('')
-  const project = view.projects.some(p => p.id === pick) ? pick : (view.projects[0]?.id ?? '') // one picked, else the first (projects come and go)
+  const projects = view.projects.filter(p => !p.kind) // Terminals and Browsers: no tasks
+  const project = projects.some(p => p.id === pick) ? pick : (projects[0]?.id ?? '') // one picked, else the first (projects come and go)
   const [text, setText] = useState('')
   const [starting, setStarting] = useState<string[]>([]) // to-dos whose workspace is on its way
   const [over, setOver] = useState('') // the column a to-do is dragged over
   const name = (id: string) => view.projects.find(p => p.id === id)?.name ?? id
   const cards = view.workspaces
-    .filter(w => !w.archived)
+    .filter(w => !w.archived && projects.some(p => p.id === w.project))
     .map(w => {
       const tabs = view.tabs.filter(t => t.workspace === w.id)
       return { w, tabs, col: columnOf(w, tabs) }
@@ -86,13 +95,13 @@ export function BoardPage({ view, timers, api, onClose }: { view: View; timers?:
               </div>
             </div>
           ))}
-          {view.projects.length > 0 && (
+          {projects.length > 0 && (
             <form className="board-add" onSubmit={add}>
               <textarea value={text} rows={3} placeholder="What should an agent do? (⌘⏎ adds it)" onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && add()} />
               <div className="board-foot">
-                {view.projects.length > 1 && (
+                {projects.length > 1 && (
                   <select value={project} onChange={e => setPick(e.target.value)} title="Project">
-                    {view.projects.map(p => (
+                    {projects.map(p => (
                       <option key={p.id} value={p.id}>
                         {p.name}
                       </option>
@@ -113,16 +122,28 @@ export function BoardPage({ view, timers, api, onClose }: { view: View; timers?:
             <section key={col} className={`board-col ${over === col ? 'over' : ''}`} {...drop(col)}>
               <h3>
                 {title} <span className="board-count">{ws.length || ''}</span>
+                {col === 'merged' && ws.some(c => c.w.kind === 'worktree') && (
+                  <>
+                    <span className="spacer" />
+                    <IconButton icon="more" title="Archive them all" onClick={e => api.archiveAll(e, ws.map(c => c.w).filter(w => w.kind === 'worktree'))} />
+                  </>
+                )}
               </h3>
               {ws.map(({ w, tabs }) => {
                 const last = tabs.find(t => t.kind === 'agent' && t.last)?.last
                 return (
-                  <button key={w.id} className="board-card" onClick={() => api.open(w.id)}>
+                  // a click anywhere opens it; from the keyboard its name does (a button), its ⋯ is one of its own
+                  <div key={w.id} className={`board-card opens ${going[w.id] ? 'busy' : ''}`} onClick={() => api.open(w.id)} onContextMenu={e => api.menu(e, w)}>
                     <div className="board-foot">
                       <Glyph s={w.setup ? 'running' : rollup(tabs)} />
-                      <b className="board-name">{w.name || w.id}</b>
+                      <button type="button" className="board-name" onClick={e => (e.stopPropagation(), api.open(w.id))}>
+                        {w.name || w.id}
+                      </button>
                       <span className="spacer" />
-                      {timers && <TurnTime tabs={tabs} />}
+                      {going[w.id] ? <span className="muted small">{going[w.id]}…</span> : timers && <TurnTime tabs={tabs} />}
+                      <button className="board-more" aria-label="More" data-tip="Open, archive, delete" onClick={e => (e.stopPropagation(), api.menu(e, w))}>
+                        <Icon name="more" size={14} />
+                      </button>
                     </div>
                     <div className="muted small">
                       {name(w.project)}
@@ -136,7 +157,7 @@ export function BoardPage({ view, timers, api, onClose }: { view: View; timers?:
                         {w.pr.conflict && w.pr.state === 'OPEN' ? ' · conflicts' : ''}
                       </div>
                     )}
-                  </button>
+                  </div>
                 )
               })}
             </section>

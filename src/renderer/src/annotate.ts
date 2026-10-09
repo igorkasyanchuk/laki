@@ -32,31 +32,57 @@ let typing: HTMLInputElement | null = null
 const lw = () => Math.max(3, Math.round(img.naturalWidth / 400)) // a line as thick on a Retina capture as on a small one
 const font = () => `700 ${lw() * 7}px -apple-system, system-ui, sans-serif`
 
-function button(label: string, on: () => void, key?: string) {
-  const b = document.createElement('button')
-  b.textContent = label
-  if (key) b.append(Object.assign(document.createElement('kbd'), { textContent: key.toUpperCase() }))
+// the tools' and Undo's line icons (constants: safe as markup)
+const svg = (d: string) => `<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
+const ICONS: Record<Tool | 'undo', string> = {
+  crop: svg('<path d="M4 1.5V12h10.5M1.5 4H12v10.5"/>'),
+  arrow: svg('<path d="M3 13L13 3M6.5 3H13v6.5"/>'),
+  text: svg('<path d="M3 3.5h10M8 3.5V13"/>'),
+  rect: svg('<rect x="2.5" y="3.5" width="11" height="9" rx="1"/>'),
+  pen: svg('<path d="M11 2.5l2.5 2.5L6 12.5H3.5V10z"/>'),
+  undo: svg('<path d="M5.5 3.5L2.5 6.5l3 3M2.5 6.5H10a3.5 3.5 0 010 7H7"/>'),
+}
+const el = (tag: string, className = '', text = '') => Object.assign(document.createElement(tag), { className, textContent: text })
+function button(label: string, on: () => void, tip: string, icon?: string) {
+  const b = el('button') as HTMLButtonElement
+  if (icon) b.innerHTML = icon
+  if (label) b.append(label)
+  b.title = tip
   b.onclick = on
   bar.append(b)
   return b
 }
-const toolButtons = TOOLS.map(([t, label, key]) => [t, button(label, () => pick(t), key)] as const)
-bar.append(Object.assign(document.createElement('span'), { className: 'sep' }))
+// a tool: its icon, its name and key (the names go as the window narrows: fit, below)
+const toolButtons = TOOLS.map(([t, label, key]) => {
+  const b = button('', () => pick(t), `${label} · ${key.toUpperCase()}`, ICONS[t])
+  b.className = 'tool'
+  b.setAttribute('aria-label', label)
+  const lbl = el('span', 'lbl', label)
+  lbl.append(el('kbd', '', key.toUpperCase()))
+  b.append(lbl)
+  return [t, b] as const
+})
+bar.append(el('span', 'sep'))
+const colors = el('span', 'colors')
+bar.append(colors)
 const swatches = COLORS.map((c, i) => {
-  const b = button('', () => paint(c))
+  const b = button('', () => paint(c), `Color ${i + 1} · ${i + 1}`)
   b.className = 'color'
-  b.style.background = c
-  b.title = `Color ${i + 1}`
-  b.setAttribute('aria-label', b.title)
+  b.style.setProperty('--c', c)
+  b.setAttribute('aria-label', `Color ${i + 1}`)
+  b.append(el('i'))
+  colors.append(b)
   return [c, b] as const
 })
-bar.append(Object.assign(document.createElement('span'), { className: 'sep' }))
-button('Undo', undo).title = '⌘Z'
-bar.append(Object.assign(document.createElement('span'), { className: 'grow' }))
-button('Cancel', cancel).title = 'Esc'
-const add = button('Add to prompt', finish)
+bar.append(el('span', 'sep'))
+button('', undo, 'Undo · ⌘Z', ICONS.undo).setAttribute('aria-label', 'Undo')
+bar.append(el('span', 'grow'))
+button('Cancel', cancel, 'Esc')
+const add = button('Add to prompt', finish, '⌘⏎')
 add.className = 'primary'
-add.title = '⌘⏎'
+// the tools' names while the row has room for them, else their icons alone
+const fit = () => (bar.classList.remove('bare'), bar.scrollWidth > bar.clientWidth && bar.classList.add('bare'))
+new ResizeObserver(fit).observe(bar)
 
 function pick(t: Tool) {
   commitText()

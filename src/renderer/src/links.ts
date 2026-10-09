@@ -1,5 +1,5 @@
 // laki:// links (macOS opens the app with them): a workspace or tab, the new-workspace page filled in, Scheduled
-// tasks, the board, Settings, Help, About (the app menu's). They select and fill in, never start anything: a link from anywhere can't run an agent.
+// tasks, the board, Settings, Help, About and Get started (the app menu's). They select and fill in, never start anything: a link from anywhere can't run an agent.
 export type Link =
   | { to: 'ws'; ws: string; tab?: string }
   | { to: 'new'; project?: string; prompt?: string; preset?: string; name?: string }
@@ -8,6 +8,7 @@ export type Link =
   | { to: 'help' }
   | { to: 'board' }
   | { to: 'about' }
+  | { to: 'onboard' }
 
 const decode = (s: string) => {
   try {
@@ -42,6 +43,8 @@ export function parseLink(url: string): Link | null {
       return { to: 'board' }
     case 'about':
       return { to: 'about' }
+    case 'onboard':
+      return { to: 'onboard' }
   }
   return null
 }

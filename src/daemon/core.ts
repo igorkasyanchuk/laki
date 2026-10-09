@@ -2,7 +2,7 @@
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { readFile, stat } from 'node:fs/promises'
+import { readFile, rm, stat } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
 import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, userInfo } from 'node:os'
@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
@@ -152,8 +152,9 @@ function hookFiles(h: Hooks): Record<string, string> {
       Stop: c('idle'),
       StopFailure: c('failed'),
     },
-    // Progress on tabs: claude reports without asking each time (this Mac's CLI only: a host has none)
-    ...(h === localHooks && { permissions: { allow: [`Bash(${LAKI_CLI} progress:*)`] } }),
+    // Progress on tabs, and the Laki note's rename and PR of its own workspace: claude runs them without asking each time
+    // (this Mac's CLI only: a host has none)
+    ...(h === localHooks && { permissions: { allow: [`Bash(${LAKI_CLI} progress:*)`, `Bash(${LAKI_CLI} rename .:*)`, `Bash(${LAKI_CLI} pr .:*)`] } }),
   }
   // gemini's (versions with hooks, in a folder it trusts): the same states; a hook must print JSON, or gemini waits on it
   const g = (st: string) => [{ hooks: [{ type: 'command', command: `${h.cmd(st)} >/dev/null 2>&1; echo '{}'` }] }] // laki hook ends within 1s
@@ -191,6 +192,25 @@ another session in it) with an agent started on the task. This session goes on a
 4. Say in one line what it made: the workspace id it printed, and the agent.
 `,
 })
+
+// What Laki is and what its CLI does for an agent (a preset's laki, unset: on): told to claude and codex at every start
+const LAKI_NOTE = () =>
+  `You run in a tab of Laki, an app that runs coding agents side by side, each task in a workspace of its own (a git worktree or a folder). Its CLI is \`${LAKI_CLI}\`, \`laki\` below (\`laki help\` lists it all); \`.\` is your workspace ($LAKI_WORKSPACE). Use it when it helps, quietly:
+- \`laki rename . "<a few words>"\`: name the workspace after its task once the task is clear (the user sees the name in Laki's sidebar).
+- \`laki pr . <url|number>\`: attach the pull request you opened or work on, when it isn't one on this branch.
+- \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace.
+- \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
+- $LAKI_STORAGE_FOLDER (when set): this workspace's own folder, outside the repo, for files you make for the user to keep (screenshots, reports, exports, notes); every tab of the workspace shares it. Save there when the user asks for such files or mentions the storage folder.`
+
+// codex's own developer_instructions (its config.toml): -c would replace them, so Laki's note isn't given then.
+// ponytail: a line match, any table, CODEX_HOME from this process (a preset's env may point elsewhere)
+const codexOwn = () => {
+  try {
+    return /^\s*developer_instructions\s*=/m.test(readFileSync(join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'config.toml'), 'utf8'))
+  } catch {
+    return false
+  }
+}
 
 // Progress on tabs (settings.progress): told to claude and codex at every start, since the laki skill loads only for
 // Laki's own tasks
@@ -518,12 +538,13 @@ function actionsOk(l: unknown): RunAction[] | undefined {
   return ok.length ? ok.map(a => ({ name: a.name, target: a.target, text: a.text })) : undefined
 }
 
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string }) {
   const p = findProject(ref)
+  if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined
   if (o.name?.trim()) p.name = o.name.trim()
   if (typeof o.notes === 'string') p.notes = o.notes.trim() ? o.notes.slice(0, 100000) : undefined
   if (Array.isArray(o.seps)) {
-    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}) }))
+    const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}), ...(WS_SORTS.includes(x.sort as WsSort) ? { sort: x.sort } : {}) }))
     p.seps = seps.length ? seps : undefined
     if (!p.seps) p.rows = undefined
   }
@@ -568,6 +589,25 @@ function worktreesOf(proj: Project) {
 }
 
 const setupMarker = (ws: Workspace) => join(runDir, `${ws.id}.setup`)
+
+// a workspace's storage folder ($LAKI_STORAGE_FOLDER): <storageDir>/<name>-<id>, named and made at its first tab and kept
+// (a rename doesn't move it); none for Terminals and Browsers. ponytail: on this Mac only, a host's workspaces get none
+function storageOf(ws: Workspace) {
+  if (ws.host || state.projects.find(p => p.id === ws.project)?.kind) return undefined
+  if (!ws.storage) {
+    const root = typeof state.settings?.storageDir === 'string' ? state.settings.storageDir.trim() : ''
+    const name = slug(ws.name ?? '')
+    const at = join(root ? resolve(homedir(), tilde(root)) : join(dir, 'storage'), name && name !== ws.id ? `${name}-${ws.id}` : ws.id)
+    ws.storage = existsSync(at) ? `${at}-${randomBytes(3).toString('hex')}` : at // never a folder that's there already: wsRm deletes it
+    save()
+  }
+  try {
+    mkdirSync(ws.storage, { recursive: true })
+  } catch (e) {
+    log(`storage ${ws.storage}: ${(e as Error).message}`)
+  }
+  return ws.storage
+}
 
 // ---------- projects
 
@@ -642,7 +682,7 @@ export function projectRm(ref: string) {
   // worktrees, and the folder's sessions scheduled tasks made (their own agents): delete them first
   const live = state.workspaces.filter(w => w.project === p.id && (w.kind === 'worktree' || w.schedule) && !w.archived)
   if (live.length) throw new Error(`${p.name} has workspaces: delete them first (${live.map(w => w.id).join(', ')})`)
-  for (const w of state.workspaces.filter(w => w.project === p.id)) dropWs(w)
+  for (const w of state.workspaces.filter(w => w.project === p.id)) dropWs(w), rmStorage(w) // their storage folders too
   state.projects = state.projects.filter(x => x !== p)
   state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
   state.todos = state.todos?.filter(t => t.project !== p.id) // and its board's to-dos
@@ -899,6 +939,7 @@ function childEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}) {
 // what Laki adds to a tab's environment: over this Mac's (childEnv), or all of it on an SSH host (hostScript); hooks:
 // where its agents' hook files are
 function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, hooks = dir): Record<string, string> {
+  const storage = tab.id ? storageOf(ws) : ws.storage // teardown's stand-in makes none
   return {
     // an agent's links as links (OSC 8: claude's [#12](url) shows #12, xterm opens it); an env below may say 0. Not
     // in shells: tools that honor it put the escapes in piped output too
@@ -916,6 +957,7 @@ function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, ho
     PORT: String(ws.port),
     ...(!ws.host && { LAKI_HOME: dir }), // the laki CLI's: there's none on a host
     LAKI_PROJECT_PATH: state.projects.find(p => p.id === ws.project)?.path ?? ws.path, // the repo itself: setup copies .env etc. from it
+    ...(storage && { LAKI_STORAGE_FOLDER: storage }), // its files for the user to keep: every tab's the same
     // ponytail: these replace one the user set
     ...(tab.preset === 'opencode' && { OPENCODE_CONFIG_DIR: join(hooks, 'opencode') }), // Laki's plugin, on top of the user's config
     ...(tab.preset === 'gemini' && { GEMINI_CLI_SYSTEM_DEFAULTS_PATH: join(hooks, 'gemini-settings.json') }), // the lowest layer; hooks add up
@@ -928,17 +970,18 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   const again = resume && tab.resumeId // its chat, again
   let argv: string[]
   let ask = prompt && !resume ? [prompt] : [] // how the first prompt goes in: last, or after a flag
-  const told = h === localHooks && state.settings?.progress // a host has no laki CLI to report with
+  // what it's told at the start: Laki (its preset's switch) and progress; a host has no laki CLI
+  const told = h === localHooks ? [pr?.laki !== false && LAKI_NOTE(), state.settings?.progress && PROGRESS_NOTE()].filter(Boolean).join('\n\n') : ''
   if (tab.preset === 'claude') {
     argv = ['claude', '--settings', join(h.dir, 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
-    if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', PROGRESS_NOTE()) // a preset's own wins
+    if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
   } else if (tab.preset === 'codex') {
     argv = again ? ['codex', 'resume', again] : ['codex']
     // notify runs when a turn ends; a JSON string array is a TOML one too. ~/.codex stays untouched.
     argv.push('-c', 'notify=' + JSON.stringify([...h.argv, 'hook', 'done']))
-    if (told && !pr?.args?.includes('developer_instructions')) argv.push('-c', 'developer_instructions=' + JSON.stringify(PROGRESS_NOTE())) // a JSON string is a TOML one
+    if (told && !pr?.args?.includes('developer_instructions') && !codexOwn()) argv.push('-c', 'developer_instructions=' + JSON.stringify(told)) // a JSON string is a TOML one
   } else if (tab.preset === 'gemini') {
     argv = again ? ['gemini', '--resume', again] : ['gemini']
     if (ask.length) ask = ['-i', ...ask] // a bare prompt would answer it and exit
@@ -1563,8 +1606,13 @@ export async function wsRm(ref: string) {
   const ws = findWs(ref)
   await teardown(ws)
   dropWs(ws)
+  rmStorage(ws)
   save()
   changed()
+}
+// a deleted workspace's storage folder goes with it (settings.keepStorage: stays); only one Laki named, <…>-<id>
+function rmStorage(ws: Workspace) {
+  if (ws.storage && !state.settings?.keepStorage && basename(ws.storage).includes(ws.id)) void rm(ws.storage, { recursive: true, force: true }).catch(e => log(`storage ${ws.storage}: ${e.message}`))
 }
 
 // wsArchive is wsRm that keeps the workspace's record (branch, agents' resume ids) for wsRestore.

@@ -286,8 +286,8 @@ ipcMain.handle('browse', async (e, r: Browse) => {
   await settle()
   return { url: wc.getURL(), title: wc.getTitle() }
 })
-ipcMain.handle('pick-folder', async () => {
-  const r = await dialog.showOpenDialog(win!, { properties: ['openDirectory', 'createDirectory'] }) // createDirectory: macOS's New Folder button
+ipcMain.handle('pick-folder', async e => {
+  const r = await dialog.showOpenDialog(BrowserWindow.fromWebContents(e.sender) ?? win!, { properties: ['openDirectory', 'createDirectory'] }) // createDirectory: macOS's New Folder button
   return r.canceled ? null : r.filePaths[0]
 })
 // macOS dictation, as Edit › Start Dictation does; its language and microphone are in System Settings
@@ -319,6 +319,22 @@ ipcMain.on('dock-icon', (e, png: unknown) => {
 // item, from the same message so the two never disagree: the count, a menu of those tabs (a click shows one, as a
 // notification's does), Open and Quit. tray false: Settings › General hid it
 let tray: Tray | null = null
+let trayTabs: MenuItemConstructorOptions[] = [] // the last badge's, for a menu made again as screens come and go
+function trayMenu() {
+  tray?.setContextMenu(
+    Menu.buildFromTemplate([
+      ...trayTabs,
+      ...(trayTabs.length ? [{ type: 'separator' as const }] : []),
+      { label: 'New Workspace…', click: () => newWsWin() }, // the bubbles' + window: over the app you're in
+      { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
+      { label: 'Screenshot Screen', ...(screen.getAllDisplays().length > 1 ? { submenu: screenItems() } : { click: () => screenshot(false) }) },
+      { type: 'separator' },
+      { label: `Open ${app.name}`, click: () => show() },
+      { label: 'Quit', click: () => app.quit() },
+    ]),
+  )
+}
+app.whenReady().then(() => (screen.on('display-added', trayMenu), screen.on('display-removed', trayMenu), screen.on('display-metrics-changed', trayMenu))) // its sizes
 ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = [], on = true) => {
   const count = Number.isInteger(n) && n > 0 ? String(n) : ''
   app.dock?.setBadge(count)
@@ -326,38 +342,33 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
   tray ??= new Tray(trayIcon())
   tray.setTitle(count, { fontType: 'monospacedDigit' })
   tray.setToolTip(count ? `${app.name}: ${count} need${count === '1' ? 's' : ''} you` : app.name)
-  const tabs: MenuItemConstructorOptions[] = (Array.isArray(items) ? items : []).slice(0, 30).map(i => ({ label: String(i.label).slice(0, 90), click: () => show(String(i.tab)) }))
-  tray.setContextMenu(
-    Menu.buildFromTemplate([
-      ...tabs,
-      ...(tabs.length ? [{ type: 'separator' as const }] : []),
-      { label: 'Screenshot Area…', click: () => screenshot(true) }, // to the new-workspace page, for an agent
-      { label: 'Screenshot Screen', click: () => screenshot(false) },
-      { type: 'separator' },
-      { label: `Open ${app.name}`, click: () => show() },
-      { label: 'Quit', click: () => app.quit() },
-    ]),
-  )
+  trayTabs = (Array.isArray(items) ? items : []).slice(0, 30).map(i => ({ label: String(i.label).slice(0, 90), click: () => show(String(i.tab)) }))
+  trayMenu()
 })
 
 // the floating bubbles (Settings › Appearance): a drop stuck to the screen's left or right edge, over every app and
 // Space, with a circle per workspace whose agent works or waits (and the last ones used: floaterRecent), from the app
-// window's list, then + Session and the microphone (floaterNew, floaterMic; with +, the drop stays when no agent is at
-// work); hidden while Laki is in front. A circle's click shows its tab; a hover shows its card in a window of its
+// window's list, then a + (floaterNew; with it, the drop stays when no agent is at work) whose click shows New task,
+// Say it, Screenshot area and Whole screen (the menu bar's): stacked in the drop over the + (floaterMenu stack: the drop
+// grows up, the + stays under the mouse) or as a menu in a window beside it (card: #menu, keys 1-4, gone as it loses the
+// focus); hidden while Laki is in front. A circle's click shows its tab; a hover shows its card in a window of its
 // own beside the drop, toward the screen's middle, that takes no clicks (the drop never moves under the mouse). The
-// microphone's window (#voice) takes a prompt by dictation, for an agent of the list or a new session. The card and the
-// voice window are the bar's window.open: the three share one renderer process. Dragged anywhere (floater-drag: the
+// Say it's window (#voice) takes a prompt by dictation, for an agent of the list or a new session. The card, the menu and
+// the voice window are the bar's window.open: the four share one renderer process. Dragged anywhere (floater-drag: the
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // nearer edge as it's let go, and stays there
 type Float = { tab: string; status?: string }
-type FloatOpts = { style: string; cards: boolean; add: boolean; mic: boolean; voiceTo: 'pick' | 'new' }
+type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
+const MENU = { width: 236, height: 196 } // the +'s menu beside the drop (floaterMenu card); floater.html's #menu too
 const STYLES = ['glow', 'gradient', 'arc', 'bricks', 'comet', 'wave', 'still'] // a working agent's circle (Settings' previews: floater.css)
-let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, mic: false, voiceTo: 'pick' }
+let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, menu: 'stack', voiceTo: 'pick', doneAlert: true }
 let floater: BrowserWindow | null = null
 let card: BrowserWindow | null = null
 let voice: BrowserWindow | null = null
+let menu: BrowserWindow | null = null
+let menuTop = 0 // the +'s top in the bar, as its menu opens
 let voiceTabs = new Set<string>() // the agents the voice window offered (one may finish, and leave the list, meanwhile)
 let hover: { tab: string; top: number } | null = null // the circle under the mouse: its tab, its top in the bar
 let front = false // Laki is the front app (a launch makes it so; one in the background doesn't)
@@ -365,6 +376,8 @@ const floaterFile = () => join(app.getPath('userData'), 'floater.json') // where
 let home: { x: number; y: number } | null = null // where it was left (floater.json); barAt: where it is (a screen gone: the main one's default)
 let barAt: { x: number; y: number } | null = null
 let dragFrom: { x: number; y: number } | null = null // the window's spot as a drag started
+let stackFrom: { x: number; y: number } | null = null // where the drop was as its stack opened: back there as it closes
+let shooting = false // a screenshot under way: the drop and its card stay out of it
 const barSide = () => { // where the card goes: toward the middle of the bar's screen
   if (!barAt) return 'left'
   const d = screen.getDisplayNearestPoint(barAt).workArea
@@ -396,16 +409,16 @@ const pin = (f: BrowserWindow, to?: string) => {
   f.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
   f.webContents.on('will-navigate', (e, url) => url !== to && e.preventDefault())
 }
-// the bar; its page opens the card and the voice window (#card, #voice), only those, as one of each
+// the bar; its page opens the card, the menu and the voice window (#card, #menu, #voice), only those, as one of each
 function barWin() {
   const f = new BrowserWindow(floatOpts(BAR, 60))
   pin(f)
-  const kind = (url: string) => (url.split('#')[0] === f.webContents.getURL().split('#')[0] ? /#(card|voice)$/.exec(url)?.[1] : undefined)
+  const kind = (url: string) => (url.split('#')[0] === f.webContents.getURL().split('#')[0] ? /#(card|voice|menu)$/.exec(url)?.[1] : undefined)
   f.webContents.setWindowOpenHandler(({ url }) => {
     const k = kind(url)
     if (k === 'voice' && voice && !voice.isDestroyed()) voice.focus()
-    if (!k || (k === 'card' ? card : voice)?.isDestroyed() === false) return { action: 'deny' }
-    return { action: 'allow', overrideBrowserWindowOptions: k === 'card' ? floatOpts(280, 60, false) : floatOpts(VOICE.width, VOICE.height) }
+    if (!k || (k === 'card' ? card : k === 'menu' ? menu : voice)?.isDestroyed() === false) return { action: 'deny' }
+    return { action: 'allow', overrideBrowserWindowOptions: k === 'card' ? floatOpts(280, 60, false) : k === 'menu' ? floatOpts(MENU.width, MENU.height) : floatOpts(VOICE.width, VOICE.height) }
   })
   f.webContents.on('did-create-window', (w, { url }) => {
     pin(w, url)
@@ -414,6 +427,25 @@ function barWin() {
       card = w
       w.setIgnoreMouseEvents(true)
       w.on('closed', () => card === w && (card = null))
+      return
+    }
+    if (kind(url) === 'menu') {
+      menu = w
+      card?.hide()
+      hover = null
+      w.on('blur', () => w.close()) // a click anywhere else; the + again closes it too (floater.ts: open as the press began)
+      w.on('closed', () => menu === w && ((menu = null), floater?.webContents.send('floater-menu', false)))
+      w.webContents.on('did-finish-load', () => {
+        if (barAt) {
+          const d = screen.getDisplayNearestPoint(barAt).workArea
+          const y = Math.max(d.y, Math.min(barAt.y + menuTop + 40 - MENU.height, d.y + d.height - MENU.height)) // its foot by the +'s
+          w.setPosition(barSide() === 'left' ? barAt.x - 6 - MENU.width : barAt.x + BAR + 6, Math.round(y))
+        }
+        w.webContents.send('floats', floats) // the theme's colors
+        w.show()
+        w.focus() // its keys: 1-4, arrows, Esc
+        floater?.webContents.send('floater-menu', true)
+      })
       return
     }
     voice = w
@@ -438,9 +470,8 @@ function barWin() {
 // the drop against the nearer edge (left or right) of the screen it's on (its spot's, or the main one's when that's on
 // no screen: a laptop undocked, home kept for its return), inside it top to bottom; the page told which side, for its
 // shape. animate: let go after a drag
-function snap(animate = false) {
+function snap(animate = false, h = floater?.getSize()[1] ?? 0) {
   if (!floater) return
-  const h = floater.getSize()[1]
   const at = home ?? { x: Infinity, y: 0 }
   const on = screen.getAllDisplays().find(({ bounds: b }) => at.x + BAR / 2 >= b.x && at.x + BAR / 2 < b.x + b.width && at.y >= b.y && at.y < b.y + b.height)
   const d = (on ?? screen.getPrimaryDisplay()).workArea
@@ -451,7 +482,8 @@ function snap(animate = false) {
 }
 app.whenReady().then(() => screen.on('display-removed', () => snap()))
 function placeFloater() {
-  if ((!floats.items.length && !floats.add) || front || parked) return void (floater?.hide(), card?.hide(), (hover = null))
+  // hidden: the + closes too, its stack or menu (a hidden panel's page gets no visibilitychange)
+  if ((!floats.items.length && !floats.add) || front || parked || shooting) return void (floater?.isVisible() && floater.webContents.send('floater-menu', false), floater?.hide(), card?.hide(), menu?.close(), (hover = null))
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
@@ -472,10 +504,12 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     style: STYLES.includes(o.style as string) ? o.style! : 'glow',
     cards: o.cards !== false,
     add: o.add === true,
-    mic: o.mic === true,
+    menu: o.menu === 'card' ? 'card' : 'stack',
     voiceTo: o.voiceTo === 'new' ? 'new' : 'pick',
+    doneAlert: o.doneAlert !== false,
   }
-  if (!floats.cards) (hover = null), card?.hide()
+  if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
+  if (floats.menu !== 'card' || !floats.add) menu?.close()
   if (parked && floatState() !== parked) parked = ''
   placeFloater()
 })
@@ -508,8 +542,9 @@ ipcMain.handle('procs', e => {
     else if (page) add(wc.getOSProcessId(), 'The preview', 'preview')
   }
   for (const [ws, a] of agentWins) if (!a.w.isDestroyed()) add(a.w.webContents.getOSProcessId(), `browser:${ws}`, `browse:${ws}`)
-  for (const f of [floater, card, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
+  for (const f of [floater, card, menu, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
   if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
+  if (newWin && !newWin.isDestroyed()) add(newWin.webContents.getOSProcessId(), 'New workspace window')
   return out
 })
 ipcMain.on('proc-stop', (e, what: unknown) => {
@@ -517,7 +552,7 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
   if (what === 'floater') {
     parked = floatState()
     hover = null
-    for (const f of [floater, card, voice]) if (f && !f.isDestroyed()) f.destroy()
+    for (const f of [floater, card, menu, voice]) if (f && !f.isDestroyed()) f.destroy()
   } else if (what.startsWith('browse:')) {
     const a = agentWins.get(what.slice(7))
     if (!a) return
@@ -526,10 +561,79 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
     if (!a.w.isDestroyed()) a.w.destroy()
   }
 })
-ipcMain.on('floater-size', (e, h: number) => floater && e.sender === floater.webContents && h > 0 && h < 1200 && Math.round(h) !== floater.getSize()[1] && (floater.setSize(BAR, Math.round(h)), dragFrom || snap())) // where it is, kept on screen (a drag may be under way); the same height: nothing, a snap's animation goes on
+// where it is, kept on screen (a drag may be under way); the same height: nothing, a snap's animation goes on. up: the
+// stack opened or closed, the drop grows or shrinks upward, so the + stays under the mouse
+ipcMain.on('floater-size', (e, h: number, up?: boolean) => {
+  if (!floater || e.sender !== floater.webContents || !(h > 0 && h < 1200)) return
+  const [was, now] = [floater.getSize()[1], Math.round(h)]
+  if (now === was) return
+  if (dragFrom) return floater.setSize(BAR, now)
+  if (up && barAt && now > was) {
+    stackFrom ??= home ?? barAt
+    home = { x: barAt.x, y: Math.max(screen.getDisplayNearestPoint(barAt).workArea.y, barAt.y + was - now) } // on its screen: snap finds it
+  } else if (up && stackFrom) (home = stackFrom), (stackFrom = null) // not saved: a drag saves where it is
+  snap(false, now)
+})
 ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab)))
-// its buttons: + Session (the new-workspace page); the microphone's window is the page's own window.open
-ipcMain.on('floater-act', (e, what: string) => floater && e.sender === floater.webContents && what === 'new' && (app.focus({ steal: true }), openLink('laki://new')))
+// the +'s actions, from the stack in the drop or the menu beside it: New task (the new-workspace page, in a window of its
+// own), the menu bar's screenshots; Say it from the menu: the bar opens its window (the stack's opens it itself)
+ipcMain.on('floater-act', (e, what: unknown) => {
+  if (!(floater && e.sender === floater.webContents) && !(menu && e.sender === menu.webContents)) return
+  menu?.close()
+  if (what === 'new') newWsWin()
+  else if (what === 'area') screenshot(true)
+  else if (what === 'screen') screenPick()
+  else if (what === 'mic') floater?.webContents.send('floater-voice')
+})
+ipcMain.on('floater-menu-at', (e, top: unknown) => floater && e.sender === floater.webContents && typeof top === 'number' && Number.isFinite(top) && (menuTop = top))
+ipcMain.on('floater-menu-close', e => (e.sender === floater?.webContents || e.sender === menu?.webContents) && menu?.close())
+
+// the bubbles' +, the menu bar's New Workspace… and a voice prompt for a new session: the new-workspace page alone (the renderer's ?window=new), in a
+// panel over every app, Space and full-screen app, so the app you're in (and Laki's own window) stays where it is. One
+// at a time: another + brings it up, a prompt fills it. As tall as the page (new-fit). It closes once the workspace is
+// made, or on Esc.
+let newWin: BrowserWindow | null = null
+function newWsWin(prompt?: string) {
+  if (newWin && !newWin.isDestroyed()) {
+    if (prompt) newWin.webContents.send('new-prompt', prompt)
+    return void newWin.focus()
+  }
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
+  const [width, height] = [Math.min(640, d.width - 40), Math.min(340, d.height - 40)] // then new-fit: as tall as the page
+  const w = (newWin = new BrowserWindow({
+    x: Math.round(d.x + (d.width - width) / 2),
+    y: Math.round(d.y + (d.height - height) / 3),
+    width,
+    height,
+    minWidth: 480,
+    minHeight: 200,
+    type: 'panel', // an NSPanel: it takes the keyboard without bringing Laki forward
+    frame: false, // the page's head is its title bar (a drag region)
+    backgroundColor: '#0e1014',
+    minimizable: false,
+    maximizable: false,
+    fullscreenable: false,
+    skipTaskbar: true,
+    hiddenInMissionControl: true,
+    acceptFirstMouse: true,
+    show: false,
+    webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
+  }))
+  pin(w)
+  w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+  w.webContents.on('will-navigate', e => e.preventDefault()) // a dropped file would load in place, bridge and all
+  w.once('ready-to-show', () => (w.show(), w.focus()))
+  w.on('closed', () => newWin === w && (newWin = null))
+  const query = { window: 'new', ...(prompt && { prompt }) }
+  if (dev) w.loadURL(`${process.env.ELECTRON_RENDERER_URL}?${new URLSearchParams(query)}`)
+  else w.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)), { query })
+}
+// the new-workspace window's height, as the page grows or shrinks (More, images, a template's preview); its top stays
+ipcMain.on('new-fit', (e, h: unknown) => {
+  if (!newWin || newWin.isDestroyed() || e.sender !== newWin.webContents || typeof h !== 'number' || !Number.isFinite(h)) return
+  const d = screen.getDisplayMatching(newWin.getBounds()).workArea
+  newWin.setContentSize(newWin.getContentSize()[0], Math.round(Math.min(Math.max(h, 200), d.y + d.height - newWin.getBounds().y - 20)))
+})
 // the voice prompt: to an agent of the list (send, as the app's, queued while it works), or a new session's page
 ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
   if (!voice || e.sender !== voice.webContents || typeof text !== 'string' || !text.trim()) return { error: 'nothing to send' }
@@ -542,8 +646,7 @@ ipcMain.handle('voice-send', async (e, tab: unknown, text: unknown) => {
     return { queued: !!r?.queued }
   }
   voice.close()
-  app.focus({ steal: true })
-  openLink(`laki://new?prompt=${encodeURIComponent(text.trim())}`)
+  newWsWin(text.trim())
   return {}
 })
 ipcMain.on('voice-close', e => voice && e.sender === voice.webContents && voice.close())
@@ -557,6 +660,7 @@ ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
   } else if (phase === 'move' && dragFrom && Number.isFinite(dx) && Number.isFinite(dy)) floater.setPosition(Math.round(dragFrom.x + dx), Math.round(dragFrom.y + dy))
   else if (phase === 'end' && dragFrom) {
     dragFrom = null
+    stackFrom = null // where it's let go is its place now
     const [x, y] = floater.getPosition()
     home = { x, y }
     snap(true)
@@ -575,6 +679,14 @@ const overBar = () => {
   const b = floater.getBounds()
   return p.x >= b.x && p.x < b.x + b.width && p.y >= b.y && p.y < b.y + b.height
 }
+// a stacked action's name and what it does, in the card's window beside it (cards on hover or not: the icons alone don't say)
+const TIP = '\u0000tip' // never a tab id
+ipcMain.on('floater-tip', (e, name: unknown, hint: unknown, top: unknown) => {
+  if (!floater || e.sender !== floater.webContents || dragFrom || typeof name !== 'string' || typeof hint !== 'string' || !Number.isFinite(top)) return
+  hover = !front && overBar() ? { tab: TIP, top: top as number } : null
+  if (hover) card?.webContents.send('card', { tab: TIP, name: name.slice(0, 60), last: hint.slice(0, 120), status: 'tip' }, floats.colors)
+  else card?.hide()
+})
 ipcMain.on('floater-hover', (e, tab: string, top: number) => {
   if (!floater || e.sender !== floater.webContents || dragFrom) return
   const f = floats.items.find(x => x.tab === tab)
@@ -592,19 +704,24 @@ ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
 })
 // in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
 // takes the click), so being active alone isn't it: the drop would hide under the pointer as a drag starts
-const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== voice
+const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== menu && w !== voice && w !== newWin // the bubbles stay over another app while the new-workspace window is up
 const setFront = (on: boolean) => on !== front && ((front = on), placeFloater())
 app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
 app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after
 app.on('did-resign-active', () => setFront(false))
 
-// the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels),
-// then the editor window (annotate) to draw on it, then the new-workspace page with it. Needs Screen Recording for Laki (macOS asks once).
-// ponytail: the whole screen is the main display; screencapture takes a file per display for the others
-function screenshot(part: boolean) {
+// the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels; a
+// screen: its rectangle, -R in the same global points as Electron's bounds; none: the main one), then the editor window
+// (annotate) to draw on it, then the new-workspace page with it. Needs Screen Recording for Laki (macOS asks once).
+function screenshot(part: boolean, on?: Electron.Rectangle) {
   const file = join(tmpdir(), `laki-shot-${process.pid}-${Date.now()}.png`)
+  const what = part ? ['-i'] : on ? [`-R${on.x},${on.y},${on.width},${on.height}`] : ['-m']
+  shooting = true
+  placeFloater() // the bubbles out of the picture, until it's taken or cancelled
   setTimeout(() => // the menu closes first, out of the picture
-    execFile('screencapture', [part ? '-i' : '-m', '-x', file], () => {
+    execFile('screencapture', [...what, '-x', file], () => {
+      shooting = false
+      placeFloater()
       let png: string
       try {
         png = readFileSync(file).toString('base64')
@@ -616,17 +733,43 @@ function screenshot(part: boolean) {
     }), 250)
 }
 
+// with more than one screen, which one: the one under the pointer first (the bubbles' menu, made as it opens), or the
+// main one first (the menu bar's, made at the last badge: the pointer was elsewhere then). Its bounds as it's clicked
+// (a resolution or arrangement may have changed since)
+function screenItems(here?: Electron.Display): MenuItemConstructorOptions[] {
+  const first = here ?? screen.getPrimaryDisplay()
+  return [first, ...screen.getAllDisplays().filter(d => d.id !== first.id)].map((d, i) => ({
+    label: `${d.label || `Screen ${i + 1}`}${here && d.id === here.id ? ' (this one)' : ''}`,
+    sublabel: `${d.size.width}×${d.size.height}`,
+    click: () => (now => now && screenshot(false, now.bounds))(screen.getAllDisplays().find(x => x.id === d.id)), // gone meanwhile: nothing
+  }))
+}
+// the bubbles' Whole screen: one screen, at once; more, a menu at the pointer
+function screenPick() {
+  if (screen.getAllDisplays().length < 2) return screenshot(false)
+  Menu.buildFromTemplate([{ label: 'Which screen?', enabled: false }, ...screenItems(screen.getDisplayNearestPoint(screen.getCursorScreenPoint()))]).popup(floater && !floater.isDestroyed() ? { window: floater } : {})
+}
+
 // the screenshot's editor (annotate.html): a small window over the others to crop it, draw on it and say what to do
 // with it; Add to prompt sends both to the new-workspace page, Esc drops them
 let annot: BrowserWindow | null = null
 function annotate(png: string) {
   annot?.destroy()
   const { width, height } = nativeImage.createFromBuffer(Buffer.from(png, 'base64')).getSize()
-  const d = screen.getPrimaryDisplay()
-  const fit = (n: number, extra: number, min: number, max: number) => Math.round(Math.min(Math.max(n / d.scaleFactor + extra, min), max))
+  const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()) // the screen you're on, likely the one shot
+  const a = d.workArea
+  // the picture at its size in points with the page around it (annotate.html: the bar 46, the stage's padding 24, the
+  // note 68); a whole screen's, or near it: the whole work area
+  const [pw, ph] = [width / d.scaleFactor + 24, height / d.scaleFactor + 138]
+  const big = pw > a.width * 0.8 || ph > a.height * 0.8
+  const [ww, wh] = big ? [a.width, a.height] : [Math.round(Math.min(Math.max(pw, 760), a.width)), Math.round(Math.min(Math.max(ph, 400), a.height))]
   const w = (annot = new BrowserWindow({
-    width: fit(width, 48, 720, d.workAreaSize.width * 0.85),
-    height: fit(height, 190, 460, d.workAreaSize.height * 0.85),
+    x: Math.round(a.x + (a.width - ww) / 2),
+    y: Math.round(a.y + (a.height - wh) / 2),
+    width: ww,
+    height: wh,
+    minWidth: 680, // the toolbar's icons and buttons in one row
+    minHeight: 360,
     title: 'Screenshot',
     backgroundColor: '#0e1014',
     titleBarStyle: 'hiddenInset',
@@ -741,6 +884,13 @@ Menu.setApplicationMenu(
     { role: 'editMenu' },
     { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'togglefullscreen' }] },
     { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }] },
+    {
+      role: 'help',
+      submenu: [
+        { label: `${app.name} Help`, click: () => openLink('laki://help') },
+        { label: 'Get Started Again…', click: () => openLink('laki://onboard') }, // the first steps, after Don't show again too
+      ],
+    },
   ]),
 )
 

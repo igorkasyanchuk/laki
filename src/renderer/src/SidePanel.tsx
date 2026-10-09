@@ -368,7 +368,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
         )}
         <span className="muted small grow">{d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : ` changed vs ${d.base}`}${files.length ? ' · click a line to comment' : ''}` : err ? '' : 'Loading…'}</span>
         {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
-        <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} />
+        {files.some(f => open.has(f.path)) ? <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} /> : <IconButton icon="expand" title="Expand all" onClick={() => setOpen(new Set(files.map(f => f.path)))} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
       <div className="sp-body">

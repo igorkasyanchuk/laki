@@ -21,12 +21,14 @@ type Bridge = {
   glass?(on: boolean): void
   dockIcon?(png: string): void // Settings' Dock icon, a PNG data URL (main's app.dock.setIcon)
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
-  floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; mic: boolean; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
+  floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
   procStop?(what: string): void
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
   onShot?(cb: (png: string, note?: string) => void): void
+  onNewPrompt?(cb: (prompt: string) => void): void // the new-workspace window's: a voice prompt while it's open
+  fitNew?(height: number): void // the new-workspace window's: its height, as tall as the page
 }
 export const bridge: Bridge | undefined = (window as any).laki
 

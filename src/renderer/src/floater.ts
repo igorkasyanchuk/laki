@@ -2,26 +2,41 @@
 // on the screen's edge with a circle per workspace whose agent works (floater.css: a glow, a gradient, an arc,
 // bricks, a comet, a wave or still, Settings' pick), waits for you (a pulse), or was used last (dimmer), its initials inside; a click opens its tab
 // in Laki, a hover asks main for its card, a drag (from anywhere on it, past 4px) moves it and main sticks it to the
-// nearer edge as it's let go. Under the circles, + Session and the microphone (Settings' switches). #card: that card
+// nearer edge as it's let go. Under the circles, a + (Settings' switch) whose click shows ACTS: stacked in the drop
+// over it (floaterMenu stack, a hover's name in the card's window) or #menu, a window beside it (card). #card: that card
 // (name, project, what the agent asked or last said) in a window of its own beside the drop, so the drop never moves
-// under the mouse. #voice: the microphone's prompt, dictated (macOS's), sent to an agent of the list or a new session.
-// The bar opens the other two (window.open): one renderer process for all three.
+// under the mouse. #voice: Say it's prompt, dictated (macOS's), sent to an agent of the list or a new session.
+// The bar opens the other three (window.open): one renderer process for all four.
 import './floater.css'
 import { initials } from './text'
 
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them
 export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[] }
 type Colors = Record<string, string>
+type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean }
+// the +'s actions, the menu bar's too: what, its name, what it does
+const ACTS = [
+  ['new', 'New task', 'an agent in a worktree'],
+  ['mic', 'Say it', 'dictate a prompt'],
+  ['area', 'Screenshot area', 'drag over what to show'],
+  ['screen', 'Whole screen', "the screen you're on"],
+] as const
+type Act = (typeof ACTS)[number][0]
 type Bridge = {
   dictate?: () => void
   floater?: {
-    onFloats: (cb: (f: { items: Float[]; colors: Colors; style?: string; add?: boolean; mic?: boolean }) => void) => void
+    onFloats: (cb: (f: Floats) => void) => void
     onSide: (cb: (side: 'left' | 'right') => void) => void
     drag: (phase: 'start' | 'move' | 'end', dx?: number, dy?: number) => void
-    size: (h: number) => void
+    size: (h: number, up?: boolean) => void
     hover: (tab: string, top: number) => void
     open: (tab: string) => void
-    act: (what: 'new') => void
+    act: (what: Act) => void
+    tip: (name: string, hint: string, top: number) => void
+    menuAt: (top: number) => void
+    menuClose: () => void
+    onMenu: (cb: (open: boolean) => void) => void
+    onVoiceOpen: (cb: () => void) => void
     onCard: (cb: (f: Float, colors: Colors) => void) => void
     cardSize: (tab: string, w: number, h: number) => void
     onVoice: (cb: (items: Float[], colors: Colors, to: string) => void) => void
@@ -34,8 +49,8 @@ const laki = (window as unknown as { laki?: Bridge }).laki
 const bridge = laki?.floater
 const bar = document.getElementById('bar')!
 const card = document.getElementById('card')!
-const mode = /^#(card|voice)$/.exec(location.hash)?.[1] ?? 'bar'
-const page = (hash: string) => window.open(`${location.href.split('#')[0]}#${hash}`) // main allows #card and #voice
+const mode = /^#(card|voice|menu)$/.exec(location.hash)?.[1] ?? 'bar'
+const page = (hash: string) => window.open(`${location.href.split('#')[0]}#${hash}`) // main allows #card, #menu and #voice
 
 const paint = (colors: Colors) => {
   for (const [k, v] of Object.entries(colors)) if (/^[a-z]+$/.test(k) && typeof v === 'string') document.documentElement.style.setProperty(`--${k}`, v)
@@ -45,10 +60,17 @@ let hovered = '' // the tab whose card shows
 const hover = (tab: string, top = 0) => ((hovered = tab), bridge?.hover(tab, top))
 const el = (tag: string, text: string, cls = '') => Object.assign(document.createElement(tag), { textContent: text, className: cls })
 // the buttons' line icons (constants: safe as markup)
-const svg = (d: string) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
-const ICONS = { new: svg('<path d="M12 5v14M5 12h14"/>'), mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>') }
-const button = (act: 'new' | 'mic', tip: string) => {
-  const b = Object.assign(document.createElement('div'), { className: 'fl-btn', innerHTML: ICONS[act], title: tip })
+const svg = (d: string, box = 24) => `<svg viewBox="0 0 ${box} ${box}" fill="none" stroke="currentColor" stroke-width="${box === 24 ? 2 : 1.5}" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`
+const ICONS: Record<Act | 'plus', string> = {
+  plus: svg('<path d="M12 5v14M5 12h14"/>'),
+  new: svg('<path d="M7 3H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9"/><path d="M11.5 2.5l2 2L8 10H6V8z"/>', 16),
+  mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'),
+  area: svg('<path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/>', 16),
+  screen: svg('<rect x="2" y="3" width="12" height="8" rx="1"/><path d="M6 14h4M8 11v3"/>', 16),
+}
+const button = (act: Act | 'plus', name: string) => {
+  const b = Object.assign(document.createElement('div'), { className: 'fl-btn', innerHTML: ICONS[act] })
+  b.setAttribute('aria-label', name)
   b.dataset.act = act
   return b
 }
@@ -57,6 +79,8 @@ document.body.dataset.mode = mode
 if (mode === 'card')
   bridge?.onCard((f, colors) => {
     paint(colors)
+    card.classList.toggle('tip', (f.status as string) === 'tip') // a stacked action's name
+    if ((f.status as string) === 'tip') return card.replaceChildren(el('b', f.name), el('div', f.last ?? '', 'meta')), bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
     card.style.setProperty('--c', `var(--${f.status})`)
     const meta = el('div', '', 'meta')
     meta.append(el('i', WORDS[f.status] ?? f.status), ` · ${f.project} · click to open`)
@@ -73,11 +97,18 @@ if (mode === 'card')
     bridge.cardSize(f.tab, card.offsetWidth, card.offsetHeight)
   })
 else if (mode === 'voice') voicePage()
+else if (mode === 'menu') menuPage()
 else {
   page('card')
   // a drag from anywhere on the drop (a circle too: less than 4px is its click); main moves the window, the pointer's
   // screen position stays true while it does
-  let drag: { x: number; y: number; moved: boolean; tab?: string; act?: string } | null = null
+  let drag: { x: number; y: number; moved: boolean; tab?: string; act?: string; wasOpen?: boolean } | null = null
+  let cur: Floats | null = null // the last list, drawn again as the + opens or closes
+  let stack = false // the + open, its actions stacked over it (floaterMenu stack)
+  let menuOpen = false // its menu beside the drop (card), and when that last closed: a press on the + takes its focus,
+  let menuShut = 0 // which closes it before the click would open it again
+  let tipped = '' // the stacked action whose name shows
+  let quiet = 0 // until then no name shows: the stack just opened, and put an action under a pointer that didn't move
   // the circle or button under the mouse: a class set as the mouse really moves, not :hover (or pointerover), which
   // Chromium sets again at the last place the mouse was (the + just clicked) as the bar comes back after Laki was in
   // front: hidden, the page hears nothing (no visibilitychange for a hidden panel)
@@ -94,7 +125,7 @@ else {
     if (e.button !== 0) return
     bar.setPointerCapture(e.pointerId)
     const at = e.target as HTMLElement
-    drag = { x: e.screenX, y: e.screenY, moved: false, tab: at.closest<HTMLElement>('.fl-dot')?.dataset.tab, act: at.closest<HTMLElement>('.fl-btn')?.dataset.act }
+    drag = { x: e.screenX, y: e.screenY, moved: false, tab: at.closest<HTMLElement>('.fl-dot')?.dataset.tab, act: at.closest<HTMLElement>('.fl-btn')?.dataset.act, wasOpen: menuOpen || Date.now() - menuShut < 400 }
   }
   bar.onpointermove = e => {
     if (!drag) return void (away || hot((e.target as HTMLElement).closest('.fl-dot, .fl-btn')))
@@ -106,20 +137,52 @@ else {
   const done = (click: boolean) => {
     const d = drag
     drag = null
-    if (click && !d?.moved && (d?.tab || d?.act === 'new')) (away = true), hot() // Laki comes in front, the bar hides: not lit as it comes back
+    if (click && !d?.moved && (d?.tab || d?.act === 'new' || d?.act === 'area' || d?.act === 'screen')) (away = true), hot() // the bar hides, or a window comes over it: not lit as it comes back
     if (d?.moved) document.body.classList.remove('dragging'), bridge?.drag('end')
     else if (click && d?.tab) hover(''), bridge?.open(d.tab)
-    else if (click && d?.act === 'new') bridge?.act('new')
-    else if (click && d?.act === 'mic') page('voice')
+    else if (click && d?.act === 'plus') plus(!!d.wasOpen)
+    else if (click && d?.act) {
+      hover('')
+      if (stack) (stack = false), render(true)
+      if (d.act === 'mic') page('voice')
+      else bridge?.act(d.act as Act)
+    }
   }
+  const plusAt = () => bar.querySelector<HTMLElement>('[data-act="plus"]')?.getBoundingClientRect().top ?? 0
+  const plus = (wasOpen: boolean) => {
+    hover('')
+    if (cur?.menu !== 'card') return void ((stack = !stack), (quiet = Date.now() + 400), render(true, stack))
+    if (wasOpen) return bridge?.menuClose()
+    bridge?.menuAt(plusAt())
+    page('menu')
+  }
+  // the menu beside the drop opened or closed; closed also as main hides the bar: the stack shuts too
+  bridge?.onMenu(open => {
+    if (!open && menuOpen) menuShut = Date.now() // a menu that was open: not the hide's signal alone
+    menuOpen = open
+    if (!open && stack) (stack = false), render(true)
+    bar.querySelector('[data-act="plus"]')?.classList.toggle('on', open)
+  })
+  bridge?.onVoiceOpen(() => page('voice'))
   bar.onpointerup = () => done(true)
   bar.onpointercancel = () => done(false)
   // hidden (Laki in front): the circle under the mouse then isn't under it as it comes back
   document.addEventListener('visibilitychange', () => document.hidden && (hovered = ''))
   bridge?.onSide(side => (document.body.dataset.side = side))
-  bridge?.onFloats(({ items, colors, style, add, mic }) => {
+  bridge?.onFloats(f => {
+    cur = f
+    const shut = stack && (!f.add || f.menu === 'card') // closed by Settings: shrinks upward, as the + would
+    if (shut) stack = false
+    render(shut)
+  })
+  // up: the + opened or closed, the drop grows or shrinks upward (main); pop: its actions come in
+  function render(up = false, pop = false) {
+    if (!cur) return
+    tipped = '' // its buttons are made anew: a move names one again
+    const { items, colors, style, add, doneAlert } = cur
     paint(colors)
     document.body.dataset.fstyle = style || 'glow'
+    document.body.dataset.done = doneAlert === false ? '' : 'on' // a finished one you haven't seen: green, pulsing
     const was = bar.querySelector<HTMLElement>('.hot')?.dataset // lit again below, made anew
     bar.querySelectorAll('.fl-dot, .fl-btns').forEach(d => d.remove())
     const labels = initials(items.map(f => f.name))
@@ -133,10 +196,26 @@ else {
       d.onmouseleave = () => !drag?.moved && hover('')
       bar.append(d)
     }
-    if (add || mic) {
+    if (add) {
       const btns = el('div', '', 'fl-btns')
-      for (const [on, act, tip] of [[add, 'new', 'New session'], [mic, 'mic', 'Say a prompt']] as const)
-        if (on) btns.append(button(act, tip))
+      // a stacked action's name beside it, once the pointer really moves over it (not mouseenter: the drop growing
+      // under a still pointer puts the top one there)
+      const tip = (b: HTMLElement, name: string, hint: string) => {
+        b.onpointermove = () => drag || tipped === name || Date.now() < quiet || ((tipped = name), (hovered = ''), bridge?.tip(name, hint, b.getBoundingClientRect().top))
+        b.onmouseleave = () => !drag?.moved && ((tipped = ''), hover(''))
+      }
+      if (stack) {
+        const acts = el('div', '', `fl-acts${pop ? ' pop' : ''}`)
+        for (const [act, name, hint] of ACTS) {
+          const b = button(act, name)
+          tip(b, name, hint)
+          acts.append(b)
+        }
+        btns.append(acts)
+      }
+      const p = button('plus', stack || menuOpen ? 'Close' : 'New')
+      p.classList.toggle('on', stack || menuOpen)
+      btns.append(p)
       bar.append(btns)
     }
     hot(was && [...bar.querySelectorAll<HTMLElement>('.fl-dot, .fl-btn')].find(x => (was.tab ?? was.act) === (x.dataset.tab ?? x.dataset.act)))
@@ -144,11 +223,39 @@ else {
     const still = hovered && [...bar.querySelectorAll<HTMLElement>('.fl-dot')].find(d => d.dataset.tab === hovered)
     if (still) hover(hovered, still.getBoundingClientRect().top)
     else if (hovered) hover('')
-    bridge.size(bar.offsetHeight)
-  })
+    bridge?.size(bar.offsetHeight, up)
+  }
 }
 
-// the microphone's window: a text box dictation starts in (macOS's, as the app's prompt mic: 150 ms after the focus, once
+// the +'s menu beside the drop (floaterMenu card): a row per action with its name, what it does and its key (1-4);
+// arrows move, ⏎ picks, Esc or a click elsewhere closes it (main: on blur)
+function menuPage() {
+  const box = document.getElementById('menu')!
+  const rows = ACTS.map(([act, name, hint], i) => {
+    const b = Object.assign(document.createElement('button'), { className: 'm-row' })
+    b.onclick = () => bridge?.act(act)
+    b.setAttribute('role', 'menuitem')
+    const ic = el('span', '', 'm-ic')
+    ic.innerHTML = ICONS[act]
+    const txt = el('span', '', 'm-txt')
+    txt.append(el('span', name, 'm-t'), el('span', hint, 'm-h'))
+    b.append(ic, txt, el('span', String(i + 1), 'm-k'))
+    b.onmousemove = () => document.activeElement !== b && b.focus() // moved onto, not a pointer resting where it opened
+    return b
+  })
+  box.replaceChildren(...rows)
+  document.onkeydown = e => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return // ⌘1 and the like aren't its keys
+    const i = rows.indexOf(document.activeElement as HTMLButtonElement)
+    if (e.key === 'Escape') bridge?.menuClose()
+    else if (/^[1-4]$/.test(e.key)) rows[Number(e.key) - 1].click()
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') e.preventDefault(), rows[(i + (e.key === 'ArrowDown' ? 1 : rows.length - 1) + rows.length) % rows.length].focus()
+  }
+  bridge?.onFloats(f => paint(f.colors))
+  rows[0].focus()
+}
+
+// Say it's window: a text box dictation starts in (macOS's, as the app's prompt mic: 150 ms after the focus, once
 // macOS knows the field), who gets it (Settings' It goes to: picked each time from the bubbles' agents or a new
 // session, nothing chosen first; or always a new session, no list), ⏎ sends, Esc shuts
 const PICK = '-' // the voice window's 'pick who gets it' row: not a tab

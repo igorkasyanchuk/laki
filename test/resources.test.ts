@@ -38,7 +38,7 @@ test('resources lists each tab and its processes; an idle agent sleeps, and a me
   assert.equal((await rig.rpc('send', { target: tab.id, text: 'again' })).queued, 1)
   await until(async () => (await rig.screen(tab.id)).includes('answer: again'), 'resumed, then answered', 15000)
   const starts = () => rig.fakeLog().filter(l => l.bin === 'claude' && l.tab === tab.id)
-  assert.deepEqual(starts().at(-1).args.slice(-2), ['--resume', tab.resumeId])
+  assert.deepEqual(starts().at(-1).args.slice(-4, -2), ['--resume', tab.resumeId]) // then the note about Laki
   assert.equal((await rig.tab(ws.id)).asleep, undefined)
 
   // a look (attach) wakes it too

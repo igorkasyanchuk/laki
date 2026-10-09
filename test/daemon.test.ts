@@ -281,7 +281,7 @@ test('resume after a daemon restart: agents get --resume <id>, shells start fres
   await rig.start()
   await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length === 2, 'claude restarted')
   const again = rig.fakeLog().filter(l => l.bin === 'claude')[1]
-  assert.deepEqual(again.args.slice(4), ['--resume', tab.resumeId])
+  assert.deepEqual(again.args.slice(4, 6), ['--resume', tab.resumeId]) // then the note about Laki
   await until(() => rig.fakeLog().filter(l => l.bin === 'codex').length === 2, 'codex restarted')
   const cx = rig.fakeLog().filter(l => l.bin === 'codex')[1]
   assert.deepEqual(cx.args.slice(0, 2), ['resume', thread])
@@ -476,7 +476,7 @@ test('archive keeps the branch and resume ids; restore brings them back', async 
   assert.ok(!existsSync(ws.path))
   await rig.rpc('wsRestore', { id: ws.id })
   await until(() => rig.fakeLog().filter(l => l.bin === 'claude').length === 2, 'claude resumed')
-  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[1].args.slice(4), ['--resume', id])
+  assert.deepEqual(rig.fakeLog().filter(l => l.bin === 'claude')[1].args.slice(4, 6), ['--resume', id])
   v = await rig.rpc('state')
   assert.equal(v.workspaces[0].archived, false)
   assert.ok(existsSync(join(ws.path, 'README.md')))
@@ -484,7 +484,7 @@ test('archive keeps the branch and resume ids; restore brings them back', async 
   const fork = await rig.rpc('wsFork', { id: ws.id })
   assert.equal(fork.base, 'laki/keep')
   await until(() => rig.fakeLog().some(l => l.bin === 'claude' && l.args.includes('--fork-session')), 'forked claude')
-  assert.deepEqual(rig.fakeLog().find(l => l.args.includes('--fork-session')).args.slice(4), ['--resume', id, '--fork-session'])
+  assert.deepEqual(rig.fakeLog().find(l => l.args.includes('--fork-session')).args.slice(4, 7), ['--resume', id, '--fork-session'])
 })
 
 test('usage limit from codex screen: ◷ until reset, then "continue"', async t => {
@@ -647,6 +647,16 @@ test('presets: args and env on top of the project env; Esc ends a turn; reorder;
     await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later', template }] })
     assert.deepEqual((await rig.rpc('state')).projects[0].seps, [{ id: 'sep-a1', name: 'Later' }])
   }
+  // a sep's sort (manual too: over the project's); the project's own, manual or a bad one: none
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later', sort: 'name' }, { id: 'sep-b1', name: 'B', sort: 'manual' }, { id: 'sep-c1', name: 'C', sort: 'size' }] })
+  assert.deepEqual((await rig.rpc('state')).projects[0].seps, [{ id: 'sep-a1', name: 'Later', sort: 'name' }, { id: 'sep-b1', name: 'B', sort: 'manual' }, { id: 'sep-c1', name: 'C' }])
+  await rig.rpc('projectSet', { id: p.id, sort: 'activity' })
+  assert.equal((await rig.rpc('state')).projects[0].sort, 'activity')
+  for (const sort of ['manual', 'size']) {
+    await rig.rpc('projectSet', { id: p.id, sort })
+    assert.equal((await rig.rpc('state')).projects[0].sort, undefined)
+  }
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-a1', name: 'Later' }] })
   assert.deepEqual(pr.rows, [ws2.id, 'sep-a1', ws.id])
   await rig.rpc('reorder', { workspaces: ['sep-a1', ws.id, ws2.id] })
   const v2 = await rig.rpc('state')

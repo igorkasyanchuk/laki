@@ -1,11 +1,11 @@
 <style>
-  /* the links as one bar across the tile (Laki's linkbar: a thin rule between them, wrapping when they don't fit) */
+  /* the links in a row from the left (Laki's linkbar: a thin rule between them, wrapping when they don't fit) */
   .links { height: 100%; display: flex; align-items: safe center; overflow: hidden auto; padding: 2px 0; }
   .links .linkbar { width: 100%; }
-  .links .linkbar > a { font-size: 12px; border-radius: 0; }
+  .links .linkbar > a { font-size: 11.5px; border-radius: 0; } /* the sidebar foot's words (.ib.labeled) */
 </style>
 <template preview>
-  <div class="links"><div class="linkbar spread" id="links"></div></div>
+  <div class="links"><div class="linkbar" id="links"></div></div>
   <script>
     // each chip: "Label: https://…" (or = or |), or a bare URL (its host as the label)
     const esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c])

@@ -6,6 +6,9 @@
 .fl-dot:is(.idle, .done) { --c: var(--idle, var(--muted)); opacity: 0.72; }
 .fl-dot.done { --c: var(--done); }
 @keyframes fl-pulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); } }
+/* finished and not seen yet (Settings: Finished ones stand out): filled green, a slow pulse, until a click or a look in Laki */
+[data-done='on'] .fl-dot.done { opacity: 1; border-color: var(--c); color: #fff; background: color-mix(in srgb, var(--c) 78%, #000); text-shadow: 0 1px 1px rgb(0 0 0 / 0.35); animation: fl-done 2.6s ease-in-out infinite; }
+@keyframes fl-done { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent), 0 0 12px 2px color-mix(in srgb, var(--c) 45%, transparent); } }
 /* glow: a soft halo, breathing */
 [data-fstyle='glow'] .fl-dot.running { animation: fl-glow 2.8s ease-in-out infinite; }
 @keyframes fl-glow { 0%, 100% { box-shadow: 0 0 3px 0 color-mix(in srgb, var(--c) 25%, transparent); } 50% { box-shadow: 0 0 9px 1px color-mix(in srgb, var(--c) 45%, transparent); } }

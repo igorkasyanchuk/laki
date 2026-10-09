@@ -77,7 +77,7 @@ workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `project
 workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
 `progress`; 31: a sep's `template`, kept by `projectSet`; 32: `prAttach`, a project's `notes`, kept by `projectSet`; 33: `prAct` `merge`, a workspace's `autoLand`, a project's `pr` and
 `mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`; 34: `quickNew`, a project's `kind`,
-a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name). A
+a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -85,7 +85,7 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   project's ⋯ › Notes (`ProjectNotes`, panels.tsx) and Settings, left out of MCP's and `ls --json`'s state; `seps`: the sidebar's groups (the app's word: a
   named head over the workspaces up to the next one, its count beside it; a workspace dropped on it goes first in it (its top
   third: before it), `RowDrop` `into`, from `data-head`; a workspace's menu › *Move to group* (App's `groupItems`):
-  first in one, or *Out of its group* (before the first); groups are made only from the project's ⋯, at the top), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it, over the last one used), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
+  first in one, or *Out of its group* (before the first); groups are made only from the project's ⋯, at the top), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it, over the last one used) and a `sort` (`WS_SORTS`; unset: the project's), and the project's own `sort` (unset: manual; App's `sortedRows`: each group's workspaces in its sort, rows unchanged; last active: `laki.active`), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - `wsNew` in a folder (or `local`) whose own workspace is there: an agent other than none, or a prompt, makes `another`
   beside it (named by the prompt's first words); none gives it back as it is (scheduled tasks' `local`). In development
   mode each step goes to `devLog('new', …)` (Settings › General › *Creation log*) and, once it has an id, the
@@ -154,7 +154,7 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   `browsed`) or its sign-in window, an agent browser, the bubbles, the editor; the total splits out shell tabs and
   browsers) with a Stop each: main's `proc-stop` (the
   bubbles' windows destroyed until `floats` changes state, `parked`; an agent browser closed) or the page's own
-  `laki-stop` event (the video closed, a widget unloaded until a click or the grid folds, the preview unloaded until
+  `laki-stop` event (the video closed, a widget unloaded until a click, the preview unloaded until
   *Load it again*); `daemon` with its heap; `tabs`, each live session's process
   tree, the program first; RSS in KB); `tabSleep` (now: `cantSleep`'s rules: claude or codex with a `resumeId`, idle, no queue or limit, not on a host),
   `tabWake`, `sleepTick` (`now`: tests move the clock; every 60 s);
@@ -236,7 +236,16 @@ Commands run as `$SHELL -lic '<cmd>'`. The environment adds:
 - `TERM=xterm-256color`, `COLORTERM=truecolor`, `LAKI_APP=true`;
 - an agent's `FORCE_HYPERLINK=1` (claude's links as OSC 8; an env may say 0; not shells': piped output would get
   them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
-- `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`.
+- `LAKI_WORKSPACE`, `LAKI_TAB`, `PORT`;
+- `LAKI_STORAGE_FOLDER` (`storageOf`): the workspace's own folder for what its agents keep for you, `<settings.storageDir
+  or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
+  for Terminals, Browsers and hosts. `wsRm` and `projectRm` delete it (`rmStorage`: only a `…<id>` folder) unless `settings.keepStorage`; archive keeps it.
+
+Claude and Codex are told about Laki at every start (`LAKI_NOTE`, unless the preset's `laki` is false; then
+`PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
+the preset's args set their own, nor for codex when its `config.toml` has `developer_instructions` (`codexOwn`: `-c` would
+replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki new .`, `laki browser`,
+`$LAKI_STORAGE_FOLDER`. The CLI's `rename`/`pr` take `.` for `$LAKI_WORKSPACE` (`wsSet` name, `prAttach`).
 
 Claude gets `--settings <data>/claude-settings.json` and, on this Mac (not a host: no laki CLI there), `--plugin-dir
 <data>/claude-plugin` (`claudePlugin`, written by `writeHooks`): a plugin named laki whose `commands/new.md` is
@@ -318,7 +327,7 @@ A project with `host` (`projectAdd` `host:path`, `REMOTE` in `shared/types.ts`: 
 ### Presets
 
 `settings.presets` (default: plain `claude` and `codex`) say how agents start: `agent` (claude, codex,
-command), `args` (appended raw before the prompt), `cmd`, `env`, `off` (Settings' switch: out of the renderer's
+command), `args` (appended raw before the prompt), `cmd`, `env`, `laki` (false: no `LAKI_NOTE`; Settings' *Tell it about Laki*, claude and codex), `off` (Settings' switch: out of the renderer's
 pickers, the new-tab menu, the new-workspace page and its races, scheduled tasks; the daemon still starts it). A tab keeps `preset` = what the agent is
 (hooks, resume, colors) and `profile` = the preset's name, looked up at every start (`presetOf`), so edits
 apply on restart. Env order: process < `settings.env` (global) < project (`.laki.json`, then the app's) <
@@ -452,7 +461,7 @@ tool call (`ensureDaemon`), never before. Tested in `test/cli.test.ts`.
 `laki://` (electron-builder's `protocols`, `setAsDefaultProtocolClient` when packaged): main's `open-url` queues a
 link until the renderer says `deep-link-ready` (preload's `onDeepLink`; a main-frame navigation resets it), then
 sends `deep-link`. `links.ts` `parseLink` (tested in `test/links.test.ts`), App routes it once the view is in: a
-workspace or tab, the new-workspace page filled in (`initial`), Scheduled tasks, the Board, Settings, Help, About. Links select and fill
+workspace or tab, the new-workspace page filled in (`initial`), Scheduled tasks, the Board, Settings, Help, About, Get started (`onboard`: the Help menu's *Get Started Again…*). Links select and fill
 in; they never create or run anything.
 
 ### Preview
@@ -522,7 +531,7 @@ result: App's `widgetApi.say`, a modal through ui.tsx's `choose` (the `ask` dial
 has a `<script>` (`js`) is a page the daemon serves at `GET /widget/<id>?key=<widgetKey>` with a CSP of `sandbox
 allow-scripts; default-src 'none'` (no network, an opaque origin), the theme's variables from its `theme` query,
 `window.laki` and a click bridge that posts `open`, `refresh`, `full` and `run` to the app. The renderer's
-`Widgets.tsx`: `WidgetGrid` (the sidebar's, `laki.widgetsShut` folds it), `WidgetDialog` (the full view), `WidgetBody`
+`Widgets.tsx`: `WidgetGrid` (the sidebar's: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
 (a template widget in a shadow root after `clean`, the sanitizer: no scripts, frames, forms, `on…` attributes or
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (`WidgetPrompt`: `shared/widgetGuide.ts` `widgetPrompt`, the format as a prompt for any AI
@@ -584,14 +593,14 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 `src/renderer/src`:
 
 - **`App.tsx`**: the sidebar, tab bar, toolbar, send bar, palette items and keys.
-  - Keys are handled in a capture-phase `keydown` through the `act` map; xterm never sees ⌘ keys.
+  - Keys are handled in a capture-phase `keydown` through the `act` map; xterm never sees ⌘ keys. ⌘⇧N clicks the tab
+    bar's + (`.newtab-btn`): a menu opened by a key's click (`detail` 0) has its first item picked (`Menu` `first`).
   - Per-viewer UI state is in `localStorage`:
     - `laki.ws`: the selected workspace;
     - `laki.tabs`: the selected tab per workspace;
     - `laki.groups`: each workspace's tabs, each a split tree of sessions;
-    - `laki.side`: the sidebar width; `laki.sideOpen`: whether it's shown; `laki.info`: the info panel;
+    - `laki.side`: the sidebar width; `laki.sideOpen`: whether it's shown; `laki.info`: the workspaces whose info panel is open (⌘I, per workspace);
     - `laki.rail`: the rail layout's kind (`RailKind`: projects, shells, browsers);
-    - `laki.widgetsShut`: the sidebar's widgets folded.
     - `laki.folded`: the projects whose workspaces the sidebar hides (a click on the project's head; `rows.dragged`
       keeps a drag's click from folding it), and the seps whose workspaces up to the next sep it hides (`shownRows`);
     - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel; `laki.infoW`: the info panel's width (both
@@ -623,16 +632,16 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       `onboardDone`: a project, a workspace, Settings' sections through `SettingsPage` `onSection`, Shells or Browsers),
       `seen` (it opened once by itself), `off` (Don't show again: no `OnboardBar` at the sidebar's foot either).
     - `laki.newWs`: the new-workspace page's last choices (`LastNew`: project, preset, cmd, local, model, effort,
-      base, place (that project's), template name, and Settings' default agent then: a new default wins; never the prompt, name, PR or a race); `laki.newAdv`: its More open.
+      base, place (that project's), template name, and Settings' default agent then: a new default wins; never the prompt, name, PR or a race); its More starts closed.
   - The Dock's count (`bridge.badge`, main's `app.dock.setBadge`): tabs waiting, or done unseen, outside muted tabs,
     muted and archived workspaces. The same message carries the menu bar's item (`badge(n, items, tray)`: main's
     `Tray`, `trayIcon` drawn in code as a template image; the count as its title, a menu of those tabs, waiting first
-    with what they ask from `turn` events, `show(tab)` on a click; `settings.menuBar === false` destroys it). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
+    with what they ask from `turn` events, `show(tab)` on a click, then *New Workspace…* (`newWsWin`) and the screenshots; `settings.menuBar === false` destroys it). `TurnTime` (`ui.tsx`'s `Elapsed`, ticking each second) on a tab and a row, with
     `settings.timers`.
   - The theme is applied during render (`applyTheme`), before the terminals' effects read the CSS. Glass also
     goes to main (`bridge.glass`: `setVibrancy`) when it changes.
-  - The status bar shows the workspace's path shortened (`shortPath`), with a copy button for the full one; a Terminals
-    workspace's leaves out `$PORT` and the path (its listening ports as any), a Browsers one has no status bar (unless
+  - The toolbar's ⋯ (`wsActions`) has *Copy path* (the full one, `host:` first; `shortPath`'d as its hint); the status
+    bar has no path. A Terminals workspace's leaves out `$PORT` (its listening ports as any), a Browsers one has no status bar (unless
     the daemon is stale or the connection is down).
   - Resting on a row (`peek`, 550 ms; 120 ms once one shows) shows `peekCard` beside the sidebar instead of a
     tooltip: state and agents, the last answer or the ask, the PR (avatar, state, title, author, checks, review,
@@ -732,14 +741,23 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   longer than `floaterRecentHours`, 4 unset, 0 never: out, a minute's tick ages them); at most `floaterMax`:
   `tab`, name, project, status, its color, what it asked or last said, and `floatMore`'s branch, agents, PR and
   lines for the card), the theme's colors and the options (`style`:
-  `floaterStyle`, `cards`: `floaterCards`, `add`: `floaterNew`, `mic`: `floaterMic`, `voiceTo`: `floaterVoiceTo`) go to
+  `floaterStyle`, `cards`: `floaterCards`, `add`: `floaterNew`, `menu`: `floaterMenu`, `voiceTo`: `floaterVoiceTo`) go to
   main (`bridge.floats`);
   main's `placeFloater` shows the bar while Laki isn't in front (`front`: one of its own windows has the focus, not the
   drop, its card or the voice window: a press on the drop makes Laki the active app, and the drop would hide under the
   pointer), and with + on even with no circles; `type: 'panel'` windows over every Space and
   full-screen app: `#bar` (labels: `text.ts` `initials`, two letters, unique, `pr`/`issue`/numbers skipped; a drop against the screen's left or right edge, `data-side` from main's `floater-side`:
-  `.shape` with its flares, a slow wobble, a round blob while dragged; the circles; `.fl-btns`: + is `floater-act`
-  `new` (`laki://new`), the microphone opens `#voice`; a click on a circle is `floater-open`: `show(tab)`; a drag from
+  `.shape` with its flares, a slow wobble, a round blob while dragged; the circles; `.fl-btns`: the + (×, `.on`, while
+  open) and `ACTS`, the menu bar's: New task, Say it, Screenshot area, Whole screen; `menu` stack: `.fl-acts` over the + in
+  the drop (`floater-size` `up`: main moves `home` so the + stays under the mouse; a hover's name and hint go to the card's
+  window, `floater-tip`, cards on or not), card: `#menu`, a focusable panel beside the drop (`MENU`, its foot by the +'s,
+  `floater-menu-at`; keys 1-4, arrows, ⏎, Esc; closed on blur, the bar told by `floater-menu`: a press on the + while
+  open, or just after a blur closed it (`menuShut`), closes it); its picks are `floater-act` (`new`, `area`: `screenshot`,
+  `screen`: `screenPick`, with more than one screen a menu of `screenItems` at the pointer, as the menu bar's submenu; `mic` from the menu: `floater-voice`, the bar opens `#voice`, the stack's opens it itself); New task is
+  `new` (main's `newWsWin`, also the menu bar's *New Workspace…*: the renderer's `?window=new`, `NewWindow.tsx`, the new-workspace page alone in a `type: 'panel'`
+  window, compact (`.new-window` in styles.css; as tall as the page: `new-fit`, a `ResizeObserver` on the form), pinned over every app and Space, focused without bringing Laki's window forward (`own` leaves it out, so the
+  bubbles stay); one at a time, a voice prompt to it is `new-prompt`; it closes itself (`window.close()`) once `wsNew`
+  answers, or on Esc), Say it opens `#voice`; a click on a circle is `floater-open`: `show(tab)`; a drag from
   anywhere on it past 4px is `floater-drag` start/move/end with the pointer's screen offset, so its cursors (grab,
   pointer) work, which macOS's drag regions take away (macOS shows them only while Laki is the active app: a hovered
   circle grows instead: `.hot`, set by `pointerover`, not `:hover`, which outlives the bar's hiding as a click brings Laki in front); at the end main's `snap` sticks it to the nearer edge of its screen, animated, and
@@ -749,11 +767,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   over the bar and Laki isn't in front: a bar shown again keeps the circle it had under the mouse) and `#voice` (the
   microphone's: a focusable panel, `focus()` makes it key without bringing Laki's window forward; dictation 150 ms
   after the focus; `voiceTo` pick: a "Pick who gets it" row first, nothing sent until one is; new: no list, always a
-  new session; `voice-send`: `rpc('send', { whenIdle })` to a tab of the list, or `laki://new?prompt=`). The card
+  new session; `voice-send`: `rpc('send', { whenIdle })` to a tab of the list, or `newWsWin(prompt)`). The card
   and voice windows are the bar page's `window.open` (main's `setWindowOpenHandler` allows only `#card` and `#voice`
   of the same page, one each; `did-create-window` pins them, `pin`'s `to`: their own page's load is a navigation too,
   which `will-navigate` would block): one renderer process, one row in Settings › Resources.
-  `floater.css`: the circles' styles (`[data-fstyle]`: glow; gradient, the default; arc; bricks, box-shadow pixel bars stepped behind the initials; comet; wave, two turning rounded squares as a tide; still; idle and done dimmer),
+  `floater.css`: the circles' styles (`[data-fstyle]`: glow; gradient, the default; arc; bricks, box-shadow pixel bars stepped behind the initials; comet; wave, two turning rounded squares as a tide; still; idle and done dimmer; `[data-done='on']`: a done one filled green with a slow pulse, `floaterDone` unset or true: App keeps an unseen done one a bubble past `floaterRecent` and its hours),
   also Settings › Appearance's live previews.
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
   terminal's `minimumContrastRatio` keeps their text readable.
@@ -767,11 +785,12 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   tab's `--laki-tab`) and as the tab's border, never under it; not on a phone or the pill looks), glass
   (`html.glass`) and the creative themes' looks (`[data-look=…]`, from a theme's `look`), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
-  `glassTerm` and `glassGlow`; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
-  see-through `--app-bg` (with the glow's radial gradients), `--side` and `--term-bg` (`#rrggbbaa`: xterm reads only
-  that); what floats is nearly opaque, never `backdrop-filter` (over the see-through window Electron repaints it badly:
+  `glassTerm` and `glassGlow`, and `sideClear`; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
+  see-through `--app-bg` (with the glow's radial gradients), `--side` and `--rail-bg` (`glassSide`) and `--term-bg` (`#rrggbbaa`: xterm reads only
+  that); `sideClear` (Settings' *Sidebar see-through*, without glass) only `--side` and `--rail-bg`, with `html.side-clear`
+  (a clear body, `.main` alone on `--app-bg`; glass in the app too: the sidebar's slider is over the desktop, not the Window one's background) and the window's blur (`blurred`; the new-workspace window never: `NewWindow`'s paint); what floats is nearly opaque, never `backdrop-filter` (over the see-through window Electron repaints it badly:
   flicker, stale tooltips, rectangles around menus); the window's own blur is native
-  (`setVibrancy` over IPC). `main.tsx` loads the fonts
+  (`setVibrancy` over IPC, App's `glassed`; macOS's Reduce transparency makes every material solid grey: Settings notes it under Glass, `prefers-reduced-transparency`). `main.tsx` loads the fonts
   before the first render: a terminal measures its cells once.
 - **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB);
   tokens become React text, never HTML.
@@ -795,15 +814,18 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   `MAIL_OK` (what the daemons take: kept in step with their `MAIL`/`mailRe`); prompt templates (`templated`, `fillTemplate`, from `shared/types.ts`: the daemon's `prPrompt` uses it too; `{{prompt}}`, `{{project}}`, `{{base}}`;
   `settings.templates` and a project's `config.templates`, merged by `templatesFor`: the project's first, replacing a
   global one of the same name; filled in by the new-workspace page; `nameOf`: a templated workspace's name from the typed
-  prompt, the daemons' first-4-words rule) and `shortPath` (the status bar's).
+  prompt, the daemons' first-4-words rule) and `shortPath` (the ⋯'s *Copy path* hint).
 - **`PromptInput.tsx`**: a prompt with pasted/dropped images (saved by the daemon) and dictation (the mic's ⌄: where
   macOS picks the microphone and languages, `dictationSettings`); `tools`: the page's pickers at the toolbar's end;
   `withImages` appends their paths. The mic keeps the text box focused and starts dictation 150 ms later: macOS
   learns the web view's text field a moment after focus, and dictation started before that stops at once.
-- **`Info.tsx`**: the workspace info panel (with each public link: `WsInfo.tunnels`, `onCopy`) and the status bar's PR (`PRStatus`, `AutoToggles`, `ciText`);
+- **`Info.tsx`**: the workspace info panel (`.info-facts`: a card of one-line `Row`s, the whole value in `data-tip`, a
+  copy button on hover; the path and storage `shortPath`'d, `$PORT` opens `localhost`, each public link: `WsInfo.tunnels`,
+  `onCopy`) and the status bar's PR (`PRStatus`, `AutoToggles`, `ciText`);
   each app maps its workspace to `WsInfo`. `PRSection` (the info panel's and Review's): title, a muted meta line, one row
   of Merge ▾ (`.split.green` when nothing `blocked` it: conflicts, failing or running checks, changes requested, `ready`
-false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) square at the end, the
+false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) square at the end (neither Merge nor Approve:
+  *Open on GitHub* and ⋯ first in the row), the
   body as `Folded` Markdown (MarkdownView.tsx's: 6 lines, Show more), `Checks` (failing, running, passing, skipped, each
   with `took`, the daemon's seconds, and its URL; a summary line), *Let the agent fix*: `AutoToggles` with `row`, a
   switch per row and *Send now* (`send`) only when there's something to send (failing checks, `threads` open, an
@@ -811,7 +833,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 - **`ui.tsx`**: line icons (`Icon`, `IconButton`), `Switch` (every on/off: the auto toggles, Settings' rows as
   `switch-row`), popup and right-click menus (`useMenu`, color swatches;
   each item has a key: its own `key` or a free initial, `menuKeys`),
-  tooltips (`Tips`: any element with `data-tip`), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
+  tooltips (`Tips`: any element with `data-tip`; a pressed one shows none until the pointer leaves it, a menu it opens stays clear; `IconButton` `tip={false}`: an `aria-label` only), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
   sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
   `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
@@ -821,8 +843,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `Group`s (a titled card, `.set-group`: a new block of settings goes in one, or a new one); `VarChips` under a
   template (`TEMPLATE_VARS`) and a preset's args or command (`ENV_VARS`) put a variable in at the cursor of the field
   just before them (in a `.preset` card, shown only while it has the focus); presets, `EnvField` (KEY=value lines), fonts,
-  `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`) with a live preview
-  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section: a duplicate button, a *Show* filter by target), Appearance (themes, the current one outlined and checked, a name filter that stays in sight;
+  `termLook` (line height, weight, cursor… as xterm options; Term takes it as `look`), `termPad` (*Padding*: `.app[data-pad]`, the `.term`'s inset and the preview's padding; tiny on a phone too, roomy not) with a live preview
+  (`TermPreview`, keyed on `transparent()` like `Term`), Actions (`ActionsField`, also in each project's section: a duplicate button, a *Show* filter by target), Appearance (themes, the current one outlined and checked, a name filter that stays in sight, a ☆ on each (`favThemes`: Favorites, a group first, each one still in All themes too);
   accent color and corners: `accent`, `radius` in `Paint`, set by `applyTheme` over the theme's and its look's (`radius`
   also as `--rs`, which every fixed px radius in look.css and styles.css takes first, `var(--rs, 10px)`: keep new ones so;
   pills (999px, or half their height: `.pr`, `.tag`, the switch's track) and circles (50%) stay),
@@ -832,7 +854,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `settings.sideLook`: the sidebar's lines and rows as CSS values, App's `sideVars` sets `--ws-guide`, `--proj-divider`,
   `--ws-indent`, `--ws-h`, `--ws-font` on `.sidebar`, nearer than the looks' own, set on `[data-look]` at the end of look.css;
   `sideLook.labels === false` hides the bottom buttons' words; interface font, glass: `paint` applies
-  them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's), Remote access (`RemoteSection`, shown when App.tsx
+  them at once, before the save), Prompt templates (`TemplatesField`: `settings.templates`, and each project's; the global sections, it and Actions, open with `Global`'s note, `.set-scope`: everywhere, and where a project's own go), Remote access (`RemoteSection`, shown when App.tsx
   passes `remote`: the email, 1h…72h or Forever, then the QR code and link), and `ScriptsField` (a project's
   setup/teardown/run scripts, Import from a file), Resources (`ResourcesSection`: `resources` every 3 s while open,
   Laki itself and each tab by RSS with its processes, Sleep/Open/Wake, `settings.sleepAfter`; App.tsx passes a
@@ -841,11 +863,12 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   'settings', version: 1, settings }`; an import goes through `paint`, so it's painted and autosaved like typing, after
   `KINDS` refuses a field of the wrong kind: add a new list, object or number setting there). *Find a setting* (`FIND`: section, the title as the page writes it, more
   words; add new settings there) opens a section and lights (`.spot`) the first label, row or heading that starts with
-  the title. Hovering a theme paints it (`applyTheme`), the chosen one again as the mouse leaves `.themes` or the page closes. A
+  the title. Settings' `spot` (App's dialog `{ settings, spot }`: Run ▾'s *Edit the run script…* → Scripts, *Edit actions…* → Actions)
+  opens at that `Group`'s card, lit the same way (a ring, a halo and a tint, 2.6 s). Hovering a theme paints it (`applyTheme`), the chosen one again as the mouse leaves `.themes` or the page closes. A
   setting back at its default is saved as that value: an unset key wouldn't replace the saved one. Projects
   are sections of it (`ProjectSection`: name, scripts, env; saved 400 ms after typing and on leaving).
 - **`SidePanel.tsx`**: the right panel (⌥⌘B): Files (tree from the daemon's file list, search, new
-  file/folder, changed files marked), Changes (the diff by file, each line with its old and new numbers from the
+  file/folder, changed files marked), Changes (the diff by file, Expand all / Collapse all (one button: collapse while any is open), each line with its old and new numbers from the
   hunks; a click opens `CommentBox`: the PR, or the agent; an image, `IMAGE`, is `ImageDiff`: `PanelApi.read` with `base`
   for before, as `<img>`, SVG too, a click for full size), Review (`PRSection` from `Info.tsx` with the open
   threads' count; `ThreadCard`s: file:line, a click previews it there, each comment's author, `ago` of its `at` and its
@@ -861,14 +884,17 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   diff size, the agent's last answer and the files `diff` lists (again as `stat` moves); *Keep this one* archives
   the others (`wsArchive`, after a confirm) with *Undo* (`wsRestore`). App.tsx passes a `CompareApi`.
 - **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar foot's columns icon, ⌘K, `laki://board`): the
-  workspaces in columns by `columnOf` (`rollup` from `Glyph.tsx`, then the PR's state), cards that open one, and To
+  workspaces (not Terminals' or Browsers') in columns by `columnOf` (`rollup` from `Glyph.tsx`, then the PR's state), cards that open one (a right
+  click or `.board-more`: `BoardApi.menu`, App's open, archive, delete; Merged's ⋯: `archiveAll`, one by one), and To
   do (`view.todos`): ▷ or an HTML5 drag onto a column runs `wsNew` with the default agent, then `todoRm`.
 - **`Schedules.tsx`**: the Scheduled tasks page (ui.tsx's `Page`; the sidebar foot's clock, ⌘K, a project's ⋯ menu:
-  App's `schedulesOf`, the dialog `{ schedules: <project> }`): a project filter (`only`, starting at `project`, a chip's menu), the form (the
+  App's `schedulesOf`, the dialog `{ schedules: <project> }`): `.sched-hero` (icon, what it is, filter, New task),
+  `.sched-stats` (tasks, on, the next run `soon`, runs ok), a project filter (`only`, starting at `project`, a chip's menu), the form (the
   new-workspace page's `.nw-composer` with the agent's `.nw-pick`, a When field (`.sched-when`; `EXAMPLES` until
   `parseWhen` reads it, then its reading and the next runs), and `.nw-chip`s: project (*Another folder…*: `pick`, the
   folder picker, or a typed path in a browser, then `projectAdd`), where (`WHERE`, or a workspace) and name; the dated
-  names), the tasks (`.sched-list`, a row each: switch, a click edits, ▷ runs now, delete), the runs' log (`RUNS`, then
+  names), the tasks (`.sched-list`, a row each: its where's icon, name, the rule and a `.sched-next` pill, tags for project,
+  agent and where; ▷ and delete on hover; its switch last), the runs' log (`RUNS`, a round mark, `ago`, then
   *Show all*; a click goes to the run's workspace). App.tsx passes a `SchedulesApi`; the clock has a dot (`.ib.dot`) when a run failed after
   `laki.runsSeen` (localStorage: the newest run the page showed).
 - **`Usage.tsx`**: the status bar's first item, the plan-limits ring (in the theme's `--accent`, then `--waiting` and `--error`; `UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
@@ -887,7 +913,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 - **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings): the prompt's card
   (`PromptInput` `tools`: template, agent (`OTHER_AGENTS` after the presets), model and effort as `.nw-pick` menus),
   then a row of `.nw-chip`s: project and `place` in one menu (each sep indented under its project: `MenuItem`
-  `indent`), base with *worktree* (unticked: `local`), name, and *More* (a typed model, race);
+  `indent`), base with *worktree* (unticked: `local`), name, and *More* (a race, and a typed model only after the model menu's *Another model…* or while one it doesn't list is set: one picker, not two);
   the last choices, `laki.newWs`; `images`: the menu bar's screenshots; while it's made, `.busy` fades the cards and
   `.nw-making` says what's happening and the seconds so far), the palette,
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About
@@ -908,8 +934,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 
 | file | what |
 |---|---|
-| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m`, then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), the floating bubbles (`floats` IPC: `placeFloater`, floater.html's bar and the card and voice windows it opens; `floater-act`, `voice-send`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
-| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the voice prompt), capture, browse |
+| `src/main/index.ts` | Electron main: single instance, starts the daemon, window (maximized, hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m` (the bubbles hidden meanwhile: `shooting`), then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), the floating bubbles (`floats` IPC: `placeFloater`, floater.html's bar and the card, menu and voice windows it opens; `floater-act`, `voice-send`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
+| `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the + menu, the voice prompt), onNewPrompt and fitNew (the new-workspace window's), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
@@ -917,6 +943,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/shared/widget.ts` | widgets' template language, views, base CSS, a JS widget's page |
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |
+| `src/renderer/src/NewWindow.tsx` | the new-workspace window (`?window=new`, main.tsx renders it instead of App): the page alone, its own socket, the theme without glass |
 | `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
 | `src/renderer/src/dock.ts` | Settings › Appearance › Dock icon: the mark and `icons/*.svg`, drawn to a PNG for main's `dock-icon` IPC (`app.dock.setIcon`; kept as userData's `dock-icon.png`, set as the next start begins) |
 | `widgets/` | the widgets that come with Laki (packaged with the app) |

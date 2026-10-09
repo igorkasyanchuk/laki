@@ -148,6 +148,17 @@ async function main() {
       const r = await rpc(m, { id: rest[0] }, 120000)
       return out(r ?? { ok: true }, r?.id ? `${r.id}  ${r.path}` : 'ok')
     }
+    case 'rename':
+    case 'pr': {
+      // laki rename <ws|.> <name> | laki pr <ws|.> <url|number>: `.` is the tab's own workspace ($LAKI_WORKSPACE)
+      const [ref, ...words] = rest
+      const ws = ref === '.' ? process.env.LAKI_WORKSPACE : ref
+      if (ref === '.' && !ws) throw new Error(`laki ${cmd} .: only in a Laki tab ($LAKI_WORKSPACE): name the workspace`)
+      if (!ws || !words.length) throw new Error(cmd === 'rename' ? 'usage: laki rename <ws|.> <name>' : 'usage: laki pr <ws|.> <url|number>')
+      if (cmd === 'rename') await rpc('wsSet', { id: ws, name: words.join(' ') })
+      else await rpc('prAttach', { ws, pr: words[0] }, 60000)
+      return out({ ok: true }, cmd === 'rename' ? `renamed ${ws}` : `attached ${words[0]} to ${ws}`)
+    }
     case 'tab': {
       const t = await rpc('tabNew', { ws: rest[0], preset: flags.preset, cmd: flags.cmd })
       return out(t, `${t.name} (${t.id})`)

@@ -67,7 +67,7 @@ function fakeDom(root: Record<string, string>) {
 }
 
 test('themes: applyTheme paints a theme, glass at its sliders, then the default again; termTheme reads it back', async () => {
-  const { THEMES, applyTheme, preview, paintOf, paintKey, termTheme, transparent, UI_FALLBACK } = await import('../src/renderer/src/themes.ts')
+  const { THEMES, applyTheme, blurred, preview, paintOf, paintKey, termTheme, transparent, UI_FALLBACK } = await import('../src/renderer/src/themes.ts')
   const { props, style, html, classes } = fakeDom({ '--bg': '#0e1014', '--side': '#12151b', '--fg': '#d5d9e3' })
   const kraft = THEMES.find(t => t.id === 'kraft')!
 
@@ -76,6 +76,7 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.equal(transparent(), false)
   const term = termTheme()
   assert.deepEqual([term.background, term.red, term.brightWhite, term.cursor], ['#dcc39a', kraft.ansi![1], kraft.ansi![15], kraft.c!.accent])
+  assert.equal(props.get('--rail-bg'), `color-mix(in srgb, color-mix(in srgb, ${kraft.c!.side} 94%, #000) 100%, transparent)`) // a light theme's rail: a shade darker, not grey
 
   // glass: the window at 100 - 50%, the sidebar at 100 - 60% (its default), solid terminals; no glow
   applyTheme({ theme: 'circuit', glass: true, glassWindow: 50, glassTerm: 0, glassGlow: false, uiFont: 'Futura' })
@@ -89,6 +90,9 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.match(props.get('--app-bg')!, /^radial-gradient.*linear-gradient\(#0e10148c 0 0\)$/)
   assert.deepEqual([props.get('--term-bg'), props.get('--ui-font'), props.get('--bg'), html.dataset.look], ['#0e101400', UI_FALLBACK, undefined, ''])
   assert.equal(transparent(), true)
+  // part see-through terminals: .term-wrap paints it once, xterm its color at alpha 0 (inverse text: made opaque)
+  applyTheme({ glass: true, glassTerm: 35 })
+  assert.deepEqual([props.get('--term-bg'), termTheme().background], ['#0e1014a6', '#0e101400'])
 
   // a gradient theme: see-through terminals without glass; an unknown id is the default, every variable gone
   applyTheme('aurora')
@@ -105,12 +109,29 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   applyTheme('nope')
   assert.deepEqual([[...props.keys()], style.colorScheme, classes.has('glass'), transparent()], [[], '', false, false])
 
+  // Sidebar see-through without glass: only in the app (window.laki: a browser has no blur behind the page), the
+  // sidebar and the rail at 100 - 60%, the rest solid; glass has its own sidebar slider
+  applyTheme({ sideClear: 60 })
+  assert.deepEqual([classes.has('side-clear'), props.get('--side')], [false, undefined])
+  const g = globalThis as { laki?: unknown }
+  g.laki = {}
+  try {
+    applyTheme({ sideClear: 60 })
+    assert.deepEqual([classes.has('side-clear'), props.get('--side'), transparent()], [true, '#12151b66', false])
+    assert.match(props.get('--rail-bg')!, /^color-mix\(in srgb, color-mix\(in srgb, #12151b 82%, #000\) 40%, transparent\)$/)
+    applyTheme({ glass: true, sideClear: 60, glassSide: 100 })
+    assert.deepEqual([classes.has('side-clear'), props.get('--side')], [true, '#12151b00']) // glass in the app: the sidebar over the blur, by glass's own slider
+  } finally {
+    delete g.laki
+  }
+  assert.deepEqual([blurred({ sideClear: 5 }), blurred({ glass: true }), blurred({ sideClear: 0 })], [true, true, false]) // the window's blur
+
   // Settings' cards and what the terminals watch
   assert.deepEqual(preview(kraft), [kraft.c!.bg, kraft.c!.panel, kraft.c!.fg, kraft.c!.accent, ...kraft.ansi!.slice(1, 6)])
   assert.match(preview(THEMES.find(t => t.id === 'aurora')!)[0], /^linear-gradient\(135deg/)
   assert.equal(preview(THEMES[0])[0], '#0e1014')
-  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined })
-  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null]')
+  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined })
+  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null]')
 })
 
 test("the sidebar's video: YouTube links as embeds, anything else refused", () => {

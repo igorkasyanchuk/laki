@@ -296,3 +296,66 @@ test('/laki:new: claude tabs get Laki’s plugin (its new command); laki new . i
   assert.deepEqual([w?.project, w?.kind], [p.id, 'worktree'])
   assert.equal(v.tabs.find((x: { workspace: string }) => x.workspace === w.id)?.preset, 'codex')
 })
+
+test('agents are told about Laki (a preset can say no); a storage folder per workspace, gone with it; laki rename and pr', async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'quiet', agent: 'claude', laki: false }, { name: 'codex', agent: 'codex' }] })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'work' })
+  const started = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find((l: any) => l.bin === 'claude'), 'claude started')
+  const note = started.args[started.args.indexOf('--append-system-prompt') + 1]
+  assert.match(note, /`laki rename \. "<a few words>"`/)
+  assert.match(note, /LAKI_STORAGE_FOLDER/)
+  const allow: string[] = JSON.parse(readFileSync(started.args[started.args.indexOf('--settings') + 1], 'utf8')).permissions.allow
+  assert.ok(['rename', 'pr'].every(c => allow.some(a => a.endsWith(` ${c} .:*)`))), allow.join(', ')) // its own workspace, without asking
+  const dir = started.storage
+  assert.ok(dir.startsWith(join(rig.data, 'storage', '')) && dir.endsWith(ws.id) && existsSync(dir), dir)
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).storage, dir)
+  // the same folder for every tab; none of the note for a preset that says no
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'quiet' })
+  const quiet = await until(() => rig.fakeLog().filter((l: any) => l.bin === 'claude')[1], 'the quiet one started')
+  assert.ok(!quiet.args.includes('--append-system-prompt'), quiet.args.join(' '))
+  assert.equal(quiet.storage, dir)
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
+  const codex = await until(() => rig.fakeLog().find((l: any) => l.bin === 'codex'), 'codex started')
+  assert.ok(codex.args.includes(`developer_instructions=${JSON.stringify(note)}`), 'codex is told the same')
+  // codex's own developer_instructions: -c would replace them, so no note
+  mkdirSync(join(rig.env.HOME, '.codex'), { recursive: true })
+  writeFileSync(join(rig.env.HOME, '.codex', 'config.toml'), 'model = "x"\ndeveloper_instructions = "mine"\n')
+  await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
+  const own = await until(() => rig.fakeLog().filter((l: any) => l.bin === 'codex')[1], 'the second codex started')
+  assert.ok(!own.args.some((a: string) => a.startsWith('developer_instructions=')), own.args.join(' '))
+  // laki rename . / laki pr . in a tab
+  rig.env.LAKI_WORKSPACE = ws.id
+  t.after(() => delete rig.env.LAKI_WORKSPACE)
+  assert.equal((await rig.cli('rename', '.', 'fix', 'the', 'cart')).out, `renamed ${ws.id}\n`)
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).name, 'fix the cart')
+  mkdirSync(rig.env.FAKE_GH, { recursive: true })
+  writeFileSync(join(rig.env.FAKE_GH, 'prhead.json'), JSON.stringify({ number: 42, title: 'x', url: 'https://github.com/o/r/pull/42', headRefName: 'feat', baseRefName: 'main' }))
+  const r = await rig.cli('pr', '.', '42')
+  assert.equal(r.out, `attached 42 to ${ws.id}\n`, r.err)
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).prUrl, 'https://github.com/o/r/pull/42')
+  assert.match((await rig.cli('rename', '.')).err, /usage: laki rename/)
+  delete rig.env.LAKI_WORKSPACE
+  assert.match((await rig.cli('pr', '.', '42')).err, /only in a Laki tab/)
+  rig.env.LAKI_WORKSPACE = ws.id
+  // deleted: its folder too; kept with keepStorage
+  writeFileSync(join(dir, 'shot.png'), 'x')
+  await rig.rpc('wsRm', { id: ws.id })
+  await until(() => !existsSync(dir), 'gone with the workspace')
+  // a folder that's there already is never a workspace's: another name, so a delete can't take it
+  const mine = join(rig.data, 'storage', 'taken')
+  mkdirSync(mine, { recursive: true })
+  const ws2 = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'more', name: 'taken' })
+  const dir2 = await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws2.id).storage, 'its storage')
+  assert.match(dir2, /\/taken-[0-9a-f]{6}$/)
+  await rig.rpc('wsRm', { id: ws2.id })
+  await until(() => !existsSync(dir2), 'its own gone')
+  assert.ok(existsSync(mine), 'the folder that was there stays')
+  await rig.rpc('settingsSet', { keepStorage: true })
+  const ws3 = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'more' })
+  const dir3 = await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws3.id).storage, 'its storage')
+  await rig.rpc('wsRm', { id: ws3.id })
+  await new Promise(r => setTimeout(r, 200))
+  assert.ok(existsSync(dir3), 'kept')
+})

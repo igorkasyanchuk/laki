@@ -921,11 +921,13 @@ export const preview = (t: Theme) => {
 
 // what paints the window (Settings → Appearance): the theme, the interface's font ('system': the Mac's), glass
 // and how see-through it makes the window, the sidebar and the terminals (%), and its color glow
-export type Paint = { theme?: string; uiFont?: string; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean }
-const PAINT = ['theme', 'uiFont', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow'] as const
+export type Paint = { theme?: string; uiFont?: string; accent?: string; radius?: string; glass?: boolean; glassWindow?: number; glassSide?: number; glassTerm?: number; glassGlow?: boolean; sideClear?: number }
+const PAINT = ['theme', 'uiFont', 'accent', 'radius', 'glass', 'glassWindow', 'glassSide', 'glassTerm', 'glassGlow', 'sideClear'] as const
 export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
+// the window's own blur (main's vibrancy): glass, or a see-through sidebar without it
+export const blurred = (o: Paint) => !!o.glass || (o.sideClear ?? 0) > 0
 // a color at pct% strength (of its own alpha, if it has one): #rrggbbaa from a hex (xterm reads only that), else color-mix
 function alpha(c: string, pct: number) {
   const m = /^(#[\da-f]{6})([\da-f]{2})?$/i.exec(c)
@@ -956,7 +958,15 @@ export function applyTheme(p: string | Paint = '') {
   for (const k of Array.from(st)) if (k.startsWith('--')) st.removeProperty(k)
   st.colorScheme = ''
   root.dataset.look = t.look ?? ''
+  // the rail: the sidebar's color a shade darker (a light theme's less: 18% black is a muddy grey there), at pct
+  const rail = (side: string, pct = 100) => `color-mix(in srgb, color-mix(in srgb, ${side} ${t.light ? 94 : 82}%, #000) ${pct}%, transparent)`
   root.classList.toggle('glass', !!o.glass)
+  // Settings' Sidebar see-through, without glass; only in the app (window.laki): a browser has no blur behind the page
+  const app = !!(globalThis as { laki?: unknown }).laki
+  const clear = o.glass || !app ? 0 : Math.min(100, Math.max(0, o.sideClear ?? 0))
+  // the sidebar and the rail straight over the window's blur, the window's own background under the main area only
+  // (styles.css): glass too, or its Sidebar slider would show the Window one's background through it
+  root.classList.toggle('side-clear', clear > 0 || (!!o.glass && app))
   seeThrough = o.glass ? (o.glassTerm ?? GLASS.glassTerm) > 0 : !!t.grad
   const font = o.uiFont?.trim()
   if (font) st.setProperty('--ui-font', font === 'system' ? UI_FALLBACK : `${JSON.stringify(font)}, ${UI_FALLBACK}`)
@@ -975,14 +985,21 @@ export function applyTheme(p: string | Paint = '') {
     st.setProperty('--app-bg', o.glassGlow === false ? base : `${glow('0% 0%', '--accent')}, ${glow('100% 100%', '--tc-purple')}, ${base}`)
     st.setProperty('--term-bg', alpha(v('bg', '--bg'), solid('glassTerm')))
     st.setProperty('--side', alpha(v('side', '--side'), solid('glassSide')))
+    st.setProperty('--rail-bg', rail(v('side', '--side'), solid('glassSide'))) // the rail as see-through as the sidebar
     // the selected tab as the terminal, joined to it; a see-through terminal: a lift instead, the bar's tint is under it
     // ponytail: the bar's tint stays under the tab, so it matches the terminal only when that's mostly solid
     st.setProperty('--tab-sel', solid('glassTerm') >= 50 ? alpha(v('bg', '--bg'), solid('glassTerm')) : alpha(v('fg', '--fg'), 10))
   }
+  if (clear) {
+    // the sidebar and the rail over the window's blur, the rest solid (styles.css' html.side-clear)
+    const side = t.c?.side ?? rootVar('--side')
+    st.setProperty('--side', alpha(side, 100 - clear))
+    st.setProperty('--rail-bg', rail(side, 100 - clear))
+  }
   if (!t.c || !t.ansi) return
   const { c, ansi: a } = t
   const vars: Record<string, string> = {
-    '--bg': c.bg, '--app-bg': t.grad ? gradient(t.grad) : c.bg, '--term-bg': t.grad ? '#00000000' : c.bg, '--tab-sel': t.grad ? c.fg + '1f' : c.bg, '--side': c.side, '--panel': c.panel, '--hover': c.raised,
+    '--bg': c.bg, '--app-bg': t.grad ? gradient(t.grad) : c.bg, '--term-bg': t.grad ? '#00000000' : c.bg, '--tab-sel': t.grad ? c.fg + '1f' : c.bg, '--side': c.side, '--rail-bg': rail(c.side), '--panel': c.panel, '--hover': c.raised,
     '--line': c.line, '--fg': c.fg, '--muted': c.muted, '--accent': c.accent, '--accent-fg': c.accentFg, '--sel': c.sel,
     '--running': c.running, '--waiting': c.waiting, '--done': c.done, '--error': c.error, '--add': a[2], '--del': a[1], '--add-bg': a[2] + '1f', '--del-bg': a[1] + '1f', '--hunk': a[5],
     '--tc-red': a[1], '--tc-orange': c.orange, '--tc-yellow': a[3], '--tc-green': a[2], '--tc-teal': a[6], '--tc-blue': a[4], '--tc-purple': c.purple, '--tc-pink': c.pink,
@@ -996,8 +1013,11 @@ const ANSI = ['black', 'red', 'green', 'yellow', 'blue', 'magenta', 'cyan', 'whi
 
 // xterm's theme from the current CSS variables
 export function termTheme() {
+  const bg = css('--term-bg')
   const t: Record<string, string> = {
-    background: css('--term-bg'),
+    // see-through: .term-wrap paints it, padding and all; xterm's own would lay it twice over its cells. Its color at
+    // alpha 0, not none: xterm draws inverse text in the background made opaque
+    background: seeThrough && /^#[\da-f]{6}/i.test(bg) ? bg.slice(0, 7) + '00' : bg,
     foreground: css('--fg'),
     cursor: css('--accent'),
     cursorAccent: css('--term-bg'),

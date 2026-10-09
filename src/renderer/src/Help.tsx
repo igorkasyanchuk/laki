@@ -18,6 +18,7 @@ const KEYS: [string, string][] = [
   ['⌘O', 'open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it'],
   ['⌘N', 'new workspace'],
   ['⌘T / ⌘W', 'new shell tab / close the tab (or the file preview); in a browser: a new page / close it'],
+  ['⌘⇧N', "the tab bar's + menu: shell, an agent or a command (↑↓ ⏎, or its letter)"],
   ['⌘1…⌘9', 'go to a tab'],
   ['⌘↑ / ⌘↓', 'previous / next workspace'],
   ['⌘J', 'the next tab that needs you, in any workspace'],
@@ -193,7 +194,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
         { id: 'look', k: 'Look', v: "Settings › Appearance: themes (yours is checked; ✦ ones also change shapes and borders), glass (a see-through window: how much, and a glow), the interface font, how project names look and the sidebar's lines, rows and button labels. Settings › General exports every setting to a file, to import on another Mac. Accent and corners go over the theme's (every corner it draws); Settings & Help size: ⌘+ / ⌘− while either is open." },
         { id: 'resources', k: 'Resources', v: "Settings › Resources: memory and CPU, Laki's own and each tab's. Sleep an idle agent (it wakes as you look at it; Settings can sleep them after a while); Stop the video, a widget, the preview, an agent browser or the floating bubbles until they're opened again." },
         { id: 'worktrees', k: 'Worktrees', v: "Settings › General › Worktrees: where new worktrees go, a folder per project (~ is home); a project's settings can pick its own. Ones made already stay where they are." },
-        { id: 'files', k: 'Files', v: "The side panel's preview colors code up to 50 KB and shows Markdown rendered or raw; right-click a file to open it in a browser or another app. The status bar's path has a copy button." },
+        { id: 'files', k: 'Files', v: "The side panel's preview colors code up to 50 KB and shows Markdown rendered or raw; right-click a file to open it in a browser or another app. The toolbar's ⋯ › Copy path copies the workspace's path." },
         { id: 'changes', k: 'Changes', v: "Click a line of a diff to comment on it: on the PR (GitHub), or to the agent. With a PR, PR #n shows all of it (gh pr diff); GitHub's mark opens its Files changed." },
         { id: 'preview', k: 'Preview', v: "The toolbar's globe opens the side panel's Preview at localhost:$PORT (type /path, :5173 or any address); the devices button lays the page out at a phone's, a tablet's or a screen's size, or yours; the camera sends a screenshot to the agent; the crosshair puts a clicked element's selector, HTML, CSS and a screenshot of it in its prompt." },
         {
@@ -201,7 +202,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
           k: 'Links',
           v: (
             <>
-              <code>laki://ws/&lt;id&gt;</code> opens a workspace (a tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one, <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://board</code>, <code>laki://help</code>, <code>laki://about</code> open pages.
+              <code>laki://ws/&lt;id&gt;</code> opens a workspace (a tab's menu: Copy link); <code>laki://new?project=…&amp;prompt=…</code> fills in a new one, <code>laki://settings/&lt;section&gt;</code>, <code>laki://schedules</code>, <code>laki://board</code>, <code>laki://help</code>, <code>laki://about</code>, <code>laki://onboard</code> open pages.
             </>
           ),
         },

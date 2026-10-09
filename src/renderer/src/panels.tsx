@@ -372,7 +372,6 @@ const LAST_NEW = 'laki.newWs'
 // made or cleared
 const DRAFT = 'laki.newDraft'
 type Draft = { p: NewWsParams; images: Img[]; rivals: string[]; tpl: string; prev?: string } // prev: an earlier prompt a link's replaced
-const ADV_OPEN = 'laki.newAdv' // More open (the key from when it was Advanced)
 // the agent menu's choices after the presets: what each says, its icon
 const OTHER_AGENTS: [string, string, IconName][] = [['shell', 'Shell', 'terminal'], ['custom', 'Custom command…', 'code'], ['none', 'No agent', 'minus']]
 
@@ -409,6 +408,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   const [current, setCurrent] = useState('') // the repo's own branch: a local workspace's
   const [menu, openMenu] = useMenu()
   const modelBox = useRef<HTMLInputElement>(null) // More's model: Another model… goes there
+  const [ownModel, setOwnModel] = useState(false) // Another model… picked: More shows a box to type one in
   const [busy, setBusy] = useState(false)
   const [images, setImages] = useState<Img[]>(() => [...(draft?.images ?? []), ...(shots ?? [])])
   const had = useRef(new Set((shots ?? []).map(s => s.path))) // screenshots given so far: one taken out stays out
@@ -425,7 +425,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     const t = pr?.seps?.find(s => s.id === initial?.place)?.template
     return (t && templatesFor(view.settings.templates, pr?.config?.templates).some(x => x.name === t) ? t : draft ? draft.tpl : last.tpl) || ''
   })
-  const [adv, setAdv] = useState(() => load(ADV_OPEN, false))
+  const [adv, setAdv] = useState(false) // More: shut as it opens, a race and a typed model in it
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))
   const proj = view.projects.find(x => x.id === p.project)
   const templates = templatesFor(view.settings.templates, proj?.config?.templates)
@@ -522,6 +522,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   const models = (ag && MODELS[ag]) ?? []
   const efforts = ag && EFFORTS[ag]
   const typed = p.model?.trim()
+  const modelRow = canModel && (ownModel || (!!typed && !models.includes(typed))) // the menu has the rest: one picker, not two
   const modelMenu = (e: MouseEvent) =>
     openMenu(
       e,
@@ -529,7 +530,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
         { head: 'Model' },
         { label: "The agent's default", hint: !typed ? ON : undefined, run: () => set({ model: undefined }) },
         ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => ({ label: m, hint: typed === m ? ON : undefined, run: () => set({ model: m }) }) as MenuItem),
-        { label: 'Another model…', icon: 'pencil', run: () => (setAdv(true), keep(ADV_OPEN, true), setTimeout(() => modelBox.current?.focus())) },
+        { label: 'Another model…', icon: 'pencil', run: () => (setOwnModel(true), setAdv(true), setTimeout(() => modelBox.current?.focus())) },
         ...(efforts
           ? [null, { head: 'Effort' }, { label: "The agent's default", hint: !p.effort ? ON : undefined, run: () => set({ effort: '' }) } as MenuItem, ...efforts.map(x => ({ label: x, hint: p.effort === x ? ON : undefined, run: () => set({ effort: x }) }) as MenuItem)]
           : []),
@@ -570,7 +571,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     </>
   )
   const more = [typed && !models.includes(typed) && typed, fan && `race of ${fan.length}`].filter(Boolean).join(' · ')
-  const toggle = () => setAdv(o => (keep(ADV_OPEN, !o), !o))
+  const toggle = () => setAdv(o => !o)
   return (
     <Page title="New workspace" onClose={onClose}>
       {/* Enter in a field never makes it (a branch picked, a name typed): ⌘⏎ or Create does */}
@@ -646,16 +647,16 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
               <input className="nw-chip-input" value={p.name ?? ''} placeholder={prompting && p.prompt?.trim() ? 'name: from the prompt' : 'name'} aria-label="Name" spellCheck={false} onChange={e => set({ name: e.target.value })} />
             </label>
           )}
-          {(canModel || canRace) && (
+          {(modelRow || canRace) && (
             <button type="button" className={`nw-chip ${adv ? 'on' : ''}`} aria-expanded={adv} data-tip="Another model by name; a race" onClick={toggle}>
               <span className="nw-chip-text">More{more && <span className="muted"> · {more}</span>}</span>
               <Icon name={adv ? 'chevronUp' : 'chevron'} size={11} />
             </button>
           )}
         </div>
-        {adv && (canModel || canRace) && (
+        {adv && (modelRow || canRace) && (
           <div className="nw-card nw-more">
-            {canModel && (
+            {modelRow && (
               <label className="nw-line">
                 <span>Model</span>
                 <input ref={modelBox} list="models" value={p.model ?? ''} spellCheck={false} placeholder={starts === 'opencode' ? 'provider/model' : "the agent's default"} onChange={e => set({ model: e.target.value })} />

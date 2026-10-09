@@ -35,6 +35,14 @@ const Group = ({ title, hint, children }: { title: string; hint?: ReactNode; chi
   </section>
 )
 
+// the global lists' note (Prompt templates, Actions): everywhere, and where a project's own go
+const Global = ({ children }: { children: ReactNode }) => (
+  <div className="set-scope">
+    <span className="tag set-scope-tag">Global</span>
+    <span>{children}</span>
+  </div>
+)
+
 export type { Preset }
 
 // the sidebar's project names (ProjectLook): each option over the theme's; App.tsx puts them on the sidebar as data-ph-*
@@ -84,6 +92,7 @@ const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px',
 const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
 
 export type AppSettings = Paint & {
+  favThemes?: string[] // Appearance's starred themes: a group of their own, first
   editor?: string // an app id from the daemon's list, or 'custom' (editorCmd)
   editorCmd?: string
   agent?: string // the preset new workspaces start
@@ -98,6 +107,7 @@ export type AppSettings = Paint & {
   minContrast?: number // 1: the theme's colors as they are
   cursorStyle?: 'block' | 'bar' | 'underline'
   cursorBlink?: boolean
+  termPad?: 'tiny' | 'normal' | 'roomy' // the space around a terminal's text (unset: normal)
   scrollSpeed?: number // lines per wheel step, xterm's scrollSensitivity (unset: SCROLL)
   templates?: Template[] // prompt templates: {{prompt}}, {{project}}, {{base}}
   actions?: RunAction[] // Run ▾'s actions, with each project's
@@ -111,6 +121,8 @@ export type AppSettings = Paint & {
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
   pageZoom?: number // Settings and Help's size, one of PAGE_ZOOMS (unset: 1)
   worktrees?: string // where new worktrees go, a folder per project inside (unset: <data>/worktrees)
+  storageDir?: string // workspaces' storage folders, one per workspace inside (unset: <data>/storage)
+  keepStorage?: boolean // a deleted workspace's storage folder stays
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   projectLook?: ProjectLook // the sidebar's project names
   sideLook?: SideLook // the sidebar's lines, rows and button labels
@@ -135,8 +147,9 @@ export type AppSettings = Paint & {
   floaterVoiceTo?: 'pick' | 'new' // the voice prompt: an agent picked each time, or always a new session (unset: pick)
   floaterMax?: number // the bubbles at most (unset: 12)
   floaterCards?: boolean // a bubble's card on hover (unset: on)
-  floaterNew?: boolean // the bubbles' + Session button (unset: on)
-  floaterMic?: boolean // the bubbles' voice prompt button (unset: on)
+  floaterDone?: boolean // a finished agent you haven't seen: a green, pulsing bubble until a click or a look (unset: on)
+  floaterNew?: boolean // the bubbles' + (unset: on)
+  floaterMenu?: 'stack' | 'card' // its actions: stacked in the drop, or a menu beside it (unset: stack)
   dockIcon?: string // the Dock's icon while Laki runs (dock.ts DOCK_ICONS; unset: the app's own)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
@@ -467,6 +480,7 @@ const ENV_VARS: [string, string][] = [
   ['$LAKI_WORKSPACE', "the workspace's id"],
   ['$LAKI_TAB', "the tab's id"],
   ['$LAKI_PROJECT_PATH', 'the repo itself, not the worktree'],
+  ['$LAKI_STORAGE_FOLDER', "the workspace's storage folder: files kept for you"],
 ]
 
 // a click puts the variable in the field just before the chips, at its cursor
@@ -634,10 +648,10 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
         <input value={c.expose ?? ''} aria-label="Expose to the world" placeholder={file.expose ? `${file.expose} (.laki.json)` : 'anyone with the link'} onChange={e => setC(y => ({ ...y, expose: e.target.value }))} />
         {badMails.length > 0 && <span className="field-err">Not an address or *@domain: {badMails.join(', ')}</span>}
       </Group>
-      <Group title="Actions" hint="In Run ▾ after the global ones (Settings › Actions); one with a global one's name replaces it here">
+      <Group title="Actions" hint="This project's only: in Run ▾ after the global ones (Settings › Actions); one with a global one's name replaces it here">
         <ActionsField value={c.actions} onChange={actions => setC(y => ({ ...y, actions }))} />
       </Group>
-      <Group title="Prompt templates" hint="A new workspace here lists them first, then the global ones (Settings › Prompt templates); one with a global one's name replaces it">
+      <Group title="Prompt templates" hint="This project's only: a new workspace here lists them first, then the global ones (Settings › Prompt templates); one with a global one's name replaces it">
         <TemplatesField value={c.templates} onChange={templates => setC(y => ({ ...y, templates }))} />
       </Group>
     </>
@@ -676,8 +690,13 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Sidebar', 'status guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
   ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
+  ['appearance', 'Sidebar see-through', 'transparent translucent sidebar rail blur vibrancy desktop'],
   ['appearance', 'Glow', 'glass colors'],
   ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
+  ['appearance', 'Favorites', 'theme star starred favorite'],
+  ['general', 'Storage', 'storage folder files artifacts LAKI_STORAGE_FOLDER keep deleted'],
+  ['appearance', 'Finished ones stand out', 'floating bubbles done finished green pulse attention'],
+  ['presets', 'Tell it about Laki', 'note system prompt skill rename pr storage'],
   ['terminal', 'Font', 'monospace family'],
   ['terminal', 'Font size', 'zoom bigger smaller'],
   ['terminal', 'Line height', ''],
@@ -685,6 +704,7 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'Font weight', 'bold light'],
   ['terminal', 'Minimum contrast', 'readable'],
   ['terminal', 'Cursor style', 'block bar underline'],
+  ['terminal', 'Padding', 'tiny minimal roomy space around margin inner edge'],
   ['terminal', 'Scroll speed', 'wheel trackpad faster slow scrolling'],
   ['terminal', 'Blinking cursor', 'blink'],
   ['terminal', 'Copy selected text', 'clipboard selection'],
@@ -712,7 +732,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
-  ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus microphone voice dictation record'],
+  ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
@@ -1362,6 +1382,7 @@ export function SettingsPage(p: {
   renameProjects?: boolean
   section?: string // where it opens: a section's id, or project:<id>
   script?: keyof Scripts // a project's script tab to show
+  spot?: string // a group's title to open at, lit (Run ▾'s Edit the run script…, Edit actions…)
   skill?: SkillApi
   remote?: RemoteApi
   widgets?: WidgetsApi
@@ -1384,7 +1405,9 @@ export function SettingsPage(p: {
   const [findQ, setFindQ] = useState('') // Find a setting
   const findRef = useRef(findQ)
   findRef.current = findQ
-  const [spot, setSpot] = useState<{ title: string; n: number }>() // the setting a result goes to
+  const [spot, setSpot] = useState<{ title: string; n: number; group?: boolean }>() // the setting a result goes to; group: a whole card
+  useEffect(() => void (p.spot && setSpot({ title: p.spot, n: Date.now(), group: true })), [p.spot])
+  const favs = (s.favThemes ?? []).filter(id => THEMES.some(t => t.id === id)) // starred: their own group, first
   const shownThemes = [...THEMES].reverse().filter(t => t.name.toLowerCase().includes(themeQ.trim().toLowerCase())) // the newest first
   // a section picked opens at its top, the one already open too (a Find result scrolls to its setting instead)
   const openSec = (id: string) => (setSec(id), document.querySelector('.settings-main')?.scrollTo(0, 0))
@@ -1397,10 +1420,12 @@ export function SettingsPage(p: {
   useEffect(() => {
     if (!spot) return
     const t = spot.title.toLowerCase()
-    const el = [...document.querySelectorAll<HTMLElement>('.settings-main :is(h2, h3, label, .field, .switch-row, .switch-text, .muted.small)')].find(e => e.textContent?.trim().toLowerCase().startsWith(t))
-    el?.scrollIntoView({ block: 'center' })
+    const el = spot.group
+      ? [...document.querySelectorAll<HTMLElement>('.settings-main .set-head > h3')].find(e => e.textContent?.trim().toLowerCase() === t)?.closest<HTMLElement>('.set-group')
+      : [...document.querySelectorAll<HTMLElement>('.settings-main :is(h2, h3, label, .field, .switch-row, .switch-text, .muted.small)')].find(e => e.textContent?.trim().toLowerCase().startsWith(t))
+    el?.scrollIntoView({ block: spot.group ? 'start' : 'center' })
     el?.classList.add('spot')
-    const off = setTimeout(() => el?.classList.remove('spot'), 1600)
+    const off = setTimeout(() => el?.classList.remove('spot'), 2600)
     return () => clearTimeout(off)
   }, [spot]) // set with its section: rendered by now
   // a row of selects over one of the sidebar's looks: 'theme' is the theme's own
@@ -1644,6 +1669,14 @@ export function SettingsPage(p: {
               <Group title="Worktrees" hint="Where new workspaces' git worktrees go, a folder per project inside it; a project can pick its own (Settings › the project). Ones made already stay where they are">
                 <FolderField value={s.worktrees} label="Folder for worktrees" placeholder="Laki's data folder: ~/.laki/worktrees" onChange={v => set({ worktrees: v })} />
               </Group>
+              <Group title="Storage" hint="Each workspace's own folder, outside the repo, for what its agents make for you (screenshots, reports, exports): $LAKI_STORAGE_FOLDER in its tabs, a folder per workspace inside this one; the info panel opens it">
+                <FolderField value={s.storageDir} label="Folder for storage" placeholder="Laki's data folder: ~/.laki/storage" onChange={v => set({ storageDir: v })} />
+                <div className="setting-box">
+                  <Switch className="switch-row" on={!!s.keepStorage} onChange={v => set({ keepStorage: v })}>
+                    <Says title="Keep a deleted workspace's storage" hint="Off: deleting a workspace deletes its storage folder too (archiving keeps it)" />
+                  </Switch>
+                </div>
+              </Group>
               <Group title="Tabs">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.closeNoAsk} onChange={v => set({ closeNoAsk: v })}>
@@ -1828,6 +1861,12 @@ export function SettingsPage(p: {
                         <span className="fl-dot waiting">FC</span>
                         waiting
                       </button>
+                      {s.floaterDone !== false && (
+                        <button className="fl-wait" data-done="on" data-tip="Finished, not seen yet: green, a slow pulse" disabled>
+                          <span className="fl-dot done">FC</span>
+                          finished
+                        </button>
+                      )}
                     </div>
                     <label className="switch-row">
                       <select value={s.floaterRecent ?? 3} onChange={e => set({ floaterRecent: Number(e.target.value) })}>
@@ -1861,23 +1900,32 @@ export function SettingsPage(p: {
                       </select>
                       <Says title="Bubbles at most" hint="Waiting ones first, then working, then recent" />
                     </label>
+                    <Switch className="switch-row" on={s.floaterDone !== false} onChange={v => set({ floaterDone: v })}>
+                      <Says title="Finished ones stand out" hint="An agent that finished while you weren't looking: its bubble turns green and pulses slowly, until you click it or look at it in Laki" />
+                    </Switch>
                     <Switch className="switch-row" on={s.floaterCards !== false} onChange={v => set({ floaterCards: v })}>
                       <Says title="Card on hover" hint="Its name, project and what it asked or last said, beside the drop" />
                     </Switch>
                     <Switch className="switch-row" on={s.floaterNew !== false} onChange={v => set({ floaterNew: v })}>
-                      <Says title="+ Session" hint="A + under the circles: Laki's new-workspace page. With it the drop stays when no agent is at work" />
+                      <Says title="+ button" hint="A + under the circles; a click shows New task (the new-workspace page in a window of its own, over the app you're in), Say it, Screenshot area and Whole screen, as the menu bar's. With it the drop stays when no agent is at work" />
                     </Switch>
-                    <Switch className="switch-row" on={s.floaterMic !== false} onChange={v => set({ floaterMic: v })}>
-                      <Says title="Voice prompt" hint="A microphone under the circles: say a prompt (macOS dictation), then send it to one of the agents, or start a new session with it" />
-                    </Switch>
-                    {s.floaterMic !== false && (
-                      <label className="switch-row sub">
-                        <select value={s.floaterVoiceTo ?? 'pick'} onChange={e => set({ floaterVoiceTo: e.target.value as 'pick' | 'new' })}>
-                          <option value="pick">An agent I pick each time</option>
-                          <option value="new">Always a new session</option>
-                        </select>
-                        <Says title="It goes to" hint="Pick each time: the bubbles' agents or a new session, nothing chosen until you do; a new session: Laki's new-workspace page with what you said" />
-                      </label>
+                    {s.floaterNew !== false && (
+                      <>
+                        <label className="switch-row sub">
+                          <select value={s.floaterMenu ?? 'stack'} onChange={e => set({ floaterMenu: e.target.value as 'stack' | 'card' })}>
+                            <option value="stack">Stacked in the drop</option>
+                            <option value="card">A menu beside it</option>
+                          </select>
+                          <Says title="Its actions" hint="Stacked: four buttons over the +, the drop grows, a hover names each. A menu: a card beside the drop with their names, 1-4 to pick from the keyboard" />
+                        </label>
+                        <label className="switch-row sub">
+                          <select value={s.floaterVoiceTo ?? 'pick'} onChange={e => set({ floaterVoiceTo: e.target.value as 'pick' | 'new' })}>
+                            <option value="pick">An agent I pick each time</option>
+                            <option value="new">Always a new session</option>
+                          </select>
+                          <Says title="Say it goes to" hint="Say a prompt (macOS dictation), then: pick each time from the bubbles' agents or a new session, nothing chosen until you do; or always a new session, the new-workspace window with what you said" />
+                        </label>
+                      </>
                     )}
                   </>
                 )}
@@ -1905,6 +1953,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={!!s.glass} onChange={v => paint({ glass: v }) /* the window's own blur follows once saved */}>
                   <Says title="Glass" hint="A see-through window: the desktop shows through, blurred" />
                 </Switch>
+                {(s.glass || (s.sideClear ?? 0) > 0) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
+                  <div className="muted small">macOS's Reduce transparency is on, so its blur is plain grey: turn it off in System Settings › Accessibility › Display.</div>
+                )}
                 {s.glass && (
                   <>
                     <div className="sliders">
@@ -1940,45 +1991,88 @@ export function SettingsPage(p: {
                     </Switch>
                   </>
                 )}
+                {!s.glass && (
+                  <div className="sliders">
+                    <Says title="Sidebar see-through" hint="The sidebar and the rail let the desktop through, blurred, as macOS's own sidebars; the rest stays solid. 0: off" />
+                    <label className="slider-row">
+                      <span>Sidebar</span>
+                      <input
+                        type="range"
+                        className="range"
+                        min={0}
+                        max={100}
+                        step={5}
+                        value={s.sideClear ?? 0}
+                        style={{ '--p': s.sideClear ?? 0 } as CSSProperties}
+                        onChange={e => paint({ sideClear: Number(e.target.value) })}
+                      />
+                      <span className="slider-val">{s.sideClear ?? 0}%</span>
+                    </label>
+                  </div>
+                )}
               </div>
               </Group>
               <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
               <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
               {!shownThemes.length && <div className="muted small">No theme called “{themeQ.trim()}”.</div>}
-              <div className="themes" onMouseLeave={() => applyTheme(s)}>
-                {shownThemes.map(t => {
-                  const [bg, panel, fg, accent, ...ansi] = preview(t)
-                  const on = (s.theme || 'default') === t.id
-                  return (
-                    <button
-                      key={t.id}
-                      className={`theme ${on ? 'on' : ''}`}
-                      aria-pressed={on}
-                      style={{ background: bg, color: fg }}
-                      onClick={() => paint({ theme: t.id })}
-                      onMouseEnter={() => applyTheme({ ...s, theme: t.id }) /* a look before choosing */}
-                    >
-                      <span className="theme-bar" style={{ background: panel }}>
-                        <span style={{ background: accent }} />
-                        {on && (
-                          <b className="theme-check" style={{ background: fg, color: bg }}>
-                            ✓
-                          </b>
-                        )}
-                      </span>
-                      <span className="theme-dots">
-                        {ansi.map((c, i) => (
-                          <span key={i} style={{ background: c }} />
-                        ))}
-                      </span>
-                      <span className="theme-name">
-                        {t.name}
-                        {t.look && ' ✦'}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
+              {(
+                [
+                  ['Favorites', shownThemes.filter(t => favs.includes(t.id))],
+                  [favs.length ? 'All themes' : '', shownThemes], // a starred one stays here too
+                ] as [string, typeof THEMES][]
+              ).map(([head, list]) =>
+                list.length ? (
+                  <Fragment key={head}>
+                    {head && <h4 className="themes-head">{head}</h4>}
+                    <div className="themes" onMouseLeave={() => applyTheme(s)}>
+                      {list.map(t => {
+                        const [bg, panel, fg, accent, ...ansi] = preview(t)
+                        const on = (s.theme || 'default') === t.id
+                        const fav = favs.includes(t.id)
+                        return (
+                          <div key={t.id} className="theme-wrap">
+                            <button
+                              className={`theme ${on ? 'on' : ''}`}
+                              aria-pressed={on}
+                              style={{ background: bg, color: fg }}
+                              onClick={() => paint({ theme: t.id })}
+                              onMouseEnter={() => applyTheme({ ...s, theme: t.id }) /* a look before choosing */}
+                            >
+                              <span className="theme-bar" style={{ background: panel }}>
+                                <span style={{ background: accent }} />
+                                {on && (
+                                  <b className="theme-check" style={{ background: fg, color: bg }}>
+                                    ✓
+                                  </b>
+                                )}
+                              </span>
+                              <span className="theme-dots">
+                                {ansi.map((c, i) => (
+                                  <span key={i} style={{ background: c }} />
+                                ))}
+                              </span>
+                              <span className="theme-name">
+                                {t.name}
+                                {t.look && ' ✦'}
+                              </span>
+                            </button>
+                            <button
+                              type="button"
+                              className={`theme-fav ${fav ? 'on' : ''}`}
+                              style={{ color: fg }}
+                              aria-pressed={fav}
+                              data-tip={fav ? 'Out of Favorites' : 'Add to Favorites'}
+                              onClick={() => paint({ favThemes: fav ? favs.filter(x => x !== t.id) : [...favs, t.id] })}
+                            >
+                              {fav ? '★' : '☆'}
+                            </button>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  </Fragment>
+                ) : null,
+              )}
               </Group>
             </>
           )}
@@ -2026,6 +2120,7 @@ export function SettingsPage(p: {
                 {pick('Font weight', 'fontWeight', '400', ['300', '400', '500', '600', '700'], w => `${w} · ${WEIGHTS[w]}`)}
                 {pick('Minimum contrast', 'minContrast', 1, [1, 3, 4.5, 7], n => CONTRAST[n])}
                 {pick('Cursor style', 'cursorStyle', 'block', ['block', 'bar', 'underline'], c => c[0].toUpperCase() + c.slice(1))}
+                {pick('Padding', 'termPad', 'normal', ['tiny', 'normal', 'roomy'], p => p[0].toUpperCase() + p.slice(1))}
                 {pick('Scroll speed', 'scrollSpeed', SCROLL, [1, 2, 3, 4, 5, 8], n => `${n}×${n === 1 ? ' · xterm’s' : ''} · ⌥ ${n * 3}×`)}
                 <div className="checks">
                   <Switch className="switch-row" on={s.cursorBlink !== false} onChange={v => set({ cursorBlink: v })}>
@@ -2137,10 +2232,13 @@ export function SettingsPage(p: {
           {sec === 'templates' && (
             <>
               <h2>Prompt templates</h2>
+              <Global>
+                In every project's new workspaces, whatever the agent. A project's own (Settings › the project › Prompt templates) come first there, and one
+                with the same name replaces a global one.
+              </Global>
               <p className="muted small">
                 Pick one under a new workspace's prompt and the agent gets it filled in: <code>{'{{prompt}}'}</code> is what you typed, <code>{'{{project}}'}</code> and{' '}
-                <code>{'{{base}}'}</code> the project and base branch. A template without <code>{'{{prompt}}'}</code> gets the prompt after it. Each project can
-                have its own too (its section below): they come first there.
+                <code>{'{{base}}'}</code> the project and base branch. A template without <code>{'{{prompt}}'}</code> gets the prompt after it.
               </p>
               <TemplatesField value={s.templates} onChange={templates => set({ templates })} />
             </>
@@ -2148,11 +2246,13 @@ export function SettingsPage(p: {
           {sec === 'actions' && (
             <>
               <h2>Actions</h2>
+              <Global>
+                In Run ▾ in every project's workspaces, for every preset of the agent it's for (Any agent: all of them). A project's own (Settings › the
+                project › Actions) come after them, and one with the same name and kind replaces a global one.
+              </Global>
               <p className="muted small">
-                Run ▾ lists them for the workspace you're in. A prompt goes to its agent's tab (the focused one first), queued while the agent works; it's
-                listed only while that agent runs there (Any agent: whichever runs). A command goes to a terminal: the focused one, any other, or a new one.
-                The copy button makes the same for another agent. Projects add their own (Settings › the project), and one with the same name and kind
-                replaces a global one.
+                A prompt goes to its agent's tab (the focused one first), queued while the agent works; it's listed only while that agent runs there. A
+                command goes to a terminal: the focused one, any other, or a new one. The copy button makes the same for another agent.
               </p>
               <ActionsField value={s.actions} onChange={actions => set({ actions })} />
             </>
@@ -2196,6 +2296,11 @@ export function SettingsPage(p: {
                     onChange={v => setPreset(i, p.agent === 'command' ? { cmd: v } : { args: v })}
                   />
                   <EnvField value={p.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
+                  {(p.agent === 'claude' || p.agent === 'codex') && (
+                    <Switch className="switch-row" on={p.laki !== false} onChange={on => setPreset(i, { laki: on ? undefined : false })}>
+                      <Says title="Tell it about Laki" hint="A note at each start: it runs in Laki, can name its workspace, attach a PR, start another workspace, and keep files for you in $LAKI_STORAGE_FOLDER" />
+                    </Switch>
+                  )}
                 </div>
               ))}
               <div className="row">

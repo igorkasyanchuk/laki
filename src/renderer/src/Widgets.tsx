@@ -132,43 +132,31 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
 
 const status = (w: WidgetView) => (w.running ? 'fetching…' : w.error ? `failed: ${w.error}` : w.at ? `fetched ${ago(w.at)}` : w.every ? 'not fetched yet' : '')
 
-// the sidebar's widgets: a head that folds them, then a grid 3 cells across, each widget its size in cells
-export function WidgetGrid({ widgets, api, shut, onShut }: { widgets: WidgetView[]; api: WidgetApi; shut: boolean; onShut: (shut: boolean) => void }) {
-  // JS widgets stopped in Settings › Resources (laki-stop): unloaded until a click, or the widgets fold and open again
+// the sidebar's widgets: a grid 3 cells across, each widget its size in cells, plain (no tiles, no head)
+export function WidgetGrid({ widgets, api }: { widgets: WidgetView[]; api: WidgetApi }) {
+  // JS widgets stopped in Settings › Resources (laki-stop): unloaded until a click
   const [parked, setParked] = useState<string[]>([])
   useEffect(() => {
     const f = (e: Event) => (d => typeof d === 'string' && d.startsWith('widget:') && setParked(p => [...p, d.slice(7)]))((e as CustomEvent).detail)
     window.addEventListener('laki-stop', f)
     return () => window.removeEventListener('laki-stop', f)
   }, [])
-  useEffect(() => void (shut && setParked([])), [shut])
   const on = widgets.filter(w => w.on)
   if (!on.length) return null
   return (
-    <div className="widgets">
-      <div className="widgets-head" onClick={e => !(e.target as Element).closest('button') && onShut(!shut)} data-tip={shut ? 'Show the widgets' : 'Hide the widgets'}>
-        <Icon name={shut ? 'chevronRight' : 'chevron'} size={12} />
-        <span>Widgets</span>
-        {shut && <span className="project-count">{on.length}</span>}
-        <span className="spacer" />
-        <IconButton icon="settings" title="Widgets' settings" onClick={api.settings} />
-      </div>
-      {!shut && (
-        <div className="widget-grid">
-          {on.map(w => (
-            <div key={w.id} className={`widget ${w.full ? 'opens' : ''}`} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1] * 2}` /* half rows: ½ is a thin line */ }} data-tip={`${w.name}${status(w) ? ` · ${status(w)}` : ''}`}>
-              {w.js && parked.includes(w.id) ? (
-                <button className="widget-parked muted small" onClick={() => setParked(p => p.filter(x => x !== w.id))}>
-                  Stopped · load
-                </button>
-              ) : (
-                <WidgetBody w={w} full={false} api={api} />
-              )}
-              {(w.error || w.running) && <span className={`widget-dot ${w.error && !w.running ? 'bad' : ''}`} />}
-            </div>
-          ))}
+    <div className="widgets widget-grid">
+      {on.map(w => (
+        <div key={w.id} className={`widget ${w.full ? 'opens' : ''}`} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1] * 2}` /* half rows: ½ is a thin line */ }} data-tip={`${w.name}${status(w) ? ` · ${status(w)}` : ''}`}>
+          {w.js && parked.includes(w.id) ? (
+            <button className="widget-parked muted small" onClick={() => setParked(p => p.filter(x => x !== w.id))}>
+              Stopped · load
+            </button>
+          ) : (
+            <WidgetBody w={w} full={false} api={api} />
+          )}
+          {(w.error || w.running) && <span className={`widget-dot ${w.error && !w.running ? 'bad' : ''}`} />}
         </div>
-      )}
+      ))}
     </div>
   )
 }

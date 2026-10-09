@@ -3,9 +3,9 @@
 // workspace to WsInfo.
 import { type MouseEvent, type ReactNode } from 'react'
 import { MERGE_METHODS, type MergeMethod, type PRPerm } from '../../shared/types'
-import { Glyph } from './Glyph'
 import { PanelHandle } from './Panes'
 import { Folded } from './MarkdownView'
+import { shortPath } from './text'
 import { type Tunnel } from './Tunnel'
 import { Icon, IconButton, type IconName, type MenuItem, Switch, useMenu } from './ui'
 
@@ -35,6 +35,7 @@ export type WsInfo = {
   branch: string
   base: string
   path: string
+  storage?: string // $LAKI_STORAGE_FOLDER: made with its first tab
   port: number
   ports?: number[] // listening
   kind: string
@@ -52,7 +53,6 @@ export type WsInfo = {
   prScan: number // minutes between PR checks (Settings › Pull requests)
   prTries: number // failing CI or conflicts go to the agent this many times in a row
   tunnels?: Tunnel[] // ports exposed to the world
-  agents: { id: string; name: string; glyph: string; last?: string }[]
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge' | 'autoLand'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
@@ -151,11 +151,15 @@ export function PRStatus({ w, onOpen, onToggle, onMenu }: { w: WsInfo; onOpen: (
   )
 }
 
-function Row({ k, children }: { k: string; children: ReactNode }) {
+// a fact: its name, the value on one line (cut short, all of it in the tip), a copy button on hover
+function Row({ k, children, tip, copy }: { k: string; children: ReactNode; tip?: string; copy?: () => void }) {
   return (
     <div className="info-row">
       <span className="info-k">{k}</span>
-      <span className="info-v">{children}</span>
+      <span className="info-v" data-tip={tip}>
+        {children}
+      </span>
+      {copy && <IconButton icon="copy" title="Copy" onClick={copy} />}
     </div>
   )
 }
@@ -298,7 +302,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
                 <Icon name="check" /> Approve
               </button>
             )}
-            <span className="spacer" />
+            {(merge || approve) && <span className="spacer" />}
             <button className={merge || approve ? 'square' : ''} aria-label="Open on GitHub" data-tip={`Open on GitHub · ${pr.url}`} onClick={() => onOpen(pr.url)}>
               <Icon name="github" />
               {!(merge || approve) && 'Open on GitHub'}
@@ -343,8 +347,8 @@ export function InfoPanel(p: {
   onAct: (act: PRAct, method?: MergeMethod) => void
   onRename: () => void
   onAttach?: () => void // a git workspace on a branch, with no PR: Attach a PR…
-  onAgent: (tab: string) => void
   onCopy: (text: string) => void
+  onStorage?: () => void // its storage folder in Finder (the app's only)
 }) {
   const { w } = p
   return (
@@ -359,55 +363,53 @@ export function InfoPanel(p: {
         </button>
       </div>
       <div className="info-body">
-        <section>
-          {w.name && <Row k="id">{w.id}</Row>}
+        <section className="info-facts">
+          {w.name && (
+            <Row k="id" copy={() => p.onCopy(w.id)}>
+              <span className="mono">{w.id}</span>
+            </Row>
+          )}
           {w.kind === 'worktree' ? (
-            <Row k="branch">
-              {w.branch} <span className="muted">← {w.base}</span>
+            <Row k="branch" tip={`${w.branch}, from ${w.base}`} copy={() => p.onCopy(w.branch!)}>
+              <span className="mono">{w.branch}</span> <span className="muted">← {w.base}</span>
             </Row>
           ) : (
-            <Row k="where">{w.branch ? `the repo itself, on ${w.branch}` : 'the folder itself'}</Row>
+            <Row k="where">{w.branch ? <>the repo itself, on <span className="mono">{w.branch}</span></> : 'the folder itself'}</Row>
           )}
-          <Row k="path">
-            <span className="mono small">{w.path}</span>
+          <Row k="path" tip={w.path} copy={() => p.onCopy(w.path)}>
+            <span className="mono">{shortPath(w.path)}</span>
           </Row>
-          <Row k="$PORT">{w.port}</Row>
+          {w.storage && (
+            <Row k="storage" tip={`${w.storage}: what its agents keep for you ($LAKI_STORAGE_FOLDER)`} copy={() => p.onCopy(w.storage!)}>
+              {p.onStorage ? (
+                <a href="#" className="mono" onClick={e => (e.preventDefault(), p.onStorage!())}>
+                  {w.storage.split('/').pop()}
+                </a>
+              ) : (
+                <span className="mono">{shortPath(w.storage)}</span>
+              )}
+            </Row>
+          )}
+          <Row k="$PORT" tip={`http://localhost:${w.port}`} copy={() => p.onCopy(String(w.port))}>
+            <a href="#" className="mono" onClick={e => (e.preventDefault(), p.onOpen(`http://localhost:${w.port}`))}>
+              localhost:{w.port}
+            </a>
+          </Row>
           {w.tunnels?.map(t => (
-            <Row key={t.port} k="public">
+            <Row key={t.port} k={t.mails?.length ? 'shared' : 'public'} tip={`:${t.port} · ${t.mails?.length ? `only ${t.mails.join(', ')}` : 'anyone with the link'}`} copy={t.url ? () => p.onCopy(t.url!) : undefined}>
               {t.url ? (
-                <span className="info-link">
-                  <a href={t.url} onClick={e => (e.preventDefault(), p.onOpen(t.url!))}>
-                    {t.url.replace(/^https:\/\//, '')}
-                  </a>
-                  <IconButton icon="copy" title="Copy the link" onClick={() => p.onCopy(t.url!)} />
-                  <span className="muted small">
-                    :{t.port} · {t.mails?.length ? `only ${t.mails.join(', ')}` : 'anyone with the link'}
-                  </span>
-                </span>
+                <a href={t.url} onClick={e => (e.preventDefault(), p.onOpen(t.url!))}>
+                  {t.url.replace(/^https:\/\//, '')}
+                </a>
               ) : (
                 <span className="muted">:{t.port} · starting…</span>
               )}
             </Row>
           ))}
-          {w.created ? <Row k="created">{ago(w.created)}</Row> : null}
+          {w.created ? <Row k="created" tip={new Date(w.created).toLocaleString()}>{ago(w.created)}</Row> : null}
         </section>
 
         <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onAttach={p.onAttach} />
-
-        <section>
-          <h3>
-            <Icon name="agent" /> Agents
-          </h3>
-          {!w.agents.length && <p className="muted small">No agent tabs.</p>}
-          {w.agents.map(a => (
-            <div key={a.id} className="info-agent" onClick={() => p.onAgent(a.id)}>
-              <div className="info-agent-head">
-                <Glyph s={a.glyph} /> {a.name}
-              </div>
-              {a.last ? <div className="info-last">{a.last}</div> : <div className="muted small">Nothing said yet.</div>}
-            </div>
-          ))}
-        </section>
       </div>
     </div>
   )
