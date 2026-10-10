@@ -169,7 +169,7 @@ function mdInline(x: Inline, k: number): React.ReactNode {
     case 'a':
     case 'img': {
       const href = x.t === 'a' ? x.href : x.src
-      const web = /^(https?:|mailto:)/i.test(href) // a relative one is a file of the repo: shown, not followed
+      const web = /^(https?:|mailto:|laki:)/i.test(href) // a relative one is a file of the repo: shown, not followed; laki://: in the app
       const kids = x.t === 'a' ? x.kids.map(mdInline) : `🖼 ${x.alt || 'image'}`
       return (
         <a key={k} href={web ? href : undefined} data-tip={href} onClick={e => (e.preventDefault(), web && openExternal(href))}>

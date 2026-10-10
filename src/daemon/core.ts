@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
@@ -352,7 +352,7 @@ export function changed() {
   }, 30)
 }
 
-const broadcast = (msg: unknown) => clients.forEach(c => c.send(msg))
+export const broadcast = (msg: unknown) => clients.forEach(c => c.send(msg))
 
 // when each workspace's agents worked (the last 50 stretches): comments under your name made then are the agent's
 // ponytail: in memory, so a daemon restart forgets them; a comment the agent left just before one may start a round
@@ -1100,10 +1100,16 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const model = isAgent(preset) && kind === 'agent' ? o.model?.trim() || undefined : undefined // a shell or a command has no model
   const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
   modelCheck(preset, model, effort)
-  let name = o.name || pr?.name || (kind === 'agent' ? (preset === 'custom' ? basename(o.cmd!.split(/\s/)[0]) : preset) : kind)
-  const base = name
-  for (let n = 2; tabsOf(ws.id).some(t => t.name === name); n++) name = `${base} ${n}`
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }) }
+  // a name with its task: an agent's prompt's words (not the workspace's first agent's: the workspace's name says it, and
+  // it's titled as it is), a command's first words (npm run dev)
+  const given = typeof o.name === 'string' ? o.name.trim().slice(0, 40) : ''
+  const first = !tabsOf(ws.id).some(t => t.kind === 'agent')
+  const task = !given && kind === 'agent' && preset !== 'custom' && o.prompt && !first ? taskTitle(o.prompt) : ''
+  const cmdName = (cmd: string) => [basename(cmd.trim().split(/\s+/)[0]), ...cmd.trim().split(/\s+/).slice(1, 3)].join(' ').slice(0, 30)
+  const agentName = pr?.name || (kind === 'agent' ? (preset === 'custom' ? cmdName(o.cmd!) : preset) : kind)
+  const name = freeName(ws.id, given || (task ? `${agentName}: ${task}` : agentName))
+  const titled = !!(given || task || (kind === 'agent' && o.prompt && first))
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }) }
   state.tabs.push(tab)
   save()
   try {
@@ -1154,9 +1160,29 @@ export function unread(id: string) {
 }
 
 // rename a tab, or color it
+// a name no other tab of the workspace has: "claude 2" after "claude"
+function freeName(ws: string, base: string, self?: string) {
+  let name = base
+  for (let n = 2; tabsOf(ws).some(t => t.id !== self && t.name === name); n++) name = `${base} ${n}`
+  return name
+}
+
+// an agent tab still named as it started ("claude 2") takes its first prompt's words: "claude: fix the login" (a host's
+// tabs never: its running hook sends no payload)
+function titleFrom(tab: Tab, prompt: unknown) {
+  if (tab.titled || tab.kind !== 'agent' || typeof prompt !== 'string') return
+  const agent = tab.profile ?? tab.preset ?? ''
+  if (!new RegExp(`^${agent.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}( \\d+)?$`).test(tab.name)) return // renamed before titles were kept
+  const task = taskTitle(prompt)
+  if (!task || /^\/\S*$/.test(task)) return // a bare /command (/clear, /model) says nothing of the task
+  tab.name = freeName(tab.workspace, `${agent}: ${task}`, tab.id)
+  tab.titled = true
+  save()
+}
+
 export function tabSet(o: { id: string; name?: string; color?: string; muted?: boolean }) {
   const t = findTab(o.id)
-  if (o.name?.trim()) t.name = o.name.trim().slice(0, 40)
+  if (o.name?.trim()) (t.name = o.name.trim().slice(0, 40)), (t.titled = true)
   if (o.color !== undefined) t.color = o.color || undefined
   if (o.muted !== undefined) t.muted = o.muted || undefined
   save()
@@ -1794,6 +1820,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
     case 'running':
       r.status = 'running'
       r.limit = r.escAt = undefined
+      if (pl.hook_event_name === 'UserPromptSubmit' || pl.hook_event_name === 'BeforeAgent') titleFrom(tab, pl.prompt) // claude's, gemini's
       if (pl.hook_event_name === 'PostToolUse') {
         const got = publishedBy(pl)
         if (got) (r.published ??= []).push(got)
@@ -1810,6 +1837,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
     case 'failed': {
       r.status = 'idle'
       r.limit = undefined
+      if (Array.isArray(pl['input-messages'])) titleFrom(tab, pl['input-messages'][0]) // codex's, at its first turn's end
       const id = pl['thread-id']
       if (id && id !== tab.resumeId) {
         tab.resumeId = id
@@ -1885,8 +1913,12 @@ function textFor(tab: Tab, text: string): string | Promise<string> {
 }
 
 // enter: false types it into the prompt for the user to finish (the preview's picked element): no turn starts
-export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean }) {
+// agent: only an agent's tab, and not typed into a question it asks (MCP's laki_send, Laki AI's: a model steered by
+// what it reads must not run a shell command or answer a permission prompt)
+export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean; agent?: boolean }) {
   const tab = resolveTarget(p.target)
+  if (p.agent && !tracked(tab)) throw new Error(`${tab.name} isn't an agent: messages go to agents only`)
+  if (p.agent && !p.whenIdle && rtOf(tab.id).status === 'waiting') throw new Error(`${tab.name} is asking the user something: only they answer it (or send with when_idle)`)
   if (p.enter === false && asleep.has(tab.id)) throw new Error(`${tab.name} is asleep: look at it to wake it, then send again`)
   const woke = wake(tab.id) // running until it's up: what's sent waits for that (below)
   const s = sessions.get(tab.id)
@@ -3717,11 +3749,11 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       if (live) {
         const sent = send({ target: live.id, text: prompt, whenIdle: tracked(live) })
         r.tab = live.id
-        r.what = 'queued' in sent ? `queued for ${live.name} (it was working)` : `sent to ${live.name}`
+        r.what = 'queued' in sent ? `queued for its tab, ${live.name} (it was working)` : `sent to its tab, ${live.name}`
       } else {
         const t = addTab(ws.id, { preset: s.preset, prompt })
         r.tab = t.id
-        r.what = `started in a new ${t.name} tab`
+        r.what = `started in a new tab, ${t.name}`
       }
     }
   } catch (e) {

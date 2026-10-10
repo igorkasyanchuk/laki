@@ -1,11 +1,11 @@
 // laki: the command line for the daemon. `laki hook <state>` is what agents' hooks run: it never fails or
 // blocks the agent for more than a second.
 import { execFileSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
-import { dirname, resolve } from 'node:path'
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { REMOTE, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, REMOTE, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { describe } from '../shared/when.ts'
@@ -13,7 +13,7 @@ import { describe } from '../shared/when.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -236,6 +236,21 @@ async function main() {
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
       throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg]')
+    }
+    case 'ai': {
+      const [sub] = rest
+      const money = (n?: number) => (n === undefined ? '' : `$${n.toFixed(4)}`)
+      if (sub === 'new') return out(await rpc('aiNew'), 'a new conversation')
+      if ((!rest.length && !flags.image) || sub === 'log') {
+        const a: { chat: AiMsg[]; calls: AiCall[]; totals: AiTotals } = await rpc('aiState')
+        if (!rest.length) return out(a.chat, a.chat.map(m => `${{ user: '>', ai: '', tool: '  ·', error: '  ✗' }[m.role]} ${m.text}`.trim()).join('\n') || 'no conversation yet: laki ai <ask>')
+        const t = (k: 'today' | 'month') => `${k}: ${a.totals[k].calls} calls, ${a.totals[k].in} in / ${a.totals[k].out} out, ${money(a.totals[k].cost)}`
+        return out(a, [t('today'), t('month'), ...a.calls.map(c => `${new Date(c.at).toLocaleString()}  ${c.ok ? '✓' : '✗'}  ${c.backend} ${c.model}  ${c.in}/${c.out}  ${money(c.cost)}  ${(c.ms / 1000).toFixed(1)}s  ${c.ask}`)].join('\n'))
+      }
+      // an image goes through the daemon's images folder: the only one the AI may send to a model
+      const img = typeof flags.image === 'string' ? [await rpc('imageSave', { data: readFileSync(flags.image).toString('base64'), ext: extname(flags.image).slice(1).toLowerCase() })] : []
+      const r = await rpc('aiAsk', { text: rest.join(' '), images: img }, 600000)
+      return out(r, r.text)
     }
     default:
       throw new Error(`unknown command ${cmd}\n\n${USAGE}`)

@@ -44,7 +44,7 @@ contextBridge.exposeInMainWorld('laki', {
     size: (h: number, up?: boolean) => ipcRenderer.send('floater-size', h, up), // up: the stack opened or closed, the + stays put
     hover: (tab: string, top: number) => ipcRenderer.send('floater-hover', tab, top),
     open: (tab: string) => ipcRenderer.send('floater-open', tab),
-    act: (what: 'new' | 'mic' | 'area' | 'screen') => ipcRenderer.send('floater-act', what), // the +'s actions (the bar's stack or the menu)
+    act: (what: 'new' | 'mic' | 'area' | 'screen' | 'ai') => ipcRenderer.send('floater-act', what), // the +'s actions (the bar's stack or the menu)
     tip: (name: string, hint: string, top: number) => ipcRenderer.send('floater-tip', name, hint, top), // a stacked action's name beside it
     menuAt: (top: number) => ipcRenderer.send('floater-menu-at', top), // the +'s top, then the page opens #menu
     menuClose: () => ipcRenderer.send('floater-menu-close'),

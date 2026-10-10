@@ -1,12 +1,13 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { API, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
-import { api, bridge, notify, type NotifyAction, openExternal } from './api'
+import { api, bridge, notify, type NotifyAction, onLakiLink, openExternal } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
 import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
+import { AiPage } from './Ai'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
@@ -26,7 +27,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -430,7 +431,7 @@ export function App() {
     .map(({ t, w }) => ({ tab: t.id, name: wsName(w), project: view!.projects.find(p => p.id === w.project)?.name ?? '', status: (t.done ? 'done' : 'idle') as 'idle' | 'done', color: w.color && w.color !== 'none' ? w.color : undefined, last: t.last && `Its last answer: ${t.last.replace(/\s+/g, ' ').trim().slice(0, 300)}`, ...floatMore(w) }))
   const floats = [...atWork, ...recent].slice(0, Math.max(1, fs?.floaterMax ?? 12))
   const floatColors = useMemo(() => Object.fromEntries(([['bg', '--panel'], ['fg', '--fg'], ['muted', '--muted'], ['line', '--line'], ['running', '--running'], ['waiting', '--waiting'], ['done', '--done'], ['accent', '--accent'], ['font', '--ui-font'], ...TAB_COLORS.map(c => [`tc${c}`, `--tc-${c}`])] as const).map(([k, v]) => [k, css(v)])), [theme]) // as painted just above
-  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert }
+  const floatOpts = { style: fs?.floaterStyle ?? 'gradient', cards: fs?.floaterCards !== false, add: fs?.floater !== false && fs?.floaterNew !== false, menu: fs?.floaterMenu === 'card' ? 'card' : 'stack', voiceTo: fs?.floaterVoiceTo === 'new' ? 'new' : 'pick', doneAlert, ai: !!fs?.ai?.on }
   const floatKey = JSON.stringify([floats, floatColors, floatOpts])
   useEffect(() => {
     bridge?.floats?.(floats, floatColors, floatOpts)
@@ -533,6 +534,7 @@ export function App() {
     api.connect()
     bridge?.onFocusTab(id => (setDialog(null), selectTab(id))) // a notification's or the menu bar's: over any page, as ⌘J
     bridge?.onDeepLink?.(setLink)
+    onLakiLink(setLink) // a laki:// link in the app (the AI's to a workspace): routed here, as the Dock's
     // the menu bar's screenshot: saved where pasted images go, then the new-workspace page with it (another one adds to it)
     bridge?.onShot?.((png, note) =>
       api.call<string>('imageSave', { data: png, ext: 'png' }).then(
@@ -550,7 +552,8 @@ export function App() {
     const l = parseLink(link)
     const proj = (id?: string) => view.projects.find(p => p.id === id || p.name === id)?.id
     if (l?.to === 'ws') {
-      const w = view.workspaces.find(w => w.id === l.ws)
+      // by id, else by name (a model may write the name): a live one first
+      const w = view.workspaces.find(w => w.id === l.ws) ?? [...view.workspaces].sort((a, b) => +!!a.archived - +!!b.archived).find(w => wsName(w) === l.ws)
       const t = view.tabs.find(t => t.id === l.tab && t.workspace === w?.id)
       if (!w) toast(`No workspace ${l.ws}`)
       else if (w.archived) toast(`${wsName(w)} is archived`)
@@ -569,6 +572,7 @@ export function App() {
     else if (l?.to === 'settings') setDialog(l.section && isSection(l.section) ? { section: l.section } : 'settings')
     else if (l?.to === 'help') setDialog('help')
     else if (l?.to === 'board') setDialog('board')
+    else if (l?.to === 'ai') setDialog('ai')
     else if (l?.to === 'about') setDialog('about')
     else if (l?.to === 'onboard') (setOnboard(o => ({ ...o, off: false })), setDialog('onboard'))
     else toast(`Laki can't open ${link.slice(0, 80)}`)
@@ -795,9 +799,8 @@ export function App() {
     copy,
   })
   const settings = view?.settings ?? {}
-  // Settings › Appearance › Layout: one sidebar, or a rail of kinds (Slack's) beside a list of the one picked; a phone keeps
-  // the one drawer
-  const rail = settings.layout !== 'one' && !narrow // unset: the rail
+  // a rail of kinds (Slack's) beside a list of the one picked; a phone keeps the one drawer
+  const rail = !narrow
   const railWords = settings.railLabels !== false // its own setting: words under its icons, or icons only (narrower)
   const railW = railWords ? 68 : 52
   const kindOf = (w: WorkspaceView): RailKind => view?.projects.find(p => p.id === w.project)?.kind ?? 'projects'
@@ -1303,6 +1306,8 @@ export function App() {
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
+    a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
+    a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Widget: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
     a({ label: 'Widgets: settings, reload', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
     a({ label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
@@ -1674,6 +1679,8 @@ export function App() {
   const schedTip = nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'
   const toSchedules = () => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))
   const toBoard = () => setDialog(d => (d === 'board' ? null : 'board'))
+  const toAi = () => setDialog(d => (d === 'ai' ? null : 'ai'))
+  const AI_TIP = 'AI: ask Laki to start, check and steer your agents'
   const toSettings = () => setDialog(d => (settingsOf(d) ? null : 'settings'))
   const BOARD_TIP = 'Board: every workspace by where it is, and to-dos'
   // each kind's tabs that need you (the Dock's rule) and whether one works, for its rail button
@@ -1698,13 +1705,14 @@ export function App() {
     const says = `${label}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : busy ? ' · at work' : ''}`
     return railButton(k, icon, label, railKind === k && !onPage, says, () => railTo(k), n > 0 ? <span className="rail-count">{n > 99 ? '99+' : n}</span> : busy && <span className="rail-dot" />)
   }
-  const onPage = schedulesFor !== undefined || dialog === 'board' || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
-  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board') // the rail's Schedule and Board: a page over all but the rail
+  const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
+  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || dialog === 'ai') // the rail's Schedule and Board: a page over all but the rail
   const railBar = rail && sideOpen && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }}>
       {kindButton(RAIL[0])}
       {railButton('board', 'board', 'Board', dialog === 'board', BOARD_TIP, toBoard)}
       {railButton('schedules', 'clock', 'Schedule', schedulesFor !== undefined, `${schedTip}${runFailed ? ' · a run failed' : ''}`, toSchedules, runFailed && <span className="rail-dot bad" />)}
+      {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
       {RAIL.slice(1).map(kindButton)}
       <span className="spacer" />
       {railButton('settings', 'gear', 'Settings', settingsOf(dialog), 'Settings (⌘,)', toSettings)}
@@ -1843,6 +1851,7 @@ export function App() {
             <>
               <IconButton icon="clock" title={schedTip} on={schedulesFor !== undefined} className={runFailed ? 'dot' : ''} label={labels ? 'Schedule' : undefined} onClick={toSchedules} />
               <IconButton icon="board" title={BOARD_TIP} label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={toBoard} />
+              {settings.ai?.on && <IconButton icon="ai" title={AI_TIP} label={labels ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
             </>
           )}
           <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
@@ -2026,6 +2035,7 @@ export function App() {
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             renameProjects
             skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }) }}
+            ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
             webhookTest={w => api.call('webhookTest', w)}
             resources={{
               load: () => api.call<Resources>('resources'),
@@ -2072,6 +2082,7 @@ export function App() {
         )}
         {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.logs.startsWith('widget:') ? { section: 'widgets' } : dialog.logs === 'new' ? { section: 'general' } : null)} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
+        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} />}
         {dialog === 'board' && (
           <BoardPage
             view={view}

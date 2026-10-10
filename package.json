@@ -19,7 +19,7 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=4 test/*.test.ts",
     "pack": "electron-vite build && electron-builder --dir",
-    "dmg": "npm version minor --no-git-tag-version && electron-vite build && electron-builder --mac dmg -c.directories.output=dist/release",
+    "dmg": "npm version minor --no-git-tag-version && node --experimental-strip-types --no-warnings scripts/notes.ts && electron-vite build && electron-builder --mac dmg -c.directories.output=dist/release",
     "pack:x64": "npm i --no-save --force @lydell/node-pty-darwin-x64@$(node -p \"require('./node_modules/@lydell/node-pty/package.json').version\") && electron-vite build && electron-builder --dir --x64",
     "daemon": "node --experimental-strip-types --no-warnings src/daemon/main.ts",
     "dev:web": "vite src/renderer --port 5199 --strictPort --host 127.0.0.1",

@@ -1,32 +1,33 @@
 // `laki mcp`: Laki as an MCP server over stdio (JSON-RPC 2.0, a message per line), for Claude Code, Codex or
 // any MCP client. Its tools go through the daemon's API like the CLI's commands; none deletes, archives or ships.
 import { createInterface } from 'node:readline'
-import { ensureDaemon, rpc } from '../shared/conn.ts'
+import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { API, type View } from '../shared/types.ts'
 
-type Tool = { name: string; description: string; inputSchema: object; run: (a: any) => Promise<unknown> }
+export type Tool = { name: string; description: string; inputSchema: object; run: (a: any) => Promise<unknown> }
+export type Rpc = <T = any>(method: string, params?: any, timeoutMs?: number) => Promise<T>
 const str = (description: string) => ({ type: 'string', description })
 const obj = (properties: Record<string, object>, required: string[] = []) => ({ type: 'object', properties, required })
 
 // the view, without what an agent doesn't need (scans' details) or must not see: settings (env, presets' env and cmd,
 // the webhook's URL), projects' config (env), queued prompts, remote access's link (its token). `laki ls --json` too
-export async function state() {
+export async function state(rpc: Rpc = conn) {
   const v: View = await rpc('state')
   return {
     projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind })), // kind: shells (the Terminals project) or browsers, the user's own
     workspaces: v.workspaces
       .filter(w => !w.archived)
-      .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url } })),
+      .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title } })),
     tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
 }
 
-const TOOLS: Tool[] = [
+export const tools = (rpc: Rpc): Tool[] => [
   {
     name: 'laki_state',
-    description: "Laki's projects, workspaces (a git worktree per task, or a folder) and tabs, with each tab's status: running (an agent's turn, or a shell's command), waiting (for a permission), idle or exited; done: finished while nobody looked. Terminals and Browsers (a project's kind shells or browsers) are the user's own terminals and web pages.",
+    description: "Laki's projects, workspaces (a git worktree per task, or a folder) and tabs, with each tab's status: running (an agent's turn, or a shell's command), waiting (for a permission), idle or exited; done: finished while nobody looked; last: the agent's last answer. Terminals and Browsers (a project's kind shells or browsers) are the user's own terminals and web pages.",
     inputSchema: obj({}),
-    run: state,
+    run: () => state(rpc),
   },
   {
     name: 'laki_new_workspace',
@@ -71,9 +72,21 @@ const TOOLS: Tool[] = [
   },
   {
     name: 'laki_send',
-    description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. With when_idle it waits for the agent's turn to end.",
+    description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. With when_idle it waits for the agent's turn to end. Agents only, and not while one asks the user something.",
     inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), text: str('the message'), when_idle: { type: 'boolean', description: 'queue it until the agent finishes its turn' } }, ['target', 'text']),
-    run: a => rpc('send', { target: a.target, text: a.text, whenIdle: !!a.when_idle }),
+    run: a => rpc('send', { target: a.target, text: a.text, whenIdle: !!a.when_idle, agent: true }),
+  },
+  {
+    name: 'laki_new_tab',
+    description: 'A new agent session (a tab) in a workspace that exists, in its folder, with a prompt: e.g. a codex review of what claude did there.',
+    inputSchema: obj({ ws: str('a workspace id'), preset: str("claude, codex, gemini, grok, opencode or a preset of theirs (default: the user's default agent)"), prompt: str('what it should do'), model: str("the agent's model (default: its own)"), name: str("the tab's name, 2-4 words of what it's for, e.g. codex review (default: the agent and the prompt's first words)") }, ['ws', 'prompt']),
+    run: async a => rpc('tabNew', { ws: a.ws, preset: a.preset || (await rpc<View>('state')).settings?.agent || 'claude', prompt: a.prompt, model: a.model, name: a.name || undefined }), // none: a shell
+  },
+  {
+    name: 'laki_attach_pr',
+    description: "Link a GitHub PR to a workspace (its status, checks and review then show on it), when the workspace's branch has none found: e.g. a PR its agent named.",
+    inputSchema: obj({ ws: str('a workspace id'), pr: str('the PR: its URL or number') }, ['ws', 'pr']),
+    run: a => rpc('prAttach', { ws: a.ws, pr: a.pr }),
   },
   {
     name: 'laki_progress',
@@ -121,6 +134,7 @@ const TOOLS: Tool[] = [
 ]
 
 let daemon: Promise<unknown> | undefined
+const TOOLS = tools(conn)
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool) throw new Error(`no tool ${name}`)

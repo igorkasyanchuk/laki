@@ -629,12 +629,12 @@ test('scheduled tasks: the default agent, empty prompts and times, edits that ke
   await rig.rpc('tabNew', { ws: ws.id, cmd: 'cat' })
   const s3 = await rig.rpc('scheduleSet', { project: p.id, prompt: 'hello there', when: 'every day at 9am', ws: ws.id, preset: 'claude' })
   const run = await rig.rpc('scheduleRun', { id: s3.id })
-  assert.deepEqual([run.ok, run.what, run.ws], [true, 'started in a new claude tab', ws.id])
+  assert.deepEqual([run.ok, run.what, run.ws], [true, 'started in a new tab, claude: hello there', ws.id])
   assert.equal((await state(rig)).runs[0].id, run.id)
   // again: its claude tab is live now, and gets the prompt
   const again = await rig.rpc('scheduleRun', { id: s3.id })
   assert.equal(again.tab, run.tab)
-  assert.match(again.what, /^(sent to claude|queued for claude \(it was working\))$/)
+  assert.match(again.what, /^(sent to its tab, claude: hello there|queued for its tab, claude: hello there \(it was working\))$/)
   await rig.rpc('scheduleRm', { id: s3.id })
 
   // two due at once: the second deleted while the first makes its worktree

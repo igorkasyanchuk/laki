@@ -159,7 +159,11 @@ class Api {
 
 export const api = new Api()
 
-export const openExternal = (url: string) => (bridge ? bridge.openExternal(url) : window.open(url, '_blank', 'noopener'))
+// a laki:// link (the AI's to a workspace or tab) goes to the app's own router (App's onLakiLink); a window without one
+// (the AI window) hands it to main, which shows the app window and routes it there
+let lakiLink: ((url: string) => void) | undefined
+export const onLakiLink = (f: (url: string) => void) => void (lakiLink = f)
+export const openExternal = (url: string) => (url.startsWith('laki:') && lakiLink ? lakiLink(url) : bridge ? bridge.openExternal(url) : window.open(url, '_blank', 'noopener'))
 
 export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[]) {
   if (bridge) return bridge.notify(title, body, tab, sound, actions)

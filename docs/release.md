@@ -19,7 +19,8 @@ The build is ad-hoc signed (`mac.identity: "-"`; unsigned, a download reads as "
    ```
    A disk image to hand out: `npm run dmg` bumps the minor version (`npm version minor`, no tag), builds, and writes
    `dist/release/Laki-<version>-arm64.dmg` (its own folder: a running `dist/mac-arm64/Laki.app` and its daemon stay
-   as they are). Each run is a new minor version.
+   as they are). Each run is a new minor version, and `docs/release-notes.md`'s `## Next` becomes it (Settings ›
+   Release notes): add a line there for each user-visible change before.
 5. Run `scripts/pack-smoke.sh` once before a release: it runs the packaged app's daemon, CLI and hooks on Electron's
    node with fake agents, in a temp home, and takes a window screenshot. Quit Laki.app first (the daemon can stay): macOS keeps
    the app's data folder under the real home, so a running one holds the single-instance lock and the smoke's window quits. For the Intel build:

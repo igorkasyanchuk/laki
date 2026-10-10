@@ -32,8 +32,8 @@ worktree. Agents keep running when the window is closed.
 - **Resources**: memory and CPU for Laki and each agent; put an idle agent to sleep (now, or after a while) and it wakes as you
   look; the video, widgets, the preview or the floating bubbles stop with a click.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
-- **Layout**: a rail like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a
-  list of the one you pick; or one sidebar for everything.
+- **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
+  the one you pick.
 - **Looks**: six Dock icons to pick from; 86 themes, 68 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
 - **Widgets**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
@@ -42,6 +42,9 @@ worktree. Agents keep running when the window is closed.
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new
   workspace's prompt.
 - **A video while you work**: a YouTube link plays at the bottom of the sidebar.
+- **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it starts workspaces, reviews
+  PRs, sends prompts and tells you what your agents are doing; on OpenRouter or claude -p / codex exec, every
+  ask's cost logged.
 - **Keyboard and CLI**: ⌘K for everything; `laki` (also an MCP server) drives it all, agents included.
 
 ## Install

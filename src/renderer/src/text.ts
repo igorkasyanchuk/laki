@@ -49,13 +49,16 @@ export type ActionTab = { id: string; agent?: string; shell?: boolean } // a wor
 // Run ▾'s actions, worked out as it opens: the global ones, then the project's (one with a global one's name and
 // target replaces it). An agent's only while the workspace runs that agent (its focused tab first; any: any agent); a terminal's
 // always (the focused shell, else any; none: a new one)
-export function actionsFor(global: RunAction[] = [], project: RunAction[] = [], tabs: ActionTab[] = [], focused?: string) {
+// the global actions and a project's together: a project's one with a global one's name and target replaces it
+export function mergeActions(global: RunAction[] = [], project: RunAction[] = []) {
   const same = (a: RunAction, b: RunAction) => a.target === b.target && (a.name ?? '').trim() === (b.name ?? '').trim() // a hand-edited one may lack a name
+  return [...global.filter(g => !project.some(p => same(p, g))), ...project].filter(a => a.name?.trim() && a.text?.trim())
+}
+export function actionsFor(global: RunAction[] = [], project: RunAction[] = [], tabs: ActionTab[] = [], focused?: string) {
   const pick = (ok: (t: ActionTab) => boolean) => tabs.find(t => t.id === focused && ok(t)) ?? tabs.find(ok)
   const agent: { action: RunAction; tab: string }[] = []
   const terminal: { action: RunAction; tab?: string }[] = []
-  for (const a of [...global.filter(g => !project.some(p => same(p, g))), ...project]) {
-    if (!a.name?.trim() || !a.text?.trim()) continue
+  for (const a of mergeActions(global, project)) {
     if (a.target === 'shell') terminal.push({ action: a, tab: pick(t => !!t.shell)?.id })
     else {
       const t = pick(t => (a.target === 'any' ? !!t.agent : t.agent === a.target))
@@ -179,7 +182,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {

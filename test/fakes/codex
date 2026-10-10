@@ -3,6 +3,20 @@
 const fs = require('fs'), { execFileSync } = require('child_process')
 const args = process.argv.slice(2)
 fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'codex', tab: process.env.LAKI_TAB, args }) + '\n')
+// exec --json (Laki's AI): one laki_state call through the -c mcp_servers.laki server; "fail…" fails
+if (args[0] === 'exec') {
+  const out = o => process.stdout.write(JSON.stringify(o) + '\n')
+  const cfg = k => args.find(a => a.startsWith(`mcp_servers.laki.${k}=`))?.split('=').slice(1).join('=')
+  const env = JSON.parse(cfg('env').replace(/([A-Z_]+)=/g, '"$1":')) // a TOML inline table of strings
+  const prompt = args[args.length - 1]
+  out({ type: 'thread.started', thread_id: args[1] === 'resume' ? args[2] : 'thread-x1' })
+  if (prompt.startsWith('fail')) return out({ type: 'turn.failed', error: { message: 'it broke' } }), (process.exitCode = 1)
+  out({ type: 'item.started', item: { type: 'mcp_tool_call', server: 'laki', tool: 'laki_state', arguments: {} } })
+  return require('./mcp.cjs')({ command: JSON.parse(cfg('command')), args: JSON.parse(cfg('args')), env }, 'laki_state', {}).then(text => {
+    out({ type: 'item.completed', item: { type: 'agent_message', text: `${JSON.parse(text).projects.length} projects, asked: ${prompt}` } })
+    out({ type: 'turn.completed', usage: { input_tokens: 300, cached_input_tokens: 100, output_tokens: 30 } })
+  })
+}
 const n = args.find(a => a.startsWith('notify='))
 const notify = n ? JSON.parse(n.slice(7)) : null
 const thread = args[0] === 'resume' ? args[1] : 'thread-' + Math.random().toString(36).slice(2, 8)

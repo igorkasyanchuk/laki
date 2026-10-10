@@ -3,6 +3,21 @@
 const fs = require('fs'), { execSync } = require('child_process')
 const args = process.argv.slice(2)
 fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, storage: process.env.LAKI_STORAGE_FOLDER, args, env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_') || k === 'LAKI_PROGRESS')) }) + '\n')
+// -p (Laki's AI): stream-json, one laki_state call through the --mcp-config server; "fail…" fails, "slow…" waits
+if (args[0] === '-p') {
+  const out = o => process.stdout.write(JSON.stringify(o) + '\n')
+  const prompt = args[args.length - 1]
+  const session = args.includes('--resume') ? args[args.indexOf('--resume') + 1] : 'sess-p1'
+  out({ type: 'system', subtype: 'init', session_id: session, model: 'fake-sonnet' })
+  if (prompt.startsWith('fail')) return out({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'it broke', session_id: session }), (process.exitCode = 1) // as the real one: its error, then 1
+  if (prompt.startsWith('slow')) return setTimeout(() => {}, 60000)
+  out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'mcp__laki__laki_state', input: {} }] } })
+  return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki, 'laki_state', {}).then(text => {
+    out({ type: 'user', message: { content: [{ type: 'tool_result', content: text }] } })
+    const r = `${JSON.parse(text).workspaces.length} workspaces, asked: ${prompt}`
+    out({ type: 'result', subtype: 'success', is_error: false, result: r, session_id: session, total_cost_usd: 0.0123, usage: { input_tokens: 100, cache_read_input_tokens: 50, output_tokens: 20 } })
+  })
+}
 const settings = JSON.parse(fs.readFileSync(args[args.indexOf('--settings') + 1], 'utf8'))
 const hook = (ev, payload) => {
   const cmd = settings.hooks[ev][0].hooks[0].command

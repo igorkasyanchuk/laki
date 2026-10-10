@@ -7,7 +7,7 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/renderer/src/lay
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/renderer/src/markdown.ts'
 import { actionsFor, importable, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { fillTemplate, isAgent, prAllows, rowsOf } from '../src/shared/types.ts'
+import { fillTemplate, isAgent, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
 
@@ -198,3 +198,17 @@ test("themes: glass over the stylesheet's colors with alpha or not hex, a gradie
   assert.deepEqual([props.get('--app-bg'), props.get('--term-bg'), props.get('--tab-sel')], ['linear-gradient(135deg, #051937ff, #00577aff)', '#04213f00', '#e6f1ff1a'])
   assert.deepEqual([onAccent('#000000'), onAccent('#ffffff'), onAccent('#0a0aff')], ['#ffffff', '#000000', '#ffffff'])
 })
+
+test("taskTitle: a prompt's first words for a tab's name, less links, paths, flags and filler", () => {
+  assert.equal(taskTitle('Please fix the cart total rounding in checkout.ts'), 'fix the cart total rounding')
+  assert.equal(taskTitle('Can you review https://github.com/o/r/pull/42 and leave comments'), 'review #42 and leave comments')
+  assert.equal(taskTitle('/code-review xhigh --fix'), '/code-review xhigh')
+  assert.equal(taskTitle('fix src/renderer/src/App.tsx and/or ~/x/y.md'), 'fix App.tsx and/or y.md')
+  assert.equal(taskTitle('Look at /Users/me/app/src/App.tsx and make the **sidebar** wider'), 'Look at App.tsx and make')
+  assert.equal(taskTitle('ok so now lets add dark mode to the settings page'), 'add dark mode to the settings')
+  assert.equal(taskTitle('\n\n  fix it\nmore lines'), 'fix it')
+  assert.equal(taskTitle('see https://example.com'), 'see')
+  assert.equal(taskTitle('   '), '')
+  assert.ok(taskTitle('x'.repeat(80)).endsWith('…') && taskTitle('x'.repeat(80)).length === 36)
+})
+

@@ -1,6 +1,6 @@
 import { createRoot } from 'react-dom/client'
 import { App } from './App'
-import { NewWindow } from './NewWindow'
+import { AiWindow, NewWindow } from './NewWindow'
 import './styles.css'
 import './look.css'
 
@@ -15,4 +15,7 @@ vv?.addEventListener('resize', () => document.documentElement.style.setProperty(
 const MORE = ['Fira Code', 'Cascadia Code', 'Source Code Pro', 'IBM Plex Mono', 'Geist Mono', 'Hack', 'Iosevka', 'Inconsolata', 'Roboto Mono', 'Victor Mono'].flatMap(f => [`13px "${f}"`, `bold 13px "${f}"`])
 Promise.all(['13px "JetBrains Mono"', 'bold 13px "JetBrains Mono"', '13px Inter', ...MORE].map(f => document.fonts.load(f, 'aĀЖ')))
   .catch(() => {})
-  .finally(() => createRoot(document.getElementById('root')!).render(new URLSearchParams(location.search).get('window') === 'new' ? <NewWindow /> : <App />)) // main's new-workspace window: the page alone
+  .finally(() => {
+    const w = new URLSearchParams(location.search).get('window') // main's new-workspace and AI windows: the page alone
+    createRoot(document.getElementById('root')!).render(w === 'new' ? <NewWindow /> : w === 'ai' ? <AiWindow /> : <App />)
+  })

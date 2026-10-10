@@ -387,12 +387,13 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
 // nearer edge as it's let go, and stays there
 type Float = { tab: string; status?: string }
-type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean }
+type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
 const VOICE = { width: 320, height: 186 } // the voice prompt's window; floater.html's #voice too
 const MENU = { width: 236, height: 196 } // the +'s menu beside the drop (floaterMenu card); floater.html's #menu too
+const menuH = () => MENU.height + (floats.ai ? 46 : 0) // a row more: Ask Laki AI
 const STYLES = ['glow', 'gradient', 'arc', 'bricks', 'comet', 'wave', 'still'] // a working agent's circle (Settings' previews: floater.css)
-let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, menu: 'stack', voiceTo: 'pick', doneAlert: true }
+let floats: { items: Float[]; colors: Record<string, string> } & FloatOpts = { items: [], colors: {}, style: 'glow', cards: true, add: false, menu: 'stack', voiceTo: 'pick', doneAlert: true, ai: false }
 let floater: BrowserWindow | null = null
 let card: BrowserWindow | null = null
 let voice: BrowserWindow | null = null
@@ -447,7 +448,7 @@ function barWin() {
     const k = kind(url)
     if (k === 'voice' && voice && !voice.isDestroyed()) voice.focus()
     if (!k || (k === 'card' ? card : k === 'menu' ? menu : voice)?.isDestroyed() === false) return { action: 'deny' }
-    return { action: 'allow', overrideBrowserWindowOptions: k === 'card' ? floatOpts(280, 60, false) : k === 'menu' ? floatOpts(MENU.width, MENU.height) : floatOpts(VOICE.width, VOICE.height) }
+    return { action: 'allow', overrideBrowserWindowOptions: k === 'card' ? floatOpts(280, 60, false) : k === 'menu' ? floatOpts(MENU.width, menuH()) : floatOpts(VOICE.width, VOICE.height) }
   })
   f.webContents.on('did-create-window', (w, { url }) => {
     pin(w, url)
@@ -467,7 +468,7 @@ function barWin() {
       w.webContents.on('did-finish-load', () => {
         if (barAt) {
           const d = screen.getDisplayNearestPoint(barAt).workArea
-          const y = Math.max(d.y, Math.min(barAt.y + menuTop + 40 - MENU.height, d.y + d.height - MENU.height)) // its foot by the +'s
+          const y = Math.max(d.y, Math.min(barAt.y + menuTop + 40 - menuH(), d.y + d.height - menuH())) // its foot by the +'s
           w.setPosition(barSide() === 'left' ? barAt.x - 6 - MENU.width : barAt.x + BAR + 6, Math.round(y))
         }
         w.webContents.send('floats', floats) // the theme's colors
@@ -536,6 +537,7 @@ ipcMain.on('floats', (e, items: unknown, colors: unknown, opts: unknown) => {
     menu: o.menu === 'card' ? 'card' : 'stack',
     voiceTo: o.voiceTo === 'new' ? 'new' : 'pick',
     doneAlert: o.doneAlert !== false,
+    ai: o.ai === true,
   }
   if (!floats.cards && hover?.tab !== TIP) (hover = null), card?.hide()
   if (floats.menu !== 'card' || !floats.add) menu?.close()
@@ -574,6 +576,7 @@ ipcMain.handle('procs', e => {
   for (const f of [floater, card, menu, voice]) if (f && !f.isDestroyed()) add(f.webContents.getOSProcessId(), 'Floating bubbles', 'floater') // one process (the bar's window.open), one row
   if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
   if (newWin && !newWin.isDestroyed()) add(newWin.webContents.getOSProcessId(), 'New workspace window')
+  if (aiW && !aiW.isDestroyed()) add(aiW.webContents.getOSProcessId(), 'Laki AI window')
   return out
 })
 ipcMain.on('proc-stop', (e, what: unknown) => {
@@ -605,11 +608,13 @@ ipcMain.on('floater-size', (e, h: number, up?: boolean) => {
 })
 ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab)))
 // the +'s actions, from the stack in the drop or the menu beside it: New task (the new-workspace page, in a window of its
-// own), the menu bar's screenshots; Say it from the menu: the bar opens its window (the stack's opens it itself)
+// own), Ask Laki AI (the AI page, in one too), the menu bar's screenshots; Say it from the menu: the bar opens its window
+// (the stack's opens it itself)
 ipcMain.on('floater-act', (e, what: unknown) => {
   if (!(floater && e.sender === floater.webContents) && !(menu && e.sender === menu.webContents)) return
   menu?.close()
   if (what === 'new') newWsWin()
+  else if (what === 'ai' && floats.ai) aiWin()
   else if (what === 'area') screenshot(true)
   else if (what === 'screen') screenPick()
   else if (what === 'mic') floater?.webContents.send('floater-voice')
@@ -627,15 +632,27 @@ function newWsWin(prompt?: string) {
     if (prompt) newWin.webContents.send('new-prompt', prompt)
     return void newWin.focus()
   }
+  const w = (newWin = panelWin({ window: 'new', ...(prompt && { prompt }) }, 640, 340, { minWidth: 480, minHeight: 200 })) // then new-fit: as tall as the page
+  w.on('closed', () => newWin === w && (newWin = null))
+}
+// the bubbles' Ask Laki AI: the AI page alone (?window=ai), a chat in a panel like the new-workspace one; one at a time
+let aiW: BrowserWindow | null = null
+function aiWin() {
+  if (aiW && !aiW.isDestroyed()) return void aiW.focus()
+  const w = (aiW = panelWin({ window: 'ai' }, 560, 680, { minWidth: 420, minHeight: 360 }))
+  w.on('closed', () => aiW === w && (aiW = null))
+}
+// a page of the renderer alone in a panel over every app, Space and full-screen app, in the middle of the screen the
+// mouse is on, a third down
+function panelWin(query: Record<string, string>, width: number, height: number, more: BrowserWindowConstructorOptions) {
   const d = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea
-  const [width, height] = [Math.min(640, d.width - 40), Math.min(340, d.height - 40)] // then new-fit: as tall as the page
-  const w = (newWin = new BrowserWindow({
+  ;[width, height] = [Math.min(width, d.width - 40), Math.min(height, d.height - 40)]
+  const w = new BrowserWindow({
     x: Math.round(d.x + (d.width - width) / 2),
     y: Math.round(d.y + (d.height - height) / 3),
     width,
     height,
-    minWidth: 480,
-    minHeight: 200,
+    ...more,
     type: 'panel', // an NSPanel: it takes the keyboard without bringing Laki forward
     frame: false, // the page's head is its title bar (a drag region)
     backgroundColor: '#0e1014',
@@ -647,15 +664,14 @@ function newWsWin(prompt?: string) {
     acceptFirstMouse: true,
     show: false,
     webPreferences: { preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)), contextIsolation: true, nodeIntegration: false, sandbox: true },
-  }))
+  })
   pin(w)
   w.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
   w.webContents.on('will-navigate', e => e.preventDefault()) // a dropped file would load in place, bridge and all
   w.once('ready-to-show', () => (w.show(), w.focus()))
-  w.on('closed', () => newWin === w && (newWin = null))
-  const query = { window: 'new', ...(prompt && { prompt }) }
   if (dev) w.loadURL(`${process.env.ELECTRON_RENDERER_URL}?${new URLSearchParams(query)}`)
   else w.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)), { query })
+  return w
 }
 // the new-workspace window's height, as the page grows or shrinks (More, images, a template's preview); its top stays
 ipcMain.on('new-fit', (e, h: unknown) => {
@@ -733,7 +749,7 @@ ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
 })
 // in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
 // takes the click), so being active alone isn't it: the drop would hide under the pointer as a drag starts
-const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== menu && w !== voice && w !== newWin // the bubbles stay over another app while the new-workspace window is up
+const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== menu && w !== voice && w !== newWin && w !== aiW // the bubbles stay over another app while the new-workspace or AI window is up
 const setFront = (on: boolean) => on !== front && ((front = on), placeFloater())
 app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
 app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after
@@ -854,6 +870,7 @@ ipcMain.handle('capture', async (e, id: number) => {
 })
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url)
+  else if (typeof url === 'string' && url.startsWith('laki:')) openLink(url) // the AI window's link to a tab: the app window, there
 })
 // a terminal's ⌘-clicked file:// link (claude's paths), the app window's only: { rel } for a file inside root (the
 // workspace: the app's preview), a folder in Finder, a document in its app; anything that could run (an app, a script, no

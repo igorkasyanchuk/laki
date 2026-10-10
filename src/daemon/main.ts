@@ -8,6 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
+import { aiAsk, aiKey, aiNew, aiState, aiStop } from './ai.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { skills, skillSet } from './skill.ts'
@@ -142,6 +143,11 @@ const api: Record<string, Handler> = {
   webhookTest: p => core.webhookTest(p),
   portKill: p => core.portKill(p),
   meme: () => meme(),
+  aiAsk: p => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here
+  aiState: () => aiState(),
+  aiNew: () => aiNew(),
+  aiStop: () => aiStop(),
+  aiKey: p => aiKey(p),
   send: p => core.send(p),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),
@@ -313,6 +319,7 @@ function shutdown() {
   timers.forEach(clearInterval)
   core.stopTunnels()
   core.remoteStop()
+  aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
   core.stopHosts()
   try {
     core.keepShells() // what the shells run, for the next start

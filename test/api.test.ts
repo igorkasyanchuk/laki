@@ -59,6 +59,45 @@ test('projects: a second folder of the same name, branches, removal takes local 
   assert.deepEqual([v.workspaces, v.tabs], [[], []])
 })
 
+test("tabs: named by their task: a prompt's words, the first prompt typed, a command's words; never over a name you gave", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'Please fix the cart total rounding' })
+  const first = await rig.tab(ws.id)
+  assert.equal(first.name, 'claude') // the workspace's name says its task
+  await rig.rpc('hook', { tab: first.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'and the tax too' } })
+  assert.equal((await rig.tab(ws.id)).name, 'claude')
+  assert.equal((await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'Please check the totals' })).name, 'claude: check the totals')
+  // started without a prompt: its first prompt names it (claude's UserPromptSubmit, codex's first turn), once
+  const cl = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  assert.equal(cl.name, 'claude 2')
+  const prompt = (text: string) => rig.rpc('hook', { tab: cl.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: text } })
+  await prompt('/clear') // a bare command says nothing
+  assert.equal((await rig.tab(ws.id, 'claude 2')).id, cl.id)
+  await prompt('can you add dark mode to the settings page')
+  assert.ok(await rig.tab(ws.id, 'claude: add dark mode to the settings'))
+  await prompt('now something else')
+  assert.ok(await rig.tab(ws.id, 'claude: add dark mode to the settings'))
+  const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
+  await rig.rpc('hook', { tab: cx.id, state: 'done', payload: { type: 'agent-turn-complete', 'input-messages': ['review what claude did, focus on tests'] } })
+  assert.ok(await rig.tab(ws.id, 'codex: review what claude did, focus'))
+  // a name you gave stays
+  const mine = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await rig.rpc('tabSet', { id: mine.id, name: 'claude 3' })
+  await rig.rpc('hook', { tab: mine.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'write the docs' } })
+  assert.equal((await rig.rpc('state')).tabs.find((x: any) => x.id === mine.id).name, 'claude 3')
+  const named = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'write tests', name: 'tests' })
+  assert.equal(named.name, 'tests')
+  // a command: its first words
+  assert.equal((await rig.rpc('tabNew', { ws: ws.id, cmd: '/usr/bin/env npm run dev --port 3000' })).name, 'env npm run')
+  // a given name is trimmed; a workspace made without a prompt: its first agent takes its first prompt's words
+  assert.equal((await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'x', name: '  docs  ' })).name, 'docs')
+  const bare = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const b1 = await rig.tab(bare.id)
+  await rig.rpc('hook', { tab: b1.id, state: 'running', payload: { hook_event_name: 'UserPromptSubmit', prompt: 'fix the login page' } })
+  assert.equal((await rig.tab(bare.id)).name, 'claude: fix the login page')
+})
+
 test('tabs: a command preset, numbered names, close, resize, detach, queue, codex Enter, interrupt, a gone folder', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -88,12 +127,12 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
 
   // claude: the queue can be cleared; a hook nobody sends (interrupted) still sets idle
   const cl = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', prompt: 'ask me' })
-  await until(async () => (await rig.tab(ws.id, 'claude')).status === 'waiting', 'waiting')
+  await until(async () => (await rig.tab(ws.id, 'claude: ask me')).status === 'waiting', 'waiting')
   await rig.rpc('send', { target: cl.id, text: 'later', whenIdle: true })
   await rig.rpc('queueClear', { target: cl.id })
-  assert.equal((await rig.tab(ws.id, 'claude')).queue, undefined)
+  assert.equal((await rig.tab(ws.id, 'claude: ask me')).queue, undefined)
   await rig.rpc('hook', { tab: cl.id, state: 'interrupted' })
-  assert.equal((await rig.tab(ws.id, 'claude')).status, 'idle')
+  assert.equal((await rig.tab(ws.id, 'claude: ask me')).status, 'idle')
 
   // codex reports only a turn's end: Enter starts one
   const cx = await rig.rpc('tabNew', { ws: ws.id, preset: 'codex' })
@@ -103,13 +142,13 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   await until(async () => (await rig.tab(ws.id, 'codex')).last === 'answer: hi', 'its turn ended')
 
   // an agent that ends cleanly keeps its tab and last screen; Enter resumes its chat
-  const chat = (await rig.tab(ws.id, 'claude')).resumeId
+  const chat = (await rig.tab(ws.id, 'claude: ask me')).resumeId
   await rig.rpc('input', { tab: cl.id, data: 'exit\r' })
-  await until(async () => (await rig.tab(ws.id, 'claude')).status === 'exited', 'claude ended')
-  assert.equal((await rig.tab(ws.id, 'claude')).code, 0)
+  await until(async () => (await rig.tab(ws.id, 'claude: ask me')).status === 'exited', 'claude ended')
+  assert.equal((await rig.tab(ws.id, 'claude: ask me')).code, 0)
   await until(async () => (await rig.screen(cl.id)).includes('press Enter to start it again'), 'its note')
   await rig.rpc('input', { tab: cl.id, data: '\r' })
-  await until(async () => (await rig.tab(ws.id, 'claude')).status !== 'exited', 'claude again')
+  await until(async () => (await rig.tab(ws.id, 'claude: ask me')).status !== 'exited', 'claude again')
   await until(async () => (await rig.screen(cl.id)).includes(`--resume ${chat}`), 'resumed')
 
   // the folder is gone: no tab

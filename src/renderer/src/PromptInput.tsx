@@ -30,6 +30,7 @@ export function PromptInput(p: {
   dictate?: () => void
   dictationSettings?: () => void
   onSubmit?: () => void // ⌘⏎
+  enter?: boolean // ⏎ submits too (a chat's), ⇧⏎ a new line
   onBusy?: (busy: boolean) => void // images still saving: their paths aren't in yet
   placeholder?: string
   rows?: number
@@ -88,7 +89,7 @@ export function PromptInput(p: {
         placeholder={p.placeholder ?? 'What should the agent do? Paste or drop screenshots here.'}
         onChange={e => p.onChange(e.target.value)}
         onPaste={paste}
-        onKeyDown={(e: KeyboardEvent) => e.key === 'Enter' && e.metaKey && (e.preventDefault(), p.onSubmit?.())}
+        onKeyDown={(e: KeyboardEvent) => e.key === 'Enter' && (e.metaKey || (p.enter && !e.shiftKey && !e.altKey && !e.nativeEvent.isComposing)) && (e.preventDefault(), p.onSubmit?.())}
       />
       {p.images.length > 0 && (
         <div className="prompt-images">

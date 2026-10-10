@@ -152,7 +152,7 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   const into = await task({ ws: first.ws, prompt: 'follow up {{YYYY}}', when: 'weekdays at 9' })
   const sent = await rig.rpc('scheduleRun', { id: into.id })
   assert.equal(sent.tab, first.tab)
-  assert.match(sent.what, /^(sent to|queued for) claude/)
+  assert.match(sent.what, /^(sent to|queued for) its tab, claude/)
   await until(async () => (await rig.tab(first.ws)).last === `answer: follow up ${new Date().getFullYear()}`, 'the prompt, dated, reached the same agent')
 
   // long overdue (the Mac asleep): logged as missed, not run, and on to the next time
@@ -166,7 +166,7 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   const once = await task({ ws: first.ws, preset: 'codex', prompt: 'just once', when: 'once at 23:00' })
   await rig.rpc('scheduleTick', { now: once.next })
   v = await rig.rpc('state')
-  assert.match(v.runs[0].what, /^started in a new codex tab$/)
+  assert.match(v.runs[0].what, /^started in a new tab, codex/)
   assert.deepEqual([v.schedules.find((x: any) => x.id === once.id).on, v.schedules.find((x: any) => x.id === once.id).next], [false, undefined])
 
   // the workspace gone: the run says why; it can still be turned off, not on
@@ -192,7 +192,7 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   // in a folder, no worktree: its local workspace, made by the first run; then its agent gets the next ones
   const local = await task({ project: np.id, ws: 'local', prompt: 'tidy the notes', when: 'every day at 8pm' })
   const one = await rig.rpc('scheduleRun', { id: local.id })
-  assert.deepEqual([one.ok, one.what, one.project], [true, 'started in a new claude tab', np.id])
+  assert.deepEqual([one.ok, one.what, one.project], [true, 'started in a new tab, claude', np.id])
   const folder = (await rig.rpc('state')).workspaces.find((w: any) => w.id === one.ws)
   assert.deepEqual([folder.kind, folder.path, folder.project], ['local', realpathSync(plain), np.id])
   await until(async () => (await rig.tab(one.ws)).last === 'answer: tidy the notes', 'the agent in the folder got it')

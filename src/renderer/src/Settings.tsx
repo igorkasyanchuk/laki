@@ -3,10 +3,10 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
-import { importable, MAIL_OK, parseMails, type RunAction, type Template } from './text'
+import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge } from './api'
 import { DOCK_ICONS } from './dock'
@@ -15,6 +15,10 @@ import './floater.css'
 import { Icon, IconButton, type IconName, keep, load, Switch } from './ui'
 import { QR } from './Tunnel'
 import { USAGE_AGENTS } from './Usage'
+import { BACKENDS, money, tokens } from './Ai'
+import { Markdown } from './MarkdownView'
+import notes from '../../../docs/release-notes.md?raw'
+import { version } from '../../../package.json'
 
 // a switch row's text: what it is, and under it a line on what it does
 const Says = ({ title, hint }: { title: ReactNode; hint?: ReactNode }) => (
@@ -35,10 +39,10 @@ const Group = ({ title, hint, children }: { title: string; hint?: ReactNode; chi
   </section>
 )
 
-// the global lists' note (Prompt templates, Actions): everywhere, and where a project's own go
-const Global = ({ children }: { children: ReactNode }) => (
+// a list's note (Prompt templates, Actions): Global, everywhere; This project, here only, with the global ones
+const Scope = ({ tag, children }: { tag: string; children: ReactNode }) => (
   <div className="set-scope">
-    <span className="tag set-scope-tag">Global</span>
+    <span className="tag set-scope-tag">{tag}</span>
     <span>{children}</span>
   </div>
 )
@@ -81,11 +85,6 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['extended', 'Extended', 'a second line: branch, what the agent is doing, the PR, the diff'],
   ['cards', 'Cards', 'a card each, with the agent’s last answer'],
   ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
-]
-// the app's layout (App.tsx rail): one sidebar, or a rail of kinds beside a list (Slack's); a picture each
-const LAYOUTS: ['one' | 'rail', string, string][] = [
-  ['rail', 'Rail and list', 'A rail of Projects, Board, Schedule, Terminal and Browser, with what needs you on each (Board and Schedule: a page over the list), Settings at the bottom; the list shows the one you pick'],
-  ['one', 'One sidebar', 'Projects, terminals and browsers in one list'],
 ]
 // Appearance's corners (--radius) and where the tabs go
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
@@ -138,6 +137,7 @@ export type AppSettings = Paint & {
   prTries?: number // fix CI's and fix conflicts' tries in a row
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (0: always)
   webhook?: Webhook // pushes to your phone
+  ai?: AiSettings // Laki AI (Settings › AI)
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   menuBar?: boolean // the menu bar's item (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
@@ -156,7 +156,6 @@ export type AppSettings = Paint & {
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
-  layout?: 'one' | 'rail' // one sidebar, or a rail of kinds beside a list (App.tsx rail; unset: rail)
   railLabels?: boolean // the rail's words under its icons (unset: on)
   sideStyle?: SideStyle // the sidebar's rows
 }
@@ -257,6 +256,142 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
           {said && <span className="muted small">{said}</span>}
         </div>
       )}
+    </>
+  )
+}
+
+// Settings › AI: Laki's own AI (daemon/ai.ts, the AI page): on, how it runs, the OpenRouter key (a file only you can
+// read: sent once, never shown again), each backend's model, the steps an ask may take, and what it cost
+export type AiApi = { state: () => Promise<{ key: boolean; totals: AiTotals }>; key: (key: string) => Promise<{ key: boolean }>; open: () => void }
+const AI_HOW: [AiBackend, string][] = [
+  ['openrouter', 'Any model OpenRouter has, paid per token with your API key'],
+  ['claude', 'Claude Code in the background (claude -p), on your Claude plan or its API key'],
+  ['codex', 'Codex in the background (codex exec), on your ChatGPT plan'],
+]
+// presets: Agent presets of claude or codex, each a backend of its own (its env: an account of its own)
+function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings; presets: Preset[]; onChange: (ai: AiSettings) => void }) {
+  const [st, setSt] = useState<{ key: boolean; totals: AiTotals }>()
+  const [key, setKey] = useState('')
+  const [said, setSaid] = useState('')
+  useEffect(() => void api.state().then(setSt, () => {}), [])
+  const backend = ai.backend ?? 'openrouter'
+  // the agents' presets, but the plain ones (claude, codex as they are: the options above them)
+  const mine = presets.filter(p => (p.agent === 'claude' || p.agent === 'codex') && (p.name !== p.agent || Object.keys(p.env ?? {}).length))
+  const preset = backend !== 'openrouter' ? mine.find(p => p.name === ai.preset && p.agent === backend) : undefined
+  const pick = (v: string) => {
+    const p = v.startsWith('preset:') ? mine.find(x => x.name === v.slice(7)) : undefined
+    onChange({ ...ai, backend: (p?.agent ?? v) as AiBackend, preset: p?.name })
+  }
+  const saveKey = (k: string) => api.key(k).then(r => (setSt(x => x && { ...x, key: r.key }), setKey(''), setSaid(r.key ? 'Saved' : 'Removed')), e => setSaid(e.message))
+  const sum = (k: 'today' | 'month', label: string) => (
+    <div>
+      <b>{money(st?.totals[k].cost ?? 0)}</b>
+      <span>
+        {label} · {st?.totals[k].calls ?? 0} asks · {tokens((st?.totals[k].in ?? 0) + (st?.totals[k].out ?? 0))} tokens
+      </span>
+    </div>
+  )
+  return (
+    <>
+      <h2>AI</h2>
+      <p className="muted small">
+        Laki's own assistant: ask it, in words, to start workspaces, review PRs from a screenshot, send prompts to your agents or tell you what they're
+        doing. It works Laki through the same tools as <code>laki mcp</code>, only when you ask, and never archives, deletes, ships or merges. Optional:
+        off until you turn it on.
+      </p>
+      <Group title="Laki AI">
+        <div className="setting-box">
+          <Switch className="switch-row" on={!!ai.on} onChange={on => onChange({ ...ai, on })}>
+            <Says title="Turn on Laki AI" hint="The AI page (the rail's AI, ⌘K) and laki ai in the terminal" />
+          </Switch>
+        </div>
+      </Group>
+      <Group title="Runs with">
+        <div className="grid2">
+          <label>
+            Backend
+            <select value={preset ? `preset:${preset.name}` : backend} onChange={e => pick(e.target.value)}>
+              {AI_HOW.map(([id]) => (
+                <option key={id} value={id}>
+                  {BACKENDS[id]}
+                </option>
+              ))}
+              {mine.length > 0 && (
+                <optgroup label="Your agent presets">
+                  {mine.map(p => (
+                    <option key={p.name} value={`preset:${p.name}`}>
+                      {p.name} · {BACKENDS[p.agent as AiBackend]}
+                    </option>
+                  ))}
+                </optgroup>
+              )}
+            </select>
+          </label>
+        </div>
+        <p className="muted small">
+          {preset
+            ? `Your preset ${preset.name}: ${BACKENDS[backend]} with its env${Object.keys(preset.env ?? {}).length ? ` (${Object.keys(preset.env!).join(', ')})` : ''}, for an account of its own. Its args are for a tab, not used here.`
+            : AI_HOW.find(x => x[0] === backend)?.[1]}
+          {backend !== 'openrouter' && !preset && ' Another account (CLAUDE_CONFIG_DIR, CODEX_HOME): make an agent preset with that env, then pick it here.'}
+        </p>
+        <label>
+          Model
+          <input
+            className="mono"
+            value={ai.models?.[backend] ?? ''}
+            placeholder={backend === 'openrouter' ? AI_MODEL : backend === 'claude' ? 'its default: sonnet, opus, haiku…' : 'its default: gpt-5.6-sol…'}
+            spellCheck={false}
+            onChange={e => onChange({ ...ai, models: { ...ai.models, [backend]: e.target.value.trim() || undefined } })}
+          />
+        </label>
+        {backend === 'openrouter' && (
+          <p className="muted small">
+            A model id from openrouter.ai/models, one that can call tools (and read images, for screenshots).
+          </p>
+        )}
+      </Group>
+      {backend === 'openrouter' && (
+        <Group title="OpenRouter API key" hint="Kept in a file only you can read, in Laki's data folder: never in its settings, never shown again">
+          <div className="row-buttons">
+            <input
+              className="mono grow"
+              type="password"
+              autoComplete="off"
+              value={key}
+              placeholder={st?.key ? '•••••••• saved: paste another to replace it' : 'sk-or-v1-…'}
+              spellCheck={false}
+              onChange={e => (setKey(e.target.value), setSaid(''))}
+              onKeyDown={e => e.key === 'Enter' && key.trim() && saveKey(key)}
+            />
+            <button type="button" className="primary" disabled={!key.trim()} onClick={() => saveKey(key)}>
+              Save
+            </button>
+            {st?.key && (
+              <button type="button" onClick={() => saveKey('')}>
+                Remove
+              </button>
+            )}
+          </div>
+          {said && <p className="muted small">{said}</p>}
+        </Group>
+      )}
+      <Group title="Steps" hint="OpenRouter: how many rounds of tool calls one ask may take before it stops, a guard against a model that loops (claude -p and codex exec keep their own)">
+        <label>
+          Rounds at most
+          <input type="number" min={1} max={100} placeholder={String(AI_STEPS)} value={ai.steps ?? ''} onChange={e => onChange({ ...ai, steps: e.target.value ? Math.max(1, Math.min(100, Math.round(Number(e.target.value)) || 1)) : undefined })} />
+        </label>
+      </Group>
+      <Group title="Spending" hint="Every ask, its tokens and cost, is on the AI page. OpenRouter's cost is its own; claude -p's is Claude Code's estimate; codex exec's is your plan">
+        <div className="sched-stats ai-totals">
+          {sum('today', 'today')}
+          {sum('month', 'this month')}
+        </div>
+        <div className="row-buttons">
+          <button type="button" onClick={api.open}>
+            Open the AI page
+          </button>
+        </div>
+      </Group>
     </>
   )
 }
@@ -584,12 +719,31 @@ function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange:
   )
 }
 
-function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promise<ProjectConfig>; rename?: boolean; script?: keyof Scripts; onSave: (o: { name?: string; config: ProjectConfig; notes?: string }) => unknown }) {
+function ProjectSection(p: {
+  project: ProjectInfo
+  file?: (id: string) => Promise<ProjectConfig>
+  rename?: boolean
+  script?: keyof Scripts
+  global?: { actions?: RunAction[]; templates?: Template[] } // Settings' own, which go with this project's
+  onGlobal?: (sec: 'actions' | 'templates') => void
+  onSave: (o: { name?: string; config: ProjectConfig; notes?: string }) => unknown
+}) {
   const [name, setName] = useState(p.project.name)
   const [notes, setNotes] = useState(p.project.notes ?? '')
   const notes0 = useRef(notes) // sent only once changed here: the Notes dialog or another client may have saved since
   const [c, setC] = useState<ProjectConfig>(p.project.config ?? {})
   const [file, setFile] = useState<ProjectConfig>({})
+  // the lists' note: how many the global ones and these make together (fewer: one here replaces a global one)
+  const count = (global: number, own: number, all: number) => `${global} global + ${own} here, ${all} in all`
+  const named = (l?: Template[]) => (l ?? []).filter(t => t.name.trim())
+  const globalLink = (sec: 'actions' | 'templates', label: string) =>
+    p.onGlobal ? (
+      <button type="button" className="link" onClick={() => p.onGlobal?.(sec)}>
+        {label}
+      </button>
+    ) : (
+      label
+    )
   useEffect(() => void p.file?.(p.project.id).then(setFile, () => {}), [p.project.id])
   const first = useRef(true)
   const unsaved = useRef<(() => unknown) | null>(null)
@@ -648,10 +802,20 @@ function ProjectSection(p: { project: ProjectInfo; file?: (id: string) => Promis
         <input value={c.expose ?? ''} aria-label="Expose to the world" placeholder={file.expose ? `${file.expose} (.laki.json)` : 'anyone with the link'} onChange={e => setC(y => ({ ...y, expose: e.target.value }))} />
         {badMails.length > 0 && <span className="field-err">Not an address or *@domain: {badMails.join(', ')}</span>}
       </Group>
-      <Group title="Actions" hint="This project's only: in Run ▾ after the global ones (Settings › Actions); one with a global one's name replaces it here">
+      <Group title="Actions">
+        <Scope tag="This project">
+          Only for this project. Run ▾ in its workspaces shows the global actions ({globalLink('actions', 'Settings › Actions')}) and these together:{' '}
+          {count(mergeActions(p.global?.actions).length, mergeActions([], c.actions).length, mergeActions(p.global?.actions, c.actions).length)}. One here with
+          a global one's name and kind replaces it.
+        </Scope>
         <ActionsField value={c.actions} onChange={actions => setC(y => ({ ...y, actions }))} />
       </Group>
-      <Group title="Prompt templates" hint="This project's only: a new workspace here lists them first, then the global ones (Settings › Prompt templates); one with a global one's name replaces it">
+      <Group title="Prompt templates">
+        <Scope tag="This project">
+          Only for this project. Its new workspaces show these first, then the global templates ({globalLink('templates', 'Settings › Prompt templates')}):{' '}
+          {count(named(p.global?.templates).length, named(c.templates).length, named(templatesFor(p.global?.templates, c.templates)).length)}. One here with a
+          global one's name replaces it.
+        </Scope>
         <TemplatesField value={c.templates} onChange={templates => setC(y => ({ ...y, templates }))} />
       </Group>
     </>
@@ -669,6 +833,11 @@ const FIND: [string, string, string?][] = [
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
   ['webhook', 'Notifications webhook', 'phone push ntfy slack telegram json notify waiting done'],
+  ['notes', 'Release notes', "what's new changelog version changes added recently"],
+  ['ai', 'Turn on Laki AI', 'assistant orchestrate llm chat openrouter'],
+  ['ai', 'Runs with', 'backend openrouter claude -p codex exec model'],
+  ['ai', 'OpenRouter API key', 'token secret ai'],
+  ['ai', 'Spending', 'cost usage tokens ai today month'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['general', 'Menu bar item', 'tray status count waiting needs you'],
@@ -686,7 +855,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Settings & Help size', 'zoom text font size small bigger larger readable page'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Project names', 'sidebar font case letter spacing size weight'],
-  ['appearance', 'Layout', 'one sidebar rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
+  ['appearance', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
   ['appearance', 'Sidebar', 'status guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
   ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
@@ -746,11 +915,13 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
+  { id: 'notes', label: 'Release notes', icon: 'file', group: 'Laki' },
   { id: 'presets', label: 'Agent presets', icon: 'agent', group: 'Agents' },
   { id: 'templates', label: 'Prompt templates', icon: 'pencil', group: 'Agents' },
   { id: 'actions', label: 'Actions', icon: 'run', group: 'Agents' },
   { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Agents' },
   { id: 'skill', label: 'Agent skill', icon: 'import', group: 'Agents' },
+  { id: 'ai', label: 'AI', icon: 'ai', group: 'Agents' },
   { id: 'open', label: 'Open in', icon: 'code', group: 'Connect' },
   { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
   { id: 'widgets', label: 'Widgets', icon: 'panel', group: 'Connect' },
@@ -1384,6 +1555,7 @@ export function SettingsPage(p: {
   script?: keyof Scripts // a project's script tab to show
   spot?: string // a group's title to open at, lit (Run ▾'s Edit the run script…, Edit actions…)
   skill?: SkillApi
+  ai?: AiApi
   remote?: RemoteApi
   widgets?: WidgetsApi
   resources?: ResourcesApi
@@ -1395,7 +1567,7 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
   const [sec, setSec] = useState(() => p.section ?? (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(load('laki.settingsSec', 'general')))
   useEffect(() => {
     keep('laki.settingsSec', sec)
@@ -1596,6 +1768,8 @@ export function SettingsPage(p: {
               file={p.projectFile}
               rename={p.renameProjects}
               script={p.script}
+              global={{ actions: s.actions, templates: s.templates }}
+              onGlobal={openSec}
               onSave={o => p.onSaveProject?.(project.id, o)}
             />
           )}
@@ -1806,25 +1980,10 @@ export function SettingsPage(p: {
                 </label>
               </div>
               </Group>
-              <Group title="Layout" hint="On a phone it's always one sidebar">
-                <div className="layouts" role="radiogroup" aria-label="Layout">
-                  {LAYOUTS.map(([k, name, what]) => (
-                    <button key={k} type="button" role="radio" aria-checked={(s.layout ?? 'rail') === k} className={`layout-pick ${(s.layout ?? 'rail') === k ? 'on' : ''}`} onClick={() => set({ layout: k })}>
-                      <span className="layout-pic" aria-hidden>
-                        {k === 'rail' && <i className="lp-rail" />}
-                        <i className="lp-side" />
-                        <i className="lp-main" />
-                      </span>
-                      <b>{name}</b>
-                      <span className="muted small">{what}</span>
-                    </button>
-                  ))}
-                </div>
-                {(s.layout ?? 'rail') === 'rail' && ( // each layout's own settings, under it
-                  <Switch className="switch-row" on={s.railLabels !== false} onChange={v => set({ railLabels: v })}>
-                    <Says title="Labels" hint="Words under the rail's icons: Projects, Board, Schedule, Terminal, Browser, Settings; off: icons only, and a narrower rail" />
-                  </Switch>
-                )}
+              <Group title="Rail" hint="Projects, Board, Schedule, Terminal and Browser on the left, with what needs you on each; the list beside it shows the one you pick">
+                <Switch className="switch-row" on={s.railLabels !== false} onChange={v => set({ railLabels: v })}>
+                  <Says title="Labels" hint="Words under the rail's icons: Projects, Board, Schedule, Terminal, Browser, Settings; off: icons only, and a narrower rail" />
+                </Switch>
               </Group>
               <Group title="Sidebar" hint="How a workspace's row looks; each choice is over the theme's">
               <div className="field">
@@ -1916,7 +2075,7 @@ export function SettingsPage(p: {
                             <option value="stack">Stacked in the drop</option>
                             <option value="card">A menu beside it</option>
                           </select>
-                          <Says title="Its actions" hint="Stacked: four buttons over the +, the drop grows, a hover names each. A menu: a card beside the drop with their names, 1-4 to pick from the keyboard" />
+                          <Says title="Its actions" hint="Stacked: buttons over the +, the drop grows, a hover names each. A menu: a card beside the drop with their names, a number key picks one. Ask Laki AI joins them while Laki AI is on" />
                         </label>
                         <label className="switch-row sub">
                           <select value={s.floaterVoiceTo ?? 'pick'} onChange={e => set({ floaterVoiceTo: e.target.value as 'pick' | 'new' })}>
@@ -2189,6 +2348,16 @@ export function SettingsPage(p: {
           {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} />}
           {sec === 'remote' && p.remote && <RemoteSection api={p.remote} mail={s.remoteMail ?? ''} onMail={remoteMail => set({ remoteMail })} />}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? 0} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
+          {sec === 'notes' && (
+            <>
+              <h2>Release notes</h2>
+              <p className="muted small">What's new in Laki, newest first. This build: {version}.</p>
+              <div className="release-notes">
+                <Markdown src={notes.replace(/<!--[\s\S]*?-->/g, '').replace(/^## Next$/m, `## New since ${version}`)} />
+              </div>
+            </>
+          )}
+          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} presets={presets} onChange={ai => set({ ai })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (
             <>
@@ -2232,10 +2401,10 @@ export function SettingsPage(p: {
           {sec === 'templates' && (
             <>
               <h2>Prompt templates</h2>
-              <Global>
+              <Scope tag="Global">
                 In every project's new workspaces, whatever the agent. A project's own (Settings › the project › Prompt templates) come first there, and one
                 with the same name replaces a global one.
-              </Global>
+              </Scope>
               <p className="muted small">
                 Pick one under a new workspace's prompt and the agent gets it filled in: <code>{'{{prompt}}'}</code> is what you typed, <code>{'{{project}}'}</code> and{' '}
                 <code>{'{{base}}'}</code> the project and base branch. A template without <code>{'{{prompt}}'}</code> gets the prompt after it.
@@ -2246,10 +2415,10 @@ export function SettingsPage(p: {
           {sec === 'actions' && (
             <>
               <h2>Actions</h2>
-              <Global>
+              <Scope tag="Global">
                 In Run ▾ in every project's workspaces, for every preset of the agent it's for (Any agent: all of them). A project's own (Settings › the
                 project › Actions) come after them, and one with the same name and kind replaces a global one.
-              </Global>
+              </Scope>
               <p className="muted small">
                 A prompt goes to its agent's tab (the focused one first), queued while the agent works; it's listed only while that agent runs there. A
                 command goes to a terminal: the focused one, any other, or a new one. The copy button makes the same for another agent.

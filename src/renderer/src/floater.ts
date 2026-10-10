@@ -13,15 +13,18 @@ import { initials } from './text'
 // branch, agents, pr, lines: the card's more, as the sidebar's hover card has them
 export type Float = { tab: string; name: string; project: string; status: 'running' | 'waiting' | 'idle' | 'done'; color?: string; last?: string; branch?: string; agents?: string; pr?: { state: string; text: string; meta: string }; lines?: string[] }
 type Colors = Record<string, string>
-type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean }
-// the +'s actions, the menu bar's too: what, its name, what it does
+type Floats = { items: Float[]; colors: Colors; style?: string; add?: boolean; menu?: 'stack' | 'card'; doneAlert?: boolean; ai?: boolean }
+// the +'s actions, the menu bar's too: what, its name, what it does; Ask Laki AI while it's on (Settings › AI), last:
+// the others keep their keys
 const ACTS = [
   ['new', 'New task', 'an agent in a worktree'],
   ['mic', 'Say it', 'dictate a prompt'],
   ['area', 'Screenshot area', 'drag over what to show'],
   ['screen', 'Whole screen', "the screen you're on"],
+  ['ai', 'Ask Laki AI', 'it starts and steers agents'],
 ] as const
 type Act = (typeof ACTS)[number][0]
+const actsFor = (f: Floats | null) => ACTS.filter(([act]) => act !== 'ai' || f?.ai)
 type Bridge = {
   dictate?: () => void
   floater?: {
@@ -65,6 +68,7 @@ const ICONS: Record<Act | 'plus', string> = {
   plus: svg('<path d="M12 5v14M5 12h14"/>'),
   new: svg('<path d="M7 3H4a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V9"/><path d="M11.5 2.5l2 2L8 10H6V8z"/>', 16),
   mic: svg('<rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/>'),
+  ai: svg('<path d="M6.5 2.5l1.2 3.3 3.3 1.2-3.3 1.2-1.2 3.3-1.2-3.3L2 7l3.3-1.2zM12 9.5l.6 1.9 1.9.6-1.9.6-.6 1.9-.6-1.9-1.9-.6 1.9-.6z"/>', 16),
   area: svg('<path d="M2 5V2h3M11 2h3v3M14 11v3h-3M5 14H2v-3"/>', 16),
   screen: svg('<rect x="2" y="3" width="12" height="8" rx="1"/><path d="M6 14h4M8 11v3"/>', 16),
 }
@@ -137,7 +141,7 @@ else {
   const done = (click: boolean) => {
     const d = drag
     drag = null
-    if (click && !d?.moved && (d?.tab || d?.act === 'new' || d?.act === 'area' || d?.act === 'screen')) (away = true), hot() // the bar hides, or a window comes over it: not lit as it comes back
+    if (click && !d?.moved && (d?.tab || d?.act === 'new' || d?.act === 'ai' || d?.act === 'area' || d?.act === 'screen')) (away = true), hot() // the bar hides, or a window comes over it: not lit as it comes back
     if (d?.moved) document.body.classList.remove('dragging'), bridge?.drag('end')
     else if (click && d?.tab) hover(''), bridge?.open(d.tab)
     else if (click && d?.act === 'plus') plus(!!d.wasOpen)
@@ -206,7 +210,7 @@ else {
       }
       if (stack) {
         const acts = el('div', '', `fl-acts${pop ? ' pop' : ''}`)
-        for (const [act, name, hint] of ACTS) {
+        for (const [act, name, hint] of actsFor(cur)) {
           const b = button(act, name)
           tip(b, name, hint)
           acts.append(b)
@@ -227,32 +231,37 @@ else {
   }
 }
 
-// the +'s menu beside the drop (floaterMenu card): a row per action with its name, what it does and its key (1-4);
-// arrows move, ⏎ picks, Esc or a click elsewhere closes it (main: on blur)
+// the +'s menu beside the drop (floaterMenu card): a row per action with its name, what it does and its key (1-5);
+// arrows move, ⏎ picks, Esc or a click elsewhere closes it (main: on blur). Its rows come with the floats (Ask Laki AI)
 function menuPage() {
   const box = document.getElementById('menu')!
-  const rows = ACTS.map(([act, name, hint], i) => {
-    const b = Object.assign(document.createElement('button'), { className: 'm-row' })
-    b.onclick = () => bridge?.act(act)
-    b.setAttribute('role', 'menuitem')
-    const ic = el('span', '', 'm-ic')
-    ic.innerHTML = ICONS[act]
-    const txt = el('span', '', 'm-txt')
-    txt.append(el('span', name, 'm-t'), el('span', hint, 'm-h'))
-    b.append(ic, txt, el('span', String(i + 1), 'm-k'))
-    b.onmousemove = () => document.activeElement !== b && b.focus() // moved onto, not a pointer resting where it opened
-    return b
-  })
-  box.replaceChildren(...rows)
+  let rows: HTMLButtonElement[] = []
+  const draw = (f: Floats) =>
+    (rows = actsFor(f).map(([act, name, hint], i) => {
+      const b = Object.assign(document.createElement('button'), { className: 'm-row' })
+      b.onclick = () => bridge?.act(act)
+      b.setAttribute('role', 'menuitem')
+      const ic = el('span', '', 'm-ic')
+      ic.innerHTML = ICONS[act]
+      const txt = el('span', '', 'm-txt')
+      txt.append(el('span', name, 'm-t'), el('span', hint, 'm-h'))
+      b.append(ic, txt, el('span', String(i + 1), 'm-k'))
+      b.onmousemove = () => document.activeElement !== b && b.focus() // moved onto, not a pointer resting where it opened
+      return b
+    }))
   document.onkeydown = e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return // ⌘1 and the like aren't its keys
     const i = rows.indexOf(document.activeElement as HTMLButtonElement)
     if (e.key === 'Escape') bridge?.menuClose()
-    else if (/^[1-4]$/.test(e.key)) rows[Number(e.key) - 1].click()
-    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') e.preventDefault(), rows[(i + (e.key === 'ArrowDown' ? 1 : rows.length - 1) + rows.length) % rows.length].focus()
+    else if (/^[1-9]$/.test(e.key)) rows[Number(e.key) - 1]?.click()
+    else if (e.key === 'ArrowDown' || e.key === 'ArrowUp') e.preventDefault(), rows[(i + (e.key === 'ArrowDown' ? 1 : rows.length - 1) + rows.length) % rows.length]?.focus()
   }
-  bridge?.onFloats(f => paint(f.colors))
-  rows[0].focus()
+  bridge?.onFloats(f => {
+    paint(f.colors)
+    const focus = rows.length ? rows.indexOf(document.activeElement as HTMLButtonElement) : 0
+    box.replaceChildren(...draw(f))
+    rows[Math.max(0, focus)]?.focus()
+  })
 }
 
 // Say it's window: a text box dictation starts in (macOS's, as the app's prompt mic: 150 ms after the focus, once

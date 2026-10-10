@@ -148,6 +148,28 @@ export type Tab = {
   model?: string // the agent's --model (unset: its own default), kept for restarts
   effort?: string // and its effort (EFFORTS)
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
+  titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
+}
+
+// a few words of what a prompt asks, for a tab's name: its first line less links (a GitHub PR's or issue's is #n), flags,
+// Markdown, a leading "please" and a trailing "the"; a path is its file's name; "" when nothing's left
+export function taskTitle(prompt: string, words = 6) {
+  let s = (prompt.split('\n').find(l => l.trim()) ?? '')
+    .replace(/https?:\/\/github\.com\/[^\s/]+\/[^\s/]+\/(?:pull|issues)\/(\d+)\S*/g, '#$1')
+    .replace(/https?:\/\/\S+/g, ' ')
+    .replace(/(^|\s)(?:[~.]{0,2}\/(?:[^\s/]+\/)+|(?:[^\s/]+\/){2,})([^\s/]*)/g, '$1$2') // a path: two parts at least (a /command, and/or stay)
+    .replace(/(^|\s)--?[a-z][\w-]*(=\S*)?/gi, '$1')
+    .replace(/[*_`>[\]()"{}]+|#(?!\d)/g, ' ')
+    .trim()
+  for (let was = ''; was !== s; ) {
+    was = s
+    s = s.replace(/^(please|pls|can you|could you|would you|will you|i want you to|i need you to|i'd like you to|let's|lets|now|ok|okay|hey|hi|so|then|and)\b[\s,:;!.-]*/i, '')
+  }
+  const w = s.split(/\s+/).filter(Boolean).slice(0, words)
+  while (w.length > 1 && /^(the|a|an|to|of|in|on|for|and|or|with|at|from|that|this|is|by|as)$/i.test(w.at(-1)!.replace(/[,.;:!?-]+$/, ''))) w.pop()
+  const t = w.join(' ').replace(/[\s,.;:!?-]+$/, '')
+  const c = [...t] // by code point: an emoji stays whole
+  return c.length > 36 ? `${c.slice(0, 35).join('').trimEnd()}…` : t
 }
 
 // how an agent starts: one of AGENTS with extra args, or any command; env on top of the project's
@@ -223,12 +245,34 @@ export type Settings = {
   dockIcon?: string // the Dock's icon while Laki runs: laki, dawn, terminal, glacier, bubbles, neon (unset: the app's own, laki)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
-  layout?: 'one' | 'rail' // one sidebar for everything, or a rail of kinds (Projects, Terminals, Browsers) beside a list of the one picked (unset: rail)
   railLabels?: boolean // the rail layout's words under its icons; off: icons only, a narrower rail (unset: on)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
   progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
+  ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
+}
+
+// Laki's own AI (daemon/ai.ts): optional (on), it works Laki through the MCP server's tools, only when asked. backend:
+// OpenRouter (its key in <data>/ai-key, never here) or a CLI agent in the background (claude -p, codex exec); models:
+// each backend's (unset: AI_MODEL for OpenRouter, the agent's own for the others); steps: tool calls an ask may make
+export type AiBackend = 'openrouter' | 'claude' | 'codex'
+// preset: an agent preset of the backend's agent (claude, codex), its env for an account of its own
+export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; steps?: number }
+export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
+export const AI_STEPS = 20
+// the AI page's conversation: what you asked (images: their paths), its answers, each tool it ran, a failure
+export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: number; images?: string[] }
+// one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
+// estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
+export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string }
+export type AiTotals = { today: AiSum; month: AiSum }
+export type AiSum = { calls: number; in: number; out: number; cost: number }
+// today's and this month's calls, on this Mac's clock
+export function aiTotals(calls: AiCall[], now = new Date()): AiTotals {
+  const sum = (from: number): AiSum =>
+    calls.filter(c => c.at >= from).reduce((s, c) => ({ calls: s.calls + 1, in: s.in + (c.in || 0), out: s.out + (c.out || 0), cost: s.cost + (c.cost || 0) }), { calls: 0, in: 0, out: 0, cost: 0 })
+  return { today: sum(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()), month: sum(new Date(now.getFullYear(), now.getMonth(), 1).getTime()) }
 }
 
 // Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
@@ -342,4 +386,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 41
+export const API = 43
