@@ -18,10 +18,10 @@ export type SchedulesApi = {
 const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, wed and fri at 18:30', 'every 2 hours from 9am to 6pm', 'tomorrow at 7am']
 const RUNS = 8 // the log's rows until Show all
 // where a run goes: its words, its icon
-const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']]
-const at = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
+export const WHERE: [string, string, 'fork' | 'folder'][] = [['new', 'a new workspace each run', 'fork'], ['local-new', 'in its folder, a new session each run', 'folder'], ['local', 'in its folder, one session', 'folder']]
+export const at = (t: number) => new Date(t).toLocaleString([], { weekday: 'short', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })
 // how soon a run is: in 5 min, in 3 h, in 2 days
-const soon = (t: number, now = Date.now()) => {
+export const soon = (t: number, now = Date.now()) => {
   const m = Math.max(0, Math.round((t - now) / 60000))
   const h = Math.round(m / 60)
   const d = Math.round(m / 60 / 24)

@@ -8,6 +8,7 @@ import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERG
 import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { AiPage } from './Ai'
+import { ProjectPage } from './Project'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
@@ -21,13 +22,13 @@ import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, clock, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
+import { actionsFor, clock, mergeActions, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string } | { project: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -164,6 +165,10 @@ export function App() {
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, openMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
+  // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
+  // window full screen too (main's, so Esc stays the terminal's)
+  const [full, setFull] = useState(false)
+  const toggleFull = (on = !full) => (setFull(on), bridge?.fullScreen?.(on))
   const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
@@ -295,12 +300,13 @@ export function App() {
     const t = timersRef.current.find(x => x.id === id)
     if (!t) return
     if ((t.then === 'send' || t.then === 'remind') && !viewRef.current) return void setTimeout(() => ring(id), 1000) // due as Laki opens: once the tabs are in
+    if (t.then === 'send' && t.tab === 'ai') return void (setTimer(id, () => null), askLater(stamp(t.text!, Date.now())))
     if (t.then === 'send') {
       setTimer(id, () => null)
       const tab = viewRef.current?.tabs.find(x => x.id === t.tab)
       const say = (text: string, ok?: boolean) => (notify('Message for later', text, ok ? t.tab! : '', () => tab && selectTab(tab.id), viewRef.current?.settings.notifySound), toast(text, undefined, undefined, ok))
       if (!tab) return say(`Not sent: its agent tab is gone (${clip(t.text!)})`)
-      return void api.call<{ queued?: number }>('send', { target: tab.id, text: t.text, whenIdle: true }).then(
+      return void api.call<{ queued?: number }>('send', { target: tab.id, text: stamp(t.text!, Date.now()), whenIdle: true }).then(
         r => say(`${r?.queued ? `Queued for ${tab.name}, busy now` : `Sent to ${tab.name}`}: ${clip(t.text!)}`, true),
         e => say(`Not sent to ${tab.name}: ${e.message}`),
       )
@@ -329,6 +335,18 @@ export function App() {
     const again = () => addTimer(t.ms, { then: t.then, cmd: t.cmd, ws: t.ws, note: t.note })
     if (document.querySelector('.ask-overlay')) return toast(`Timer: ${up}`, again, 'Again') // a dialog would answer the open one with no
     choose(t.note || `${span(t.ms)} timer is up`, [t.note && `${span(t.ms)} timer is up`, did && did.slice(2).replace(/^./, c => c.toUpperCase())].filter(Boolean).join(' · ') || undefined, [{ label: 'Again' }, { label: 'OK', primary: true }]).then(i => i === 0 && again())
+  }
+  // Send later to Laki AI: asked now, or once it's free (one ask at a time: tried every 15 s for an hour); its answer is
+  // a notification that opens the AI page
+  // busy or not connected (a daemon restarting): tried again every 15 s for an hour
+  // ponytail: the retries live in this window only; a reload meanwhile drops the ask (keep it as a timer if that bites)
+  const askLater = (text: string, tries = 0) => {
+    const say = (s: string, ok?: boolean) => (notify('Laki AI', s, '', () => setDialog('ai'), viewRef.current?.settings.notifySound), toast(s, () => setDialog('ai'), 'Open', ok))
+    if (!tries) toast(`Asked Laki AI: ${clip(text)}`, () => setDialog('ai'), 'Open', true)
+    api.call('aiAsk', { text }).then(
+      () => say(`Answered: ${clip(text)}`, true),
+      e => (/^(the AI is still|the AI is at work|not connected)/.test(e.message) && tries < 240 ? void setTimeout(() => askLater(text, tries + 1), 15000) : say(`${tries >= 240 || /^(Laki AI is off|ask something|no OpenRouter API key|not connected)/.test(e.message) ? 'Not asked' : 'Failed'}: ${e.message} (${clip(text)})`)),
+    )
   }
   useEffect(() => {
     const n = missed.current.length
@@ -945,11 +963,11 @@ export function App() {
   ]
   // a timer's own (its bar): more time, a new length, what happens as it ends, or stop it
   const reminder = (t: Timer, w = live.find(x => x.id === t.ws)) => `Remind me about ${w ? wsName(w) : 'a gone workspace'}`
-  const sendTo = (t: Timer) => view?.tabs.find(x => x.id === t.tab)?.name ?? 'a gone tab'
+  const sendTo = (t: Timer) => (t.tab === 'ai' ? 'Laki AI' : (view?.tabs.find(x => x.id === t.tab)?.name ?? 'a gone tab'))
   const timerMenu = (t: Timer): MenuItem[] => t.then === 'send' ? [
     { head: `Sends to ${sendTo(t)} at ${new Date(t.end).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` },
     { label: 'Send now', icon: 'arrowRight', key: 's', run: () => ring(t.id) },
-    { label: 'Edit…', icon: 'pencil', key: 'e', run: () => t.ws && setDialog({ sendLater: t.ws, edit: t.id }) },
+    { label: 'Edit…', icon: 'pencil', key: 'e', run: () => setDialog({ sendLater: t.ws ?? '', edit: t.id }) },
     null,
     { label: 'Cancel it', icon: 'stop', key: 'c', danger: true, run: () => setTimer(t.id, () => null) },
   ] : t.then === 'remind' ? [
@@ -980,6 +998,7 @@ export function App() {
     { colors: TAB_COLORS, value: w.color, pick: c => call('wsSet', { id: w.id, color: c }) },
     { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: w.id }) },
     { label: 'Info', icon: 'info', key: 'i', run: () => (setWsId(w.id), showInfo(true, w.id)) },
+    { label: 'Open in', icon: 'code', key: 'o', items: openInItems({ ws: w.id }) },
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
     { label: 'Remind me…', icon: 'timer', key: 'e', run: () => setDialog({ remind: w.id }) },
     { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
@@ -991,9 +1010,6 @@ export function App() {
     ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
     ...(w.pr?.state === 'OPEN' && !w.pr.mine && allows(w, 'approve') ? [{ label: `Approve PR #${w.pr.number}…`, icon: 'check', run: () => prAct(w, 'approve') } as MenuItem] : []),
     ...(w.pinned ? [] : groupItems(w)),
-    null,
-    { head: 'Open in' },
-    ...openInItems({ ws: w.id }),
     null,
     ...(w.kind === 'worktree'
       ? [
@@ -1088,6 +1104,7 @@ export function App() {
       { colors: TAB_COLORS, value: colorOf(ts[0]), pick: c => ts.forEach(t => call('tabSet', { id: t.id, color: c })) },
       { label: ts[0].muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => ts.forEach(t => call('tabSet', { id: t.id, muted: !ts[0].muted })) },
       { label: 'Mark as unread', icon: 'unread', key: 'u', run: () => ts.forEach(t => markUnread(t.id)) },
+      ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
       ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),
       null,
       { label: 'Split right', icon: 'splitRight', run: () => (selectTab(ts[0].id), split('right', ts[0].id)) },
@@ -1195,6 +1212,8 @@ export function App() {
     const k = e.key.toLowerCase()
     // ⌘⇧N: the tab bar's +, its menu (shell, each agent, command) to pick from with the keys
     if (e.shiftKey && k === 'n') return void (e.preventDefault(), e.stopPropagation(), dialog || document.querySelector<HTMLElement>('.newtab-btn')?.click())
+    if (e.shiftKey && k === 'a') return void (e.preventDefault(), e.stopPropagation(), dialog || toggleArtifacts())
+    if (e.shiftKey && k === 'enter') return void (e.preventDefault(), e.stopPropagation(), toggleFull()) // ⌘⇧⏎: full screen, or back // ⌘⇧A: the Artifacts strip (not under a page: out of sight)
     const act: Record<string, () => void> = {
       n: () => newWs(ws?.project),
       b: () => setSideOpen(o => !o),
@@ -1218,6 +1237,7 @@ export function App() {
       arrowdown: () => moveWs(1),
     }
     if (/^[1-9]$/.test(k)) act[k] = () => groups[Number(k) - 1] && selectGroup(groups[Number(k) - 1])
+    if (canLater && !dialog) act.l = () => sendLater(tab?.kind === 'agent' ? tab.id : undefined)
     if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown' && k !== '+')) return
     const t = e.target as HTMLElement | null // ⌘↑/⌘↓ in a text field move its cursor (xterm's own textarea isn't one)
     if (k.startsWith('arrow') && t && (t.isContentEditable || t.tagName === 'TEXTAREA' || (t instanceof HTMLInputElement && !/^(checkbox|radio|button|submit)$/.test(t.type))) && !t.classList.contains('xterm-helper-textarea')) return
@@ -1248,6 +1268,11 @@ export function App() {
     setDialog(null)
     selectTab(need[(need.findIndex(t => t.id === tab?.id) + 1) % need.length])
   }
+  // ⌘⇧A, the status bar's Artifacts › Show here: the strip of what its agents keep, over the status bar, or not
+  const toggleArtifacts = () => (ws?.storage ? setGallery(g => (g === ws.id ? null : ws.id)) : toast('No artifacts here: its folder is made with its first agent'))
+  // Send later: to one of the workspace's agents, or Laki AI (on); to: who it's for at first
+  const canLater = !!ws && (!!settings.ai?.on || tabs.some(t => t.kind === 'agent' && t.status !== 'exited'))
+  const sendLater = (to?: string, text?: string) => setDialog({ sendLater: ws?.id ?? '', ...(to && { to }), ...(text && { text }) })
   const wsActions: Action[] = !ws
     ? []
     : [
@@ -1255,7 +1280,7 @@ export function App() {
         ...(ws.kind === 'worktree'
           ? [{ label: 'Fork workspace', icon: 'fork', key: 'f', run: () => forkWs(ws) } as Action, { label: 'Archive workspace', icon: 'archive', key: 'a', run: () => archive(ws) } as Action]
           : []),
-        ...(tabs.some(t => t.workspace === ws.id && t.kind === 'agent' && t.status !== 'exited') ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', run: () => setDialog({ sendLater: ws.id }) } as Action] : []),
+        ...(canLater ? [{ label: 'Send a message later…', icon: 'timer', key: 'l', hint: '⌘L', run: () => sendLater() } as Action] : []),
         { label: 'Rename workspace…', icon: 'pencil', key: 'r', run: () => setDialog({ renameWs: ws.id }) },
         ...(ws.browser === undefined ? [{ label: 'Copy path', icon: 'copy', key: 'c', hint: (ws.host ? `${ws.host}:` : '') + shortPath(ws.path), run: () => copy((ws.host ? `${ws.host}:` : '') + ws.path) } as Action] : []),
         { label: ws.pinned ? 'Unpin workspace' : 'Pin workspace to top', icon: 'pin', run: () => call('wsSet', { id: ws.id, pinned: !ws.pinned }) },
@@ -1268,6 +1293,8 @@ export function App() {
     const archived = view?.workspaces.filter(w => w.archived && w.project === p.id) ?? []
     return [
       { label: newWord(p), icon: 'plus', hint: p.kind ? undefined : '⌘N', run: () => newIn(p) },
+      ...(p.kind ? [] : [{ label: 'Open project page', icon: 'info', key: 'o', run: () => setDialog({ project: p.id }) } as MenuItem]),
+      { label: 'Open in', icon: 'code', key: 'i', items: openInItems({ project: p.id }) },
       { label: 'Add a group', icon: 'sep', run: () => setDialog({ sep: p.id }) },
       { label: folded.includes(p.id) ? 'Expand' : 'Collapse', icon: folded.includes(p.id) ? 'chevron' : 'chevronRight', run: () => fold(p.id) },
       { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', run: () => setDialog({ notes: p.id }) },
@@ -1276,9 +1303,6 @@ export function App() {
       ...(p.kind ? [] : [{ label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) } as MenuItem]), // Terminals and Browsers have none
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
       { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => void (y && call('projectRm', { id: p.id }).then(() => done(`Removed project ${p.name}`), () => {}))) },
-      null,
-      { head: 'Open in' },
-      ...openInItems({ project: p.id }),
       ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: wsName(w), icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
     ]
   }
@@ -1293,6 +1317,9 @@ export function App() {
       if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
     }
     a({ label: 'Next tab that needs you', icon: 'bell', hint: '⌘J', run: nextNeed })
+    a({ label: full ? 'Exit full screen' : 'Full screen: just this tab', icon: full ? 'minimize' : 'maximize', hint: '⌘⇧⏎', run: () => toggleFull() })
+    if (settings.ai?.on) a({ label: 'Ask Laki AI later…', icon: 'timer', run: () => sendLater('ai') })
+    if (ws?.storage) a({ label: gallery === ws.id ? 'Hide artifacts' : 'Show artifacts', icon: 'image', hint: '⌘⇧A', run: toggleArtifacts })
     for (const race of new Set(live.flatMap(w => (w.race ? [w.race] : [])))) {
       const w = live.find(w => w.race === race)!
       a({ label: `Compare the race: ${wsName(w).replace(/-[^-]+$/, '')}`, icon: 'race', run: () => setDialog({ compare: race }) })
@@ -1308,8 +1335,8 @@ export function App() {
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
     a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
-    for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Widget: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
-    a({ label: 'Widgets: settings, reload', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
+    for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
+    a({ label: 'Extensions: settings, reload', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
     a({ label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
     a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
     a({ label: 'About Laki', icon: 'info', run: () => setDialog('about') })
@@ -1351,7 +1378,7 @@ export function App() {
     }
     for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${wsName(w)}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
     return items
-  }, [view, live, ws, tab, group, sideOpen, apps, previewed, video, timers.length, find])
+  }, [view, live, ws, tab, group, sideOpen, apps, previewed, video, timers.length, find, gallery, full])
 
   if (!view)
     return (
@@ -1728,7 +1755,7 @@ export function App() {
     </div>
   )
   return (
-    <div style={rail ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} className={`app ${sideOpen ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge ? 'electron' : ''} ${settings.dimPanes ? 'dim-panes' : ''}`} data-pad={settings.termPad}>
+    <div style={rail ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} className={`app ${sideOpen ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge ? 'electron' : ''} ${settings.dimPanes ? 'dim-panes' : ''} ${full ? 'full' : ''}`} data-pad={settings.termPad}>
       {railBar}
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
       <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
@@ -1777,9 +1804,9 @@ export function App() {
             <div key={p.id} className={`project ${rows.at('project', p.id)}`} data-row={`project:${p.id}` /* the whole block: a project dropped anywhere on it */}>
               <div
                 className="project-head"
-                data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · click to ${shut ? 'expand' : 'collapse'} · drag to move`}
+                data-tip={`${p.host ? `${p.host}:` : ''}${p.path} · ${p.kind ? `click to ${shut ? 'expand' : 'collapse'}` : `click for its page (notes, tasks, memory, settings) · the arrow ${shut ? 'expands' : 'collapses'} it`} · drag to move`}
                 onPointerDown={e => rows.start(e, 'project', p.id)}
-                onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && fold(p.id)}
+                onClick={e => !rows.dragged() && !(e.target as Element).closest('button') && (p.kind || (e.target as Element).closest('.project-chev') ? fold(p.id) : setDialog({ project: p.id }))}
                 onContextMenu={e => openMenu(e, projectActions(p))}
               >
                 <span className="project-chev">
@@ -1869,10 +1896,12 @@ export function App() {
       {sideOpen && !listOff && (narrow ? <div className="side-backdrop" onClick={() => setSideOpen(false)} /> : <SideHandle width={sideW} onWidth={setSideW} init={SIDE} at={rail ? railW : 0} />)}
 
       <main className="main">
+        {full && <IconButton icon="minimize" title="Exit full screen (⌘⇧⏎)" className="full-exit" onClick={() => toggleFull(false)} />}
         <div className="tabbar drag" data-tabbar>
           {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
+          {ws && <IconButton icon="maximize" title="Full screen: just this tab (⌘⇧⏎)" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
@@ -1890,6 +1919,7 @@ export function App() {
               <IconButton icon="panel" title="Files, changes, review, preview (⌥⌘B)" on={panelShown} onClick={() => togglePanel()} />
               {ws.kind === 'worktree' && !narrow && <IconButton icon="ship" title="Ship: commit, push, open a PR" onClick={() => setDialog('ship')} />}
               <IconButton icon="search" title="Commands (⌘K)" onClick={() => setDialog('palette')} />
+              {canLater && !narrow && <IconButton icon="timer" title="Send a message later (⌘L): to an agent or Laki AI" onClick={() => sendLater(tab?.kind === 'agent' ? tab.id : undefined)} />}
               <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsActions, 'right')} />
               <RunButton
                 running={devRunning}
@@ -2083,7 +2113,24 @@ export function App() {
         )}
         {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.logs.startsWith('widget:') ? { section: 'widgets' } : dialog.logs === 'new' ? { section: 'general' } : null)} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
-        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} />}
+        {dialog && typeof dialog === 'object' && 'project' in dialog && (p => p && (
+          <ProjectPage
+            key={p.id}
+            project={p}
+            schedules={view.schedules?.filter(s => s.project === p.id) ?? []}
+            onClose={() => setDialog(null)}
+            api={{
+              save: o => call('projectSet', { id: p.id, ...o }),
+              saveSettings: o => call('projectSet', { id: p.id, ...o }).catch(() => {}),
+              file: id => api.call<ProjectConfig>('projectFile', { id }),
+              global: { actions: settings.actions, templates: settings.templates },
+              onGlobal: sec => setDialog({ section: sec }),
+              schedules: () => setDialog({ schedules: p.id }),
+              setSchedule: (id, on) => call('scheduleSet', { id, on }),
+            }}
+          />
+        ))(view.projects.find(x => x.id === dialog.project && !x.kind))}
+        {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} />}
         {dialog === 'board' && (
           <BoardPage
             view={view}
@@ -2256,14 +2303,14 @@ export function App() {
           {!!ws?.artifacts && ws.storage && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): Finder, or here
             <button
               className="listen port-main"
-              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER)`}
+              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER) · ⌘⇧A shows them here`}
               onClick={e =>
                 bridge?.openPath
                   ? openMenu(e, [
                       { label: 'Open in Finder', icon: 'folder', run: () => void bridge!.openPath!(ws.storage!) },
-                      { label: gallery === ws.id ? 'Hide the gallery' : 'Show here', icon: 'image', run: () => setGallery(g => (g === ws.id ? null : ws.id)) },
+                      { label: gallery === ws.id ? 'Hide the gallery' : 'Show here', icon: 'image', hint: '⌘⇧A', run: toggleArtifacts },
                     ])
-                  : setGallery(g => (g === ws.id ? null : ws.id))
+                  : toggleArtifacts()
               }
             >
               Artifacts: {ws.artifacts}
@@ -2378,18 +2425,24 @@ export function App() {
       )}
       {dialog && typeof dialog === 'object' && 'sendLater' in dialog && (() => {
         const old = timers.find(t => t.id === dialog.edit)
-        const agents = (view?.tabs ?? []).filter(t => t.workspace === dialog.sendLater && t.kind === 'agent' && (t.status !== 'exited' || t.id === old?.tab))
+        const agents = [
+          ...(view?.tabs ?? []).filter(t => t.workspace === dialog.sendLater && t.kind === 'agent' && (t.status !== 'exited' || t.id === old?.tab)).map(t => ({ id: t.id, name: t.name })),
+          ...(settings.ai?.on || old?.tab === 'ai' ? [{ id: 'ai', name: 'Laki AI' }] : []),
+        ]
+        const w = live.find(x => x.id === dialog.sendLater)
+        const picks = mergeActions(settings.actions, view?.projects.find(p => p.id === w?.project)?.config?.actions).filter(a => a.target !== 'shell') // Run ▾'s agent actions
         return (
           <SendLaterDialog
-            agents={agents.map(t => ({ id: t.id, name: t.name }))}
-            tab={old?.tab ?? (agents.some(t => t.id === tab?.id) ? tab!.id : undefined)}
-            text={old?.text}
+            agents={agents}
+            tab={old?.tab ?? dialog.to ?? (agents.some(t => t.id === tab?.id) ? tab!.id : undefined)}
+            text={old?.text ?? dialog.text}
             at={old?.end}
-            onClose={() => setDialog(null)}
+            picks={picks}
+            onClose={() => setDialog(dialog.back ?? null)}
             onPick={o => {
               if (old) setTimer(old.id, x => ({ ...x, tab: o.tab, text: o.text, end: Date.now() + o.ms, ms: o.ms }))
               else addTimer(o.ms, { then: 'send', ws: dialog.sendLater, tab: o.tab, text: o.text })
-              setDialog(null)
+              setDialog(dialog.back ?? null) // from the AI page: back there
               done(`It goes to ${agents.find(t => t.id === o.tab)?.name ?? 'the agent'} at ${new Date(Date.now() + o.ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`)
             }}
           />

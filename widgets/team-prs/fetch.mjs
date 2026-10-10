@@ -22,9 +22,9 @@ const low = list => new Set(list.map(x => x.replace(/^@/, '').toLowerCase()))
 
 export default async function ({ config }) {
   const repo = repoOf(config.repo)
-  if (!repo) throw new Error('Set Repo (owner/name) in Settings › Widgets')
+  if (!repo) throw new Error('Set Repo (owner/name) in Settings › Extensions')
   const want = low(config.logins)
-  if (!want.size) throw new Error('Set GitHub logins in Settings › Widgets')
+  if (!want.size) throw new Error('Set GitHub logins in Settings › Extensions')
   const only = low(config.only)
   const hide = low(config.hide)
   // each login's open PRs, all at once: the repo's whole list with its checks is too much for GitHub's API in a busy

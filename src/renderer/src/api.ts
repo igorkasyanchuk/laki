@@ -19,6 +19,7 @@ type Bridge = {
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void
+  fullScreen?(on: boolean): void // ⌘⇧⏎: the window full screen (the tab alone in it), or as it was
   dockIcon?(png: string): void // Settings' Dock icon, a PNG data URL (main's app.dock.setIcon)
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)

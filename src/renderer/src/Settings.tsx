@@ -17,6 +17,7 @@ import { QR } from './Tunnel'
 import { USAGE_AGENTS } from './Usage'
 import { BACKENDS, money, tokens } from './Ai'
 import { Markdown } from './MarkdownView'
+import { Modal } from './panels'
 import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
 
@@ -719,8 +720,9 @@ function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange:
   )
 }
 
-function ProjectSection(p: {
+export function ProjectSection(p: {
   project: ProjectInfo
+  noNotes?: boolean // the project page: its own Notes tab has them
   file?: (id: string) => Promise<ProjectConfig>
   rename?: boolean
   script?: keyof Scripts
@@ -773,9 +775,11 @@ function ProjectSection(p: {
           <input value={name} aria-label="Name" onChange={e => setName(e.target.value)} />
         </Group>
       )}
-      <Group title="Notes" hint="Markdown, yours: links, how to run it, who to ask. The project's ⋯ › Notes shows them; agents never see them">
-        <textarea className="mono notes-field" rows={Math.min(16, Math.max(4, notes.split('\n').length + 1))} value={notes} aria-label="Notes" placeholder="# Links&#10;- Staging: https://…" onChange={e => setNotes(e.target.value)} />
-      </Group>
+      {!p.noNotes && (
+        <Group title="Notes" hint="Markdown, yours: links, how to run it, who to ask. The project's ⋯ › Notes shows them; agents never see them">
+          <textarea className="mono notes-field" rows={Math.min(16, Math.max(4, notes.split('\n').length + 1))} value={notes} aria-label="Notes" placeholder="# Links&#10;- Staging: https://…" onChange={e => setNotes(e.target.value)} />
+        </Group>
+      )}
       {p.project.git && !p.project.host && (
         <Group title="Worktrees" hint="Where this project's new worktrees go (a path relative to the repo, ~, or a full one); empty: Settings › General's folder. Ones made already stay">
           <FolderField value={c.worktrees} label="This project's worktrees" placeholder={`<the worktrees folder>/${p.project.id}`} onChange={v => setC(y => ({ ...y, worktrees: v }))} />
@@ -892,9 +896,9 @@ const FIND: [string, string, string?][] = [
   ['templates', 'Prompt templates', 'prompt'],
   ['actions', 'Actions', 'run menu prompt command'],
   ['skill', 'Agent skill', 'mcp server laki cli'],
-  ['skill', 'Widget creator', 'agent skill widgets laki-widget make extension ai'],
-  ['widgets', 'Widgets', 'sidebar extensions plugins folder reload fetch schedule'],
-  ['widgets', 'More folders', 'widgets extensions'],
+  ['skill', 'Extension creator', 'agent skill widgets laki-widget make extension ai'],
+  ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule'],
+  ['widgets', 'More folders', 'extensions widgets'],
   ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
   ['general', 'Worktrees', 'folder directory location path where worktree workspaces disk'],
@@ -924,7 +928,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'ai', label: 'AI', icon: 'ai', group: 'Agents' },
   { id: 'open', label: 'Open in', icon: 'code', group: 'Connect' },
   { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
-  { id: 'widgets', label: 'Widgets', icon: 'panel', group: 'Connect' },
+  { id: 'widgets', label: 'Extensions', icon: 'panel', group: 'Connect' },
   { id: 'remote', label: 'Remote access', icon: 'globe', group: 'Connect' },
 ]
 export const isSection = (id: string) => SECTIONS.some(x => x.id === id)
@@ -983,7 +987,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
     const ns = named.filter(x => x.pid === p.pid && x.name !== 'The window')
     if (!ns.length) return []
     const widgets = [...new Set(ns.filter(x => x.name.startsWith('widget:')).map(x => word(x.name)))] // the grid's and a full view's: one
-    const name = [...(widgets.length ? [`${widgets.length > 1 ? 'Widgets' : 'Widget'} · ${widgets.join(', ')}`] : []), ...new Set(ns.filter(x => !x.name.startsWith('widget:')).map(x => word(x.name)))].join(' · ')
+    const name = [...(widgets.length ? [`${widgets.length > 1 ? 'Extensions' : 'Extension'} · ${widgets.join(', ')}`] : []), ...new Set(ns.filter(x => !x.name.startsWith('widget:')).map(x => word(x.name)))].join(' · ')
     return [{ ...p, name, stops: [...new Set(ns.flatMap(x => (x.stop ? [x.stop] : [])))] }]
   })
   const app = r ? [...r.app.filter(p => !held.some(h => h.pid === p.pid)), { ...r.daemon, kind: 'daemon' }] : []
@@ -1015,7 +1019,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
       <h2>Resources</h2>
       <p className="muted small">
         Memory and CPU now, every 3 seconds while this is open. macOS counts every process Laki starts as Laki's: each agent, its MCP servers, the dev
-        servers in its tabs, Laki AI's agent, tunnels, remote access, SSH connections and widgets' fetches. An agent grows the longer it runs; sleeping it gives that back. The video, JS widgets, the preview, the floating bubbles,
+        servers in its tabs, Laki AI's agent, tunnels, remote access, SSH connections and extensions' fetches. An agent grows the longer it runs; sleeping it gives that back. The video, JS extensions, the preview, the floating bubbles,
         an agent browser and the sidebar's browser pages each run in a process of their own: Stop frees one until it's opened again (a browser's: the
         pages you aren't on).
       </p>
@@ -1265,7 +1269,7 @@ export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (ag
 // the skills Settings offers, in its order: what each teaches
 const SKILL_KINDS: [string, string, string][] = [
   ['laki', 'Laki', 'list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all through the command line'],
-  ['laki-widget', 'Widget creator', "make and change the sidebar's widgets: the files, the template language, JS widgets, actions, checking them with laki widget"],
+  ['laki-widget', 'Extension creator', "make and change the sidebar's extensions: the files, the template language, JS ones, actions, checking them with laki widget"],
 ]
 
 // the skill that teaches the agents about the app, in each one's folder in the user's home
@@ -1496,6 +1500,59 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   )
 }
 
+// the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its card in a dialog.
+// Closing blurs the field first: a number or text saves as it's left
+function WidgetList({ api }: { api: WidgetsApi }) {
+  const [open, setOpen] = useState<string | null>(null)
+  const w = api.list.find(x => x.id === open)
+  const close = () => ((document.activeElement as HTMLElement | null)?.blur(), setOpen(null))
+  if (!api.list.length) return null
+  return (
+    <>
+      <div className="sched-list">
+        {api.list.map(w => (
+          <div key={w.id} className={`sched-row ${w.on ? '' : 'off'}`}>
+            <span className="sched-icon">
+              <Icon name={w.js ? 'code' : 'panel'} />
+            </span>
+            <button type="button" className="sched-main" data-tip="Configure" onClick={() => setOpen(w.id)}>
+              <span className="sched-name">{w.name}</span>
+              {w.description && (
+                <span className="sched-meta">
+                  <span className="sched-desc">{w.description}</span>
+                </span>
+              )}
+              <span className="sched-tags">
+                {w.builtin && <span className="tag">built-in</span>}
+                <span className="tag">
+                  {w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}
+                </span>
+                {w.every !== undefined && <span className="tag">every {w.every} min</span>}
+                {w.every !== undefined && <span className={`tag ${w.error && !w.running ? 'tag-closed' : ''}`}>{w.running ? 'fetching…' : w.error ? 'last fetch failed' : w.at ? `fetched ${ago(w.at)}` : 'not fetched yet'}</span>}
+              </span>
+            </button>
+            <span className="sched-acts">
+              {w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
+            </span>
+            <Switch on={w.on} tip={w.on ? `${w.name}: in the sidebar` : `${w.name}: off`} onChange={on => void api.set(w.id, { on })} />
+          </div>
+        ))}
+      </div>
+      {w && (
+        <Modal title={w.name} onClose={close} wide loose>
+          <WidgetCard w={w} api={api} />
+          <div className="buttons">
+            <span className="muted small grow">Saved as you change it</span>
+            <button className="primary" onClick={close}>
+              Done
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+}
+
 // the prompt that makes a widget in any AI chat: what's wanted, then the whole format
 function WidgetPrompt({ home }: { home: string }) {
   const [want, setWant] = useState('')
@@ -1521,11 +1578,13 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
   const read = hours.trim() ? parseHours(hours) : null
   return (
     <>
-      <h2>Widgets</h2>
+      <h2>Extensions</h2>
       <p className="muted">
         Small pages in the sidebar, above its buttons, in a grid 3 cells across: each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
-        schedule) and widget.html (what it shows, and its full view, a click away). Ask an agent with the Widget creator skill (Agent skill) to make one, or any AI with the prompt below.
+        schedule) and widget.html (what it shows, and its full view, a click away). A click on one below sets it up. Ask an agent with the Extension creator skill (Agent skill) to make one, or any AI with the prompt below.
       </p>
+      <WidgetList api={api} />
+      {!api.list.length && <p className="muted">No extensions in these folders yet.</p>}
       {api.home && <WidgetPrompt home={api.home} />}
       <Group title="Folders">
         <div className="muted small">
@@ -1533,15 +1592,15 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
         </div>
         <label>
           <span>
-            More folders <span className="muted">· one per line: a widget's folder, or a folder of them</span>
+            More folders <span className="muted">· one per line: an extension's folder, or a folder of them</span>
           </span>
           <textarea className="mono" rows={2} spellCheck={false} value={dirs.join('\n')} placeholder="~/code/my-widgets" onChange={e => onDirs(e.target.value.split('\n'))} />
         </label>
         <div className="row">
           <button disabled={busy} onClick={() => (setBusy(true), api.reload().finally(() => setBusy(false)))}>
-            {busy ? 'Reloading…' : 'Reload widgets'}
+            {busy ? 'Reloading…' : 'Reload extensions'}
           </button>
-          <span className="muted small">Reads the folders again and fetches each widget that's on: changes show without a restart.</span>
+          <span className="muted small">Reads the folders again and fetches each extension that's on: changes show without a restart.</span>
         </div>
       </Group>
       <Group title="Working hours">
@@ -1553,10 +1612,6 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
         </label>
         {read && <div className={`small ${'error' in read ? 'warn' : 'schedule-preview'}`}>{'error' in read ? `${read.error}: fetching any time until then` : `${describeHours(read)} · Fetch now still works outside them`}</div>}
       </Group>
-      {api.list.map(w => (
-        <WidgetCard key={w.id} w={w} api={api} />
-      ))}
-      {!api.list.length && <p className="muted">No widgets in these folders yet.</p>}
     </>
   )
 }
@@ -1684,7 +1739,7 @@ export function SettingsPage(p: {
   }, [s])
   useEffect(() => () => void (unsaved.current && save.current(unsaved.current)), [])
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && (findRef.current ? (e.stopPropagation(), setFindQ('')) : onClose()) // Esc clears a search first
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && !document.querySelector('.settings-page .overlay') && (findRef.current ? (e.stopPropagation(), setFindQ('')) : onClose()) // Esc clears a search first; a dialog in it (a widget's) takes it
     window.addEventListener('keydown', f, true) // before the preview terminal takes it
     return () => window.removeEventListener('keydown', f, true)
   }, [onClose])
@@ -1907,7 +1962,7 @@ export function SettingsPage(p: {
               <Group title="Development">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.devMode} onChange={v => set({ devMode: v })}>
-                  <Says title="Development mode" hint="Keeps what happens to each workspace (PR checks, what the PR switches sent and why not, its agents' turns and commands) and widget (fetches, actions): ⋯ › Logs, and Logs on a widget in Settings › Widgets" />
+                  <Says title="Development mode" hint="Keeps what happens to each workspace (PR checks, what the PR switches sent and why not, its agents' turns and commands) and extension (fetches, actions): ⋯ › Logs, and Logs on an extension in Settings › Extensions" />
                 </Switch>
                 {s.devMode && p.logs && (
                   <div className="row">

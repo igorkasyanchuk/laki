@@ -277,7 +277,7 @@ function exec(w: Entry, cmd: string, args: string[], extra: Record<string, strin
       execFile(cmd, args, { cwd: w.dir, env, timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
         e ? no(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message))) : ok(String(stdout)),
       ),
-      `Widget · ${w.m.name || w.id}`,
+      `Extension · ${w.m.name || w.id}`,
     ),
   )
 }

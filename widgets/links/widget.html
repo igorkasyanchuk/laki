@@ -18,6 +18,6 @@
     }).filter(Boolean)
     document.getElementById('links').innerHTML = links.length
       ? links.map(l => `<a href="${esc(l.url)}" title="${esc(l.url)}">${esc(l.label)}</a>`).join('')
-      : '<span class="muted small">Add links in Settings › Widgets: Label: https://…</span>'
+      : '<span class="muted small">Add links in Settings › Extensions: Label: https://…</span>'
   </script>
 </template>

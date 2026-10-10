@@ -1,4 +1,4 @@
-// How to make a widget, in words: the laki-widget skill's body (daemon/skill.ts) and the prompt Settings › Widgets
+// How to make a widget, in words: the laki-widget skill's body (daemon/skill.ts) and the prompt Settings › Extensions
 // copies for any AI chat (widgetPrompt). One text, so both say the same.
 
 export const WIDGET_EVERY = 5 // minutes between fetches when widget.json doesn't say
@@ -9,7 +9,7 @@ export const widgetFormat = () => `## widget.json
 \`\`\`json
 {
   "name": "PRs with conflicts",
-  "description": "One line: what it shows (Settings › Widgets shows it).",
+  "description": "One line: what it shows (Settings › Extensions shows it).",
   "size": [1, 1],
   "every": 5,
   "view": "m",
@@ -32,7 +32,7 @@ export const widgetFormat = () => `## widget.json
   turned on, when its settings change, on Reload and from \`laki widget run <id>\`.
 - \`view\`: the full view's dialog, \`s\` (small), \`m\` (medium, the default) or \`l\` (large: for wide tables). The user
   can change it.
-- \`config\`: the settings the user fills in (Settings › Widgets). Each is a default (a string: text; \`true\`/\`false\`:
+- \`config\`: the settings the user fills in (Settings › Extensions). Each is a default (a string: text; \`true\`/\`false\`:
   an on/off; a number) or \`{ "type", "label", "hint", "default", "choices" }\`, \`type\` one of \`text\`, \`number\`, \`bool\`,
   \`choice\` (one of \`choices\`) or \`list\` (words or names, typed as chips: logins, labels). Give each a short \`label\`
   and, when it isn't obvious, a \`hint\`. Never hard-code a user's repo, login or token: make it a setting.
@@ -48,14 +48,14 @@ export const widgetFormat = () => `## widget.json
 import json, os, sys, urllib.request
 config = json.loads(os.environ["LAKI_WIDGET_CONFIG"])  # the settings, typed
 if not config["repo"]:
-    sys.exit("Set Repo in Settings › Widgets")  # stderr, exit 1: the error the user sees
+    sys.exit("Set Repo in Settings › Extensions")  # stderr, exit 1: the error the user sees
 with urllib.request.urlopen(f"https://api.github.com/repos/{config['repo']}") as r:
     repo = json.load(r)
 print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
 \`\`\`
 
 - What it prints (stdout) must be JSON: it's stored as \`data\`. Exit non-zero (with a line on stderr, e.g.
-  "Set Repo in Settings › Widgets") to fail: the widget keeps its last data and shows the error.
+  "Set Repo in Settings › Extensions") to fail: the widget keeps its last data and shows the error.
 - Its environment: \`$WIDGET_<NAME>\` for each setting (\`repo\` is \`$WIDGET_REPO\`; an on/off is \`1\` or empty, a list
   its items joined by commas), \`$LAKI_WIDGET_CONFIG\` (all of them as JSON: an on/off \`true\`/\`false\`, a number a number,
   a list an array), \`$LAKI_WIDGET_FILE\` (its storage, a JSON file with the last \`data\`), \`$LAKI_CLI\` (the laki command:
@@ -120,6 +120,6 @@ export const widgetPrompt = (want: string, home: string) => `Make me a widget fo
 
 What I want: ${want.trim() || '<describe what it should show, where the data comes from, and what a click should do>'}
 
-Everything a widget is, below. Answer with the files (widget.json, widget.html, and the scripts it runs: its fetch, fetch.sh, fetch.py or fetch.mjs, and any its actions run), each in a code block headed by its file name, and a folder name for it (its id: lowercase, dashes). I'll put them in ${home}/<id>/ and press Reload in Settings › Widgets. Then tell me which settings to fill in, and what it fetches how often.
+Everything a widget is, below. Answer with the files (widget.json, widget.html, and the scripts it runs: its fetch, fetch.sh, fetch.py or fetch.mjs, and any its actions run), each in a code block headed by its file name, and a folder name for it (its id: lowercase, dashes). I'll put them in ${home}/<id>/ and press Reload in Settings › Extensions. Then tell me which settings to fill in, and what it fetches how often.
 
 ${widgetFormat()}`

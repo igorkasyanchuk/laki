@@ -11,7 +11,7 @@ import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON
 
 // a click outside closes it, unless something was typed in it: then it nods instead (Esc or its buttons close it);
 // loose: closed by a click outside whatever was typed (a search; notes, whose close saves)
-function Modal({ title, onClose, children, wide, loose }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean }) {
+export function Modal({ title, onClose, children, wide, loose }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean; loose?: boolean }) {
   const typed = useRef(false)
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
@@ -30,13 +30,16 @@ function Modal({ title, onClose, children, wide, loose }: { title: string; onClo
   )
 }
 
-// a project's notes (its ⋯ menu's Notes): its Markdown rendered, Edit for the text (empty: editing from the start);
-// closing saves an edit (Settings autosaves too)
-export function ProjectNotes({ name, notes, onSave, onClose }: { name: string; notes: string; onSave: (text: string) => Promise<unknown>; onClose: () => void }) {
+// a project's notes (its ⋯ menu's Notes, the project page's Notes): its Markdown rendered, Edit for the text (empty:
+// editing from the start); leaving it (closed, another tab) saves an edit
+export function NotesView({ notes, onSave, onClose }: { notes: string; onSave: (text: string) => Promise<unknown>; onClose?: () => void }) {
   const [edit, setEdit] = useState<string | null>(notes.trim() ? null : '')
   const save = (then: () => void) => (edit !== null && edit !== notes ? onSave(edit).then(then, () => {}) : then())
+  const last = useRef({ edit, notes, onSave })
+  last.current = { edit, notes, onSave }
+  useEffect(() => () => void (({ edit, notes, onSave }) => edit !== null && edit !== notes && onSave(edit).catch(() => {}))(last.current), [])
   return (
-    <Modal title={`Notes · ${name}`} onClose={() => save(onClose)} wide loose /* closing saves */>
+    <>
       {edit === null ? (
         <div className="notes-view">
           <Markdown src={notes} />
@@ -53,7 +56,7 @@ export function ProjectNotes({ name, notes, onSave, onClose }: { name: string; n
         />
       )}
       <div className="row">
-        <span className="muted small grow">{edit === null ? 'Kept with the project in Laki; agents never see them' : 'Markdown · ⌘⏎ saves · closing saves too'}</span>
+        <span className="muted small grow">{edit === null ? 'Kept with the project in Laki; agents never see them' : 'Markdown · ⌘⏎ saves · leaving saves too'}</span>
         {edit === null ? (
           <button onClick={() => setEdit(notes)}>
             <Icon name="pencil" /> Edit
@@ -61,10 +64,19 @@ export function ProjectNotes({ name, notes, onSave, onClose }: { name: string; n
         ) : (
           notes.trim() && <button onClick={() => setEdit(null)}>Cancel</button>
         )}
-        <button className="primary" onClick={() => (edit === null ? onClose() : save(() => setEdit(null)))}>
-          {edit === null ? 'Close' : 'Save'}
-        </button>
+        {(edit !== null || onClose) && (
+          <button className="primary" onClick={() => (edit === null ? onClose!() : save(() => setEdit(null)))}>
+            {edit === null ? 'Close' : 'Save'}
+          </button>
+        )}
       </div>
+    </>
+  )
+}
+export function ProjectNotes({ name, notes, onSave, onClose }: { name: string; notes: string; onSave: (text: string) => Promise<unknown>; onClose: () => void }) {
+  return (
+    <Modal title={`Notes · ${name}`} onClose={onClose} wide loose /* closing saves */>
+      <NotesView notes={notes} onSave={onSave} onClose={onClose} />
     </Modal>
   )
 }
@@ -169,7 +181,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'project', title: 'Add a project', hint: "A git repository or any folder: + at the sidebar's top, ⌘O, or drop a folder on the window", go: 'Add one' },
   { id: 'workspace', title: 'Start a workspace', hint: 'An agent and a prompt, in a git worktree of its own, so agents never step on each other (⌘N)', go: 'New workspace' },
   { id: 'settings', title: 'Look around Settings', hint: 'Themes, fonts, notifications, your agents and how they start (⌘,)', go: 'Settings' },
-  { id: 'widgets', title: 'Turn on a widget', hint: "Small live pages in the sidebar: your PRs, your team's, your links", go: 'Widgets' },
+  { id: 'widgets', title: 'Turn on an extension', hint: "Small live pages in the sidebar: your PRs, your team's, your links", go: 'Extensions' },
   { id: 'actions', title: 'Set up actions', hint: 'Run ▾: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
@@ -915,9 +927,10 @@ export function RemindDialog({ name, onClose, onPick }: { name: string; onClose:
   )
 }
 
-// Send later (the toolbar's ⋯): a message to one of the workspace's agents at a time; a timer in the sidebar until
-// then (edit: its message, agent and time again)
-export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab?: string; text?: string; at?: number; onClose: () => void; onPick: (o: { tab: string; text: string; ms: number }) => void }) {
+// Send later (the toolbar's ⋯ and clock, a tab's right click, ⌘L, ⌘K, the AI page's clock): a message to one of the
+// workspace's agents, or Laki AI (id 'ai'), at a time; a timer in the sidebar until then (edit: its message, agent and
+// time again). picks: Run ▾'s agent actions, a click puts one's text in
+export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab?: string; text?: string; at?: number; picks?: { name: string; text: string }[]; onClose: () => void; onPick: (o: { tab: string; text: string; ms: number }) => void }) {
   const [to, setTo] = useState(p.agents.some(a => a.id === p.tab) ? p.tab! : (p.agents[0]?.id ?? ''))
   const [text, setText] = useState(p.text ?? '')
   const [when, setWhen] = useState(() => (p.at ? laterText(p.at) : '')) // an edit: its time again
@@ -941,6 +954,15 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
           Message
           <textarea rows={4} value={text} autoFocus placeholder="Run the tests again and fix what fails" onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), ok && p.onPick({ tab: to, text: text.trim(), ms: ms! }))} />
         </label>
+        {!!p.picks?.length && (
+          <div className="remind-quick" aria-label="Your actions">
+            {p.picks.map((a, i) => (
+              <button key={i} type="button" className={text === a.text ? 'on' : ''} data-tip={a.text} onClick={() => setText(a.text)}>
+                {a.name}
+              </button>
+            ))}
+          </div>
+        )}
         <label>
           When
           <input value={when} placeholder="in 10m · 2h · 1h 30m · at 15:30 · 3pm" onChange={e => setWhen(e.target.value)} />
@@ -955,7 +977,7 @@ export function SendLaterDialog(p: { agents: { id: string; name: string }[]; tab
         <div className="muted small">
           {when.trim() && !ms
             ? 'A length (10m, 2h, 1h 30m) or a time (15:30, 3pm), within a day.'
-            : `${ms ? `Sends at ${time(ms)}. ` : ''}Queued if the agent is busy then. Laki must be running: one due while it was closed isn't sent.`}
+            : `${ms ? `Sends at ${time(ms)}. ` : ''}${to === 'ai' ? 'Asked when Laki AI is free.' : 'Queued if the agent is busy then.'} Laki must be running: one due while it was closed isn't sent.`}
         </div>
         <div className="buttons">
           <span className="spacer" />

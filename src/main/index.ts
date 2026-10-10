@@ -148,7 +148,7 @@ const saveWin = () => {
   clearTimeout(winSave)
   if (!win || win.isDestroyed() || win.isMinimized()) return
   try {
-    writeFileSync(winFile(), JSON.stringify({ ...win.getNormalBounds(), max: win.isMaximized(), full: win.isFullScreen() }))
+    writeFileSync(winFile(), JSON.stringify({ ...win.getNormalBounds(), max: win.isMaximized(), full: focusFull ?? win.isFullScreen() }))
   } catch {}
 }
 const keepWin = () => (clearTimeout(winSave), (winSave = setTimeout(saveWin, 500))) // a drag's moves: once it rests
@@ -192,8 +192,13 @@ function create() {
     e.preventDefault()
     win?.hide()
   })
-  win.on('closed', () => ((win = null), (linkReady = shotReady = false), app.dock?.setBadge(''), tray?.setTitle(''))) // the count came from the window
-  win.webContents.on('did-start-navigation', e => e.isMainFrame && !e.isSameDocument && (linkReady = shotReady = false)) // a reload: links wait for the new page
+  win.on('closed', () => ((win = null), (focusFull = null), (linkReady = shotReady = false), app.dock?.setBadge(''), tray?.setTitle(''))) // the count came from the window
+  win.webContents.on('did-start-navigation', e => {
+    if (!e.isMainFrame || e.isSameDocument) return
+    linkReady = shotReady = false // a reload: links wait for the new page
+    if (focusFull !== null) win?.setFullScreen(focusFull) // and comes back out of full-screen mode, as it was before
+    focusFull = null
+  })
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
     pendingTab = null
@@ -322,6 +327,15 @@ ipcMain.handle('pick-folder', async e => {
 // macOS dictation, as Edit › Start Dictation does; its language and microphone are in System Settings
 ipcMain.on('dictate', () => Menu.sendActionToFirstResponder('startDictation:'))
 ipcMain.on('dictation-settings', () => shell.openExternal('x-apple.systempreferences:com.apple.Keyboard-Settings.extension'))
+// Full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone in the window, the window full screen too; off: full
+// screen only if it was before. focusFull: that, while it's on (what the window's saved state keeps)
+let focusFull: boolean | null = null
+ipcMain.on('full-screen', (e, on: boolean) => {
+  if (!win || e.sender !== win.webContents) return
+  if (on && focusFull === null) focusFull = win.isFullScreen()
+  win.setFullScreen(on || !!focusFull)
+  if (!on) focusFull = null
+})
 // Glass (Settings › Appearance): macOS's blur behind the page, whose backgrounds go see-through
 ipcMain.on('glass', (_e, on: boolean) => {
   win?.setVibrancy(on ? 'under-window' : null)

@@ -44,7 +44,9 @@ export type Project = {
   notes?: string // Project notes: the user's Markdown (links, how-tos), its ⋯ menu's Notes and Settings; never agents'
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
+  memory?: Memory[] // the project page's Memory: the user's notes to keep, one each, newest last; never agents' (yet)
 }
+export type Memory = { id: string; text: string; at: number; edited?: number } // at: when it was added
 export type Sep = { id: string; name: string; color?: string; template?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; sort: its workspaces' (unset: the project's)
 // the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
 export const WS_SORTS = ['manual', 'created', 'activity', 'name'] as const
@@ -387,4 +389,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 44
+export const API = 45

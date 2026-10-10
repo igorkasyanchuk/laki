@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld('laki', {
   dictate: () => ipcRenderer.send('dictate'), // macOS dictation into the focused field
   dictationSettings: () => ipcRenderer.send('dictation-settings'), // its language and microphone
   glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
+  fullScreen: (on: boolean) => ipcRenderer.send('full-screen', on), // ⌘⇧⏎: the window full screen with the tab alone, or back
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
   badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean) => ipcRenderer.send('badge', n, items, tray),

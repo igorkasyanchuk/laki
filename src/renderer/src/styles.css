@@ -35,6 +35,10 @@
   --tc-blue: #7aa2f7;
   --tc-purple: #bb9af7;
   --tc-pink: #f5a3d0;
+  /* made from the theme's own (themes.ts sets the 8 above): each theme gets its lime, brown and gray */
+  --tc-lime: color-mix(in oklch, var(--tc-green) 65%, var(--tc-yellow));
+  --tc-brown: color-mix(in srgb, var(--tc-orange) 60%, #000);
+  --tc-gray: var(--muted);
   /* the terminal's 16 colors (themes.ts) */
   --ansi-0: #1b1e25; --ansi-1: #f7768e; --ansi-2: #9ece6a; --ansi-3: #e0af68; --ansi-4: #7aa2f7; --ansi-5: #bb9af7; --ansi-6: #7dcfff; --ansi-7: #c0caf5;
   --ansi-8: #565f89; --ansi-9: #ff899d; --ansi-10: #b9f27c; --ansi-11: #ffc777; --ansi-12: #8db0ff; --ansi-13: #c7a9ff; --ansi-14: #a4daff; --ansi-15: #e6e9f5;
@@ -110,6 +114,7 @@ textarea { resize: vertical; font-family: inherit; }
 .side-find .seg button { flex: 1; font-size: 11px; padding: 2px 4px; }
 /* Remind me's quick times, two by two */
 .remind-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.remind-quick > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* Send later's picks: an action's name */
 .side-scroll { flex: 1; overflow-y: auto; padding: 2px 0 8px; }
 /* its scrollbar: thin, no track, a faint rounded thumb, brighter under the mouse (a look's own, aqua's, wins; Chromium
    doesn't repaint a thumb for the list's own :hover, so it isn't hidden until then) */
@@ -164,6 +169,7 @@ textarea { resize: vertical; font-family: inherit; }
 /* Settings › Widgets: a card per widget, its head one row (switch, name, size, minutes, view, buttons), its settings in a
    grid under it; a list setting's chips; the AI prompt with its copy button */
 .widget-card.off > :not(.wc-head) { opacity: 0.7; }
+.modal .widget-card { padding: 0; border: none; background: none; } /* Settings › Extensions' dialog: the card is the dialog */
 .preset .row.wc-head { align-items: center; flex-wrap: wrap; gap: 6px; }
 .preset .row.wc-head > * { flex: none; white-space: nowrap; }
 .preset .row.wc-head > .grow { flex: 1; min-width: 0; }
@@ -254,6 +260,10 @@ textarea { resize: vertical; font-family: inherit; }
 @keyframes spin { to { transform: rotate(360deg); } }
 
 .main { flex: 1; display: flex; flex-direction: column; min-width: 0; position: relative; }
+/* full screen (⌘⇧⏎): the tab's content alone; ⤡ in the corner, faint until the mouse is on it */
+.app.full :is(.rail, .sidebar, .side-backdrop, .side-handle, .sp-handle, .tabbar, .tabstrip, .status, .artifacts, .stale-bar, .body > .side-panel, .body > .info) { display: none !important; }
+.full-exit { position: absolute; top: 6px; right: 10px; z-index: 20; opacity: 0.25; background: var(--panel); }
+.full-exit:hover { opacity: 1; }
 /* Settings: a page over the main column */
 .settings-page { position: absolute; inset: 0; z-index: 30; display: flex; flex-direction: column; background: var(--bg); }
 .main:has(> .settings-page) > .body { visibility: hidden; } /* nothing under a page shows through it (glass, a see-through theme) */
@@ -1024,7 +1034,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .schedule-preview { display: flex; align-items: center; gap: 6px; margin-top: -2px; font-size: 12px; color: var(--done); }
 .schedule-preview.muted { color: var(--muted); }
 /* the tasks and the runs: one card each, a row a line */
-.sched-list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: calc(var(--radius) + 4px); background: var(--panel); overflow: hidden; }
+.sched-list { flex: none; display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: calc(var(--radius) + 4px); background: var(--panel); overflow: hidden; }
 .sched-list > * + * { border-top: 1px solid var(--line); }
 /* a task: its kind's icon, name, when and next, its project, agent and where as tags; Run now and Delete on hover, its switch */
 .sched-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
@@ -1117,6 +1127,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .sched-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; font-size: 13.5px; }
 .sched-meta { display: flex; align-items: center; gap: 8px; min-width: 0; color: var(--muted); font-size: 12px; white-space: nowrap; }
 .sched-meta > b { font-weight: 500; color: var(--fg); overflow: hidden; text-overflow: ellipsis; }
+.sched-desc { overflow: hidden; text-overflow: ellipsis; } /* Settings › Extensions: what one shows, one line */
 .sched-next { flex: none; padding: 0 7px; border-radius: 999px; font-size: 11px; line-height: 17px; color: var(--done); background: color-mix(in srgb, var(--done) 14%, transparent); }
 .sched-tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
 .sched-acts { flex: none; display: flex; align-items: center; gap: 2px; opacity: 0; transition: opacity 0.12s; }
@@ -1424,3 +1435,17 @@ button.board-name:hover { background: none; }
 .wp-line { color: var(--muted); font-size: 11px; }
 .wp-acts { display: flex; align-items: center; gap: 6px; padding-top: 6px; border-top: 1px solid var(--line); }
 .wp-acts > button { padding: 3px 9px; font-size: 11.5px; }
+/* a project's page (Project.tsx): from the top, its path and tabs, then the tab; Settings' project section as it is */
+.page-body > .project-page { margin: 0 auto; display: flex; flex-direction: column; gap: 14px; }
+.pp-head { display: flex; flex-direction: column; align-items: flex-start; gap: 10px; }
+.settings-main.form.pp-settings { padding: 0; overflow: visible; max-width: none; }
+.pp-settings > .set-title { display: none; } /* the page's title says it */
+.mem-new, .mem { display: flex; flex-direction: column; gap: 8px; padding: 12px 14px; border: 1px solid var(--line); border-radius: calc(var(--radius) + 4px); background: var(--panel); }
+.mem-new textarea, .mem textarea { width: 100%; box-sizing: border-box; resize: vertical; }
+.mem-text { overflow-wrap: anywhere; }
+.mem-text > .md { padding: 0; }
+.mem-text > .md > :last-child { margin-bottom: 0; }
+.mem-foot { display: flex; align-items: center; gap: 2px; }
+.mem-foot .ib { opacity: 0; transition: opacity 0.12s; }
+.mem:is(:hover, :focus-within) .mem-foot .ib { opacity: 1; }
+@media (hover: none) { .mem-foot .ib { opacity: 1; } }

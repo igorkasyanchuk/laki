@@ -30,13 +30,13 @@ worktree. Agents keep running when the window is closed.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only (or anyone with the
   link, if you type *confirm*: a red warning says what that risks).
 - **Resources**: memory and CPU for Laki and each agent; put an idle agent to sleep (now, or after a while) and it wakes as you
-  look; the video, widgets, the preview or the floating bubbles stop with a click.
+  look; the video, extensions, the preview or the floating bubbles stop with a click.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
 - **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
   the one you pick.
 - **Looks**: six Dock icons to pick from; 98 themes, 80 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
-- **Widgets**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
+- **Extensions**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
   with an agent or any AI chat: Settings has the prompt), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs.
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new

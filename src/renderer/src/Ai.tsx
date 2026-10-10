@@ -49,11 +49,13 @@ export function AiPage({
   workspaces = [],
   onClose,
   onSettings,
+  onLater,
 }: {
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
   onClose: () => void
   onSettings?: () => void
+  onLater?: (text: string) => void // Send later's dialog for Laki AI, with what's typed (the app's; not the AI window's)
 }) {
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
@@ -196,9 +198,16 @@ export function AiPage({
                   rows={2}
                   placeholder="Ask Laki… or paste a screenshot of PR links"
                   tools={
-                    <button className="primary ai-send" aria-label="Ask (⏎)" data-tip="Ask (⏎) · ⇧⏎ a new line" disabled={!can} onClick={ask}>
-                      <Icon name="arrowRight" size={14} />
-                    </button>
+                    <>
+                      {onLater && (
+                        <button type="button" className="ib" aria-label="Ask later" data-tip={images.length ? 'Ask later takes words only: remove the images' : 'Ask later: in 10 min, at 3pm…'} disabled={!ready || !text.trim() || !!images.length} onClick={() => onLater(text)}>
+                          <Icon name="timer" />
+                        </button>
+                      )}
+                      <button className="primary ai-send" aria-label="Ask (⏎)" data-tip="Ask (⏎) · ⇧⏎ a new line" disabled={!can} onClick={ask}>
+                        <Icon name="arrowRight" size={14} />
+                      </button>
+                    </>
                   }
                 />
               </div>

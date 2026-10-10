@@ -4,6 +4,20 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Open in** is a submenu in a workspace's and a project's ⋯ menu: hover it, or → / ⏎.
+- **Three more colors** for workspaces, groups and tabs: lime, brown and gray.
+
+## 0.10.0 · Oct 10, 2026
+
+- **Send later, to Laki AI too**: ⌘L, the toolbar's clock, a tab's right click or ⌘K pick an agent or Laki AI, a
+  message (or one of Run ▾'s actions: *Review the code*) and a time; the AI page's clock asks it later. A timer bar
+  in the sidebar until then: *Send now*, *Edit…*, *Cancel it*.
+- **Extensions**: widgets are called extensions now; Settings › Extensions lists them a row each with its switch, and a
+  click sets one up in a dialog.
+- **⌘⇧A** shows or hides the workspace's artifacts over the status bar.
+- **A page for each project**: a click on its name (the arrow still folds it) opens its Notes, Scheduled tasks, Memory
+  (things to keep about it: add, edit, delete) and Settings.
+- **Full screen for a tab**: ⌘⇧⏎ or the tab bar's ⤢ leaves only the tab's content, the window full screen; ⌘⇧⏎ again or the ⤡ in the corner brings the rest back.
 - **Laki AI** (optional, Settings › AI): ask in plain words, or paste a screenshot of PR links, and it works Laki for
   you: starts workspaces (PR reviews in their own worktrees), opens agent tabs, sends prompts, attaches PRs, schedules
   tasks and tells you what your agents are doing. It runs on OpenRouter with your API key, or on `claude -p` /

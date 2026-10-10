@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
@@ -541,11 +541,20 @@ function actionsOk(l: unknown): RunAction[] | undefined {
   return ok.length ? ok.map(a => ({ name: a.name, target: a.target, text: a.text })) : undefined
 }
 
-export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string }) {
+export function projectSet(ref: string, o: { name?: string; config?: ProjectConfig; seps?: Sep[]; rows?: string[]; notes?: string; sort?: string; memory?: Memory[] }) {
   const p = findProject(ref)
   if (o.sort !== undefined) p.sort = WS_SORTS.includes(o.sort as WsSort) && o.sort !== 'manual' ? (o.sort as WsSort) : undefined
   if (o.name?.trim()) p.name = o.name.trim()
   if (typeof o.notes === 'string') p.notes = o.notes.trim() ? o.notes.slice(0, 100000) : undefined
+  if (Array.isArray(o.memory)) {
+    // the whole list, as the page has it: each with an id and some text, 1000 at most
+    const ok = (n: unknown) => typeof n === 'number' && Number.isFinite(n) && n > 0
+    const m = o.memory
+      .filter((x, i) => typeof x?.id === 'string' && /^[\w-]{1,40}$/.test(x.id) && typeof x.text === 'string' && x.text.trim() && o.memory!.findIndex(y => y?.id === x.id) === i)
+      .slice(-1000)
+      .map(x => ({ id: x.id, text: x.text.slice(0, 20000), at: ok(x.at) ? x.at : Date.now(), ...(ok(x.edited) && { edited: x.edited }) }))
+    p.memory = m.length ? m : undefined
+  }
   if (Array.isArray(o.seps)) {
     const seps = o.seps.filter((x, i) => /^sep-\w{1,20}$/.test(x?.id) && typeof x.name === 'string' && x.name.trim() && o.seps!.findIndex(y => y?.id === x.id) === i).map(x => ({ id: x.id, name: Array.from(x.name.trim()).slice(0, 40).join(''), ...(typeof x.color === 'string' && /^[a-z]{1,12}$/.test(x.color) && x.color !== 'none' ? { color: x.color } : {}), ...(typeof x.template === 'string' && x.template.trim() ? { template: Array.from(x.template.trim()).slice(0, 200).join('') } : {}), ...(WS_SORTS.includes(x.sort as WsSort) ? { sort: x.sort } : {}) }))
     p.seps = seps.length ? seps : undefined

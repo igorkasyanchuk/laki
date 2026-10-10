@@ -80,12 +80,13 @@ workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `project
 workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
 `progress`; 31: a sep's `template`, kept by `projectSet`; 32: `prAttach`, a project's `notes`, kept by `projectSet`; 33: `prAct` `merge`, a workspace's `autoLand`, a project's `pr` and
 `mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`; 34: `quickNew`, a project's `kind`,
-a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`). A
+a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `notes`: the user's Markdown, the
-  project's ⋯ › Notes (`ProjectNotes`, panels.tsx) and Settings, left out of MCP's and `ls --json`'s state; `seps`: the sidebar's groups (the app's word: a
+  project's ⋯ › Notes (`ProjectNotes`, panels.tsx), its page and Settings, left out of MCP's and `ls --json`'s state; `memory`:
+  the project page's Memory, the whole list, likewise left out; `seps`: the sidebar's groups (the app's word: a
   named head over the workspaces up to the next one, its count beside it; a workspace dropped on it goes first in it (its top
   third: before it), `RowDrop` `into`, from `data-head`; a workspace's menu › *Move to group* (App's `groupItems`):
   first in one, or *Out of its group* (before the first); groups are made only from the project's ⋯, at the top), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it, over the last one used) and a `sort` (`WS_SORTS`; unset: the project's), and the project's own `sort` (unset: manual; App's `sortedRows`: each group's workspaces in its sort, rows unchanged; last active: `laki.active`), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects), `projectFile` (the repo's `.laki.json`), `branches`, `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
@@ -606,7 +607,9 @@ allow-scripts; default-src 'none'` (no network, an opaque origin), the theme's v
 `Widgets.tsx`: `WidgetGrid` (the sidebar's: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
 (a template widget in a shadow root after `clean`, the sanitizer: no scripts, frames, forms, `on…` attributes or
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
-Settings' `WidgetsSection` (`WidgetPrompt`: `shared/widgetGuide.ts` `widgetPrompt`, the format as a prompt for any AI
+Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
+Scheduled tasks' `.sched-row`s, each with its switch, a click opens its `WidgetCard` in panels.tsx' `Modal`, whose
+close blurs the field first (text and numbers save on blur), and Settings' Esc leaves it to an open `.overlay`; `WidgetPrompt`: `shared/widgetGuide.ts` `widgetPrompt`, the format as a prompt for any AI
 chat, which the laki-widget skill's SKILL.md shares as `widgetFormat`; `WidgetCard`: a head row, then
 `WidgetOptionField` per setting, a list's `ChipsInput`; its folder button is App's Open in menu with `widget`). The
 ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, plain words with a rule between them, opened in the
@@ -667,6 +670,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
 - **`App.tsx`**: the sidebar, tab bar, toolbar, send bar, palette items and keys.
   - Keys are handled in a capture-phase `keydown` through the `act` map; xterm never sees ⌘ keys. ⌘⇧N clicks the tab
     bar's + (`.newtab-btn`): a menu opened by a key's click (`detail` 0) has its first item picked (`Menu` `first`).
+    ⌘⇧A is `toggleArtifacts` (the status bar's Artifacts strip, `gallery`); ⌘L is Send later (`canLater`); ⌘⇧⏎ is
+    `toggleFull` (the tab bar's ⤢): `.app.full` hides the chrome (styles.css), `.full-exit` brings it back, and main's
+    `full-screen` IPC puts the window full screen (`focusFull`: whether it was, restored after, and what `saveWin` keeps).
   - Per-viewer UI state is in `localStorage`:
     - `laki.ws`: the selected workspace;
     - `laki.tabs`: the selected tab per workspace;
@@ -686,9 +692,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.timers`: the sidebar's timers (`id`, `end`, `ms`, `then`, `left`: paused, its ms left, kept as it is;
       `note`: its message, Go out: on its bar, the end dialog's title, the notification's); ones that ended while the
       app was closed are dropped.
-      Send later (the toolbar's ⋯, `SendLaterDialog` in panels.tsx, `text.ts` `parseLater`: a length or a time of day)
-      is one with `then: 'send'`, `ws`, `tab`, `text`: `send` `whenIdle` as it rings (Send now, Edit, Cancel in its
-      menu); one due while the app was closed is dropped with a toast (`missed`).
+      Send later (⌘L, the toolbar's clock and ⋯, a tab's right click, ⌘K, the AI page's clock (`onLater`, dialog `back`);
+      `SendLaterDialog` in panels.tsx, `text.ts` `parseLater`: a length or a time of day; `picks`: Run ▾'s agent actions,
+      `mergeActions`) is one with `then: 'send'`, `ws`, `tab`, `text`: `send` `whenIdle` as it rings (Send now, Edit,
+      Cancel in its menu); `tab: 'ai'` is Laki AI (`askLater`: `aiAsk` with the text stamped, tried every 15 s for an hour
+      while it's busy, a notification as it answers); one due while the app was closed is dropped with a toast (`missed`).
     - `laki.watches`: the stopwatches (the timer menu's *Stopwatch*, `StopwatchBar` in panels.tsx): `ms` counted before,
       `from` running since.
       A reminder (a workspace's *Remind me…*, `RemindDialog`) is one with `then: 'remind'` and `ws`: it notifies about
@@ -913,13 +921,19 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 - **`ui.tsx`**: line icons (`Icon`, `IconButton`), `Switch` (every on/off: the auto toggles, Settings' rows as
   `switch-row`), popup and right-click menus (`useMenu`, color swatches;
   each item has a key: its own `key` or a free initial, `menuKeys`; `sub`: a line under the label, `pill`/`tone`: a tag at
-  its end, `mono`, `foot`: under a line at the bottom, its icon at the end; a picked item (`hint` `ON`) is in the accent
+  its end, `mono`, `foot`: under a line at the bottom, its icon at the end; `items`: a submenu beside it (a hover, a click, → or ⏎; ← or Esc back), as the ⋯ menus' *Open in*; a picked item (`hint` `ON`) is in the accent
   with a check; `{ filter }`: a box on top, letters go to it, ⏎ runs the first label match (else the picked one), Esc
   clears it first; such menus are `.menu.rich`; one flipped above its button is held by its bottom),
   tooltips (`Tips`: any element with `data-tip`; a pressed one shows none until the pointer leaves it, a menu it opens stays clear; `IconButton` `tip={false}`: an `aria-label` only), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
   sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
   `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
+- **`Project.tsx`**: a project's page (a click on its name in the sidebar, its ⋯ › *Open project page*; dialog
+  `{ project }`, the last tab in `laki.projectTab`): Notes (panels.tsx' `NotesView`, also the ⋯ › Notes dialog's:
+  an edit saved as it unmounts), Scheduled tasks (Schedules.tsx' rows, a switch each; changes on that page), Memory
+  (`Project.memory`, `{ id, text, at, edited }`, the whole list through `projectSet`, which keeps 1000 with an id and
+  text; never in MCP's state or `ls --json`) and Settings (Settings.tsx' `ProjectSection`, `noNotes`). The sidebar's
+  arrow folds; Terminals and Browsers have no page.
 - **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size times `settings.pageZoom`
   (`PAGE_ZOOMS`, Appearance's *Settings & Help size*; ⌘± while it or Help is open; Help takes the same zoom; its
   preview cancels that); the nav's sections under a head each (`SECTIONS` `group`: Laki, Agents, Connect); each section's settings in

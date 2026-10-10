@@ -64,6 +64,8 @@ const paths = {
   camera: 'M2.5 5h2.7l1.2-1.8h3.2L10.8 5h2.7v7.5h-11zM8 10.6a1.9 1.9 0 100-3.8 1.9 1.9 0 000 3.8z',
   collapse: 'M8 1.5v4M5.5 3.5L8 6l2.5-2.5M8 14.5v-4M5.5 12.5L8 10l2.5 2.5M2.5 8h11',
   expand: 'M8 6V1.5M5.5 4L8 1.5 10.5 4M8 10v4.5M5.5 12L8 14.5l2.5-2.5M2.5 8h11',
+  maximize: 'M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10',
+  minimize: 'M6 2.5V6H2.5M13.5 6H10V2.5M10 13.5V10h3.5M2.5 10H6v3.5',
   sort: 'M2.5 4h7M2.5 8h5M2.5 12h3M12 3v10M10 11l2 2 2-2',
   changes: 'M4.5 5.6a1.3 1.3 0 100-2.6 1.3 1.3 0 000 2.6zM11.5 13a1.3 1.3 0 100-2.6 1.3 1.3 0 000 2.6zM4.5 5.6V10a2 2 0 002 2H9M11.5 10.4V6a2 2 0 00-2-2H7M8 10.5l1.5 1.5L8 13.5M8 2.5L6.5 4 8 5.5',
   review: 'M2.5 3h11v8H8l-3 2.5V11H2.5z',
@@ -272,7 +274,7 @@ export function StaleDaemon({ restart }: { restart: () => Promise<unknown> }) {
 }
 
 // tab colors, by name: CSS --tc-<name> in each app's theme
-export const TAB_COLORS = ['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink']
+export const TAB_COLORS = ['red', 'orange', 'yellow', 'lime', 'green', 'teal', 'blue', 'purple', 'pink', 'brown', 'gray']
 export const colorVar = (c?: string) => (c && c !== 'none' ? ({ '--tab-c': `var(--tc-${c})` } as CSSProperties) : undefined)
 
 // a row dropped before or after another of its kind (and group: workspaces stay in their project)
@@ -339,14 +341,16 @@ export const moveId = (ids: string[], d: RowDrop, n = 1) => {
 // yellow); mono: its label in the terminal's font; foot: in the menu's foot, under a line.
 // { filter } puts a box on top (its placeholder): what's typed keeps the items it matches, and keys are for the box
 export const ON = '✓' // a menu item's hint: the one picked (its label in the accent, a check after it)
+type ItemBase = { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean }
 export type MenuItem =
-  | { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; run: () => void }
+  | (ItemBase & { run: () => void; items?: never })
+  | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
   | { head: string }
   | { filter: string }
   | { colors: string[]; value?: string; pick: (c: string) => void }
   | null
-type Act = Extract<MenuItem, { run: () => void }>
-const isAct = (it: MenuItem): it is Act => !!it && 'run' in it
+type Act = Extract<MenuItem, { label: string }>
+const isAct = (it: MenuItem): it is Act => !!it && 'label' in it
 
 // a key per item: its own, else a free initial of its words, else any free letter of its label
 function menuKeys(acts: Act[]) {
@@ -360,7 +364,8 @@ function menuKeys(acts: Act[]) {
   })
 }
 
-function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; onClose: () => void }) {
+// beside: a submenu's, the item it opens from (no backdrop of its own; onBack: ← or Esc closes only it)
+function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; beside?: DOMRect; onBack?: () => void; onEnter?: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   const filter = all.find(it => !!it && 'filter' in it) as { filter: string } | undefined
   const [q, setQ] = useState('')
@@ -379,28 +384,43 @@ function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; 
   // what had the keyboard (the new-workspace form, for its ⌘⏎) gets it back as a filter's box goes, unless a pick moved it
   const back = useRef(document.activeElement as HTMLElement | null)
   useEffect(() => () => void (filter && back.current?.isConnected && (!document.activeElement || document.activeElement === document.body) && back.current.focus()), [])
-  const pick = (a: Act) => {
-    onClose()
-    a.run()
+  // a submenu opens on a hover after a moment (a short one to switch, so a slant toward it doesn't close it)
+  const [subOf, setSubOf] = useState<{ it: Act; at: DOMRect; anchor: DOMRect; first?: boolean } | null>(null)
+  const wait = useRef(0)
+  useEffect(() => () => clearTimeout(wait.current), [])
+  const open = (it: Act, el: Element, first?: boolean) => {
+    clearTimeout(wait.current)
+    const at = el.getBoundingClientRect()
+    setSubOf({ it, at, anchor: new DOMRect(at.right + 4, at.top - 10, 0, 0), first })
   }
+  const hover = (it: Act, el: Element) => {
+    clearTimeout(wait.current)
+    if (subOf?.it !== it && (subOf || it.items)) wait.current = window.setTimeout(() => (it.items ? open(it, el) : setSubOf(null)), subOf ? 250 : 120)
+  }
+  const pick = (a: Act, el?: Element | null, first = true) => {
+    if (a.items) return el && open(a, el, first) // a key's: its first item picked
+    onClose()
+    a.run?.()
+  }
+  const elOf = (a: Act) => box.current?.querySelectorAll('.menu-item')[acts.indexOf(a)] ?? null
   const colors = items.find(it => !!it && 'colors' in it) as Extract<MenuItem, { colors: string[] }> | undefined
   // keys go to the menu while it's open (not to the terminal under it); ⌘ shortcuts still work
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = e => {
-    if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (e.metaKey || e.ctrlKey || e.altKey || subOf) return // an open submenu has the keys
     if (filter && !['Escape', 'ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return // typed into the box
     if (filter && e.key === 'Escape' && q) return e.preventDefault(), e.stopPropagation(), setQ('') // Esc clears it first
     e.preventDefault()
     e.stopPropagation()
     const k = e.key.toLowerCase()
-    if (e.key === 'Escape') onClose()
+    if (e.key === 'Escape' || (e.key === 'ArrowLeft' && onBack)) (onBack ?? onClose)()
     else if (e.key === 'ArrowDown') setSel((sel + 1) % acts.length)
     else if (e.key === 'ArrowUp') setSel((sel <= 0 ? acts.length : sel) - 1)
-    else if (e.key === 'Enter' && acts[sel]) pick(acts[sel])
+    else if ((e.key === 'Enter' || (e.key === 'ArrowRight' && acts[sel]?.items)) && acts[sel]) pick(acts[sel], elOf(acts[sel]))
     else if (colors && /^[0-9]$/.test(k) && +k <= colors.colors.length) {
       onClose()
       colors.pick(['none', ...colors.colors][+k])
-    } else if (keys.includes(k)) pick(acts[keys.indexOf(k)])
+    } else if (keys.includes(k)) pick(acts[keys.indexOf(k)], elOf(acts[keys.indexOf(k)]))
   }
   useEffect(() => {
     const f = (e: KeyboardEvent) => onKey.current(e)
@@ -413,13 +433,12 @@ function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; 
     el.style.bottom = '' // another anchor: placed again
     const r = el.getBoundingClientRect()
     // above it, held by its bottom: a filter that shrinks it keeps it by the button
-    if (r.bottom > window.innerHeight - 6) anchor.top - r.height - 4 < 6 ? (el.style.top = '6px') : ((el.style.top = 'auto'), (el.style.bottom = `${window.innerHeight - anchor.top + 4}px`))
-    if (r.right > window.innerWidth - 6) el.style.left = `${Math.max(6, window.innerWidth - r.width - 6)}px`
+    if (r.bottom > window.innerHeight - 6) beside ? (el.style.top = `${Math.max(6, window.innerHeight - r.height - 6)}px`) : anchor.top - r.height - 4 < 6 ? (el.style.top = '6px') : ((el.style.top = 'auto'), (el.style.bottom = `${window.innerHeight - anchor.top + 4}px`))
+    if (r.right > window.innerWidth - 6) el.style.left = `${Math.max(6, beside ? beside.left - r.width - 4 : window.innerWidth - r.width - 6)}px` // a submenu: on the other side
   }, [anchor])
   const pos = align === 'left' ? { left: anchor.left } : { right: window.innerWidth - anchor.right }
-  return (
-    <div className="menu-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()} onContextMenu={e => (e.preventDefault(), onClose())}>
-      <div className={`menu ${filter || all.some(it => isAct(it) && it.sub) ? 'rich' : ''}`} role="menu" ref={box} style={{ top: anchor.bottom + 4, ...pos }}>
+  const menu = (
+      <div className={`menu ${filter || all.some(it => isAct(it) && it.sub) ? 'rich' : ''}`} role="menu" ref={box} style={{ top: anchor.bottom + 4, ...pos }} onPointerEnter={onEnter}>
         {filter && <input className="menu-filter" value={q} placeholder={filter.filter} aria-label="Filter" spellCheck={false} autoFocus={!matchMedia('(pointer: coarse)').matches /* no keyboard popping up on a phone */} onChange={e => (setQ(e.target.value), setSel(-2))} />}
         <div className="menu-list">
           {items.map((it, i) =>
@@ -436,7 +455,7 @@ function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; 
                     key={c}
                     className={`swatch ${c === (it.value ?? 'none') ? 'on' : ''}`}
                     style={colorVar(c)}
-                    data-tip={`${c === 'none' ? 'No color' : c} · ${n}`}
+                    data-tip={`${c === 'none' ? 'No color' : c}${n <= 9 ? ` · ${n}` : ''}`}
                     onClick={() => {
                       onClose()
                       it.pick(c)
@@ -452,6 +471,18 @@ function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; 
         </div>
         {foot.length > 0 && <div className="menu-foot">{foot.map(item)}</div>}
       </div>
+  )
+  const sub = subOf && <Menu key={subOf.it.label} anchor={subOf.anchor} beside={subOf.at} items={subOf.it.items!} align="left" first={subOf.first} onBack={() => setSubOf(null)} onEnter={() => clearTimeout(wait.current)} onClose={onClose} />
+  if (beside) return (
+    <>
+      {menu}
+      {sub}
+    </>
+  )
+  return (
+    <div className="menu-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()} onContextMenu={e => (e.preventDefault(), onClose())}>
+      {menu}
+      {sub}
     </div>
   )
   function item(it: Act, i: number) {
@@ -460,8 +491,11 @@ function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; 
       <button
         key={i}
         role="menuitem"
-        className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it ? 'sel' : ''}`}
-        onClick={() => pick(it)}
+        aria-haspopup={it.items ? 'menu' : undefined}
+        aria-expanded={it.items ? subOf?.it === it : undefined}
+        className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
+        onClick={e => pick(it, e.currentTarget, e.detail === 0)}
+        onPointerEnter={e => hover(it, e.currentTarget)}
         onPointerMove={() => setSel(acts.indexOf(it))} // the one under the mouse is ⏎'s, as in a native menu
       >
         <span className="menu-icon">{it.icon && <Icon name={it.icon} />}</span>
@@ -475,6 +509,7 @@ function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; 
         {it.hint && !on && <span className="menu-hint">{it.hint}</span>}
         {it.pill && <span className={`menu-pill ${it.tone ?? ''}`}>{it.pill}</span>}
         {keys[acts.indexOf(it)] && <kbd className="menu-key">{keys[acts.indexOf(it)]!.toUpperCase()}</kbd>}
+        {it.items && <Icon name="chevronRight" size={12} />}
       </button>
     )
   }

@@ -657,6 +657,20 @@ test("project notes: projectSet keeps them, blank drops them; ls --json leaves t
   assert.equal((await rig.rpc('state')).projects[0].notes, undefined)
 })
 
+test("project memory: projectSet keeps the list, drops bad items, an empty one clears it; ls --json leaves it out", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, memory: [{ id: 'm-1', text: 'Deploys go through staging first', at: 5 }, { id: 'm-1', text: 'a twin' }, { id: 'bad id!', text: 'x' }, { id: 'm-2', text: '  ' }, { id: 'm-3', text: 'Ask Ann about billing', at: 6, edited: 7 }] })
+  const kept = (await rig.rpc('state')).projects[0].memory
+  assert.deepEqual(kept, [{ id: 'm-1', text: 'Deploys go through staging first', at: 5 }, { id: 'm-3', text: 'Ask Ann about billing', at: 6, edited: 7 }])
+  await rig.rpc('projectSet', { id: p.id, name: 'App' }) // another field: the list stays
+  assert.equal((await rig.rpc('state')).projects[0].memory.length, 2)
+  const ls = await rig.cli('ls', '--json')
+  assert.ok(!ls.out.includes('staging first'), 'agents never see it')
+  await rig.rpc('projectSet', { id: p.id, memory: [] })
+  assert.equal((await rig.rpc('state')).projects[0].memory, undefined)
+})
+
 test('a shell tab running a command is running until its prompt is back', async t => {
   const rig = await fresh(t)
   const c = await rig.connect() // shells are checked only while someone looks
