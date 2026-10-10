@@ -183,7 +183,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
           ),
         },
         { id: 'actions', k: 'Actions', v: "Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in." },
-        { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent, its model and effort under the prompt. The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › General › Turn timers: how long each turn has gone. In a Claude Code tab, /laki:new <the task> with codex starts it in a new workspace of the project." },
+        { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent, its model and effort under the prompt (type in a picker to filter it, ⏎ picks). The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › General › Turn timers: how long each turn has gone. In a Claude Code tab, /laki:new <the task> with codex starts it in a new workspace of the project." },
         { id: 'widgets', k: 'Widgets', v: 'Live tiles at the bottom of the sidebar (a click opens the full view): each a folder with widget.json and widget.html, fed by a command on a schedule while the app is open. Settings › Widgets turns them on, sizes them (and their full view: small, medium, large), sets them up and opens their folders; the Widget creator skill (Settings › Agent skill) has your agent make new ones, or Make one with AI there gives a prompt for any AI chat.' },
         { id: 'board', k: 'Board', v: 'The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.' },
         {
@@ -206,7 +206,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
             </>
           ),
         },
-        { id: 'quit', k: 'Quit', v: '⌘Q quits the app: agents keep running in the daemon. Quit … Completely (the app menu) stops the daemon too; agents resume next time.' },
+        { id: 'quit', k: 'Quit', v: '⌘Q quits the app: agents keep running in the daemon. Quit … Completely (the app menu) stops the daemon too; agents resume next time, and shells come back in their folder with what ran in them (an agent resumed, a command typed for ⏎).' },
       ],
     },
     {

@@ -289,6 +289,49 @@ test('resume after a daemon restart: agents get --resume <id>, shells start fres
   assert.deepEqual(v.tabs.map((t: any) => [t.name, t.status === 'exited']), [['claude', false], ['codex', false], ['shell', false]])
 })
 
+test('shells come back after a daemon restart: their folder, an agent resumed, a command typed back, a Run tab again', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, config: { run: 'sleep 300' } })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  mkdirSync(join(ws.path, 'sub'))
+  const agent = await until(() => rig.tab(ws.id, 'shell'), 'a shell')
+  const cmd = await rig.rpc('tabNew', { ws: ws.id })
+  const idle = await rig.rpc('tabNew', { ws: ws.id })
+  await rig.rpc('run', { ws: ws.id })
+  for (const s of [agent, cmd, idle]) await until(async () => (await rig.screen(s.id)).includes('$'), 'a prompt')
+  // claude typed in a shell: it keeps its chat id in ~/.claude/sessions/<pid>.json
+  const bin = join(rig.home, 'agent')
+  mkdirSync(bin)
+  writeFileSync(join(bin, 'claude'), `#!/usr/bin/env node
+const fs = require('fs'), dir = process.env.HOME + '/.claude/sessions'
+fs.mkdirSync(dir, { recursive: true })
+fs.writeFileSync(dir + '/' + process.pid + '.json', JSON.stringify({ pid: process.pid, sessionId: 'chat-in-a-shell' }))
+setTimeout(() => {}, 300000)
+`, { mode: 0o755 })
+  await rig.rpc('input', { tab: agent.id, data: `cd sub && ${join(bin, 'claude')}\r` })
+  writeFileSync(join(bin, 'serve'), "#!/usr/bin/env node\nconsole.log('serving')\nsetTimeout(() => {}, 300000)\n", { mode: 0o755 }) // ps: node /…/serve --port 3000
+  await rig.rpc('input', { tab: cmd.id, data: `${join(bin, 'serve')} --port 3000\r` })
+  await rig.rpc('input', { tab: idle.id, data: 'cd sub\r' })
+  await until(() => existsSync(join(rig.home, '.claude/sessions')) && readdirSync(join(rig.home, '.claude/sessions')).length > 0, "claude's session file")
+  await until(async () => (await rig.screen(cmd.id)).includes('\nserving'), 'the command running')
+  await sleep(300)
+  await rig.stop()
+  await rig.start()
+  // the agent resumes its chat, in its folder (the fake claude on PATH logs it)
+  await until(() => rig.fakeLog().some(l => l.bin === 'claude' && l.args.join(' ') === '--resume chat-in-a-shell'), 'claude --resume, run', 15000)
+  assert.match(await rig.screen(agent.id), /Laki restarted · resuming it/)
+  // another program is typed back by its name, not run
+  await until(async () => /\$ serve --port 3000\s*$/.test(await rig.screen(cmd.id)), 'serve typed', 15000)
+  assert.match(await rig.screen(cmd.id), /⏎ runs it again/)
+  // an idle shell starts where it was
+  await rig.rpc('input', { tab: idle.id, data: 'pwd\r' })
+  await until(async () => (await rig.screen(idle.id)).includes(join(realpathSync(ws.path), 'sub')), 'in sub')
+  const dev = await rig.tab(ws.id, 'dev')
+  assert.equal(dev?.status, 'idle', 'the Run tab started again')
+  assert.equal(dev.again, undefined)
+})
+
 test('diff: committed and uncommitted changes since the base, new files too', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

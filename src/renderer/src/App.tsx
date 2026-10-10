@@ -4,8 +4,8 @@ import { stamp } from '../../shared/when'
 import { api, bridge, notify, type NotifyAction, openExternal } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, type WsInfo } from './Info'
-import { About, AddProject, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
+import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
@@ -18,7 +18,7 @@ import { Term, xterms } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, RunButton, SidePanel, type Thread } from './SidePanel'
+import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, clock, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, type Paint, paintKey, paintOf, transparent } from './themes'
@@ -162,6 +162,7 @@ export function App() {
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, openMenu] = useMenu()
+  const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
   const [apps, setApps] = useState<AppInfo[]>([])
   const viewRef = useRef<View | null>(null)
   viewRef.current = view
@@ -769,6 +770,8 @@ export function App() {
     preview: async (path, line) => (await leavePreview()) && setPreview({ ws: w.id, path, line, n: ++requests }),
     changes: () => api.call<Changes>('diff', { ws: w.id }),
     prChanges: () => api.call<Changes>('prDiff', { ws: w.id }),
+    prFiles: () => api.call<PRFiles>('prFiles', { ws: w.id }),
+    setViewed: (path, viewed, id) => api.call('prViewed', { ws: w.id, path, viewed, id }),
     read: (path, base) => api.call<FileContent>('fileRead', { ws: w.id, path, base }),
     threads: () => api.call<Thread[]>('prThreads', { ws: w.id }),
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
@@ -1544,6 +1547,7 @@ export function App() {
               {(pr.additions || pr.deletions) ? <span className="ws-stat"><span className="add">+{short(pr.additions ?? 0)}</span> <span className="del">−{short(pr.deletions ?? 0)}</span></span> : null}
               {w.prLinked && <span>linked</span>}
             </div>
+            {reviewersText(pr) && <div className="wp-pr-meta">{reviewersText(pr)}</div>}
           </div>
         )}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0 || w.stat.dirty > 0) && <div className="wp-line">{statText(w)}</div>}
@@ -1639,14 +1643,14 @@ export function App() {
         return (
           <div
             key={ts[0]?.id}
-            className={`tab nodrag ${g === group ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}`}
+            className={`tab nodrag ${g === group ? 'sel' : ''}${ts.some(t => t.asleep) ? ' asleep' : ''}${ts.length && ts.every(t => t.kind === 'agent' && t.status === 'exited') ? ' ended' : ''}`}
             style={colorVar(colorOf(ts[0]))}
             onClick={() => selectGroup(g)}
             onDoubleClick={() => ts[0] && setDialog({ rename: ts[0].id })}
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-tip={[...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
@@ -2180,6 +2184,19 @@ export function App() {
             }}
           />
         )}
+        {ws && gallery === ws.id && ws.storage && (
+          <ArtifactsBar
+            ws={ws.id}
+            n={ws.artifacts ?? 0}
+            links={ws.links}
+            onClose={() => setGallery(null)}
+            api={{
+              list: () => api.call<Artifact[]>('artifactList', { ws: ws.id }),
+              read: path => api.call<FileContent>('fileRead', { ws: ws.id, path, storage: true }),
+              reveal: bridge?.openPath && (path => void bridge!.openPath!(`${ws.storage}/${path.replace(/\/?[^/]*$/, '')}`)), // its folder: open-path would open a document in its app
+            }}
+          />
+        )}
         {(ws?.browser === undefined || !connected) && ( // a browser page: none, unless something's wrong
         <div className="status">
           {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage')} /> /* remounts as agents are turned on or off */}
@@ -2223,6 +2240,22 @@ export function App() {
               )}
               {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
+          )}
+          {!!ws?.artifacts && ws.storage && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): Finder, or here
+            <button
+              className="listen port-main"
+              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER)`}
+              onClick={e =>
+                bridge?.openPath
+                  ? openMenu(e, [
+                      { label: 'Open in Finder', icon: 'folder', run: () => void bridge!.openPath!(ws.storage!) },
+                      { label: gallery === ws.id ? 'Hide the gallery' : 'Show here', icon: 'image', run: () => setGallery(g => (g === ws.id ? null : ws.id)) },
+                    ])
+                  : setGallery(g => (g === ws.id ? null : ws.id))
+              }
+            >
+              Artifacts: {ws.artifacts}
+            </button>
           )}
           <span className="spacer" />
           {view.remote && ws?.browser === undefined && (

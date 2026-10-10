@@ -10,16 +10,22 @@ worktree. Agents keep running when the window is closed.
   messages sent later (in 2h, at 3pm). Agents resume after a
   restart or a usage limit.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
-- **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command. Terminals in
+- **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command (an agent
+  started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
+  update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in
   your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
-- **PRs**: CI and reviews in the status bar, sent to the agent if you like; ship (commit, push, PR) in one step; merge
+- **PRs**: CI and reviews in the status bar (who approved, who asked for changes), sent to the agent if you like; ship (commit, push, PR) in one step; merge
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
   merged, if you like.
-- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (comment on a line; images before and after), review threads, and a preview of the dev
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (comment on a line; images before and after;
+  a Viewed box per file, the same as GitHub's), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`).
+- **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports) and
+  links to what they publish (Claude artifacts, sites, gists: kept on their own as an agent publishes them): counted in the status bar, a gallery of previews (links first,
+  opened in the browser), the links in the info panel too.
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only (or anyone with the
   link, if you type *confirm*: a red warning says what that risks).

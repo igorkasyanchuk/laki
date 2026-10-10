@@ -373,7 +373,18 @@ const LAST_NEW = 'laki.newWs'
 const DRAFT = 'laki.newDraft'
 type Draft = { p: NewWsParams; images: Img[]; rivals: string[]; tpl: string; prev?: string } // prev: an earlier prompt a link's replaced
 // the agent menu's choices after the presets: what each says, its icon
-const OTHER_AGENTS: [string, string, IconName][] = [['shell', 'Shell', 'terminal'], ['custom', 'Custom command…', 'code'], ['none', 'No agent', 'minus']]
+const OTHER_AGENTS: [string, string, IconName, string][] = [
+  ['shell', 'Shell', 'terminal', 'A terminal in the workspace’s folder'],
+  ['custom', 'Custom command…', 'code', 'Any program: aider, a script…'],
+  ['none', 'No agent', 'minus', 'Opens empty, for you to start what you like'],
+]
+// the model menu's lines (claude's own words for them) and how much each costs next to the others
+const MODEL_SAYS: Record<string, [string, string, 'good' | 'warn' | undefined]> = {
+  fable: ['For the hardest problems', '$$$$', 'warn'],
+  opus: ['For complex work', '$$$', 'warn'],
+  sonnet: ['For most tasks', '$$', undefined],
+  haiku: ['For quick questions: the fastest', '$', 'good'],
+}
 
 // initial: a laki://new link's prompt, preset and name; project and initial win over the last choices; images: the menu
 // bar's screenshots
@@ -502,19 +513,33 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   const placeMenu = (e: MouseEvent) =>
     openMenu(
       e,
-      view.projects.flatMap(x => [
+      [
+        ...(view.projects.length > 6 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
+        ...view.projects.flatMap(x => [
         { label: x.name, icon: x.git === false ? 'folder' : 'fork', hint: x.id === p.project && !sep ? ON : undefined, run: () => set({ project: x.id, place: undefined, ...(x.id !== p.project && { base: '' }) }) } as MenuItem,
         ...(x.seps ?? []).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', indent: true, hint: x.id === p.project && sep?.id === s.id ? ON : undefined, run: () => set({ project: x.id, place: s.id, ...(x.id !== p.project && { base: '' }) }) }) as MenuItem),
-      ]),
+        ]),
+      ],
     )
+  // a preset's line: its command, or the agent and its args; none when it would only say its name again (codex: Codex)
+  const presetSays = (x: (typeof view.presets)[number]) => {
+    const say = x.agent === 'command' ? x.cmd || 'A command' : [AGENT_NAMES[x.agent], x.args].filter(Boolean).join(' · ')
+    return say.toLowerCase() === x.name.toLowerCase() ? undefined : say
+  }
+  const on = view.presets.filter(x => !x.off)
+  const def = on.some(x => x.name === view.settings.agent) ? view.settings.agent : on[0]?.name // what new workspaces start (Settings): a pill, and the foot sets it
   const agentMenu = (e: MouseEvent) =>
     openMenu(
       e,
       [
+        { filter: 'Type to filter…' },
         { head: 'Agent' },
-        ...view.presets.filter(x => !x.off || x.name === p.preset).map(x => ({ label: x.name, icon: 'agent', hint: p.preset === x.name ? ON : undefined, run: () => set({ preset: x.name, model: undefined, effort: undefined }) }) as MenuItem), // another agent's names
+        ...view.presets
+          .filter(x => !x.off || x.name === p.preset)
+          .map(x => ({ label: x.name, icon: 'agent', mono: true, sub: presetSays(x), pill: x.name === def ? 'default' : undefined, hint: p.preset === x.name ? ON : undefined, run: () => set({ preset: x.name, model: undefined, effort: undefined }) }) as MenuItem), // another agent's names
         null,
-        ...OTHER_AGENTS.map(([x, label, icon]) => ({ label, icon, hint: p.preset === x ? ON : undefined, run: () => set({ preset: x, model: undefined, effort: undefined }) }) as MenuItem),
+        ...OTHER_AGENTS.map(([x, label, icon, sub]) => ({ label, icon, sub, hint: p.preset === x ? ON : undefined, run: () => set({ preset: x, model: undefined, effort: undefined }) }) as MenuItem),
+        ...(p.preset !== def && view.presets.some(x => x.name === p.preset) ? [{ label: `Make ${p.preset} the default for new workspaces`, icon: 'pin', foot: true, run: () => void api.call('settingsSet', { agent: p.preset }) } as MenuItem] : []),
       ],
       'right',
     )
@@ -527,13 +552,14 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     openMenu(
       e,
       [
+        { filter: 'Type to filter…' },
         { head: 'Model' },
-        { label: "The agent's default", hint: !typed ? ON : undefined, run: () => set({ model: undefined }) },
-        ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => ({ label: m, hint: typed === m ? ON : undefined, run: () => set({ model: m }) }) as MenuItem),
-        { label: 'Another model…', icon: 'pencil', run: () => (setOwnModel(true), setAdv(true), setTimeout(() => modelBox.current?.focus())) },
+        { label: 'default', mono: true, sub: `Whatever ${ag ? AGENT_NAMES[ag] : 'the agent'} picks`, hint: !typed ? ON : undefined, run: () => set({ model: undefined }) },
+        ...[...models, ...(typed && !models.includes(typed) ? [typed] : [])].map(m => ({ label: m, mono: true, sub: MODEL_SAYS[m]?.[0], pill: MODEL_SAYS[m]?.[1], tone: MODEL_SAYS[m]?.[2], hint: typed === m ? ON : undefined, run: () => set({ model: m }) }) as MenuItem),
         ...(efforts
-          ? [null, { head: 'Effort' }, { label: "The agent's default", hint: !p.effort ? ON : undefined, run: () => set({ effort: '' }) } as MenuItem, ...efforts.map(x => ({ label: x, hint: p.effort === x ? ON : undefined, run: () => set({ effort: x }) }) as MenuItem)]
+          ? [null, { head: 'Effort' }, { label: 'default', mono: true, hint: !p.effort ? ON : undefined, run: () => set({ effort: '' }) } as MenuItem, ...efforts.map(x => ({ label: x, mono: true, hint: p.effort === x ? ON : undefined, run: () => set({ effort: x }) }) as MenuItem)]
           : []),
+        { label: 'Another model by name…', icon: 'pencil', foot: true, run: () => (setOwnModel(true), setAdv(true), setTimeout(() => modelBox.current?.focus())) },
       ],
       'right',
     )
@@ -1119,6 +1145,108 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
           {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install Claude Code or Codex, then restart Laki')}
           {missing.length > 0 && found.length > 0 && <div className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</div>}
         </div>
+      )}
+    </div>
+  )
+}
+
+// the status bar's Artifacts, in the app: a strip of the storage folder's files over the status bar (newest first, a
+// preview each), a click shows it big, ← → (or the keys) go through the others. n: their count, a change reloads them
+export type Artifact = { path: string; size: number; at: number }
+export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void }
+const host = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]
+const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
+type Seen = { size: number; text?: string; image?: string } | { error: string }
+// links: its .url files (what its agents published): first, a click opens them in the browser
+export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: string; n: number; links?: { path: string; url: string; title: string }[]; api: ArtifactsApi; onClose: () => void }) {
+  const linkOf = (path: string) => links.find(l => l.path === path)
+  const [files, setFiles] = useState<Artifact[] | null>(null)
+  const [err, setErr] = useState('')
+  const [big, setBig] = useState<string | null>(null) // the file shown big, by path: a reload (a new one first) keeps it
+  const [seen, setSeen] = useState<Record<string, Seen>>({}) // each file's content, by path and time: read once
+  const asked = useRef(new Set<string>())
+  const api = useRef(a)
+  api.current = a
+  useEffect(() => void api.current.list().then(f => (setFiles(f), setErr('')), e => setErr(String(e?.message ?? e))), [ws, n])
+  const key = (f: Artifact) => `${f.path}@${f.at}`
+  const need = (f: Artifact) => {
+    if (asked.current.has(key(f))) return
+    asked.current.add(key(f))
+    api.current.read(f.path).then(c => setSeen(s => ({ ...s, [key(f)]: c })), e => setSeen(s => ({ ...s, [key(f)]: { error: String(e?.message ?? e) } })))
+  }
+  // ponytail: previews for the newest 60 of 2 MB or less (a picture comes whole); the rest load as they're opened
+  useEffect(() => void files?.slice(0, 60).forEach(f => f.size <= 2 << 20 && !linkOf(f.path) && need(f)), [files])
+  const i = files && big !== null ? files.findIndex(f => f.path === big) : -1
+  const at = files && i >= 0 ? files[i] : null
+  const step = (d: number) => files?.length && i >= 0 && setBig(files[(i + d + files.length) % files.length].path)
+  useEffect(() => void (at && !linkOf(at.path) && need(at)), [at])
+  useEffect(() => {
+    if (big === null) return
+    const f = (e: KeyboardEvent) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return
+      e.preventDefault()
+      step(e.key === 'ArrowLeft' ? -1 : 1)
+    }
+    window.addEventListener('keydown', f, true)
+    return () => window.removeEventListener('keydown', f, true)
+  })
+  const look = (f: Artifact, full = false) => {
+    const l = linkOf(f.path)
+    if (l)
+      return (
+        <span className="art-link">
+          <Icon name="globe" size={full ? 28 : 18} />
+          <span className="art-host">{host(l.url)}</span>
+          {full && (
+            <button className="primary" onClick={() => openExternal(l.url)}>
+              Open {l.url.length > 60 ? `${l.url.slice(0, 60)}…` : l.url}
+            </button>
+          )}
+        </span>
+      )
+    const c = seen[key(f)]
+    if (!c) return full || f.size <= 2 << 20 ? <span className="muted small">Loading…</span> : <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
+    if ('error' in c) return <span className="warn small">{c.error}</span>
+    if (c.image) return <img src={c.image} alt={f.path} />
+    if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
+    return <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
+  }
+  return (
+    <div className="artifacts">
+      <div className="art-head">
+        <Icon name="folder" size={12} /> Artifacts <span className="muted">{files ? files.length : ''}</span>
+        <span className="grow" />
+        <IconButton icon="x" title="Close" onClick={onClose} />
+      </div>
+      <div className="art-strip">
+        {err && <span className="warn small">{err}</span>}
+        {files && !files.length && <span className="muted small">Nothing kept yet</span>}
+        {files?.map(f => (
+          <button
+            key={f.path}
+            className={`art-card ${linkOf(f.path) ? 'link' : ''}`}
+            data-tip={linkOf(f.path) ? `${linkOf(f.path)!.url} · open in the browser` : `${f.path} · ${sizeOf(f.size)} · ${new Date(f.at).toLocaleString()}`}
+            onClick={() => (linkOf(f.path) ? openExternal(linkOf(f.path)!.url) : setBig(f.path))}
+          >
+            <span className="art-thumb">{look(f)}</span>
+            <span className="art-name">{linkOf(f.path)?.title ?? f.path.split('/').pop()}</span>
+          </button>
+        ))}
+      </div>
+      {at && files && (
+        <Modal title={`${at.path} · ${i + 1} of ${files.length}`} onClose={() => setBig(null)} wide loose>
+          <div className="art-big">{look(at, true)}</div>
+          <div className="buttons">
+            <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
+            {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
+            <button aria-label="Previous" disabled={files.length < 2} onClick={() => step(-1)}>
+              <Icon name="back" />
+            </button>
+            <button aria-label="Next" disabled={files.length < 2} onClick={() => step(1)}>
+              <Icon name="forward" />
+            </button>
+          </div>
+        </Modal>
       )}
     </div>
   )

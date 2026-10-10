@@ -40,15 +40,16 @@ writeFileSync(
   JSON.stringify({
     number: 42, state: 'OPEN', url: 'https://github.com/acme/shop/pull/42', title: 'Cart: totals with discounts', author: { login: 'ann' }, isDraft: false,
     headRefOid: 'abc123', reviewDecision: 'CHANGES_REQUESTED', mergeable: 'CONFLICTING', additions: 120, deletions: 14, updatedAt: ago(3600),
+    reviews: [{ author: { login: 'carol' }, state: 'APPROVED' }, { author: { login: 'bob' }, state: 'CHANGES_REQUESTED' }],
     body: '## Summary\n\nAdds **discount codes** to the cart, checked at `total()`.\n\n- percent and fixed discounts\n- one code per order\n- tests for both\n\n## Testing\n\n```sh\nnpm test\n```\n\nSee [the design doc](https://example.invalid/design) for the rules.',
     statusCheckRollup: [check('lint', 'SUCCESS', 'COMPLETED', 18), check('test (node 22)', 'FAILURE', 'COMPLETED', 72), check('build', 'SUCCESS', 'COMPLETED', 141), check('e2e', '', 'IN_PROGRESS'), check('deploy preview', 'SKIPPED')],
   }),
 )
-// review threads, for the side panel's Review tab
+// review threads, for the side panel's Review tab; the PR's files as you've marked them viewed, for Changes
 const said = (login: string, body: string, secs = 7200) => ({ author: { login, __typename: 'User' }, authorAssociation: 'MEMBER', body, createdAt: ago(secs) })
 writeFileSync(
   join(home, 'gh/graphql.json'),
-  JSON.stringify({ data: { viewer: { login: 'demo' }, repository: { pullRequest: { reviewThreads: { nodes: [
+  JSON.stringify({ data: { viewer: { login: 'demo' }, repository: { pullRequest: { id: 'PR_demo', files: { nodes: [{ path: 'src/cart.js', viewerViewedState: 'VIEWED' }, { path: 'src/cart.test.js', viewerViewedState: 'UNVIEWED' }], pageInfo: { hasNextPage: false } }, reviewThreads: { nodes: [
     { id: 't1', isResolved: false, isOutdated: false, path: 'src/cart.js', line: 2, comments: { nodes: [said('ann', 'Round to cents before summing, or `0.1 + 0.2` shows up in totals:\n\n```suggestion\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100), 0)\n```')] } },
     { id: 't2', isResolved: false, isOutdated: true, path: 'src/cart.test.js', line: 5, comments: { nodes: [said('bob', 'Add a case for an empty cart.'), said('demo', 'On it.', 600)] } },
     { id: 't3', isResolved: true, isOutdated: false, path: 'README.md', line: 1, comments: { nodes: [said('ann', 'Typo.')] } },
@@ -76,5 +77,8 @@ await new Promise(r => setTimeout(r, 3000))
 writeFileSync(join(a.path, 'src/cart.js'), 'export function total(items) {\n  const cents = items.reduce((s, i) => s + Math.round(i.price * 100), 0)\n  return cents / 100\n}\n')
 writeFileSync(join(a.path, 'src/cart.test.js'), "import { total } from './cart.js'\nconsole.assert(total([{ price: 0.1 }, { price: 0.2 }]) === 0.3)\n")
 await rpc('run', { ws: a.id })
+// what its agents kept: the status bar's Artifacts
+const kept = (await rpc<{ workspaces: { id: string; storage?: string }[] }>('state')).workspaces.find(w => w.id === a.id)?.storage
+if (kept) for (const [f, text] of [['smoke/report.md', '# Smoke test\n\nAll pages load.\n'], ['smoke/home.txt', 'home ok\n'], ['links.md', '- https://example.invalid/artifact\n']]) mkdirSync(dirname(join(kept, f)), { recursive: true }), writeFileSync(join(kept, f), text)
 await rpc('send', { target: c.id, text: 'ask before deleting' })
 console.log(JSON.stringify({ home, url: `${origins.split(',')[0]}/#port=${info.port}&token=${info.token}` }))

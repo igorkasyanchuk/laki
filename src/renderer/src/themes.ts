@@ -989,6 +989,11 @@ export function applyTheme(p: string | Paint = '') {
     // the selected tab as the terminal, joined to it; a see-through terminal: a lift instead, the bar's tint is under it
     // ponytail: the bar's tint stays under the tab, so it matches the terminal only when that's mostly solid
     st.setProperty('--tab-sel', solid('glassTerm') >= 50 ? alpha(v('bg', '--bg'), solid('glassTerm')) : alpha(v('fg', '--fg'), 10))
+    // the theme's own surfaces see-through too: a hovered row, a line, a selection take on what's behind the window,
+    // a tint of the text's color over it, never a solid block of the theme's dark (or light) over the desktop
+    st.setProperty('--hover', `color-mix(in srgb, ${v('fg', '--fg')} 9%, transparent)`)
+    st.setProperty('--line', `color-mix(in srgb, ${v('fg', '--fg')} 14%, transparent)`)
+    st.setProperty('--sel', alpha(v('sel', '--sel'), 70)) // #rrggbbaa: xterm's selection reads it too
   }
   if (clear) {
     // the sidebar and the rail over the window's blur, the rest solid (styles.css' html.side-clear)

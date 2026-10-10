@@ -28,6 +28,8 @@ export type PanelApi = {
   preview: (path: string, line?: number) => void // in the app
   changes: () => Promise<Changes>
   prChanges: () => Promise<Changes> // the PR's whole diff, as GitHub has it
+  prFiles: () => Promise<PRFiles> // its files' Viewed boxes, as you ticked them on GitHub
+  setViewed: (path: string, viewed: boolean, id: string) => Promise<unknown>
   read: (path: string, base?: boolean) => Promise<FileContent> // base: as it was where the changes start (an image)
   threads: () => Promise<Thread[]>
   comment: (c: { path: string; line: number; side: 'LEFT' | 'RIGHT'; body: string }) => Promise<unknown> // on the PR, at a diff line
@@ -36,6 +38,9 @@ export type PanelApi = {
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
 }
+
+// a PR's node id and each file's viewerViewedState: VIEWED, UNVIEWED, DISMISSED (viewed, then changed by a commit)
+export type PRFiles = { id: string; files: Record<string, string> }
 
 export const PANEL_WIDTH = 340
 const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
@@ -353,6 +358,24 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   }
   const toggle = (p: string) => setOpen(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
   const files = d?.files ?? []
+  // Viewed, as on GitHub's Files changed: a box for each file in the PR (in both views); ticked, it folds and dims.
+  // DISMISSED (viewed, then changed by a commit) is unticked. mine: ticks made here until GitHub's next answer has them
+  const [gh] = useLoad<PRFiles | null>(pr ? api.prFiles : () => Promise.resolve(null), `${ws}#${pr?.number ?? ''}`, 60000)
+  const [mine, setMine] = useState<Record<string, string>>({})
+  useEffect(() => setMine({}), [ws])
+  useEffect(() => setMine(m => Object.fromEntries(Object.entries(m).filter(([p, v]) => gh?.files[p] !== v))), [gh]) // kept until GitHub's answer has them (one asked for before the tick doesn't)
+  const viewedOf = (p: string) => mine[p] ?? gh?.files[p]
+  const inPR = files.filter(f => viewedOf(f.path))
+  const viewed = inPR.filter(f => viewedOf(f.path) === 'VIEWED').length
+  const [vErr, setVErr] = useState('')
+  const mark = (p: string, on: boolean) => {
+    if (!gh) return
+    const was = viewedOf(p)
+    setMine(m => ({ ...m, [p]: on ? 'VIEWED' : 'UNVIEWED' }))
+    if (on) setOpen(o => (o.delete(p), new Set(o)))
+    setVErr('')
+    api.setViewed(p, on, gh.id).catch(e => (setMine(m => ({ ...m, [p]: was! })), setVErr(String(e?.message ?? e))))
+  }
   return (
     <>
       <div className="sp-tools">
@@ -367,15 +390,21 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
           </span>
         )}
         <span className="muted small grow">{d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : ` changed vs ${d.base}`}${files.length ? ' · click a line to comment' : ''}` : err ? '' : 'Loading…'}</span>
+        {inPR.length > 0 && (
+          <span className={`sp-viewed-n ${viewed === inPR.length ? 'all' : ''}`} data-tip={`Files you've marked viewed on GitHub, of the ${inPR.length} here in PR #${pr!.number}`}>
+            {viewed}/{inPR.length} viewed
+          </span>
+        )}
         {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
-        {files.some(f => open.has(f.path)) ? <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} /> : <IconButton icon="expand" title="Expand all" onClick={() => setOpen(new Set(files.map(f => f.path)))} />}
+        {files.some(f => open.has(f.path)) ? <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} /> : <IconButton icon="expand" title={viewed ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setOpen(new Set(files.filter(f => viewedOf(f.path) !== 'VIEWED').map(f => f.path)))} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
       </div>
       <div className="sp-body">
         {err && <div className="warn small pad">{err}</div>}
+        {vErr && <div className="warn small pad">{vErr}</div>}
         {d && !files.length && <div className="muted small pad">{all ? `PR #${pr!.number} changes nothing.` : `No changes: the branch is where ${d.base} is, and nothing is uncommitted.`}{!all && pr ? ` PR #${pr.number} above shows the PR's.` : ''}</div>}
         {files.map(f => (
-          <div key={f.path} className="sp-change">
+          <div key={f.path} className={`sp-change ${viewedOf(f.path) === 'VIEWED' ? 'viewed' : ''}`}>
             <div className="sp-row" onClick={() => toggle(f.path)} data-tip={f.path}>
               <span className="sp-chev">
                 <Icon name={open.has(f.path) ? 'chevron' : 'chevronRight'} />
@@ -388,6 +417,11 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
                 <span className="mono small">
                   <span className="add">+{f.add}</span> <span className="del">−{f.del ?? 0}</span>
                 </span>
+              )}
+              {viewedOf(f.path) && (
+                <label className="sp-viewed" data-tip={viewedOf(f.path) === 'VIEWED' ? 'Viewed (on GitHub too): untick to show it again' : 'Mark viewed, as on GitHub'} onClick={e => e.stopPropagation()}>
+                  <input type="checkbox" checked={viewedOf(f.path) === 'VIEWED'} onChange={e => mark(f.path, e.target.checked)} />
+                </label>
               )}
             </div>
             {open.has(f.path) && IMAGE.test(f.path) && !all && <ImageDiff api={api} path={f.path} status={f.status} />}

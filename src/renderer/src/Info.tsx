@@ -21,6 +21,8 @@ export type PRInfo = {
   mine?: boolean // you opened it
   draft?: boolean
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
+  approved?: string[] // who approved it (each one's latest review); an older daemon: none
+  changes?: string[] // who asked for changes
   conflict?: boolean // merge conflicts with its base branch
   ready?: boolean // GitHub would merge it now; false: blocked, behind, unstable…
   base?: string
@@ -36,6 +38,7 @@ export type WsInfo = {
   base: string
   path: string
   storage?: string // $LAKI_STORAGE_FOLDER: made with its first tab
+  links?: { path: string; url: string; title: string }[] // its .url files there: what its agents published
   port: number
   ports?: number[] // listening
   kind: string
@@ -77,6 +80,37 @@ export const Avatar = ({ login, size = 14 }: { login?: string; size?: number }) 
 
 export const prState = (pr: PRInfo) => (pr.draft && pr.state === 'OPEN' ? 'draft' : pr.state.toLowerCase())
 export const REVIEW: Record<string, string> = { APPROVED: 'approved', CHANGES_REQUESTED: 'changes requested', REVIEW_REQUIRED: 'review required' }
+
+// who reviewed it, as a line: the status bar's tip, the hover card
+export const reviewersText = (pr: PRInfo) =>
+  [pr.approved?.length && `approved by ${pr.approved.join(', ')}`, pr.changes?.length && `changes requested by ${pr.changes.join(', ')}`].filter(Boolean).join(' · ')
+
+// the PR section's: each kind of review, its people with their pictures
+function Reviewers({ pr }: { pr: PRInfo }) {
+  const rows: [string, string, string[] | undefined][] = [
+    ['approved', 'Approved by', pr.approved],
+    ['changes', 'Changes requested by', pr.changes],
+  ]
+  if (!rows.some(([, , who]) => who?.length)) return null
+  return (
+    <div className="pr-reviewers">
+      {rows.map(
+        ([k, word, who]) =>
+          !!who?.length && (
+            <div key={k} className={`pr-rv pr-rv-${k}`}>
+              <Icon name={k === 'approved' ? 'check' : 'x'} />
+              <span className="muted">{word}</span>
+              {who.map(l => (
+                <span key={l} className="pr-by">
+                  <Avatar login={l} /> {l}
+                </span>
+              ))}
+            </div>
+          ),
+      )}
+    </div>
+  )
+}
 
 export const ago = (t?: string | number) => {
   if (!t) return ''
@@ -131,7 +165,7 @@ export function PRStatus({ w, onOpen, onToggle, onMenu }: { w: WsInfo; onOpen: (
   if (!pr) return null
   return (
     <span className="pr-status" onContextMenu={onMenu}>
-      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} data-tip={`${pr.title ?? ''} · ${prState(pr)}`.replace(/^ · /, '')} onClick={() => onOpen(pr.url)}>
+      <button className={`pr pr-${pr.checks || 'none'} pr-${pr.state.toLowerCase()}`} data-tip={[pr.title, prState(pr), reviewersText(pr)].filter(Boolean).join(' · ')} onClick={() => onOpen(pr.url)}>
         #{pr.number}
       </button>
       {pr.state === 'OPEN' && (
@@ -279,6 +313,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
             )}
             {pr.updated && <span>updated {ago(pr.updated)}</span>}
           </div>
+          <Reviewers pr={pr} />
           {/* GitHub's order: Merge first (green once it could go in), Approve beside it, the PR on GitHub at the end and
               closing, rare and lasting, in ⋯; each asks first (App's prAct) */}
           <div className="pr-acts">
@@ -390,6 +425,13 @@ export function InfoPanel(p: {
               )}
             </Row>
           )}
+          {w.links?.map((l, i) => ( // what its agents published (the storage folder's .url files), newest first
+            <Row key={l.path} k={i ? '' : 'links'} tip={l.url} copy={() => p.onCopy(l.url)}>
+              <a href={l.url} onClick={e => (e.preventDefault(), p.onOpen(l.url))}>
+                {l.title}
+              </a>
+            </Row>
+          ))}
           <Row k="$PORT" tip={`http://localhost:${w.port}`} copy={() => p.onCopy(String(w.port))}>
             <a href="#" className="mono" onClick={e => (e.preventDefault(), p.onOpen(`http://localhost:${w.port}`))}>
               localhost:{w.port}

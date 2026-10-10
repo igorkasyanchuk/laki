@@ -121,7 +121,8 @@ npm link
 
 ## First run
 
-1. Open the app. It starts its background daemon if one isn't running. With no project yet it says what it found:
+1. Open the app (maximized the first time; after that where you left it: its size, place, maximized or full
+   screen, on that screen if it's still there). It starts its background daemon if one isn't running. With no project yet it says what it found:
    git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
    links and remote access) and which agents are on your PATH.
 2. *Get started* opens once (everyone sees it once, after an update too): the first steps (add a project, start a
@@ -177,7 +178,8 @@ selected workspace's PR is in the status bar.
     shows only the ports something in it listens on (no `$PORT`, no folder); a browser has none. Their top bar has only
     ⋯ (no Open in, info, preview, side panel or Run), and Settings and the Board leave them out.
 - A shell tab running a command (a `git push`, `npm install`, a dev server) has the spinner, on its tab and its row,
-  until its prompt is back.
+  until its prompt is back. An agent you start there (`claude`, `codex`…) shows as an agent tab does instead: idle,
+  working, asking (◆) or done (●), read off its screen (no notifications: start it in its own tab for those).
 - *Meme* (the smiley) at its bottom, beside *Video*: a random meme from r/memes, r/ProgrammerHumor or
   r/wholesomememes, pictures only, for a break (*Next*, → or N; a right click: copy, download, open on
   Reddit; Esc closes it); one you've seen comes again only when nothing new is left. Fetched only when you click:
@@ -254,8 +256,8 @@ selected workspace's PR is in the status bar.
 - Drag the dividers to resize.
 - × on a pane closes that terminal; × on a tab closes all of its terminals. Both stop the process.
 - ⌘1…⌘9 switch tabs. Double click a tab to rename it.
-- A tab closes by itself when its shell exits, or its agent ends cleanly (exit code 0). An agent that failed
-  stays open to read, and ⏎ starts it again.
+- A tab closes by itself when its shell exits, or its command ends cleanly (exit code 0). An agent that ends (you
+  quit it, or it failed) stays open to read, its chat id on the screen, its name dimmed, and ⏎ resumes it.
 - Each workspace remembers its tabs and splits.
 - Drop files or folders from Finder on a terminal: their paths are typed in (quoted when they need it), for a
   shell or an agent's prompt.
@@ -397,7 +399,9 @@ until the agent's next run renews it. Settings › General turns each agent off 
   for its diff, with links to preview the file or open it in the editor (*Expand all* opens every file's, then
   *Collapse all* closes them). With a PR, *Here* / *PR #n* switch to the
   whole PR as GitHub has it (`gh pr diff`; first for a workspace that only links its PR), and the GitHub mark opens
-  its *Files changed* there. Click a line of a diff to write a
+  its *Files changed* there. Each file in the PR has a *Viewed* box, in both views, the same one as on GitHub's
+  *Files changed* (ticked here, it's ticked there): a viewed file folds and dims, *Expand all* skips it, and the bar
+  counts *3/10 viewed*. A file changed by a commit since you viewed it is unticked again, as GitHub has it. Click a line of a diff to write a
   comment on it: *Comment on PR #n* posts it on GitHub at that line (`gh`; the line must be in the PR's diff,
   so commit and push first), *Send to the agent* gives it to the workspace's agent with the file and line
   (when its turn ends). ⌘⏎ does the first that applies, Esc closes it. A changed image (PNG, JPEG, GIF, WebP, SVG)
@@ -460,6 +464,9 @@ with no agent running nothing is sent, and the next check tries again.
   you. Right after a push GitHub doesn't know yet whether it conflicts: that keeps the count; no conflicts, or the
   switch turned off and on, starts it over.
 
+Under the PR's title, who approved it and who asked for changes (each one's latest review, with their pictures);
+the status bar PR's tooltip and the row's hover card say the same.
+
 *Merge* ▾ (green once it could go in: checks passing, no conflicts, no changes requested; plain otherwise, its
 tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Close pull request…*), under the PR's title (the
 side panel's *Review*, the info panel), in the status bar PR's right click and (approve) a workspace's right click,
@@ -494,9 +501,11 @@ Closing it (Esc, ✕, a click in the sidebar) keeps what you typed as a draft: i
 until you create it or *Clear* it. Enter in a field never creates it; ⌘⏎ or *Create* does.
 It starts from your last choices (project, its group, agent, model, template, worktree), never the last prompt.
 - Under the prompt: ＋ (images), the mic and its ⌄, *Template*, the agent (a preset, *Shell*, *Custom command…* or
-  *No agent*) and the model (the agent's default, one of its models or *Another model…*; for Claude Code and Codex
-  the effort too; both kept for its restarts and forks).
-- The row below: the project and its group in one menu (a group puts it first in that group; the project alone, first
+  *No agent*) and the model (the agent's default, one of its models or *Another model by name…*; for Claude Code and Codex
+  the effort too; both kept for its restarts and forks). Their menus have a filter box (type, ↑↓, ⏎), a line about each
+  choice, the picked one in the accent with a check; the agent menu marks your default and, for another agent, offers
+  *Make … the default for new workspaces*; Claude's models show how they compare in cost ($ to $$$$).
+- The row below: the project and its group in one menu (with a filter past six projects; a group puts it first in that group; the project alone, first
   in the project), the base branch with *worktree* (untick it to work in the repo itself, on its current branch),
   the name (from the prompt when blank) and *More*: *Race*, and a box for a model typed by hand (like a full name) once you pick *Another model…*.
 In a plain folder (or without a worktree), whose own workspace is there already, an agent or a prompt makes another
@@ -732,9 +741,11 @@ lit for a moment.
   another app's pointer shapes only while it's the active one, so a hovered circle or button grows a little instead),
   *Glass* (a see-through
   window: the desktop shows through, blurred; sliders for how see-through the window (the main area), the sidebar (the rail too) and the
-  terminals are, and *Glow*: the theme's colors lit from two corners behind it; with macOS's *Reduce transparency* on
+  terminals are, and *Glow*: the theme's colors lit from two corners behind it; every theme's rows, lines, hovers and
+  selection turn into tints of its own text color over what shows through, never solid blocks; with macOS's *Reduce transparency* on
   (System Settings › Accessibility › Display) the blur is plain grey, and Settings says so), without glass *Sidebar see-through*
-  (a slider, 0 by default: the sidebar and the rail let the desktop through, blurred, like macOS's own sidebars; the rest stays solid), and the theme (newest first; yours is outlined and checked; hovering one shows it on
+  (a slider, 0 by default: the sidebar and the rail let the desktop through, blurred, like macOS's own sidebars, their
+  hovers, lines and selection tints as with glass; the rest stays solid), and the theme (newest first; yours is outlined and checked; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds
   one by name; the ☆ on a card's corner makes it a favorite: *Favorites*, a group of its own above the rest, and still in the full list): Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
   Velvet, Nightfall, Paper (light), Mist (light), and the Warp-style gradients Cyber Wave, Koi, Pink City, Leafy,
@@ -803,11 +814,19 @@ lit for a moment.
   *Tell it about Laki* (on by default; Claude Code and Codex): each start adds a short note to the agent's system
   prompt (`--append-system-prompt`, Codex's `developer_instructions`; a preset whose arguments set their own keeps
   those, and so does Codex with `developer_instructions` in its `config.toml`: no note then): it runs in Laki, and how to name its workspace (`laki rename . "…"`), attach a PR (`laki pr . <n>`), hand a
-  task to a new workspace, look at the app in the agent browser, and where to keep files for you (the storage folder, below).
+  task to a new workspace, look at the app in the agent browser, and where to keep files for you, and a link to whatever it publishes (the storage folder, below).
 - *Storage* (General): every workspace gets a folder of its own outside the repo, `$LAKI_STORAGE_FOLDER` in each of its
   tabs (agents and shells alike): `<data>/storage/<name>-<id>`, or under the folder you set. It's made with the
   workspace's first tab and keeps its path when the workspace is renamed. Ask an agent to put screenshots, reports
-  or exports there; the info panel's *Storage* opens it. Archiving keeps it; deleting the workspace (or removing its
+  or exports there; the info panel's *Storage* opens it, and the status bar's *Artifacts: n* (the files in it, hidden
+  ones not counted; none at 0) opens it in Finder or shows them here: a strip of previews over the status bar, newest
+  first; click one for a big view (images, text, Markdown rendered), ← and → for the others. A link to whatever an
+  agent publishes for you (a Claude artifact, a deployed site, a gist) is kept there too, as a `<title>.url` file
+  (Finder opens it in the browser), without anyone asking: Laki keeps what Claude's publish tools return (its
+  *Artifact* tool, an MCP tool named publish, deploy, upload or share) and, for any agent, the links its last answer
+  gives to Claude artifacts, gists and sites on vercel.app, netlify.app, pages.dev, github.io, fly.dev, onrender.com,
+  surge.sh, web.app or workers.dev; agents are told to save anything else themselves. Each link once. Links come first in the strip and open in the browser on a click,
+  and the info panel lists them under *links*. Archiving keeps it; deleting the workspace (or removing its
   project) deletes it too, unless *Keep a deleted workspace's storage* is on. None for Terminals, Browsers and SSH hosts.
 - *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
@@ -1048,8 +1067,12 @@ sidebar for (youtube-nocookie.com).
 After pulling or changing the code, rebuild (`npm run pack`) and reopen the app. The running daemon stays the
 old build until it restarts. When the app relies on something that daemon lacks, a yellow bar at the top says
 *Restart Laki's daemon* (close Settings or any page over it to see it): click *Restart the daemon*, then again to confirm. Or run `laki stop` and open the app. Agents
-come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`);
-shells and dev servers start fresh.
+come back resumed (`claude --resume`, `codex resume`, `gemini --resume`, `grok --resume`, `opencode --session`).
+Shells come back in the folder they were in. An agent you started in one comes back too: claude resumes its own chat,
+codex its last one in that folder. Any other program that was running (a dev server, a watcher) is typed back at the
+prompt; press ⏎ to run it again. It isn't run for you, so a deploy caught halfway doesn't run twice. A Run tab that was
+running starts again. This happens when the daemon stops properly (the yellow bar, `laki stop`, *Quit Laki Completely*,
+a log out). After a crash, shells start fresh, and nothing comes back over SSH.
 
 Coming from Laki Electron (the app's old name): build, quit *Laki Electron*, and open `dist/mac-arm64/Laki.app`.
 It finds the same daemon and data, and says the daemon is older: restart it there. Then delete the old app. The
@@ -1071,7 +1094,7 @@ old `laki-electron` folder from `~/.claude/skills` and `~/.codex/skills` if you 
 
 - **Build**: ad-hoc signed, not notarized (the first open of a download needs *Open Anyway*), one architecture per build (no universal app), no auto-update. The app is ~290 MB and uses ~500 MB of memory.
 - **Startup**: when the daemon starts, every tab of every workspace starts (agents resume). After a reboot that can mean many agents at once.
-- **Daemon**: if it dies, its terminals end. Agents come back resumed; shells start fresh.
+- **Daemon**: if it dies, its terminals end. Agents come back resumed. Shells start fresh, without what ran in them (a stop brings that back too, see Updating).
 - **Codex** has no prompt hook, so "running" is a guess (Enter in an idle codex tab).
 - **How Laki follows the other agents**: OpenCode through a plugin of Laki's (`OPENCODE_CONFIG_DIR`, on top of your
   config), Gemini through hooks in a settings file of Laki's (`GEMINI_CLI_SYSTEM_DEFAULTS_PATH`, added to yours;

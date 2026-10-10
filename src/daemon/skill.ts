@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync,
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { USAGE } from '../shared/usage.ts'
-import { cliArgv, cliEnv, dir, q } from './core.ts'
+import { cliArgv, cliEnv, dir, q, STORAGE_NOTE } from './core.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 import { BUILTIN } from './widgets.ts'
 
@@ -69,6 +69,10 @@ task is while you work on it: \`laki progress <0-100> "<what you're on>"\` (or t
 every 20-30 seconds of work. It's your estimate of the whole task, not of the step: weigh the steps by how long
 they take, never go back down, and send \`100\` when it's done. Laki shows it on your tab until your turn ends.
 Unset: don't.
+
+## Keep files and links for the user
+
+${STORAGE_NOTE}
 
 ## Commands
 

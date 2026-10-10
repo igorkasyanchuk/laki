@@ -334,11 +334,14 @@ export const moveId = (ids: string[], d: RowDrop, n = 1) => {
 
 // null is a separator, { head } a section title, { colors } a row of swatches (keys 0-8). An item's key
 // runs it while the menu is open; without one it gets the first free initial of its label's words. indent: under the
-// item before it (a project's groups)
-export const ON = '✓' // a menu item's hint: the one picked
+// item before it (a project's groups); sub: a line under its label; pill: a tag at its end (tone: good green, warn
+// yellow); mono: its label in the terminal's font; foot: in the menu's foot, under a line.
+// { filter } puts a box on top (its placeholder): what's typed keeps the items it matches, and keys are for the box
+export const ON = '✓' // a menu item's hint: the one picked (its label in the accent, a check after it)
 export type MenuItem =
-  | { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; run: () => void }
+  | { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; run: () => void }
   | { head: string }
+  | { filter: string }
   | { colors: string[]; value?: string; pick: (c: string) => void }
   | null
 type Act = Extract<MenuItem, { run: () => void }>
@@ -356,11 +359,25 @@ function menuKeys(acts: Act[]) {
   })
 }
 
-function Menu({ anchor, items, align, first, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; onClose: () => void }) {
+function Menu({ anchor, items: all, align, first, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
-  const acts = items.filter(isAct)
-  const keys = menuKeys(acts)
-  const [sel, setSel] = useState(first ? 0 : -1) // ↑↓ moves it, ⏎ runs it; first: opened by a key, ⏎ runs the first
+  const filter = all.find(it => !!it && 'filter' in it) as { filter: string } | undefined
+  const [q, setQ] = useState('')
+  const words = q.toLowerCase().split(/\s+/).filter(Boolean)
+  const shown = all.filter(it => it !== filter && (!words.length || (isAct(it) && (it.foot || words.every(w => `${it.label} ${it.sub ?? ''}`.toLowerCase().includes(w))))))
+  const items = shown.filter(it => !isAct(it) || !it.foot)
+  const foot = shown.filter((it): it is Act => isAct(it) && !!it.foot)
+  const main = items.filter(isAct)
+  const acts = [...main, ...foot]
+  const keys = filter ? [] : menuKeys(acts) // with a box, letters are for it
+  // ↑↓ moves it, ⏎ runs it; first: opened by a key, ⏎ runs the first; -2 (a filter's): the first whose label matches
+  // what's typed (else the first match by its line; none: nothing, never a foot's), or the picked one while nothing is
+  const [at, setSel] = useState(filter ? -2 : first ? 0 : -1)
+  const best = words.length ? (i => (i >= 0 ? i : main.length ? 0 : -1))(main.findIndex(a => words.every(w => a.label.toLowerCase().includes(w)))) : Math.max(0, acts.findIndex(a => a.hint === ON))
+  const sel = at === -2 ? best : at
+  // what had the keyboard (the new-workspace form, for its ⌘⏎) gets it back as a filter's box goes, unless a pick moved it
+  const back = useRef(document.activeElement as HTMLElement | null)
+  useEffect(() => () => void (filter && back.current?.isConnected && (!document.activeElement || document.activeElement === document.body) && back.current.focus()), [])
   const pick = (a: Act) => {
     onClose()
     a.run()
@@ -370,12 +387,14 @@ function Menu({ anchor, items, align, first, onClose }: { anchor: DOMRect; items
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = e => {
     if (e.metaKey || e.ctrlKey || e.altKey) return
+    if (filter && !['Escape', 'ArrowDown', 'ArrowUp', 'Enter'].includes(e.key)) return // typed into the box
+    if (filter && e.key === 'Escape' && q) return e.preventDefault(), e.stopPropagation(), setQ('') // Esc clears it first
     e.preventDefault()
     e.stopPropagation()
     const k = e.key.toLowerCase()
     if (e.key === 'Escape') onClose()
-    else if (e.key === 'ArrowDown') setSel(i => (i + 1) % acts.length)
-    else if (e.key === 'ArrowUp') setSel(i => (i <= 0 ? acts.length : i) - 1)
+    else if (e.key === 'ArrowDown') setSel((sel + 1) % acts.length)
+    else if (e.key === 'ArrowUp') setSel((sel <= 0 ? acts.length : sel) - 1)
     else if (e.key === 'Enter' && acts[sel]) pick(acts[sel])
     else if (colors && /^[0-9]$/.test(k) && +k <= colors.colors.length) {
       onClose()
@@ -390,54 +409,74 @@ function Menu({ anchor, items, align, first, onClose }: { anchor: DOMRect; items
   // kept inside the window: flipped up or left when there's no room
   useLayoutEffect(() => {
     const el = box.current!
+    el.style.bottom = '' // another anchor: placed again
     const r = el.getBoundingClientRect()
-    if (r.bottom > window.innerHeight - 6) el.style.top = `${Math.max(6, anchor.top - r.height - 4)}px`
+    // above it, held by its bottom: a filter that shrinks it keeps it by the button
+    if (r.bottom > window.innerHeight - 6) anchor.top - r.height - 4 < 6 ? (el.style.top = '6px') : ((el.style.top = 'auto'), (el.style.bottom = `${window.innerHeight - anchor.top + 4}px`))
     if (r.right > window.innerWidth - 6) el.style.left = `${Math.max(6, window.innerWidth - r.width - 6)}px`
   }, [anchor])
   const pos = align === 'left' ? { left: anchor.left } : { right: window.innerWidth - anchor.right }
   return (
     <div className="menu-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()} onContextMenu={e => (e.preventDefault(), onClose())}>
-      <div className="menu" role="menu" ref={box} style={{ top: anchor.bottom + 4, ...pos }}>
-        {items.map((it, i) =>
-          !it ? (
-            <div key={i} className="menu-sep" />
-          ) : 'head' in it ? (
-            <div key={i} className="menu-head">
-              {it.head}
-            </div>
-          ) : 'colors' in it ? (
-            <div key={i} className="menu-colors">
-              {['none', ...it.colors].map((c, n) => (
-                <button
-                  key={c}
-                  className={`swatch ${c === (it.value ?? 'none') ? 'on' : ''}`}
-                  style={colorVar(c)}
-                  data-tip={`${c === 'none' ? 'No color' : c} · ${n}`}
-                  onClick={() => {
-                    onClose()
-                    it.pick(c)
-                  }}
-                />
-              ))}
-            </div>
-          ) : (
-            <button
-              key={i}
-              role="menuitem"
-              className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${acts[sel] === it ? 'sel' : ''}`}
-              onClick={() => pick(it)}
-              onPointerMove={() => setSel(-1)}
-            >
-              <span className="menu-icon">{it.icon && <Icon name={it.icon} />}</span>
-              <span className="menu-label">{it.label}</span>
-              {it.hint && <span className="menu-hint">{it.hint}</span>}
-              {keys[acts.indexOf(it)] && <kbd className="menu-key">{keys[acts.indexOf(it)]!.toUpperCase()}</kbd>}
-            </button>
-          ),
-        )}
+      <div className={`menu ${filter || all.some(it => isAct(it) && it.sub) ? 'rich' : ''}`} role="menu" ref={box} style={{ top: anchor.bottom + 4, ...pos }}>
+        {filter && <input className="menu-filter" value={q} placeholder={filter.filter} aria-label="Filter" spellCheck={false} autoFocus={!matchMedia('(pointer: coarse)').matches /* no keyboard popping up on a phone */} onChange={e => (setQ(e.target.value), setSel(-2))} />}
+        <div className="menu-list">
+          {items.map((it, i) =>
+            !it ? (
+              <div key={i} className="menu-sep" />
+            ) : 'head' in it ? (
+              <div key={i} className="menu-head">
+                {it.head}
+              </div>
+            ) : 'colors' in it ? (
+              <div key={i} className="menu-colors">
+                {['none', ...it.colors].map((c, n) => (
+                  <button
+                    key={c}
+                    className={`swatch ${c === (it.value ?? 'none') ? 'on' : ''}`}
+                    style={colorVar(c)}
+                    data-tip={`${c === 'none' ? 'No color' : c} · ${n}`}
+                    onClick={() => {
+                      onClose()
+                      it.pick(c)
+                    }}
+                  />
+                ))}
+              </div>
+            ) : (
+              isAct(it) && item(it, i)
+            ),
+          )}
+          {words.length > 0 && !main.length && <div className="menu-none">Nothing matches</div>}
+        </div>
+        {foot.length > 0 && <div className="menu-foot">{foot.map(item)}</div>}
       </div>
     </div>
   )
+  function item(it: Act, i: number) {
+    const on = it.hint === ON
+    return (
+      <button
+        key={i}
+        role="menuitem"
+        className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it ? 'sel' : ''}`}
+        onClick={() => pick(it)}
+        onPointerMove={() => setSel(acts.indexOf(it))} // the one under the mouse is ⏎'s, as in a native menu
+      >
+        <span className="menu-icon">{it.icon && <Icon name={it.icon} />}</span>
+        <span className="menu-text">
+          <span className={`menu-label ${it.mono ? 'mono' : ''}`}>
+            <span>{it.label}</span>
+            {on && <Icon name="check" size={12} />}
+          </span>
+          {it.sub && <span className="menu-sub">{it.sub}</span>}
+        </span>
+        {it.hint && !on && <span className="menu-hint">{it.hint}</span>}
+        {it.pill && <span className={`menu-pill ${it.tone ?? ''}`}>{it.pill}</span>}
+        {keys[acts.indexOf(it)] && <kbd className="menu-key">{keys[acts.indexOf(it)]!.toUpperCase()}</kbd>}
+      </button>
+    )
+  }
 }
 
 // [the open menu (render it somewhere), open(event, items, align)]: under the clicked element, or at the

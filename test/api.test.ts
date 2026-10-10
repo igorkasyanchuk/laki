@@ -102,14 +102,20 @@ test('tabs: a command preset, numbered names, close, resize, detach, queue, code
   assert.equal((await rig.tab(ws.id, 'codex')).status, 'running')
   await until(async () => (await rig.tab(ws.id, 'codex')).last === 'answer: hi', 'its turn ended')
 
-  // an agent that ends cleanly closes its tab
+  // an agent that ends cleanly keeps its tab and last screen; Enter resumes its chat
+  const chat = (await rig.tab(ws.id, 'claude')).resumeId
   await rig.rpc('input', { tab: cl.id, data: 'exit\r' })
-  await until(async () => !(await rig.rpc('state')).tabs.some((x: any) => x.id === cl.id), 'claude tab closed')
+  await until(async () => (await rig.tab(ws.id, 'claude')).status === 'exited', 'claude ended')
+  assert.equal((await rig.tab(ws.id, 'claude')).code, 0)
+  await until(async () => (await rig.screen(cl.id)).includes('press Enter to start it again'), 'its note')
+  await rig.rpc('input', { tab: cl.id, data: '\r' })
+  await until(async () => (await rig.tab(ws.id, 'claude')).status !== 'exited', 'claude again')
+  await until(async () => (await rig.screen(cl.id)).includes(`--resume ${chat}`), 'resumed')
 
   // the folder is gone: no tab
   rmSync(ws.path, { recursive: true, force: true })
   await assert.rejects(rig.rpc('tabNew', { ws: ws.id }), /is gone/)
-  assert.equal((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === ws.id).length, 3)
+  assert.equal((await rig.rpc('state')).tabs.filter((x: any) => x.workspace === ws.id).length, 4)
 })
 
 test('claude StopFailure on a usage limit: ◷ until it resets; a time gone by is tomorrow\'s', async t => {
@@ -624,6 +630,83 @@ test('a shell tab running a command is running until its prompt is back', async 
   await rig.rpc('input', { tab: shell.id, data: 'sleep 3\r' })
   await until(async () => (await rig.tab(w.id, 'shell')).status === 'running', 'running while sleep runs', 5000)
   await until(async () => (await rig.tab(w.id, 'shell')).status === 'idle', 'idle once it ends', 8000)
+
+  // an agent typed there (node …/claude): its status off its screen, as an agent tab's; no spinner while it sits idle
+  const bin = join(rig.home, 'agent')
+  mkdirSync(bin)
+  writeFileSync(
+    join(bin, 'claude'),
+    `#!/usr/bin/env node
+const say = (s, ms) => setTimeout(() => process.stdout.write('\\x1b[2J\\x1b[H' + s), ms)
+say('✻ Working… (esc to interrupt)\\r\\n', 0)
+say('> \\r\\n', 5000)
+say('Do it?\\r\\n❯ 1. Yes\\r\\n  2. No\\r\\n', 10000)
+setTimeout(() => {}, 60000)
+`,
+    { mode: 0o755 },
+  )
+  await rig.rpc('input', { tab: shell.id, data: `${join(bin, 'claude')}\r` })
+  const sh = () => rig.tab(w.id, 'shell')
+  await until(async () => (await sh()).runs === 'claude' && (await sh()).status === 'running', 'working', 5000)
+  await until(async () => (await sh()).status === 'idle', 'idle: no spinner', 7000)
+  assert.equal((await sh()).done, true, 'done: no one was looking')
+  await until(async () => (await sh()).status === 'waiting', 'its menu', 8000)
+  assert.deepEqual((await sh()).ask.options.map((o: any) => o.label), ['Yes', 'No'])
+  await rig.rpc('input', { tab: shell.id, data: '\x03' })
+  await until(async () => !(await sh()).runs && (await sh()).status === 'idle', 'the agent gone', 5000)
+})
+
+test('what an agent publishes is kept as a link: its publish tool, the hosts its last answer names; once each', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const tab = await until(() => rig.tab(w.id, 'shell'), 'its tab')
+  const dir = await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).storage, 'its storage folder')
+  const used = (tool_name: string, tool_input: object, tool_response: unknown) => rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PostToolUse', tool_name, tool_input, tool_response } })
+  await used('Artifact', { file_path: '/tmp/site-notes.html' }, 'Published https://claude.ai/artifact/SyQ5g1JA · subscribed')
+  await used('Artifact', { action: 'list' }, 'https://claude.ai/artifact/Other1') // a listing publishes nothing
+  await used('mcp__artifacto__publish_page', { title: 'Q3 report' }, [{ type: 'text', text: 'ok: https://artifacto.example/p/9f.' }])
+  await used('Read', {}, 'see https://old.vercel.app') // a file read isn't a publish
+  await used('Artifact', { file_path: '/tmp/.notes.html', title: { not: 'a string' } }, 'https://claude.ai/artifact/Dot123') // no hidden file, no [object Object]
+  writeFileSync(join(dir, 'Mine.url'), '[InternetShortcut]\nURL=https://gist.github.com/me/abc/\n') // the agent saved this one itself
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'Done. I published [the notes](https://claude.ai/artifact/SyQ5g1JA), the gist is https://gist.github.com/me/abc and the shop is live at https://shop.vercel.app/. Docs: https://docs.example.com' } })
+  const urls = async () => Object.fromEntries(readdirSync(dir).filter(f => f.endsWith('.url')).map(f => [f, /URL=(\S+)/.exec(readFileSync(join(dir, f), 'utf8'))![1]]))
+  await until(async () => Object.keys(await urls()).length === 5, 'five links')
+  assert.deepEqual(await urls(), { 'site-notes.url': 'https://claude.ai/artifact/SyQ5g1JA', 'notes.url': 'https://claude.ai/artifact/Dot123', 'Q3 report.url': 'https://artifacto.example/p/9f', 'Mine.url': 'https://gist.github.com/me/abc/', 'the shop is live.url': 'https://shop.vercel.app/' })
+  // the same link again, another turn: nothing new
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'Still at https://shop.vercel.app' } })
+  await new Promise(r => setTimeout(r, 300))
+  assert.equal(Object.keys(await urls()).length, 5)
+  await until(async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id).links?.length === 5, 'in the view')
+})
+
+test('Artifacts: the files in a workspace storage folder, hidden ones not counted', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
+  const ws = async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id)
+  const dir = await until(async () => (await ws()).storage, 'its storage folder')
+  assert.equal((await ws()).artifacts, undefined)
+  mkdirSync(join(dir, 'shots', '.cache'), { recursive: true })
+  mkdirSync(join(dir, '.git'))
+  for (const f of ['report.md', 'shots/home.png', 'shots/.cache/x', '.git/HEAD', '.DS_Store']) writeFileSync(join(dir, f), 'x')
+  await until(async () => (await ws()).artifacts === 2, 'two files')
+  // the gallery's: its files newest first, each read as the side panel reads one; nothing outside the folder
+  writeFileSync(join(dir, 'report.md'), '# ok')
+  assert.deepEqual((await rig.rpc('artifactList', { ws: w.id })).map((f: any) => f.path), ['report.md', 'shots/home.png'])
+  assert.equal((await rig.rpc('fileRead', { ws: w.id, path: 'report.md', storage: true })).text, '# ok')
+  await assert.rejects(rig.rpc('fileRead', { ws: w.id, path: '../../state.json', storage: true }), /not a path inside/)
+  // a link an agent kept (a .url file): in the view for the info panel, first in the gallery; only http(s)
+  writeFileSync(join(dir, 'Project page.url'), '[InternetShortcut]\r\nURL=https://claude.ai/artifact/SyQ5\r\n')
+  writeFileSync(join(dir, 'bad.url'), '[InternetShortcut]\nURL=javascript:alert(1)\n')
+  const links = await until(async () => (await ws()).links, 'its link')
+  assert.deepEqual(links.map((l: any) => [l.title, l.url]), [['Project page', 'https://claude.ai/artifact/SyQ5']])
+  assert.deepEqual((await rig.rpc('artifactList', { ws: w.id })).slice(0, 2).map((f: any) => f.path).sort(), ['Project page.url', 'bad.url']) // .url files first
+  rmSync(join(dir, 'bad.url'))
+  rmSync(join(dir, 'shots'), { recursive: true })
+  rmSync(join(dir, 'report.md'))
+  rmSync(join(dir, 'Project page.url'))
+  await until(async () => (await ws()).artifacts === undefined, 'none again')
 })
 
 test('Terminals and Browsers: a project each in the home folder, a workspace per terminal or page', async t => {

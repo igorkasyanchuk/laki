@@ -129,17 +129,43 @@ const daemon = () =>
     ...(dev ? { LAKI_DEV_ORIGIN: new URL(process.env.ELECTRON_RENDERER_URL!).origin } : {}),
   })
 
+// where the window was left (window.json in userData): its bounds out of maximized and full screen, and whether it
+// was either. Only when they're on a screen still there (a monitor unplugged: maximized again, as the first start)
+const winFile = () => join(app.getPath('userData'), 'window.json')
+type WinAt = { x: number; y: number; width: number; height: number; max?: boolean; full?: boolean }
+function winAt(): WinAt | null {
+  try {
+    const w: WinAt = JSON.parse(readFileSync(winFile(), 'utf8'))
+    const a = screen.getDisplayMatching(w).workArea
+    const over = Math.min(w.x + w.width, a.x + a.width) - Math.max(w.x, a.x) >= 100 && Math.min(w.y + w.height, a.y + a.height) - Math.max(w.y, a.y) >= 50
+    return [w.x, w.y, w.width, w.height].every(Number.isFinite) && over ? { ...w, width: Math.min(w.width, a.width), height: Math.min(w.height, a.height) } : null // from a bigger screen: no larger than this one
+  } catch {
+    return null
+  }
+}
+let winSave: ReturnType<typeof setTimeout> | undefined
+const saveWin = () => {
+  clearTimeout(winSave)
+  if (!win || win.isDestroyed() || win.isMinimized()) return
+  try {
+    writeFileSync(winFile(), JSON.stringify({ ...win.getNormalBounds(), max: win.isMaximized(), full: win.isFullScreen() }))
+  } catch {}
+}
+const keepWin = () => (clearTimeout(winSave), (winSave = setTimeout(saveWin, 500))) // a drag's moves: once it rests
+
 function create() {
+  const at = winAt()
   win = new BrowserWindow({
     width: 1440,
     height: 900,
+    ...(at && { x: at.x, y: at.y, width: at.width, height: at.height }),
     minWidth: 700,
     minHeight: 400,
     backgroundColor: '#0e1014',
     visualEffectState: 'active', // glass keeps its blur when the window isn't focused
     titleBarStyle: 'hiddenInset',
     trafficLightPosition: { x: 14, y: 12 }, // centered in the 38px sidebar header
-    show: false, // shown maximized once ready
+    show: false, // shown once ready: where it was left (winAt), else maximized
     webPreferences: {
       preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)),
       contextIsolation: true,
@@ -149,9 +175,11 @@ function create() {
     },
   })
   win.once('ready-to-show', () => {
-    win?.maximize()
+    if (!at || at.max) win?.maximize()
+    if (at?.full) win?.setFullScreen(true)
     win?.show()
   })
+  for (const e of ['resize', 'move', 'maximize', 'unmaximize', 'enter-full-screen', 'leave-full-screen'] as const) win.on(e as 'resize', keepWin)
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (typeof url === 'string' && /^(https?:\/\/|mailto:)/i.test(url)) shell.openExternal(url) // a site, or a mail to write (widgets' links)
     return { action: 'deny' }
@@ -159,6 +187,7 @@ function create() {
   win.webContents.on('will-navigate', e => e.preventDefault())
   // closing hides: the renderer keeps posting notifications for agents while the app runs windowless
   win.on('close', e => {
+    saveWin() // a move just before quitting isn't lost to the timer
     if (quitting) return
     e.preventDefault()
     win?.hide()

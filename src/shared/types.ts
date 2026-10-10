@@ -147,6 +147,7 @@ export type Tab = {
   muted?: boolean // no notifications from it
   model?: string // the agent's --model (unset: its own default), kept for restarts
   effort?: string // and its effort (EFFORTS)
+  again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
 }
 
 // how an agent starts: one of AGENTS with extra args, or any command; env on top of the project's
@@ -283,6 +284,8 @@ export type PR = {
   draft?: boolean
   head?: string
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
+  approved?: string[] // the logins whose latest review approves it
+  changes?: string[] // and whose asks for changes
   conflict?: boolean // merge conflicts with its base branch
   ready?: boolean // mergeStateStatus CLEAN (or HAS_HOOKS): GitHub would merge it now; false: blocked, behind, unstable…
   base?: string // its base branch
@@ -297,7 +300,7 @@ export type PR = {
 export type Ask = { options: { n: number; label: string }[]; at: number }
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string } }
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string }; runs?: Agent } // runs: an agent typed in a shell tab
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -311,8 +314,11 @@ export type Tunnel = { port: number; url?: string; mails?: string[] }
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
 // (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's)
 export type Stat = { add: number; del: number; files: number; dirty: number }
-// procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports
-export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat }
+// procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
+// the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
+export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; artifacts?: number; links?: Link[] }
+// a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
+export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string }
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; agents: { id: Agent; found: boolean }[] }
@@ -336,4 +342,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 37
+export const API = 41

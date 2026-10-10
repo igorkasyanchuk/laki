@@ -549,3 +549,30 @@ test('Attach PR: one by URL or number becomes the workspace’s (asked for by UR
   const fw = await rig.rpc('wsNew', { project: fp.id, preset: 'none' })
   await assert.rejects(rig.rpc('prAttach', { ws: fw.id, pr: '77' }), /only a git project/)
 })
+
+test("who reviewed a PR (each one's last approval or ask for changes; a comment keeps it, a dismissal drops it); its files' Viewed boxes, read and ticked through GitHub's GraphQL", async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await assert.rejects(rig.rpc('prViewed', { ws: ws.id, path: 'a.ts', viewed: true }), /has no PR/)
+  const review = (login: string, state: string) => ({ author: { login }, state })
+  const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', statusCheckRollup: [], reviews: [review('ann', 'APPROVED'), review('bob', 'CHANGES_REQUESTED'), review('ann', 'COMMENTED'), review('cy', 'COMMENTED'), review('dee', 'APPROVED'), review('dee', 'DISMISSED')] }
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
+  const got = await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  assert.deepEqual([got.approved, got.changes], [['ann'], ['bob']])
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, reviews: [] }))
+  await until(async () => !(await rig.rpc('state')).workspaces[0].pr.approved, 'none now')
+
+  const files = { 'a.ts': 'VIEWED', 'b.ts': 'DISMISSED', 'c.ts': 'UNVIEWED' }
+  writeFileSync(join(gh, 'graphql.json'), JSON.stringify({ data: { repository: { pullRequest: { id: 'PR_kw9', files: { nodes: Object.entries(files).map(([path, viewerViewedState]) => ({ path, viewerViewedState })), pageInfo: { hasNextPage: false } } } } } }))
+  assert.deepEqual(await rig.rpc('prFiles', { ws: ws.id }), { id: 'PR_kw9', files })
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api graphql -f owner=o -f repo=r -F pr=9 -f query=query/) // the PR's repo, by its URL
+  assert.deepEqual(await rig.rpc('prViewed', { ws: ws.id, path: 'b.ts', viewed: true, id: 'PR_kw9' }), { path: 'b.ts', state: 'VIEWED' })
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh api graphql -f id=PR_kw9 -f path=b.ts -f query=mutation\(\$id: ID!, \$path: String!\) \{ markFileAsViewed\(/)
+  await rig.rpc('prViewed', { ws: ws.id, path: 'a.ts', viewed: false }) // no id: read first
+  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /-f id=PR_kw9 -f path=a.ts -f query=mutation[^\n]*unmarkFileAsViewed/)
+  rmSync(join(gh, 'graphql.json'))
+  await assert.rejects(rig.rpc('prViewed', { ws: ws.id, path: 'a.ts', viewed: true, id: 'PR_kw9' }), /gh: |not found/)
+})

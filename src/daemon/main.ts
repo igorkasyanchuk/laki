@@ -149,6 +149,7 @@ const api: Record<string, Handler> = {
   files: p => core.files(p.ws),
   fileNew: p => core.fileNew(p),
   fileRead: p => core.fileRead(p),
+  artifactList: p => core.artifactList(p.ws),
   fileWrite: p => core.fileWrite(p),
   skills: () => skills(),
   skillSet: p => skillSet(p),
@@ -156,6 +157,8 @@ const api: Record<string, Handler> = {
   prAct: p => core.prAct(p),
   prThreads: p => core.prThreads(p.ws),
   prDiff: p => core.prDiff(p.ws),
+  prFiles: p => core.prFiles(p.ws),
+  prViewed: p => core.prViewed(p),
   run: p => core.runDev(p.ws),
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
   usage: () => usage(core.state.settings?.usage),
@@ -311,6 +314,11 @@ function shutdown() {
   core.stopTunnels()
   core.remoteStop()
   core.stopHosts()
+  try {
+    core.keepShells() // what the shells run, for the next start
+  } catch (e) {
+    log('keeping shells', e) // the stop goes on
+  }
   for (const s of core.sessions.values()) s.kill()
   core.sessions.clear() // their exits aren't ones to act on (onExit)
   rmSync(join(dir, 'daemon.json'), { force: true })

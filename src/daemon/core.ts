@@ -2,7 +2,7 @@
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomUUID } from 'node:crypto'
-import { readFile, rm, stat } from 'node:fs/promises'
+import { readdir, readFile, rm, stat } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
 import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, userInfo } from 'node:os'
@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, type FixWhat, type LogLine, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
@@ -62,7 +62,7 @@ const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { progress?: { pct: number; note?: string }; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; askKey?: string } // askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy)
+type Runtime = { progress?: { pct: number; note?: string }; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; askKey?: string; published?: Published[] } // askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -193,6 +193,9 @@ another session in it) with an agent started on the task. This session goes on a
 `,
 })
 
+// the storage folder, for the start note and the laki skill (skill.ts): files, and links to what an agent publishes
+export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's own folder, outside the repo, for what you make for the user to keep (screenshots, reports, exports, notes); every tab of the workspace shares it, and Laki shows it as the workspace's Artifacts. Save there when the user asks for such files or mentions the storage folder. Whatever you publish for the user (a Claude artifact, a deployed site, a gist, a hosted page or file) gets a link there, without being asked: give its link in your last answer, as \`[a few words](link)\`, and Laki keeps Claude artifacts and sites on the usual hosts (vercel.app, netlify.app, pages.dev, github.io, gists…) on its own; anything else, save yourself as \`<a few words>.url\` holding \`[InternetShortcut]\` and, on the next line, \`URL=<the link>\` (\`printf '[InternetShortcut]\\nURL=%s\\n' "<link>" > "$LAKI_STORAGE_FOLDER/<a few words>.url"\`). Laki lists links first and opens them in the browser.`
+
 // What Laki is and what its CLI does for an agent (a preset's laki, unset: on): told to claude and codex at every start
 const LAKI_NOTE = () =>
   `You run in a tab of Laki, an app that runs coding agents side by side, each task in a workspace of its own (a git worktree or a folder). Its CLI is \`${LAKI_CLI}\`, \`laki\` below (\`laki help\` lists it all); \`.\` is your workspace ($LAKI_WORKSPACE). Use it when it helps, quietly:
@@ -200,7 +203,7 @@ const LAKI_NOTE = () =>
 - \`laki pr . <url|number>\`: attach the pull request you opened or work on, when it isn't one on this branch.
 - \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace.
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
-- $LAKI_STORAGE_FOLDER (when set): this workspace's own folder, outside the repo, for files you make for the user to keep (screenshots, reports, exports, notes); every tab of the workspace shares it. Save there when the user asks for such files or mentions the storage folder.`
+- ${STORAGE_NOTE}`
 
 // codex's own developer_instructions (its config.toml): -c would replace them, so Laki's note isn't given then.
 // ponytail: a line match, any table, CODEX_HOME from this process (a preset's env may point elsewhere)
@@ -304,7 +307,7 @@ export function view(): View {
   const tabs: TabView[] = state.tabs.map(t => {
     const s = sessions.get(t.id)
     const r = rtOf(t.id)
-    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : busyShells.has(t.id) ? 'running' : 'idle'
+    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : (shellAgents.get(t.id)?.status ?? (busyShells.has(t.id) ? 'running' : 'idle'))
     // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
     if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
     else r.runAt = undefined
@@ -313,7 +316,7 @@ export function view(): View {
     if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
-    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }) }
+    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }) }
   })
   return {
     projects: state.projects,
@@ -321,7 +324,7 @@ export function view(): View {
     workspaces: state.workspaces.map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, stat: stats.get(w.id) }
+      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, stat: stats.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id) }
     }),
     tabs,
     presets: presets(),
@@ -1002,7 +1005,7 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   return [argv.map(q).join(' '), pr?.args?.trim(), flags.map(q).join(' '), ask.map(q).join(' ')].filter(Boolean).join(' ')
 }
 
-type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string> }
+type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string>; cwd?: string }
 
 export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   const ws = findWs(tab.workspace)
@@ -1017,7 +1020,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   else args = ['-lic', wait + (o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, o.prompt, !!o.resume) : tab.cmd || 'true'))]
   sessions.get(tab.id)?.kill()
   asleep.delete(tab.id)
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
   wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
   sessions.set(tab.id, s)
   const r = rtOf(tab.id)
@@ -1051,9 +1054,9 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     // one we ended (close, restart, wake, archive, shutdown) is no longer in sessions: not this tab's end any more
     if (sessions.get(tab.id) !== s) return
     if (asleep.has(tab.id)) return changed() // put to sleep (sleepTick): it stays, and says so
-    // `exit` closes a shell's tab, a clean exit an agent's. A host's shell that lost its connection (ssh's 255) stays:
-    // Enter starts it again
-    if (((tab.kind === 'shell' && (!ws.host || code !== 255)) || (tab.kind === 'agent' && code === 0)) && state.tabs.includes(tab)) return closeTab(tab.id)
+    // `exit` closes a shell's tab, a clean exit a command's. An AI agent's stays, any exit: its last screen (the chat id
+    // it printed) is there, and Enter resumes it. A host's shell that lost its connection (ssh's 255) stays too
+    if (((tab.kind === 'shell' && (!ws.host || code !== 255)) || (tab.kind === 'agent' && code === 0 && !tracked(tab))) && state.tabs.includes(tab)) return closeTab(tab.id)
     changed()
     if (tab.kind !== 'agent' && tab.kind !== 'dev' && !(ws.host && tab.kind === 'shell')) return
     s.term.write('', () => {
@@ -1121,7 +1124,7 @@ export async function answer(p: { tab: string; n?: number; pick?: 'first' | 'las
   const t = findTab(p.tab)
   const s = sessions.get(t.id)
   if (!s || s.exited) throw new Error(`${t.name} isn't running`)
-  if (rtOf(t.id).status !== 'waiting') throw new Error(`${t.name} isn't asking anything now`)
+  if (rtOf(t.id).status !== 'waiting' && shellAgents.get(t.id)?.status !== 'waiting') throw new Error(`${t.name} isn't asking anything now`)
   if (answering.has(t.id)) throw new Error(`${t.name} is being answered`)
   answering.add(t.id)
   try {
@@ -1678,21 +1681,92 @@ export async function wsFork(ref: string) {
   return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort, fork: src.fork })
 }
 
-// restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat.
+// restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat, shells come
+// back with what they ran (keepShells), a Run tab that was running starts again.
 export function restoreAll() {
   for (const f of readdirSync(runDir)) if (/\.(setup|go|err)$/.test(f)) rmSync(join(runDir, f), { force: true }) // hostTab's too
-  state.tabs = state.tabs.filter(t => t.kind === 'agent' || t.kind === 'shell')
+  state.tabs = state.tabs.filter(t => t.kind === 'agent' || t.kind === 'shell' || (t.kind === 'dev' && t.again))
   for (const ws of state.workspaces) {
     if (ws.archived) continue
     for (const t of tabsOf(ws.id)) {
+      const a = t.again
+      t.again = undefined
       try {
-        spawnTab(t, { resume: true })
+        const s = spawnTab(t, { resume: true, cwd: a?.cwd })
+        if (a?.cmd) bringBack(s, a.cmd, !!a.run)
       } catch (e) {
         console.error(`restore ${t.id}:`, (e as Error).message)
       }
     }
   }
   save()
+}
+
+// ---------- shells across restarts
+
+// ps's lines (pid, then the rest) by pid
+const psRows = (text: string) => new Map(text.split('\n').flatMap(l => (m => (m ? [[+m[1], m[2].trim()] as const] : []))(/^\s*(\d+)\s+(.*)$/.exec(l))))
+
+// keepShells, as the daemon stops (an update, a restart): each local shell's folder and the program in front of it,
+// for its next start (restoreAll). A Run tab still running starts again.
+// ponytail: only on a shutdown (a crash or kill -9 keeps nothing), not on a host (its PTY runs ssh)
+export function keepShells() {
+  const live = state.tabs.flatMap(t => {
+    const s = sessions.get(t.id)
+    return (t.kind === 'shell' || t.kind === 'dev') && s && !s.exited && !state.workspaces.find(w => w.id === t.workspace)?.host ? [[t, s.pty.pid] as const] : []
+  })
+  for (const [t] of live) if (t.kind === 'dev') t.again = { run: true }
+  const shells = live.filter(([t]) => t.kind === 'shell')
+  if (shells.length) {
+    const out = (cmd: string, args: string[]) => {
+      try {
+        return execFileSync(cmd, args, { encoding: 'utf8', timeout: 2000, stdio: ['ignore', 'pipe', 'ignore'] })
+      } catch (e: any) {
+        return String(e?.stdout ?? '') // ps exits 1 when one's gone
+      }
+    }
+    const fg = psRows(out('ps', ['-o', 'pid=,tpgid=', '-p', shells.map(([, p]) => p).join(',')]))
+    const front = new Map(shells.map(([t, p]) => [t.id, Number(fg.get(p)) > 0 ? Number(fg.get(p)) : p])) // the program in front, or the shell
+    const pids = [...new Set(front.values())].join(',')
+    const args = psRows(out('ps', ['-o', 'pid=,args=', '-p', pids]))
+    const cwd = new Map<number, string>()
+    let at = 0
+    for (const l of out('lsof', ['-a', '-d', 'cwd', '-Fn', '-p', pids]).split('\n')) l[0] === 'p' ? (at = +l.slice(1)) : l[0] === 'n' && cwd.set(at, l.slice(1))
+    for (const [t, p] of shells) {
+      const f = front.get(t.id)!
+      t.again = { cwd: cwd.get(f), ...(f !== p && args.get(f) && rerun(f, args.get(f)!)) }
+    }
+  }
+  if (live.length) save()
+}
+
+// how a program comes back: an agent resumes its chat (claude by its session file, else its last chat in that folder;
+// codex its last chat there) and runs; anything else is typed for you to run with ⏎: a deploy caught mid-way mustn't
+// run twice on its own. A node shim's line is its name again (node /opt/homebrew/bin/npm run dev: npm run dev)
+// ponytail: the other agents are typed as they were, a prompt they started with too
+export function rerun(pid: number, args: string): { cmd: string; run?: boolean } {
+  const agent = agentRuns(args)
+  if (agent === 'claude') {
+    let id: unknown
+    try {
+      id = JSON.parse(readFileSync(join(homedir(), '.claude', 'sessions', `${pid}.json`), 'utf8')).sessionId // claude's own, read only
+    } catch {}
+    return { cmd: typeof id === 'string' && /^[\w-]+$/.test(id) ? `claude --resume ${id}` : 'claude --continue', run: true }
+  }
+  if (agent === 'codex') return { cmd: 'codex resume --last', run: true } // its newest chat in this folder
+  return { cmd: args.replace(/^\S*\b(node|bun|deno)\s+\/\S*\/([\w-]+)(?=\s|$)/, '$2') }
+}
+
+// types what a shell ran back into it once its prompt is up (it printed, then quiet for half a second; 10 s at most)
+function bringBack(s: Session, cmd: string, run: boolean) {
+  s.output(`\x1b[2m[${run ? 'Laki restarted · resuming it' : 'Laki restarted · this was running here: ⏎ runs it again'}]\x1b[0m\r\n`)
+  const from = s.lastOutput
+  const wait = setInterval(() => {
+    if (s.exited || sessions.get(s.tab) !== s) return clearInterval(wait)
+    if ((s.lastOutput === from || Date.now() - s.lastOutput < 500) && Date.now() - from < 10000) return // the prompt, then quiet
+    clearInterval(wait)
+    typeInto(s, cmd, run)
+  }, 100)
 }
 
 // ---------- agent status (hooks)
@@ -1720,6 +1794,10 @@ function turn(p: { tab: string; state: string; payload?: any }) {
     case 'running':
       r.status = 'running'
       r.limit = r.escAt = undefined
+      if (pl.hook_event_name === 'PostToolUse') {
+        const got = publishedBy(pl)
+        if (got) (r.published ??= []).push(got)
+      }
       break
     case 'waiting':
       r.status = 'waiting'
@@ -1749,6 +1827,7 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       if (!r.limit) phone(tab, 'done', r.last ?? '')
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
       prSoon()
+      void keepPublished(tab, r, last ? String(last) : undefined).catch(e => log(`links ${tab.id}: ${e.message}`))
       const w = state.workspaces.find(x => x.id === tab.workspace)
       if (last && w?.schedule && w.kind !== 'worktree') void prFromSaid(w) // a scheduled run's own folder session (a worktree's scan, finding none on its branch, does; the project's lasting local one would keep the first PR named)
       break
@@ -1979,8 +2058,133 @@ function prSoon() {
   setTimeout(() => void scanPRs(), 2000)
 }
 
+// the status bar's Artifacts: the files in each live workspace's storage folder (hidden ones, and hidden folders, not
+// walked), with the port scan; one scan at a time. ponytail: a full walk each time; cap it if folders get huge
+const artifacts = new Map<string, number>()
+const links = new Map<string, Link[]>() // its .url files' links, newest first: the info panel's, the gallery's first
+let artifacting = false
+// a .url file's link (an Internet shortcut: [InternetShortcut], URL=…), http(s) only
+export const urlOf = (text: string) => /^URL=(https?:\/\/\S+)\s*$/im.exec(text)?.[1]
+// the files under dir (relative paths), hidden files and folders left out
+const walkFiles = async (dir: string, rel = ''): Promise<string[]> => {
+  const out: string[] = []
+  for (const e of await readdir(join(dir, rel), { withFileTypes: true }).catch(() => [])) {
+    if (e.name.startsWith('.')) continue
+    if (e.isFile()) out.push(rel ? `${rel}/${e.name}` : e.name)
+    else if (e.isDirectory()) out.push(...(await walkFiles(dir, rel ? `${rel}/${e.name}` : e.name)))
+  }
+  return out
+}
+async function scanArtifacts() {
+  if (artifacting) return
+  artifacting = true
+  let moved = false
+  try {
+    for (const m of [artifacts, links]) for (const id of m.keys()) if (!state.workspaces.some(w => w.id === id)) m.delete(id) // removed ones
+    for (const w of state.workspaces) {
+      const all = w.storage && !w.archived ? await walkFiles(w.storage) : []
+      if ((artifacts.get(w.id) ?? 0) !== all.length) (moved = true), all.length ? artifacts.set(w.id, all.length) : artifacts.delete(w.id)
+      // ponytail: every .url read each scan (a few small files); key them by mtime if there get to be many
+      const found = await Promise.all(
+        all.filter(f => /\.url$/i.test(f)).map(async path => {
+          const abs = join(w.storage!, path)
+          const [st, text] = await Promise.all([stat(abs), readFile(abs, 'utf8')]).catch(() => [null, ''] as const)
+          const url = st && st.size < 8192 ? urlOf(text) : undefined
+          return url ? { path, url, title: basename(path).replace(/\.url$/i, ''), at: st!.mtimeMs } : null
+        }),
+      )
+      const ls = found.filter((l): l is Link => !!l).sort((a, b) => b.at - a.at)
+      if (JSON.stringify(ls) !== JSON.stringify(links.get(w.id) ?? [])) (moved = true), ls.length ? links.set(w.id, ls) : links.delete(w.id)
+    }
+  } finally {
+    artifacting = false
+  }
+  if (moved) changed()
+}
+
+// ---------- what agents publish, kept as links in the storage folder (.url files: the Artifacts, the info panel's links)
+// Two ways, at a turn's end: what a publish tool returned during it (claude's PostToolUse: its Artifact tool's publish,
+// or any tool named for publishing), and the links its last answer gives to where published things live (any agent
+// with a hook). One already there (the agent saved it, as its note says) isn't kept twice.
+type Published = { url: string; title: string }
+const URL_END = /[.,;:!?)\]}>'"`*_]+$/ // what follows a link in prose
+// ponytail: the hosts published things live on; add one here when an agent's site isn't kept
+export const PUBLISHED = /https:\/\/(?:claude\.ai\/(?:code\/)?artifact\/[\w-]+|(?:claude\.site|gist\.github\.com)\/\S+|chatgpt\.com\/(?:canvas\/)?share\/\S+|[\w-]+(?:\.[\w-]+)*\.(?:vercel\.app|netlify\.app|pages\.dev|github\.io|fly\.dev|onrender\.com|surge\.sh|web\.app|workers\.dev)(?:[/?#]\S*)?)/g
+const PUBLISH_TOOL = /publish|deploy|upload|share/i // an MCP tool's name that says it puts something online
+const sameUrl = (u: string) => u.replace(/#.*$/, '').replace(/\/+$/, '').toLowerCase()
+const hostOf = (u: string) => u.replace(/^https?:\/\//, '').split(/[/?#]/)[0]
+// a PostToolUse payload's published link: claude's Artifact tool publishing a page (not reading, listing, or an asset),
+// or a tool named for publishing; the first https link its answer gives, named after what it published
+export function publishedBy(pl: { tool_name?: string; tool_input?: any; tool_response?: unknown }): Published | undefined {
+  const name = String(pl.tool_name ?? '')
+  const inp = pl.tool_input && typeof pl.tool_input === 'object' ? pl.tool_input : {}
+  const artifact = name === 'Artifact' && (!inp.action || inp.action === 'publish') && !inp.asset
+  if (!artifact && !(name.startsWith('mcp__') && PUBLISH_TOOL.test(name.split('__').pop()!))) return
+  const said = (typeof pl.tool_response === 'string' ? pl.tool_response : JSON.stringify(pl.tool_response ?? '')).slice(0, 20000)
+  const url = (artifact ? said.match(PUBLISHED) : said.match(/https:\/\/[^\s"'\\<>]+/g))?.[0]?.replace(URL_END, '')
+  if (!url) return
+  const from = [inp.title, inp.name].find(x => typeof x === 'string' && x.trim()) ?? (typeof inp.file_path === 'string' ? basename(inp.file_path).replace(/\.[^.]+$/, '') : '')
+  return { url, title: from || hostOf(url) }
+}
+// the links of a last answer: its words for each ([title](url), else what precedes it on its line, less "I published")
+export function publishedIn(text: string): Published[] {
+  return [...text.matchAll(PUBLISHED)].map(m => {
+    const url = m[0].replace(URL_END, '')
+    const before = text.slice(0, m.index)
+    const md = /\[([^\]\n]{1,80})\]\($/.exec(before)?.[1]
+    const line = before.slice(before.lastIndexOf('\n') + 1).split(/https?:\/\/\S+|[.!?](?:\s|$)/).pop()! // its own sentence
+    const words = line
+      .replace(/[\s:–—\-(<]+$/, '')
+      .replace(/\*\*|`/g, '')
+      .replace(/^[\s>*•\-\d.)#,]+/, '')
+      .replace(/^(?:(?:and|but|so|then|also)\s+)?(?:(?:i(?:['’]ve| have)?|we(?:['’]ve)?|it(?:['’]s| is))\s+)?/i, '')
+      .replace(/^(?:just\s+|now\s+)?(?:published|deployed|made|created|shared|uploaded|posted|put|live)\b\s*(?:it\s+)?(?:at|to|on|here)?\s*/i, '')
+      .split(/\s+/)
+      .filter(Boolean)
+      .slice(-8)
+      .join(' ')
+      .replace(/(?:^|\s+)(?:(?:to|at|on|in|and|or|is|are|was|here|via|from|with)\b\s*)+$/i, '') // "deployed it to", "and"
+    const id = /artifact\/([\w-]{6})/.exec(url)?.[1]
+    return { url, title: md ?? (words || (id ? `Claude artifact ${id}` : hostOf(url))) }
+  })
+}
+let keeping: Promise<void> = Promise.resolve() // one at a time: two tabs ending at once mustn't both write a link
+function keepPublished(tab: Tab, r: Runtime, last?: string) {
+  const found = [...(r.published ?? []), ...(last ? publishedIn(last) : [])]
+  r.published = undefined
+  const p = keeping.then(() => keepLinks(tab, found))
+  keeping = p.catch(() => {})
+  return p
+}
+async function keepLinks(tab: Tab, found: Published[]) {
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  if (!found.length || !ws?.storage || ws.host || !existsSync(ws.storage)) return
+  const dir = ws.storage
+  const urls = await Promise.all((await walkFiles(dir)).filter(f => /\.url$/i.test(f)).map(f => readFile(join(dir, f), 'utf8').then(t => sameUrl(urlOf(t) ?? ''), () => '')))
+  const have = new Set(urls)
+  for (const p of found) {
+    if (have.has(sameUrl(p.url))) continue
+    have.add(sameUrl(p.url))
+    const name = p.title.replace(/[/\\:*?"<>|\x00-\x1f]+/g, ' ').replace(/\s+/g, ' ').replace(/^[.\s]+/, '').slice(0, 60).trim() || hostOf(p.url) // a leading dot: hidden, never listed
+    let file = join(dir, `${name}.url`)
+    for (let n = 2; existsSync(file); n++) file = join(dir, `${name} ${n}.url`)
+    writeFileSync(file, `[InternetShortcut]\r\nURL=${p.url}\r\n`)
+    wsLog(ws, `${tab.name}: kept a link it published, ${p.url} (${basename(file)})`)
+  }
+  void scanArtifacts()
+}
+
+// artifactList: the storage folder's files for the status bar's gallery, newest first (500 at most)
+export async function artifactList(ref: string) {
+  const ws = findWs(ref)
+  if (!ws.storage) return []
+  const list = await Promise.all((await walkFiles(ws.storage)).map(path => stat(join(ws.storage!, path)).then(st => ({ path, size: st.size, at: st.mtimeMs }), () => null)))
+  return list.filter(x => !!x).sort((a, b) => Number(/\.url$/i.test(b.path)) - Number(/\.url$/i.test(a.path)) || b.at - a.at).slice(0, 500) // links first
+}
+
 export async function scanPorts() {
   syncBranches()
+  void scanArtifacts()
   const root = new Map<number, string>()
   for (const [id, s] of sessions) {
     const t = state.tabs.find(t => t.id === id)
@@ -2338,7 +2542,17 @@ export function scanPRs(): Promise<void> {
   return prScan
 }
 
-const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,mergeable,mergeStateStatus,additions,deletions,body,updatedAt,statusCheckRollup'
+// who approved and who asked for changes: each one's last say (a comment review after an approval keeps it; a
+// dismissed one counts for neither), as GitHub's review decision reads them
+function reviewersOf(j: { reviews?: { author?: { login?: string }; state?: string }[] }) {
+  const said = new Map<string, string>()
+  for (const r of j.reviews ?? []) if (r.author?.login && /^(APPROVED|CHANGES_REQUESTED|DISMISSED)$/.test(r.state ?? '')) said.set(r.author.login, r.state!) // oldest first
+  const by = (st: string) => [...said].filter(([, s]) => s === st).map(([who]) => who)
+  const approved = by('APPROVED')
+  const changes = by('CHANGES_REQUESTED')
+  return { ...(approved.length && { approved }), ...(changes.length && { changes }) }
+}
+const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,reviews,mergeable,mergeStateStatus,additions,deletions,body,updatedAt,statusCheckRollup'
 
 // who you are on GitHub, per host ('': this Mac): gh api user's login, kept 10 minutes (gh auth switch), a failure
 // not at all
@@ -2380,6 +2594,7 @@ async function scanPR(ws: Workspace) {
       draft: j.isDraft,
       head: j.headRefOid,
       review: j.reviewDecision || undefined,
+      ...reviewersOf(j),
       conflict: j.mergeable === 'CONFLICTING' ? true : j.mergeable === 'MERGEABLE' ? false : undefined, // UNKNOWN for a while after a push
       ready: j.mergeStateStatus && j.mergeStateStatus !== 'UNKNOWN' ? j.mergeStateStatus === 'CLEAN' || j.mergeStateStatus === 'HAS_HOOKS' : undefined, // GitHub would merge it now: required checks and reviews in, not behind
       base: j.baseRefName,
@@ -2728,10 +2943,31 @@ export function sweepRunning(now = Date.now()) {
   }
 }
 
+// a command line that runs an agent: its program (or a node/bun/deno/python script's) named as one, a path or not
+// ponytail: by name; an agent under another name (an alias to a wrapper script) still spins
+export const agentRuns = (args: string): Agent | undefined => {
+  const [a = '', b = ''] = args.trim().split(/\s+/).map(x => basename(x))
+  return isAgent(a) ? a : /^(node|bun|deno|python3?)$/.test(a) && isAgent(b) ? b : undefined
+}
+
 // a shell tab running a command (the terminal's foreground process group isn't the shell's own): running, its
-// spinner, until the prompt is back. Every 2 s, one ps for all of them; not on a host (its PTY runs ssh)
+// spinner, until the prompt is back. Every 2 s, one ps for all of them; not on a host (its PTY runs ssh).
+// An agent typed there (claude, codex…) has no hooks: its status is read off its screen, as an agent tab's would be
+// (a menu: waiting; what BUSY says it shows while it works: running; else idle, ● done if you weren't looking)
+// ponytail: no notifications or turn timers for it; start the agent in its own tab for those
 const busyShells = new Set<string>()
+const shellAgents = new Map<string, { agent: Agent; status: Status }>()
+let shellTicking = false // a tick waits on ps and screens: the next one doesn't start meanwhile
 export async function shellTick() {
+  if (shellTicking) return
+  shellTicking = true
+  try {
+    await shellScan()
+  } finally {
+    shellTicking = false
+  }
+}
+async function shellScan() {
   if (!clients.size) return // no one sees the spinner (the next tick after one connects does)
   const live = state.tabs.flatMap(t => {
     const s = sessions.get(t.id)
@@ -2745,7 +2981,31 @@ export async function shellTick() {
       if (pid > 0) fg.set(pid, tpgid)
     }
   }
-  const now = new Set(live.flatMap(([id, pid]) => (fg.get(pid) ?? 0) > 0 && fg.get(pid) !== pid ? [id] : []))
+  let busy = live.filter(([, pid]) => (fg.get(pid) ?? 0) > 0 && fg.get(pid) !== pid)
+  if (busy.length) {
+    // an agent started in a shell (claude typed there) works on its own clock: no spinner for it
+    const { stdout } = await run('ps', ['-o', 'pid=,args=', '-p', busy.map(([, pid]) => fg.get(pid)).join(',')]).catch(e => ({ stdout: String(e?.stdout ?? '') }))
+    const cmd = psRows(stdout)
+    let moved = false
+    const agents = new Set<string>()
+    for (const [id, pid] of busy) {
+      const agent = agentRuns(cmd.get(fg.get(pid)!) ?? '')
+      const s = sessions.get(id)
+      if (!agent || !s) continue
+      agents.add(id)
+      await s.flushed()
+      const was = shellAgents.get(id)
+      const status: Status = askOf(s.screenText(16)) ? 'waiting' : BUSY[agent].test(`${s.title}\n${s.screenText(15)}`) ? 'running' : 'idle'
+      if (was?.status === status && was.agent === agent) continue
+      if (status === 'idle' && was && was.status !== 'idle' && !viewed(id)) rtOf(id).done = true
+      shellAgents.set(id, { agent, status })
+      moved = true
+    }
+    for (const id of shellAgents.keys()) if (!agents.has(id)) (shellAgents.delete(id), (moved = true))
+    busy = busy.filter(([id]) => !agents.has(id))
+    if (moved) changed()
+  } else if (shellAgents.size) (shellAgents.clear(), changed())
+  const now = new Set(busy.map(([id]) => id))
   if (now.size === busyShells.size && [...now].every(id => busyShells.has(id))) return
   busyShells.clear()
   for (const id of now) busyShells.add(id)
@@ -3121,8 +3381,13 @@ const MAX_TEXT = 512 << 10
 
 // fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size. base: an image
 // as it was where the workspace's changes start (diff's base, through git show), for Changes' before and after
-export async function fileRead(o: { ws: string; path: string; base?: boolean }) {
-  const ws = findWs(o.ws)
+export async function fileRead(o: { ws: string; path: string; base?: boolean; storage?: boolean }) {
+  let ws = findWs(o.ws)
+  if (o.storage) {
+    // a file in its storage folder (the status bar's Artifacts), never on a host: read as one of its own
+    if (!ws.storage || ws.host || o.base) throw new Error('no storage folder')
+    ws = { ...ws, path: ws.storage }
+  }
   const abs = inside(ws, o.path)
   if (o.base) {
     const mime = IMAGES[extname(abs).slice(1).toLowerCase()]
@@ -3279,6 +3544,48 @@ function diffFiles(text: string) {
     else if (l[0] === '-') f.del++
   }
   return files
+}
+
+// the PR's files as you've marked them on GitHub (Changes' Viewed boxes): VIEWED, UNVIEWED, or DISMISSED (viewed,
+// then changed by a commit since). Its node id goes with them: marking one needs it
+const FILES_QUERY = `query($owner: String!, $repo: String!, $pr: Int!, $after: String) { repository(owner: $owner, name: $repo) { pullRequest(number: $pr) { id files(first: 100, after: $after) { nodes { path viewerViewedState } pageInfo { hasNextPage endCursor } } } } }`
+// the owner and name in a PR's URL (a fork's PR is the upstream's); else gh's {owner} and {repo}: the worktree's own
+const repoArgs = (pr: PR) => {
+  const m = /^https:\/\/[^/]+\/([^/]+)\/([^/]+)\/pull\/\d+/.exec(pr.url)
+  return m ? ['-f', `owner=${m[1]}`, '-f', `repo=${m[2]}`] : ['-F', 'owner={owner}', '-F', 'repo={repo}'] // -f: a name all digits stays a string
+}
+export async function prFiles(ref: string): Promise<{ id: string; files: Record<string, string> }> {
+  const ws = findWs(ref)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  const files: Record<string, string> = {}
+  let id = ''
+  let after: string | undefined
+  for (let page = 0; page < 30; page++) { // ponytail: 3,000 files at most, GitHub's own cap
+    const { stdout } = await exec(ws, 'gh', ['api', 'graphql', ...repoArgs(pr), '-F', `pr=${pr.number}`, ...(after ? ['-f', `after=${after}`] : []), '-f', `query=${FILES_QUERY}`], { timeout: 20000 }).catch(e => {
+      throw new Error(ghSays(e, `PR #${pr.number}'s files`))
+    })
+    const p = JSON.parse(stdout).data?.repository?.pullRequest
+    if (!p) throw new Error(`no files for PR #${pr.number} (gh api graphql)`)
+    id = p.id
+    for (const f of p.files?.nodes ?? []) files[f.path] = f.viewerViewedState
+    if (!p.files?.pageInfo?.hasNextPage) break
+    after = p.files.pageInfo.endCursor
+  }
+  return { id, files }
+}
+
+// prViewed: ticks (or unticks) a file of the PR as viewed, on GitHub as its own box does
+export async function prViewed(p: { ws: string; path: string; viewed: boolean; id?: string }) {
+  const ws = findWs(p.ws)
+  if (!prs.get(ws.id)) throw new Error(`${ws.id} has no PR`)
+  if (typeof p.path !== 'string' || !p.path) throw new Error('path?')
+  const id = p.id || (await prFiles(ws.id)).id
+  const op = p.viewed ? 'markFileAsViewed' : 'unmarkFileAsViewed'
+  await exec(ws, 'gh', ['api', 'graphql', '-f', `id=${id}`, '-f', `path=${p.path}`, '-f', `query=mutation($id: ID!, $path: String!) { ${op}(input: { pullRequestId: $id, path: $path }) { clientMutationId } }`], { timeout: 20000 }).catch(e => {
+    throw new Error(ghSays(e, `PR's ${p.path}`))
+  })
+  return { path: p.path, state: p.viewed ? 'VIEWED' : 'UNVIEWED' }
 }
 
 // prThreads: the PR's review threads, for the side panel
