@@ -12,7 +12,7 @@ import type { WidgetOption, WidgetSize, WidgetView } from '../shared/types.ts'
 import { hasFull, hasScript, pageOf, render, sayOf, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
-import { changed, cliArgv, cliEnv, clients, devLog, dir, plainEnv, q, state } from './core.ts'
+import { changed, cliArgv, cliEnv, clients, devLog, dir, own, plainEnv, q, state } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -273,8 +273,11 @@ function exec(w: Entry, cmd: string, args: string[], extra: Record<string, strin
   }
   for (const [k, v] of Object.entries(config)) env[`WIDGET_${k.toUpperCase()}`] = v
   return new Promise<string>((ok, no) =>
-    execFile(cmd, args, { cwd: w.dir, env, timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
-      e ? no(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message))) : ok(String(stdout)),
+    own(
+      execFile(cmd, args, { cwd: w.dir, env, timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
+        e ? no(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message))) : ok(String(stdout)),
+      ),
+      `Widget · ${w.m.name || w.id}`,
     ),
   )
 }

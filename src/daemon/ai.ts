@@ -7,7 +7,7 @@ import { appendFileSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFil
 import { extname, join, sep } from 'node:path'
 import { type Rpc, type Tool, tools } from '../cli/mcp.ts'
 import { AI_MODEL, AI_STEPS, type AiBackend, type AiCall, type AiMsg, aiTotals } from '../shared/types.ts'
-import { broadcast, cliArgv, dir, presets, state } from './core.ts'
+import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 
 const keyPath = join(dir, 'ai-key')
 const chatPath = join(dir, 'ai-chat.json')
@@ -232,6 +232,7 @@ function cli(o: Opts, cmd: AiBackend, args: string[], line: (j: any) => void) {
     const env = { ...process.env, ...state.settings?.env, ...presetOf(cmd)?.env, MCP_TOOL_TIMEOUT: '300000' }
     const c = spawn(cmd, args, { cwd: home, env, stdio: ['ignore', 'pipe', 'pipe'] })
     o.spawned(c)
+    own(c, `Laki AI · ${cmd}`, 'ai')
     let out = ''
     let err = ''
     c.stdout.on('data', d => {

@@ -349,7 +349,8 @@ export type TabView = Tab & { status: Status; code?: number; done: boolean; limi
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
 export type ProcUse = { pid: number; rss: number; cpu: number; cmd: string }
-export type Resources = { app: (ProcUse & { kind: string })[]; daemon: ProcUse & { heap: number }; tabs: { tab: string; rss: number; cpu: number; procs: ProcUse[] }[] }
+// others: what the daemon runs besides tabs (Laki AI's agent, tunnels, remote access, SSH, widgets' fetches); stop: resourceStop's key
+export type Resources = { app: (ProcUse & { kind: string })[]; daemon: ProcUse & { heap: number }; tabs: { tab: string; rss: number; cpu: number; procs: ProcUse[] }[]; others?: { name: string; stop?: string; rss: number; cpu: number; procs: ProcUse[] }[] }
 
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
 export type Tunnel = { port: number; url?: string; mails?: string[] }
@@ -386,4 +387,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 43
+export const API = 44

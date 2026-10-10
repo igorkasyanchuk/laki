@@ -2042,6 +2042,7 @@ export function App() {
               tabs: view.tabs,
               wsName: id => (w => (w ? wsName(w) : id))(view.workspaces.find(w => w.id === id)),
               sleep: tab => api.call('tabSleep', { tab }),
+              stopOther: key => api.call('resourceStop', { key }),
               open: tab => (setDialog(null), selectTab(tab), view.tabs.find(t => t.id === tab)?.asleep && call('tabWake', { tab }).catch(() => {})),
               procs: bridge?.procs,
               // main's (the bubbles, an agent browser), else the page's own frames (laki-stop: the video, a widget, the preview)

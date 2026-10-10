@@ -38,7 +38,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   and the images' paths. Prompt templates wrap it (`{{prompt}}`).
 - **Plan limits**: a ring in the status bar fills to the 5-hour limit of your Claude and Codex plans; click
   it for each one (5-hour, weekly, per model) and when it resets.
-- **Resources**: memory and CPU for Laki and each tab (its agent, MCP servers, dev servers), in Settings or ⌘K; idle
+- **Resources**: memory and CPU for Laki, each tab (its agent, MCP servers, dev servers), Laki AI, tunnels, remote
+  access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI, new review
   comments or merge conflicts to the agent on their own; an info panel with the PR and its checks;
@@ -61,7 +62,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
   run script in its tab, ■ stops it; listening ports you click to open, name (`.laki.json`), stop (✕), or expose to
   the world (a public trycloudflare.com link and its QR code, optionally only for some email addresses).
-- **Look**: 86 themes, including Warp-style gradients and sixty-eight that also change shapes, borders and type;
+- **Look**: 98 themes, including Warp-style gradients and eighty that also change shapes, borders and type;
   glass (a see-through window, as see-through as you set, with a color glow); Inter and eleven terminal fonts
   built in (JetBrains Mono, Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist Mono, Hack, Iosevka,
   Inconsolata, Roboto Mono, Victor Mono); tab and
@@ -778,7 +779,7 @@ lit for a moment.
   the whole window until the mouse leaves the list; the box above them finds
   one by name; the ☆ on a card's corner makes it a favorite: *Favorites*, a group of its own above the rest, and still in the full list): Midnight (default), Dawn (light), Synthwave, Forest, Ember, Fjord, Graphite,
   Velvet, Nightfall, Paper (light), Mist (light), and the Warp-style gradients Cyber Wave, Koi, Pink City, Leafy,
-  Aurora, Sunset and Snowy (light); and fifty-eight ✦ themes that change more than colors: Phosphor (a CRT: mono,
+  Aurora, Sunset and Snowy (light); and eighty ✦ themes that change more than colors: Phosphor (a CRT: mono,
   dashed, glowing, scanlines), Neon Arcade (pills and glow), Brutalist (light: thick black lines, hard
   shadows), Bubblegum (light: round and soft), Blueprint (a drafting grid, mono capitals), Cyberpunk (clipped
   corners, hazard stripes, yellow tabs), Art Deco (gold double rules, serif capitals, a sunburst), Classic
@@ -819,7 +820,16 @@ lit for a moment.
   Phantom (black, white and red slanted slabs), Test Chamber (light: a test lab's tiles and two portals), Monolith (a
   ship computer's red eye), Macrodata (a severed office's sea-blue terminal), Redline (a racing HUD: carbon fibre,
   shift lights), Mission Control (1969 consoles, label plates, an amber lamp), Grimoire (a dungeon inventory's gold
-  frames), Cockpit (an orange flight HUD with target brackets) and Islander (light: an island phone app).
+  frames), Cockpit (an orange flight HUD with target brackets), Islander (light: an island phone app), Llama Amp (a
+  1998 music player: ribbed chrome, gold title stripes, the playlist's blue selection, a spectrum in the status bar),
+  Spartan (a power-armour HUD: hexagons, a shield bar, the visor's gold, a motion tracker), Vault Dweller (a wrist
+  computer's green screen with scanlines), Overworld (a block world: dirt, stone buttons, a grass block, the
+  experience bar), Rip & Tear (hell's red on scorched iron, claw marks, a fire's glow), Warp Pipe (light: sky and
+  clouds, coins, a brick ledge), Power Pellet (a maze arcade: blue double walls, pellets, a chomping circle),
+  Hyperspace (stars, the crawl's yellow leaning back, saber glows), Spice (light: desert sand, wind ripples, two
+  moons), Outatime (brushed steel, a title in italic fire, the flux glow, the time circuits' display), Grand Hotel
+  (light: pink wallpaper stripes, a pastry box with a ribbon, lobby purple) and Replicant (a haze from amber smog to
+  night teal).
   Terminals take its 16 colors.
 - *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist
   Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
@@ -906,7 +916,10 @@ lit for a moment.
   click on it; the preview: *Load it again*; the bubbles: when an agent's state
   changes; a browser: the pages you aren't on, each back as you open it). The total line splits out *shells* (every
   shell tab) and *browsers*. Template widgets and the memes are drawn in the window's own
-  process. Then each tab, biggest first, with its processes under it (a click). *Sleep* ends an idle Claude or Codex
+  process. What the daemon runs besides tabs gets a row each: *Laki AI* (its `claude -p` or `codex exec` while it
+  answers), *Expose to the world* (each tunnel's cloudflared), *Remote access*, *SSH* (a host's connection) and a
+  widget's fetch; *Stop* ends the AI's answer, a tunnel or remote access. The daemon's short commands (git, gh) count
+  under *Laki itself*. Then each tab, biggest first, with its processes under it (a click). *Sleep* ends an idle Claude or Codex
   tab's process now; *Open* goes to the tab.
   *Sleep idle agents after* (never by default; 15 minutes to 8 hours) does it on its own for an idle Claude or Codex
   tab nobody is looking at, quiet that long. A sleeping tab keeps its screen and says so; looking at it, a key, or a

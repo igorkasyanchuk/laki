@@ -337,7 +337,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
   background: linear-gradient(90deg, #3a82e0, #a9d4ff 35%, #64b0f8 60%, #2f78d8); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
 
 /* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
-:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
 
 /* Clay: soft UI. One color everywhere, shapes raised out of it or pressed into it by light from the top left */
 [data-look='clay'] { --radius: 12px;
@@ -1974,6 +1974,307 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='islander'] .board-card { border: none; border-radius: var(--rs, 14px); box-shadow: 0 2px 0 #e2d3a8; }
 [data-look='islander'] .toggle.on .toggle-track { background: #3cb88a; }
 [data-look='islander'] .theme { border-radius: var(--rs, 14px); }
+
+/* Llama Amp: a 1998 music player. Dark ribbed chrome, gold stripes after the title bars, bevelled buttons, a green
+   play button, the playlist's blue selection, the song display's black for the status bar with a spectrum at its end */
+[data-look='amp'] { --radius: 0px; --ui-font: Tahoma, Verdana, sans-serif;
+  --ribs: repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0 1px, transparent 1px 3px); }
+[data-look='amp'] :is(.sidebar, .settings-nav) { border-right: 1px solid #0a0a14; background: var(--ribs), linear-gradient(90deg, #262640, #1e1e30); }
+[data-look='amp'] :is(.settings-main h2, .tunnel-head b) { font-size: 15px; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #e6e6f0; }
+[data-look='amp'] .settings-main h2::after { content: ''; display: inline-block; width: 90px; height: 7px; margin-left: 12px; vertical-align: 2px;
+  background: repeating-linear-gradient(180deg, #d9a03a 0 1px, transparent 1px 3px); }
+[data-look='amp'] .project-head { color: #d9a03a; letter-spacing: 1.5px; }
+[data-look='amp'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #0a0a14; background: linear-gradient(#4a4a6e, #2c2c46); box-shadow: inset 1px 1px 0 #7a7aa0, inset -1px -1px 0 #1a1a2c; }
+[data-look='amp'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='amp'] .seg button.on { background: linear-gradient(#2c2c46, #4a4a6e); color: #00e000; }
+[data-look='amp'] button.primary { border: 1px solid #003a00; background: linear-gradient(#5aff5a, #00b000); color: #000; font-weight: 700; box-shadow: inset 1px 1px 0 #b0ffb0; }
+[data-look='amp'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 1px solid #0a0a14; background: #000; box-shadow: inset 1px 1px 0 #000, inset -1px -1px 0 #45456a; }
+[data-look='amp'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #0a0a14; background: #22223a; box-shadow: inset 1px 1px 0 #5a5a80, 0 14px 30px rgba(0, 0, 0, 0.7); }
+[data-look='amp'] .menu-item:hover { background: #0000c6; color: #fff; }
+[data-look='amp'] .ws.sel { background: #0000c6; border-left-color: #00e000; color: #fff; }
+[data-look='amp'] .settings-nav button.on { background: #0000c6; color: #fff; }
+[data-look='amp'] .tab.sel { box-shadow: inset 0 2px 0 var(--tab-c, #00e000); }
+[data-look='amp'] .status { border-top: 2px solid #45456a; background: #000; }
+[data-look='amp'] .status::after { content: ''; flex: none; order: 99; width: 30px; height: 12px;
+  background: linear-gradient(#00e000, #00e000) 0 100% / 3px 50% no-repeat, linear-gradient(#00e000, #00e000) 4px 100% / 3px 80% no-repeat,
+    linear-gradient(#d9e000, #d9e000) 8px 100% / 3px 100% no-repeat, linear-gradient(#00e000, #00e000) 12px 100% / 3px 65% no-repeat,
+    linear-gradient(#00e000, #00e000) 16px 100% / 3px 40% no-repeat, linear-gradient(#00e000, #00e000) 20px 100% / 3px 75% no-repeat,
+    linear-gradient(#00e000, #00e000) 24px 100% / 3px 30% no-repeat, linear-gradient(#00e000, #00e000) 28px 100% / 2px 55% no-repeat; }
+[data-look='amp'] :is(.board-col, .board-card) { border-color: #45456a; }
+[data-look='amp'] .toggle.on .toggle-track { background: #00e000; }
+[data-look='amp'] .theme { border-color: #45456a; }
+
+/* Spartan: a power-armoured soldier's HUD. Armour green and shield blue, a hexagon grid on the sidebar, a segmented
+   shield bar before the headings, cut corners, the visor's gold for the main button, a motion tracker in the terminals'
+   corner */
+[data-look='spartan'] { --radius: 0px; --ui-font: 'Avenir Next Condensed', 'Avenir Next', 'Helvetica Neue', sans-serif; --hud: #5fc8ff;
+  --cut: polygon(8px 0, 100% 0, 100% calc(100% - 8px), calc(100% - 8px) 100%, 0 100%, 0 8px);
+  --hex: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='28' height='48'%3E%3Cpath d='M14 0L28 8V24L14 32L0 24V8ZM14 32V48' fill='none' stroke='%235fc8ff' stroke-opacity='0.09'/%3E%3C/svg%3E") 0 0 / 28px 48px; }
+[data-look='spartan'] :is(.sidebar, .settings-nav) { border-right: 1px solid rgba(95, 200, 255, 0.35); background: var(--hex), var(--side); }
+[data-look='spartan'] .rail { background: var(--hex), var(--rail-bg); }
+[data-look='spartan'] :is(.settings-main h2, .tunnel-head b) { text-transform: uppercase; letter-spacing: 3px; font-weight: 600; color: #e4eee6; }
+[data-look='spartan'] .settings-main h2::before { content: ''; display: inline-block; width: 34px; height: 8px; margin-right: 12px; vertical-align: 2px;
+  background: repeating-linear-gradient(90deg, var(--hud) 0 5px, transparent 5px 7px); box-shadow: 0 0 8px rgba(95, 200, 255, 0.5); }
+[data-look='spartan'] .project-head { color: var(--hud); letter-spacing: 2px; }
+[data-look='spartan'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(95, 200, 255, 0.4); background: rgba(95, 200, 255, 0.06); clip-path: var(--cut); text-transform: uppercase; letter-spacing: 1px; }
+[data-look='spartan'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='spartan'] .seg button.on { background: rgba(95, 200, 255, 0.18); color: #fff; }
+[data-look='spartan'] button.primary { border: none; background: linear-gradient(135deg, #ffd98a, #f2b33d 50%, #c98a1a); color: #1a1204; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; clip-path: var(--cut); }
+[data-look='spartan'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: rgba(95, 200, 255, 0.3); background: #08100d; }
+[data-look='spartan'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(95, 200, 255, 0.35); background: #0d1814; box-shadow: 0 0 16px rgba(95, 200, 255, 0.12), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='spartan'] .menu-item:hover { background: rgba(95, 200, 255, 0.14); }
+[data-look='spartan'] .ws.sel { background: linear-gradient(90deg, rgba(95, 200, 255, 0.2), transparent); border-left-color: var(--hud); }
+[data-look='spartan'] .settings-nav button.on { background: rgba(95, 200, 255, 0.14); box-shadow: inset 2px 0 0 var(--hud); }
+[data-look='spartan'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--hud)), 0 6px 10px -8px var(--hud); }
+[data-look='spartan'] .status { border-top: 1px solid rgba(95, 200, 255, 0.35); }
+[data-look='spartan'] .term-wrap::after { content: ''; position: absolute; left: 0; bottom: 0; z-index: 2; width: 150px; height: 150px; pointer-events: none;
+  background: repeating-radial-gradient(circle at 0 100%, rgba(95, 200, 255, 0.12) 0 1px, transparent 1px 36px), radial-gradient(circle at 0 100%, rgba(95, 200, 255, 0.08), transparent 70%);
+  -webkit-mask-image: radial-gradient(circle at 0 100%, #000 145px, transparent 146px); mask-image: radial-gradient(circle at 0 100%, #000 145px, transparent 146px); }
+[data-look='spartan'] :is(.board-col, .board-card) { border-color: rgba(95, 200, 255, 0.25); }
+[data-look='spartan'] .toggle.on .toggle-track { background: var(--hud); }
+[data-look='spartan'] .theme { border-color: #2a3f35; }
+
+/* Vault Dweller: a wrist computer's screen in a fallout shelter. Green on black in a monospace, glowing a little,
+   boxed selections, a rule under the headings like its tab bar, scanlines and a curved edge's shadow over the
+   terminals */
+[data-look='vault'] { --radius: 2px; --ui-font: var(--mono); --pip: #4cff94; }
+[data-look='vault'] body { text-shadow: 0 0 4px rgba(76, 255, 148, 0.35); }
+[data-look='vault'] :is(.sidebar, .settings-nav) { border-right: 1px solid #145232; }
+[data-look='vault'] :is(.settings-main h2, .tunnel-head b) { text-transform: uppercase; letter-spacing: 2px; font-weight: 700; color: var(--pip); }
+[data-look='vault'] .settings-main h2 { padding-bottom: 6px; border-bottom: 2px solid var(--pip); box-shadow: 0 6px 0 -4px rgba(76, 255, 148, 0.25); }
+[data-look='vault'] .settings-main h2::before { content: '\25B6  '; }
+[data-look='vault'] .project-head { color: var(--pip); letter-spacing: 1.5px; }
+[data-look='vault'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2a7a4a; background: transparent; color: var(--pip); text-transform: uppercase; }
+[data-look='vault'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='vault'] .seg button.on { border-color: var(--pip); background: rgba(76, 255, 148, 0.16); }
+[data-look='vault'] button.primary { border: none; background: var(--pip); color: #03100a; font-weight: 700; text-transform: uppercase; text-shadow: none; }
+[data-look='vault'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #2a7a4a; background: #020b06; }
+[data-look='vault'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid var(--pip); background: #04140b; box-shadow: 0 0 18px rgba(76, 255, 148, 0.18), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='vault'] .menu-item:hover { background: rgba(76, 255, 148, 0.18); }
+[data-look='vault'] .ws.sel { background: rgba(76, 255, 148, 0.14); border-left-color: var(--pip); box-shadow: inset 0 0 0 1px rgba(76, 255, 148, 0.6); }
+[data-look='vault'] .settings-nav button.on { background: rgba(76, 255, 148, 0.14); box-shadow: inset 0 0 0 1px rgba(76, 255, 148, 0.6); }
+[data-look='vault'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--pip)); }
+[data-look='vault'] .status { border-top: 2px solid #145232; background: #020b06; }
+[data-look='vault'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none;
+  background: repeating-linear-gradient(transparent 0 2px, rgba(0, 0, 0, 0.22) 2px 3px), radial-gradient(ellipse at 50% 50%, transparent 62%, rgba(0, 0, 0, 0.45)); }
+[data-look='vault'] :is(.board-col, .board-card) { border-color: #145232; }
+[data-look='vault'] .toggle.on .toggle-track { background: var(--pip); }
+[data-look='vault'] .theme { border-color: #145232; }
+
+/* Overworld: a block world's menus. Dirt in pixel squares behind the sidebar, grey stone buttons with a pixel bevel
+   and a shadowed label, a grass block for the main button, the hotbar's white frame on the selection, the experience
+   bar along the status bar */
+[data-look='overworld'] { --radius: 0px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --pixel: Silom, 'Krungthep', Menlo, monospace;
+  --dirt: repeating-conic-gradient(#2e2218 0 25%, #35281c 0 50%) 0 0 / 8px 8px; }
+[data-look='overworld'] :is(.sidebar, .settings-nav) { border-right: 2px solid #000; background: var(--dirt); }
+[data-look='overworld'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--pixel); font-weight: 400; color: #fff; text-shadow: 2px 2px 0 #3f3f3f; }
+[data-look='overworld'] .settings-main h2::before { content: ''; display: inline-block; width: 14px; height: 14px; margin-right: 10px; vertical-align: -1px;
+  background: linear-gradient(#62b83d 0 35%, #7a5536 35%); box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.35); }
+[data-look='overworld'] .project-head { font-family: var(--pixel); font-weight: 400; color: #ffff55; text-shadow: 1px 1px 0 #3f3f15; letter-spacing: 1px; }
+[data-look='overworld'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid #000; background: #6f6f6f; color: #fff; text-shadow: 1px 1px 0 #3f3f3f;
+  box-shadow: inset 2px 2px 0 #a8a8a8, inset -2px -2px 0 #4a4a4a; }
+[data-look='overworld'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='overworld'] .seg button.on { background: #5a6296; color: #ffffa0; box-shadow: inset 2px 2px 0 #8a92c8, inset -2px -2px 0 #3a4270; }
+[data-look='overworld'] button.primary { border: 2px solid #000; background: #7a5536; color: #fff; font-weight: 700; text-shadow: 1px 1px 0 #2a1a0a; box-shadow: inset 0 5px 0 #62b83d, inset 2px 0 0 #8e6a48, inset -2px -2px 0 #4a3020; }
+[data-look='overworld'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid #a0a0a0; background: #000; }
+[data-look='overworld'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #000; background: #2a2118; box-shadow: inset 2px 2px 0 #5a4a38, inset -2px -2px 0 #15100b, 0 16px 36px rgba(0, 0, 0, 0.7); }
+[data-look='overworld'] .menu-item:hover { background: #4a3a28; color: #ffffa0; }
+[data-look='overworld'] .ws.sel { background: rgba(255, 255, 255, 0.08); border-left-color: transparent; box-shadow: inset 0 0 0 2px #e8e8e8; }
+[data-look='overworld'] .settings-nav button.on { background: rgba(255, 255, 255, 0.08); box-shadow: inset 0 0 0 2px #e8e8e8; }
+[data-look='overworld'] .tab.sel { box-shadow: inset 0 -3px 0 var(--tab-c, #62b83d); }
+[data-look='overworld'] .status { border-top: 4px solid; border-image: repeating-linear-gradient(90deg, #80ff20 0 18px, #2a5a08 18px 20px) 1; }
+[data-look='overworld'] :is(.board-col, .board-card) { border: 2px solid #000; }
+[data-look='overworld'] .board-col { background: var(--dirt); }
+[data-look='overworld'] .toggle.on .toggle-track { background: #62b83d; }
+[data-look='overworld'] .theme { border: 2px solid #000; }
+
+/* Rip & Tear: a demon-slaying shooter. Hell's red on scorched iron, Impact capitals after three claw marks, riveted
+   iron plates for buttons, the old status bar's grey stone, a fire's glow rising from the bottom of the sidebar and the
+   terminals */
+[data-look='riptear'] { --radius: 2px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --hell: #f23a1e; }
+[data-look='riptear'] :is(.sidebar, .settings-nav) { border-right: 1px solid #4a2a1e; background: linear-gradient(180deg, transparent 65%, rgba(242, 58, 30, 0.14)), var(--side); }
+[data-look='riptear'] :is(.settings-main h2, .tunnel-head b) { font-family: Impact, 'Arial Black', sans-serif; font-weight: 400; text-transform: uppercase; letter-spacing: 1.5px; color: #f0e2d6; text-shadow: 0 0 10px rgba(242, 58, 30, 0.55); }
+[data-look='riptear'] .settings-main h2::before { content: ''; display: inline-block; width: 16px; height: 16px; margin-right: 10px; vertical-align: -1px;
+  background: repeating-linear-gradient(115deg, transparent 0 2px, var(--hell) 2px 4px, transparent 4px 6px); }
+[data-look='riptear'] .project-head { color: #ff7a5a; letter-spacing: 2px; }
+[data-look='riptear'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a2a1e; background: radial-gradient(circle at 5px 5px, #6a4a3a 1.5px, transparent 2px), linear-gradient(#34241c, #20150f); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06); }
+[data-look='riptear'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='riptear'] .seg button.on { border-color: var(--hell); color: #fff; }
+[data-look='riptear'] button.primary { border: 1px solid #7a1408; background: linear-gradient(#ff6a4a, #f23a1e); color: #0f0806; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 12px rgba(242, 58, 30, 0.45); }
+[data-look='riptear'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a2a1e; background: #0a0605; }
+[data-look='riptear'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #5a3424; background: #160e0b; box-shadow: 0 0 20px rgba(242, 58, 30, 0.15), 0 20px 50px rgba(0, 0, 0, 0.85); }
+[data-look='riptear'] .menu-item:hover { background: rgba(242, 58, 30, 0.18); }
+[data-look='riptear'] .ws.sel { background: linear-gradient(90deg, rgba(242, 58, 30, 0.24), transparent); border-left-color: var(--hell); }
+[data-look='riptear'] .settings-nav button.on { background: rgba(242, 58, 30, 0.16); box-shadow: inset 2px 0 0 var(--hell); }
+[data-look='riptear'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--hell)), 0 8px 12px -10px var(--hell); }
+[data-look='riptear'] .status { border-top: 2px solid #6a625c; background: linear-gradient(#3a3532, #24201e); }
+[data-look='riptear'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 130%, rgba(242, 58, 30, 0.12), transparent 60%); }
+[data-look='riptear'] :is(.board-col, .board-card) { border-color: #4a2a1e; }
+[data-look='riptear'] .toggle.on .toggle-track { background: var(--hell); }
+[data-look='riptear'] .theme { border-color: #4a2a1e; }
+
+/* Warp Pipe: a plumber's platformer. Sky blue with clouds on the sidebar, round chunky type with a white edge, a coin
+   before the headings, pipe-green buttons' lips, the red cap for the main button, a brick ledge over the status bar */
+[data-look='warp'] { --radius: 10px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --round: 'Arial Rounded MT Bold', 'Avenir Next', sans-serif;
+  --clouds: radial-gradient(ellipse 26px 11px at 50px 70px, #fff 96%, transparent), radial-gradient(ellipse 16px 10px at 66px 63px, #fff 96%, transparent),
+    radial-gradient(ellipse 20px 9px at 150px 190px, #fff 96%, transparent), radial-gradient(ellipse 13px 8px at 163px 184px, #fff 96%, transparent); }
+[data-look='warp'] :is(.sidebar, .settings-nav) { border-right: none; background: var(--clouds), var(--side); background-size: 220px 260px, 220px 260px, 220px 260px, 220px 260px, auto; }
+[data-look='warp'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--round); font-weight: 400; font-size: 20px; color: #1c1f33; text-shadow: 2px 2px 0 #fff, -1px -1px 0 #fff; }
+[data-look='warp'] .settings-main h2::before { content: ''; display: inline-block; width: 12px; height: 16px; margin-right: 10px; vertical-align: -2px; border-radius: 50%;
+  background: linear-gradient(90deg, transparent 4px, #c88a00 4px 7px, transparent 7px), #ffc81a; box-shadow: inset 0 0 0 1px #9a6a00; }
+[data-look='warp'] .project-head { font-family: var(--round); font-weight: 400; color: #b81a16; letter-spacing: 0.5px; }
+[data-look='warp'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid #1c1f33; border-radius: var(--rs, 10px); background: #fff; color: #1c1f33; font-weight: 600; box-shadow: 0 3px 0 #1a8a33; }
+[data-look='warp'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='warp'] .seg button.on { background: #e2f7e6; color: #0f5a20; }
+[data-look='warp'] button.primary { border: 2px solid #1c1f33; border-radius: var(--rs, 10px); background: #e52521; color: #fff; font-family: var(--round); font-weight: 400; box-shadow: 0 3px 0 #8a1210; }
+[data-look='warp'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid #a8c4f0; border-radius: var(--rs, 8px); background: #fff; }
+[data-look='warp'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #1c1f33; border-radius: var(--rs, 12px); background: #fff; box-shadow: 0 4px 0 #1c1f33, 0 16px 36px rgba(28, 31, 51, 0.2); }
+[data-look='warp'] .menu-item:hover { background: #fff1c2; }
+[data-look='warp'] .ws.sel { background: #ffd75e; border-left-color: #e52521; border-radius: 0 var(--rs, 8px) var(--rs, 8px) 0; }
+[data-look='warp'] .settings-nav button.on { background: #ffd75e; border-radius: var(--rs, 8px); }
+[data-look='warp'] .tab.sel { box-shadow: inset 0 -3px 0 var(--tab-c, #e52521); }
+[data-look='warp'] .status { border-top: 6px solid; border-image: repeating-linear-gradient(90deg, #c84c0c 0 14px, #5a1a00 14px 16px) 1; }
+[data-look='warp'] :is(.board-col, .board-card) { border-radius: var(--rs, 12px); }
+[data-look='warp'] .board-card { border: 2px solid #1c1f33; box-shadow: 0 3px 0 #1c1f33; }
+[data-look='warp'] .toggle.on .toggle-track { background: #1a8a33; }
+[data-look='warp'] .theme { border-radius: var(--rs, 10px); }
+
+/* Power Pellet: a maze arcade game. Black with the maze's blue double walls around the popups, boards and the status
+   bar, pellets dotted over the sidebar, a chomping yellow circle before the headings, the ghosts' four colors in the
+   terminal */
+[data-look='pellet'] { --radius: 8px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --arcade: Krungthep, Silom, Impact, sans-serif; --maze: #2121de; }
+[data-look='pellet'] :is(.sidebar, .settings-nav) { border-right: 3px double var(--maze); }
+[data-look='pellet'] .sidebar { background: radial-gradient(circle, rgba(255, 184, 174, 0.22) 1.5px, transparent 2px) 14px 14px / 28px 28px, var(--side); }
+[data-look='pellet'] :is(.settings-main h2, .tunnel-head b) { font-family: var(--arcade); font-weight: 400; text-transform: uppercase; letter-spacing: 2px; color: #ffd400; }
+[data-look='pellet'] .settings-main h2::before { content: ''; display: inline-block; width: 16px; height: 16px; margin-right: 12px; vertical-align: -1px; border-radius: 50%;
+  background: conic-gradient(#ffd400 0 55deg, transparent 55deg 125deg, #ffd400 125deg); }
+[data-look='pellet'] .settings-main h2::after { content: '\2022 \2022 \2022'; margin-left: 12px; color: #ffb8ae; letter-spacing: 4px; }
+[data-look='pellet'] .project-head { font-family: var(--arcade); font-weight: 400; color: #00e8ff; letter-spacing: 1.5px; }
+[data-look='pellet'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 2px solid var(--maze); border-radius: 999px; background: #000; }
+[data-look='pellet'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='pellet'] .seg button.on { border-color: #ffd400; color: #ffd400; }
+[data-look='pellet'] button.primary { border: none; border-radius: 999px; background: #ffd400; color: #000; font-weight: 700; }
+[data-look='pellet'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border: 2px solid var(--maze); background: #000; }
+[data-look='pellet'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 4px double var(--maze); border-radius: var(--rs, 12px); background: #000; box-shadow: 0 20px 50px rgba(0, 0, 0, 0.9); }
+[data-look='pellet'] .menu-item:hover { background: #14143a; color: #ffd400; }
+[data-look='pellet'] .ws.sel { background: #0a0a30; border-left-color: #ffd400; box-shadow: inset 0 0 0 1px var(--maze); }
+[data-look='pellet'] .settings-nav button.on { background: #0a0a30; box-shadow: inset 0 0 0 1px var(--maze); color: #ffd400; }
+[data-look='pellet'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #ffd400); }
+[data-look='pellet'] .status { border-top: 4px double var(--maze); background: #000; }
+[data-look='pellet'] :is(.board-col, .board-card) { border: 3px double var(--maze); border-radius: var(--rs, 12px); }
+[data-look='pellet'] .toggle.on .toggle-track { background: #ffd400; }
+[data-look='pellet'] .theme { border: 2px solid var(--maze); }
+
+/* Hyperspace: a space opera. Stars on black, the opening crawl's yellow capitals for headings, a
+   saber's white core and colored glow on the selected tab and row, the empire's black and yellow for the main button */
+[data-look='hyperspace'] { --radius: 4px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --crawl: #ffe81f; --saber: #4ab4ff;
+  --stars: radial-gradient(1px 1px at 22px 34px, #fff, transparent), radial-gradient(1px 1px at 96px 128px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 150px 62px, #fff, transparent), radial-gradient(1px 1px at 60px 180px, rgba(255, 255, 255, 0.6), transparent); }
+[data-look='hyperspace'] :is(.sidebar, .settings-nav) { border-right: 1px solid #1a1f2a; background: var(--stars), var(--side); background-size: 190px 210px, 190px 210px, 190px 210px, 190px 210px, auto; }
+[data-look='hyperspace'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Avenir Next Condensed', 'Avenir Next', sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: 3px; color: var(--crawl); }
+[data-look='hyperspace'] .project-head { color: var(--crawl); letter-spacing: 2px; }
+[data-look='hyperspace'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2c3444; background: #0b0d12; }
+[data-look='hyperspace'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='hyperspace'] .seg button.on { border-color: var(--saber); box-shadow: 0 0 8px rgba(74, 180, 255, 0.5); color: #fff; }
+[data-look='hyperspace'] button.primary { border: none; background: var(--crawl); color: #000; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; }
+[data-look='hyperspace'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #262c38; background: #000; }
+[data-look='hyperspace'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #2c3444; background: #07080c; box-shadow: 0 24px 60px rgba(0, 0, 0, 0.9); }
+[data-look='hyperspace'] .menu-item:hover { background: #1a2236; }
+[data-look='hyperspace'] .ws.sel { background: linear-gradient(90deg, rgba(74, 180, 255, 0.16), transparent); border-left-color: #fff; box-shadow: -3px 0 8px var(--saber); }
+[data-look='hyperspace'] .settings-nav button.on { background: #1a2236; box-shadow: inset 2px 0 0 #fff, -2px 0 8px var(--saber); }
+[data-look='hyperspace'] .tab.sel { box-shadow: inset 0 -2px 0 #fff, 0 3px 8px -2px var(--tab-c, var(--saber)); }
+[data-look='hyperspace'] .status { border-top: 1px solid rgba(255, 232, 31, 0.35); background: #000; }
+[data-look='hyperspace'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 50%, rgba(74, 180, 255, 0.05), transparent 65%); }
+[data-look='hyperspace'] :is(.board-col, .board-card) { border-color: #262c38; }
+[data-look='hyperspace'] .toggle.on .toggle-track { background: var(--saber); box-shadow: 0 0 8px var(--saber); }
+[data-look='hyperspace'] .theme { border-color: #262c38; }
+
+/* Spice: a desert planet's epic. Sand with wind ripples on the sidebar, wide-spaced thin capitals, two moons before
+   the headings, a horizon over the status bar, flat stone buttons, the spice's orange for the main one */
+[data-look='spice'] { --radius: 2px; --ui-font: Futura, 'Avenir Next', 'Helvetica Neue', sans-serif;
+  --ripples: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='26'%3E%3Cpath d='M0 13 Q30 3 60 13 T120 13' fill='none' stroke='%23b8945a' stroke-opacity='0.3'/%3E%3C/svg%3E") 0 0 / 120px 26px; }
+[data-look='spice'] :is(.sidebar, .settings-nav) { border-right: 1px solid #cfb588; background: var(--ripples), var(--side); }
+[data-look='spice'] :is(.settings-main h2, .tunnel-head b) { font-weight: 500; text-transform: uppercase; letter-spacing: 7px; color: #3a2414; }
+[data-look='spice'] .settings-main h2::before { content: ''; display: inline-block; width: 22px; height: 12px; margin-right: 12px; vertical-align: 0;
+  background: radial-gradient(circle at 6px 6px, #b84e14 0 5px, transparent 5.5px), radial-gradient(circle at 17px 7px, #d89a5a 0 3.5px, transparent 4px); }
+[data-look='spice'] .project-head { color: #8a3a0e; letter-spacing: 3px; }
+[data-look='spice'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #cfb588; background: #efdfbf; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11.5px; }
+[data-look='spice'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='spice'] .seg button.on { border-color: #b84e14; color: #8a3a0e; }
+[data-look='spice'] button.primary { border: none; background: #b84e14; color: #fff; text-transform: uppercase; letter-spacing: 2px; font-weight: 500; }
+[data-look='spice'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #cfb588; background: #fbf4e6; }
+[data-look='spice'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #cfb588; background: #f8eedb; box-shadow: 0 18px 44px rgba(58, 36, 20, 0.22); }
+[data-look='spice'] .menu-item:hover { background: #ecd8b0; }
+[data-look='spice'] .ws.sel { background: linear-gradient(90deg, rgba(184, 78, 20, 0.2), transparent); border-left-color: #b84e14; }
+[data-look='spice'] .settings-nav button.on { background: #ecd8b0; box-shadow: inset 2px 0 0 #b84e14; }
+[data-look='spice'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #b84e14); }
+[data-look='spice'] .status { border-top: 2px solid #b84e14; }
+[data-look='spice'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: linear-gradient(180deg, transparent 75%, rgba(184, 78, 20, 0.05)); }
+[data-look='spice'] :is(.board-col, .board-card) { border-color: #cfb588; }
+[data-look='spice'] .toggle.on .toggle-track { background: #b84e14; }
+[data-look='spice'] .theme { border-color: #cfb588; }
+:is([data-look='spice'], [data-look='grandhotel']) .seg button { text-transform: none; letter-spacing: 0; font-size: inherit; } /* a row of choices keeps its width */
+
+/* Outatime: a time machine with gull-wing doors. Brushed stainless steel, the title's chrome in italic fire,
+   the flux capacitor's glow before the headings and on the main button, the time circuits' red, green and amber on a
+   black display for the status bar */
+[data-look='outatime'] { --radius: 3px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --flux: #8ad8ff;
+  --brushed: repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.03) 0 1px, transparent 1px 3px); }
+[data-look='outatime'] :is(.sidebar, .settings-nav) { border-right: 1px solid #4a5058; background: var(--brushed), linear-gradient(180deg, #2c3035, #212428); }
+[data-look='outatime'] .rail { background: var(--brushed), var(--rail-bg); }
+[data-look='outatime'] :is(.settings-main h2, .tunnel-head b) { font-style: italic; font-weight: 800; letter-spacing: -0.3px; color: #ffb000; }
+[data-look='outatime'] .settings-main h2 { width: fit-content; padding-right: 4px; background: linear-gradient(180deg, #ffe680, #ff9a1a 55%, #ff4a1a); -webkit-background-clip: text; background-clip: text; color: transparent; }
+[data-look='outatime'] .settings-main h2::before { content: ''; display: inline-block; width: 10px; height: 10px; margin-right: 12px; vertical-align: 1px; border-radius: 50%; background: #fff; box-shadow: 0 0 6px 2px var(--flux), 0 0 14px 4px rgba(138, 216, 255, 0.5); }
+[data-look='outatime'] .project-head { color: #c8ccd2; letter-spacing: 2px; }
+[data-look='outatime'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #4a5058; background: var(--brushed), linear-gradient(#3a3f46, #24272b); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.12); }
+[data-look='outatime'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='outatime'] .seg button.on { border-color: var(--flux); color: #fff; }
+[data-look='outatime'] button.primary { border: none; background: var(--flux); color: #05121a; font-weight: 700; box-shadow: 0 0 12px rgba(138, 216, 255, 0.55); }
+[data-look='outatime'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #4a5058; background: #0a0b0d; }
+[data-look='outatime'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #4a5058; background: var(--brushed), #1c1f23; box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='outatime'] .menu-item:hover { background: #2a313a; }
+[data-look='outatime'] .ws.sel { background: #1a1d21; border-left-color: #3aff6a; box-shadow: inset 0 0 0 1px #3f444b; }
+[data-look='outatime'] .settings-nav button.on { background: #1a1d21; box-shadow: inset 2px 0 0 #3aff6a; }
+[data-look='outatime'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, #ffb000), 0 6px 10px -8px #ffb000; }
+[data-look='outatime'] .status { border-top: 2px solid #4a5058; background: #050505; text-shadow: 0 0 5px currentColor; }
+[data-look='outatime'] :is(.board-col, .board-card) { border-color: #3f444b; }
+[data-look='outatime'] .toggle.on .toggle-track { background: var(--flux); }
+[data-look='outatime'] .theme { border-color: #3f444b; }
+
+/* Grand Hotel: a pink mountain hotel in a symmetrical film. Striped wallpaper on the sidebar, Futura capitals spaced
+   wide, a pastry box tied with a blue ribbon before the headings, popups framed like the box's lid, the lobby boys'
+   purple for the main button and the selection's edge */
+[data-look='grandhotel'] { --radius: 3px; --ui-font: Futura, 'Avenir Next', 'Helvetica Neue', sans-serif; --plum: #7a3a8c; }
+[data-look='grandhotel'] :is(.sidebar, .settings-nav) { border-right: 2px solid #ddb3c0; background: repeating-linear-gradient(90deg, #f2d5dc 0 14px, #efcdd6 14px 28px); }
+[data-look='grandhotel'] :is(.settings-main h2, .tunnel-head b) { font-weight: 500; text-transform: uppercase; letter-spacing: 5px; color: var(--plum); }
+[data-look='grandhotel'] .settings-main h2::before { content: ''; display: inline-block; width: 16px; height: 13px; margin-right: 12px; vertical-align: 0;
+  background: linear-gradient(90deg, transparent 7px, #4a7ad0 7px 9px, transparent 9px), linear-gradient(transparent 5px, #4a7ad0 5px 7px, transparent 7px), #f4b8c8; box-shadow: inset 0 0 0 1px #c88aa0; }
+[data-look='grandhotel'] .project-head { color: var(--plum); letter-spacing: 3px; }
+[data-look='grandhotel'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #c890a8; background: #fff7f8; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11.5px; }
+[data-look='grandhotel'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='grandhotel'] .seg button.on { border-color: var(--plum); color: var(--plum); }
+[data-look='grandhotel'] button.primary { border: none; background: var(--plum); color: #fff; text-transform: uppercase; letter-spacing: 2px; box-shadow: inset 0 0 0 2px #7a3a8c, inset 0 0 0 3px #e9c6d0; }
+[data-look='grandhotel'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #ddb3c0; background: #fffbfc; }
+[data-look='grandhotel'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 2px solid #ddb3c0; background: #fff7f8; box-shadow: inset 0 0 0 4px #fff7f8, inset 0 0 0 5px #4a7ad0, 0 18px 44px rgba(59, 31, 58, 0.2); }
+[data-look='grandhotel'] .menu-item:hover { background: #f6dde4; }
+[data-look='grandhotel'] .ws.sel { background: #fff7f8; border-left-color: var(--plum); box-shadow: inset 0 0 0 1px #ddb3c0; }
+[data-look='grandhotel'] .settings-nav button.on { background: #fff7f8; box-shadow: inset 0 0 0 1px #ddb3c0, inset 2px 0 0 var(--plum); }
+[data-look='grandhotel'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--plum)); }
+[data-look='grandhotel'] .status { border-top: 3px double var(--plum); }
+[data-look='grandhotel'] :is(.board-col, .board-card) { border-color: #ddb3c0; }
+[data-look='grandhotel'] .toggle.on .toggle-track { background: var(--plum); }
+[data-look='grandhotel'] .theme { border-color: #ddb3c0; }
+
+/* Replicant: a city in orange smog. A haze from amber to night teal behind everything, thin capitals spaced wide,
+   outlined amber buttons, the holograms' teal on the selected tab, a glow from the top of the terminals */
+[data-look='replicant'] { --radius: 2px; --ui-font: Futura, 'Avenir Next', 'Helvetica Neue', sans-serif; --amber: #ff9a3a; --holo: #4ad8e8; }
+[data-look='replicant'] :is(.sidebar, .settings-nav) { border-right: 1px solid rgba(255, 154, 58, 0.25); }
+[data-look='replicant'] :is(.settings-main h2, .tunnel-head b) { font-weight: 400; text-transform: uppercase; letter-spacing: 7px; color: #ffe6cc; text-shadow: 0 0 14px rgba(255, 154, 58, 0.45); }
+[data-look='replicant'] .settings-main h2::before { content: ''; display: inline-block; width: 22px; height: 1px; margin-right: 12px; vertical-align: 6px; background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+[data-look='replicant'] .project-head { color: var(--amber); letter-spacing: 3px; }
+[data-look='replicant'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid rgba(255, 154, 58, 0.45); background: rgba(255, 154, 58, 0.05); letter-spacing: 1px; }
+[data-look='replicant'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='replicant'] .seg button.on { background: rgba(255, 154, 58, 0.18); color: #fff4e8; }
+[data-look='replicant'] button.primary { border: none; background: var(--amber); color: #1a0c04; font-weight: 600; letter-spacing: 1.5px; text-transform: uppercase; }
+[data-look='replicant'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: rgba(255, 154, 58, 0.3); background: rgba(10, 8, 6, 0.6); }
+[data-look='replicant'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid rgba(255, 154, 58, 0.35); background: #1a130d; box-shadow: 0 0 24px rgba(255, 154, 58, 0.12), 0 20px 50px rgba(0, 0, 0, 0.8); }
+[data-look='replicant'] .menu-item:hover { background: rgba(255, 154, 58, 0.16); }
+[data-look='replicant'] .ws.sel { background: linear-gradient(90deg, rgba(255, 154, 58, 0.22), transparent); border-left-color: var(--amber); }
+[data-look='replicant'] .settings-nav button.on { background: rgba(255, 154, 58, 0.16); box-shadow: inset 2px 0 0 var(--amber); }
+[data-look='replicant'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--holo)), 0 6px 12px -8px var(--holo); }
+[data-look='replicant'] .status { border-top: 1px solid rgba(74, 216, 232, 0.3); }
+[data-look='replicant'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 70% -10%, rgba(255, 154, 58, 0.1), transparent 60%); }
+[data-look='replicant'] :is(.board-col, .board-card) { border-color: rgba(255, 154, 58, 0.25); }
+[data-look='replicant'] .toggle.on .toggle-track { background: var(--amber); }
+[data-look='replicant'] .theme { border-color: #4a3220; }
 @media (prefers-reduced-motion: reduce) { [data-look='monolith'] .settings-main h2::before { animation: none; } }
 
 /* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
@@ -1986,7 +2287,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
   [data-look='manuscript'], [data-look='modular'], [data-look='neon'], [data-look='notebook'], [data-look='quest'],
   [data-look='riso'], [data-look='sakura'], [data-look='shibuya'], [data-look='sonar'], [data-look='starship'],
   [data-look='terrarium'], [data-look='tiki'], [data-look='topo'], [data-look='transit'], [data-look='washi'],
-  [data-look='workshop'])
+  [data-look='workshop'], [data-look='overworld'], [data-look='pellet'], [data-look='warp'])
   { --seg-gap: 4px; --seg-overlap: 0px; }
 
 /* an icon on a bar a look colors its own way (starship's black on its light heads, a status bar of another color):
@@ -2021,6 +2322,8 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='cockpit'] { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 50%, transparent); --ws-indent: 14px; }
 [data-look='chamber'] { --ws-guide: 2px solid #1f9bff; }
 :is([data-look='monolith'], [data-look='islander']) { --ws-guide: none; --proj-divider: none; --ws-h: 30px; } /* bare, roomy */
+[data-look='pellet'] { --ws-guide: 2px solid #2121de; } /* the maze's wall */
+:is([data-look='spartan'], [data-look='vault']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
 
 /* the right panels' edge (Files…, the info panel) as the look draws the sidebar's, mirrored: both are dragged the same way */
 [data-look='neon'] :is(.side-panel, .info) { border-left-color: color-mix(in srgb, var(--accent) 35%, transparent); }

@@ -939,6 +939,7 @@ export type ResourcesApi = {
   open: (tab: string) => void
   procs?: () => Promise<{ pid: number; name: string; stop?: string }[]> // the app's: what each process holds (main's)
   stop?: (what: string) => void // free one: the video, a widget, the preview, the bubbles, an agent browser
+  stopOther?: (key: string) => Promise<unknown> // end one the daemon runs: Laki AI's ask, a tunnel, remote access
   widgetName: (id: string) => string
 }
 const SLEEP: [number, string][] = [[0, 'Never'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']]
@@ -989,7 +990,8 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
   const own = total(app)
   const live = (r?.tabs ?? []).filter(x => tabOf(x.tab))
   const rows = live.filter(x => !tabOf(x.tab)!.asleep).sort((a, b) => b.rss - a.rss) // an asleep one still exiting: its own row, below
-  const all = own + total(held) + total(live)
+  const others = r?.others ?? [] // what the daemon runs besides tabs: Laki AI, tunnels, remote access, SSH, widgets
+  const all = own + total(held) + total(live) + total(others)
   // what the sidebar's Terminals and Browsers hold: shell tabs (anywhere), Browsers pages and their sign-in windows
   const shells = total(live.filter(x => tabOf(x.tab)!.kind === 'shell'))
   const browsers = total(held.filter(p => p.name.includes('Browser: ')))
@@ -1013,7 +1015,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
       <h2>Resources</h2>
       <p className="muted small">
         Memory and CPU now, every 3 seconds while this is open. macOS counts every process Laki starts as Laki's: each agent, its MCP servers, the dev
-        servers in its tabs. An agent grows the longer it runs; sleeping it gives that back. The video, JS widgets, the preview, the floating bubbles,
+        servers in its tabs, Laki AI's agent, tunnels, remote access, SSH connections and widgets' fetches. An agent grows the longer it runs; sleeping it gives that back. The video, JS widgets, the preview, the floating bubbles,
         an agent browser and the sidebar's browser pages each run in a process of their own: Stop frees one until it's opened again (a browser's: the
         pages you aren't on).
       </p>
@@ -1028,6 +1030,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
                 Laki itself {size(own + total(held) - browsers)} · agents and tabs {size(total(live) - shells)}
                 {shells > 0 && ` · shells ${size(shells)}`}
                 {browsers > 0 && ` · browsers ${size(browsers)}`}
+                {others.length > 0 && ` · Laki AI and connections ${size(total(others))}`}
               </span>
             </div>
             <div className="res-rows">
@@ -1047,6 +1050,22 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
                     ),
                   )}
                   {open === `pid:${p.pid}` && <Procs ps={[p]} />}
+                </div>
+              ))}
+              {others.map(o => (
+                <div key={o.procs[0]?.pid ?? o.name}>
+                  {row(
+                    `other:${o.procs[0]?.pid}`,
+                    o.name,
+                    o.rss,
+                    o.cpu,
+                    o.stop && api.stopOther && (
+                      <button className="small" data-tip={o.stop === 'ai' ? 'Stops its answer' : 'Ends it: the link stops working'} onClick={() => api.stopOther!(o.stop!).then(() => setSaid(''), e => setSaid((e as Error).message))}>
+                        Stop
+                      </button>
+                    ),
+                  )}
+                  {open === `other:${o.procs[0]?.pid}` && <Procs ps={o.procs} />}
                 </div>
               ))}
               {rows.map(x => {
@@ -1580,7 +1599,7 @@ export function SettingsPage(p: {
   const [spot, setSpot] = useState<{ title: string; n: number; group?: boolean }>() // the setting a result goes to; group: a whole card
   useEffect(() => void (p.spot && setSpot({ title: p.spot, n: Date.now(), group: true })), [p.spot])
   const favs = (s.favThemes ?? []).filter(id => THEMES.some(t => t.id === id)) // starred: their own group, first
-  const shownThemes = [...THEMES].reverse().filter(t => t.name.toLowerCase().includes(themeQ.trim().toLowerCase())) // the newest first
+  const shownThemes = [...THEMES].reverse().filter(t => `${t.name} ${t.aka ?? ''}`.toLowerCase().includes(themeQ.trim().toLowerCase())) // the newest first; by name, or what it's after
   // a section picked opens at its top, the one already open too (a Find result scrolls to its setting instead)
   const openSec = (id: string) => (setSec(id), document.querySelector('.settings-main')?.scrollTo(0, 0))
   const set = (k: Partial<AppSettings>) => setS(x => ({ ...x, ...k }))
@@ -2172,7 +2191,7 @@ export function SettingsPage(p: {
               </div>
               </Group>
               <Group title="Theme" hint="Terminals use the Terminal section's font. Themes marked ✦ also change shapes, borders and type.">
-              <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
+              <input type="search" className="theme-find" value={themeQ} placeholder={`Find a theme by name, game or film (${THEMES.length})`} spellCheck={false} onChange={e => setThemeQ(e.target.value)} />
               {!shownThemes.length && <div className="muted small">No theme called “{themeQ.trim()}”.</div>}
               {(
                 [

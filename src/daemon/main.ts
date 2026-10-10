@@ -169,6 +169,15 @@ const api: Record<string, Handler> = {
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
   usage: () => usage(core.state.settings?.usage),
   resources: () => core.resources(),
+  // Resources' Stop for what the daemon runs (resources' others): Laki AI's ask, a tunnel, remote access
+  resourceStop: p => {
+    const k = String(p.key ?? '')
+    const t = k.match(/^tunnel:(.+):(\d+)$/)
+    if (k === 'ai') return aiStop()
+    if (k === 'remote') return core.remoteStop()
+    if (t) return core.tunnelStop({ ws: t[1], port: Number(t[2]) })
+    throw new Error(`nothing to stop called ${k}`)
+  },
   sleepTick: p => core.sleepTick(p?.now), // tests move the clock
   tabSleep: p => core.sleepNow(p.tab),
   tabWake: p => core.wake(p.tab), // a pane already on it: a look doesn't attach again

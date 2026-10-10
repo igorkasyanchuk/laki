@@ -20,6 +20,13 @@ version it builds, with the date. -->
   IBM Plex Sans, Roboto, Manrope, Source Sans 3, Fira Sans).
 - **More interface fonts**: Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans and Manrope, and the developer
   fonts Geist Mono, IBM Plex Mono, Fira Code, Cascadia Code, Source Code Pro and Roboto Mono (Settings › Appearance).
+- **Resources counts everything Laki runs**: Laki AI's agent, tunnels, remote access, SSH connections and widgets'
+  fetches each get a row (Stop ends the AI's answer, a tunnel or remote access).
+- **Find a theme by game or film**: *winamp*, *halo*, *fallout*, *star wars*… in Settings › Appearance's theme finder.
+- **12 new themes after games and films**: Llama Amp (a 1998 music player), Spartan (a power-armour HUD), Vault
+  Dweller (a wrist computer's green screen), Overworld (a block world), Rip & Tear (hell's red), Warp Pipe (a plumber's
+  sky), Power Pellet (a maze arcade), Hyperspace (a space opera), Spice (a desert planet), Outatime (a time machine),
+  Grand Hotel (a pink mountain hotel) and Replicant (orange smog), each with its own look.
 - **The rail only**: *One sidebar* is gone from Settings › Appearance; the rail's *Labels* switch stays (a phone still has
   its one drawer).
 - **Tabs named by their task**: another agent tab in a workspace is named by its prompt's first words (`claude: fix

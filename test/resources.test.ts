@@ -1,5 +1,7 @@
 // Resources: memory by tab; idle agents put to sleep (settings.sleepAfter) and resumed by a message or a look.
 import assert from 'node:assert/strict'
+import { symlinkSync } from 'node:fs'
+import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, running, sleep, until } from './helpers.ts'
 
@@ -62,4 +64,20 @@ test('resources lists each tab and its processes; an idle agent sleeps, and a me
   await until(() => c.events.some(e => e.ev === 'exit' && e.tab === tab.id && e.code === -1), 'told to attach again')
   await until(() => starts().length === n + 2, 'resumed on a key')
   c.close()
+})
+
+test("resources lists what the daemon runs besides tabs, named, and Stop ends a tunnel", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  await rig.rpc('tunnelStart', { ws: ws.id, port: 5173 })
+  const row = (r: any) => r.others?.find((o: any) => o.stop === `tunnel:${ws.id}:5173`)
+  const tn = row(await rig.rpc('resources'))
+  assert.ok(tn && /^Expose to the world · .* :5173$/.test(tn.name) && tn.procs.some((x: any) => /cloudflared/.test(x.cmd)), JSON.stringify(tn))
+  assert.ok(!(await rig.rpc('resources')).app.some((x: any) => x.pid === tn.procs[0].pid)) // not Laki itself's too
+  await assert.rejects(rig.rpc('resourceStop', { key: 'nope' }), /nothing to stop called nope/)
+  await rig.rpc('resourceStop', { key: tn.stop })
+  assert.deepEqual((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).tunnels ?? [], [])
+  await until(async () => !row(await rig.rpc('resources')), 'its cloudflared gone')
 })

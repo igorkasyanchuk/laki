@@ -767,6 +767,7 @@ async function connect(host: string): Promise<HostRun> {
   const mine = hosts.get(host) // this connection's (hostUp set it before the first await)
   let up = false
   const master = spawn('ssh', ['-M', '-N', '-S', ctl, '-o', 'BatchMode=yes', '-o', 'ConnectTimeout=15', '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=4', host], { stdio: ['ignore', 'ignore', 'pipe'] })
+  own(master, `SSH · ${host}`)
   let err = ''
   let gone = false
   master.stderr!.on('data', d => (err = (err + d).slice(-4000)))
@@ -2330,9 +2331,10 @@ export async function cloudflared(o: { ws?: string } = {}): Promise<{ version?: 
 // cloudflared publishing target (with mails: only those, after a one-time code from Cloudflare Access). url resolves
 // once it prints one (undefined: stopped first) or fails with its output; ended: it went after giving the URL.
 type Cf = { stop: () => void }
-function cloudflare(target: string, mails: string[], ended: (why: string) => void): { cf: Cf; url: Promise<string | undefined> } {
+function cloudflare(target: string, mails: string[], ended: (why: string) => void, who: [name: string, stop: string]): { cf: Cf; url: Promise<string | undefined> } {
   // the values go in as arguments of their own (=), so one starting with - is no flag
   const proc = spawn('cloudflared', ['tunnel', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], { stdio: ['ignore', 'pipe', 'pipe'] })
+  own(proc, ...who)
   let stopped = false
   const cf = { stop: () => ((stopped = true), proc.kill()) }
   const url = new Promise<string | undefined>((resolve, reject) => {
@@ -2393,7 +2395,7 @@ export async function tunnelStart(o: { ws: string; port: number; mails?: string[
     tunnels.delete(key)
     changed()
   }
-  const { cf, url } = cloudflare(`http://localhost:${port}`, mails, why => (log(`tunnel ${key} ended (${why})`), drop()))
+  const { cf, url } = cloudflare(`http://localhost:${port}`, mails, why => (log(`tunnel ${key} ended (${why})`), drop()), [`Expose to the world · ${ws.name ?? ws.id} :${port}`, `tunnel:${key}`])
   const t: TunnelRun = { ws: ws.id, port, mails, cf }
   tunnels.set(key, t)
   changed()
@@ -2447,7 +2449,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
   if (remote) return remoteView()
   await cfReady(!open)
   if (remote) return remoteView() // started meanwhile
-  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, open ? [] : [mail], why => (log(`remote access ended (${why})`), remoteStop()))
+  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, open ? [] : [mail], why => (log(`remote access ended (${why})`), remoteStop()), ['Remote access', 'remote'])
   const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf }
   remote = r
   changed()
@@ -3073,9 +3075,21 @@ function trees(rows: PsRow[]) {
 const use = ({ pid, rss, cpu, cmd }: PsRow): ProcUse => ({ pid, rss, cpu, cmd })
 const sum = (ps: PsRow[], k: 'rss' | 'cpu') => Math.round(ps.reduce((n, p) => n + p[k], 0) * 10) / 10
 
+// what this daemon runs besides tabs, by pid, for Resources: Laki AI's agent, a tunnel, remote access, an SSH host's
+// connection, a widget's fetch; stop: main.ts' resourceStop key. Dropped as it exits
+const owned = new Map<number, { name: string; stop?: string }>()
+export function own(c: ChildProcess, name: string, stop?: string) {
+  const pid = c.pid
+  if (!pid) return
+  owned.set(pid, { name, ...(stop && { stop }) })
+  c.once('exit', () => owned.delete(pid))
+}
+
 // macOS counts everything Laki starts as Laki's: each tab's agent, its MCP servers, its dev servers. Laki's own are the
-// app bundle's processes (main, windows, GPU, network…; none in dev, on plain node) and this daemon.
-// ponytail: a process that left its tab's tree (a double fork) shows nowhere
+// app bundle's processes (main, windows, GPU, network…; none in dev, on plain node), this daemon and the short commands
+// it runs (git, gh, lsof: in app, as their names); what own named is others, a row each.
+// ponytail: a process that left its tab's tree (a double fork) shows nowhere, nor main's own short helpers (screencapture,
+// afplay), nor, for a refresh, a closed tab's still exiting
 export async function resources(): Promise<Resources> {
   const rows = await psAll()
   const tree = trees(rows)
@@ -3085,13 +3099,26 @@ export async function resources(): Promise<Resources> {
     return [{ tab, rss: sum(ps, 'rss'), cpu: sum(ps, 'cpu'), procs: ps.map(use) }]
   })
   const mine = new Set([process.pid, ...tabs.flatMap(t => t.procs.map(p => p.pid))])
+  const others: NonNullable<Resources['others']> = []
+  const rest: PsRow[] = []
+  for (const k of rows.filter(r => r.ppid === process.pid && !mine.has(r.pid) && !r.cmd.startsWith('ps -axo '))) {
+    const ps = tree(k.pid)
+    const o = owned.get(k.pid)
+    if (o) others.push({ ...o, rss: sum(ps, 'rss'), cpu: sum(ps, 'cpu'), procs: ps.map(use) })
+    else rest.push(...ps)
+  }
+  for (const o of others) for (const p of o.procs) mine.add(p.pid)
+  for (const r of rest) mine.add(r.pid)
   const bundle = process.execPath.match(/^(.*?\.app)\//)?.[1]
   const kind = (cmd: string) => cmd.match(/--utility-sub-type=(\w+)/)?.[1] ?? cmd.match(/--type=([\w-]+)/)?.[1] ?? 'main'
-  const app = bundle ? rows.filter(r => r.cmd.startsWith(`${bundle}/`) && !mine.has(r.pid)).map(r => ({ ...use(r), kind: kind(r.cmd) })) : []
+  const app = [
+    ...(bundle ? rows.filter(r => r.cmd.startsWith(`${bundle}/`) && !mine.has(r.pid)).map(r => ({ ...use(r), kind: kind(r.cmd) })) : []),
+    ...rest.map(r => ({ ...use(r), kind: basename(r.cmd.split(' ')[0]) })), // a moment's git or gh: Laki's own work
+  ]
   const me = rows.find(r => r.pid === process.pid)
   const mem = process.memoryUsage()
   const kb = (b: number) => Math.round(b / 1024)
-  return { app, daemon: { ...(me ? use(me) : { pid: process.pid, rss: kb(mem.rss), cpu: 0, cmd: process.argv.join(' ') }), heap: kb(mem.heapUsed) }, tabs }
+  return { app, daemon: { ...(me ? use(me) : { pid: process.pid, rss: kb(mem.rss), cpu: 0, cmd: process.argv.join(' ') }), heap: kb(mem.heapUsed) }, tabs, others }
 }
 
 // An idle claude or codex nobody looks at, quiet for settings.sleepAfter minutes, is put to sleep: its process ends
