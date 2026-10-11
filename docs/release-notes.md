@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.11.0 · Oct 11, 2026
 
 - **Linux and Windows through WSL (preview)**: `npm run pack:linux` builds an AppImage in Docker and runs the tests and
   a smoke test against it; the window has the system's title bar, and closing it quits (the daemon and its agents keep
