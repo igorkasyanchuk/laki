@@ -62,7 +62,7 @@ button.on { border-color: var(--accent); color: var(--accent-ink); }
 button:disabled { opacity: 0.5; cursor: default; }
 button.icon { background: none; border: none; font-size: 17px; line-height: 1; padding: 2px 7px; color: var(--muted); }
 button.icon:hover { color: var(--fg); background: var(--hover); }
-button.icon.small { font-size: 14px; padding: 0 5px; }
+button.icon.small { font-size: 14px; padding: 0 5px; min-width: 20px; min-height: 20px; }
 button.link { background: none; border: none; color: var(--accent-ink); padding: 0 4px; }
 input, select, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; outline: none; width: 100%; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
@@ -101,7 +101,7 @@ textarea { resize: vertical; font-family: inherit; }
 .rail-kind.on .rail-icon { background: color-mix(in srgb, var(--accent) 24%, transparent); color: var(--accent-ink); }
 .rail-kind:focus-visible { outline: none; }
 .rail-kind:focus-visible .rail-icon { outline: 2px solid var(--accent); outline-offset: 1px; }
-.rail-count { position: absolute; top: -4px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; border: 2px solid var(--rail-bg); background: var(--waiting); color: var(--on-waiting); font-size: 9.5px; font-weight: 700; line-height: 13px; text-align: center; }
+.rail-count { position: absolute; top: -4px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; border: 2px solid var(--rail-bg); background: var(--waiting); color: var(--on-waiting); font-size: 10px; font-weight: 700; line-height: 13px; text-align: center; }
 .rail-dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--running); }
 .rail-dot.bad { background: var(--error); }
 /* the sidebar's filter, under its head */
@@ -332,7 +332,7 @@ textarea { resize: vertical; font-family: inherit; }
 .tabbar > .tab:not(.sel):hover::after, .tabbar > .tab:hover + .tab::after { display: none; }
 .electron.side-closed .tabbar { padding-left: 76px; }
 .tabbar > .side-show { margin: 0 6px 0 0; }
-.tab .x { background: none; border: none; padding: 0 4px; color: var(--muted); visibility: hidden; }
+.tab .x { background: none; border: none; padding: 0 4px; min-width: 20px; min-height: 20px; color: var(--muted); visibility: hidden; }
 .tab:hover .x, .tab.sel .x { visibility: visible; }
 .tab:is(:hover, .sel) .x { color: color-mix(in srgb, currentColor 75%, transparent); } /* the tab's own text color: a look's bright or dark tab keeps it readable */
 .tabbar > .ib { align-self: center; margin-left: 2px; }
@@ -359,6 +359,9 @@ textarea { resize: vertical; font-family: inherit; }
 .empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--muted); }
 .status { height: 22px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); background: var(--side); font-family: var(--mono); white-space: nowrap; min-width: 0; overflow: hidden; }
 .status .pr { border: none; background: none; padding: 0; }
+/* every control in the bar at least 20px (macOS's smallest), the icon-only ones that wide too */
+.status button { min-height: 20px; }
+.status :is(.usage-btn, .tunnel-btn, .port-stop) { min-width: 20px; justify-content: center; }
 .status .pr.pr-attach { color: var(--muted); }
 .status .pr.pr-attach:hover { color: var(--accent-ink); }
 .warn-soft { color: var(--waiting); }
@@ -682,10 +685,10 @@ kbd { font-family: var(--mono); }
 .fold-body .md > :last-child { margin-bottom: 0; }
 .fold-body .md :is(p, ul, ol, blockquote, pre, .md-table) { margin-bottom: 0.6em; }
 .fold-body .md :is(h1, h2, h3, h4, h5, h6) { font-size: 1.05em; margin: 0.8em 0 0.3em; padding: 0; border: 0; }
-button.fold-more { padding: 0; font-size: 12px; }
+button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .pr-sec :is(button, a[href]):focus-visible, .sp-thread-head:focus-visible, .sp-resolved summary:focus-visible, .fold-more:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 .pr-status { display: inline-flex; align-items: center; gap: 8px; }
-.toggle { display: inline-flex; align-items: center; gap: 5px; background: none; border: none; padding: 0; color: var(--muted); font: inherit; }
+.toggle { display: inline-flex; align-items: center; gap: 5px; min-height: 20px; background: none; border: none; padding: 0; color: var(--muted); font: inherit; }
 .toggle:hover { background: none; color: var(--fg); }
 .toggle.on { color: var(--fg); }
 .toggle-track { position: relative; width: 22px; height: 12px; border-radius: 6px; background: var(--line); transition: background 0.15s; }
@@ -1452,3 +1455,7 @@ button.board-name:hover { background: none; }
 .mem-foot .ib { opacity: 0; transition: opacity 0.12s; }
 .mem:is(:hover, :focus-within) .mem-foot .ib { opacity: 1; }
 @media (hover: none) { .mem-foot .ib { opacity: 1; } }
+/* keyboard focus in the accent, as macOS draws it (inputs show theirs on the border); a component's own ring wins */
+:where(button, a[href], summary, [tabindex]:not([tabindex='-1'], input, textarea, select)):focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* macOS's Reduce motion: no transitions, and animations end where they would (the per-component rules above too) */
+@media (prefers-reduced-motion: reduce) { *, ::before, ::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important; } }

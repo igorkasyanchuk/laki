@@ -23,7 +23,7 @@ import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, clock, mergeActions, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
-import { applyTheme, blurred, css, type Paint, paintKey, paintOf, transparent } from './themes'
+import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
@@ -98,6 +98,8 @@ const media = (q: string) => {
 }
 const NARROW = media('(max-width: 640px)') // under the app window's minWidth (700): phones and narrow browsers only
 const TOUCH = media('(pointer: coarse)')
+const LESS = media(LESS_CLEAR) // macOS's Reduce transparency and Increase contrast: applyTheme reads them, App repaints
+const MORE = media(MORE_CONTRAST)
 
 // keys a phone's keyboard lacks, typed into the focused pane (claude and codex ask with arrows, Esc, ⇧⇥)
 const KEYS: [string, string][] = [['esc', '\x1b'], ['tab', '\t'], ['⇧tab', '\x1b[Z'], ['^C', '\x03'], ['←', '\x1b[D'], ['↑', '\x1b[A'], ['↓', '\x1b[B'], ['→', '\x1b[C'], ['⏎', '\r']]
@@ -385,7 +387,9 @@ export function App() {
 
   // the theme, painted before the terminals read it (their effects run before ours)
   const paint = paintOf(view?.settings)
-  const theme = paintKey(paint) // terminals repaint when it changes
+  const lessClear = useSyncExternalStore(LESS.on, LESS.now)
+  const moreContrast = useSyncExternalStore(MORE.on, MORE.now)
+  const theme = paintKey(paint) + (lessClear ? ' less' : '') + (moreContrast ? ' more' : '') // terminals repaint when it changes
   const painted = useRef<string | null>(null)
   const glassed = useRef<boolean | null>(null)
   if (view && painted.current !== theme) {

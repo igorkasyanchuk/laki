@@ -2215,7 +2215,7 @@ export function SettingsPage(p: {
                   <Says title="Glass" hint="A see-through window: the desktop shows through, blurred" />
                 </Switch>
                 {(s.glass || (s.sideClear ?? 0) > 0) && matchMedia('(prefers-reduced-transparency: reduce)').matches && (
-                  <div className="muted small">macOS's Reduce transparency is on, so its blur is plain grey: turn it off in System Settings › Accessibility › Display.</div>
+                  <div className="muted small">macOS's Reduce transparency is on, so the window stays solid: turn it off in System Settings › Accessibility › Display.</div>
                 )}
                 {s.glass && (
                   <>

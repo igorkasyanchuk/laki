@@ -923,13 +923,23 @@ async function quitCompletely() {
   app.quit()
 }
 
-// no ⌘W/⌘N/⌘T/⌘K accelerators: the renderer owns those keys
+// the renderer owns ⌘W/⌘N/⌘T/⌘K…: the menu shows each key without registering it (the key still goes to App's
+// keys), and a click sends it there as browser-key, as a Browsers page does
+// ponytail: Toggle Sidebar has one title; Show/Hide by its state would need the renderer to rebuild the menu
+const key = (label: string, accelerator: string, k: string): MenuItemConstructorOptions => ({
+  label,
+  accelerator,
+  registerAccelerator: false,
+  click: () => (show(), win?.webContents.send('browser-key', k)),
+})
 Menu.setApplicationMenu(
   Menu.buildFromTemplate([
     {
       label: app.name,
       submenu: [
         { label: `About ${app.name}`, click: () => openLink('laki://about') }, // the renderer's: with the website
+        { type: 'separator' },
+        key('Settings…', 'CmdOrCtrl+,', ','),
         { type: 'separator' },
         { role: 'services' },
         { type: 'separator' },
@@ -941,13 +951,70 @@ Menu.setApplicationMenu(
         { label: `Quit ${app.name} Completely`, click: quitCompletely },
       ],
     },
-    { role: 'editMenu' },
-    { label: 'View', submenu: [{ role: 'reload' }, { role: 'toggleDevTools' }, { type: 'separator' }, { role: 'togglefullscreen' }] },
-    { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }] },
+    {
+      label: 'File',
+      submenu: [
+        key('New Workspace…', 'CmdOrCtrl+N', 'n'),
+        key('New Tab', 'CmdOrCtrl+T', 't'),
+        key('Open Project Folder…', 'CmdOrCtrl+O', 'o'),
+        { type: 'separator' },
+        key('Go to File…', 'CmdOrCtrl+P', 'p'),
+        key('Open in Editor', 'CmdOrCtrl+E', 'e'),
+        { type: 'separator' },
+        key('Close Tab', 'CmdOrCtrl+W', 'w'),
+      ],
+    },
+    {
+      label: 'Edit',
+      submenu: [
+        { role: 'undo' },
+        { role: 'redo' },
+        { type: 'separator' },
+        { role: 'cut' },
+        { role: 'copy' },
+        { role: 'paste' },
+        { role: 'pasteAndMatchStyle' },
+        { role: 'delete' },
+        { role: 'selectAll' },
+        { type: 'separator' },
+        key('Find…', 'CmdOrCtrl+F', 'f'),
+      ],
+    },
+    {
+      label: 'View',
+      submenu: [
+        key('Toggle Sidebar', 'CmdOrCtrl+B', 'b'),
+        key('Workspace Info', 'CmdOrCtrl+I', 'i'),
+        key('Changes', 'CmdOrCtrl+D', 'd'),
+        { type: 'separator' },
+        key('Command Palette…', 'CmdOrCtrl+K', 'k'),
+        { type: 'separator' },
+        key('Bigger', 'CmdOrCtrl+Plus', '='),
+        key('Smaller', 'CmdOrCtrl+-', '-'),
+        key('Default Font Size', 'CmdOrCtrl+0', '0'),
+        { type: 'separator' },
+        { role: 'togglefullscreen' },
+        { type: 'separator' },
+        { role: 'reload' },
+        { role: 'toggleDevTools' },
+      ],
+    },
+    {
+      label: 'Go',
+      submenu: [
+        key('Next That Needs You', 'CmdOrCtrl+J', 'j'),
+        key('Previous Workspace', 'CmdOrCtrl+Up', 'ArrowUp'),
+        key('Next Workspace', 'CmdOrCtrl+Down', 'ArrowDown'),
+        { type: 'separator' },
+        { label: 'Board', click: () => openLink('laki://board') },
+        { label: 'Scheduled Tasks', click: () => openLink('laki://schedules') },
+      ],
+    },
+    { label: 'Window', submenu: [{ role: 'minimize' }, { role: 'zoom' }, { type: 'separator' }, { role: 'front' }] },
     {
       role: 'help',
       submenu: [
-        { label: `${app.name} Help`, click: () => openLink('laki://help') },
+        key(`${app.name} Help`, 'CmdOrCtrl+/', '/'),
         { label: 'Get Started Again…', click: () => openLink('laki://onboard') }, // the first steps, after Don't show again too
       ],
     },

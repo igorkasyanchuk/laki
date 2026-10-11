@@ -4,6 +4,13 @@ version it builds, with the date. -->
 
 ## Next
 
+- **The menu bar has Laki's commands**: Laki › Settings… (⌘,), File (new workspace, new tab, open a project,
+  go to a file, close tab), Edit › Find…, View (sidebar, info, changes, palette, font size) and Go (the next that
+  needs you, previous and next workspace, Board, Scheduled tasks).
+- Laki follows macOS's *Increase contrast* (stronger hints and lines), *Reduce transparency* (no glass: the window
+  stays solid) and *Reduce motion* (no animations).
+- The keyboard's focus is a ring in the theme's accent, and the status bar's and tabs' small buttons are easier to
+  hit.
 - **Open in** is a submenu in a workspace's and a project's ⋯ menu: hover it, or → / ⏎.
 - **Three more colors** for workspaces, groups and tabs: lime, brown and gray.
 - **PR marks in the sidebar**: ✓ an open PR approved, ✓✓ approved by you too, 👀 you commented; each can be turned off,

@@ -1040,8 +1040,13 @@ const PAINT = ['theme', 'uiFont', 'accent', 'radius', 'glass', 'glassWindow', 'g
 export const paintOf = (s?: Paint): Paint => Object.fromEntries(PAINT.map(k => [k, s?.[k]]))
 export const paintKey = (p: Paint) => JSON.stringify(PAINT.map(k => p[k] ?? null))
 export const GLASS = { glassWindow: 45, glassSide: 60, glassTerm: 100 } // the sliders' defaults
+// macOS's Accessibility › Display: Reduce transparency turns glass and the see-through sidebar off (its blur would be
+// plain grey), Increase contrast makes secondary text and lines stronger; App repaints as either changes
+export const LESS_CLEAR = '(prefers-reduced-transparency: reduce)'
+export const MORE_CONTRAST = '(prefers-contrast: more)'
+const asked = (q: string) => !!globalThis.matchMedia?.(q).matches
 // the window's own blur (main's vibrancy): glass, or a see-through sidebar without it
-export const blurred = (o: Paint) => !!o.glass || (o.sideClear ?? 0) > 0
+export const blurred = (o: Paint) => !asked(LESS_CLEAR) && (!!o.glass || (o.sideClear ?? 0) > 0)
 // a color at pct% strength (of its own alpha, if it has one): #rrggbbaa from a hex (xterm reads only that), else color-mix
 function alpha(c: string, pct: number) {
   const m = /^(#[\da-f]{6})([\da-f]{2})?$/i.exec(c)
@@ -1087,7 +1092,7 @@ export const transparent = () => seeThrough
 
 // paints <html> with a theme (an unknown id is the default), or a whole Paint
 export function applyTheme(p: string | Paint = '') {
-  const o: Paint = typeof p === 'string' ? { theme: p } : p
+  const o: Paint = { ...(typeof p === 'string' ? { theme: p } : p), ...(asked(LESS_CLEAR) && { glass: false, sideClear: 0 }) }
   const t = THEMES.find(x => x.id === o.theme) ?? THEMES[0]
   const root = document.documentElement
   const st = root.style
@@ -1142,6 +1147,12 @@ export function applyTheme(p: string | Paint = '') {
     const side = t.c?.side ?? rootVar('--side')
     st.setProperty('--side', alpha(side, 100 - clear))
     st.setProperty('--rail-bg', rail(side, 100 - clear))
+  }
+  if (asked(MORE_CONTRAST)) {
+    // halfway to the text: hints and labels, and lines between things (the theme's, or glass's tint)
+    const fg = t.c?.fg ?? rootVar('--fg')
+    st.setProperty('--muted', `color-mix(in srgb, ${t.c?.muted ?? rootVar('--muted')} 50%, ${fg})`)
+    st.setProperty('--line', `color-mix(in srgb, ${st.getPropertyValue('--line') || t.c?.line || rootVar('--line')} 55%, ${fg})`)
   }
   if (!t.c || !t.ansi) return
   const { c, ansi: a } = t

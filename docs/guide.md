@@ -699,6 +699,8 @@ settings) and shows a server icon; the toolbar's ⋯ › *Copy path* gives `devb
 
 ### Keys
 
+The menu bar's File, Edit, View and Go menus list most of these, and Laki › Settings… is ⌘,.
+
 | key | |
 |---|---|
 | ⌘O | open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it |
@@ -727,6 +729,9 @@ settings) and shows a server icon; the toolbar's ⋯ › *Copy path* gives `devb
 | ⌘, | settings |
 | ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
 | ⌘+ / ⌘− / ⌘0 | terminal font bigger / smaller / default (Settings or Help open: their size) |
+
+Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
+stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motion* stops its animations.
 
 ## Settings
 
@@ -787,7 +792,7 @@ lit for a moment.
   window: the desktop shows through, blurred; sliders for how see-through the window (the main area), the sidebar (the rail too) and the
   terminals are, and *Glow*: the theme's colors lit from two corners behind it; every theme's rows, lines, hovers and
   selection turn into tints of its own text color over what shows through, never solid blocks; with macOS's *Reduce transparency* on
-  (System Settings › Accessibility › Display) the blur is plain grey, and Settings says so), without glass *Sidebar see-through*
+  (System Settings › Accessibility › Display) the window stays solid instead, and Settings says so), without glass *Sidebar see-through*
   (a slider, 0 by default: the sidebar and the rail let the desktop through, blurred, like macOS's own sidebars, their
   hovers, lines and selection tints as with glass; the rest stays solid), and the theme (newest first; yours is outlined and checked; hovering one shows it on
   the whole window until the mouse leaves the list; the box above them finds

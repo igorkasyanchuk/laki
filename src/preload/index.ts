@@ -8,7 +8,7 @@ contextBridge.exposeInMainWorld('laki', {
   browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
   onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),
   onBrowserTab: (cb: (url: string, front: boolean) => void) => ipcRenderer.on('browser-tab', (_e, url: string, front: boolean) => cb(url, front)), // a Browsers page's link to a new tab
-  onBrowserKey: (cb: (key: string) => void) => ipcRenderer.on('browser-key', (_e, key: string) => cb(key)), // ⌘W or ⌘T while a Browsers page has the keyboard
+  onBrowserKey: (cb: (key: string) => void) => ipcRenderer.on('browser-key', (_e, key: string) => cb(key)), // ⌘W or ⌘T while a Browsers page has the keyboard, or a menu bar item's key
   pickFolder: (): Promise<string | null> => ipcRenderer.invoke('pick-folder'),
   pathOf: (f: File): string => webUtils.getPathForFile(f), // a dropped file or folder
   openExternal: (url: string) => ipcRenderer.send('open-external', url),
