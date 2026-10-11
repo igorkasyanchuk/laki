@@ -478,6 +478,17 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   await assert.rejects(rig.rpc('skillSet', { agent: 'claude', on: true, skill: 'nope' }), /no skill/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'aider', on: true }), /no agent/)
   await assert.rejects(rig.rpc('skillSet', { agent: 'constructor', on: true }), /no agent/) // not an inherited key
+  // a daemon start writes an outdated one again (a Laki update), never one of another data dir
+  const wsk = join(rig.home, '.claude/skills/laki-widget/SKILL.md')
+  writeFileSync(wsk, 'old')
+  await rig.rpc('skillSet', { agent: 'codex', on: true })
+  const other = join(rig.home, '.codex/skills/laki')
+  writeFileSync(join(other, 'laki'), readFileSync(join(other, 'laki'), 'utf8').replace(`LAKI_HOME=${rig.data}`, 'LAKI_HOME=/elsewhere'))
+  writeFileSync(join(other, 'SKILL.md'), 'old')
+  await rig.stop()
+  await rig.start()
+  assert.match(readFileSync(wsk, 'utf8'), /^---\nname: laki-widget/)
+  assert.equal(readFileSync(join(other, 'SKILL.md'), 'utf8'), 'old')
 })
 
 test('ports of the workspace process tree, their names, stopping one; PR from gh, dev server', async t => {

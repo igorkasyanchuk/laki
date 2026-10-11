@@ -1,5 +1,5 @@
 import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, type NotifyAction, onLakiLink, openExternal } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
@@ -8,7 +8,7 @@ import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERG
 import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { AiPage } from './Ai'
-import { ProjectPage } from './Project'
+import { ProjectPage, type ProjectTab } from './Project'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
@@ -28,7 +28,7 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string } | { project: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -163,7 +163,7 @@ export function App() {
   })
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
-  const [menu, openMenu] = useMenu()
+  const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
   // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
   // window full screen too (main's, so Esc stays the terminal's)
@@ -187,6 +187,8 @@ export function App() {
       setPeek({ id, top: r.top, left: (el.closest('.sidebar') ?? el).getBoundingClientRect().right + 6 })
     }, !id ? 250 : peek ? 120 : 550)
   }
+  // a menu (a row's ⋯, a right click, any other) closes the card first
+  const openMenu: typeof showMenu = (e, items, align) => (clearTimeout(peekTimer.current), setPeek(null), showMenu(e, items, align))
   useEffect(() => {
     if (!peek) return
     const hide = (e: Event) => !(e.type === 'wheel' && peekBox.current?.contains(e.target as Node)) && (clearTimeout(peekTimer.current), setPeek(null))
@@ -1300,7 +1302,7 @@ export function App() {
       { label: 'Notes', icon: 'file', key: 'n', hint: p.notes?.trim() ? undefined : 'none yet', run: () => setDialog({ notes: p.id }) },
       ...(p.kind ? [] : sortItems(p.sort ?? 'manual', sort => call('projectSet', { id: p.id, sort: sort ?? 'manual' }))),
       null,
-      ...(p.kind ? [] : [{ label: 'Settings…', icon: 'settings', run: () => setDialog({ settings: p.id }) } as MenuItem]), // Terminals and Browsers have none
+      ...(p.kind ? [] : [{ label: 'Settings', icon: 'settings', key: 's', run: () => setDialog({ project: p.id, tab: 'settings' }) } as MenuItem]), // its page's Settings tab; Terminals and Browsers have none
       { label: 'Scheduled tasks…', icon: 'clock', hint: tasksOf(p.id), run: () => setDialog({ schedules: p.id }) },
       { label: 'Remove project', icon: 'trash', key: 'd', danger: true, run: () => void ask(`Remove project ${p.name}?`, { text: 'Its workspaces leave Laki; its files stay.', ok: 'Remove', danger: true }).then(y => void (y && call('projectRm', { id: p.id }).then(() => done(`Removed project ${p.name}`), () => {}))) },
       ...(archived.length ? [null, { head: 'Archived' }, ...archived.map(w => ({ label: wsName(w), icon: 'restore' as IconName, hint: 'restore', run: () => restore(w.id) }))] : []),
@@ -1439,6 +1441,7 @@ export function App() {
     const state = more ? rollup(wt) : 'idle' // the second line's
     const status = sideStyle === 'status' // an edge in its state's color, a line that fills with its agents' progress
     const pct = status ? Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)) : -1
+    const yes = prMarks(w.pr)
     const last = sideStyle === 'cards' ? wt.find(t => t.kind === 'agent' && t.last)?.last?.trim().replace(/\s+/g, ' ').slice(0, 300) : undefined // a card's: the agent's last answer
     return (
       <div
@@ -1452,10 +1455,12 @@ export function App() {
         onPointerEnter={e => e.pointerType === 'mouse' && !e.buttons && !narrow && !view.projects.find(p => p.id === w.project)?.kind && peekAt(w.id, e.currentTarget) /* Terminals and Browsers: no port, PR or agent to tell of */}
         onPointerLeave={() => peekAt()}
         onClick={() => (setWsId(w.id), (!pin && !find && rows.dragged()) || setDialog(null), narrow && setSideOpen(false)) /* a page over the main area (Settings, the new-workspace page…) gives way to it, not to a drag's end */}
-        onContextMenu={e => (setPeek(null), openMenu(e, wsMenu(w)))}
+        onContextMenu={e => openMenu(e, wsMenu(w))}
       >
         {w.browser !== undefined ? <Icon name="globe" size={11} /> /* a page: no tabs */ : <Glyph s={w.setup || going[w.id] ? 'running' : rollup(wt)} />}
+        {marksAt === 'start' && yes}
         <span className="ws-name">{wsName(w)}</span>
+        {marksAt === 'name' && yes}
         {going[w.id] && <span className="ws-going">{going[w.id]}…</span>}
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
         {queued > 0 && <span className="badge">+{queued}</span>}
@@ -1497,6 +1502,7 @@ export function App() {
             merged
           </span>
         )}
+        {marksAt === 'end' && yes}
         {w.pr && settings.prIcon !== false && (
           <span className={`ws-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
             {!w.pr.mine && <Avatar login={w.pr.author} size={16} />}
@@ -1524,6 +1530,31 @@ export function App() {
         {sideStyle === 'cards' && last && <div className="ws-last">{last}</div>}
         {status && <span className={`ws-line ${pct >= 0 ? 'pct' : ''}`} />}
       </div>
+    )
+  }
+  // an open PR's marks (settings.prMarks, each unset on): ✓ approved, ✓✓ approved by you too, 👀 you commented
+  const marksAt = settings.prMarks?.at ?? 'start'
+  const prMarks = (pr?: PR) => {
+    const m = settings.prMarks ?? {}
+    if (!pr || pr.state !== 'OPEN') return null
+    const ok = pr.review === 'APPROVED' || (!pr.review && !!pr.approved?.length) // GitHub's decision; none required: any approval
+    const two = ok && pr.approvedByMe && m.mine !== false
+    const one = ok && !two && m.approved !== false
+    const eyes = pr.commentedByMe && m.commented !== false
+    if (!one && !two && !eyes) return null
+    return (
+      <span className="ws-yes">
+        {(one || two) && (
+          <span data-tip={`PR #${pr.number} approved${pr.approved?.length ? ` by ${pr.approved.join(', ')}` : ''}${two ? ' (you too)' : ''}`}>
+            <Icon name={two ? 'checks' : 'check'} size={11} />
+          </span>
+        )}
+        {eyes && (
+          <span className="ws-eyes" data-tip={`You commented on PR #${pr.number}`}>
+            👀
+          </span>
+        )}
+      </span>
     )
   }
   // the card over a row (peek): its state and agents, the agent's last answer, its PR (author, checks, review, lines),
@@ -1592,7 +1623,7 @@ export function App() {
           <button onClick={() => (setPeek(null), setWsId(w.id), setDialog(null))}>Open</button>
           {pr && <button onClick={() => openExternal(pr.url)}>PR #{pr.number} on GitHub</button>}
           <span className="spacer" />
-          <IconButton icon="more" title="Workspace" onClick={e => (setPeek(null), openMenu(e, wsMenu(w)))} />
+          <IconButton icon="more" title="Workspace" onClick={e => openMenu(e, wsMenu(w))} />
         </div>
       </div>
     )
@@ -1882,7 +1913,7 @@ export function App() {
             </>
           )}
           <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
-          {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › General)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
+          {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
           <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
           {!rail && (
             <>
@@ -2118,6 +2149,8 @@ export function App() {
             key={p.id}
             project={p}
             schedules={view.schedules?.filter(s => s.project === p.id) ?? []}
+            tab={dialog.tab}
+            onTab={tab => setDialog({ project: p.id, tab })}
             onClose={() => setDialog(null)}
             api={{
               save: o => call('projectSet', { id: p.id, ...o }),

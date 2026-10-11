@@ -561,7 +561,14 @@ test("who reviewed a PR (each one's last approval or ask for changes; a comment 
   const pr = { number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', statusCheckRollup: [], reviews: [review('ann', 'APPROVED'), review('bob', 'CHANGES_REQUESTED'), review('ann', 'COMMENTED'), review('cy', 'COMMENTED'), review('dee', 'APPROVED'), review('dee', 'DISMISSED')] }
   writeFileSync(join(gh, 'pr.json'), JSON.stringify(pr))
   const got = await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
-  assert.deepEqual([got.approved, got.changes], [['ann'], ['bob']])
+  assert.deepEqual([got.approved, got.changes, got.approvedByMe, got.commentedByMe], [['ann'], ['bob'], undefined, undefined])
+  // you (the fake gh's user, me): your approval, your comment; none of it on your own PR
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, reviews: [...pr.reviews, review('me', 'APPROVED')], comments: [{ author: { login: 'me' } }] }))
+  const mine = await until(async () => ((p => p?.approvedByMe && p)((await rig.rpc('state')).workspaces[0].pr)), 'approved by me')
+  assert.deepEqual([mine.approved, mine.commentedByMe], [['ann', 'me'], true])
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, author: { login: 'me' }, reviews: [review('me', 'COMMENTED')] }))
+  const own = await until(async () => ((p => p?.mine && p)((await rig.rpc('state')).workspaces[0].pr)), 'my own PR')
+  assert.deepEqual([own.approvedByMe, own.commentedByMe], [undefined, undefined])
   writeFileSync(join(gh, 'pr.json'), JSON.stringify({ ...pr, reviews: [] }))
   await until(async () => !(await rig.rpc('state')).workspaces[0].pr.approved, 'none now')
 

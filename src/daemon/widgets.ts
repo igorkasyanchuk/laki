@@ -4,7 +4,7 @@
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
 import { execFile } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -22,7 +22,7 @@ type Spec = { type?: string; label?: string; hint?: string; default?: unknown; c
 type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string> }
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed)
-type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; config?: Record<string, string>; data?: unknown; at?: number; error?: string }
+type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai' } // by: Laki AI wrote it (widgetWrite)
 type Entry = { id: string; dir: string; builtin: boolean; m: Manifest; full: boolean; js: boolean; s: Omit<Store, 'data'> }
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -156,6 +156,7 @@ export const widgetsView = (): WidgetView[] =>
     at: w.s.at,
     error: w.s.error,
     running: running.has(w.id) || undefined,
+    byAi: w.s.by === 'ai' || undefined,
     rev,
   }))
 
@@ -373,6 +374,71 @@ export function widgetTick(now = Date.now()) {
     return
   }
   for (const w of widgets.values()) if (due(w, now)) void widgetRun({ id: w.id })
+}
+
+// an extension's files, as text (Laki AI's and MCP's laki_extension_read: an example to copy, or the one to change):
+// its folder's own files only, none hidden, 20 at most
+export function widgetFiles(o: { id: string }) {
+  const w = find(o.id)
+  const files: Record<string, string> = {}
+  for (const d of readdirSync(w.dir, { withFileTypes: true }).filter(d => d.isFile() && !d.name.startsWith('.')).slice(0, 20)) {
+    const p = join(w.dir, d.name)
+    const buf = statSync(p).size > 64 << 10 ? null : readFileSync(p)
+    files[d.name] = !buf ? '(over 64 KB: not shown)' : buf.includes(0) ? '(binary: not shown)' : buf.toString('utf8')
+  }
+  return { id: w.id, builtin: w.builtin || undefined, files }
+}
+
+// an extension made or changed by Laki AI or an MCP client (laki_extension_write): its files in Laki's own folder only
+// (<data>/widgets/<id>, never another folder's, the user's own there, nor through a link), files left out kept. Saved off: its fetch runs shell
+// commands a model wrote, so the user turns it on in Settings › Extensions after a look
+const ID = /^[a-z0-9][a-z0-9-]{0,39}$/
+const FILE = /^\w[\w.-]{0,59}$/
+const statOf = (p: string) => {
+  try {
+    return lstatSync(p)
+  } catch {
+    return null
+  }
+}
+export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
+  if (typeof o.id !== 'string' || !ID.test(o.id)) throw new Error('an id: lowercase letters, digits and dashes')
+  const files = Object.entries(o.files && typeof o.files === 'object' && !Array.isArray(o.files) ? o.files : {})
+  if (!files.length || files.length > 20) throw new Error('1 to 20 files')
+  for (const [n, t] of files) {
+    if (!FILE.test(n) || n.includes('..')) throw new Error(`${n}: a file's name in the extension's folder, no folders`)
+    if (typeof t !== 'string' || t.length > 256 << 10) throw new Error(`${n}: its text, up to 256 KB`)
+  }
+  const d = join(widgetHome(), o.id)
+  const had = widgets.get(o.id)
+  if (had && had.dir !== d) throw new Error(`${o.id} is ${had.builtin ? 'one that comes with Laki' : `in ${had.dir}`}: write a new one under another id`)
+  if (statOf(d) && readStore(o.id).by !== 'ai') throw new Error(`${o.id} is the user's own (Laki AI didn't make it): write a new one under another id`) // theirs isn't overwritten
+  const json = files.find(([n]) => n === 'widget.json')?.[1] as string | undefined
+  if (json === undefined && !statOf(join(d, 'widget.json'))) throw new Error('a new extension needs widget.json')
+  if (json !== undefined) {
+    let m: unknown
+    try {
+      m = JSON.parse(json)
+    } catch (e) {
+      throw new Error(`widget.json: ${(e as Error).message}`)
+    }
+    if (!m || typeof m !== 'object' || Array.isArray(m)) throw new Error('widget.json: an object')
+  }
+  mkdirSync(widgetHome(), { recursive: true })
+  const at = statOf(d)
+  if (at && !at.isDirectory()) throw new Error(`${d} isn't a folder`)
+  mkdirSync(d, { recursive: true })
+  for (const [n, t] of files) {
+    const p = join(d, n)
+    const was = statOf(p)
+    if (was && !was.isFile()) throw new Error(`${n} is a link or a folder there`)
+    writeFileSync(p, t as string)
+    chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
+  }
+  writeStore(o.id, { ...readStore(o.id), on: false, by: 'ai' })
+  scanWidgets()
+  wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; off until it's turned on`)
+  return { ...widgetsView().find(w => w.id === o.id), note: 'Saved turned off: the user turns it on in Settings › Extensions' }
 }
 
 // a widget's folder, for Open in (core's openIn)

@@ -46,6 +46,8 @@ export type Project = {
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
   memory?: Memory[] // the project page's Memory: the user's notes to keep, one each, newest last; never agents' (yet)
 }
+// each mark unset: on; at: where a row shows them (unset: start, by the status circle)
+export type PRMarks = { approved?: boolean; mine?: boolean; commented?: boolean; at?: 'start' | 'name' | 'end' }
 export type Memory = { id: string; text: string; at: number; edited?: number } // at: when it was added
 export type Sep = { id: string; name: string; color?: string; template?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; sort: its workspaces' (unset: the project's)
 // the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
@@ -193,6 +195,7 @@ export type Settings = {
   editKeys?: boolean // the terminal's ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   notify?: boolean
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
+  prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
   timerAlert?: 'dialog' | 'notification' // what a sidebar timer's end shows (unset: Laki's dialog)
@@ -332,6 +335,8 @@ export type PR = {
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
   approved?: string[] // the logins whose latest review approves it
   changes?: string[] // and whose asks for changes
+  approvedByMe?: boolean // your latest review approves it (someone else's PR)
+  commentedByMe?: boolean // you commented on it, or reviewed with comments (someone else's PR)
   conflict?: boolean // merge conflicts with its base branch
   ready?: boolean // mergeStateStatus CLEAN (or HAS_HOOKS): GitHub would merge it now; false: blocked, behind, unstable…
   base?: string // its base branch
@@ -378,7 +383,7 @@ export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?:
 // or names, kept joined by commas), what Settings calls it and says under it
 export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'choice' | 'list'; label?: string; hint?: string; choices?: string[] }
 // view: the full view's dialog, small, medium or large; config: each setting as text (a bool's '1' or '')
-export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; rev: number }
+export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; rev: number }
 export type WidgetSize = 's' | 'm' | 'l'
 
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
@@ -389,4 +394,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 45
+export const API = 47

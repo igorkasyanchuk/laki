@@ -29,9 +29,10 @@ export type ProjectApi = {
 }
 
 const TAB = 'laki.projectTab' // the last tab shown, for the next project opened
-export function ProjectPage({ project: p, schedules, api, onClose }: { project: Project; schedules: Schedule[]; api: ProjectApi; onClose: () => void }) {
-  const [tab, setTab] = useState<ProjectTab>(() => (t => (PROJECT_TABS.some(x => x[0] === t) ? t : 'notes'))(load<ProjectTab>(TAB, 'notes')))
-  const pick = (t: ProjectTab) => (setTab(t), keep(TAB, t))
+// tab: the one shown, App's (the project's ⋯ › Settings sets it, a click here through onTab), else the last one shown
+export function ProjectPage({ project: p, schedules, tab: at, onTab, api, onClose }: { project: Project; schedules: Schedule[]; tab?: ProjectTab; onTab: (t: ProjectTab) => void; api: ProjectApi; onClose: () => void }) {
+  const tab = at ?? (t => (PROJECT_TABS.some(x => x[0] === t) ? t : 'notes'))(load<ProjectTab>(TAB, 'notes'))
+  const pick = (t: ProjectTab) => (onTab(t), keep(TAB, t))
   const count = (t: ProjectTab) => (t === 'tasks' ? schedules.length : t === 'memory' ? (p.memory?.length ?? 0) : 0)
   return (
     <Page title={p.name} onClose={onClose}>

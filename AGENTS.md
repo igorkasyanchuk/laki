@@ -80,7 +80,7 @@ workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `project
 workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
 `progress`; 31: a sep's `template`, kept by `projectSet`; 32: `prAttach`, a project's `notes`, kept by `projectSet`; 33: `prAct` `merge`, a workspace's `autoLand`, a project's `pr` and
 `mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`; 34: `quickNew`, a project's `kind`,
-a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`). A
+a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`; 46: a PR's `approvedByMe`, `commentedByMe`; 47: `widgetFiles`, `widgetWrite`, a widget's `byAi`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -148,12 +148,13 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   workspace: `inside`, links followed, by `realpath`);
 - widgets (below): `widgetRender` (`id`, `full`: the filled HTML, a JS widget's as a whole page; null: no such
   view), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes),
-  `widgetRun` (fetch now), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetTick` (`now`: tests move the
+  `widgetRun` (fetch now), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'`) nor through a link, files left out kept; saved off with the store's `by: 'ai'`, the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
   (claude, codex, gemini, grok, opencode: `skill.ts` `AGENTS`, each one's home and `mcp add`), `on` and `skill`
-  (`SKILLS`: laki, the default, or laki-widget: the widget creator's guide, its own folder and launcher, no MCP);
+  (`SKILLS`: laki, the default, or laki-widget: the widget creator's guide, its own folder and launcher, no MCP; it says
+  extension and widget are one thing); `refreshSkills` at the daemon's start writes an installed skill that's out of date again (only one whose launcher has this data dir's `LAKI_HOME`);
 - scheduled tasks: `scheduleSet` (makes one, or changes one by `id`: name, project, preset, ws, prompt, when, on;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
@@ -409,7 +410,7 @@ and neither does a host.
   count as `stat` (`WorkspaceView.stat`: add, del, files, dirty); one scan at a time.
 - PRs: `gh pr view <branch> --json …` (`PR_FIELDS`: title, author, checks list, head commit, base
   branch, review decision, mergeable: `PR.conflict`, the sidebar's ⚠, mergeStateStatus: `PR.ready` (CLEAN or HAS_HOOKS; UNKNOWN: none), size, body, reviews:
-  `reviewersOf`'s (each author's last approval or ask for changes) `approved`, `changes` (the PR section's *Approved by*, the hover card, the status bar's tip); `mine`: the author is `ghLogin`'s,
+  `reviewersOf`'s (each author's last approval or ask for changes) `approved`, `changes` (the PR section's *Approved by*, the hover card, the status bar's tip); `yoursOn`'s `approvedByMe` and `commentedByMe` (someone else's PR: your approval, your comments or reviews with them; `comments` in `PR_FIELDS`), the sidebar's ✓, ✓✓ and 👀 (`settings.prMarks`: `approved`, `mine`, `commented`, unset on; `at`: start, name or end); `mine`: the author is `ghLogin`'s,
   `gh api user` once per host: no avatar, no Approve), every `settings.prScan` minutes
   (`PR_SCAN`, 1; `prTick`, each minute; `LAKI_PR_SCAN_MS`: tests' pace instead); one scan at a time (`scanPRs`), so `autoPR` never sends twice.
   `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now. No PR on the
@@ -491,6 +492,8 @@ gone or archived workspace is a failed run.
 
 `daemon/ai.ts` (`settings.ai`, `AiSettings`; off unless `on`): one conversation that works Laki with `cli/mcp.ts`'s
 `tools(rpc)`, given the daemon's own `call` (no HTTP), less `laki_progress`: nothing archives, deletes, ships or merges;
+its extension tools (`laki_extensions`, `laki_extension_guide`: `widgetFormat`, `laki_extension_read`, `laki_extension_write`;
+a tool's `max` is what its result may give the model, over `TOOL_TEXT`) make extensions, saved off;
 its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask at a time (`busy`); `aiStop` aborts the
 fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backends (`backend`, unset: openrouter):
 - `openrouter`: `POST <api>/chat/completions` (`LAKI_AI_API`: tests' fake, localhost only) with the tools as functions
@@ -929,7 +932,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
   `AskHost` in App: never `confirm()`, the OS's sheet; its keys stay in it, Esc or outside is no).
 - **`Project.tsx`**: a project's page (a click on its name in the sidebar, its ⋯ › *Open project page*; dialog
-  `{ project }`, the last tab in `laki.projectTab`): Notes (panels.tsx' `NotesView`, also the ⋯ › Notes dialog's:
+  `{ project, tab? }`: its ⋯ › Settings opens that tab, else the last one, `laki.projectTab`): Notes (panels.tsx' `NotesView`, also the ⋯ › Notes dialog's:
   an edit saved as it unmounts), Scheduled tasks (Schedules.tsx' rows, a switch each; changes on that page), Memory
   (`Project.memory`, `{ id, text, at, edited }`, the whole list through `projectSet`, which keeps 1000 with an id and
   text; never in MCP's state or `ls --json`) and Settings (Settings.tsx' `ProjectSection`, `noNotes`). The sidebar's
@@ -996,7 +999,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `laki.runsSeen` (localStorage: the newest run the page showed).
 - **`Usage.tsx`**: the status bar's first item, the plan-limits ring (in the theme's `--accent`, then `--waiting` and `--error`; `UsageButton`: each agent's first window, the shortest: 5-hour; the busier agent's, asked
   every minute; hidden while the daemon has none) and its popup: each agent's windows, bars, when they reset.
-  `USAGE_AGENTS` names the agents Settings › General has switches for.
+  `USAGE_AGENTS` names the agents Settings › Appearance has switches for.
 - **`Help.tsx`**: the help page (⌘/, the sidebar's ?, ⌘K): keys, status glyphs, where things are, the main CLI
   commands and recipes (`cli`: the app's command; `ship`: list `ship`), each section a `Sec` of `Item`s. Laid out
   like Settings (`.settings-nav`, `.help-nav`): a filter (focused as it opens, not on a touch screen; ⌘F or / goes to

@@ -1,6 +1,6 @@
 // The agent skill: SKILL.md and a launcher for the CLI in each agent's skills folder (~/.claude/skills/laki,
 // ~/.codex/…, ~/.gemini/…, ~/.grok/…, ~/.config/opencode/…), so their sessions know laki and can drive it. Written
-// only when the user asks (Settings).
+// when the user asks (Settings), and again as a daemon starts when a Laki update changed one installed for it
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
@@ -40,7 +40,7 @@ function files(at: string, k: SkillName): Record<string, string> {
     laki,
     'SKILL.md': `---
 name: laki
-description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work.
+description: Drive Laki, the desktop app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in its own git worktree. Use it to list projects and workspaces, start a new workspace with an agent and a prompt, open tabs, message an agent or read its screen, see a workspace's diff, run its dev server or ship it as a PR, and schedule prompts for later or on repeat (every weekday at 9am…). Use when the user asks to start, hand off, parallelize, schedule or check work in Laki, and whenever $LAKI_PROGRESS is 1: then report how far along your task is (laki progress) while you work. To make a Laki extension (a widget), use the laki-widget skill.
 ---
 
 # Laki
@@ -93,6 +93,9 @@ ${USAGE}
 
 Write prompts as for a new colleague: the goal, where to look, how to tell it's done. Independent tasks: one
 workspace each, so they run in parallel.
+
+An extension (also called a widget: a small live page in Laki's sidebar) is made with the laki-widget skill (Settings ›
+Agent skill installs it); \`laki widget\` lists and checks them.
 
 ### A new session (/laki:new)
 
@@ -164,12 +167,13 @@ more than 30 minutes late is skipped and logged as missed).
 // laki-widget: the widget creator, a skill of its own
 const widgetSkill = (cli: string) => `---
 name: laki-widget
-description: Make Laki widgets, the small live pages in the Laki app's sidebar (a count of PRs, a chart, a table) with a full view a click away, each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki widget or extension.
+description: Make Laki extensions, also called widgets (one and the same thing), the small live pages in the Laki app's sidebar (a clock, a count of PRs, a chart, a table) with a full view a click away, each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki extension or widget (or a tile, panel or plugin for Laki's sidebar).
 ---
 
-# Making a Laki widget
+# Making a Laki extension (a widget)
 
-A widget is a folder; its name is the widget's id. Make new ones in Laki's own folder:
+Extension and widget are two names for one thing: the app says extension (Settings › Extensions), its files, ids and
+\`laki widget\` say widget. A user who asks for either means this. A widget is a folder; its name is the widget's id. Make new ones in Laki's own folder:
 
     ${join(dir, 'widgets')}/<id>/
 
@@ -189,7 +193,7 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget ls                   # each one: on or off, size, schedule, last error
 
 A new widget in Laki's folder is on as soon as it's found. Tell the user which settings to fill in (Settings ›
-Widgets) and what it fetches how often: each fetch may call an API.
+Extensions) and what it fetches how often: each fetch may call an API.
 `
 
 function info(a: SkillAgent, k: SkillName): SkillInfo {
@@ -203,6 +207,14 @@ function info(a: SkillAgent, k: SkillName): SkillInfo {
 
 // laki's rows first, one per agent, then laki-widget's
 export const skills = () => SKILLS.flatMap(k => (Object.keys(AGENTS) as SkillAgent[]).map(a => info(a, k)))
+
+// as the daemon starts: an installed skill that's out of date (a Laki update changed it) is written again; never one
+// that isn't there, nor one whose launcher drives another data dir's daemon (another Laki, LAKI_HOME=…)
+export function refreshSkills() {
+  const ours = q(`LAKI_HOME=${dir}`)
+  const launcher = (at: string) => (existsSync(join(at, 'laki')) ? readFileSync(join(at, 'laki'), 'utf8') : '')
+  for (const r of skills()) if (r.state === 'outdated' && launcher(r.path).includes(` ${ours} `)) skillSet({ agent: r.agent, on: true, skill: r.skill })
+}
 
 // install (or update) a skill (laki unless said) for an agent, or remove it: only our files, and the folder if that
 // empties it

@@ -1148,11 +1148,14 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .sched-run.live:hover { background: var(--hover); }
 .sched-more { align-self: flex-start; }
 .ws-sched, .ws-mark { display: inline-flex; flex: none; color: var(--muted); opacity: 0.8; } /* mark: muted */
-/* a workspace's PR (Settings › General): open, draft (gray), merged (purple), closed (red); an open one's failing checks red */
+/* a workspace's PR (Settings › Appearance): open, draft (gray), merged (purple), closed (red); an open one's failing checks red */
 .ws-pr { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--done); }
 .avatar { flex: none; border-radius: 50%; vertical-align: -3px; background: var(--hover); }
 /* a row's marks, the PR's author and GitHub's mark alike: one size (Settings › Appearance › Icon size) */
-.ws :is(.ws-pr, .ws-mark, .ws-sched) :is(.icon-svg, .avatar) { width: var(--ws-icon, 13px); height: var(--ws-icon, 13px); }
+/* an open PR's marks (settings.prMarks): ✓ approved, ✓✓ by you too, 👀 you commented */
+.ws-yes { display: inline-flex; align-items: center; gap: 3px; flex: none; color: var(--done); }
+.ws-eyes { font-size: calc(var(--ws-icon, 13px) - 1px); line-height: 1; }
+.ws :is(.ws-pr, .ws-mark, .ws-sched, .ws-yes) :is(.icon-svg, .avatar) { width: var(--ws-icon, 13px); height: var(--ws-icon, 13px); }
 .pr-by { display: inline-flex; align-items: center; gap: 4px; }
 /* the PR's own buttons: one height; Merge ▾ green once it could go in (a tint, readable on every theme), else plain;
    Approve plain with GitHub's green check; GitHub and ⋯ square */
@@ -1369,7 +1372,7 @@ button.board-name:hover { background: none; }
 .sidebar[data-style='cards'] .ws.sel { background-color: var(--sel); }
 .ws-last { flex-basis: 100%; padding-left: 18px; margin-top: 3px; font-size: 11.5px; line-height: 1.35; color: var(--fg); opacity: 0.8; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; white-space: normal; }
 .side-styles { margin-bottom: 8px; }
-/* Settings › General: the floating bubbles' styles, each a live preview (floater.css) */
+/* Settings › Appearance: the floating bubbles' styles, each a live preview (floater.css) */
 .fl-styles, .setting-box > .fl-styles.switch-row.sub { display: flex; flex-direction: row; justify-content: flex-start; flex-wrap: wrap; align-items: center; gap: 6px; }
 .fl-styles > span { margin-right: 4px; }
 .fl-styles button { display: inline-flex; align-items: center; gap: 7px; padding: 5px 10px 5px 6px; border-radius: 999px; }

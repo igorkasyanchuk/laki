@@ -7,8 +7,10 @@ worktree. Agents keep running when the window is closed.
   worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR. Plain folders work too.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make,
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
-  messages sent later (in 2h, at 3pm). Agents resume after a
+  messages sent later (in 2h, at 3pm; to Laki AI too). Agents resume after a
   restart or a usage limit.
+- **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (things to keep about it) and its
+  settings.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
@@ -16,7 +18,8 @@ worktree. Agents keep running when the window is closed.
   your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
-- **PRs**: CI and reviews in the status bar (who approved, who asked for changes), sent to the agent if you like; ship (commit, push, PR) in one step; merge
+- **PRs**: CI and reviews in the status bar (who approved, who asked for changes) and at a glance in the sidebar (✓ approved, ✓✓ by
+  you too, 👀 you commented), sent to the agent if you like; ship (commit, push, PR) in one step; merge
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
   merged, if you like.
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (comment on a line; images before and after;
@@ -36,16 +39,16 @@ worktree. Agents keep running when the window is closed.
   the one you pick.
 - **Looks**: six Dock icons to pick from; 98 themes, 80 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
-- **Extensions**: live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
-  with an agent or any AI chat: Settings has the prompt), each fed by a command on a schedule (within working hours, if
+- **Extensions** (widgets, the same thing): live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
+  with an agent's laki-widget skill, Laki AI, or any AI chat: Settings has the prompt), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs.
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new
   workspace's prompt.
 - **A video while you work**: a YouTube link plays at the bottom of the sidebar.
 - **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it starts workspaces, reviews
-  PRs, sends prompts and tells you what your agents are doing; on OpenRouter or claude -p / codex exec, every
+  PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); on OpenRouter or claude -p / codex exec, every
   ask's cost logged.
-- **Keyboard and CLI**: ⌘K for everything; `laki` (also an MCP server) drives it all, agents included.
+- **Keyboard and CLI**: ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
 
 ## Install
 

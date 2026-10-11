@@ -1,6 +1,6 @@
 // The status bar's first item: a ring filled to the shortest limit (the 5-hour session) of the agents' plans, and its popup with every
 // limit (the 5-hour session, the week, per model) and when each resets. The daemon reads them with the agents' own
-// sign-in, at most every 5 minutes (usage.ts); Settings › General picks the agents.
+// sign-in, at most every 5 minutes (usage.ts); Settings › Appearance picks the agents.
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { IconButton } from './ui'
 
@@ -118,7 +118,7 @@ function UsagePop({ anchor, rows, top, onClose }: { anchor: DOMRect; rows: Agent
           </section>
         ))}
         <p className="muted small">
-          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each agent's own sign-in, at most every 5 minutes. Settings › General picks the agents.
+          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each agent's own sign-in, at most every 5 minutes. Settings › Appearance picks the agents.
         </p>
       </div>
     </div>

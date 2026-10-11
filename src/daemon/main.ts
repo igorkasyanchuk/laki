@@ -11,9 +11,9 @@ import { WebSocketServer } from 'ws'
 import { aiAsk, aiKey, aiNew, aiState, aiStop } from './ai.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
-import { skills, skillSet } from './skill.ts'
+import { refreshSkills, skills, skillSet } from './skill.ts'
 import { usage } from './usage.ts'
-import { scanWidgets, widgetAction, widgetPage, widgetReload, widgetRender, widgetRun, widgetSet, widgetTick } from './widgets.ts'
+import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 
 const { dir } = core
 mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -67,6 +67,11 @@ core.load()
 core.writeHooks()
 core.restoreAll()
 scanWidgets()
+try {
+  refreshSkills()
+} catch (e) {
+  log(`skills: ${(e as Error).message}`)
+}
 
 const token = randomBytes(32).toString('hex')
 // Browsers always send Origin on a WebSocket; node clients (CLI, hooks, Electron main) send none.
@@ -202,6 +207,8 @@ const api: Record<string, Handler> = {
   widgetRun: p => widgetRun(p),
   widgetAction: p => widgetAction(p),
   widgetReload: () => widgetReload(),
+  widgetFiles: p => widgetFiles(p),
+  widgetWrite: p => widgetWrite(p), // Laki AI's and MCP's: saved off
   widgetTick: p => widgetTick(p.now), // tests move the clock
   shutdown: () => void setTimeout(shutdown, 50),
 }

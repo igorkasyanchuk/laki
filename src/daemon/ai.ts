@@ -28,6 +28,7 @@ Do what the user asks with the laki tools, at once, without asking first: look t
 Find workspaces by name, branch, PR number or PR title. You cannot archive, delete, ship or merge anything: say so if asked.
 Link each workspace or tab you name, so the user opens it with a click: [its name](laki://ws/<workspace id>), or [its name](laki://ws/<workspace id>?tab=<tab id>) for a tab.
 A screenshot may hold PR links or other work: act on each item.
+Make a Laki extension (also called a widget, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made, yourself (the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
 Answer in a few plain sentences: what you did (workspace names) or what you found.`
 
 // the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress (an agent's own)
@@ -151,7 +152,7 @@ async function runTool(list: Tool[], name: string, args: unknown) {
   try {
     if (!tool) throw new Error(`no tool ${name}`)
     const r = await tool.run(args ?? {})
-    return (typeof r === 'string' ? r : JSON.stringify(r)).slice(0, TOOL_TEXT)
+    return (typeof r === 'string' ? r : JSON.stringify(r)).slice(0, tool.max ?? TOOL_TEXT)
   } catch (e) {
     return `failed: ${(e as Error).message}`
   }

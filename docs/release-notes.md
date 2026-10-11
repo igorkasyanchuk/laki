@@ -6,6 +6,16 @@ version it builds, with the date. -->
 
 - **Open in** is a submenu in a workspace's and a project's ⋯ menu: hover it, or → / ⏎.
 - **Three more colors** for workspaces, groups and tabs: lime, brown and gray.
+- **PR marks in the sidebar**: ✓ an open PR approved, ✓✓ approved by you too, 👀 you commented; each can be turned off,
+  and they go by the status circle, after the name or with GitHub's mark (Settings › Appearance › Pull request marks).
+- A workspace's ⋯ closes its hover card.
+- Settings › Appearance holds what the window shows (plan limits, PR marks, the menu bar item, the fun button, turn
+  timers, diff size), out of General.
+- A project's ⋯ › *Settings* opens its page at the Settings tab.
+- The agent skills know an extension and a widget are one thing, and an installed skill is brought up to date as Laki
+  starts.
+- **Laki AI makes extensions**: ask for one (*a clock with the time in New York*) and it writes it in Laki's extensions
+  folder, saved off; turn it on in Settings › Extensions after a look (*by Laki AI* on its row).
 
 ## 0.10.0 · Oct 10, 2026
 

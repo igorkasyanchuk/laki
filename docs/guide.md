@@ -56,7 +56,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Board**: every workspace in a column by where it is (running, needs you, done, PR open, merged), and to-dos
   that start a workspace.
 - **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it works Laki for you: starts
-  workspaces, reviews PRs in their own worktrees, sends prompts, tells you what your agents are doing. It runs on
+  workspaces, reviews PRs in their own worktrees, sends prompts, tells you what your agents are doing, makes extensions. It runs on
   OpenRouter (your API key) or on claude -p / codex exec, and every ask's tokens and cost are logged.
 - **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
 - **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
@@ -72,14 +72,14 @@ changing it: [AGENTS.md](../AGENTS.md).
   until you stop it; a QR code to open it.
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the bottom of the sidebar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
-  one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › General hides it.
+  one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Appearance hides it.
 - **Timers**: the stopwatch at the bottom of the sidebar starts a countdown, 1 minute to an hour (or any length), as
   many as you like; each shows as a bar over the bottom buttons (⏸ pauses it) and then rings: a sound and a dialog,
   or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
-- **Extensions**: small live pages at the bottom of the sidebar, in a grid 3 cells across: a count, a chart, a table,
-  each fed by a command or a script on a schedule, with a full view a click away (below: Extensions). Two come with
-  Laki: *My PRs* and *Team PRs*; the *Extension creator* agent skill makes more.
+- **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar, in a grid 3 cells across: a count, a chart, a table,
+  each fed by a command or a script on a schedule, with a full view a click away (below: Extensions). Three come with
+  Laki: *Links*, *My PRs* and *Team PRs*; the *Extension creator* agent skill or Laki AI makes more.
 - **A video while you work**: the play button at the bottom of the sidebar asks for a YouTube link (a video, a
   short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
@@ -148,10 +148,12 @@ npm link
 
 **Sidebar:** projects (a branch icon for a repo, a folder for a plain folder) and their workspaces, one line each
 (status, name; GitHub's mark when it has a PR: green open, gray draft, purple merged, red closed
-or an open one's failing checks; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › General). The
+or an open one's failing checks; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › Appearance). The
 selected workspace's PR is in the status bar.
+- An open PR's marks, by the status circle: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
+  else's PR. Settings › Appearance › *Pull request marks* turns each off and puts them after the name or with GitHub's mark.
 - A line divides the projects; each one's workspaces hang under it, indented on a guide line.
-- *Diff size in the sidebar* (Settings › General, off by default) puts each workspace's diff size on its row
+- *Diff size in the sidebar* (Settings › Appearance, off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
   menu, slides in at the row's end and its marks move left to make room.
 - Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
@@ -225,7 +227,7 @@ selected workspace's PR is in the status bar.
 - ⋯ on a project opens its menu:
   - *New workspace*;
   - *Collapse* / *Expand*;
-  - *Settings…* (see Project settings below);
+  - *Settings* (the project's page at its Settings tab; see Project settings below);
   - *Scheduled tasks…* (the project's tasks and runs; the count of its tasks on the right);
   - *Remove project*;
   - its archived workspaces, which you click to restore.
@@ -369,7 +371,9 @@ you're in): Laki's own assistant, one conversation that works Laki with the same
 `laki mcp`. Ask *what are my agents doing?*, *start a code review of the PR with the login form*, *take the PR from
 workspace ABC and start a new codex session to review it*, or paste a screenshot with three PR links and ask to review
 each in its own workspace: it reads the workspaces, their PRs and agents' last answers, then starts workspaces (a PR's
-on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. It never archives, deletes, ships
+on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. Ask it for an extension
+(*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
+so you look and turn it on in Settings › Extensions (*by Laki AI* on its row). It never archives, deletes, ships
 or merges, and it does nothing until you ask. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
 into one line you can open, *Stop* ends an ask, *New chat* starts over. A workspace or tab it names is a link: a click
 opens it in Laki (from the bubbles' window too); a tool line's *Open* goes to the workspace it worked on. The *Calls* tab
@@ -416,7 +420,7 @@ the week per model and extra usage; Codex's 5-hour and weekly windows. Each show
 reads them the way Superset and CodexBar do: with the sign-in the agent already keeps on this Mac (Claude
 Code's Keychain item or `~/.claude/.credentials.json`; Codex's `~/.codex/auth.json`), from the endpoint the
 agent's own `/usage` screen asks, at most every 5 minutes. It never refreshes a token: an expired one says so
-until the agent's next run renews it. Settings › General turns each agent off (then nothing is read).
+until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read).
 
 **Side panel** (⌥⌘B, the panel icon; drag its edge to resize; one panel at a time with the info panel):
 - *Files*: the workspace's files (git's, ignored ones left out; a plain folder's, without `node_modules` and
@@ -587,7 +591,7 @@ notification; click it to jump there. Settings › General picks which (waiting,
 sound, or turns them off; a workspace's or tab's menu mutes just it. The Dock icon counts the tabs that wait
 for you or finished while you looked away (muted ones aside); so does Laki's mark in the menu bar, whose menu lists
 those tabs (waiting first, with what they ask): a click opens one. Its *New Workspace…* opens the new-workspace page in a
-small window of its own over the app you're in, as the bubbles' + does. With *Turn timers* on (Settings › General), a
+small window of its own over the app you're in, as the bubbles' + does. With *Turn timers* on (Settings › Appearance), a
 working tab and its workspace show how long the turn has gone (`42s`, `12m`, `1h 5m`). Follow-ups queued with `laki send --when-idle` show as `+n`.
 **A new session from an agent**: in a Claude Code tab, `/laki:new <the task> with codex` (or claude, gemini, grok,
 opencode; none named: claude) has the agent write the task up as a prompt and start it in a new workspace of this
@@ -732,10 +736,7 @@ setting* (the box above the sections) lists the settings that match what you typ
 lit for a moment.
 - *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `laki/`),
   *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
-  kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *plan limits* for
-  Claude Code and for Codex (the status bar's ring; on by default), *Pull requests in the sidebar* (GitHub's
-  mark on a workspace with a PR; on by default), *Menu bar item* (the count and its menu; on by default), *Fun button* (the smiley at the bottom of the sidebar; on by default), *Turn
-  timers* (off by default), *Diff size in the sidebar* (off by default), *Progress on tabs* (agents report how far
+  kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
@@ -745,7 +746,11 @@ lit for a moment.
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
   reads it back (projects and their own settings don't move). A file from another version comes in too: a setting
   this one keeps in another shape is left out (Import names it), the rest applies.
-- *Appearance*: *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
+- *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
+  default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default; *Pull request marks*:
+  ✓, ✓✓ and 👀, each on by default, and where they go; *Menu bar item*: the count and its menu, on by default; *Fun
+  button*: the smiley at the bottom of the sidebar, on by default; *Turn timers* and *Diff size in the sidebar*, off by
+  default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
   from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), the interface font (Inter by default, SF Pro, Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans, Manrope, a few of the Mac's, or a developer's monospace one: JetBrains Mono, Geist Mono, Fira Code and more), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
@@ -944,7 +949,7 @@ whose turn ends without a word (a resumed chat's recap): quiet for a few seconds
 
 ## Project settings
 
-Settings → *Projects*, or ⋯ on a project then *Settings…* (Run ▾ → *Edit the run script…* opens its Run
+Settings → *Projects*, or ⋯ on a project then *Settings* (its page's Settings tab; Run ▾ → *Edit the run script…* opens its Run
 tab). Saved as you type:
 - Name.
 - *Notes*: yours, in Markdown (links, how to run it, who to ask). ⋯ on the project › *Notes* shows them rendered, with
@@ -1009,7 +1014,7 @@ laki pr . 42                                            # attach a PR (URL or nu
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
-laki widget | widget reload                             # the sidebar's widgets | read their folders again, fetch
+laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
 laki widget on|off|run <id>                             # show or hide one | fetch now
 laki widget render <id> --full                          # the HTML its full view shows now
 laki widget action <id> <action> [arg]                  # run one of its buttons' actions: what the app would show

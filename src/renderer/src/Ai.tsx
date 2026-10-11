@@ -38,7 +38,7 @@ const SESSION = {
   claude: 'One claude session for the whole chat: each ask goes on with it (--resume), so it remembers. New chat starts another.',
   codex: 'One codex thread for the whole chat: each ask goes on with it, so it remembers. New chat starts another.',
 } as const
-const CAN = ['See your workspaces, agents and PRs', 'Start workspaces and agent tabs', 'Send prompts to your agents', 'Attach PRs, schedule tasks']
+const CAN = ['See your workspaces, agents and PRs', 'Start workspaces and agent tabs', 'Send prompts to your agents', 'Attach PRs, schedule tasks', 'Make extensions (off until you turn them on)']
 
 export const money = (n?: number) => (n === undefined ? '—' : n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`)
 export const tokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))

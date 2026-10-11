@@ -263,6 +263,7 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
   const names = got[2].result.tools.map((t: any) => t.name)
   assert.ok(names.includes('laki_state') && names.includes('laki_send') && names.includes('laki_browser') && names.includes('laki_progress'))
   assert.ok(!names.some((n: string) => /rm|archive|ship/.test(n)))
+  assert.ok(names.includes('laki_extension_write') && got[2].result.tools.every((t: any) => !('max' in t)), 'extension tools; max is Laki AI’s, not listed')
   assert.ok(!got[3].result.isError, got[3].result.content[0].text)
   assert.equal(JSON.parse(got[3].result.content[0].text).id, 'mcp-ws')
   assert.equal(got[4].result.isError, true)

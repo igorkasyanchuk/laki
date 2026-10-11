@@ -2595,7 +2595,13 @@ function reviewersOf(j: { reviews?: { author?: { login?: string }; state?: strin
   const changes = by('CHANGES_REQUESTED')
   return { ...(approved.length && { approved }), ...(changes.length && { changes }) }
 }
-const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,reviews,mergeable,mergeStateStatus,additions,deletions,body,updatedAt,statusCheckRollup'
+const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,reviews,comments,mergeable,mergeStateStatus,additions,deletions,body,updatedAt,statusCheckRollup'
+// you on someone else's PR: your last say approves it; you commented (a comment, a review's comments, an ask for changes)
+function yoursOn(j: { author?: { login?: string }; reviews?: { author?: { login?: string }; state?: string }[]; comments?: { author?: { login?: string } }[] }, me: string, approved?: string[]) {
+  if (!me || j.author?.login === me) return {}
+  const said = (j.reviews ?? []).some(r => r.author?.login === me && /^(COMMENTED|CHANGES_REQUESTED)$/.test(r.state ?? '')) || (j.comments ?? []).some(c => c.author?.login === me)
+  return { ...(approved?.includes(me) && { approvedByMe: true }), ...(said && { commentedByMe: true }) }
+}
 
 // who you are on GitHub, per host ('': this Mac): gh api user's login, kept 10 minutes (gh auth switch), a failure
 // not at all
@@ -2625,6 +2631,8 @@ async function scanPR(ws: Workspace) {
     const { stdout } = await exec(ws, 'gh', ['pr', 'view', ws.prUrl ?? ws.branch, '--json', PR_FIELDS], { timeout: 20000 })
     const j = JSON.parse(stdout)
     const list: Check[] = newest(j.statusCheckRollup ?? []).map(checkOf)
+    const me = await ghLogin(ws)
+    const who = reviewersOf(j)
     pr = {
       number: j.number,
       state: j.state,
@@ -2633,11 +2641,12 @@ async function scanPR(ws: Workspace) {
       list,
       title: j.title,
       author: j.author?.login,
-      mine: j.author?.login && j.author.login === (await ghLogin(ws)) ? true : undefined,
+      mine: j.author?.login && j.author.login === me ? true : undefined,
       draft: j.isDraft,
       head: j.headRefOid,
       review: j.reviewDecision || undefined,
-      ...reviewersOf(j),
+      ...who,
+      ...yoursOn(j, me, who.approved),
       conflict: j.mergeable === 'CONFLICTING' ? true : j.mergeable === 'MERGEABLE' ? false : undefined, // UNKNOWN for a while after a push
       ready: j.mergeStateStatus && j.mergeStateStatus !== 'UNKNOWN' ? j.mergeStateStatus === 'CLEAN' || j.mergeStateStatus === 'HAS_HOOKS' : undefined, // GitHub would merge it now: required checks and reviews in, not behind
       base: j.baseRefName,

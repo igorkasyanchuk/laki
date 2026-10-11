@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
@@ -89,6 +89,8 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
 ]
 // Appearance's corners (--radius) and where the tabs go
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
+// where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
+const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['start', 'By the status circle'], ['name', 'After the name'], ['end', "With GitHub's mark"]]
 const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
 
 export type AppSettings = Paint & {
@@ -114,6 +116,7 @@ export type AppSettings = Paint & {
   env?: Record<string, string> // every session's
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
+  prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   timers?: boolean // a turn's time on its tab and row (unset: off)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: off)
@@ -844,13 +847,14 @@ const FIND: [string, string, string?][] = [
   ['ai', 'Spending', 'cost usage tokens ai today month'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
-  ['general', 'Menu bar item', 'tray status count waiting needs you'],
-  ['general', 'Fun button', 'meme reddit smiley break joke'],
-  ['general', 'Pull requests in the sidebar', 'pr github icon'],
-  ['general', 'Turn timers', 'elapsed time'],
-  ['general', 'Diff size in the sidebar', 'lines added removed changes stat'],
-  ['general', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
-  ['general', 'Codex plan limits', 'usage ring 5-hour weekly'],
+  ['appearance', 'Menu bar item', 'tray status count waiting needs you'],
+  ['appearance', 'Fun button', 'meme reddit smiley break joke'],
+  ['appearance', 'Pull requests in the sidebar', 'pr github icon'],
+  ['appearance', 'Pull request marks', 'approved approval check double eyes commented review me sidebar'],
+  ['appearance', 'Turn timers', 'elapsed time'],
+  ['appearance', 'Diff size in the sidebar', 'lines added removed changes stat'],
+  ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
+  ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['general', 'Environment', 'env variables'],
   ['general', 'Move to another Mac', 'export import backup file'],
   ['appearance', 'Interface font', 'ui type'],
@@ -1524,6 +1528,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               )}
               <span className="sched-tags">
                 {w.builtin && <span className="tag">built-in</span>}
+                {w.byAi && <span className="tag" data-tip="Laki AI wrote it; it was saved off: look at what it runs (its folder) before turning it on">by Laki AI</span>}
                 <span className="tag">
                   {w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}
                 </span>
@@ -1930,33 +1935,9 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={!!s.closeNoAsk} onChange={v => set({ closeNoAsk: v })}>
                   <Says title="Close tabs without asking" hint="No question when a tab you close still runs something (an agent, a server): it's stopped at once" />
                 </Switch>
-              </div>
-              </Group>
-              <Group title="What the window shows">
-              <div className="setting-box">
-                <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
-                  <Says title="Fun button" hint="The smiley at the bottom of the sidebar: a random meme from r/memes for a break (→ or N for another)" />
-                </Switch>
-                <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
-                  <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
-                </Switch>
-                <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
-                  <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
-                </Switch>
-                <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
-                  <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
-                </Switch>
                 <Switch className="switch-row" on={!!s.progress} onChange={v => set({ progress: v })}>
                   <Says title="Progress on tabs" hint="Claude and Codex estimate how far along their task is and report it every 20-30 seconds, shown on the tab; agents started from now on (other agents need the laki skill, Settings › Agent skill)" />
                 </Switch>
-                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
-                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
-                </Switch>
-                {Object.entries(USAGE_AGENTS).map(([a, name]) => (
-                  <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
-                    <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
-                  </Switch>
-                ))}
               </div>
               </Group>
               <Group title="Development">
@@ -2074,6 +2055,53 @@ export function SettingsPage(p: {
               <Switch className="switch-row" on={s.sideLook?.labels !== false} onChange={v => set({ sideLook: { ...s.sideLook, labels: v } })}>
                 <Says title="Button labels" hint="Words beside the buttons at the bottom of the sidebar: Schedule, Board, Video, Timer, Settings (Rail and list: Video, Meme, Timer); the last ones drop theirs when the row is too narrow" />
               </Switch>
+              </Group>
+              <Group title="What the window shows">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.fun !== false} onChange={v => set({ fun: v })}>
+                  <Says title="Fun button" hint="The smiley at the bottom of the sidebar: a random meme from r/memes for a break (→ or N for another)" />
+                </Switch>
+                <Switch className="switch-row" on={s.menuBar !== false} onChange={v => set({ menuBar: v })}>
+                  <Says title="Menu bar item" hint="Laki's mark with the count of agents that need you (as the Dock's badge); its menu lists them, a click opens one" />
+                </Switch>
+                <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
+                  <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
+                </Switch>
+                <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
+                  <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
+                </Switch>
+                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
+                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
+                </Switch>
+                {Object.entries(USAGE_AGENTS).map(([a, name]) => (
+                  <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
+                    <Says title={`${name} plan limits`} hint={`The status bar's ring: the 5-hour and weekly windows, read with ${name}'s own sign-in every 5 minutes`} />
+                  </Switch>
+                ))}
+              </div>
+              </Group>
+              <Group title="Pull request marks" hint="On a workspace whose open PR is approved, or one you looked at: in the sidebar, at a glance">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.prMarks?.approved !== false} onChange={v => set({ prMarks: { ...s.prMarks, approved: v } })}>
+                  <Says title="✓ Approved" hint="Its reviews approve it (GitHub's decision, or an approval where none is required)" />
+                </Switch>
+                <Switch className="switch-row" on={s.prMarks?.mine !== false} onChange={v => set({ prMarks: { ...s.prMarks, mine: v } })}>
+                  <Says title="✓✓ Approved by you too" hint="Approved, and your approval is one of them" />
+                </Switch>
+                <Switch className="switch-row" on={s.prMarks?.commented !== false} onChange={v => set({ prMarks: { ...s.prMarks, commented: v } })}>
+                  <Says title="👀 You commented" hint="Someone else's PR you commented on or reviewed with comments" />
+                </Switch>
+                <label>
+                  Where they go
+                  <select value={s.prMarks?.at ?? 'start'} onChange={e => set({ prMarks: { ...s.prMarks, at: e.target.value as PRMarks['at'] } })}>
+                    {MARKS_AT.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
               </Group>
               <Group title="Floating bubbles" hint="While you're in another app: a drop on the screen's edge, over every app and Space, with a circle per agent; hover one to see what it said, click to open it, drag it to the other edge or up and down">
               <div className="setting-box">

@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { ago, hasFull, hasScript, pageOf, render, sayOf, spark, viewOf } from '../src/shared/widget.ts'
@@ -401,4 +401,28 @@ test('widget sizes: half a cell down is kept (a thin line), other fractions roun
   assert.deepEqual((await links()).size, [1, 0.5])
   await rig.rpc('widgetSet', { id: 'links', size: [9, 0] })
   assert.deepEqual((await links()).size, [3, 1], 'clamped to the grid')
+})
+
+test('extensions Laki AI writes: in its own folder only, saved off, read back; never over another folder’s', async t => {
+  const rig = await fresh(t)
+  const json = JSON.stringify({ name: 'NY clock', fetch: 'echo "{\\"t\\": 1}"', every: 1 })
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'My Clock', files: { 'widget.json': json } }), /an id/)
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { '../x.sh': 'x' } }), /no folders/)
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.html': 'x' } }), /needs widget.json/)
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': '{nope' } }), /widget.json/)
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'my-prs', files: { 'widget.json': json } }), /comes with Laki/)
+  const w = await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': json, 'widget.html': '<template preview>{{data.t}}</template>', 'fetch.sh': '#!/bin/sh\necho "{}"' } })
+  assert.deepEqual([w.id, w.on, w.byAi, w.every], ['ny', false, true, 1], 'saved off')
+  const dir = join(rig.data, 'widgets', 'ny')
+  assert.equal(readFileSync(join(dir, 'widget.html'), 'utf8'), '<template preview>{{data.t}}</template>')
+  assert.ok(statSync(join(dir, 'fetch.sh')).mode & 0o100, 'a script with #! runs')
+  await rig.rpc('widgetSet', { id: 'ny', on: true })
+  await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.html': '<template preview>new</template>' } })
+  assert.equal((await find(rig, 'ny')).on, false, 'a change turns it off again')
+  assert.deepEqual(Object.keys((await rig.rpc('widgetFiles', { id: 'ny' })).files).sort(), ['fetch.sh', 'widget.html', 'widget.json'], 'files left out stay')
+  assert.match((await rig.rpc('widgetFiles', { id: 'links' })).files['widget.json'], /"name"/, 'an example that comes with Laki')
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: ['x'] }), /1 to 20 files/)
+  mkdirSync(join(rig.data, 'widgets', 'mine'))
+  writeFileSync(join(rig.data, 'widgets', 'mine', 'widget.json'), json)
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.json': json } }), /the user's own/)
 })

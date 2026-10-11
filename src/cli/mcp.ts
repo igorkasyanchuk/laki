@@ -3,8 +3,9 @@
 import { createInterface } from 'node:readline'
 import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { API, type View } from '../shared/types.ts'
+import { widgetFormat } from '../shared/widgetGuide.ts'
 
-export type Tool = { name: string; description: string; inputSchema: object; run: (a: any) => Promise<unknown> }
+export type Tool = { name: string; description: string; inputSchema: object; max?: number; run: (a: any) => Promise<unknown> } // max: what Laki AI's model may read of its result (TOOL_TEXT)
 export type Rpc = <T = any>(method: string, params?: any, timeoutMs?: number) => Promise<T>
 const str = (description: string) => ({ type: 'string', description })
 const obj = (properties: Record<string, object>, required: string[] = []) => ({ type: 'object', properties, required })
@@ -131,6 +132,39 @@ export const tools = (rpc: Rpc): Tool[] => [
     ),
     run: a => rpc('scheduleSet', { project: a.project, when: a.when, prompt: a.prompt, preset: a.preset, name: a.name, ws: a.where }),
   },
+  // extensions (the app's word; files, ids and the API say widget): read the guide, an example, then write one, saved off
+  {
+    name: 'laki_extensions',
+    description: "Laki's extensions (also called widgets: the same thing): small live pages in the sidebar (a clock, a count of PRs, a chart), each a folder with widget.json and widget.html fed by a fetch on a schedule. Each one's id, name, whether it's on, its last fetch's error.",
+    inputSchema: obj({}),
+    run: async () => ((await rpc<View>('state')).widgets ?? []).map(w => ({ id: w.id, name: w.name, description: w.description, on: w.on, builtin: w.builtin, byAi: w.byAi, every: w.every, error: w.error })),
+  },
+  {
+    name: 'laki_extension_guide',
+    description: 'How a Laki extension (a widget) is made (widget.json, widget.html, its fetch command or JS script, the template language, JS pages). Read it before laki_extension_write.',
+    inputSchema: obj({}),
+    max: 12000,
+    run: async () => `Examples that come with Laki (laki_extension_read): links (a JS page, no fetch), my-prs (a shell fetch with gh and jq, a template), team-prs (a JS fetch script, a JS page). Write a new one under a new id with laki_extension_write; change one you made by its id (files you leave out stay; never the user's own nor one that comes with Laki). A fetch runs in the extension's folder; for a JS script, "script": "fetch.mjs". It is saved turned off: the user turns it on in Settings › Extensions (laki://settings/widgets).\n\n${widgetFormat()}`,
+  },
+  {
+    name: 'laki_extension_read',
+    description: "An extension's files as text: an example to copy (links, my-prs, team-prs) or one to change.",
+    inputSchema: obj({ id: str('its id, from laki_extensions') }, ['id']),
+    max: 24000,
+    run: a => rpc('widgetFiles', { id: a.id }),
+  },
+  {
+    name: 'laki_extension_write',
+    description: "Make an extension, or change one Laki AI made: its files in Laki's extensions folder (never the user's own). Files left out stay as they are. Saved turned off: tell the user to turn it on in [Settings › Extensions](laki://settings/widgets), and what its fetch runs.",
+    inputSchema: obj(
+      {
+        id: str('a new id for a new one: lowercase letters, digits and dashes (e.g. ny-clock)'),
+        files: { type: 'object', additionalProperties: { type: 'string' }, description: 'each file name and its whole text: widget.json, widget.html, and the scripts its fetch runs (fetch.sh, fetch.mjs…)' },
+      },
+      ['id', 'files'],
+    ),
+    run: a => rpc('widgetWrite', { id: a.id, files: typeof a.files === 'string' ? JSON.parse(a.files) : a.files }), // some models send the object as JSON text
+  },
 ]
 
 let daemon: Promise<unknown> | undefined
@@ -155,7 +189,7 @@ async function answer(m: any): Promise<object | undefined> {
     case 'ping':
       return {}
     case 'tools/list':
-      return { tools: TOOLS.map(({ run, ...t }) => t) }
+      return { tools: TOOLS.map(({ run, max, ...t }) => t) }
     case 'tools/call':
       try {
         return { content: [{ type: 'text', text: await call(m.params?.name, m.params?.arguments) }] }
