@@ -1,10 +1,11 @@
-// Widgets (daemon/widgets.ts): the sidebar's grid of previews, above its foot, and a widget's full view in a dialog.
+// Widgets (daemon/widgets.ts): the sidebar's grid of previews, above its foot (or a line of them in the top bar or the
+// status bar: WidgetStrip, each widget's place), and a widget's full view in a dialog.
 // The daemon fills each template. A widget without scripts is shown in a shadow root (the app's CSS variables reach
 // it, its styles stay in it) once `clean` has taken out what could run or navigate; one with scripts is a frame of
 // the daemon's page for it, sandboxed, that talks to the app only in messages: open a link, refresh, the full view,
 // run one of its actions.
 // Only what's on screen is rendered: a folded grid, or a closed dialog, holds nothing.
-import { type MouseEvent, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
 import type { WidgetView } from '../../shared/types'
 import { ago, sayOf, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
 import { daemonBase } from './api'
@@ -69,7 +70,7 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
     let live = true
     setErr('')
     if (w.js) {
-      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}&at=${w.at ?? 0}&rev=${w.rev}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
+      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
       return () => void (live = false)
     }
     const el = host.current!
@@ -84,7 +85,7 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, full, config, api.key, theme])
+  }, [w.id, w.js, w.at, w.rev, w.net, full, config, api.key, theme]) // net: Network access's CSP needs the page loaded again
   // a JS widget's messages: only from its own frame, and only right after a click in it (the frame has the focus,
   // the page a user activation), never on its script's own say (a refresh on load would loop: each fetch reloads it);
   // Esc in it closes the full view
@@ -132,30 +133,62 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
 
 const status = (w: WidgetView) => (w.running ? 'fetching…' : w.error ? `failed: ${w.error}` : w.at ? `fetched ${ago(w.at)}` : w.every ? 'not fetched yet' : '')
 
+// JS widgets stopped in Settings › Resources (laki-stop): unloaded until a click, wherever they show. Kept here, not in
+// a strip's state: the status bar's goes away on a Browsers page, and a stop meanwhile would be lost
+const parked = new Set<string>()
+const parkSubs = new Set<() => void>()
+const parkSay = () => parkSubs.forEach(f => f())
+if (typeof window !== 'undefined')
+  window.addEventListener('laki-stop', e => (d => typeof d === 'string' && d.startsWith('widget:') && (parked.add(d.slice(7)), parkSay()))((e as CustomEvent).detail))
+function useParked() {
+  const [, tick] = useState(0)
+  useEffect(() => {
+    const f = () => tick(n => n + 1)
+    parkSubs.add(f)
+    return () => void parkSubs.delete(f)
+  }, [])
+  return [[...parked], (id: string) => (parked.delete(id), parkSay())] as const
+}
+
+// a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
+function Cell({ w, api, parked, load, style }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties }) {
+  return (
+    <div className={`widget ${w.full ? 'opens' : ''}`} style={style} data-tip={`${w.name}${status(w) ? ` · ${status(w)}` : ''}`}>
+      {w.js && parked ? (
+        <button className="widget-parked muted small" onClick={load}>
+          Stopped · load
+        </button>
+      ) : (
+        <WidgetBody w={w} full={false} api={api} />
+      )}
+      {(w.error || w.running) && <span className={`widget-dot ${w.error && !w.running ? 'bad' : ''}`} />}
+    </div>
+  )
+}
+
 // the sidebar's widgets: a grid 3 cells across, each widget its size in cells, plain (no tiles, no head)
 export function WidgetGrid({ widgets, api }: { widgets: WidgetView[]; api: WidgetApi }) {
-  // JS widgets stopped in Settings › Resources (laki-stop): unloaded until a click
-  const [parked, setParked] = useState<string[]>([])
-  useEffect(() => {
-    const f = (e: Event) => (d => typeof d === 'string' && d.startsWith('widget:') && setParked(p => [...p, d.slice(7)]))((e as CustomEvent).detail)
-    window.addEventListener('laki-stop', f)
-    return () => window.removeEventListener('laki-stop', f)
-  }, [])
-  const on = widgets.filter(w => w.on)
+  const [parked, load] = useParked()
+  const on = widgets.filter(w => w.on && (w.place ?? 'side') === 'side')
   if (!on.length) return null
   return (
     <div className="widgets widget-grid">
       {on.map(w => (
-        <div key={w.id} className={`widget ${w.full ? 'opens' : ''}`} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1] * 2}` /* half rows: ½ is a thin line */ }} data-tip={`${w.name}${status(w) ? ` · ${status(w)}` : ''}`}>
-          {w.js && parked.includes(w.id) ? (
-            <button className="widget-parked muted small" onClick={() => setParked(p => p.filter(x => x !== w.id))}>
-              Stopped · load
-            </button>
-          ) : (
-            <WidgetBody w={w} full={false} api={api} />
-          )}
-          {(w.error || w.running) && <span className={`widget-dot ${w.error && !w.running ? 'bad' : ''}`} />}
-        </div>
+        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1] * 2}` /* half rows: ½ is a thin line */ }} />
+      ))}
+    </div>
+  )
+}
+
+// the top bar's or the status bar's widgets: a line high, each as wide as its cells across (a ½-high one fits best)
+export function WidgetStrip({ widgets, api, place }: { widgets: WidgetView[]; api: WidgetApi; place: 'top' | 'status' }) {
+  const [parked, load] = useParked()
+  const on = widgets.filter(w => w.on && w.place === place)
+  if (!on.length) return null
+  return (
+    <div className={`widget-strip ${place} nodrag`}>
+      {on.map(w => (
+        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }} />
       ))}
     </div>
   )

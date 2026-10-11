@@ -39,6 +39,8 @@ const SESSION = {
   codex: 'One codex thread for the whole chat: each ask goes on with it, so it remembers. New chat starts another.',
 } as const
 const CAN = ['See your workspaces, agents and PRs', 'Start workspaces and agent tabs', 'Send prompts to your agents', 'Attach PRs, schedule tasks', 'Make extensions (off until you turn them on)']
+// what Laki's skill adds (Settings › AI, on unless turned off)
+const SKILL_CAN = ["List your open PRs and others' in your repos", "Read and write a project's notes and memory", 'Rename and pin workspaces and tabs, open shells', 'Run your actions, start workspaces from templates', 'Ask you with options when unsure', 'Remove a memory item, task, tab or to-do once you say Yes']
 
 export const money = (n?: number) => (n === undefined ? '—' : n < 0.01 && n > 0 ? `$${n.toFixed(4)}` : `$${n.toFixed(2)}`)
 export const tokens = (n: number) => (n >= 1e6 ? `${(n / 1e6).toFixed(1)}M` : n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n))
@@ -102,6 +104,13 @@ export function AiPage({
   }
   const model = settings.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : 'its default model')
   const runs = `${BACKENDS[backend]}${backend !== 'openrouter' && settings.preset ? ` (${settings.preset})` : ''}`
+  const cost = !settings.hideCost // Settings › AI's Show costs
+  const skill = settings.skill !== false
+  // a question's button: its pick goes on as the next ask (a removal: done on Yes, by Laki)
+  const pick = (id: string, n: number) => (setErr(''), api.call('aiAnswer', { id, n }).catch(e => setErr(e.message)))
+  // the questions still open: none of yours after them (an older one's moment has passed)
+  const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
+  const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
   const t = d?.totals
   const settingsLink = (label: string) =>
     onSettings ? (
@@ -134,7 +143,7 @@ export function AiPage({
             ))}
           </div>
           <span className="grow" />
-          {t && backend !== 'codex' && (
+          {t && cost && backend !== 'codex' && (
             <span className="muted small ai-today" data-tip={`This month: ${money(t.month.cost)}, ${t.month.calls} asks`}>
               today {money(t.today.cost)}
             </span>
@@ -165,7 +174,7 @@ export function AiPage({
                     </div>
                   </div>
                 ) : (
-                  turns(d.chat).map((g, i) => (Array.isArray(g) ? <Tools key={i} list={g} /> : <Message key={i} m={g} link={link} />))
+                  turns(d.chat).map((g, i) => (Array.isArray(g) ? <Tools key={i} list={g} /> : <Message key={i} m={g} link={link} busy={!!d.busy || !ready || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
                 )}
                 {d?.busy && (
                   <div className="ai-working">
@@ -215,7 +224,7 @@ export function AiPage({
                 <div className="ai-err">{err}</div>
               ) : (
                 <div className="ai-foot">
-                  {runs} · {model} · it never archives, deletes, ships or merges
+                  {runs} · {model} · {skill ? 'it removes only what you confirm; never archives, ships or merges' : 'it never archives, deletes, ships or merges'}
                 </div>
               )}
             </div>
@@ -229,7 +238,7 @@ export function AiPage({
                     <div key={c.at} className="ai-call" data-tip={c.error ? `Failed: ${c.error}` : c.ask}>
                       <span className={`ai-ok ${c.ok ? 'ok' : 'bad'}`}>{c.ok ? '✓' : '✗'}</span>
                       <span className="ai-ask">{c.ask || '(an image)'}</span>
-                      <span className="mono">{c.backend === 'codex' ? 'plan' : money(c.cost)}</span>
+                      {cost && <span className="mono">{c.backend === 'codex' ? 'plan' : money(c.cost)}</span>}
                       <span className="ai-meta">
                         {BACKENDS[c.backend]} · <span className="mono">{c.model}</span> · {tokens(c.in)} → {tokens(c.out)} tokens · {(c.ms / 1000).toFixed(1)}s
                         · {ago(c.at)}
@@ -263,14 +272,14 @@ export function AiPage({
                 <h4>Spent</h4>
                 <div className="ai-spent">
                   <div>
-                    <b>{money(t?.today.cost ?? 0)}</b>
+                    <b>{cost ? money(t?.today.cost ?? 0) : `${t?.today.calls ?? 0} asks`}</b>
                     <span>
-                      today · {t?.today.calls ?? 0} asks · {tokens((t?.today.in ?? 0) + (t?.today.out ?? 0))} tokens
+                      today{cost ? ` · ${t?.today.calls ?? 0} asks` : ''} · {tokens((t?.today.in ?? 0) + (t?.today.out ?? 0))} tokens
                     </span>
                   </div>
                   <div>
-                    <b>{money(t?.month.cost ?? 0)}</b>
-                    <span>this month · {t?.month.calls ?? 0} asks</span>
+                    <b>{cost ? money(t?.month.cost ?? 0) : `${t?.month.calls ?? 0} asks`}</b>
+                    <span>this month{cost ? ` · ${t?.month.calls ?? 0} asks` : ''}</span>
                   </div>
                 </div>
                 <button className="link" onClick={() => setTab('calls')}>
@@ -280,13 +289,13 @@ export function AiPage({
               <section>
                 <h4>What it can do</h4>
                 <ul>
-                  {CAN.map(x => (
+                  {[...CAN, ...(skill ? SKILL_CAN : [])].map(x => (
                     <li key={x}>
                       <Icon name="check" size={11} /> {x}
                     </li>
                   ))}
                 </ul>
-                <p className="muted">It never archives, deletes, ships or merges: those stay yours.</p>
+                <p className="muted">{skill ? "Laki's skill is on (Settings › AI). " : ''}It never archives or deletes workspaces, ships or merges: those stay yours.</p>
               </section>
             </div>
           </div>
@@ -348,7 +357,7 @@ function target(args: string): [string, string?] | undefined {
   } catch {}
 }
 
-function Message({ m, link }: { m: AiMsg; link: (text: string) => string }) {
+function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: string) => string; busy: boolean; onPick: (id: string, n: number) => void }) {
   const src = useMemo(() => link(m.text), [m.text, link])
   if (m.role === 'error') return <div className="ai-msg ai-error">{m.text}</div>
   if (m.role === 'user')
@@ -368,7 +377,25 @@ function Message({ m, link }: { m: AiMsg; link: (text: string) => string }) {
       <span className="ai-mark small">
         <Icon name="ai" size={13} />
       </span>
-      <Markdown src={src} />
+      <div className="ai-body">
+        <Markdown src={src} />
+        {m.ask && (
+          // its options: one pick, then they stay as they were picked
+          <div className="ai-options" role="group" aria-label="Answer">
+            {m.ask.options.map((o, n) => (
+              <button
+                key={o}
+                className={m.ask!.picked === o ? 'picked' : m.ask!.act && n === 0 ? 'danger' : ''}
+                disabled={busy || m.ask!.picked !== undefined}
+                aria-pressed={m.ask!.picked === o}
+                onClick={() => onPick(m.ask!.id, n)}
+              >
+                {m.ask!.picked === o && <Icon name="check" size={11} />} {o}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   )
 }

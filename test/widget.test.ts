@@ -426,3 +426,37 @@ test('extensions Laki AI writes: in its own folder only, saved off, read back; n
   writeFileSync(join(rig.data, 'widgets', 'mine', 'widget.json'), json)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.json': json } }), /the user's own/)
 })
+
+test('extensions: a place (sidebar, top bar, status bar), network access for a JS page, deleted for good', async t => {
+  const rig = await fresh(t)
+  widget(rig, 'net', { name: 'Net', place: 'status' }, '<template preview><script>1</script></template>', {})
+  widget(rig, 'plain', { name: 'Plain', place: 'nowhere' }, '<template preview>hi</template>', {})
+  await rig.rpc('widgetReload')
+  assert.equal((await find(rig, 'net')).place, 'status', "widget.json's place")
+  assert.equal((await find(rig, 'plain')).place, 'side', 'one it does not know: the sidebar')
+  await rig.rpc('widgetSet', { id: 'plain', place: 'top' })
+  assert.equal((await find(rig, 'plain')).place, 'top', "the user's wins")
+  await rig.rpc('widgetSet', { id: 'plain', place: 'bogus' })
+  assert.equal((await find(rig, 'plain')).place, 'side')
+
+  // network: off until the user turns it on, and only a JS page's CSP opens, to https
+  const { port } = rig.info()
+  const key = (await rig.rpc('state')).widgetKey
+  const csp = async () => (await fetch(`http://127.0.0.1:${port}/widget/net?key=${key}`)).headers.get('content-security-policy') ?? ''
+  assert.equal((await find(rig, 'net')).net, undefined)
+  assert.doesNotMatch(await csp(), /connect-src/)
+  await rig.rpc('widgetSet', { id: 'net', net: true })
+  assert.equal((await find(rig, 'net')).net, true)
+  assert.match(await csp(), /connect-src https:; img-src data: https:/)
+  await rig.rpc('widgetSet', { id: 'plain', net: true })
+  assert.equal((await find(rig, 'plain')).net, undefined, 'a template widget has no page of its own')
+
+  // delete: its folder and its storage go; one that comes with Laki only turns off
+  await assert.rejects(rig.rpc('widgetRm', { id: 'links' }), /comes with Laki/)
+  const dir = join(rig.data, 'widgets', 'net')
+  assert.ok(existsSync(join(rig.data, 'widget-data', 'net.json')))
+  assert.deepEqual(await rig.rpc('widgetRm', { id: 'net' }), { deleted: 'net' })
+  assert.ok(!existsSync(dir) && !existsSync(join(rig.data, 'widget-data', 'net.json')))
+  assert.equal(await find(rig, 'net'), undefined)
+  await assert.rejects(rig.rpc('widgetRm', { id: 'net' }), /no widget net/)
+})

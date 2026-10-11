@@ -28,7 +28,7 @@ worktree. Agents keep running when the window is closed.
   drive a browser of their own on it (`laki browser`).
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports) and
   links to what they publish (Claude artifacts, sites, gists: kept on their own as an agent publishes them): counted in the status bar, a gallery of previews (links first,
-  opened in the browser), the links in the info panel too.
+  opened in the browser) a click away, in Finder or the side panel's Files too, the links in the info panel.
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only (or anyone with the
   link, if you type *confirm*: a red warning says what that risks).
@@ -39,15 +39,17 @@ worktree. Agents keep running when the window is closed.
   the one you pick.
 - **Looks**: six Dock icons to pick from; 98 themes, 80 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
-- **Extensions** (widgets, the same thing): live tiles in the sidebar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
+- **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar or the status bar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
   with an agent's laki-widget skill, Laki AI, or any AI chat: Settings has the prompt), each fed by a command on a schedule (within working hours, if
-  you like), with a full view a click away; their buttons answer with toasts and dialogs.
+  you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.
+  The SDK: [docs/extensions.md](docs/extensions.md).
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new
   workspace's prompt.
 - **A video while you work**: a YouTube link plays at the bottom of the sidebar.
 - **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it starts workspaces, reviews
-  PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); on OpenRouter or claude -p / codex exec, every
-  ask's cost logged.
+  PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); with Laki's skill it also
+  lists your PRs and others', runs your actions and templates, keeps a project's notes and memory, and asks you with options when unsure (it
+  removes something only when you press Yes); on OpenRouter or claude -p / codex exec, every ask's cost logged (shown or hidden).
 - **Keyboard and CLI**: ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
 
 ## Install

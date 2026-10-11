@@ -23,7 +23,7 @@ const KEYS: [string, string][] = [
   ['⌘↑ / ⌘↓', 'previous / next workspace'],
   ['⌘J', 'the next tab that needs you, in any workspace'],
   ['⌘L', 'send a message later: to an agent or Laki AI'],
-  ['⌘⇧A', "show or hide the workspace's artifacts"],
+  ['⌘⇧A', "show or hide the workspace's artifacts (the status bar's Artifacts too; their ⋯: Finder, or the side panel's Files)"],
   ['⌘⇧⏎', 'full screen: just the tab, or back (also the tab bar’s ⤢)'],
   ['⌘K', 'the palette: every workspace, tab and action'],
   ['⌘P', 'find a file in the workspace'],
@@ -188,7 +188,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
         },
         { id: 'actions', k: 'Actions', v: "Settings › Actions (and a project's): a prompt for an agent, or a command for a terminal. Run ▾ lists them for the workspace you're in." },
         { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent, its model and effort under the prompt (type in a picker to filter it, ⏎ picks). The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › Appearance › Turn timers: how long each turn has gone. In a Claude Code tab, /laki:new <the task> with codex starts it in a new workspace of the project." },
-        { id: 'widgets', k: 'Extensions', v: 'Extensions (also called widgets): live tiles at the bottom of the sidebar (a click opens the full view): each a folder with widget.json and widget.html, fed by a command on a schedule while the app is open. Settings › Extensions lists them, each with its switch; a click on one sizes it (and its full view: small, medium, large), sets it up and opens its folder; the Extension creator skill (Settings › Agent skill) has your agent make new ones, or Make one with AI there gives a prompt for any AI chat. Laki AI makes them too, saved off until you turn them on.' },
+        { id: 'widgets', k: 'Extensions', v: 'Extensions (also called widgets or plugins): live tiles in the sidebar, the top bar or the status bar (a click opens the full view): each a folder with widget.json and widget.html, fed by a command on a schedule while the app is open. Settings › Extensions lists them, each with its switch; a click on one places it (sidebar, top bar, status bar), sizes it (and its full view: small, medium, large), sets it up, gives a JS one network access, opens its folder or deletes it; the Extension creator skill (Settings › Agent skill) has your agent make new ones, or Make one with AI there gives a prompt for any AI chat. Laki AI makes them too, saved off until you turn them on.' },
         { id: 'board', k: 'Board', v: 'The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.' },
         { id: 'ai', k: 'AI', v: "Settings › AI turns it on (OpenRouter with your key, or claude -p / codex exec), then AI on the rail, in ⌘K or in the floating bubbles' +: ask in plain words (⏎ asks, ⇧⏎ a new line), or paste a screenshot of PR links, and it starts workspaces, opens tabs, sends prompts and attaches PRs. It never archives, deletes, ships or merges. Calls: each ask with its tokens and cost." },
         {

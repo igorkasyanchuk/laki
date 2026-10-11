@@ -26,6 +26,23 @@ version it builds, with the date. -->
   starts.
 - **Laki AI makes extensions**: ask for one (*a clock with the time in New York*) and it writes it in Laki's extensions
   folder, saved off; turn it on in Settings › Extensions after a look (*by Laki AI* on its row).
+- **Extensions in the top bar or the status bar**: each one's *Sidebar / Top bar / Status bar* in Settings › Extensions;
+  in a bar it's a line high.
+- **Network access for an extension**: a switch per JS extension (off by default) lets its page fetch from https sites.
+- **Delete an extension** (or plugin: search finds it by either word) from Settings › Extensions: its folder and
+  settings, for good, after a confirm.
+- **The extensions SDK** in one page: `docs/extensions.md`.
+- **Laki's skill for Laki AI** (Settings › AI, on by default): your open PRs and others' in your repos, projects' notes
+  and memory, renaming and pinning, shells, your actions and prompt templates (*the review action on each PR in this
+  screenshot*), to-dos and scheduled tasks. It asks you with options as buttons when unsure, and removes a memory item,
+  task, tab or to-do only when you press Yes.
+- **Show costs ($)** (Settings › AI): off hides the money on the AI page.
+- **Your instructions** (Settings › AI): your own context for Laki AI, added to its instructions at every ask.
+- **Artifacts**: the status bar's *Artifacts* opens the previews at once; their ⋯ has *Show in Finder* and *Open in
+  Files* (the side panel's Files has an *Artifacts* tab now).
+- **New workspace**: *worktree* is a switch; the template, agent and model pickers are words with a ⌄, not buttons; the
+  prompt's top corners no longer poke out of its card (on the AI page too).
+- **PR marks** go with GitHub's mark by default.
 
 ## 0.10.0 · Oct 10, 2026
 

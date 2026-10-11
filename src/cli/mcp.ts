@@ -2,7 +2,8 @@
 // any MCP client. Its tools go through the daemon's API like the CLI's commands; none deletes, archives or ships.
 import { createInterface } from 'node:readline'
 import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
-import { API, type View } from '../shared/types.ts'
+import { AI_ACTS, API, mergeActions, prRef, templated, templatesFor, type View } from '../shared/types.ts'
+import { stamp } from '../shared/when.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 
 export type Tool = { name: string; description: string; inputSchema: object; max?: number; run: (a: any) => Promise<unknown> } // max: what Laki AI's model may read of its result (TOOL_TEXT)
@@ -18,7 +19,7 @@ export async function state(rpc: Rpc = conn) {
     projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind })), // kind: shells (the Terminals project) or browsers, the user's own
     workspaces: v.workspaces
       .filter(w => !w.archived)
-      .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title } })),
+      .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review } })),
     tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
 }
@@ -46,12 +47,15 @@ export const tools = (rpc: Rpc): Tool[] => [
         issue: str('a GitHub issue (its URL or number) to work on: its title and text become the prompt, with the prompt above after them'),
         pr: str("a GitHub PR (its URL or number) to work on: the workspace is a worktree on its branch (forks too), named after it"),
         presets: { type: 'array', items: { type: 'string' }, description: 'a race: 2–6 presets (claude, codex…) that each get a worktree on the same prompt, for the user to compare and keep one' },
+        template: str("a prompt template's name (laki_templates): the prompt goes into it"),
+        action: str("an agent action's name (Run ▾'s, laki_actions): its prompt is what the agent does, the prompt above added after it"),
       },
       ['project'],
     ),
-    run: a => {
-      const o = { project: a.project, prompt: a.prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr }
-      if (!a.prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
+    run: async a => {
+      const prompt = a.template || a.action ? await promptOf(rpc, a.project, a.prompt ?? '', a.template, a.action, a.pr, a.base) : a.prompt
+      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr }
+      if (!prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },
   },
@@ -135,7 +139,7 @@ export const tools = (rpc: Rpc): Tool[] => [
   // extensions (the app's word; files, ids and the API say widget): read the guide, an example, then write one, saved off
   {
     name: 'laki_extensions',
-    description: "Laki's extensions (also called widgets: the same thing): small live pages in the sidebar (a clock, a count of PRs, a chart), each a folder with widget.json and widget.html fed by a fetch on a schedule. Each one's id, name, whether it's on, its last fetch's error.",
+    description: "Laki's extensions (also called widgets or plugins: the same thing): small live pages in the sidebar (a clock, a count of PRs, a chart), each a folder with widget.json and widget.html fed by a fetch on a schedule. Each one's id, name, whether it's on, its last fetch's error.",
     inputSchema: obj({}),
     run: async () => ((await rpc<View>('state')).widgets ?? []).map(w => ({ id: w.id, name: w.name, description: w.description, on: w.on, builtin: w.builtin, byAi: w.byAi, every: w.every, error: w.error })),
   },
@@ -167,8 +171,167 @@ export const tools = (rpc: Rpc): Tool[] => [
   },
 ]
 
+// a project's prompt templates and Run ▾'s actions, as the app has them (templatesFor, mergeActions)
+async function kit(rpc: Rpc, project?: string, view?: View) {
+  const v: View = view ?? (await rpc('state'))
+  const p = project ? v.projects.find(x => x.id === project || x.name === project) : undefined
+  if (project && !p) throw new Error(`no project ${project}`)
+  const templates = templatesFor(v.settings.templates, p?.config?.templates).filter(t => t.name?.trim() && t.text?.trim())
+  return { v, p, templates, actions: mergeActions(v.settings.actions, p?.config?.actions) }
+}
+const named = <T extends { name: string }>(list: T[], name: string, what: string) => list.find(x => x.name.trim().toLowerCase() === name.trim().toLowerCase()) ?? Promise.reject(new Error(`no ${what} ${name}: ${list.map(x => x.name).join(', ') || 'none'}`))
+// a new workspace's prompt through a template or from an action (its words first, what was asked after)
+async function promptOf(rpc: Rpc, project: string, prompt: string, template?: string, action?: string, pr?: string, base?: string) {
+  const { p, templates, actions } = await kit(rpc, project)
+  if (action) {
+    const x = await named(actions.filter(a => a.target !== 'shell'), action, 'agent action')
+    prompt = [stamp(x.text.trim(), Date.now()), prompt.trim()].filter(Boolean).join('\n\n') // its {{HH:mm}}-style dates: now's, as Run ▾'s
+  }
+  if (!template) return prompt
+  return templated(await named(templates, template, 'template'), prompt, { project: p?.name, base, pr: pr ? prRef(String(pr)) : undefined }) // as the new-workspace page fills one
+}
+
+// Laki's skill for Laki AI (Settings › AI, on unless turned off): what these tools are for, in its instructions
+export const SKILL = `With Laki's skill you also: list a project's open PRs (laki_prs: yours, or others' to review), read a project's notes, memory, templates, actions and scheduled tasks (laki_project), write its notes and memory, rename or pin workspaces and tabs, open a shell (its command typed for the user to run), run the user's own actions (laki_run_action: a terminal's command is typed for them to run), start a workspace through a prompt template or an agent action (laki_new_workspace's template and action: e.g. a review action on each PR of a screenshot, a workspace each), add to-dos, change scheduled tasks.
+Not sure what the user means, or which of a few they want? Ask with laki_ask (2-6 short options) instead of guessing, then stop: their pick comes as the next message.
+To remove something (a memory item, a scheduled task, a tab, a to-do) call laki_remove: the user confirms it with a button, and Laki removes it, not you. Never archive, delete, ship or merge workspaces.`
+
+// the skill's tools: Laki AI's only (laki mcp gives them when LAKI_AI_SKILL is set: its claude -p or codex exec)
+export const skillTools = (rpc: Rpc): Tool[] => [
+  {
+    name: 'laki_ask',
+    description: 'Ask the user a question with 2-6 options, shown as buttons in the conversation; then end your turn without more words: their pick comes as the next message. Use it when unsure what they mean or which of several things they want.',
+    inputSchema: obj({ question: str('the question, short'), options: { type: 'array', items: { type: 'string' }, description: '2 to 6 short answers to pick from' } }, ['question', 'options']),
+    run: a => rpc('aiQuestion', { text: a.question, options: a.options }),
+  },
+  {
+    name: 'laki_remove',
+    description: 'Ask the user to remove something: a memory item of a project, a scheduled task, a tab (closing it), a to-do. They see Yes / No buttons and Laki removes it on Yes; you never remove it yourself. End your turn after it.',
+    inputSchema: obj({ kind: { type: 'string', enum: [...AI_ACTS] }, id: str('its id (a memory item: from laki_project; a tab: <tab id>)'), project: str("a memory item's project id"), }, ['kind', 'id']),
+    run: a => rpc('aiQuestion', { act: { kind: a.kind, id: a.id, project: a.project } }), // Laki names it, from its own state
+  },
+  {
+    name: 'laki_prs',
+    description: "Open pull requests on GitHub in a project's repo (gh pr list), or in every project's: who: mine (the user's), others (everyone else's: to review), all. Each with its author, branch, review state, and the workspace that has it, if one does.",
+    inputSchema: obj({ project: str('a project id (default: every git project)'), who: { type: 'string', enum: ['mine', 'others', 'all'] } }),
+    max: 12000,
+    run: async a => {
+      const v: View = await rpc('state')
+      const ps = v.projects.filter(p => p.git !== false && !p.kind && (!a.project || p.id === a.project || p.name === a.project))
+      if (!ps.length) throw new Error(a.project ? `no git project ${a.project}` : 'no git projects')
+      return Promise.all(ps.map(p => rpc('prList', { project: p.id, who: a.who || 'all' }, 40000).then(prs => ({ project: p.id, name: p.name, prs }), e => ({ project: p.id, name: p.name, error: e.message }))))
+    },
+  },
+  {
+    name: 'laki_project',
+    description: "A project's notes (the user's Markdown), memory (items to remember, each with an id), prompt templates, actions (Run ▾'s: a prompt for an agent, or a command for a terminal), scheduled tasks and to-dos.",
+    inputSchema: obj({ project: str('a project id') }, ['project']),
+    max: 16000,
+    run: async a => {
+      const { v, p, templates, actions } = await kit(rpc, a.project)
+      return { id: p!.id, name: p!.name, path: p!.path, notes: p!.notes || '', memory: p!.memory ?? [], templates, actions, schedules: (v.schedules ?? []).filter(x => x.project === p!.id).map(x => ({ id: x.id, name: x.name, when: x.when, on: x.on, next: x.next, prompt: x.prompt.slice(0, 300) })), todos: (v.todos ?? []).filter(t => t.project === p!.id) }
+    },
+  },
+  {
+    name: 'laki_notes_write',
+    description: "Write a project's notes (Markdown, the user's own page): add to the end, or replace them all when asked to.",
+    inputSchema: obj({ project: str('a project id'), text: str('Markdown'), replace: { type: 'boolean', description: 'replace the whole notes (default: add to the end)' } }, ['project', 'text']),
+    run: async a => {
+      const { p } = await kit(rpc, a.project)
+      const notes = a.replace ? String(a.text) : [p!.notes?.trimEnd(), String(a.text)].filter(Boolean).join('\n\n')
+      await rpc('projectSet', { id: p!.id, notes })
+      return { ok: true, length: notes.length }
+    },
+  },
+  {
+    name: 'laki_memory_write',
+    description: "Add an item to a project's memory (a fact to keep: a decision, a how-to), or change one by its id.",
+    inputSchema: obj({ project: str('a project id'), text: str('the item, a line or a few'), id: str("an item's id to change it (default: a new one)") }, ['project', 'text']),
+    run: async a => {
+      const { p } = await kit(rpc, a.project)
+      const list = p!.memory ?? []
+      const text = String(a.text).trim()
+      if (!text) throw new Error('its text')
+      if (a.id && !list.some(m => m.id === a.id)) throw new Error(`no memory item ${a.id} in ${p!.name}`)
+      const id = a.id || Math.random().toString(36).slice(2, 10)
+      const memory = a.id ? list.map(m => (m.id === a.id ? { ...m, text, edited: Date.now() } : m)) : [...list, { id, text, at: Date.now() }]
+      await rpc('projectSet', { id: p!.id, memory })
+      return { ok: true, id }
+    },
+  },
+  {
+    name: 'laki_rename',
+    description: 'Rename, pin, mute or color a workspace, or rename or mute a tab.',
+    inputSchema: obj({ ws: str('a workspace id'), tab: str('a tab id (instead of ws)'), name: str('its new name'), pinned: { type: 'boolean', description: 'a workspace: in the sidebar’s Pinned' }, muted: { type: 'boolean', description: 'no notifications from it' }, color: str('a workspace’s color: red, orange, yellow, lime, green, teal, blue, purple, pink, brown, gray, or none') }),
+    run: a => {
+      if (a.tab) return rpc('tabSet', { id: a.tab, name: a.name || undefined, muted: a.muted })
+      if (!a.ws) throw new Error('a workspace or a tab')
+      return rpc('wsSet', { id: a.ws, name: a.name || undefined, pinned: a.pinned, muted: a.muted, color: a.color === 'none' ? '' : a.color })
+    },
+  },
+  {
+    name: 'laki_shell',
+    description: "Open a shell: a tab in a workspace's folder, or a new Terminal in the home folder. A command is typed into it for the user to run (Enter is theirs).",
+    inputSchema: obj({ ws: str('a workspace id (default: a new Terminal)'), command: str('what to type, not run') }),
+    run: async a => {
+      // a workspace's new shell tab, or a new Terminal's (quickNew: a workspace with its shell)
+      const t = a.ws ? await rpc('tabNew', { ws: a.ws, preset: 'shell' }) : await rpc<{ id: string }>('quickNew', { kind: 'shells' }).then(w => rpc<View>('state').then(v => v.tabs.find(x => x.workspace === w.id)))
+      if (!t?.id) throw new Error('no shell tab')
+      // ponytail: a fixed 1.5 s for the shell's prompt to come up; a slow login shell gets it typed early (bringBack's wait for quiet output if that bites)
+      if (a.command) await new Promise(r => setTimeout(r, 1500)).then(() => rpc('send', { target: t.id, text: String(a.command), enter: false }))
+      return { ok: true, workspace: t.workspace, tab: t.id, typed: !!a.command }
+    },
+  },
+  {
+    name: 'laki_actions',
+    description: "The user's actions (Run ▾): prompts for an agent and commands for a terminal, global and the project's, by name.",
+    inputSchema: obj({ project: str('a project id') }),
+    run: async a => (await kit(rpc, a.project)).actions,
+  },
+  {
+    name: 'laki_templates',
+    description: "The user's prompt templates for new workspaces ({{prompt}} is where the prompt goes), global and the project's.",
+    inputSchema: obj({ project: str('a project id') }),
+    run: async a => (await kit(rpc, a.project)).templates,
+  },
+  {
+    name: 'laki_run_action',
+    description: "Run one of the user's actions in a workspace, as Run ▾ does: an agent's prompt goes to its agent there (a new tab of it when none runs); a terminal's command is typed into a new shell tab for the user to run (Enter is theirs, as laki_shell's).",
+    inputSchema: obj({ ws: str('a workspace id'), name: str("the action's name (laki_actions)") }, ['ws', 'name']),
+    run: async a => {
+      const v0: View = await rpc('state')
+      const w = v0.workspaces.find(x => x.id === a.ws)
+      if (!w) throw new Error(`no workspace ${a.ws}`)
+      const { v, actions } = await kit(rpc, w.project, v0)
+      const x = await named(actions, a.name, 'action')
+      const text = stamp(x.text, Date.now()) // its {{HH:mm}}-style dates: now's, as Run ▾'s
+      if (x.target === 'shell') {
+        const t = await rpc('tabNew', { ws: w.id, preset: 'shell' })
+        await new Promise(r => setTimeout(r, 1500)) // ponytail: as laki_shell's, a fixed wait for the prompt
+        await rpc('send', { target: t.id, text, enter: false }) // typed, not run: a command on the Mac is the user's to start
+        return { ok: true, workspace: w.id, tab: t.id, typed: true }
+      }
+      const live = v.tabs.find(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited' && (x.target === 'any' || t.preset === x.target))
+      if (live) return rpc('send', { target: live.id, text, whenIdle: true, agent: true })
+      return rpc('tabNew', { ws: w.id, preset: x.target === 'any' ? v.settings.agent || 'claude' : x.target, prompt: text, name: x.name })
+    },
+  },
+  {
+    name: 'laki_schedule_set',
+    description: 'Change a scheduled task by its id (laki_schedules): turn it on or off, its times in English, prompt or name.',
+    inputSchema: obj({ id: str("the task's id"), on: { type: 'boolean' }, when: str('e.g. "weekdays at 9am"'), prompt: str('its prompt'), name: str('its name') }, ['id']),
+    run: a => rpc('scheduleSet', { id: a.id, on: a.on, when: a.when, prompt: a.prompt, name: a.name }),
+  },
+  {
+    name: 'laki_todo_add',
+    description: "Add a to-do to a project's column on the Board (a task to start later).",
+    inputSchema: obj({ project: str('a project id'), text: str('the task') }, ['project', 'text']),
+    run: a => rpc('todoAdd', { project: a.project, text: a.text }),
+  },
+]
+
 let daemon: Promise<unknown> | undefined
-const TOOLS = tools(conn)
+const TOOLS = [...tools(conn), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(conn) : [])]
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool) throw new Error(`no tool ${name}`)

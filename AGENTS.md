@@ -86,7 +86,7 @@ workspace's `procs` and `portNames`, `fileRead` `base`; 17: `meme`; 18: `project
 workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`, `fileRead` `lossy`; 21: a project's `seps` and `rows`, kept by `projectSet` and `reorder`; 22: `prRefresh`, `doctor`'s `cloudflared`; 23: `wsNew`/`wsFan` `place`; 24: `prAct`, an action's `any`; 25: `prDiff`, a sep's `color`, a PR's `mine`; 26: widgets: `widgetRender`/`widgetSet`/`widgetRun`/`widgetAction`/`widgetReload`, the view's `widgets`, `widgetKey`, `widgetHome`, `skillSet` `skill`; 27: a widget's `options` and `view`, `widgetSet` `view`, `openIn` `widget`; 28: `resources`, `tabSleep`/`tabWake`, a tab's `asleep`; 29: `logs`, settings' `devMode`, `widgetAction`'s `toast`/`modal`; 30: `progress`, a tab's
 `progress`; 31: a sep's `template`, kept by `projectSet`; 32: `prAttach`, a project's `notes`, kept by `projectSet`; 33: `prAct` `merge`, a workspace's `autoLand`, a project's `pr` and
 `mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`; 34: `quickNew`, a project's `kind`,
-a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`; 46: a PR's `approvedByMe`, `commentedByMe`; 47: `widgetFiles`, `widgetWrite`, a widget's `byAi`). A
+a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`; 46: a PR's `approvedByMe`, `commentedByMe`; 47: `widgetFiles`, `widgetWrite`, a widget's `byAi`; 48: `widgetRm`, a widget's `place` and `net`, `widgetSet` `place`/`net`, `prList`, `aiQuestion`/`aiAnswer`, a chat message's `ask`, settings' `ai.skill` and `ai.hideCost`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -154,7 +154,8 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   workspace: `inside`, links followed, by `realpath`);
 - widgets (below): `widgetRender` (`id`, `full`: the filled HTML, a JS widget's as a whole page; null: no such
   view), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes),
-  `widgetRun` (fetch now), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'`) nor through a link, files left out kept; saved off with the store's `by: 'ai'`, the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
+  `widgetRun` (fetch now), `widgetRm` (Settings' trash can, after `ask`: the folder, `rmSync` (a link: only it), and its
+  store; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'`) nor through a link, files left out kept; saved off with the store's `by: 'ai'`, the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
@@ -190,6 +191,11 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
 - Laki AI (below): `aiAsk` (`text`, `images`: paths `imageSave` gave; resolves with the answer), `aiState` (the
   conversation, `busy`, `key`: one is saved, the last 100 calls, `totals`), `aiNew`, `aiStop`, `aiKey` (`key`; empty
   removes it);
+- Laki AI's skill: `prList` (`project`, `who` mine/others/all: `gh pr list --state open` in the project, `ghLogin`
+  for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
+  `AI_ACTS` memory/schedule/tab/todo with `id`, `project`, `label`: Yes / No; only while `busy`; a chat message with
+  `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an `act`'s Yes is `remove` here,
+  never the AI's own);
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`: resolves once there's a link),
   `remoteStop`, `remoteTick` (`now`: tests move the clock);
 - terminals: `screen`, `input`, `resize`, `view`, `detach`;
@@ -498,6 +504,12 @@ gone or archived workspace is a failed run.
 
 `daemon/ai.ts` (`settings.ai`, `AiSettings`; off unless `on`): one conversation that works Laki with `cli/mcp.ts`'s
 `tools(rpc)`, given the daemon's own `call` (no HTTP), less `laki_progress`: nothing archives, deletes, ships or merges;
+with `settings.ai.skill` unset or true, Laki's skill: `cli/mcp.ts` `skillTools` (`laki_ask`, `laki_remove`: `aiQuestion` names it from state, `whatOf`; `aiAnswer` refuses a question with an ask of yours after it,
+`laki_prs`, `laki_project`, `laki_notes_write`, `laki_memory_write`, `laki_rename`, `laki_shell`: a command typed with
+`enter: false`, never run; `laki_actions`, `laki_templates`, `laki_run_action` (a terminal's command typed likewise; an agent's sent), `laki_schedule_set`, `laki_todo_add`) and
+`SKILL` after `SYSTEM` (`system()`), given to `laki mcp` as `LAKI_AI_SKILL=1` for the CLI backends; a turn that asked
+(`asked`) ends there on OpenRouter and says no answer of its own; `laki_new_workspace` takes a `template` and an agent
+`action` (`promptOf`, `kit`: text.ts' merge rules); `settings.ai.hideCost`: the AI page without money; `settings.ai.context` (Settings › AI › *Your instructions*, `AI_CONTEXT_MAX`): the user's words after `SYSTEM` and `SKILL`, in `system()`;
 its extension tools (`laki_extensions`, `laki_extension_guide`: `widgetFormat`, `laki_extension_read`, `laki_extension_write`;
 a tool's `max` is what its result may give the model, over `TOOL_TEXT`) make extensions, saved off;
 its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask at a time (`busy`); `aiStop` aborts the
@@ -585,7 +597,8 @@ native setter and fires input and change), then wait 300 ms.
 
 ### Widgets
 
-`daemon/widgets.ts`: a widget is a folder with `widget.json` (`Manifest`: name, size in cells (down 1–4 or 0.5: half a cell, `down`; the grid's
+`daemon/widgets.ts` (the SDK for people: `docs/extensions.md`): a widget is a folder with `widget.json` (`Manifest`: name, `place` (`WIDGET_PLACES`: side, top,
+status; the store's wins, `placeOf`), size in cells (down 1–4 or 0.5: half a cell, `down`; the grid's
 rows are half cells, `span size*2`), `every` minutes,
 `view` (the full view's dialog: `s`, `m`, `l`, `WidgetSize`; `.modal.widget-modal.<size>`), `config` (each setting a
 default or a `Spec`: `type` text, number, bool, choice, list, `label`, `hint`, `choices`; `optionsOf` gives the view's
@@ -612,8 +625,10 @@ result: App's `widgetApi.say`, a modal through ui.tsx's `choose` (the `ask` dial
 `ago`, `spark`), `viewOf` (`<template preview>` / `<template full>`), `WIDGET_CSS` and `pageOf`. A widget whose HTML
 has a `<script>` (`js`) is a page the daemon serves at `GET /widget/<id>?key=<widgetKey>` with a CSP of `sandbox
 allow-scripts; default-src 'none'` (no network, an opaque origin), the theme's variables from its `theme` query,
-`window.laki` and a click bridge that posts `open`, `refresh`, `full` and `run` to the app. The renderer's
-`Widgets.tsx`: `WidgetGrid` (the sidebar's: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
+`window.laki` and a click bridge that posts `open`, `refresh`, `full` and `run` to the app; the store's `net` (Settings'
+*Network access*, a JS widget's only, never widget.json's) adds `connect-src https:` and https images and fonts (`netOf`). The renderer's
+`Widgets.tsx`: `WidgetStrip` (`place` top: the tab bar after its spacer; status: the status bar's end; each `Cell` as wide
+as its cells across, `--widget-cell`, a line high), `WidgetGrid` (the sidebar's, `place` side or none: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
 (a template widget in a shadow root after `clean`, the sanitizer: no scripts, frames, forms, `on…` attributes or
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
@@ -905,6 +920,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
   line opens Raw). Tested in `test/markdown.test.ts`.
+- **Artifacts in Files** (`SidePanel.tsx` `Files` `root`, App's `filesRoot`): with a storage folder, Files has
+  *Workspace* / *Artifacts* (`PanelApi.artifacts`: `artifactList` as the tree, the preview's `storage` (read-only,
+  `openLabel` Open: main's `open-path`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's
+  *Artifacts: n* toggles `ArtifactsBar`; its ⋯ (`ArtifactsApi` `reveal('')`, `files`: `artifactsInFiles`) and the big
+  view's buttons go to Finder or there.
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,
   which replace a global one of the same name and target; an agent's only with a live tab of it (`any`: any
   agent's), the focused one first; a shell's to the focused shell, any, or none: each app's `runAction` opens one), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and

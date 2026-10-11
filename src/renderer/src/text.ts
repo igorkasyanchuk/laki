@@ -1,30 +1,10 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { fillTemplate, prIn, type RunAction, type Template } from '../../shared/types.ts'
+import { fillTemplate, mergeActions, prRef, type RunAction, type Template, templated, templatesFor } from '../../shared/types.ts'
 export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
-export { fillTemplate }
-
-// a project's templates first, then the global ones it doesn't replace (one of the same name)
-export const templatesFor = (global: Template[] = [], project: Template[] = []) => [...project, ...global.filter(g => !project.some(t => t.name.trim() === g.name.trim()))]
-
-// a PR as the new-workspace page has it: the PR field (#123 or its URL), else a PR's URL in the prompt, else a prompt
-// that is only #123 or 123
-export function prRef(field = '', prompt = '') {
-  const ref = (s: string) => /^https?:\/\//.test(s) ? s : /^#?\d+$/.test(s) ? `#${s.replace('#', '')}` : undefined
-  return ref(field.trim()) ?? prIn(prompt) ?? ref(prompt.trim())
-}
-
-// the prompt through a template; one without {{prompt}} gets the typed text after it, unless that text is only the
-// PR its {{pr}} took
-export function templated(t: Template | undefined, prompt: string, vars: Record<string, string | undefined> = {}) {
-  if (!t) return prompt
-  const text = fillTemplate(t.text, { ...vars, prompt })
-  const uses = (k: string) => new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`).test(t.text)
-  const taken = uses('pr') && !!vars.pr && [vars.pr, vars.pr.replace('#', '')].includes(prompt.trim())
-  return uses('prompt') || !prompt.trim() || taken ? text : `${text}\n\n${prompt}`
-}
+export { fillTemplate, mergeActions, prRef, templated, templatesFor } // shared: laki mcp's (Laki AI's) templates and actions too
 
 // a workspace's name from what was typed, not the template around it (as the daemons do: its first words)
 export const nameOf = (prompt: string) => prompt.trim().split(/\s+/).slice(0, 4).join(' ') || undefined
@@ -49,11 +29,6 @@ export type ActionTab = { id: string; agent?: string; shell?: boolean } // a wor
 // Run ▾'s actions, worked out as it opens: the global ones, then the project's (one with a global one's name and
 // target replaces it). An agent's only while the workspace runs that agent (its focused tab first; any: any agent); a terminal's
 // always (the focused shell, else any; none: a new one)
-// the global actions and a project's together: a project's one with a global one's name and target replaces it
-export function mergeActions(global: RunAction[] = [], project: RunAction[] = []) {
-  const same = (a: RunAction, b: RunAction) => a.target === b.target && (a.name ?? '').trim() === (b.name ?? '').trim() // a hand-edited one may lack a name
-  return [...global.filter(g => !project.some(p => same(p, g))), ...project].filter(a => a.name?.trim() && a.text?.trim())
-}
 export function actionsFor(global: RunAction[] = [], project: RunAction[] = [], tabs: ActionTab[] = [], focused?: string) {
   const pick = (ok: (t: ActionTab) => boolean) => tabs.find(t => t.id === focused && ok(t)) ?? tabs.find(ok)
   const agent: { action: RunAction; tab: string }[] = []

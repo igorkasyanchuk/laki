@@ -2615,6 +2615,23 @@ function ghLogin(at: At) {
   return p
 }
 
+// Laki AI's laki_prs: a project's open PRs (gh pr list), yours, everyone else's or all, each with the workspace that has
+// it (by its URL), if one does; mine: the author's the login, or the list is --author @me's (no login needed)
+export async function prList(o: { project: string; who?: 'mine' | 'others' | 'all' }) {
+  const p = findProject(o.project)
+  if (p.git === false || p.kind) throw new Error(`${p.name} isn't a git repository`)
+  const fields = 'number,title,author,url,headRefName,baseRefName,isDraft,reviewDecision,updatedAt'
+  const [{ stdout }, me] = await Promise.all([
+    exec(p, 'gh', ['pr', 'list', '--state', 'open', '--limit', '100', '--json', fields, ...(o.who === 'mine' ? ['--author', '@me'] : [])], { timeout: 30000 }).catch(e => Promise.reject(new Error(ghSays(e, 'the repo')))),
+    ghLogin(p),
+  ])
+  if (o.who === 'others' && !me) throw new Error("couldn't tell your GitHub login (gh api user): try again, or ask for all")
+  const list: { number: number; title: string; author?: { login: string }; url: string; headRefName: string; baseRefName: string; isDraft: boolean; reviewDecision: string; updatedAt: string }[] = JSON.parse(stdout || '[]')
+  return list
+    .filter(x => o.who !== 'others' || !me || x.author?.login !== me)
+    .map(x => ({ number: x.number, title: x.title, author: x.author?.login, mine: o.who === 'mine' || (!!me && x.author?.login === me), url: x.url, branch: x.headRefName, base: x.baseRefName, draft: x.isDraft || undefined, review: x.reviewDecision || undefined, updated: x.updatedAt, workspace: state.workspaces.find(w => !w.archived && w.prUrl === x.url)?.id ?? state.workspaces.find(w => !w.archived && w.project === p.id && w.kind === 'worktree' && w.branch === x.headRefName)?.id }))
+}
+
 async function scanPR(ws: Workspace) {
   if (ws.host) await hostSync(ws)
   // linked to a PR its agent named (prFromSaid): one on its own branch, once there, wins (a local one's by its URL:

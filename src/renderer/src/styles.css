@@ -156,6 +156,13 @@ textarea { resize: vertical; font-family: inherit; }
 .widget.opens:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); } /* a tint, not a block: on glass too */
 .widget-body, .widget-frame { display: block; width: 100%; height: 100%; border: 0; background: transparent; }
 .widget-body { contain: paint; } /* a widget's position: fixed stays in its box, never over the app */
+/* a line of them in the top bar or the status bar (a widget's place): each its cells across wide, a line high */
+.widget-strip { display: flex; align-items: stretch; flex: none; min-width: 0; overflow: hidden; }
+.widget-strip.top { align-self: center; height: 28px; margin: 0 4px; }
+.widget-strip.status { align-self: stretch; height: 100%; margin: 0 -10px 0 0; font-family: var(--ui-font, inherit); }
+.widget-strip .widget { flex: none; margin: 0; padding: 0 8px; border: none; border-left: 1px solid var(--line); border-radius: 0; }
+.widget-strip.top .widget { border-radius: var(--rs, 6px); border: none; }
+.widget-strip .widget-dot { top: 3px; right: 3px; }
 .widget-dot { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--running); }
 .widget-dot.bad { background: var(--error); }
 .widget-msg { position: absolute; inset: 0; padding: 6px; overflow: auto; background: var(--panel); }
@@ -476,7 +483,9 @@ textarea { resize: vertical; font-family: inherit; }
 .nw-composer { padding: 0; gap: 0; transition: border-color 0.15s; }
 .nw-composer:focus-within { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); }
 .nw-composer .prompt-input { gap: 0; }
-.nw-composer textarea, .nw-composer .nw-cmd { border: none; background: transparent; padding: 14px 16px 6px; font-size: 13.5px; line-height: 1.5; box-shadow: none; }
+/* the card is the box: its prompt is see-through and follows its corners (a look's or glass's field rules would give it a
+   square box of its own, poking out of the card's top corners) */
+.nw-card.nw-composer :is(textarea, .nw-cmd) { border: none; background: transparent; border-radius: calc(var(--radius) + 3px) calc(var(--radius) + 3px) 0 0; padding: 14px 16px 6px; font-size: 13.5px; line-height: 1.5; box-shadow: none; }
 .nw-composer textarea { resize: vertical; min-height: 120px; }
 .nw-composer .prompt-images { padding: 4px 16px 6px; }
 .nw-composer .prompt-tools { padding: 4px 8px 8px; gap: 2px; }
@@ -484,9 +493,12 @@ textarea { resize: vertical; font-family: inherit; }
 .prompt-tools-end { display: flex; align-items: center; gap: 2px; margin-left: auto; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
 .mic-split { display: inline-flex; align-items: center; }
 .mic-split .ib.caret { width: 16px; }
-.nw-pick { display: inline-flex; align-items: center; gap: 5px; height: 26px; max-width: 220px; padding: 0 8px; border: none; background: color-mix(in srgb, var(--fg) 5%, transparent); border-radius: var(--rs, 6px); color: var(--muted); font: 12px var(--mono); white-space: nowrap; }
+/* the composer's pickers (template, agent, model): words with a caret, not buttons; a hover shows they're a menu */
+.nw-pick { display: inline-flex; align-items: center; gap: 4px; height: 26px; max-width: 220px; padding: 0 6px; border: none; background: none; border-radius: var(--rs, 6px); color: var(--muted); font: inherit; font-size: 12px; white-space: nowrap; box-shadow: none; }
 .nw-pick > span { overflow: hidden; text-overflow: ellipsis; }
-.nw-pick:hover, .nw-pick:focus-visible { background: var(--hover); color: var(--fg); }
+.nw-pick > svg:last-child { opacity: 0.6; }
+.nw-pick:hover, .nw-pick:focus-visible, .nw-pick[aria-expanded='true'] { background: var(--hover); color: var(--fg); }
+.nw-pick:hover > svg:last-child { opacity: 1; }
 .nw-chips { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0; border: none; background: none; }
 .nw-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; max-width: 100%; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--rs, 8px); background: var(--panel); color: var(--fg); font-size: 12.5px; white-space: nowrap; }
 .nw-chip > svg, .nw-chip > .icon { flex: none; color: var(--muted); }
@@ -495,8 +507,10 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 .nw-chip.quiet { color: var(--muted); }
 .nw-chip-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
 .form .nw-chip label, .form label.nw-chip { flex-direction: row; align-items: center; gap: 5px; color: inherit; font-size: inherit; cursor: pointer; }
-.form .nw-chip input[type='checkbox'] { width: auto; margin: 0; }
-.nw-chip-input { field-sizing: content; width: auto; min-width: 7ch; max-width: 28ch; height: 100%; padding: 0; border: none; background: transparent; font-size: 12.5px; }
+.nw-chip .toggle { gap: 6px; color: inherit; font-size: inherit; }
+.nw-chip .toggle:not(.on) { color: var(--muted); }
+/* a field in a chip is the chip's words: no box of its own, whatever a look or glass gives fields */
+.nw-chip .nw-chip-input { field-sizing: content; width: auto; min-width: 7ch; max-width: 28ch; height: 100%; padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; font-size: 12.5px; }
 .nw-chip-sep { align-self: stretch; width: 1px; margin: 7px 2px; background: var(--line); }
 .nw-more { gap: 10px; padding: 12px 14px; }
 .form .nw-line { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted); font-size: 12px; }
@@ -709,6 +723,8 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .sp-tabs > .ib { align-self: center; margin-bottom: 4px; }
 .sp-tabs { container-type: inline-size; } /* not the panel: containment would anchor its fixed menus to it */
 @container (max-width: 420px) { .sp-tabs > button:not(.on, .ib) .sp-tab-label { display: none; } } /* a narrow panel: the other tabs as icons */
+/* Files: the workspace's, or its Artifacts (SidePanel's Files root) */
+.sp-roots { flex: none; align-self: flex-start; margin: 8px 10px 2px; }
 .sp-tools { display: flex; align-items: center; gap: 2px; padding: 6px 8px; border-bottom: 1px solid var(--line); color: var(--muted); }
 .sp-tools > svg { margin: 0 4px 0 2px; flex: none; }
 .sp-tools input { flex: 1; min-width: 0; border: none; background: none; padding: 3px 2px; }
@@ -1066,9 +1082,16 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-user { align-self: flex-end; max-width: 78%; padding: 9px 14px; border-radius: 16px 16px 4px 16px; background: color-mix(in srgb, var(--fg) 7%, var(--panel)); white-space: pre-wrap; }
 .ai-user > .tag { margin-left: 8px; display: inline-flex; align-items: center; gap: 4px; }
 .ai-answer { display: flex; align-items: flex-start; gap: 12px; }
-.ai-answer > .md { flex: 1; min-width: 0; padding-top: 1px; }
-.ai-answer > .md > :first-child { margin-top: 0; }
-.ai-answer > .md > :last-child { margin-bottom: 0; }
+.ai-answer > .ai-body { flex: 1; min-width: 0; padding-top: 1px; }
+.ai-body > .md > :first-child { margin-top: 0; }
+.ai-body > .md > :last-child { margin-bottom: 0; }
+/* a question's options (laki_ask, a removal's Yes / No): one pick, then the picked one stays lit */
+.ai-options { display: flex; flex-wrap: wrap; gap: 6px; margin-top: -4px; padding: 0 22px 8px; } /* under the answer's text (.md's inset) */
+.ai-options button { display: inline-flex; align-items: center; gap: 5px; padding: 5px 12px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--fg); font-size: 12.5px; }
+.ai-options button:hover:not(:disabled) { border-color: var(--accent); background: var(--hover); }
+.ai-options button.danger:not(:disabled) { color: var(--error); }
+.ai-options button.picked { border-color: var(--accent); color: var(--accent-ink); opacity: 1; }
+.ai-options button:disabled:not(.picked) { opacity: 0.45; }
 /* a turn's tools: one pill, open: a line each */
 .ai-tools { margin-left: 36px; color: var(--muted); font-size: 12px; }
 .ai-tools > summary { display: inline-flex; align-items: center; gap: 6px; max-width: 100%; padding: 3px 10px; border: 1px solid var(--line); border-radius: 999px; cursor: pointer; list-style: none; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }

@@ -8,12 +8,12 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
-import { aiAsk, aiKey, aiNew, aiState, aiStop } from './ai.ts'
+import { aiAnswer, aiAsk, aiKey, aiNew, aiQuestion, aiState, aiStop } from './ai.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { refreshSkills, skills, skillSet } from './skill.ts'
 import { usage } from './usage.ts'
-import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 
 const { dir } = core
 mkdirSync(dir, { recursive: true, mode: 0o700 })
@@ -144,12 +144,15 @@ const api: Record<string, Handler> = {
   progress: p => core.progress(p),
   prAttach: p => core.prAttach(p), // the app's Attach PR: { ws, pr: a URL or number }
   phoneTick: () => core.phoneTick(), // answers from the phone now (tests: not every 5 s)
+  prList: p => core.prList(p), // Laki AI's laki_prs: a project's open PRs
   prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
   webhookTest: p => core.webhookTest(p),
   portKill: p => core.portKill(p),
   meme: () => meme(),
   aiAsk: p => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here
   aiState: () => aiState(),
+  aiQuestion: p => aiQuestion(p), // the skill's laki_ask and laki_remove: a question with buttons, only while an ask works
+  aiAnswer: p => aiAnswer(p, (method, params) => call(method, params) as Promise<any>), // the AI page's buttons: a removal is done here, on Yes
   aiNew: () => aiNew(),
   aiStop: () => aiStop(),
   aiKey: p => aiKey(p),
@@ -205,6 +208,7 @@ const api: Record<string, Handler> = {
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetRun: p => widgetRun(p),
+  widgetRm: p => widgetRm(p), // Settings' Delete, after its confirm: never MCP's nor Laki AI's
   widgetAction: p => widgetAction(p),
   widgetReload: () => widgetReload(),
   widgetFiles: p => widgetFiles(p),

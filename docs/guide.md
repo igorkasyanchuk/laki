@@ -161,7 +161,7 @@ npm link
    - For a git repository, also pick a base branch. The workspace gets a worktree in
      `~/.laki/worktrees/<project>/<id>` (or the folder you pick in Settings › General › *Worktrees*, or in the
      project's settings) on branch `laki/<id>`, its setup command runs, then the
-     agent starts. Untick *worktree* to work in the repo itself instead.
+     agent starts. Turn off the *worktree* switch to work in the repo itself instead.
    - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
 
 ## Using it
@@ -170,8 +170,8 @@ npm link
 (status, name; GitHub's mark when it has a PR: green open, gray draft, purple merged, red closed
 or an open one's failing checks; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › Appearance). The
 selected workspace's PR is in the status bar.
-- An open PR's marks, by the status circle: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
-  else's PR. Settings › Appearance › *Pull request marks* turns each off and puts them after the name or with GitHub's mark.
+- An open PR's marks, with GitHub's mark at the row's end: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
+  else's PR. Settings › Appearance › *Pull request marks* turns each off and puts them by the status circle or after the name instead.
 - A line divides the projects; each one's workspaces hang under it, indented on a guide line.
 - *Diff size in the sidebar* (Settings › Appearance, off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
@@ -391,10 +391,17 @@ you're in): Laki's own assistant, one conversation that works Laki with the same
 `laki mcp`. Ask *what are my agents doing?*, *start a code review of the PR with the login form*, *take the PR from
 workspace ABC and start a new codex session to review it*, or paste a screenshot with three PR links and ask to review
 each in its own workspace: it reads the workspaces, their PRs and agents' last answers, then starts workspaces (a PR's
-on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. Ask it for an extension
+on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. *Laki's skill*
+(Settings › AI, on by default) gives it more of Laki: your open PRs and everyone else's in your projects' repos, a
+project's notes, memory, templates, actions and to-dos (it writes notes and memory, adds to-dos), renaming and pinning
+workspaces and tabs, a shell with a command typed for you to run, your actions (*start the review action on each PR in
+this screenshot, a workspace each*; a terminal's command is typed, for you to run) and prompt templates for new
+workspaces. When it isn't sure, it asks with a few options as buttons: a click answers, and it goes on (until you ask
+something else: then that question is closed). It removes a memory item, a scheduled task, a tab or a to-do only
+through such a question: *Yes, remove…* is yours to press, and Laki does it. Ask it for an extension
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
-so you look and turn it on in Settings › Extensions (*by Laki AI* on its row). It never archives, deletes, ships
-or merges, and it does nothing until you ask. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
+so you look and turn it on in Settings › Extensions (*by Laki AI* on its row). It never archives or deletes
+workspaces, ships or merges, and it does nothing until you ask. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
 into one line you can open, *Stop* ends an ask, *New chat* starts over. A workspace or tab it names is a link: a click
 opens it in Laki (from the bubbles' window too); a tool line's *Open* goes to the workspace it worked on. The *Calls* tab
 lists every ask with its backend and model, tokens in and out, cost and time; *Info* says how it runs and how it's paid
@@ -409,7 +416,10 @@ for, what it spent today and this month (also in Settings › AI), and what it c
   yours: a claude or codex preset with its env, another account (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`), each with a session
   of its own.
 
-*Steps* (unset: 20) caps the rounds of tool calls one ask may make.
+*Steps* (unset: 20) caps the rounds of tool calls one ask may make. *Show costs ($)* (Settings › AI › Spending, on by
+default) turned off hides the money on the AI page: asks and tokens only.
+*Your instructions* (Settings › AI) is your own context for it, added after Laki's instructions at every ask: who you
+are, how you name things, what it should know. It can't lift what Laki AI may not do.
 
 **Scheduled tasks** (the clock at the bottom of the sidebar, *Schedule* on the rail in Rail and list, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
 times you write in plain English. *New task* opens the form: the prompt, with the agent under it, then *When*, then
@@ -560,13 +570,13 @@ under it, where the work goes in the row below.
 Closing it (Esc, ✕, a click in the sidebar) keeps what you typed as a draft: it's there when the page opens again,
 until you create it or *Clear* it. Enter in a field never creates it; ⌘⏎ or *Create* does.
 It starts from your last choices (project, its group, agent, model, template, worktree), never the last prompt.
-- Under the prompt: ＋ (images), the mic and its ⌄, *Template*, the agent (a preset, *Shell*, *Custom command…* or
-  *No agent*) and the model (the agent's default, one of its models or *Another model by name…*; for Claude Code and Codex
+- Under the prompt: ＋ (images), the mic and its ⌄, then *Template*, the agent (a preset, *Shell*, *Custom command…* or
+  *No agent*) and the model, as words with a ⌄ (a hover shows they're menus) (the agent's default, one of its models or *Another model by name…*; for Claude Code and Codex
   the effort too; both kept for its restarts and forks). Their menus have a filter box (type, ↑↓, ⏎), a line about each
   choice, the picked one in the accent with a check; the agent menu marks your default and, for another agent, offers
   *Make … the default for new workspaces*; Claude's models show how they compare in cost ($ to $$$$).
 - The row below: the project and its group in one menu (with a filter past six projects; a group puts it first in that group; the project alone, first
-  in the project), the base branch with *worktree* (untick it to work in the repo itself, on its current branch),
+  in the project), the base branch with the *worktree* switch (off: work in the repo itself, on its current branch),
   the name (from the prompt when blank) and *More*: *Race*, and a box for a model typed by hand (like a full name) once you pick *Another model…*.
 In a plain folder (or without a worktree), whose own workspace is there already, an agent or a prompt makes another
 session beside it, in the same folder, named after the prompt; *No agent* gives the folder's own back. A new
@@ -641,7 +651,12 @@ mark, its author's picture and the other marks to one size.
 
 ### Extensions
 
-Small live pages at the bottom of the sidebar, above its buttons, in a grid 3 cells across (a cell is 64 px tall, or
+Extensions (also called widgets or plugins: one and the same) are small live pages. The SDK, in one page:
+[extensions.md](extensions.md).
+
+Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar* or *Status bar*): the
+sidebar's grid (the default), the top bar left of its buttons, or the status bar's right end; the bars are a line
+high, as wide as its cells across. In the sidebar they sit at the bottom, above its buttons, in a grid 3 cells across (a cell is 64 px tall, or
 half that: ½, a thin line, like *Links*, its sites as plain words with a rule between them, wrapping when they don't fit),
 plain values on the sidebar (no tiles; Settings › Extensions turns them on and off). A click on one opens its full view in a dialog, small, medium or large (its *view* in
 Settings › Extensions: large for wide tables; ↻ fetches now, the sliders its settings).
@@ -689,8 +704,12 @@ To make one, install the *Extension creator* skill (Settings › Agent skill) an
 open issues"), or use any AI chat: Settings › Extensions › *Make one with AI* has the whole format as a prompt (type what
 you want, copy it, paste it in the chat), then save the files it gives you in `<data>/widgets/<id>/` and press
 *Reload extensions*. An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
-sandboxed frame that can't reach the network or the app (its data comes from its fetch). `laki widget` lists,
-reloads, fetches and renders them.
+sandboxed frame that can't reach the app, nor the network unless you turn on its *Network access* (then its page may
+fetch from and show images of https sites; its data otherwise comes from its fetch, which always has the network).
+`laki widget` lists, reloads, fetches and renders them.
+
+To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
+after you confirm. The ones that come with Laki only turn off.
 
 ### Projects over SSH
 
@@ -897,8 +916,10 @@ lit for a moment.
   tabs (agents and shells alike): `<data>/storage/<name>-<id>`, or under the folder you set. It's made with the
   workspace's first tab and keeps its path when the workspace is renamed. Ask an agent to put screenshots, reports
   or exports there; the info panel's *Storage* opens it, and the status bar's *Artifacts: n* (the files in it, hidden
-  ones not counted; none at 0) opens it in Finder or shows them here (⌘⇧A shows or hides them): a strip of previews over the status bar, newest
-  first; click one for a big view (images, text, Markdown rendered), ← and → for the others. A link to whatever an
+  ones not counted; none at 0) shows them here (⌘⇧A shows or hides them): a strip of previews over the status bar, newest
+  first; click one for a big view (images, text, Markdown rendered), ← and → for the others. The strip's ⋯ has *Show in
+  Finder* and *Open in Files*: the side panel's Files with its *Artifacts* tab (beside *Workspace*), a tree of them to
+  search, preview (read-only) and open in their app. A link to whatever an
   agent publishes for you (a Claude artifact, a deployed site, a gist) is kept there too, as a `<title>.url` file
   (Finder opens it in the browser), without anyone asking: Laki keeps what Claude's publish tools return (its
   *Artifact* tool, an MCP tool named publish, deploy, upload or share) and, for any agent, the links its last answer

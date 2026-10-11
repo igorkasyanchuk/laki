@@ -10,7 +10,7 @@ import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type Skil
 import { AiPage } from './Ai'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BoardPage } from './Board'
-import { type WidgetApi, WidgetDialog, WidgetGrid } from './Widgets'
+import { type WidgetApi, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
 import { ComparePage } from './Compare'
 import { Glyph, rollup } from './Glyph'
@@ -20,7 +20,7 @@ import { Term, xterms } from './Term'
 import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
 import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
-import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
+import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
 import { actionsFor, clock, mergeActions, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
@@ -144,7 +144,8 @@ export function App() {
   const [panelOpen, setPanelOpen] = useState<boolean>(() => load('laki.panel', false)) // the right panel: files, changes, review
   const [panelTab, setPanelTab] = useState<PanelTab>(() => load('laki.panelTab', 'files'))
   const [panelW, setPanelW] = useState<number>(() => load('laki.panelW', PANEL_WIDTH))
-  const [preview, setPreview] = useState<{ ws: string; path: string; line?: number; n: number; edit?: Edit } | null>(null) // a file shown in the app; n: each request reloads it; edit: its unsaved edit
+  const [preview, setPreview] = useState<{ ws: string; path: string; line?: number; n: number; edit?: Edit; storage?: boolean } | null>(null) // a file shown in the app; n: each request reloads it; edit: its unsaved edit; storage: an artifact's (read-only)
+  const [artsIn, setArtsIn] = useState<string | null>(null) // the workspace whose side panel Files shows its Artifacts (the others: their worktree)
   // the workspaces whose info panel is open (⌘I): each its own, so another one opens without it (an older boolean: none)
   const [infoOn, setInfoOn] = useState<string[]>(() => (x => (Array.isArray(x) ? x.filter(i => typeof i === 'string') : []))(load<unknown>('laki.info', [])))
   const [infoW, setInfoW] = useState<number>(() => load('laki.infoW', INFO_WIDTH))
@@ -813,7 +814,23 @@ export function App() {
       return api.call('send', { target: to.id, text, enter: false }).then(() => (selectTab(to.id), xterms.get(to.id)?.focus(), toast(`In ${to.name}'s prompt: say what to do with it`)))
     },
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
+    artifacts: w.storage
+      ? {
+          files: () => api.call<{ path: string }[]>('artifactList', { ws: w.id }).then(l => ({ files: l.map(f => f.path), changed: {} })),
+          preview: async path => (await leavePreview()) && setPreview({ ws: w.id, path, n: ++requests, storage: true }),
+          open: path => void bridge?.openPath?.(`${w.storage}/${path}`), // a document in its app, else shown in Finder
+          menu: (e, path) =>
+            openMenu(e, [
+              ...(bridge?.openPath ? [{ label: 'Open', icon: 'file', run: () => void bridge!.openPath!(`${w.storage}/${path}`) } as MenuItem, { label: 'Show in Finder', icon: 'folder', run: () => revealArt(w, path) } as MenuItem, null] : []),
+              { label: 'Copy path', icon: 'copy', key: 'c', run: () => copy(`${w.storage}/${path}`) },
+            ]),
+        }
+      : undefined,
   })
+  // an artifact's folder in Finder ('': the storage folder): open-path would open a document in its app
+  const revealArt = (w: WorkspaceView, path: string) => void bridge?.openPath?.(`${w.storage}/${path.replace(/\/?[^/]*$/, '')}`)
+  // the Artifacts in the side panel's Files (the strip's ⋯ › Open in Files)
+  const artifactsInFiles = () => (setArtsIn(ws?.id ?? null), showPanel('files'), setGallery(null))
   const copy = (text: string) => navigator.clipboard.writeText(text).then(() => done('Copied'), fail)
   const tunnelApi = (w: WorkspaceView): TunnelApi => ({
     check: () => api.call<Cloudflared>('cloudflared', { ws: w.id }),
@@ -1342,7 +1359,7 @@ export function App() {
     a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
-    a({ label: 'Extensions: settings, reload', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
+    a({ label: 'Extensions (plugins): settings, reload, delete', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
     a({ label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
     a({ label: 'Help: keys and commands', icon: 'help', hint: '⌘/', run: () => setDialog('help') })
     a({ label: 'About Laki', icon: 'info', run: () => setDialog('about') })
@@ -1537,7 +1554,7 @@ export function App() {
     )
   }
   // an open PR's marks (settings.prMarks, each unset on): ✓ approved, ✓✓ approved by you too, 👀 you commented
-  const marksAt = settings.prMarks?.at ?? 'start'
+  const marksAt = settings.prMarks?.at ?? 'end'
   const prMarks = (pr?: PR) => {
     const m = settings.prMarks ?? {}
     if (!pr || pr.state !== 'OPEN') return null
@@ -1936,6 +1953,7 @@ export function App() {
           {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
+          <WidgetStrip widgets={view.widgets ?? []} api={widgetApi} place="top" />
           {ws && <IconButton icon="maximize" title="Full screen: just this tab (⌘⇧⏎)" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
@@ -2030,8 +2048,10 @@ export function App() {
               key={previewed.n}
               path={previewed.path}
               line={previewed.line}
-              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path })}
-              onOpen={() => panelApi(ws).openFile(previewed.path)}
+              load={() => api.call<FileContent>('fileRead', { ws: ws.id, path: previewed.path, storage: previewed.storage })}
+              onOpen={() => (previewed.storage ? panelApi(ws).artifacts?.open(previewed.path) : panelApi(ws).openFile(previewed.path))}
+              openLabel={previewed.storage ? 'Open' : undefined}
+              readOnly={previewed.storage}
               onClose={closePreview}
               edit={previewed.edit}
               onEdit={edit => setPreview(x => x && { ...x, edit })}
@@ -2052,6 +2072,8 @@ export function App() {
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
               onAct={(act, method) => prAct(ws, act, method)}
+              root={artsIn === ws.id ? 'artifacts' : 'ws'}
+              onRoot={(r: FilesRoot) => setArtsIn(r === 'artifacts' ? ws.id : null)}
             />
           )}
           {info && ws && (
@@ -2120,6 +2142,7 @@ export function App() {
               home: view.widgetHome,
               set: (id, o) => call('widgetSet', { id, ...o }),
               run: id => call('widgetRun', { id }),
+              rm: id => call('widgetRm', { id }).then(() => done('Deleted')),
               reload: () => call('widgetReload'),
               open: id => setDialog({ widget: id }),
               folder: (id, e) => {
@@ -2289,7 +2312,8 @@ export function App() {
             api={{
               list: () => api.call<Artifact[]>('artifactList', { ws: ws.id }),
               read: path => api.call<FileContent>('fileRead', { ws: ws.id, path, storage: true }),
-              reveal: bridge?.openPath && (path => void bridge!.openPath!(`${ws.storage}/${path.replace(/\/?[^/]*$/, '')}`)), // its folder: open-path would open a document in its app
+              reveal: bridge?.openPath && (path => revealArt(ws, path)),
+              files: artifactsInFiles,
             }}
           />
         )}
@@ -2337,18 +2361,11 @@ export function App() {
               {ws.setup && <span className="warn-soft">setup running…</span>}
             </>
           )}
-          {!!ws?.artifacts && ws.storage && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): Finder, or here
+          {!!ws?.artifacts && ws.storage && ( // the files its agents keep for you ($LAKI_STORAGE_FOLDER): shown here; Finder and Files from the strip's ⋯
             <button
-              className="listen port-main"
-              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER) · ⌘⇧A shows them here`}
-              onClick={e =>
-                bridge?.openPath
-                  ? openMenu(e, [
-                      { label: 'Open in Finder', icon: 'folder', run: () => void bridge!.openPath!(ws.storage!) },
-                      { label: gallery === ws.id ? 'Hide the gallery' : 'Show here', icon: 'image', hint: '⌘⇧A', run: toggleArtifacts },
-                    ])
-                  : toggleArtifacts()
-              }
+              className={`listen port-main ${gallery === ws.id ? 'on' : ''}`}
+              data-tip={`${shortPath(ws.storage)}: what its agents keep for you ($LAKI_STORAGE_FOLDER) · ⌘⇧A`}
+              onClick={toggleArtifacts}
             >
               Artifacts: {ws.artifacts}
             </button>
@@ -2364,6 +2381,7 @@ export function App() {
             </button>
           )}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
+          <WidgetStrip widgets={view.widgets ?? []} api={widgetApi} place="status" />
         </div>
         )}
       </main>

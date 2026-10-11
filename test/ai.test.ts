@@ -1,9 +1,10 @@
 import assert from 'node:assert/strict'
-import { readFileSync, realpathSync, statSync } from 'node:fs'
+import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import { skillTools, tools } from '../src/cli/mcp.ts'
 import { aiTotals } from '../src/shared/types.ts'
 import { fresh, until } from './helpers.ts'
 
@@ -20,7 +21,7 @@ async function openrouter(t: { after: (f: () => void) => void }, answers: object
   })
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => (srv.closeAllConnections(), srv.close()))
-  return { hits, url: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` }
+  return { hits, answers, url: `http://127.0.0.1:${(srv.address() as AddressInfo).port}` } // answers: a test adds to it as it goes
 }
 const reply = (message: object, usage = { prompt_tokens: 100, completion_tokens: 10, cost: 0.002 }) => ({ model: 'anthropic/claude-sonnet-5.5', choices: [{ message }], usage })
 
@@ -176,4 +177,127 @@ test('ai: laki_send reaches agents only, and never types into a question they as
   await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.id === agent.id).status === 'waiting', 'the agent waiting')
   await assert.rejects(rig.rpc('send', { target: ws.id, text: '1', agent: true }), /asking the user something/)
   assert.deepEqual(await rig.rpc('send', { target: ws.id, text: 'later', agent: true, whenIdle: true }), { tab: agent.id, queued: 1 })
+})
+
+test("ai: Laki's skill asks with options, writes memory, and removes only on the user's Yes", async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [
+    call('c1', 'laki_ask', { question: 'Which one?', options: ['alpha', 'beta'] }),
+    reply({ content: 'Alpha it is.' }),
+  ]) // more below: the project's id isn't known yet
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, memory: [{ id: 'm1', text: 'old note', at: 1 }] })
+  await rig.rpc('settingsSet', { ai: { on: true, context: 'Our staging is on fly.io.' } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  await assert.rejects(rig.rpc('aiQuestion', { text: 'x', options: ['a', 'b'] }), /only while Laki AI works/)
+
+  // a question: its options in the chat, the turn ends there; a pick goes on as the next ask
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'do the thing' }), { text: '' })
+  const names = or.hits[0].body.tools.map((x: any) => x.function.name)
+  for (const n of ['laki_ask', 'laki_remove', 'laki_prs', 'laki_project', 'laki_memory_write', 'laki_notes_write', 'laki_run_action', 'laki_templates', 'laki_shell']) assert.ok(names.includes(n), n)
+  assert.match(or.hits[0].body.messages[0].content, /laki_ask/, "the skill's words in its instructions")
+  assert.match(or.hits[0].body.messages[0].content, /own instructions for you[^\n]*\nOur staging is on fly\.io\.$/, 'Your instructions, last')
+  assert.equal(or.hits.length, 1, 'no round after the question')
+  let a = await rig.rpc('aiState')
+  const q = a.chat.at(-1)
+  assert.deepEqual([q.role, q.text, q.ask.options], ['ai', 'Which one?', ['alpha', 'beta']])
+  await assert.rejects(rig.rpc('aiAnswer', { id: q.ask.id, n: 5 }), /no such option/)
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 0 }), { text: 'Alpha it is.' })
+  a = await rig.rpc('aiState')
+  assert.equal(a.chat.find((m: any) => m.ask)?.ask.picked, 'alpha')
+  assert.deepEqual(a.chat.slice(-2).map((m: any) => [m.role, m.text]), [['user', 'alpha'], ['ai', 'Alpha it is.']])
+  await assert.rejects(rig.rpc('aiAnswer', { id: q.ask.id, n: 1 }), /answered already/)
+
+  // memory written by a tool; a removal only asks, and Laki removes it on Yes
+  or.answers.push(
+    call('c2', 'laki_memory_write', { project: p.id, text: 'staging is on fly' }),
+    reply({ content: 'Noted.' }),
+    call('c3', 'laki_remove', { kind: 'memory', id: 'm1', project: p.id, label: 'the old note' }),
+    call('c4', 'laki_remove', { kind: 'memory', id: 'm1', project: p.id, label: 'the old note' }),
+  )
+  await rig.rpc('aiAsk', { text: 'remember: staging is on fly' })
+  const mem = () => rig.rpc('state').then((v: any) => v.projects[0].memory.map((m: any) => m.text))
+  assert.deepEqual(await mem(), ['old note', 'staging is on fly'])
+  await rig.rpc('aiAsk', { text: 'forget the old note' })
+  a = await rig.rpc('aiState')
+  const rm = a.chat.at(-1).ask
+  assert.deepEqual(rm.options, ['Yes, remove the memory “old note”', 'No, keep it'])
+  assert.deepEqual(await mem(), ['old note', 'staging is on fly'], 'not removed by the AI')
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: rm.id, n: 1 }), { kept: true })
+  assert.deepEqual(await mem(), ['old note', 'staging is on fly'])
+  await rig.rpc('aiAsk', { text: 'forget it, really' })
+  const rm2 = (await rig.rpc('aiState')).chat.at(-1).ask
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: rm2.id, n: 0 }), { removed: true })
+  assert.deepEqual(await mem(), ['staging is on fly'])
+  assert.equal((await rig.rpc('aiState')).chat.at(-1).text, 'Removed the memory “old note”.')
+
+  // a question left unanswered closes once you ask something else: its pick would come out of context
+  or.answers.push(call('c5', 'laki_ask', { question: 'Which?', options: ['x', 'y'] }), reply({ content: 'ok' }))
+  await rig.rpc('aiAsk', { text: 'pick one' })
+  const q3 = (await rig.rpc('aiState')).chat.at(-1).ask
+  await rig.rpc('aiAsk', { text: 'never mind' })
+  await assert.rejects(rig.rpc('aiAnswer', { id: q3.id, n: 0 }), /a newer ask came since/)
+
+  // the skill turned off: its tools go
+  await rig.rpc('settingsSet', { ai: { on: true, skill: false } })
+  or.answers.push(reply({ content: 'ok' }))
+  await rig.rpc('aiAsk', { text: 'hi' })
+  const off = or.hits.at(-1)!.body.tools.map((x: any) => x.function.name)
+  assert.ok(!off.includes('laki_ask') && off.includes('laki_state'))
+})
+
+test("ai: prList, laki_prs's: a project's open PRs, yours or others', each with the workspace that has it", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const pr = (number: number, login: string) => ({ number, title: `PR ${number}`, author: { login }, url: `https://github.com/o/r/pull/${number}`, headRefName: `b${number}`, baseRefName: 'main', isDraft: false, reviewDecision: '', updatedAt: '2026-10-11T00:00:00Z' })
+  mkdirSync(rig.env.FAKE_GH, { recursive: true })
+  writeFileSync(join(rig.env.FAKE_GH, 'prlist.json'), JSON.stringify([pr(1, 'me'), pr(2, 'bob')]))
+  const all = await rig.rpc('prList', { project: p.id })
+  assert.deepEqual(all.map((x: any) => [x.number, x.author, x.mine, x.branch]), [[1, 'me', true, 'b1'], [2, 'bob', false, 'b2']])
+  assert.deepEqual((await rig.rpc('prList', { project: p.id, who: 'others' })).map((x: any) => x.number), [2])
+  await assert.rejects(rig.rpc('prList', { project: 'nope' }), /no project nope/)
+})
+
+test("ai: the skill's tools: templates and actions start workspaces, a shell gets a command typed, actions run, notes and renames", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', {
+    templates: [{ name: 'careful', text: 'Be careful. {{prompt}}' }],
+    actions: [{ name: 'review', target: 'claude', text: 'Review the code' }, { name: 'lint', target: 'shell', text: 'echo linted' }],
+  })
+  await rig.rpc('projectSet', { id: p.id, config: { templates: [{ name: 'careful', text: 'Project care: {{prompt}}' }] } })
+  const [ask] = skillTools(rig.rpc)
+  const tool = (name: string): ((a: object) => Promise<any>) => [...tools(rig.rpc), ...skillTools(rig.rpc)].find(x => x.name === name)!.run
+  assert.equal(ask.name, 'laki_ask')
+  assert.deepEqual((await tool('laki_templates')({ project: p.id })).map((x: any) => x.text), ['Project care: {{prompt}}'], "the project's replaces the global one of its name")
+  assert.deepEqual((await tool('laki_actions')({ project: p.id })).map((x: any) => x.name), ['review', 'lint'])
+
+  // a workspace from an action, through a template: the action's words, then what was asked
+  const w = await tool('laki_new_workspace')({ project: p.id, action: 'review', template: 'careful', prompt: 'mind the auth', name: 'rv', local: true })
+  await until(() => rig.fakeLog().some((l: any) => l.bin === 'claude' && l.args.includes('Project care: Review the code\n\nmind the auth')), 'the prompt')
+  await assert.rejects(tool('laki_new_workspace')({ project: p.id, action: 'nope', prompt: 'x' }), /no agent action nope: review/)
+  await assert.rejects(tool('laki_new_workspace')({ project: p.id, action: 'lint', prompt: 'x' }), /no agent action lint/, "a terminal's isn't an agent's")
+
+  // a shell action runs in a new shell tab; an agent's goes to the agent there
+  const tabs0 = (await rig.rpc('state')).tabs.length
+  await tool('laki_run_action')({ ws: w.id, name: 'lint' })
+  assert.equal((await rig.rpc('state')).tabs.length, tabs0 + 1)
+
+  // a shell with a command typed, not run (Enter is the user's)
+  const sh = await tool('laki_shell')({ ws: w.id, command: 'echo typed-not-run' })
+  assert.deepEqual([sh.workspace, sh.typed], [w.id, true])
+  const screen = await until(() => rig.rpc('screen', { target: `${w.id}/${sh.tab}`, lines: 10 }).then((x: any) => (JSON.stringify(x).includes('echo typed-not-run') ? x : null)), 'the command typed')
+  assert.doesNotMatch(JSON.stringify(screen), /\\ntyped-not-run/, 'not run')
+
+  // notes: added to the end, or replaced; a workspace renamed
+  await tool('laki_notes_write')({ project: p.id, text: 'one' })
+  await tool('laki_notes_write')({ project: p.id, text: 'two' })
+  assert.equal((await rig.rpc('state')).projects[0].notes, 'one\n\ntwo')
+  await tool('laki_notes_write')({ project: p.id, text: 'only', replace: true })
+  assert.equal((await rig.rpc('state')).projects[0].notes, 'only')
+  await tool('laki_rename')({ ws: w.id, name: 'review auth', pinned: true })
+  const ws = (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id)
+  assert.deepEqual([ws.name, ws.pinned], ['review auth', true])
+  await assert.rejects(tool('laki_memory_write')({ project: p.id, text: 'x', id: 'nope' }), /no memory item nope/)
 })

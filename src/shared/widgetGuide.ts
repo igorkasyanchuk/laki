@@ -13,6 +13,7 @@ export const widgetFormat = () => `## widget.json
   "size": [1, 1],
   "every": 5,
   "view": "m",
+  "place": "side",
   "config": {
     "repo": { "label": "Repo", "hint": "owner/name" },
     "user": { "label": "Author", "default": "@me" },
@@ -30,6 +31,9 @@ export const widgetFormat = () => `## widget.json
 - \`size\`: cells [across 1–3, down 0.5 or 1–4] in the sidebar's grid; one cell is about 70×64 px, 0.5 a line 29 px tall. The user can change it.
 - \`every\`: minutes between fetches (default ${WIDGET_EVERY}); the user can change it. A fetch also runs when the widget is
   turned on, when its settings change, on Reload and from \`laki widget run <id>\`.
+- \`place\`: where it shows at first: \`side\` (the sidebar's grid, the default), \`top\` (the top bar) or \`status\` (the
+  status bar's right end). The bars are a line high (about 26 px), and it's as wide as its cells across: design it as a
+  ½-high one (a number and a word, a few links). The user can move it.
 - \`view\`: the full view's dialog, \`s\` (small), \`m\` (medium, the default) or \`l\` (large: for wide tables). The user
   can change it.
 - \`config\`: the settings the user fills in (Settings › Extensions). Each is a default (a string: text; \`true\`/\`false\`:
@@ -107,7 +111,9 @@ print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
 - Links open in the browser. \`data-laki="refresh"\` on an element fetches again; \`data-run\` runs an action (above).
 - Without a \`<script>\` the widget is drawn inside the app: no scripts, frames, forms or \`on…\` attributes (they're removed).
 - With a \`<script>\` it's a JS widget: its page runs in a sandboxed frame with no network (no fetch, no external
-  scripts: inline everything), and gets \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`,
+  scripts: inline everything) unless the user turns on its *Network access* (Settings › Extensions: then \`fetch()\` and
+  images from https sites work, with CORS: the page's origin is \`null\`; get data in the fetch when you can, it always has
+  the network, and say in \`description\` when the page needs it), and gets \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`,
   \`open(url)\`, \`expand()\` (the full view), \`run(action, arg)\`, \`toast(text)\`, \`modal({ title, text, buttons })\`
   (the same as an action's JSON; these only work right after a click in the widget). Templates are filled first, so both work. Use it for
   canvas charts, sorting, filtering; build HTML with your own escaping. Draw a canvas at a fixed size (its \`width\` and

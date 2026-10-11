@@ -3,10 +3,11 @@
 // <data>/ai-key, 0600) or by an agent's CLI in the background: claude -p or codex exec, each given `laki mcp`. Every ask
 // is logged with its tokens and cost in <data>/ai-calls.jsonl; the conversation is <data>/ai-chat.json.
 import { type ChildProcess, spawn } from 'node:child_process'
+import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
-import { type Rpc, type Tool, tools } from '../cli/mcp.ts'
-import { AI_MODEL, AI_STEPS, type AiBackend, type AiCall, type AiMsg, aiTotals } from '../shared/types.ts'
+import { type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
+import { AI_ACTS, AI_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, aiTotals, type View } from '../shared/types.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 
 const keyPath = join(dir, 'ai-key')
@@ -25,14 +26,22 @@ const api = () => {
 
 const SYSTEM = `You are Laki's assistant. Laki is a Mac app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in a workspace: a git worktree on its own branch, with tabs (agent sessions, shells).
 Do what the user asks with the laki tools, at once, without asking first: look things up with laki_state (workspaces, their PRs with titles, each tab's status and last answer), laki_screen and laki_diff; start work with laki_new_workspace (a PR to review: its pr field and a prompt saying what to do), laki_new_tab (another agent in a workspace that exists), laki_send (a message to a running agent), laki_attach_pr; laki_schedules and laki_schedule_add when asked to schedule work.
-Find workspaces by name, branch, PR number or PR title. You cannot archive, delete, ship or merge anything: say so if asked.
+Find workspaces by name, branch, PR number or PR title. You cannot archive or delete workspaces, ship or merge: say so if asked.
 Link each workspace or tab you name, so the user opens it with a click: [its name](laki://ws/<workspace id>), or [its name](laki://ws/<workspace id>?tab=<tab id>) for a tab.
 A screenshot may hold PR links or other work: act on each item.
-Make a Laki extension (also called a widget, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made, yourself (the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
+Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made, yourself (the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
 Answer in a few plain sentences: what you did (workspace names) or what you found.`
 
-// the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress (an agent's own)
-const toolsFor = (rpc: Rpc) => tools(rpc).filter(t => t.name !== 'laki_progress')
+// Laki's skill for its AI (Settings › AI, unset: on): more tools, and what they're for in its instructions
+const skilled = () => state.settings?.ai?.skill !== false
+// the user's own context (Settings › AI › Your instructions) last: it can't take the rules above away, only add to them
+const system = () => {
+  const own = String(state.settings?.ai?.context ?? '').trim().slice(0, CONTEXT_MAX)
+  return [SYSTEM, skilled() && SKILL, own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
+}
+// the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress (an agent's own),
+// and the skill's
+const toolsFor = (rpc: Rpc) => [...tools(rpc).filter(t => t.name !== 'laki_progress'), ...(skilled() ? skillTools(rpc) : [])]
 
 // ---------- the key: a file only you can read, never in state.json or the view
 
@@ -57,6 +66,7 @@ export function aiKey(o: { key?: string | null }) {
 let resume: Record<string, string | undefined> = {} // claude's session, codex's thread, by sessionKey: the next ask goes on with it
 let chat: AiMsg[] = load()
 let busy: { kill: () => void } | null = null
+let asked = false // this ask's turn asked the user something (laki_ask): the pick comes as the next ask
 function load(): AiMsg[] {
   try {
     const j = JSON.parse(readFileSync(chatPath, 'utf8'))
@@ -111,6 +121,7 @@ export async function aiAsk(p: { text?: string; images?: string[] }, rpc: Rpc) {
   let child: ChildProcess | undefined
   busy = { kill: () => (ctl.abort(), child?.kill('SIGTERM')) }
   say('user', ask, images)
+  asked = false
   const t0 = Date.now()
   const r: Run = { text: '', model: s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
   const o: Opts = { ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
@@ -118,7 +129,7 @@ export async function aiAsk(p: { text?: string; images?: string[] }, rpc: Rpc) {
   try {
     await (backend === 'claude' ? claude(o) : backend === 'codex' ? codex(o) : openrouter(o))
     call.ok = true
-    say('ai', r.text || '(no answer)')
+    if (r.text.trim() || !asked) say('ai', r.text || '(no answer)') // a question it asked is the answer
     return { text: r.text }
   } catch (e) {
     const msg = ctl.signal.aborted ? 'stopped' : (e as Error).message
@@ -174,7 +185,7 @@ async function openrouter(o: Opts) {
   const list = toolsFor(o.rpc)
   const fns = list.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema } }))
   const pics = o.images.map(p => ({ type: 'image_url', image_url: { url: dataUrl(p) } }))
-  const messages: object[] = [{ role: 'system', content: SYSTEM }, ...history(), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
+  const messages: object[] = [{ role: 'system', content: system() }, ...history(), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
   const r = o.r
   r.cost = 0
   for (let i = 0; ; i++) {
@@ -205,6 +216,7 @@ async function openrouter(o: Opts) {
       r.calls++
       messages.push({ role: 'tool', tool_call_id: c.id, content: await runTool(list, c.function?.name, args) })
     }
+    if (asked) return void (r.text = '') // it asked the user: their pick goes on from here, as the next ask
   }
 }
 function dataUrl(path: string) {
@@ -215,7 +227,7 @@ function dataUrl(path: string) {
 }
 
 // `laki mcp` as an MCP server for a CLI agent: this daemon's (LAKI_HOME), through node or Electron as node
-const mcpServer = () => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
+const mcpServer = () => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
 
 // Settings › AI's preset of the agent (an account of its own: CLAUDE_CONFIG_DIR, CODEX_HOME…): its env, over Settings'
 // env as a tab of it gets; its args are a tab's, not used here
@@ -262,7 +274,7 @@ async function claude(o: Opts) {
   const model = state.settings?.ai?.models?.claude
   const sk = sessionKey('claude')
   const prompt = o.images.length ? `${o.ask}\n\nImages (read them): ${o.images.join(' ')}` : o.ask
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--append-system-prompt', SYSTEM, ...(model ? ['--model', model] : []), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--append-system-prompt', system(), ...(model ? ['--model', model] : []), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
   const r = o.r
   let failed = ''
   await cli(o, 'claude', args, j => {
@@ -301,7 +313,7 @@ async function codex(o: Opts) {
     '--skip-git-repo-check',
     '--ignore-user-config', // the user's config.toml: its MCP servers would be tools past Laki's (claude: --strict-mcp-config)
     '-c', 'sandbox_mode="read-only"',
-    '-c', `developer_instructions=${toml(SYSTEM)}`,
+    '-c', `developer_instructions=${toml(system())}`,
     '-c', `mcp_servers.laki.command=${toml(m.command)}`,
     '-c', `mcp_servers.laki.args=${toml(m.args)}`,
     '-c', `mcp_servers.laki.env=${env}`,
@@ -325,6 +337,81 @@ async function codex(o: Opts) {
     throw failed ? new Error(failed) : e // its own words over the exit code
   })
   if (failed) throw new Error(failed)
+}
+
+// ---------- asking the user (the skill's laki_ask and laki_remove)
+
+// a question in the conversation, its options as buttons on the AI page; only while an ask is at work (its tools'). act:
+// a removal the AI asked about, done here when the user picks Yes (the AI itself never removes anything)
+export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct }) {
+  if (!busy) throw new Error('only while Laki AI works on an ask')
+  const act = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
+  if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
+  if (act && !act.label) throw new Error(`no ${act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
+  const text = act ? `Remove ${act.label}?` : String(p.text ?? '').trim().slice(0, 2000)
+  if (!text) throw new Error('a question')
+  const options = act ? [`Yes, remove ${act.label}`, 'No, keep it'] : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
+  if (options.length < 2) throw new Error('2 to 6 options')
+  const id = randomBytes(6).toString('hex')
+  chat.push({ role: 'ai', text, at: Date.now(), ask: { id, options, act } })
+  asked = true
+  changed()
+  return { asked: id, note: act ? 'The user sees Yes / No buttons; a Yes removes it (you do not). End your turn now, without more words.' : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+}
+
+// the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
+export async function aiAnswer(p: { id: string; n: number }, rpc: Rpc) {
+  const m = chat.find(m => m.ask?.id === p.id)
+  if (!m?.ask) throw new Error('no such question: a new chat started since')
+  if (m.ask.picked !== undefined) throw new Error('answered already')
+  if (chat.slice(chat.indexOf(m) + 1).some(x => x.role === 'user')) throw new Error('a newer ask came since: ask again') // its context is gone
+  if (busy) throw new Error('the AI is still on the last ask')
+  const pick = m.ask.options[Number(p.n)]
+  if (pick === undefined) throw new Error('no such option')
+  const act = m.ask.act
+  if (!act) {
+    const r = aiAsk({ text: pick }, rpc) // its checks (on, a key) are before its first await: busy once they pass
+    if (busy) (m.ask.picked = pick), changed() // refused: the buttons stay, for another try
+    return r
+  }
+  m.ask.picked = pick
+  say('user', pick)
+  if (Number(p.n) !== 0) return say('ai', `Kept ${act.label}.`), { kept: true }
+  try {
+    await remove(act, rpc)
+    say('ai', `Removed ${act.label}.`)
+    return { removed: true }
+  } catch (e) {
+    say('error', `${act.label}: ${(e as Error).message}`)
+    throw e
+  }
+}
+// what a removal would take, in words, from Laki's own state
+function whatOf(a: AiAct) {
+  const cut = (t: string) => `“${t.length > 80 ? `${t.slice(0, 79)}…` : t}”`
+  if (a.kind === 'schedule') {
+    const x = state.schedules?.find(x => x.id === a.id)
+    return x && `the scheduled task ${cut(x.name || x.prompt)}`
+  }
+  if (a.kind === 'tab') {
+    const x = state.tabs.find(x => x.id === a.id)
+    return x && `the tab ${cut(x.name)}`
+  }
+  if (a.kind === 'todo') {
+    const x = state.todos?.find(x => x.id === a.id)
+    return x && `the to-do ${cut(x.text)}`
+  }
+  const x = state.projects.find(x => x.id === a.project)?.memory?.find(m => m.id === a.id)
+  return x && `the memory ${cut(x.text)}`
+}
+
+async function remove(a: AiAct, rpc: Rpc) {
+  if (a.kind === 'schedule') return rpc('scheduleRm', { id: a.id })
+  if (a.kind === 'tab') return rpc('tabClose', { id: a.id })
+  if (a.kind === 'todo') return rpc('todoRm', { id: a.id })
+  const p = (await rpc<View>('state')).projects.find(x => x.id === a.project)
+  if (!p?.memory?.some(m => m.id === a.id)) throw new Error('not in that project’s memory any more')
+  return rpc('projectSet', { id: p.id, memory: p.memory.filter(m => m.id !== a.id) })
 }
 
 // ---------- the call log

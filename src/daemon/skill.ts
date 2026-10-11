@@ -167,7 +167,7 @@ more than 30 minutes late is skipped and logged as missed).
 // laki-widget: the widget creator, a skill of its own
 const widgetSkill = (cli: string) => `---
 name: laki-widget
-description: Make Laki extensions, also called widgets (one and the same thing), the small live pages in the Laki app's sidebar (a clock, a count of PRs, a chart, a table) with a full view a click away, each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki extension or widget (or a tile, panel or plugin for Laki's sidebar).
+description: Make Laki extensions, also called widgets (one and the same thing), the small live pages in the Laki app's sidebar, top bar or status bar (a clock, a count of PRs, a chart, a table) with a full view a click away, each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki extension or widget (or a tile, panel or plugin for Laki's sidebar).
 ---
 
 # Making a Laki extension (a widget)

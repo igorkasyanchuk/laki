@@ -118,6 +118,28 @@ export const prIn = (text = '') => /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pul
 // The template's dates ({{DD-MM-YY HH:MM}}, when.ts' stamp) are now's; what vars bring in (a typed prompt) isn't stamped
 export const fillTemplate = (text: string, vars: Record<string, string | undefined>, at = Date.now()) =>
   stamp(text, at).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
+// a project's templates first, then the global ones it doesn't replace (one of the same name)
+export const templatesFor = (global: Template[] = [], project: Template[] = []) => [...project, ...global.filter(g => !project.some(t => t.name.trim() === g.name.trim()))]
+// a PR as the new-workspace page has it: the PR field (#123 or its URL), else a PR's URL in the prompt, else a prompt
+// that is only #123 or 123
+export function prRef(field = '', prompt = '') {
+  const ref = (s: string) => /^https?:\/\//.test(s) ? s : /^#?\d+$/.test(s) ? `#${s.replace('#', '')}` : undefined
+  return ref(field.trim()) ?? prIn(prompt) ?? ref(prompt.trim())
+}
+// the prompt through a template; one without {{prompt}} gets the typed text after it, unless that text is only the
+// PR its {{pr}} took
+export function templated(t: Template | undefined, prompt: string, vars: Record<string, string | undefined> = {}) {
+  if (!t) return prompt
+  const text = fillTemplate(t.text, { ...vars, prompt })
+  const uses = (k: string) => new RegExp(`\\{\\{\\s*${k}\\s*\\}\\}`).test(t.text)
+  const taken = uses('pr') && !!vars.pr && [vars.pr, vars.pr.replace('#', '')].includes(prompt.trim())
+  return uses('prompt') || !prompt.trim() || taken ? text : `${text}\n\n${prompt}`
+}
+// the global actions and a project's together: a project's one with a global one's name and target replaces it
+export function mergeActions(global: RunAction[] = [], project: RunAction[] = []) {
+  const same = (a: RunAction, b: RunAction) => a.target === b.target && (a.name ?? '').trim() === (b.name ?? '').trim() // a hand-edited one may lack a name
+  return [...global.filter(g => !project.some(p => same(p, g))), ...project].filter(a => a.name?.trim() && a.text?.trim())
+}
 // a webhook's URL as pushes take it (push.ts; Settings says why not as you type)
 export function webhookUrl(url?: string) {
   let u: URL
@@ -263,11 +285,19 @@ export type Settings = {
 // each backend's (unset: AI_MODEL for OpenRouter, the agent's own for the others); steps: tool calls an ask may make
 export type AiBackend = 'openrouter' | 'claude' | 'codex'
 // preset: an agent preset of the backend's agent (claude, codex), its env for an account of its own
-export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; steps?: number }
+// skill: Laki's skill for it (unset: on): more tools (PRs, projects' notes and memory, tabs and shells, actions, templates) and
+// asking you with options; hideCost: no $ on the AI page
+export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string } // context: the user's own instructions, after the system prompt
 export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
 export const AI_STEPS = 20
+export const AI_CONTEXT_MAX = 8000 // Your instructions' characters
 // the AI page's conversation: what you asked (images: their paths), its answers, each tool it ran, a failure
-export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: number; images?: string[] }
+export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: number; images?: string[]; ask?: AiAsk }
+// a question Laki AI asked (laki_ask, or before a removal): its options as buttons, picked: the answer given. act: what a
+// Yes removes: only the user's click does it (the daemon's aiAnswer), never the AI itself
+export type AiAsk = { id: string; options: string[]; picked?: string; act?: AiAct }
+export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo'] as const
+export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string }
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string }
@@ -383,8 +413,11 @@ export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?:
 // or names, kept joined by commas), what Settings calls it and says under it
 export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'choice' | 'list'; label?: string; hint?: string; choices?: string[] }
 // view: the full view's dialog, small, medium or large; config: each setting as text (a bool's '1' or '')
-export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; rev: number }
+export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; rev: number }
 export type WidgetSize = 's' | 'm' | 'l'
+// where an extension shows: the sidebar's grid (the default), the top bar or the status bar (a line high, by the bar's right end)
+export const WIDGET_PLACES = ['side', 'top', 'status'] as const
+export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
@@ -394,4 +427,4 @@ export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: Tab
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 47
+export const API = 48

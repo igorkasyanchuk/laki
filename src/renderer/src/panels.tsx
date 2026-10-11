@@ -674,9 +674,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
                 </>
               )}
               <span className="nw-chip-sep" />
-              <label data-tip="A git worktree of its own, off the base branch; off: work in the repo itself">
-                <input type="checkbox" checked={!p.local} onChange={e => set({ local: !e.target.checked })} /> worktree
-              </label>
+              <Switch on={!p.local} onChange={v => set({ local: !v })} tip="A git worktree of its own, off the base branch; off: work in the repo itself">
+                worktree
+              </Switch>
             </span>
           )}
           {canName && (
@@ -1176,13 +1176,15 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
 // the status bar's Artifacts, in the app: a strip of the storage folder's files over the status bar (newest first, a
 // preview each), a click shows it big, ← → (or the keys) go through the others. n: their count, a change reloads them
 export type Artifact = { path: string; size: number; at: number }
-export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void }
+// reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
+export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void }
 const host = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string } | { error: string }
 // links: its .url files (what its agents published): first, a click opens them in the browser
 export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: string; n: number; links?: { path: string; url: string; title: string }[]; api: ArtifactsApi; onClose: () => void }) {
   const linkOf = (path: string) => links.find(l => l.path === path)
+  const [menu, openMenu] = useMenu()
   const [files, setFiles] = useState<Artifact[] | null>(null)
   const [err, setErr] = useState('')
   const [big, setBig] = useState<string | null>(null) // the file shown big, by path: a reload (a new one first) keeps it
@@ -1239,6 +1241,18 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
       <div className="art-head">
         <Icon name="folder" size={12} /> Artifacts <span className="muted">{files ? files.length : ''}</span>
         <span className="grow" />
+        {(a.reveal || a.files) && (
+          <IconButton
+            icon="more"
+            title="Open in Finder or Files"
+            onClick={e =>
+              openMenu(e, [
+                ...(a.reveal ? [{ label: 'Show in Finder', icon: 'folder', run: () => a.reveal!('') } as MenuItem] : []),
+                ...(a.files ? [{ label: 'Open in Files', icon: 'panel', sub: "The side panel's Files, on its Artifacts", run: a.files } as MenuItem] : []),
+              ], 'right')
+            }
+          />
+        )}
         <IconButton icon="x" title="Close" onClick={onClose} />
       </div>
       <div className="art-strip">
@@ -1262,6 +1276,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
           <div className="buttons">
             <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
             {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
+            {a.files && <button onClick={() => (setBig(null), a.files!())}>Open in Files</button>}
             <button aria-label="Previous" disabled={files.length < 2} onClick={() => step(-1)}>
               <Icon name="back" />
             </button>
@@ -1271,6 +1286,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
           </div>
         </Modal>
       )}
+      {menu}
     </div>
   )
 }

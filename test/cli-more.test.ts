@@ -328,7 +328,7 @@ test('laki mcp: blank lines, bad JSON, ping, an unknown tool, a string answer, t
   assert.deepEqual([agent.kind, agent.agent, agent.status, agent.queued, agent.last], ['agent', 'claude', 'waiting', 1, 'answer: hi'])
   const none = v.workspaces.find((w: any) => w.id === quiet.id)
   assert.deepEqual([none.kind, v.tabs.some((x: any) => x.workspace === quiet.id)], ['worktree', false])
-  if (none.pr) assert.deepEqual(Object.keys(none.pr), ['number', 'state', 'url'], "a PR's number, state and link only")
+  if (none.pr) assert.deepEqual(Object.keys(none.pr), ['number', 'state', 'url', 'checks'], "a PR's number, state, link and checks: what it has (title, author, review only when known)")
 
   assert.deepEqual(by[5].result.content, [{ type: 'text', text: 'no changes' }], 'a string answer as it is')
   assert.deepEqual([by[6].result.isError, by[6].result.content[0].text], [true, 'a prompt, an issue or a PR'])

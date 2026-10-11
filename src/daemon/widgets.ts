@@ -4,11 +4,11 @@
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
 import { execFile } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { WidgetOption, WidgetSize, WidgetView } from '../shared/types.ts'
+import { type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
 import { hasFull, hasScript, pageOf, render, sayOf, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
@@ -17,12 +17,12 @@ import { changed, cliArgv, cliEnv, clients, devLog, dir, own, plainEnv, q, state
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
 // (its default export, or what it prints); actions: commands its buttons run by name (data-run="name", data-arg:
-// $WIDGET_ARG); view: the full view's size
+// $WIDGET_ARG); view: the full view's size; place: where it shows at first (side, top, status: the user's choice wins)
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string> }
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string> }
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
-// (at: when it ran; error: why it failed)
-type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai' } // by: Laki AI wrote it (widgetWrite)
+// (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
+type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai' } // by: Laki AI wrote it (widgetWrite)
 type Entry = { id: string; dir: string; builtin: boolean; m: Manifest; full: boolean; js: boolean; s: Omit<Store, 'data'> }
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -107,6 +107,8 @@ const onOf = (w: Entry) => w.s.on ?? !w.builtin
 const SIZES: WidgetSize[] = ['s', 'm', 'l']
 const isSize = (v: unknown): v is WidgetSize => SIZES.includes(v as WidgetSize)
 const viewSize = (w: Entry): WidgetSize => [w.s.view, w.m.view].find(isSize) ?? 'm'
+const isPlace = (v: unknown): v is WidgetPlace => WIDGET_PLACES.includes(v as WidgetPlace)
+const placeOf = (w: Entry): WidgetPlace => [w.s.place, w.m.place].find(isPlace) ?? 'side'
 
 const TYPES: WidgetOption['type'][] = ['text', 'number', 'bool', 'choice', 'list']
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -150,6 +152,8 @@ export const widgetsView = (): WidgetView[] =>
     every: fetches(w) ? everyOf(w) : undefined,
     full: w.full,
     view: viewSize(w),
+    place: placeOf(w),
+    net: (w.js && w.s.net) || undefined,
     js: w.js || undefined,
     config: configOf(w),
     options: optionsOf(w).map(({ def: _, ...o }) => o),
@@ -180,7 +184,9 @@ export function widgetRender(o: { id: string; full?: boolean; vars?: Record<stri
 }
 
 // GET /widget/<id>?key=…&full=1&theme=<JSON of CSS variables>: a JS widget's page, sandboxed by its CSP (an origin of
-// its own, no requests out, images only as data: URLs): its script sees its data, never the app, the daemon or the web
+// its own, no requests out, images only as data: URLs): its script sees its data, never the app, the daemon or the web.
+// With the user's Network access (net) it may fetch() and show images from https sites, still never the app or the daemon
+const netOf = (id: string) => !!widgets.get(id)?.s.net
 export function widgetPage(id: string, query: URLSearchParams): { code: number; headers: Record<string, string>; body: string } {
   const key = Buffer.from(query.get('key') ?? '')
   const bad = (code: number, body: string) => ({ code, headers: { 'content-type': 'text/plain' }, body })
@@ -200,7 +206,7 @@ export function widgetPage(id: string, query: URLSearchParams): { code: number; 
     code: 200,
     headers: {
       'content-type': 'text/html; charset=utf-8',
-      'content-security-policy': "sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:",
+      'content-security-policy': `sandbox allow-scripts; default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; ${netOf(id) ? 'connect-src https:; img-src data: https:; font-src data: https:' : 'img-src data:; font-src data:'}`,
       'cache-control': 'no-store',
       'referrer-policy': 'no-referrer',
       'x-content-type-options': 'nosniff',
@@ -209,15 +215,17 @@ export function widgetPage(id: string, query: URLSearchParams): { code: number; 
   }
 }
 
-// the user's choices: on, size, every (minutes), view (the full view's size), config (each setting as text, made what
-// its kind takes); a widget turned on fetches now
-export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; config?: Record<string, string> }) {
+// the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
+// (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
+export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace; net?: boolean; config?: Record<string, string> }) {
   const w = find(o.id)
   const s = readStore(w.id)
   if (o.on !== undefined) s.on = !!o.on
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
+  if (o.place !== undefined) s.place = isPlace(o.place) ? o.place : undefined
+  if (o.net !== undefined) s.net = !!o.net || undefined
   if (o.config) {
     const opts = new Map(optionsOf(w).map(x => [x.key, x]))
     const given = Object.entries(o.config).filter(([k]) => opts.has(k)).map(([k, v]) => [k, textOf(opts.get(k)!, v)])
@@ -435,10 +443,25 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
     writeFileSync(p, t as string)
     chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
   }
-  writeStore(o.id, { ...readStore(o.id), on: false, by: 'ai' })
+  writeStore(o.id, { ...readStore(o.id), on: false, net: undefined, by: 'ai' }) // net too: the user allows the network for the page they looked at, not a rewrite
   scanWidgets()
   wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; off until it's turned on`)
   return { ...widgetsView().find(w => w.id === o.id), note: 'Saved turned off: the user turns it on in Settings › Extensions' }
+}
+
+// Settings › Extensions' Delete (after the app's confirm): its folder and its storage, for good. Not one that comes with
+// Laki (turn it off), nor a folder that holds more than it (your home, Laki's own)
+export function widgetRm(o: { id: string }) {
+  const w = find(o.id)
+  if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: turn it off instead`)
+  if (running.has(w.id)) throw new Error(`${w.m.name || w.id} is fetching: try again in a moment`)
+  const d = resolve(w.dir)
+  if ([homedir(), dir, widgetHome(), '/'].includes(d)) throw new Error(`${d} isn't one extension's own folder`) // a widget.json put in one of those
+  rmSync(d, { recursive: true, force: true }) // a link: only the link
+  rmSync(storePath(w.id), { force: true })
+  wLog(w, `deleted: ${d}`)
+  scanWidgets()
+  return { deleted: w.id }
 }
 
 // a widget's folder, for Open in (core's openIn)

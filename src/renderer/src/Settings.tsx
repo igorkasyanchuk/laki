@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { AGENT_NAMES, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
@@ -12,7 +12,7 @@ import { bridge } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
-import { Icon, IconButton, type IconName, keep, load, Switch } from './ui'
+import { ask, Icon, IconButton, type IconName, keep, load, Switch } from './ui'
 import { QR } from './Tunnel'
 import { USAGE_AGENTS } from './Usage'
 import { BACKENDS, money, tokens } from './Ai'
@@ -90,7 +90,7 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
 // Appearance's corners (--radius) and where the tabs go
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
-const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['start', 'By the status circle'], ['name', 'After the name'], ['end', "With GitHub's mark"]]
+const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's mark"], ['start', 'By the status circle'], ['name', 'After the name']]
 const TABS_AT: [NonNullable<AppSettings['tabsAt']>, string][] = [['top', 'Top'], ['bottom', 'Bottom'], ['left', 'Left'], ['right', 'Right']]
 
 export type AppSettings = Paint & {
@@ -300,7 +300,7 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
       <h2>AI</h2>
       <p className="muted small">
         Laki's own assistant: ask it, in words, to start workspaces, review PRs from a screenshot, send prompts to your agents or tell you what they're
-        doing. It works Laki through the same tools as <code>laki mcp</code>, only when you ask, and never archives, deletes, ships or merges. Optional:
+        doing. It works Laki through the same tools as <code>laki mcp</code>, only when you ask, and never archives or deletes workspaces, ships or merges. Optional:
         off until you turn it on.
       </p>
       <Group title="Laki AI">
@@ -308,7 +308,16 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
           <Switch className="switch-row" on={!!ai.on} onChange={on => onChange({ ...ai, on })}>
             <Says title="Turn on Laki AI" hint="The AI page (the rail's AI, ⌘K) and laki ai in the terminal" />
           </Switch>
+          <Switch className="switch-row" on={ai.skill !== false} onChange={skill => onChange({ ...ai, skill })}>
+            <Says
+              title="Laki's skill"
+              hint="More of Laki for it: your open PRs and others' in your repos, projects' notes and memory, renaming and pinning, shells, your actions and prompt templates, to-dos. It asks you with options when unsure, and removes a memory item, task, tab or to-do only when you press Yes"
+            />
+          </Switch>
         </div>
+      </Group>
+      <Group title="Your instructions" hint="Added to Laki AI's instructions at every ask: who you are, how you work, what it should know. It can't lift what Laki AI may not do">
+        <textarea rows={5} maxLength={AI_CONTEXT_MAX} value={ai.context ?? ''} placeholder={'I review PRs in the morning. Name new workspaces in kebab case.\nOur staging is on fly.io.'} aria-label="Your instructions for Laki AI" onChange={e => onChange({ ...ai, context: e.target.value || undefined })} />
       </Group>
       <Group title="Runs with">
         <div className="grid2">
@@ -386,6 +395,11 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
         </label>
       </Group>
       <Group title="Spending" hint="Every ask, its tokens and cost, is on the AI page. OpenRouter's cost is its own; claude -p's is Claude Code's estimate; codex exec's is your plan">
+        <div className="setting-box">
+          <Switch className="switch-row" on={!ai.hideCost} onChange={v => onChange({ ...ai, hideCost: !v })}>
+            <Says title="Show costs ($)" hint="On the AI page: today's spend, each call's cost and the totals. Off: asks and tokens only" />
+          </Switch>
+        </div>
         <div className="sched-stats ai-totals">
           {sum('today', 'today')}
           {sum('month', 'this month')}
@@ -845,6 +859,9 @@ const FIND: [string, string, string?][] = [
   ['ai', 'Runs with', 'backend openrouter claude -p codex exec model'],
   ['ai', 'OpenRouter API key', 'token secret ai'],
   ['ai', 'Spending', 'cost usage tokens ai today month'],
+  ['ai', "Laki's skill", 'tools prs notes memory shells actions templates ask options remove'],
+  ['ai', 'Show costs ($)', 'hide cost money dollars price spend'],
+  ['ai', 'Your instructions', 'custom context system prompt my own rules'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['appearance', 'Menu bar item', 'tray status count waiting needs you'],
@@ -901,7 +918,7 @@ const FIND: [string, string, string?][] = [
   ['actions', 'Actions', 'run menu prompt command'],
   ['skill', 'Agent skill', 'mcp server laki cli'],
   ['skill', 'Extension creator', 'agent skill widgets laki-widget make extension ai'],
-  ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule'],
+  ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule delete remove uninstall top bar status bar where place network internet https'],
   ['widgets', 'More folders', 'extensions widgets'],
   ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
@@ -1354,8 +1371,9 @@ function SkillSection({ api }: { api: SkillApi }) {
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; config?: Record<string, string> }) => Promise<unknown>
+  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace; net?: boolean; config?: Record<string, string> }) => Promise<unknown>
   run: (id: string) => Promise<unknown>
+  rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, for good (asked first here)
   reload: () => Promise<unknown>
   open: (id: string) => void // its full view
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
@@ -1363,6 +1381,11 @@ export type WidgetsApi = {
 }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
+const PLACES: [WidgetPlace, string, string][] = [
+  ['side', 'Sidebar', 'In the sidebar, above its buttons'],
+  ['top', 'Top bar', 'In the top bar, left of its buttons: a line high'],
+  ['status', 'Status bar', "At the status bar's right end: a line high"],
+]
 const VIEWS: [WidgetSize, string][] = [
   ['s', 'Small'],
   ['m', 'Medium'],
@@ -1448,11 +1471,18 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   return (
     <div className={`preset widget-card ${w.on ? '' : 'off'}`}>
       <div className="row wc-head">
-        <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? `${w.name}: in the sidebar` : `${w.name}: off`} />
+        <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? `${w.name}: on` : `${w.name}: off`} />
         <b>{w.name}</b>
         {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
         <span className="grow" />
-        <select className="wc-size" value={w.size.join('x')} data-tip="Size in the sidebar: cells across × down" onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
+        <select className="wc-place" value={w.place ?? 'side'} data-tip={PLACES.find(x => x[0] === (w.place ?? 'side'))?.[2]} aria-label="Where it shows" onChange={e => void api.set(w.id, { place: e.target.value as WidgetPlace })}>
+          {PLACES.map(([v, n]) => (
+            <option key={v} value={v}>
+              {n}
+            </option>
+          ))}
+        </select>
+        <select className="wc-size" value={w.size.join('x')} data-tip={(w.place ?? 'side') === 'side' ? 'Size in the sidebar: cells across × down' : 'Its width: cells across (a bar is a line high)'} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
           {SIZES.map(([a, d]) => (
             <option key={`${a}x${d}`} value={`${a}x${d}`}>
               {a}×{d === 0.5 ? '½' : d}
@@ -1490,8 +1520,22 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         {w.full && <button onClick={() => api.open(w.id)}>Open</button>}
         {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
         {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
+        {api.rm && !w.builtin && (
+          <IconButton
+            icon="trash"
+            title="Delete it: its folder and settings"
+            onClick={() =>
+              void ask(`Delete ${w.name}?`, { text: `Its folder (${w.dir}) and its settings go for good.`, ok: 'Delete', danger: true }).then(yes => yes && api.rm!(w.id))
+            }
+          />
+        )}
       </div>
       {w.description && <div className="muted small">{w.description}</div>}
+      {w.js && (
+        <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
+          <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its fetch gave it. Its fetch command always has the network" />
+        </Switch>
+      )}
       {options.length > 0 && (
         <div className="wc-opts">
           {options.map(o => (
@@ -1528,6 +1572,8 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               )}
               <span className="sched-tags">
                 {w.builtin && <span className="tag">built-in</span>}
+                {(w.place ?? 'side') !== 'side' && <span className="tag">{PLACES.find(x => x[0] === w.place)?.[1]}</span>}
+                {w.net && <span className="tag" data-tip="Its page may reach https sites">network</span>}
                 {w.byAi && <span className="tag" data-tip="Laki AI wrote it; it was saved off: look at what it runs (its folder) before turning it on">by Laki AI</span>}
                 <span className="tag">
                   {w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}
@@ -1539,7 +1585,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
             <span className="sched-acts">
               {w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
             </span>
-            <Switch on={w.on} tip={w.on ? `${w.name}: in the sidebar` : `${w.name}: off`} onChange={on => void api.set(w.id, { on })} />
+            <Switch on={w.on} tip={w.on ? `${w.name}: on` : `${w.name}: off`} onChange={on => void api.set(w.id, { on })} />
           </div>
         ))}
       </div>
@@ -1585,7 +1631,7 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
     <>
       <h2>Extensions</h2>
       <p className="muted">
-        Small pages in the sidebar, above its buttons, in a grid 3 cells across: each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
+        Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 3 cells across, or a line high in the top bar or the status bar: each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
         schedule) and widget.html (what it shows, and its full view, a click away). A click on one below sets it up. Ask an agent with the Extension creator skill (Agent skill) to make one, or any AI with the prompt below.
       </p>
       <WidgetList api={api} />
@@ -2093,7 +2139,7 @@ export function SettingsPage(p: {
                 </Switch>
                 <label>
                   Where they go
-                  <select value={s.prMarks?.at ?? 'start'} onChange={e => set({ prMarks: { ...s.prMarks, at: e.target.value as PRMarks['at'] } })}>
+                  <select value={s.prMarks?.at ?? 'end'} onChange={e => set({ prMarks: { ...s.prMarks, at: e.target.value as PRMarks['at'] } })}>
                     {MARKS_AT.map(([v, name]) => (
                       <option key={v} value={v}>
                         {name}

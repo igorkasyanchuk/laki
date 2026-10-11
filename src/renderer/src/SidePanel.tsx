@@ -37,7 +37,11 @@ export type PanelApi = {
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
+  // the workspace's Artifacts (its storage folder) as Files' other root: list, show one in the app, open it in its app,
+  // its right click (Finder, copy path); none: no storage folder yet
+  artifacts?: { files: () => Promise<FileList>; preview: (path: string) => void; open: (path: string) => void; menu: (e: MouseEvent, path: string) => void }
 }
+export type FilesRoot = 'ws' | 'artifacts'
 
 // a PR's node id and each file's viewerViewedState: VIEWED, UNVIEWED, DISMISSED (viewed, then changed by a commit)
 export type PRFiles = { id: string; files: Record<string, string> }
@@ -94,8 +98,10 @@ function tree(files: string[]) {
 const parentOf = (p: string) => (p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '')
 const ST: Record<string, string> = { M: 'modified', A: 'new', D: 'deleted', R: 'renamed', '?': 'new' }
 
-function Files({ api, ws }: { api: PanelApi; ws: string }) {
-  const [d, err, reload] = useLoad(api.files, ws, 8000)
+// root: the worktree's files, or its Artifacts (read-only here: no new files; a double click opens one in its app)
+function Files({ api, ws, root, onRoot }: { api: PanelApi; ws: string; root: FilesRoot; onRoot: (r: FilesRoot) => void }) {
+  const art = root === 'artifacts' ? api.artifacts : undefined
+  const [d, err, reload] = useLoad(art?.files ?? api.files, `${ws}:${art ? 'art' : 'ws'}`, 8000)
   const [q, setQ] = useState('')
   const [open, setOpen] = useState<Set<string>>(new Set())
   const [sel, setSel] = useState('')
@@ -107,7 +113,9 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
     setOpen(new Set())
     setSel('')
     setMade([])
-  }, [ws])
+  }, [ws, !!art])
+  const preview = (f: string) => (art ? art.preview(f) : api.preview(f))
+  const menu = (e: MouseEvent, f: string, dir: boolean) => (art ? art.menu(e, f) : api.menu(e, f, dir))
   const kids = useMemo(() => tree([...(d?.files ?? []), ...made.map(m => `${m}/`)]), [d, made])
   const changed = d?.changed ?? {}
   const changedDirs = useMemo(() => {
@@ -155,11 +163,21 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
     dir ? changedDirs.has(p) && <span className="sp-dot" /> : changed[p] && <span className={`sp-dot st-${changed[p]}`} data-tip={ST[changed[p]]} />
   return (
     <>
+      {api.artifacts && (
+        <div className="seg sp-roots" role="tablist">
+          <button role="tab" aria-selected={!art} className={art ? '' : 'on'} onClick={() => onRoot('ws')}>
+            Workspace
+          </button>
+          <button role="tab" aria-selected={!!art} className={art ? 'on' : ''} data-tip="What its agents keep for you ($LAKI_STORAGE_FOLDER)" onClick={() => onRoot('artifacts')}>
+            Artifacts
+          </button>
+        </div>
+      )}
       <div className="sp-tools">
         <Icon name="search" />
-        <input value={q} placeholder="Search files" spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), setQ(''))} />
-        <IconButton icon="filePlus" title={`New file in ${folder || 'the root'}`} onClick={() => startMaking(false)} />
-        <IconButton icon="folderPlus" title={`New folder in ${folder || 'the root'}`} onClick={() => startMaking(true)} />
+        <input value={q} placeholder={art ? 'Search artifacts' : 'Search files'} spellCheck={false} onChange={e => setQ(e.target.value)} onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), setQ(''))} />
+        {!art && <IconButton icon="filePlus" title={`New file in ${folder || 'the root'}`} onClick={() => startMaking(false)} />}
+        {!art && <IconButton icon="folderPlus" title={`New folder in ${folder || 'the root'}`} onClick={() => startMaking(true)} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
         <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} />
       </div>
@@ -182,7 +200,7 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
         {!d && !err && <div className="muted small pad">Loading…</div>}
         {query
           ? found.map(f => (
-              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} onClick={() => (setSel(f), api.preview(f))} onContextMenu={e => (setSel(f), api.menu(e, f, false))}>
+              <div key={f} className={`sp-row ${sel === f ? 'sel' : ''}`} data-tip={f} onClick={() => (setSel(f), preview(f))} onContextMenu={e => (setSel(f), menu(e, f, false))}>
                 <Icon name="file" />
                 <span className="sp-name">
                   {f.slice(f.lastIndexOf('/') + 1)} <span className="muted">{parentOf(f)}</span>
@@ -195,9 +213,9 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
                 key={n.path}
                 className={`sp-row ${sel === n.path ? 'sel' : ''} ${n.dir ? '' : `ch-${changed[n.path] ?? ''}`}`}
                 style={{ paddingLeft: 8 + depth * 14 }}
-                onClick={e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && api.preview(n.path))} // a double-click's second opens the editor
-                onDoubleClick={() => !n.dir && api.openFile(n.path)}
-                onContextMenu={e => (setSel(n.path), api.menu(e, n.path, n.dir))}
+                onClick={e => (setSel(n.path), n.dir ? toggle(n.path) : e.detail < 2 && preview(n.path))} // a double-click's second opens the editor
+                onDoubleClick={() => !n.dir && (art ? art.open(n.path) : api.openFile(n.path))}
+                onContextMenu={e => (setSel(n.path), menu(e, n.path, n.dir))}
               >
                 <span className="sp-chev">{n.dir && <Icon name={open.has(n.path) ? 'chevron' : 'chevronRight'} />}</span>
                 <span className="sp-name">{n.name}</span>
@@ -205,6 +223,7 @@ function Files({ api, ws }: { api: PanelApi; ws: string }) {
               </div>
             ))}
         {query && !found.length && <div className="muted small pad">No file matches.</div>}
+        {art && d && !d.files.length && !query && <div className="muted small pad">Nothing kept yet: its agents save files and links here.</div>}
         {d?.cut && <div className="muted small pad">Showing the first 50,000 files.</div>}
       </div>
     </>
@@ -540,6 +559,8 @@ export function SidePanel(p: {
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: FixWhat) => void
   onAct: (act: PRAct, method?: MergeMethod) => void
+  root: FilesRoot // Files': the worktree, or the Artifacts
+  onRoot: (r: FilesRoot) => void
 }) {
   const tabs = TABS.filter(t => p.git || t.id === 'files' || t.id === 'preview')
   const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
@@ -555,7 +576,7 @@ export function SidePanel(p: {
         <span className="grow" />
         <IconButton icon="x" title="Close (⌥⌘B)" onClick={p.onClose} />
       </div>
-      {tab === 'files' && <Files api={p.api} ws={p.w.id} />}
+      {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
       {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
@@ -1045,6 +1066,8 @@ export function FilePreview(p: {
   edit?: Edit // being edited (the pencil): a textarea instead of the lines
   onEdit: (e?: Edit) => void
   save: (text: string, was: string, force?: boolean) => Promise<unknown> // over the file, unless it changed since was
+  openLabel?: string // the open button's words (an artifact: in its app)
+  readOnly?: boolean // no edit (an artifact)
 }) {
   const [f, setF] = useState<FileContent | null>(null)
   const [err, setErr] = useState('')
@@ -1068,7 +1091,7 @@ export function FilePreview(p: {
   useLayoutEffect(() => void (p.edit ? area.current?.scrollTo(0, top.current) : body.current?.scrollTo(0, top.current)), [!!p.edit])
   const name = p.path.slice(p.path.lastIndexOf('/') + 1)
   // edit: small tweaks, no more (no completion); only what the preview shows whole and as its bytes
-  const editable = f?.text !== undefined && !f.cut && !f.lossy && !(f.text.includes('\r\n') && /(^|[^\r])\n/.test(f.text)) // mixed line ends: one kind would replace both
+  const editable = !p.readOnly && f?.text !== undefined && !f.cut && !f.lossy && !(f.text.includes('\r\n') && /(^|[^\r])\n/.test(f.text)) // mixed line ends: one kind would replace both
   const startEdit = () => {
     top.current = body.current?.scrollTop ?? 0
     p.onEdit({ text: f!.text!.replace(/\r\n/g, '\n'), was: f!.text! })
@@ -1143,9 +1166,9 @@ export function FilePreview(p: {
         )}
         {editable && <IconButton icon="pencil" title="Edit here: small changes, ⌘S saves" onClick={startEdit} />}
         <IconButton icon="refresh" title="Reload" onClick={() => setN(x => x + 1)} />
-        <button className="small" data-tip="Open in editor" onClick={p.onOpen}>
+        <button className="small" data-tip={p.openLabel ?? 'Open in editor'} onClick={p.onOpen}>
           <Icon name="code" />
-          <span className="pv-wide"> Open in editor</span>
+          <span className="pv-wide"> {p.openLabel ?? 'Open in editor'}</span>
         </button>
           </>
         )}
