@@ -117,6 +117,26 @@ xattr -dr com.apple.quarantine /Applications/Laki.app
 `npm run pack:x64` builds the Intel app on an Apple silicon Mac (it adds node-pty's Intel binary to
 `node_modules`, unsaved; the next `npm install` drops it).
 
+### Linux, and Windows through WSL
+
+`npm run pack:linux` builds the Linux app in Docker, `dist/linux/Laki-<version>-arm64.AppImage` (`ARCH=x64 npm run
+pack:linux`: `…-x86_64.AppImage`), then runs the tests and a smoke test against it. To run it on Ubuntu 24.04, or on
+Windows in WSL 2 (its Ubuntu; WSLg shows the window):
+
+```bash
+sudo apt install libnss3 libasound2t64 libfuse2t64 wslu xdg-utils   # wslu: WSL only, links open in Windows' browser
+chmod +x Laki-*-x86_64.AppImage && ./Laki-*-x86_64.AppImage
+```
+
+In WSL, add `export BROWSER=wslview` to `~/.bashrc` for those links. Everything runs in Linux there: install your agents
+and `gh` in WSL and sign in there, and keep projects in its own folders (`~/…`, not `/mnt/c`: git is slow across that
+boundary). On a desktop Ubuntu 24.04+, if it stops on the SUID sandbox helper (AppArmor), start it with `--no-sandbox`.
+On arm64 the AppImage's starter also wants `libz.so` (`sudo apt install zlib1g-dev`).
+
+Not like the Mac: shortcuts written ⌘ are the Super key, and paste in a terminal is Ctrl+Shift+V (Ctrl+V and Ctrl+C go
+to the terminal); the window has the system's title bar (Alt shows the menu) and closing it quits Laki (the daemon and
+its agents keep running); no menu bar screenshots, timer sounds, *Open in* other apps, `laki open` or laki:// links.
+
 To put the CLI on your PATH as `laki`:
 
 ```bash

@@ -14,6 +14,7 @@ npm run typecheck                 # tsc --noEmit
 npm test                          # node:test, ~95s (4 at a time)
 npm run pack                      # electron-vite build + electron-builder --dir → dist/mac-arm64/Laki.app (Intel: dist/mac)
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
+npm run pack:linux                # in Docker: dist/linux/Laki-<version>-<arch>.AppImage, then the tests and pack-smoke.sh under Xvfb (ARCH=x64)
 npm run dmg                       # minor version +1, then dist/release/Laki-<version>-arm64.dmg (the user's ask: every dmg)
 npm run dev                       # Electron + renderer dev server on :5199
 ```
@@ -31,6 +32,11 @@ npm run dev                       # Electron + renderer dev server on :5199
      world, `ln -s $PWD/test/cloudflared /tmp/laki-x/bin/`.
   2. `npm run dev:web` serves the renderer on :5199; open that URL.
   3. Afterwards stop it: `LAKI_HOME=/tmp/laki-x/data node out/main/cli.js stop`, then stop vite.
+- **Linux** (`scripts/linux.sh`, a preview): node:22-trixie with Electron's libraries; `npm ci` there gets node-pty's
+  Linux binary. Main's `mac`: off it, the system's title bar (`autoHideMenuBar`: Alt shows the menu) and close quits
+  (no Dock to bring a hidden window back); the renderer's `.electron` (the traffic lights' room) is macOS only. ⌘ keys
+  are Super (`metaKey`); macOS-only parts (`open`, `afplay`, `screencapture`, the Keychain, `open-url` links, panel
+  windows) fail quietly or fall back.
 - `scripts/pack-smoke.sh` checks the packaged app (daemon, CLI and hooks through Electron's node, plus a
   window screenshot); `APP=$PWD/dist/mac/Laki.app` checks the Intel build (under Rosetta here). `scripts/mem.sh` measures RSS with 3 workspaces × 2 tabs.
 - The user runs their own daemon with real agents in it, in `~/.laki-electron` (from when the app was called

@@ -12,6 +12,7 @@ import { ensureDaemon, rpc } from '../shared/conn.ts'
 import type { View } from '../shared/types.ts'
 
 const dev = !!process.env.ELECTRON_RENDERER_URL
+const mac = process.platform === 'darwin' // elsewhere (Linux): the system's title bar, and closing the window quits (no Dock to bring it back)
 let win: BrowserWindow | null = null
 let pendingTab: string | null = null
 let quitting = false
@@ -163,8 +164,7 @@ function create() {
     minHeight: 400,
     backgroundColor: '#0e1014',
     visualEffectState: 'active', // glass keeps its blur when the window isn't focused
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 14, y: 12 }, // centered in the 38px sidebar header
+    ...(mac ? { titleBarStyle: 'hiddenInset', trafficLightPosition: { x: 14, y: 12 } } : { autoHideMenuBar: true }), // centered in the 38px sidebar header; Alt shows the menu
     show: false, // shown once ready: where it was left (winAt), else maximized
     webPreferences: {
       preload: fileURLToPath(new URL('../preload/index.cjs', import.meta.url)),
@@ -188,7 +188,7 @@ function create() {
   // closing hides: the renderer keeps posting notifications for agents while the app runs windowless
   win.on('close', e => {
     saveWin() // a move just before quitting isn't lost to the timer
-    if (quitting) return
+    if (quitting || !mac) return
     e.preventDefault()
     win?.hide()
   })

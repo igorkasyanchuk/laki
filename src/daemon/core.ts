@@ -1372,7 +1372,7 @@ export type NewWs = { project: string; base?: string; preset?: string; cmd?: str
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
   const err = String(e.stderr || e.message)
-  if (e.code === 'ENOENT') return "gh isn't installed: brew install gh, then gh auth login"
+  if (e.code === 'ENOENT') return `gh isn't installed: ${process.platform === 'darwin' ? 'brew' : 'sudo apt'} install gh, then gh auth login`
   if (/exec: gh: not found|gh: command not found|command not found: gh/.test(err)) return "gh isn't installed on the SSH host: install it there, then gh auth login" // exec's
   if (/gh auth login|not logged in|authenticat/i.test(err)) return "gh isn't signed in: run gh auth login"
   if (/could not resolve to a pull ?request|no pull requests found|not found/i.test(err)) return `${what} not found`

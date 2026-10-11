@@ -640,6 +640,7 @@ test('scheduled tasks: the default agent, empty prompts and times, edits that ke
   // two due at once: the second deleted while the first makes its worktree
   const due = (await state(rig)).schedules.find((x: any) => x.id === s1.id).next
   await rig.rpc('scheduleSet', { id: s2.id, on: true })
+  writeFileSync(join(rig.repo, '.git/hooks/post-checkout'), '#!/bin/sh\nsleep 0.3\n', { mode: 0o755 }) // a worktree that takes a while (Linux makes one in under 30 ms)
   const tick = rig.rpc('scheduleTick', { now: due + 1000 })
   await sleep(30)
   await rig.rpc('scheduleRm', { id: s2.id })

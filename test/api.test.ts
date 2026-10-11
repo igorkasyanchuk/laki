@@ -519,7 +519,7 @@ test('diff size, archive only when clean, the first-run checks', async t => {
   assert.deepEqual(await rig.rpc('wsArchive', { id: ws.id, ifClean: true }), { dirty: 3 }) // not archived: it'd lose them
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived, undefined)
   execFileSync('git', ['add', '-A'], { cwd: ws.path })
-  execFileSync('git', ['commit', '-qm', 'work'], { cwd: ws.path })
+  execFileSync('git', ['commit', '-qm', 'work'], { cwd: ws.path, env: rig.env }) // its author: Linux has no user@host.local to fall back on
   await until(async () => (await stat())?.dirty === 0, 'committed') // still +4 against the base
   assert.deepEqual(await stat(), { add: 4, del: 0, files: 3, dirty: 0 })
   assert.equal(await rig.rpc('wsArchive', { id: ws.id, ifClean: true }), null)

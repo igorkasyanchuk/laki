@@ -4,9 +4,13 @@
 # connects (file:// origin) and captures a screenshot. Temp home; nothing real is touched.
 set -e
 ROOT=$(cd "$(dirname "$0")/.." && pwd)
-APP=${APP:-$ROOT/dist/$([ "$(uname -m)" = arm64 ] && echo mac-arm64 || echo mac)/Laki.app} # APP=…/dist/mac/Laki.app: the Intel build, under Rosetta
-BIN="$APP/Contents/MacOS/Laki"
-RES="$APP/Contents/Resources/app/out/main"
+if [ "$(uname)" = Linux ]; then # a display from Xvfb; Chromium's sandbox wants a setuid helper or user namespaces
+  APP=${APP:-$ROOT/dist/$([ "$(uname -m)" = aarch64 ] && echo linux-arm64-unpacked || echo linux-unpacked)}
+  BIN="$APP/laki" RES="$APP/resources/app/out/main" X="xvfb-run -a" NOSB=--no-sandbox
+else
+  APP=${APP:-$ROOT/dist/$([ "$(uname -m)" = arm64 ] && echo mac-arm64 || echo mac)/Laki.app} # APP=…/dist/mac/Laki.app: the Intel build, under Rosetta
+  BIN="$APP/Contents/MacOS/Laki" RES="$APP/Contents/Resources/app/out/main"
+fi
 H=${1:-/tmp/laki-pack}
 NODE_DIR=$(dirname "$(node -p process.execPath)") # before HOME moves (version managers)
 rm -rf "$H" && mkdir -p "$H/repo"
@@ -23,7 +27,7 @@ for i in $(seq 100); do laki ls | grep -q "○● claude" && break; sleep 0.1; d
 laki ls
 echo "--- hook command:"; grep -o '"command": "[^"]*hook idle' "$LAKI_HOME/claude-settings.json"
 echo "--- screen:"; laki screen packed
-LAKI_CAPTURE=$H/shot.png LAKI_NOTIFY_LOG=$H/notify.log "$BIN" > "$H/app.out" 2>&1 &
+LAKI_CAPTURE=$H/shot.png LAKI_NOTIFY_LOG=$H/notify.log $X "$BIN" $NOSB > "$H/app.out" 2>&1 &
 APP_PID=$!
 for i in $(seq 100); do [ -f "$H/shot.png" ] && break; sleep 0.1; done
 # a turn that ends in a workspace the window doesn't show: the app posts a notification

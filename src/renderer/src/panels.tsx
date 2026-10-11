@@ -1131,6 +1131,7 @@ const CLOUDFLARED_WHY =
 export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: () => void; check: () => Promise<Doctor> }) {
   const [d, setD] = useState<Doctor | null>(null)
   useEffect(() => void check().then(setD, () => {}), [])
+  const mac = /Mac/.test(navigator.userAgent) // Linux's (and WSL's) hints: apt
   const row = (ok: boolean, name: string, hint: string, why?: string) => (
     <div className="check" key={name}>
       <Glyph s={ok ? 'ok' : why ? 'idle' : 'exited'} />{/* why: optional, so missing it is no failure */}
@@ -1160,10 +1161,10 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
       </button>
       {d && (
         <div className="welcome-checks">
-          {row(d.git, 'git', d.git ? 'found' : 'needed for worktrees: xcode-select --install')}
-          {row(d.gh === 'in', 'gh', d.gh === 'in' ? 'signed in: PRs, checks and Ship work' : d.gh === 'out' ? 'not signed in, for PRs: gh auth login' : 'not found, for PRs: brew install gh')}
+          {row(d.git, 'git', d.git ? 'found' : `needed for worktrees: ${mac ? 'xcode-select --install' : 'sudo apt install git'}`)}
+          {row(d.gh === 'in', 'gh', d.gh === 'in' ? 'signed in: PRs, checks and Ship work' : d.gh === 'out' ? 'not signed in, for PRs: gh auth login' : `not found, for PRs: ${mac ? 'brew' : 'sudo apt'} install gh`)}
           {d.cloudflared !== undefined &&
-            row(d.cloudflared, 'cloudflared', d.cloudflared ? 'found: public links work' : 'optional: brew install cloudflared', CLOUDFLARED_WHY)}
+            row(d.cloudflared, 'cloudflared', d.cloudflared ? 'found: public links work' : `optional: ${mac ? 'brew ' : ''}install cloudflared`, CLOUDFLARED_WHY)}
           {found.length ? found.map(a => row(true, AGENT_NAMES[a.id], 'on PATH: a preset')) : row(false, 'agents', 'none on PATH: install Claude Code or Codex, then restart Laki')}
           {missing.length > 0 && found.length > 0 && <div className="muted small">Not on PATH: {missing.map(a => AGENT_NAMES[a.id]).join(', ')}</div>}
         </div>

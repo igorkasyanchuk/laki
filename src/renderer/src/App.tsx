@@ -1790,7 +1790,7 @@ export function App() {
     </div>
   )
   return (
-    <div style={rail ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} className={`app ${sideOpen ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge ? 'electron' : ''} ${settings.dimPanes ? 'dim-panes' : ''} ${full ? 'full' : ''}`} data-pad={settings.termPad}>
+    <div style={rail ? ({ '--rail-w': `${railW}px` } as CSSProperties) : undefined} className={`app ${sideOpen ? '' : 'side-closed'} ${rail ? 'rail-on' : ''} ${listOff ? 'list-off' : ''} ${narrow ? 'narrow' : ''} ${bridge && /Mac/.test(navigator.userAgent) ? 'electron' : ''} ${settings.dimPanes ? 'dim-panes' : ''} ${full ? 'full' : ''}`} data-pad={settings.termPad}>
       {railBar}
       {(sideOpen || video) && ( // hidden, not gone, while a video plays
       <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>

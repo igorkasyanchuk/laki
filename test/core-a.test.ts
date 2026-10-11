@@ -50,7 +50,7 @@ test('state.json and its backup unreadable: an empty start, the file kept; no gh
   assert.equal(readFileSync(join(rig.data, broken!), 'utf8'), '[]')
   assert.deepEqual(v.presets.map((x: any) => x.name), ['claude', 'codex']) // the others aren't on PATH
   const p = await rig.rpc('projectAdd', { path: rig.repo })
-  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', pr: '5' }), /gh isn't installed: brew install gh, then gh auth login/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', pr: '5' }), /gh isn't installed: (brew|sudo apt) install gh, then gh auth login/)
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', issue: '7' }), /gh issue view 7: spawn gh ENOENT/)
   assert.deepEqual((await rig.rpc('state')).workspaces, [])
   // a good state.json whose backup can't be written (a folder there): it loads all the same

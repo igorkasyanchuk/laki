@@ -61,6 +61,9 @@ open dist/mac-arm64/Laki.app      # Intel: dist/mac; or copy it to /Applications
 npm link                          # optional: the laki CLI
 ```
 
+Linux and Windows (WSL 2), a preview: `npm run pack:linux` builds `dist/linux/Laki-<version>-<arch>.AppImage` in Docker
+and tests it there (`ARCH=x64` for Intel/AMD); [the guide](docs/guide.md#linux-and-windows-through-wsl) says how to run it.
+
 ## Use
 
 1. **⌘O** (or drop a folder) adds a project; one on another machine: ⌘K › *Open a project over SSH…* (`host:path`).

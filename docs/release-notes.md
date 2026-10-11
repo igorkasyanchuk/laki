@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Linux and Windows through WSL (preview)**: `npm run pack:linux` builds an AppImage in Docker and runs the tests and
+  a smoke test against it; the window has the system's title bar, and closing it quits (the daemon and its agents keep
+  running). The guide says what to install.
 - **The menu bar has Laki's commands**: Laki › Settings… (⌘,), File (new workspace, new tab, open a project,
   go to a file, close tab), Edit › Find…, View (sidebar, info, changes, palette, font size) and Go (the next that
   needs you, previous and next workspace, Board, Scheduled tasks).
