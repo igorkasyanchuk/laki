@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.12.0 · Oct 12, 2026
 
 - **Specs & Brainstorms** (experimental, Settings › General): write a project's requirements like a Notion page
   (checklists, images, diagrams: flowcharts, architecture, ER, screen flows, wireframes), then *Start* a workspace
