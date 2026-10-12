@@ -143,6 +143,7 @@ export type AppSettings = Paint & {
   webhook?: Webhook // pushes to your phone
   ai?: AiSettings // Laki AI (Settings › AI)
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
+  syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched first ('': off)
   menuBar?: boolean // the menu bar's item (unset: on)
   floater?: boolean // the floating bubbles over other apps (unset: on)
   floaterStyle?: FloaterStyle // a working agent's bubble (unset: gradient)
@@ -851,7 +852,8 @@ const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1
 // A result opens the section and shows the first label, row or heading starting with the title. Add new settings here.
 const FIND: [string, string, string?][] = [
   ['general', 'New workspaces start', 'default agent preset'],
-  ['general', 'Branch prefix', 'git worktree'],
+  ['git', 'Branch prefix', 'git worktree'],
+  ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
   ['webhook', 'Notifications webhook', 'phone push ntfy slack telegram json notify waiting done'],
@@ -870,7 +872,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Pull requests in the sidebar', 'pr github icon'],
   ['appearance', 'Pull request marks', 'approved approval check double eyes commented review me sidebar'],
   ['appearance', 'Turn timers', 'elapsed time'],
-  ['appearance', 'Diff size in the sidebar', 'lines added removed changes stat'],
+  ['git', 'Diff size in the sidebar', 'lines added removed changes stat'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['general', 'Environment', 'env variables'],
@@ -910,7 +912,7 @@ const FIND: [string, string, string?][] = [
   ['open', 'Custom command', 'editor'],
   ['presets', 'Agent presets', 'claude codex gemini args env model'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
-  ['pr', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
+  ['git', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
   ['pr', 'Tries in a row', 'pr fix ci conflicts limit attempts how many times'],
   ['pr', 'Fix CI', 'pr prompt failing checks auto'],
   ['pr', 'Review', 'pr prompt comments auto'],
@@ -923,7 +925,7 @@ const FIND: [string, string, string?][] = [
   ['widgets', 'More folders', 'extensions widgets'],
   ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
-  ['general', 'Worktrees', 'folder directory location path where worktree workspaces disk'],
+  ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
@@ -939,6 +941,7 @@ const FIND: [string, string, string?][] = [
 // the nav's sections, under a head each (group): the app, its agents, what it connects to
 const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] = [
   { id: 'general', label: 'General', icon: 'settings', group: 'Laki' },
+  { id: 'git', label: 'Git & worktrees', icon: 'fork', group: 'Laki' },
   { id: 'appearance', label: 'Appearance', icon: 'palette', group: 'Laki' },
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
@@ -1900,6 +1903,50 @@ export function SettingsPage(p: {
               onSave={o => p.onSaveProject?.(project.id, o)}
             />
           )}
+          {sec === 'git' && (
+            <>
+              <h2>Git &amp; worktrees</h2>
+              <Group title="New worktrees" hint="Each new workspace is a git worktree on a branch of its own, off the base branch the new-workspace page picks (the repo's main one unless you pick another)">
+              <label>
+                <span>
+                  Branch prefix <span className="muted">· for new worktrees' branches</span>
+                </span>
+                <input className="mono" value={s.branchPrefix ?? ''} placeholder="laki/" onChange={e => set({ branchPrefix: e.target.value })} />
+              </label>
+              <div className="setting-box">
+                <label className="switch-row">
+                  <select value={s.syncBase ?? ''} onChange={e => set({ syncBase: e.target.value as AppSettings['syncBase'] }) /* '': off (an unset key wouldn't replace the saved one) */}>
+                    <option value="">Off</option>
+                    <option value="origin">Origin's (recommended)</option>
+                    <option value="ff">Fast-forward mine</option>
+                  </select>
+                  <Says title="Sync the base branch" hint="git fetch before each new worktree, so it starts from origin's latest. A failed fetch never stops it" />
+                </label>
+              </div>
+              <p className="muted small">Origin's: the worktree starts off <code>origin/&lt;base&gt;</code>, your own branch as it is. Fast-forward mine: your base branch moves up to origin's first, when it can (not while it's checked out, nor with commits of its own: then origin's). Off: your branch as it is, no network.</p>
+              <div className="field">
+                <span>
+                  Folder for worktrees <span className="muted">· a folder per project inside it; a project can pick its own (Settings › the project). Ones made already stay where they are</span>
+                </span>
+                <FolderField value={s.worktrees} label="Folder for worktrees" placeholder="Laki's data folder: ~/.laki/worktrees" onChange={v => set({ worktrees: v })} />
+              </div>
+              </Group>
+              <Group title="In the sidebar">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
+                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
+                </Switch>
+              </div>
+              </Group>
+              <Group title="When a PR merges">
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.archiveMerged} onChange={v => set({ archiveMerged: v })}>
+                  <Says title="Archive workspace when its PR merges" hint="Only a clean one: nothing uncommitted or unpushed, no agent at work. A toast offers Undo; one left alone says merged in the sidebar." />
+                </Switch>
+              </div>
+              </Group>
+            </>
+          )}
           {sec === 'general' && (
             <>
               <h2>General</h2>
@@ -1913,12 +1960,6 @@ export function SettingsPage(p: {
                   <option value="shell">shell</option>
                   <option value="none">nothing</option>
                 </select>
-              </label>
-              <label>
-                <span>
-                  Branch prefix <span className="muted">· for new worktrees' branches</span>
-                </span>
-                <input className="mono" value={s.branchPrefix ?? ''} placeholder="laki/" onChange={e => set({ branchPrefix: e.target.value })} />
               </label>
               </Group>
               <Group title="Notifications" hint="Phone pushes are in their own section">
@@ -1966,9 +2007,6 @@ export function SettingsPage(p: {
                   <Says title="Sound" hint="Played as it ends, whatever the notifications' settings; picking one plays it" />
                 </label>
               </div>
-              </Group>
-              <Group title="Worktrees" hint="Where new workspaces' git worktrees go, a folder per project inside it; a project can pick its own (Settings › the project). Ones made already stay where they are">
-                <FolderField value={s.worktrees} label="Folder for worktrees" placeholder="Laki's data folder: ~/.laki/worktrees" onChange={v => set({ worktrees: v })} />
               </Group>
               <Group title="Storage" hint="Each workspace's own folder, outside the repo, for what its agents make for you (screenshots, reports, exports): $LAKI_STORAGE_FOLDER in its tabs, a folder per workspace inside this one; the info panel opens it">
                 <FolderField value={s.storageDir} label="Folder for storage" placeholder="Laki's data folder: ~/.laki/storage" onChange={v => set({ storageDir: v })} />
@@ -2124,9 +2162,6 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
-                </Switch>
-                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
-                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
                 </Switch>
                 {Object.entries(USAGE_AGENTS).map(([a, name]) => (
                   <Switch key={a} className="switch-row" on={s.usage?.[a] !== false} onChange={v => set({ usage: { ...s.usage, [a]: v } })}>
@@ -2530,9 +2565,6 @@ export function SettingsPage(p: {
                 {pick('Check pull requests every', 'prScan', PR_SCAN, [1, 2, 5, 10, 15, 30], n => (n === 1 ? '1 minute' : `${n} minutes`))}
                 {pick('Tries in a row', 'prTries', PR_TRIES, [1, 2, 3, 5, 10], n => `${n} · then it's over to you`)}
               </div>
-              <Switch className="switch-row" on={!!s.archiveMerged} onChange={v => set({ archiveMerged: v })}>
-                <Says title="Archive workspace when its PR merges" hint="Only a clean one: nothing uncommitted or unpushed, no agent at work. A toast offers Undo; one left alone says merged in the sidebar." />
-              </Switch>
               </Group>
               <Group title="What the switches send" hint="Each prompt goes first, then the checks' logs or the review threads">
               {PR_KINDS.map(([k, title, after]) => {

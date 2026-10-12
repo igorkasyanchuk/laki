@@ -3,7 +3,7 @@
 import { createInterface } from 'node:readline'
 import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { BRAINSTORM_OUTPUT } from '../shared/plans.ts'
-import { AI_ACTS, API, mergeActions, prRef, templated, templatesFor, type View } from '../shared/types.ts'
+import { AI_ACTS, API, mergeActions, prRef, rowsOf, templated, templatesFor, type View } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 
@@ -16,13 +16,29 @@ const obj = (properties: Record<string, object>, required: string[] = []) => ({ 
 // the webhook's URL), projects' config (env), queued prompts, remote access's link (its token). `laki ls --json` too
 export async function state(rpc: Rpc = conn) {
   const v: View = await rpc('state')
+  const live = v.workspaces.filter(w => !w.archived)
+  // each workspace's group: the sidebar's head above it (rowsOf: the project's order)
+  const groupOf = new Map<string, string>()
+  for (const p of v.projects) {
+    let at: string | undefined
+    for (const r of rowsOf(p, live)) if ('project' in r) at && groupOf.set(r.id, at); else at = r.name || 'Unnamed group'
+  }
   return {
-    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind })), // kind: shells (the Terminals project) or browsers, the user's own
-    workspaces: v.workspaces
-      .filter(w => !w.archived)
-      .map(w => ({ id: w.id, name: w.name, project: w.project, kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review } })),
+    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind, groups: p.seps?.length ? p.seps.map(s => s.name || 'Unnamed group') : undefined })), // kind: shells (the Terminals project) or browsers, the user's own; groups: the sidebar's, laki_new_workspace's group
+    workspaces: live
+      .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review } })),
     tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
+}
+
+// a group of a project by its name (any case) or id, as wsNew's place
+async function groupId(rpc: Rpc, project: string, group: string) {
+  const v: View = await rpc('state')
+  const p = v.projects.find(x => x.id === project || x.name === project || x.path === project || `${x.host}:${x.path}` === project) // as findProject takes it
+  const want = String(group).trim().toLowerCase()
+  const s = p?.seps?.find(x => x.id === group || (x.name || 'Unnamed group').toLowerCase() === want)
+  if (!s) throw new Error(`no group ${group} in ${project}${p?.seps?.length ? `: its groups are ${p.seps.map(x => x.name || 'Unnamed group').join(', ')}` : ': it has none (leave group out)'}`)
+  return s.id
 }
 
 export const tools = (rpc: Rpc): Tool[] => [
@@ -50,12 +66,14 @@ export const tools = (rpc: Rpc): Tool[] => [
         presets: { type: 'array', items: { type: 'string' }, description: 'a race: 2–6 presets (claude, codex…) that each get a worktree on the same prompt, for the user to compare and keep one' },
         template: str("a prompt template's name (laki_templates): the prompt goes into it"),
         action: str("an agent action's name (Run ▾'s, laki_actions): its prompt is what the agent does, the prompt above added after it"),
+        group: str("one of the project's groups (laki_state's groups), the sidebar's heading it goes under: the one whose name fits the task best (a PR review under Reviews); leave it out when none fits"),
       },
       ['project'],
     ),
     run: async a => {
+      const place = a.group ? await groupId(rpc, a.project, a.group) : undefined // before the prompt: a wrong group makes nothing
       const prompt = a.template || a.action ? await promptOf(rpc, a.project, a.prompt ?? '', a.template, a.action, a.pr, a.base) : a.prompt
-      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr }
+      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, place }
       if (!prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },

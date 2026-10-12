@@ -80,6 +80,7 @@ export type Workspace = {
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
   muted?: boolean // no notifications from its tabs
   pinned?: boolean // the sidebar shows it above the projects, under Pinned
+  railPin?: number // on the rail, after a line, for a quick click (RAIL_PINS at most): when it was pinned, their order
   autoFix?: boolean // failing CI goes to the agent
   autoReview?: boolean // new PR review comments go to the agent
   autoMerge?: boolean // merge conflicts with the PR's base go to the agent
@@ -254,6 +255,7 @@ export type Settings = {
   storageDir?: string // where workspaces' storage folders go (unset: <data>/storage; ~ is home)
   keepStorage?: boolean // a deleted workspace's storage folder stays (unset: removed with it)
   worktrees?: string // where new worktrees go: <it>/<project>/<workspace> (unset: <data>/worktrees; a project's own folder wins)
+  syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched from origin first: origin, start off origin's copy (your branch untouched); ff, your branch fast-forwarded to it when it can be, else origin's (unset or '': off, the local branch as it is)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
@@ -440,4 +442,5 @@ export type PlanTemplate = { name: string; kind: PlanKind; text: string }
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 50
+export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
+export const API = 51

@@ -158,10 +158,13 @@ npm link
    window. It can be a git repository or any other folder.
 4. The new-workspace page opens. Pick an agent (claude, codex, gemini, grok, opencode, shell, or a custom command) and,
    optionally, a first prompt.
-   - For a git repository, also pick a base branch. The workspace gets a worktree in
-     `~/.laki/worktrees/<project>/<id>` (or the folder you pick in Settings › General › *Worktrees*, or in the
+   - For a git repository, also pick a base branch (the repo's main one, `main` or `master`, unless you pick
+     another; ⌄ lists them all, or type any ref). The workspace gets a worktree in
+     `~/.laki/worktrees/<project>/<id>` (or the folder you pick in Settings › *Git & worktrees*, or in the
      project's settings) on branch `laki/<id>`, its setup command runs, then the
-     agent starts. Turn off the *worktree* switch to work in the repo itself instead.
+     agent starts. Settings › *Git & worktrees* › *Sync the base branch* (off by default) fetches it from origin first:
+     *Origin's* (recommended) starts the worktree off `origin/<base>`, your own branch as it is; *Fast-forward mine*
+     moves your base branch up to origin's first, when it can. Turn off the *worktree* switch to work in the repo itself instead.
    - A folder without git always works in the folder itself; it has no branches, diff, PRs or ship.
 
 ## Using it
@@ -185,7 +188,7 @@ selected workspace's PR is in the status bar.
   | <img src="icons/approved-you.svg" width="14" alt="double check"> | approved, and by you too |
   | 👀 | you commented on, or reviewed with comments, someone else's PR |
 - A line divides the projects; each one's workspaces hang under it, indented on a guide line.
-- *Diff size in the sidebar* (Settings › Appearance, off by default) puts each workspace's diff size on its row
+- *Diff size in the sidebar* (Settings › Git & worktrees, off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
   menu, slides in at the row's end and its marks move left to make room.
 - Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
@@ -268,6 +271,8 @@ selected workspace's PR is in the status bar.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
 - Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
   *Info*, *Mute notifications*, *Remind me…*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
+  *Pin to the rail* (a button on the rail, below a line, a click away from anywhere; 5 at most: terminals and browsers
+  too), *Run ›* (the toolbar's Run ▾ for that workspace: its run script, localhost, your agent and terminal actions),
   *Mark as unread*, *Copy branch name*, *Refresh PR status* (asks GitHub now, not at the next check), *Attach a PR…* (a
   git workspace on a branch with no PR found: one opened another way, by its URL or number; also the status bar's
   *+ PR* and the info panel's PR section; a PR whose branch is another one is only linked: its status, no PR switches;
@@ -282,7 +287,7 @@ selected workspace's PR is in the status bar.
 - Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
   many it holds. *Sort workspaces* (a project's ⋯, and a group's menu): *As dragged* (the default), *Newest first*,
   *Last active first* (its agents' latest turn) or *By name*; a group's own sort wins over the project's (*Like the
-  project* gives it back), and a drag still moves a workspace into a group. A workspace's menu › *Move to group*: one of the project's groups (first in it), or *Out of its group*. A click folds it: they hide, the selected one too (the
+  project* gives it back), and a drag still moves a workspace into a group. A workspace's menu › *Move to group ›*: one of the project's groups (first in it), or *Out of its group*. A click folds it: they hide, the selected one too (the
   busiest one's mark stays on it), until another click. Drop a workspace on a group's head to put it first in
   that group (a folded one opens). Drag the head like a workspace; double click to rename; right click (or its ⋯)
   for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
@@ -403,7 +408,9 @@ you're in): Laki's own assistant, one conversation that works Laki with the same
 `laki mcp`. Ask *what are my agents doing?*, *start a code review of the PR with the login form*, *take the PR from
 workspace ABC and start a new codex session to review it*, or paste a screenshot with three PR links and ask to review
 each in its own workspace: it reads the workspaces, their PRs and agents' last answers, then starts workspaces (a PR's
-on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. *Laki's skill*
+on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. A project with
+groups gets each new workspace in the group whose name fits it (a review in *Reviews*), or none. The bubbles' window is
+the chat alone: no Calls, Info or cost (the app's AI page has them). *Laki's skill*
 (Settings › AI, on by default) gives it more of Laki: your open PRs and everyone else's in your projects' repos, a
 project's notes, memory, templates, actions and to-dos (it writes notes and memory, adds to-dos), renaming and pinning
 workspaces and tabs, a shell with a command typed for you to run, your actions (*start the review action on each PR in
@@ -568,7 +575,7 @@ Each project says which of these Laki may do (its settings › *Pull requests*):
 until you turn them off; *Merge when green* is off until you turn it on. What's off isn't shown, and the daemon
 refuses it.
 
-*Archive workspace when its PR merges* (Settings › *Pull requests*, off by default): the next check after a merge
+*Archive workspace when its PR merges* (Settings › *Git & worktrees*, off by default): the next check after a merge
 archives the workspace, if it's clean: nothing uncommitted, no commit the PR doesn't have, no agent at work. Once per
 PR: *Undo* in the message brings it back for good. One that can't go says *merged* in the sidebar.
 
@@ -588,7 +595,8 @@ It starts from your last choices (project, its group, agent, model, template, wo
   choice, the picked one in the accent with a check; the agent menu marks your default and, for another agent, offers
   *Make … the default for new workspaces*; Claude's models show how they compare in cost ($ to $$$$).
 - The row below: the project and its group in one menu (with a filter past six projects; a group puts it first in that group; the project alone, first
-  in the project), the base branch with the *worktree* switch (off: work in the repo itself, on its current branch),
+  in the project), the base branch (the repo's main one; its ⌄ lists every branch, with a filter) with the *worktree*
+  switch (off: work in the repo itself, on its current branch),
   the name (from the prompt when blank) and *More*: *Race*, and a box for a model typed by hand (like a full name) once you pick *Another model…*.
 In a plain folder (or without a worktree), whose own workspace is there already, an agent or a prompt makes another
 session beside it, in the same folder, named after the prompt; *No agent* gives the folder's own back. A new
@@ -652,7 +660,9 @@ and report through the laki skill (Settings › Agent skill) or MCP's `laki_prog
 over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
 list shows the kind you pick, and its rail button goes back to the last workspace you had there.
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the
-filter looks through every kind. A phone always has one sidebar.
+filter looks through every kind. Below a line, up to 5 workspaces, terminals or browsers you pinned there (a
+workspace's menu › *Pin to the rail*): their initials in their color (a terminal's or browser's icon), with a count when
+one needs you; a click opens it, a right click its menu. A phone always has one sidebar.
 
 **The sidebar's style** (Settings › Appearance › Sidebar): *Compact* (a short line: the state and the name),
 *Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
@@ -828,23 +838,26 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 `state.json`. The page grows and shrinks with the terminal font size; on/off options are switches. *Find a
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment.
-- *General*: the agent new workspaces start with, the branch prefix for new worktrees (default `laki/`),
-  *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
+- *General*: the agent new workspaces start with, *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
   making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; and per extension, *Logs* in Settings › Extensions: each fetch, how
-  long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), *Close tabs without asking* (off by default: closing a tab whose agent or server still runs asks first), *Worktrees* (the folder new worktrees go in, a folder per project inside it; empty: `~/.laki/worktrees`; a project's settings can pick its own; ones made already stay), and environment
+  long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), *Close tabs without asking* (off by default: closing a tab whose agent or server still runs asks first), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
   reads it back (projects and their own settings don't move). A file from another version comes in too: a setting
   this one keeps in another shape is left out (Import names it), the rest applies.
+- *Git & worktrees*: the branch prefix for new worktrees (default `laki/`), *Sync the base branch* (off; *Origin's*,
+  recommended: git fetch, then the worktree starts off `origin/<base>`; *Fast-forward mine*: your base branch moves up to
+  origin's first, when it can; a failed fetch never stops a workspace), *Folder for worktrees* (a folder per project
+  inside it; empty: `~/.laki/worktrees`; a project's settings can pick its own; ones made already stay), *Diff size in
+  the sidebar* (off) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default; *Pull request marks*:
   ✓, ✓✓ and 👀, each on by default, and where they go; *Menu bar item*: the count and its menu, on by default; *Fun
-  button*: the smiley at the bottom of the sidebar, on by default; *Turn timers* and *Diff size in the sidebar*, off by
-  default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
+  button*: the smiley at the bottom of the sidebar, on by default; *Turn timers*, off by default), *Dock icon* (Laki's, or Dawn, Terminal, Glacier, Bubbles or Neon: the Dock and the app switcher show it
   from the moment Laki opens, after a restart or an update too; Finder keeps the app's own), the interface font (Inter by default, SF Pro, Geist, IBM Plex Sans, Roboto, Source Sans 3, Fira Sans, Manrope, a few of the Mac's, or a developer's monospace one: JetBrains Mono, Geist Mono, Fira Code and more), *Settings & Help size* (90% to 150%,
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
@@ -988,7 +1001,7 @@ lit for a moment.
   press would, so it can allow a command. Laki asks Telegram or ntfy for taps every 5 seconds only while a pushed
   question waits (a day at most), and a tap counts only while the same menu is still on screen.
 - *Pull requests*: how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
-  conflicts* get (3), *Archive workspace when its PR merges* (off), and the prompts the PR switches send (above, in
+  conflicts* get (3), and the prompts the PR switches send (above, in
   *PRs*).
 - *Prompt templates*: prompts you reuse. `{{prompt}}` is what you type when you use one, `{{project}}` and
   `{{base}}` the workspace's project and base branch, `{{pr}}` its PR (a PR link in the prompt, or a prompt of

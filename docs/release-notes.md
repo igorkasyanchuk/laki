@@ -2,6 +2,19 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- **Pin to the rail**: a workspace's menu puts it (a terminal or a browser too) on the rail below a line, a click away;
+  5 at most, with a count when one needs you.
+- A workspace's right click has **Run ›**, the toolbar's Run ▾ for it (its script, localhost, your actions), and
+  **Move to group ›** is a submenu.
+- **Settings › Git & worktrees**: *Sync the base branch* (off by default) fetches it from origin before a new worktree
+  starts off it; the branch prefix, the worktrees folder, diff size and archive on merge moved there.
+- The new-workspace page starts off the repo's **main branch**, not whatever the repo has checked out; its ⌄ lists every
+  branch (the box filtered them by what was in it). Opened for another project than your draft's, it starts empty there.
+- **Laki AI** puts a new workspace in the project's group that fits it (a review in *Reviews*); the bubbles' AI window
+  is the chat alone, with a cleaner head.
+
 ## 0.12.0 · Oct 12, 2026
 
 - **Specs & Brainstorms** (experimental, Settings › General): write a project's requirements like a Notion page

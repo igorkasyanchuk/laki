@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, type NotifyAction, onLakiLink, openExternal } from './api'
@@ -23,7 +23,7 @@ import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, clock, mergeActions, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
+import { actionsFor, clock, initials, mergeActions, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
@@ -766,23 +766,29 @@ export function App() {
     const r = await call<{ queued?: number }>('send', { target: t.id, text: stamp(a.text, Date.now()), whenIdle: a.target !== 'shell' }).catch(() => null) // its {{HH:mm}}-style dates: now's
     if (r?.queued) toast(`${a.name}: queued for when the agent's turn ends`)
   }
+  // Run ▾'s actions for a workspace (the sidebar's right click: any workspace's, its own tabs and project)
   const actionItems = (w: WorkspaceView): MenuItem[] => {
-    const live = tabs.filter(t => t.status !== 'exited').map(t => ({ id: t.id, agent: t.kind === 'agent' ? t.preset : undefined, shell: t.kind === 'shell' }))
-    return actionMenu(actionsFor(settings.actions, project?.config?.actions, live, tab?.id), id => byId(id)?.name, (a, t) => runAction(w, a, t))
+    const live = (view?.tabs ?? []).filter(t => t.workspace === w.id && t.status !== 'exited').map(t => ({ id: t.id, agent: t.kind === 'agent' ? t.preset : undefined, shell: t.kind === 'shell' }))
+    const cfg = view?.projects.find(p => p.id === w.project)?.config
+    return actionMenu(actionsFor(settings.actions, cfg?.actions, live, w.id === ws?.id ? tab?.id : undefined), id => byId(id)?.name, (a, t) => runAction(w, a, t))
   }
-  const runMenu = (): MenuItem[] =>
-    ws
-      ? [
-          { label: devTab ? 'Restart' : 'Run', icon: 'run', key: 'r', run: () => (ws.run ? run() : editScripts()) },
-          ...(devRunning ? [{ label: 'Stop', icon: 'stop', key: 's', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) } as MenuItem] : []),
-          ...(devTab ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', run: () => selectTab(devTab.id) } as MenuItem] : []),
-          { label: `Open localhost:${ws.port}`, icon: 'link', key: 'o', run: () => openPort(ws.port) },
-          ...actionItems(ws),
-          null,
-          { label: ws.run ? 'Edit the run script…' : 'Set a run script…', icon: 'pencil', key: 'e', run: editScripts },
-          ...(project && !project.kind ? [{ label: 'Edit actions…', icon: 'pencil', run: () => setDialog({ settings: project.id, spot: 'Actions' }) } as MenuItem] : []),
-        ]
-      : []
+  // Run ▾: the toolbar's, and a sidebar row's right click (Run ›) for any workspace
+  const runMenu = (w = ws): MenuItem[] => {
+    if (!w) return []
+    const dev = view?.tabs.find(t => t.workspace === w.id && t.kind === 'dev')
+    const p = view?.projects.find(x => x.id === w.project)
+    const edit = () => p && setDialog({ settings: p.id, script: 'run', spot: 'Scripts' }) // opened at its Scripts, lit
+    return [
+      { label: dev ? 'Restart' : 'Run', icon: 'run', key: 'r', run: () => (w.run ? call<TabView>('run', { ws: w.id }).then(selectTab, () => {}) : edit()) },
+      ...(dev && dev.status !== 'exited' ? [{ label: 'Stop', icon: 'stop', key: 's', run: () => api.send('input', { tab: dev.id, data: '\x03' }) } as MenuItem] : []),
+      ...(dev ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', run: () => selectTab(dev.id) } as MenuItem] : []),
+      { label: `Open localhost:${w.port}`, icon: 'link', key: 'o', run: () => openPort(w.port) },
+      ...actionItems(w),
+      null,
+      { label: w.run ? 'Edit the run script…' : 'Set a run script…', icon: 'pencil', key: 'e', run: edit },
+      ...(p && !p.kind ? [{ label: 'Edit actions…', icon: 'pencil', run: () => setDialog({ settings: p.id, spot: 'Actions' }) } as MenuItem] : []),
+    ]
+  }
   // the file preview goes (closed, or another file shown): an unsaved edit only once you say so
   const leavePreview = async () => !edited(preview?.edit) || ask(`Discard your changes to ${preview!.path.split('/').pop()}?`, { text: "They aren't saved.", ok: 'Discard', danger: true })
   const closePreview = async () => void ((await leavePreview()) && setPreview(null))
@@ -1030,6 +1036,7 @@ export function App() {
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
     { label: 'Remind me…', icon: 'timer', key: 'e', run: () => setDialog({ remind: w.id }) },
     { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
+    ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(() => {}) } as MenuItem] : []),
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
     ...(w.branch ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
@@ -1038,6 +1045,7 @@ export function App() {
     ...(settings.devMode ? [{ label: 'Logs', icon: 'file', key: 'l', run: () => setDialog({ logs: `ws:${w.id}`, title: `Logs · ${wsName(w)}` }) } as MenuItem] : []),
     ...(w.pr?.state === 'OPEN' && !w.pr.mine && allows(w, 'approve') ? [{ label: `Approve PR #${w.pr.number}…`, icon: 'check', run: () => prAct(w, 'approve') } as MenuItem] : []),
     ...(w.pinned ? [] : groupItems(w)),
+    ...runItems(w),
     null,
     ...(w.kind === 'worktree'
       ? [
@@ -1048,8 +1056,8 @@ export function App() {
     { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) },
   ]
 
-  // a workspace into one of its project's groups (first in it, as a drop on its head), or out of its group (last before
-  // the first one); no groups: nothing (they're made from the project's ⋯)
+  // Move to group ›, a submenu: a workspace into one of its project's groups (first in it, as a drop on its head), or out
+  // of its group (last before the first one); no groups: nothing (they're made from the project's ⋯)
   const groupItems = (w: WorkspaceView): MenuItem[] => {
     const p = view?.projects.find(p => p.id === w.project)
     if (!p?.seps?.length) return []
@@ -1061,13 +1069,15 @@ export function App() {
       call('reorder', { workspaces: moveId(ids, { kind: 'ws', id: w.id, target, after: into, into }) }).catch(() => {})
       if (into && folded.includes(target)) fold(target) // as a drop does: it opens, to show it there
     }
-    return [
-      null,
-      { head: 'Move to group' },
+    const items = [
       ...seps.filter(s => s.id !== inSep).map(s => ({ label: s.name || 'Unnamed group', icon: 'sep', run: () => to(s.id, true) }) as MenuItem),
       ...(inSep ? [{ label: 'Out of its group', icon: 'minus', run: () => to(ids.find(isSep)!, false) } as MenuItem] : []),
     ]
+    return items.length ? [{ label: 'Move to group', icon: 'sep', key: 'g', items }] : []
   }
+  // Run ›: the toolbar's Run ▾ for this workspace (its script, localhost, the agent and terminal actions), a submenu;
+  // a terminal or a browser has none
+  const runItems = (w: WorkspaceView): MenuItem[] => (kindOf(w) === 'projects' ? [{ label: 'Run', icon: 'run', key: 'n', items: runMenu(w) }] : [])
   // a git workspace on a branch with no PR found: one can be attached by hand (prAttach)
   const attachable = (w: WorkspaceView) => !w.pr && !!w.branch && view?.projects.find(p => p.id === w.project)?.git !== false
   // a workspace for the info panel and the status bar's PR
@@ -1793,6 +1803,25 @@ export function App() {
     const says = `${label}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : busy ? ' · at work' : ''}`
     return railButton(k, icon, label, railKind === k && !onPage, says, () => railTo(k), n > 0 ? <span className="rail-count">{n > 99 ? '99+' : n}</span> : busy && <span className="rail-dot" />)
   }
+  // the rail's quick access: workspaces, terminals and browsers pinned there (Pin to the rail), oldest pin first
+  const railPins = rail ? live.filter(w => w.railPin).sort((a, b) => a.railPin! - b.railPin!).slice(0, RAIL_PINS) : []
+  const pinMarks = initials(railPins.map(wsName))
+  const pinButton = (w: WorkspaceView, i: number) => {
+    const mine = view.tabs.filter(t => t.workspace === w.id)
+    const n = mine.filter(needsYou).length
+    const k = kindOf(w)
+    const tip = `${wsName(w)}${k === 'projects' ? ` · ${view.projects.find(p => p.id === w.project)?.name ?? ''}` : ''}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : ''} · right click: its menu`
+    const on = ws?.id === w.id && !onPage
+    return (
+      <button key={`pin:${w.id}`} type="button" className={`rail-kind rail-pin nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} onClick={() => (setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
+        <span className="rail-icon" style={colorVar(w.color)}>
+          {k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
+          {n > 0 ? <span className="rail-count">{n}</span> : mine.some(t => t.status === 'running') && <span className="rail-dot" />}
+        </span>
+        {railWords && <span className="rail-label">{wsName(w)}</span>}
+      </button>
+    )
+  }
   const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || !!specsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || (specsOn && !!specsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   const railBar = rail && sideOpen && (
@@ -1803,6 +1832,8 @@ export function App() {
       {specsOn && railButton('specs', 'spec', 'Specs', !!specsOf(dialog), SPECS_TIP, toSpecs)}
       {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
       {RAIL.slice(1).map(kindButton)}
+      {railPins.length > 0 && <span className="rail-sep" />}
+      {railPins.map(pinButton)}
       <span className="spacer" />
       {railButton('settings', 'gear', 'Settings', settingsOf(dialog), 'Settings (⌘,)', toSettings)}
     </nav>

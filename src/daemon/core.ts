@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
@@ -443,11 +443,15 @@ async function exec(at: At, cmd: string, args: string[], o: { timeout?: number; 
   return slot(at.host, () => run('ssh', [...sshOpts(at.host!), at.host!, `export PATH=${q(h.path)}; cd ${q(at.path)} && exec ${[cmd, ...args].map(q).join(' ')}`], { maxBuffer: 64 << 20, ...o }))
 }
 
+// main: the repo's own main branch (origin's HEAD, else main or master), the new-workspace page's base unless picked
 export async function branches(projectRef: string) {
   const p = findProject(projectRef)
-  if (p.git === false) return { current: '', branches: [] }
-  const [current, list] = await Promise.all([git(p, 'rev-parse', '--abbrev-ref', 'HEAD'), git(p, 'branch', '--format=%(refname:short)')])
-  return { current, branches: list.split('\n').filter(Boolean) }
+  if (p.git === false) return { current: '', branches: [], main: '' }
+  const [current, list, head] = await Promise.all([git(p, 'rev-parse', '--abbrev-ref', 'HEAD'), git(p, 'branch', '--format=%(refname:short)'), git(p, 'symbolic-ref', '--short', '-q', 'refs/remotes/origin/HEAD').catch(() => '')])
+  const all = list.split('\n').filter(Boolean)
+  const name = head.replace(/^origin\//, '')
+  const main = [name, 'main', 'master'].find(b => b && all.includes(b)) ?? (head || current)
+  return { current, branches: all, main }
 }
 
 export const slug = (s: string) =>
@@ -1201,8 +1205,9 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 }
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; browser?: string }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string }) {
   const w = findWs(o.id)
+  if (o.railPin && !w.railPin && state.workspaces.filter(x => x.railPin && !x.archived).length >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
   if (o.browser !== undefined && (w.browser === undefined || !URL_OK.test(o.browser))) throw new Error('browser: a Browsers workspace and an http(s) page')
   if (o.browser !== undefined) w.browser = o.browser
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
@@ -1222,6 +1227,7 @@ export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: 
   if (o.autoLand !== undefined) w.autoLand = o.autoLand || undefined
   if (o.muted !== undefined) w.muted = o.muted || undefined
   if (o.pinned !== undefined) w.pinned = o.pinned || undefined
+  if (o.railPin !== undefined) w.railPin = o.railPin ? (w.railPin ?? Date.now()) : undefined
   save()
   changed()
   if (o.autoFix || o.autoReview || o.autoMerge || o.autoLand) scanPRs().catch(() => {}) // act on the PR as it is now (one scan at a time: no double sends)
@@ -1439,6 +1445,26 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
   return made
 }
 
+// Settings › Git & worktrees' Sync the base branch (syncBase): its origin copy fetched before a worktree starts off it.
+// origin: off origin/<base> (the local branch untouched); ff: the local branch fast-forwarded to it (git fetch refuses
+// one checked out somewhere or gone its own way: then origin's). What it starts off; a failed fetch (offline, no such
+// branch there): the base as it was, never a failed workspace
+async function synced(proj: Project, base: string, step: (text: string) => void): Promise<string> {
+  const how = state.settings?.syncBase
+  if (!how || proj.git === false) return base
+  const name = base.replace(/^origin\//, '')
+  if (!name || name === 'HEAD' || name.startsWith('-')) return base // -…: git would read it as an option
+  const ok = (args: string[]) => exec(proj, 'git', args, { timeout: 60000 }).then(() => true, e => (step(`git ${args.join(' ')}: ${firstLine(e)}`), false)) // a minute at most: a slow remote never holds the workspace up long
+  if (how === 'ff' && name === base && (await ok(['fetch', '--quiet', 'origin', `${name}:${name}`]))) return step(`${name} fast-forwarded to origin's`), base
+  if (!(await ok(['fetch', '--quiet', 'origin', name]))) return base
+  if (!(await git(proj, 'rev-parse', '--verify', '--quiet', `refs/remotes/origin/${name}`).then(Boolean, () => false))) return base
+  // a local branch with commits origin hasn't: it stays the base (origin's would leave them out)
+  if (name === base && (await git(proj, 'rev-parse', '--verify', '--quiet', `refs/heads/${name}`).then(Boolean, () => false)) && !(await git(proj, 'merge-base', '--is-ancestor', name, `origin/${name}`).then(() => true, () => false)))
+    return step(`${name} has commits origin/${name} hasn't: off it, as it is`), base
+  step(`off origin/${name}, just fetched`)
+  return `origin/${name}`
+}
+
 // development mode's log of what making a workspace runs (key new: Settings › General's *Creation log*), each line in
 // the workspace's own log too once it has an id; a failure's message last
 export async function wsNew(o: NewWs): Promise<Workspace> {
@@ -1502,7 +1528,8 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     let base = o.base || current
     let branch = `${branchPrefix()}${id}`
     if (!proj.host) mkdirSync(dirname(path), { recursive: true }) // git makes a host's
-    const add = pr ? ['--detach', path] : [path, '-b', branch, base]
+    if (!pr) base = await synced(proj, base, step)
+    const add = pr ? ['--detach', path] : [path, '-b', branch, ...(base.startsWith('origin/') ? ['--no-track'] : []), base] // --no-track: a push never goes to origin's base
     step(`git worktree add ${add.join(' ')} (in ${proj.path})`)
     await git(proj, 'worktree', 'add', ...add).catch(e => {
       throw new Error(`git worktree add failed: ${String(e.stderr || e.message).trim()}`)
@@ -1683,6 +1710,7 @@ export async function wsRestore(ref: string) {
   if (ws.host) await readHostCfgs(ws)
   else await copyIncludes(proj, ws) // archiving took them with the worktree
   ws.archived = false
+  if (ws.railPin && state.workspaces.filter(w => w.railPin && !w.archived).length > RAIL_PINS) ws.railPin = undefined // the rail filled up meanwhile
   ws.port = allocPort()
   save()
   forward(ws)

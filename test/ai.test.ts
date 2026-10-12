@@ -279,6 +279,16 @@ test("ai: the skill's tools: templates and actions start workspaces, a shell get
   await assert.rejects(tool('laki_new_workspace')({ project: p.id, action: 'nope', prompt: 'x' }), /no agent action nope: review/)
   await assert.rejects(tool('laki_new_workspace')({ project: p.id, action: 'lint', prompt: 'x' }), /no agent action lint/, "a terminal's isn't an agent's")
 
+  // a group: by its name (any case), first under it; laki_state names each project's groups and each workspace's
+  await assert.rejects(tool('laki_new_workspace')({ project: p.id, prompt: 'x', group: 'Reviews' }), /no group Reviews in .*: it has none \(leave group out\)/)
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-rv', name: 'Reviews' }, { id: 'sep-ft', name: 'Features' }], rows: [w.id, 'sep-ft', 'sep-rv'] }) // w above both: in no group
+  await assert.rejects(tool('laki_new_workspace')({ project: p.path, prompt: 'x', group: 'Bugs' }), /no group Bugs in .*: its groups are Reviews, Features/) // by its path too, as findProject
+  const g = await tool('laki_new_workspace')({ project: p.id, prompt: 'review PR 7', name: 'rv7', group: 'reviews' })
+  const st = await tool('laki_state')({})
+  assert.deepEqual(st.projects.find((x: any) => x.id === p.id).groups, ['Reviews', 'Features'])
+  assert.equal(st.workspaces.find((x: any) => x.id === g.id).group, 'Reviews')
+  assert.equal(st.workspaces.find((x: any) => x.id === w.id).group, undefined)
+
   // a shell action runs in a new shell tab; an agent's goes to the agent there
   const tabs0 = (await rig.rpc('state')).tabs.length
   await tool('laki_run_action')({ ws: w.id, name: 'lint' })

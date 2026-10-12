@@ -38,7 +38,7 @@ export function AiWindow() {
   if (!view) return null
   return (
     <>
-      <AiPage settings={view.settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: w.name || w.id }))} onClose={() => window.close()} />
+      <AiPage compact settings={view.settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: w.name || w.id }))} onClose={() => window.close()} />
       <AskHost />
       <Tips />
     </>

@@ -9,7 +9,7 @@ import { ago } from './Info'
 import { linkWorkspaces, wsLink } from './links'
 import { Markdown } from './MarkdownView'
 import { type Img, PromptInput } from './PromptInput'
-import { Icon, Page } from './ui'
+import { escapes, Icon, IconButton, Page } from './ui'
 
 type AiData = { chat: AiMsg[]; busy: boolean; key: boolean; calls: AiCall[]; totals: AiTotals }
 
@@ -52,12 +52,14 @@ export function AiPage({
   onClose,
   onSettings,
   onLater,
+  compact,
 }: {
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
   onClose: () => void
   onSettings?: () => void
   onLater?: (text: string) => void // Send later's dialog for Laki AI, with what's typed (the app's; not the AI window's)
+  compact?: boolean // the bubbles' AI window: the chat alone under a head of its own (no Calls, Info or cost)
 }) {
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
@@ -130,30 +132,8 @@ export function AiPage({
     </>
   ) : null
 
-  return (
-    <Page title="Laki AI" onClose={onClose} wide>
-      <div className="ai-page">
-        <div className="ai-bar">
-          <div className="seg" role="tablist">
-            {(['chat', 'calls', 'info'] as const).map(k => (
-              <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
-                {k === 'chat' ? 'Chat' : k === 'calls' ? 'Calls' : 'Info'}
-                {k === 'calls' && !!d?.calls.length && <span className="muted"> {d.calls.length}</span>}
-              </button>
-            ))}
-          </div>
-          <span className="grow" />
-          {t && cost && backend !== 'codex' && (
-            <span className="muted small ai-today" data-tip={`This month: ${money(t.month.cost)}, ${t.month.calls} asks`}>
-              today {money(t.today.cost)}
-            </span>
-          )}
-          <button className="ai-new" disabled={!d?.chat.length || d.busy} onClick={() => api.call('aiNew').then(load, e => setErr(e.message))}>
-            <Icon name="plus" size={12} /> New chat
-          </button>
-        </div>
-
-        {tab === 'chat' ? (
+  const newChat = () => api.call('aiNew').then(load, e => setErr(e.message))
+  const chat = (
           <>
             <div className="ai-thread" aria-live="polite">
               <div className="ai-col">
@@ -223,12 +203,61 @@ export function AiPage({
               {err ? (
                 <div className="ai-err">{err}</div>
               ) : (
-                <div className="ai-foot">
+                !compact && <div className="ai-foot">
                   {runs} · {model} · {skill ? 'it removes only what you confirm; never archives, ships or merges' : 'it never archives, deletes, ships or merges'}
                 </div>
               )}
             </div>
           </>
+  )
+  useEffect(() => {
+    if (!compact) return
+    const f = (e: KeyboardEvent) => escapes(e) && onClose()
+    window.addEventListener('keydown', f)
+    return () => window.removeEventListener('keydown', f)
+  }, [compact, onClose])
+  if (compact)
+    return (
+      <div className="ai-window" role="dialog" aria-label="Laki AI">
+        <div className="ai-win-head drag">
+          <span className="ai-mark small">
+            <Icon name="ai" size={13} />
+          </span>
+          <b>Laki AI</b>
+          <span className="grow" />
+          <button className="ai-new nodrag" disabled={!d?.chat.length || d.busy} data-tip="Start a new conversation" onClick={newChat}>
+            <Icon name="plus" size={12} /> New chat
+          </button>
+          <IconButton icon="x" title="Close (Esc)" className="nodrag" onClick={onClose} />
+        </div>
+        <div className="ai-page">{chat}</div>
+      </div>
+    )
+  return (
+    <Page title="Laki AI" onClose={onClose} wide>
+      <div className="ai-page">
+        <div className="ai-bar">
+          <div className="seg" role="tablist">
+            {(['chat', 'calls', 'info'] as const).map(k => (
+              <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>
+                {k === 'chat' ? 'Chat' : k === 'calls' ? 'Calls' : 'Info'}
+                {k === 'calls' && !!d?.calls.length && <span className="muted"> {d.calls.length}</span>}
+              </button>
+            ))}
+          </div>
+          <span className="grow" />
+          {t && cost && backend !== 'codex' && (
+            <span className="muted small ai-today" data-tip={`This month: ${money(t.month.cost)}, ${t.month.calls} asks`}>
+              today {money(t.today.cost)}
+            </span>
+          )}
+          <button className="ai-new" disabled={!d?.chat.length || d.busy} onClick={newChat}>
+            <Icon name="plus" size={12} /> New chat
+          </button>
+        </div>
+
+        {tab === 'chat' ? (
+          chat
         ) : tab === 'calls' ? (
           <div className="ai-thread">
             <div className="ai-col wide">

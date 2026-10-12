@@ -378,7 +378,7 @@ export type NewWsParams = { project: string; base?: string; preset: string; cmd?
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
-type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'base' | 'place'>> & { tpl?: string; agent?: string }
+type LastNew = Partial<Pick<NewWsParams, 'project' | 'preset' | 'cmd' | 'local' | 'model' | 'effort' | 'place'>> & { tpl?: string; agent?: string } // not the base: the repo's main one each time, unless picked
 const LAST_NEW = 'laki.newWs'
 // what the page held as it closed without making it (Esc, ✕, a click in the sidebar): back as it opens again, until it's
 // made or cleared
@@ -404,7 +404,12 @@ const notesOf = (s?: Shot[]) => (s ?? []).flatMap(x => (x.note ? [x.note] : []))
 export type Shot = Img & { note?: string } // the menu bar's screenshot, and what to do with it (the editor's note)
 export function NewWorkspace({ view, project, agent, initial, images: shots, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Shot[]; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
-  const draft = useMemo(() => load<Draft | null>(DRAFT, null), [])
+  // opened for another project than the draft's (its + or a group's New workspace here, ⌘N on one of its workspaces): the
+  // draft goes, prompt and all, and the page starts empty there
+  const draft = useMemo(() => {
+    const d = load<Draft | null>(DRAFT, null)
+    return d?.p && (!project || d.p.project === project) ? d : null // no p: not a draft this page wrote
+  }, [])
   const [p, setP] = useState<NewWsParams>(() => {
     const names = [...view.presets.filter(x => !x.off).map(x => x.name), 'shell', 'custom', 'none']
     const d = draft?.p
@@ -469,7 +474,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       r => {
         setBranches(r.branches)
         setCurrent(r.current)
-        setP(x => ({ ...x, base: x.base && r.branches.includes(x.base) ? x.base : x.project === last.project && last.base && r.branches.includes(last.base) ? last.base : r.current })) // a draft's, if the branch is still there
+        setP(x => ({ ...x, base: x.base && r.branches.includes(x.base) ? x.base : r.main || r.current })) // a draft's or a link's, if the branch is still there; else the repo's main one (an older daemon: its checkout's)
       },
       () => setBranches([]),
     )
@@ -497,7 +502,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   const submit = async () => {
     if (busy || saving) return
     setBusy(true)
-    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, base: p.base, place: p.place, tpl: tplName, agent } satisfies LastNew)
+    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, place: p.place, tpl: tplName, agent } satisfies LastNew)
     const mine = load<Draft | null>(DRAFT, null)
     keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
@@ -533,6 +538,12 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
         ]),
       ],
     )
+  // the base: every local branch, a filter on top (a datalist would show only the ones matching what's in the box)
+  const baseMenu = (e: MouseEvent) =>
+    openMenu(e, [
+      ...(branches.length > 6 ? [{ filter: 'Type to filter…' } as MenuItem] : []),
+      ...branches.map(b => ({ label: b, icon: 'pr', mono: true, pill: b === current ? 'checked out' : undefined, hint: b === p.base ? ON : undefined, run: () => set({ base: b }) }) as MenuItem),
+    ])
   // a preset's line: its command, or the agent and its args; none when it would only say its name again (codex: Codex)
   const presetSays = (x: (typeof view.presets)[number]) => {
     const say = x.agent === 'command' ? x.cmd || 'A command' : [AGENT_NAMES[x.agent], x.args].filter(Boolean).join(' · ')
@@ -687,12 +698,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
                 </span>
               ) : (
                 <>
-                  <input className="nw-chip-input" list="branches" value={p.base} aria-label="Base branch" data-tip="The base branch: the worktree starts off it" spellCheck={false} onChange={e => set({ base: e.target.value })} />
-                  <datalist id="branches">
-                    {branches.map(b => (
-                      <option key={b} value={b} />
-                    ))}
-                  </datalist>
+                  <input className="nw-chip-input" value={p.base} aria-label="Base branch" data-tip="The base branch: the worktree starts off it (any branch or ref, typed)" spellCheck={false} onChange={e => set({ base: e.target.value })} />
+                  {branches.length > 0 && <IconButton icon="chevron" title="Pick the base branch" className="nw-chip-more" onClick={baseMenu} />}
                 </>
               )}
               <span className="nw-chip-sep" />

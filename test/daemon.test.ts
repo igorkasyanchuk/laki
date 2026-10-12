@@ -570,7 +570,7 @@ test('a folder without git is a project (local workspaces only); project setting
   mkdirSync(plain)
   const np = await rig.rpc('projectAdd', { path: plain })
   assert.equal(np.git, false)
-  assert.deepEqual(await rig.rpc('branches', { project: np.id }), { current: '', branches: [] })
+  assert.deepEqual(await rig.rpc('branches', { project: np.id }), { current: '', branches: [], main: '' })
   const nw = await rig.rpc('wsNew', { project: np.id, preset: 'shell' }) // no local flag: forced
   assert.equal(nw.kind, 'local')
   assert.equal(nw.path, realpathSync(plain))

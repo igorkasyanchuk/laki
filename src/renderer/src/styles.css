@@ -104,6 +104,12 @@ textarea { resize: vertical; font-family: inherit; }
 .rail-count { position: absolute; top: -4px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; border: 2px solid var(--rail-bg); background: var(--waiting); color: var(--on-waiting); font-size: 10px; font-weight: 700; line-height: 13px; text-align: center; }
 .rail-dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--running); }
 .rail-dot.bad { background: var(--error); }
+/* the rail's quick access: a line, then the pinned workspaces (initials in their color), terminals and browsers */
+.rail-sep { flex: none; width: 32px; height: 1px; margin: 6px 0; background: color-mix(in srgb, var(--fg) 22%, transparent); }
+.rail-mark { font: 700 12px/1 var(--ui-font); letter-spacing: 0.02em; }
+.rail-pin .rail-icon { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tab-c, var(--muted)) 55%, transparent); }
+.rail-pin .rail-icon:has(.rail-mark) { color: var(--tab-c, inherit); }
+.rail-pin .rail-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 /* the sidebar's filter, under its head */
 .side-find { flex: none; display: flex; flex-direction: column; gap: 5px; padding: 2px 8px 8px; }
 .side-find input { font-size: 12px; padding: 4px 8px; width: 100%; }
@@ -512,6 +518,8 @@ button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
 /* a field in a chip is the chip's words: no box of its own, whatever a look or glass gives fields */
 .nw-chip .nw-chip-input { field-sizing: content; width: auto; min-width: 7ch; max-width: 28ch; height: 100%; padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; font-size: 12.5px; }
 .nw-chip-sep { align-self: stretch; width: 1px; margin: 7px 2px; background: var(--line); }
+/* the base branch's caret: every branch, a menu (the field keeps any ref typed) */
+.nw-chip .ib.nw-chip-more { width: 20px; height: 22px; margin-left: -4px; color: var(--muted); }
 .nw-more { gap: 10px; padding: 12px 14px; }
 .form .nw-line { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px 10px; color: var(--muted); font-size: 12px; }
 .nw-line > span:first-child { width: 48px; flex: none; }
@@ -1118,6 +1126,15 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-send svg { transform: rotate(-90deg); }
 .ai-foot, .ai-dock > .ai-err { margin-top: 6px; text-align: center; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-foot { color: var(--muted); }
+/* the bubbles' AI window (?window=ai, frameless): its own head as the title bar, then the chat alone, tighter */
+.ai-window { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--app-bg, var(--bg)); }
+.ai-win-head { flex: none; display: flex; align-items: center; gap: 9px; height: 46px; padding: 0 10px 0 14px; border-bottom: 1px solid var(--line); background: var(--panel); }
+.ai-win-head > b { font-size: 13.5px; font-weight: 600; letter-spacing: 0.01em; }
+.ai-win-head .ai-new { height: 28px; padding: 0 10px; font-size: 12px; }
+.ai-window > .ai-page { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.ai-window .ai-thread { padding: 18px 16px 10px; }
+.ai-window .ai-dock { padding: 6px 12px 12px; }
+.ai-window .ai-hello h2 { font-size: 19px; }
 .ai-none { margin: 40px 0; text-align: center; }
 /* Info: how it runs and pays, what it spent, what it can do */
 .ai-info { gap: 26px; font-size: 13px; line-height: 1.5; }

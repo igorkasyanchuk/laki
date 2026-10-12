@@ -46,7 +46,7 @@ test('projects: a second folder of the same name, branches, removal takes local 
   const other = join(rig.home, 'b', 'repo')
   mkdirSync(other, { recursive: true })
   assert.equal((await rig.rpc('projectAdd', { path: other })).id, 'repo-2')
-  assert.deepEqual(await rig.rpc('branches', { project: p.id }), { current: 'main', branches: ['main'] })
+  assert.deepEqual(await rig.rpc('branches', { project: p.id }), { current: 'main', branches: ['main'], main: 'main' })
   assert.deepEqual(await rig.rpc('projectFile', { id: p.id }), {}) // no .laki.json
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
   const local = await rig.rpc('wsNew', { project: p.id, preset: 'shell', local: true })
@@ -795,4 +795,76 @@ test('Terminals and Browsers: a project each in the home folder, a workspace per
   await rig.start()
   const names = (await rig.rpc('state')).projects.map((p: any) => `${p.kind}:${p.name}`).sort()
   assert.deepEqual(names.filter((x: string) => !x.startsWith('undefined')), ['browsers:Shells', 'shells:Terminals'])
+})
+
+test("new worktrees: the page's base is the repo's main branch; Sync the base branch fetches origin's first; the rail holds 5 pins", async t => {
+  const rig = await fresh(t)
+  const git = (cwd: string, ...a: string[]) => execFileSync('git', a, { cwd, env: rig.env }).toString().trim()
+  // origin a commit ahead of main; the repo itself on another branch
+  const origin = join(rig.home, 'origin.git')
+  git(rig.home, 'clone', '-q', '--bare', rig.repo, origin)
+  git(rig.repo, 'remote', 'add', 'origin', origin)
+  git(rig.repo, 'fetch', '-q', 'origin')
+  git(rig.repo, 'remote', 'set-head', 'origin', 'main')
+  git(rig.repo, 'checkout', '-q', '-b', 'old')
+  const up = join(rig.home, 'up')
+  git(rig.home, 'clone', '-q', origin, up)
+  writeFileSync(join(up, 'NEW.md'), 'new\n')
+  git(up, 'add', 'NEW.md')
+  git(up, 'commit', '-qm', 'newer')
+  git(up, 'push', '-q', 'origin', 'main')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  assert.deepEqual(await rig.rpc('branches', { project: p.id }), { current: 'old', branches: ['main', 'old'], main: 'main' })
+
+  // off: main as it is here, no fetch
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'a', base: 'main' })
+  assert.equal(existsSync(join(a.path, 'NEW.md')), false)
+  // origin's: off origin/main, main here as it was, no upstream (a push never goes to main)
+  await rig.rpc('settingsSet', { syncBase: 'origin' })
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'b', base: 'main' })
+  assert.equal(b.base, 'origin/main')
+  assert.ok(existsSync(join(b.path, 'NEW.md')))
+  assert.notEqual(git(rig.repo, 'rev-parse', 'main'), git(rig.repo, 'rev-parse', 'origin/main'))
+  assert.notEqual(spawnSync('git', ['rev-parse', '--abbrev-ref', '@{u}'], { cwd: b.path }).status, 0)
+  // fast-forward: main itself moved up (checked out nowhere)
+  await rig.rpc('settingsSet', { syncBase: 'ff' })
+  const c = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'c', base: 'main' })
+  assert.equal(c.base, 'main')
+  assert.ok(existsSync(join(c.path, 'NEW.md')))
+  assert.equal(git(rig.repo, 'rev-parse', 'main'), git(rig.repo, 'rev-parse', 'origin/main'))
+  // a fetch that fails (origin gone): the base as it is, the workspace made all the same
+  git(rig.repo, 'remote', 'set-url', 'origin', join(rig.home, 'gone.git'))
+  const d = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'd', base: 'old' })
+  assert.equal(d.base, 'old')
+
+  // the rail's quick access: 5 at most, in the order pinned; unpinning makes room
+  const e = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'e' })
+  const f = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'f' })
+  for (const w of [a, b, c, d, e]) await rig.rpc('wsSet', { id: w.id, railPin: true })
+  await assert.rejects(rig.rpc('wsSet', { id: f.id, railPin: true }), /the rail holds 5: unpin one first/)
+  const at = (await rig.rpc('state')).workspaces.find((w: any) => w.id === a.id).railPin
+  await rig.rpc('wsSet', { id: a.id, railPin: true }) // pinned again: its place kept
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === a.id).railPin, at)
+  await rig.rpc('wsSet', { id: b.id, railPin: false })
+  await rig.rpc('wsSet', { id: f.id, railPin: true })
+  const pins = (await rig.rpc('state')).workspaces.filter((w: any) => w.railPin).sort((x: any, y: any) => x.railPin - y.railPin)
+  assert.deepEqual(pins.map((w: any) => w.id), [a.id, c.id, d.id, e.id, f.id])
+  // one restored after the rail filled up meanwhile: off it
+  await rig.rpc('wsArchive', { id: a.id })
+  await rig.rpc('wsSet', { id: b.id, railPin: true })
+  assert.equal((await rig.rpc('wsRestore', { id: a.id })).railPin, undefined)
+
+  // a local base with commits origin hasn't: it stays the base (origin's would leave them out)
+  git(rig.repo, 'remote', 'set-url', 'origin', origin)
+  await rig.rpc('settingsSet', { syncBase: 'origin' })
+  git(rig.repo, 'push', '-q', 'origin', 'old')
+  git(rig.repo, 'checkout', '-q', 'main')
+  git(rig.repo, 'commit', '-q', '--allow-empty', '-m', 'mine only') // on main: ahead of origin/main
+  const g = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'g', base: 'main' })
+  assert.equal(g.base, 'main')
+  const og = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'og', base: 'old' }) // pushed as it is: origin's
+  assert.equal(og.base, 'origin/old')
+  // a base that looks like an option never reaches git fetch
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'h', base: '--upload-pack=touch x' }), /git worktree add failed/)
+  assert.equal(existsSync(join(rig.repo, 'x')), false)
 })
