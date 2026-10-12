@@ -1,14 +1,19 @@
-// Laki's own AI (Settings › AI, the AI page, `laki ai`): optional, and only when asked. One conversation that works
+// Laki's own AI (Settings › AI, the AI page, `laki ai`): optional, and only when asked. A conversation that works
 // Laki with the MCP server's tools (cli/mcp.ts: none archives, deletes, ships or merges), run by OpenRouter (its key in
 // <data>/ai-key, 0600) or by an agent's CLI in the background: claude -p or codex exec, each given `laki mcp`. Every ask
-// is logged with its tokens and cost in <data>/ai-calls.jsonl; the conversation is <data>/ai-chat.json.
+// is logged with its tokens and cost in <data>/ai-calls.jsonl; the conversation is <data>/ai-chat.json. A spec or brainstorm
+// has a chat of its own (the Specs page's side panel), kept in its folder (.chat.json), which ends after PLAN_CHAT_IDLE
+// unused: the next ask starts a new one, unless aiContinue takes it up again. One ask at a time, in any chat. Its `ai`
+// event says which chat as `of` ('' the AI page's): an `id` would make it a reply.
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
 import { AI_ACTS, AI_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, aiTotals, type View } from '../shared/types.ts'
+import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
+import { planOfChat } from './plans.ts'
 
 const keyPath = join(dir, 'ai-key')
 const chatPath = join(dir, 'ai-chat.json')
@@ -35,9 +40,12 @@ Answer in a few plain sentences: what you did (workspace names) or what you foun
 // Laki's skill for its AI (Settings › AI, unset: on): more tools, and what they're for in its instructions
 const skilled = () => state.settings?.ai?.skill !== false
 // the user's own context (Settings › AI › Your instructions) last: it can't take the rules above away, only add to them
-const system = () => {
+// a spec's or brainstorm's chat: which one, so every ask in it is about it
+const system = (t: Thread) => {
   const own = String(state.settings?.ai?.context ?? '').trim().slice(0, CONTEXT_MAX)
-  return [SYSTEM, skilled() && SKILL, own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
+  const plan = t.id ? planOfChat(t.id) : undefined
+  const about = plan && `This chat is about one ${plan.kind} of the user's (project ${plan.project}, kind ${plan.kind}, slug ${plan.slug}, folder ${plan.folder}): read it with laki_plan_read (it may have changed since), and put your work into it with laki_plan_write.`
+  return [SYSTEM, skilled() && SKILL, about, own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
 }
 // the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress (an agent's own),
 // and the skill's
@@ -61,80 +69,118 @@ export function aiKey(o: { key?: string | null }) {
   return { key: true }
 }
 
-// ---------- the conversation
+// ---------- the conversations: '' the AI page's, plan:<project>/<kind>/<slug> a spec's or brainstorm's (plans.ts)
 
-let resume: Record<string, string | undefined> = {} // claude's session, codex's thread, by sessionKey: the next ask goes on with it
-let chat: AiMsg[] = load()
-let busy: { kill: () => void } | null = null
+// resume: claude's session, codex's thread, by sessionKey: the next ask goes on with it. at: the last message.
+// ended: a spec's or brainstorm's chat unused PLAN_CHAT_IDLE: the next ask starts it again, empty
+type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number }
+const threads = new Map<string, Thread>()
+// ponytail: one ask at a time across every chat (laki_ask's aiQuestion finds its chat by it); a lock per chat, and the
+// chat's id through laki mcp's env, if brainstorms in parallel are wanted
+let busy: { kill: () => void; id: string } | null = null
 let asked = false // this ask's turn asked the user something (laki_ask): the pick comes as the next ask
-function load(): AiMsg[] {
+function thread(id = ''): Thread {
+  const file = id ? planOfChat(id).file : chatPath // a spec's gone, or off: that says so, each time
+  const known = threads.get(id)
+  if (known) return known
+  let j: any = {}
   try {
-    const j = JSON.parse(readFileSync(chatPath, 'utf8'))
-    resume = j.resume ?? {}
-    return Array.isArray(j.chat) ? j.chat : []
-  } catch {
-    return []
-  }
-}
-function changed() {
-  chat = chat.slice(-KEEP)
-  try {
-    writeFileSync(chatPath, JSON.stringify({ chat, resume }), { mode: 0o600 })
+    j = JSON.parse(readFileSync(file, 'utf8'))
   } catch {}
-  broadcast({ ev: 'ai', chat, busy: !!busy })
+  const t: Thread = { id, file, chat: Array.isArray(j.chat) ? j.chat : [], resume: j.resume ?? {}, at: Number(j.at) || Date.now(), ended: j.ended }
+  if (id && !t.ended && t.chat.length && Date.now() - t.at > PLAN_CHAT_IDLE) t.ended = t.at + PLAN_CHAT_IDLE // ran out while the daemon wasn't looking
+  threads.set(id, t)
+  return t
 }
-const say = (role: AiMsg['role'], text: string, images?: string[]) => (chat.push({ role, text, at: Date.now(), ...(images?.length && { images }) }), changed())
+function changed(t: Thread) {
+  t.chat = t.chat.slice(-KEEP)
+  try {
+    writeFileSync(t.file, JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at, ended: t.ended }), { mode: 0o600 })
+  } catch {}
+  broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy?.id === t.id, ended: t.ended })
+}
+const say = (t: Thread, role: AiMsg['role'], text: string, images?: string[]) => (t.chat.push({ role, text, at: (t.at = Date.now()), ...(images?.length && { images }) }), changed(t))
+const fresh = (t: Thread) => ((t.chat = []), (t.resume = {}), (t.ended = undefined), (t.at = Date.now()))
 
-export function aiNew() {
-  if (busy) throw new Error('the AI is at work: stop it first')
-  chat = []
-  resume = {}
-  changed()
+export function aiNew(p: { chat?: string } = {}) {
+  const t = thread(p.chat)
+  if (busy?.id === t.id) throw new Error('the AI is at work: stop it first')
+  fresh(t)
+  changed(t)
 }
-export function aiStop() {
-  busy?.kill()
-  return { stopped: !!busy }
+// chat: only that chat's ask (none: any, as shutdown and Settings › Resources' Stop)
+export function aiStop(p: { chat?: string } = {}) {
+  const on = !!busy && (p.chat === undefined || busy.id === p.chat)
+  if (on) busy!.kill()
+  return { stopped: on }
+}
+// an ended chat taken up again: its session goes on (claude's and codex's, while they keep it)
+export function aiContinue(p: { chat?: string }) {
+  const t = thread(p.chat)
+  t.ended = undefined
+  t.at = Date.now()
+  changed(t)
+}
+// every 10 minutes (now: tests move the clock): a spec's or brainstorm's chat unused PLAN_CHAT_IDLE ends, its ask stopped
+export function aiTick(now = Date.now()) {
+  for (const t of threads.values())
+    if (t.id && !t.ended && t.chat.length && now - t.at > PLAN_CHAT_IDLE) {
+      const working = busy?.id === t.id
+      if (working) busy!.kill()
+      t.ended = now
+      changed(t)
+      if (!working) threads.delete(t.id) // read again from its file when opened: ended there too
+    }
+}
+// a spec or brainstorm deleted: its chat with it
+export function aiForget(id: string) {
+  if (busy?.id === id) busy.kill()
+  threads.delete(id)
 }
 
-// the page's: the conversation, whether it works, the key's there, the last calls and totals
-export function aiState() {
+// the page's: the conversation, whether it works (elsewhere: on another chat's ask), the key's there, the last calls and totals
+export function aiState(p: { chat?: string } = {}) {
+  const t = thread(p.chat)
   const calls = readCalls()
-  return { chat, busy: !!busy, key: hasKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
+  return { chat: t.chat, busy: busy?.id === t.id, elsewhere: !!busy && busy.id !== t.id, ended: t.ended, key: hasKey(), calls: calls.slice(-100).reverse(), totals: aiTotals(calls) }
 }
 
 // ---------- asking
 
 type Run = { text: string; model: string; calls: number; in: number; out: number; cost?: number }
 // r: what the ask spent so far, kept when it fails too
-type Opts = { ask: string; images: string[]; rpc: Rpc; signal: AbortSignal; spawned: (c: ChildProcess) => void; r: Run }
+type Opts = { t: Thread; ask: string; images: string[]; rpc: Rpc; signal: AbortSignal; spawned: (c: ChildProcess) => void; r: Run }
 
-export async function aiAsk(p: { text?: string; images?: string[] }, rpc: Rpc) {
+// chat: a spec's or brainstorm's (planChat), else the AI page's; one that ended starts again, empty
+export async function aiAsk(p: { text?: string; images?: string[]; chat?: string }, rpc: Rpc) {
   const s = state.settings?.ai ?? {}
   if (!s.on) throw new Error('Laki AI is off: Settings › AI')
   const ask = (p.text ?? '').trim()
   const images = (p.images ?? []).filter(imageOk)
   if (!ask && !images.length) throw new Error('ask something')
-  if (busy) throw new Error('the AI is still on the last ask')
+  const t = thread(p.chat)
+  if (busy) throw new Error(busy.id === t.id ? 'the AI is still on the last ask' : 'Laki AI is busy in another chat: wait for it, or stop it')
   const backend: AiBackend = s.backend ?? 'openrouter'
   if (backend === 'openrouter' && !hasKey()) throw new Error('no OpenRouter API key: Settings › AI')
+  if (t.ended) fresh(t)
   const ctl = new AbortController()
   let child: ChildProcess | undefined
-  busy = { kill: () => (ctl.abort(), child?.kill('SIGTERM')) }
-  say('user', ask, images)
+  busy = { kill: () => (ctl.abort(), child?.kill('SIGTERM')), id: t.id }
+  say(t, 'user', ask, images)
   asked = false
   const t0 = Date.now()
   const r: Run = { text: '', model: s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
-  const o: Opts = { ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
+  const o: Opts = { t, ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
   const call: AiCall = { at: t0, backend, model: r.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: ask.slice(0, 120) }
   try {
     await (backend === 'claude' ? claude(o) : backend === 'codex' ? codex(o) : openrouter(o))
     call.ok = true
-    if (r.text.trim() || !asked) say('ai', r.text || '(no answer)') // a question it asked is the answer
+    if (r.text.trim() || !asked) say(t, 'ai', r.text || '(no answer)') // a question it asked is the answer
     return { text: r.text }
   } catch (e) {
     const msg = ctl.signal.aborted ? 'stopped' : (e as Error).message
     call.error = msg
-    say('error', msg)
+    say(t, 'error', msg)
     throw new Error(msg)
   } finally {
     Object.assign(call, { model: r.model, in: r.in, out: r.out, cost: r.cost, tools: r.calls, ms: Date.now() - t0 })
@@ -142,7 +188,7 @@ export async function aiAsk(p: { text?: string; images?: string[] }, rpc: Rpc) {
     try {
       appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
     } catch {}
-    changed()
+    changed(t)
   }
 }
 
@@ -157,9 +203,9 @@ function imageOk(path: unknown) {
 }
 
 // a tool the model asked for, shown in the conversation; its result (or failure) goes back to the model
-async function runTool(list: Tool[], name: string, args: unknown) {
-  const tool = list.find(t => t.name === name)
-  say('tool', `${name} ${JSON.stringify(args ?? {})}`)
+async function runTool(t: Thread, list: Tool[], name: string, args: unknown) {
+  const tool = list.find(x => x.name === name)
+  say(t, 'tool', `${name} ${JSON.stringify(args ?? {})}`)
   try {
     if (!tool) throw new Error(`no tool ${name}`)
     const r = await tool.run(args ?? {})
@@ -171,8 +217,8 @@ async function runTool(list: Tool[], name: string, args: unknown) {
 
 // the earlier asks and answers, for a model that keeps no session of its own (OpenRouter)
 // ponytail: the last 20, without the tools' results (it looks again); a summary of older ones if it forgets too much
-const history = () =>
-  chat
+const history = (t: Thread) =>
+  t.chat
     .slice(0, -1)
     .filter(m => m.role === 'user' || m.role === 'ai')
     .slice(-20)
@@ -185,7 +231,7 @@ async function openrouter(o: Opts) {
   const list = toolsFor(o.rpc)
   const fns = list.map(t => ({ type: 'function', function: { name: t.name, description: t.description, parameters: t.inputSchema } }))
   const pics = o.images.map(p => ({ type: 'image_url', image_url: { url: dataUrl(p) } }))
-  const messages: object[] = [{ role: 'system', content: system() }, ...history(), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
+  const messages: object[] = [{ role: 'system', content: system(o.t) }, ...history(o.t), { role: 'user', content: pics.length ? [{ type: 'text', text: o.ask || 'See the image.' }, ...pics] : o.ask }]
   const r = o.r
   r.cost = 0
   for (let i = 0; ; i++) {
@@ -206,7 +252,7 @@ async function openrouter(o: Opts) {
     if (!m.tool_calls?.length) return void (r.text = m.content ?? '')
     if (i >= (s.steps || AI_STEPS)) throw new Error(`stopped after ${i} rounds of tools (Settings › AI › Steps)`)
     messages.push(m) // as it came: a reasoning model's next request needs its reasoning_details
-    if (m.content) say('ai', m.content)
+    if (m.content) say(o.t, 'ai', m.content)
     // ponytail: Stop takes effect between tools: one under way (a wsNew) finishes first
     for (const c of m.tool_calls) {
       let args: unknown = {}
@@ -214,7 +260,7 @@ async function openrouter(o: Opts) {
         args = JSON.parse(c.function?.arguments || '{}')
       } catch {}
       r.calls++
-      messages.push({ role: 'tool', tool_call_id: c.id, content: await runTool(list, c.function?.name, args) })
+      messages.push({ role: 'tool', tool_call_id: c.id, content: await runTool(o.t, list, c.function?.name, args) })
     }
     if (asked) return void (r.text = '') // it asked the user: their pick goes on from here, as the next ask
   }
@@ -273,8 +319,9 @@ function cli(o: Opts, cmd: AiBackend, args: string[], line: (j: any) => void) {
 async function claude(o: Opts) {
   const model = state.settings?.ai?.models?.claude
   const sk = sessionKey('claude')
+  const resume = o.t.resume
   const prompt = o.images.length ? `${o.ask}\n\nImages (read them): ${o.images.join(' ')}` : o.ask
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--append-system-prompt', system(), ...(model ? ['--model', model] : []), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
   const r = o.r
   let failed = ''
   await cli(o, 'claude', args, j => {
@@ -282,7 +329,7 @@ async function claude(o: Opts) {
     if (j.type === 'system' && j.model) r.model = j.model
     if (j.type === 'assistant')
       for (const b of j.message?.content ?? []) {
-        if (b.type === 'tool_use') (r.calls++, say('tool', `${String(b.name).replace(/^mcp__laki__/, '')} ${JSON.stringify(b.input ?? {})}`))
+        if (b.type === 'tool_use') (r.calls++, say(o.t, 'tool', `${String(b.name).replace(/^mcp__laki__/, '')} ${JSON.stringify(b.input ?? {})}`))
       }
     if (j.type === 'result') {
       r.text = j.result ?? ''
@@ -303,6 +350,7 @@ async function claude(o: Opts) {
 async function codex(o: Opts) {
   const model = state.settings?.ai?.models?.codex
   const sk = sessionKey('codex')
+  const resume = o.t.resume
   const m = mcpServer()
   const toml = (v: unknown) => JSON.stringify(v) // a TOML basic string or array of them reads as JSON does
   const env = `{${Object.entries(m.env).map(([k, v]) => `${k}=${toml(v)}`).join(',')}}`
@@ -313,7 +361,7 @@ async function codex(o: Opts) {
     '--skip-git-repo-check',
     '--ignore-user-config', // the user's config.toml: its MCP servers would be tools past Laki's (claude: --strict-mcp-config)
     '-c', 'sandbox_mode="read-only"',
-    '-c', `developer_instructions=${toml(system())}`,
+    '-c', `developer_instructions=${toml(system(o.t))}`,
     '-c', `mcp_servers.laki.command=${toml(m.command)}`,
     '-c', `mcp_servers.laki.args=${toml(m.args)}`,
     '-c', `mcp_servers.laki.env=${env}`,
@@ -328,7 +376,7 @@ async function codex(o: Opts) {
   await cli(o, 'codex', args, j => {
     if (j.type === 'thread.started' && j.thread_id) resume[sk] = j.thread_id
     const it = j.item
-    if (j.type === 'item.started' && it?.type === 'mcp_tool_call') (r.calls++, say('tool', `${it.tool} ${JSON.stringify(it.arguments ?? {})}`))
+    if (j.type === 'item.started' && it?.type === 'mcp_tool_call') (r.calls++, say(o.t, 'tool', `${it.tool} ${JSON.stringify(it.arguments ?? {})}`))
     if (j.type === 'item.completed' && it?.type === 'agent_message') r.text = it.text ?? ''
     if (j.type === 'turn.completed') (r.in += j.usage?.input_tokens ?? 0), (r.out += j.usage?.output_tokens ?? 0)
     if (j.type === 'turn.failed' || j.type === 'error') failed = j.error?.message ?? j.message ?? 'failed'
@@ -345,6 +393,7 @@ async function codex(o: Opts) {
 // a removal the AI asked about, done here when the user picks Yes (the AI itself never removes anything)
 export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct }) {
   if (!busy) throw new Error('only while Laki AI works on an ask')
+  const t = thread(busy.id) // the chat whose ask is at work
   const act = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
   if (act && !act.label) throw new Error(`no ${act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
@@ -353,36 +402,39 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct 
   const options = act ? [`Yes, remove ${act.label}`, 'No, keep it'] : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
   if (options.length < 2) throw new Error('2 to 6 options')
   const id = randomBytes(6).toString('hex')
-  chat.push({ role: 'ai', text, at: Date.now(), ask: { id, options, act } })
+  t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act } })
   asked = true
-  changed()
+  changed(t)
   return { asked: id, note: act ? 'The user sees Yes / No buttons; a Yes removes it (you do not). End your turn now, without more words.' : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
-export async function aiAnswer(p: { id: string; n: number }, rpc: Rpc) {
+export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc: Rpc) {
+  const t = thread(p.chat)
+  const chat = t.chat
   const m = chat.find(m => m.ask?.id === p.id)
   if (!m?.ask) throw new Error('no such question: a new chat started since')
   if (m.ask.picked !== undefined) throw new Error('answered already')
+  if (t.ended) throw new Error('this chat ended: Continue it, or ask again') // a pick would start a new chat without the question
   if (chat.slice(chat.indexOf(m) + 1).some(x => x.role === 'user')) throw new Error('a newer ask came since: ask again') // its context is gone
-  if (busy) throw new Error('the AI is still on the last ask')
+  if (busy) throw new Error(busy.id === t.id ? 'the AI is still on the last ask' : 'Laki AI is busy in another chat: wait for it, or stop it')
   const pick = m.ask.options[Number(p.n)]
   if (pick === undefined) throw new Error('no such option')
   const act = m.ask.act
   if (!act) {
-    const r = aiAsk({ text: pick }, rpc) // its checks (on, a key) are before its first await: busy once they pass
-    if (busy) (m.ask.picked = pick), changed() // refused: the buttons stay, for another try
+    const r = aiAsk({ text: pick, chat: p.chat }, rpc) // its checks (on, a key) are before its first await: busy once they pass
+    if (busy) (m.ask.picked = pick), changed(t) // refused: the buttons stay, for another try
     return r
   }
   m.ask.picked = pick
-  say('user', pick)
-  if (Number(p.n) !== 0) return say('ai', `Kept ${act.label}.`), { kept: true }
+  say(t, 'user', pick)
+  if (Number(p.n) !== 0) return say(t, 'ai', `Kept ${act.label}.`), { kept: true }
   try {
     await remove(act, rpc)
-    say('ai', `Removed ${act.label}.`)
+    say(t, 'ai', `Removed ${act.label}.`)
     return { removed: true }
   } catch (e) {
-    say('error', `${act.label}: ${(e as Error).message}`)
+    say(t, 'error', `${act.label}: ${(e as Error).message}`)
     throw e
   }
 }

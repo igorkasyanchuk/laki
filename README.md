@@ -11,6 +11,9 @@ worktree. Agents keep running when the window is closed.
   restart or a usage limit.
 - **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (things to keep about it) and its
   settings.
+- **Specs & Brainstorms** (experimental): write what to build like a Notion page (checklists, images, diagrams), from
+  your own templates, then start a workspace from it; or brainstorm an idea with Laki AI in a chat beside it, which writes
+  options, a mind map, diagrams and clickable prototypes. Folders outside the repo that any agent can read.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
@@ -18,8 +21,10 @@ worktree. Agents keep running when the window is closed.
   your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
-- **PRs**: CI and reviews in the status bar (who approved, who asked for changes) and at a glance in the sidebar (✓ approved, ✓✓ by
-  you too, 👀 you commented), sent to the agent if you like; ship (commit, push, PR) in one step; merge
+- **PRs**: CI and reviews in the status bar (who approved, who asked for changes) and at a glance in the sidebar
+  (<img src="docs/icons/pr-open.svg" width="13" alt="GitHub's mark"> its state,
+  <img src="docs/icons/approved.svg" width="13" alt="✓"> approved, <img src="docs/icons/approved-you.svg" width="13" alt="✓✓"> by you
+  too, 👀 you commented), sent to the agent if you like; ship (commit, push, PR) in one step; merge
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
   merged, if you like.
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (comment on a line; images before and after;

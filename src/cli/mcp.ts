@@ -2,6 +2,7 @@
 // any MCP client. Its tools go through the daemon's API like the CLI's commands; none deletes, archives or ships.
 import { createInterface } from 'node:readline'
 import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
+import { BRAINSTORM_OUTPUT } from '../shared/plans.ts'
 import { AI_ACTS, API, mergeActions, prRef, templated, templatesFor, type View } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
@@ -169,6 +170,35 @@ export const tools = (rpc: Rpc): Tool[] => [
     ),
     run: a => rpc('widgetWrite', { id: a.id, files: typeof a.files === 'string' ? JSON.parse(a.files) : a.files }), // some models send the object as JSON text
   },
+  // specs and brainstorms (experimental: off, the daemon says so)
+  {
+    name: 'laki_plans',
+    description: "The user's specs (requirements for a task, to implement) and brainstorms (an idea to explore, with your ideas, diagrams and prototypes as files) in Laki: each a folder outside the repo with README.md, the spec as Markdown. Each one's project, kind, slug, title and folder.",
+    inputSchema: obj({ project: str('a project id (laki_state); default: all') }),
+    run: a => rpc('planList', { project: a.project || undefined }),
+  },
+  {
+    name: 'laki_plan_read',
+    description: 'A spec or brainstorm: its README.md (the user’s spec or brief, as Markdown), its folder and the files in it (attachments, a brainstorm’s output).',
+    inputSchema: obj({ project: str('its project id'), kind: { type: 'string', enum: ['spec', 'brainstorm'] }, slug: str('its slug, from laki_plans') }, ['project', 'kind', 'slug']),
+    max: 30000,
+    run: async a => {
+      const r = await rpc('planGet', { project: a.project, kind: a.kind, slug: a.slug })
+      return { title: r.plan.title, folder: r.plan.path, readme: r.markdown, files: r.files.map((f: { path: string; size: number }) => `${f.path} (${f.size} bytes)`) }
+    },
+  },
+  {
+    name: 'laki_plan_new',
+    description: 'Write a new spec or brainstorm for the user, in a project: its title and its text as Markdown (## Goal, Context, Steps as a - [ ] checklist, How to verify; a brainstorm: the idea, who it is for, constraints). The user edits it in Laki.',
+    inputSchema: obj({ project: str('a project id'), kind: { type: 'string', enum: ['spec', 'brainstorm'] }, title: str('a short title'), text: str('the body, Markdown') }, ['project', 'kind', 'title']),
+    run: a => rpc('planNew', { project: a.project, kind: a.kind, title: a.title, text: a.text }),
+  },
+  {
+    name: 'laki_plan_write',
+    description: `Write a file into a spec's or brainstorm's folder: a brainstorm's output (ideas.md, prototype-<option>.html, <name>.diagram.json) or notes beside a spec. Text files only (.md .html .txt .json .csv .svg .mmd), never README.md or spec.json (the user's). ${BRAINSTORM_OUTPUT}`,
+    inputSchema: obj({ project: str('its project id'), kind: { type: 'string', enum: ['spec', 'brainstorm'] }, slug: str('its slug'), path: str('the file, relative to its folder: ideas.md, prototype-cards.html…'), text: str('the whole file') }, ['project', 'kind', 'slug', 'path', 'text']),
+    run: a => rpc('planWrite', { project: a.project, kind: a.kind, slug: a.slug, path: a.path, text: a.text }),
+  },
 ]
 
 // a project's prompt templates and Run ▾'s actions, as the app has them (templatesFor, mergeActions)
@@ -194,7 +224,8 @@ async function promptOf(rpc: Rpc, project: string, prompt: string, template?: st
 // Laki's skill for Laki AI (Settings › AI, on unless turned off): what these tools are for, in its instructions
 export const SKILL = `With Laki's skill you also: list a project's open PRs (laki_prs: yours, or others' to review), read a project's notes, memory, templates, actions and scheduled tasks (laki_project), write its notes and memory, rename or pin workspaces and tabs, open a shell (its command typed for the user to run), run the user's own actions (laki_run_action: a terminal's command is typed for them to run), start a workspace through a prompt template or an agent action (laki_new_workspace's template and action: e.g. a review action on each PR of a screenshot, a workspace each), add to-dos, change scheduled tasks.
 Not sure what the user means, or which of a few they want? Ask with laki_ask (2-6 short options) instead of guessing, then stop: their pick comes as the next message.
-To remove something (a memory item, a scheduled task, a tab, a to-do) call laki_remove: the user confirms it with a button, and Laki removes it, not you. Never archive, delete, ship or merge workspaces.`
+To remove something (a memory item, a scheduled task, a tab, a to-do) call laki_remove: the user confirms it with a button, and Laki removes it, not you. Never archive, delete, ship or merge workspaces.
+The user's specs (what to build) and brainstorms (ideas to explore), when turned on: laki_plans, laki_plan_read; laki_plan_new writes one for them, laki_plan_write puts your work beside one (ideas.md, a prototype per option, diagrams).`
 
 // the skill's tools: Laki AI's only (laki mcp gives them when LAKI_AI_SKILL is set: its claude -p or codex exec)
 export const skillTools = (rpc: Rpc): Tool[] => [

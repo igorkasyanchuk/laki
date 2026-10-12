@@ -1,5 +1,6 @@
-import { type CSSProperties, type ReactNode, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { API, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, notify, type NotifyAction, onLakiLink, openExternal } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
@@ -28,10 +29,14 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab }
+const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
+
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
+// the Specs page (experimental): specs is a project's id, '' all; kind and slug, the one to open
+const specsOf = (d: Dialog) => (d && typeof d === 'object' && 'specs' in d ? d : undefined)
 // the Settings page, in any of its forms: all of it, a project's, or a section asked for
 const settingsOf = (d: Dialog) => d === 'settings' || (typeof d === 'object' && !!d && ('settings' in d || 'section' in d))
 
@@ -1356,6 +1361,7 @@ export function App() {
     a({ label: 'Settings', icon: 'gear', hint: '⌘,', run: () => setDialog('settings') })
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
+    if (settings.specs === true) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
     a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
@@ -1758,6 +1764,9 @@ export function App() {
   const schedTip = nextTask ? `Scheduled tasks · next: ${nextTask.name ? stamp(nextTask.name, nextTask.next!) : nextTask.prompt.slice(0, 40)}, ${new Date(nextTask.next!).toLocaleString([], { weekday: 'short', hour: 'numeric', minute: '2-digit' })}` : 'Scheduled tasks'
   const toSchedules = () => setDialog(d => (schedulesOf(d) === undefined ? 'schedules' : null))
   const toBoard = () => setDialog(d => (d === 'board' ? null : 'board'))
+  const specsOn = settings.specs === true // experimental: Settings › General
+  const toSpecs = () => setDialog(d => (specsOf(d) ? null : { specs: '' }))
+  const SPECS_TIP = 'Specs & Brainstorms (experimental): requirements to implement, ideas to explore with Laki AI'
   const toAi = () => setDialog(d => (d === 'ai' ? null : 'ai'))
   const AI_TIP = 'AI: ask Laki to start, check and steer your agents'
   const toSettings = () => setDialog(d => (settingsOf(d) ? null : 'settings'))
@@ -1784,13 +1793,14 @@ export function App() {
     const says = `${label}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : busy ? ' · at work' : ''}`
     return railButton(k, icon, label, railKind === k && !onPage, says, () => railTo(k), n > 0 ? <span className="rail-count">{n > 99 ? '99+' : n}</span> : busy && <span className="rail-dot" />)
   }
-  const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
-  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || dialog === 'ai') // the rail's Schedule and Board: a page over all but the rail
+  const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || !!specsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
+  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || (specsOn && !!specsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   const railBar = rail && sideOpen && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }}>
       {kindButton(RAIL[0])}
       {railButton('board', 'board', 'Board', dialog === 'board', BOARD_TIP, toBoard)}
       {railButton('schedules', 'clock', 'Schedule', schedulesFor !== undefined, `${schedTip}${runFailed ? ' · a run failed' : ''}`, toSchedules, runFailed && <span className="rail-dot bad" />)}
+      {specsOn && railButton('specs', 'spec', 'Specs', !!specsOf(dialog), SPECS_TIP, toSpecs)}
       {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
       {RAIL.slice(1).map(kindButton)}
       <span className="spacer" />
@@ -1930,6 +1940,7 @@ export function App() {
             <>
               <IconButton icon="clock" title={schedTip} on={schedulesFor !== undefined} className={runFailed ? 'dot' : ''} label={labels ? 'Schedule' : undefined} onClick={toSchedules} />
               <IconButton icon="board" title={BOARD_TIP} label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={toBoard} />
+              {specsOn && <IconButton icon="spec" title={SPECS_TIP} label={labels ? 'Specs' : undefined} on={!!specsOf(dialog)} onClick={toSpecs} />}
               {settings.ai?.on && <IconButton icon="ai" title={AI_TIP} label={labels ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
             </>
           )}
@@ -2187,10 +2198,36 @@ export function App() {
               onGlobal: sec => setDialog({ section: sec }),
               schedules: () => setDialog({ schedules: p.id }),
               setSchedule: (id, on) => call('scheduleSet', { id, on }),
+              specs: specsOn ? { list: () => api.call('planList', { project: p.id }), open: at => setDialog({ specs: p.id, ...at }) } : undefined,
             }}
           />
         ))(view.projects.find(x => x.id === dialog.project && !x.kind))}
         {dialog === 'ai' && <AiPage settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setDialog(null)} onSettings={() => setDialog({ section: 'ai' })} onLater={text => setDialog({ sendLater: ws?.id ?? '', to: 'ai', text, back: 'ai' })} />}
+        {(o =>
+          o &&
+          specsOn && (
+            <Suspense fallback={null}>
+              <SpecsPage
+                key={`${o.specs}/${o.kind}/${o.slug}`}
+                projects={view.projects.filter(p => !p.kind)}
+                at={{ project: o.specs || undefined, kind: o.kind, slug: o.slug }}
+                onClose={() => setDialog(null)}
+                api={{
+                  call,
+                  key: view.widgetKey,
+                  aiOn: !!settings.ai?.on,
+                  start: p => (setNewFor(p.project), setNewInit({ prompt: specPrompt(p) }), setDialog('new')),
+                  aiSettings: () => setDialog({ section: 'ai' }),
+                  templates: planTemplates(settings),
+                  saveTemplates: planTemplates => call('settingsSet', { planTemplates }),
+                  copy,
+                  reveal: path => void bridge?.openPath?.(path),
+                  full,
+                  toggleFull: () => toggleFull(),
+                }}
+              />
+            </Suspense>
+          ))(specsOf(dialog))}
         {dialog === 'board' && (
           <BoardPage
             view={view}

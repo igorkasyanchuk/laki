@@ -159,6 +159,7 @@ export type AppSettings = Paint & {
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
+  specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
   railLabels?: boolean // the rail's words under its icons (unset: on)
   sideStyle?: SideStyle // the sidebar's rows
@@ -925,6 +926,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
+  ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
@@ -1999,6 +2001,13 @@ export function SettingsPage(p: {
                     </button>
                   </div>
                 )}
+              </div>
+              </Group>
+              <Group title="Experimental" hint="New things to try: they may change, or go">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.specs === true} onChange={v => set({ specs: v })}>
+                  <Says title="Specs & Brainstorms" hint="Write a project's requirements like a Notion page (checklists, images, diagrams) and brainstorm ideas with Laki AI (options, a mind map, diagrams, clickable prototypes). Each is a folder outside the repo with a README.md any agent can read. Shows the rail's Specs and a project's Specs tab" />
+                </Switch>
               </div>
               </Group>
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">

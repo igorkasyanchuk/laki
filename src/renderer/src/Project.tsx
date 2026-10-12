@@ -1,8 +1,9 @@
 // A project's page (a click on its name in the sidebar): its Notes, its Scheduled tasks, Memory (the user's notes to
-// keep, one each: add, edit, delete) and its Settings (Settings' own project section). Notes and memory are the
+// keep, one each: add, edit, delete), its Specs (experimental: settings.specs; the Specs page opens one) and its
+// Settings (Settings' own project section). Notes and memory are the
 // user's: kept with the project in the daemon, never given to agents (yet). App.tsx passes a ProjectApi.
-import { useState } from 'react'
-import type { Memory, Project, ProjectConfig, RunAction, Schedule, Template } from '../../shared/types'
+import { useEffect, useState } from 'react'
+import type { Memory, Plan, PlanKind, Project, ProjectConfig, RunAction, Schedule, Template } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { describe } from '../../shared/when'
 import { Markdown } from './MarkdownView'
@@ -15,6 +16,7 @@ export const PROJECT_TABS = [
   ['notes', 'Notes'],
   ['tasks', 'Scheduled tasks'],
   ['memory', 'Memory'],
+  ['specs', 'Specs'],
   ['settings', 'Settings'],
 ] as const
 export type ProjectTab = (typeof PROJECT_TABS)[number][0]
@@ -26,12 +28,14 @@ export type ProjectApi = {
   onGlobal(sec: 'actions' | 'templates'): void
   schedules(): void // the Scheduled tasks page, at this project: making and changing them is there
   setSchedule(id: string, on: boolean): Promise<unknown>
+  specs?: { list(): Promise<Plan[]>; open(at?: { kind: PlanKind; slug?: string }): void } // experimental: on, the Specs tab
 }
 
 const TAB = 'laki.projectTab' // the last tab shown, for the next project opened
 // tab: the one shown, App's (the project's ⋯ › Settings sets it, a click here through onTab), else the last one shown
 export function ProjectPage({ project: p, schedules, tab: at, onTab, api, onClose }: { project: Project; schedules: Schedule[]; tab?: ProjectTab; onTab: (t: ProjectTab) => void; api: ProjectApi; onClose: () => void }) {
-  const tab = at ?? (t => (PROJECT_TABS.some(x => x[0] === t) ? t : 'notes'))(load<ProjectTab>(TAB, 'notes'))
+  const tabs = PROJECT_TABS.filter(([k]) => k !== 'specs' || api.specs)
+  const tab = (t => (tabs.some(x => x[0] === t) ? t : 'notes'))(at ?? load<ProjectTab>(TAB, 'notes'))
   const pick = (t: ProjectTab) => (onTab(t), keep(TAB, t))
   const count = (t: ProjectTab) => (t === 'tasks' ? schedules.length : t === 'memory' ? (p.memory?.length ?? 0) : 0)
   return (
@@ -40,7 +44,7 @@ export function ProjectPage({ project: p, schedules, tab: at, onTab, api, onClos
         <div className="pp-head">
           <span className="muted small mono">{`${p.host ? `${p.host}:` : ''}${p.path}`}</span>
           <div className="seg" role="tablist">
-            {PROJECT_TABS.map(([k, label]) => (
+            {tabs.map(([k, label]) => (
               <button key={k} role="tab" aria-selected={tab === k} className={tab === k ? 'on' : ''} onClick={() => pick(k)}>
                 {label}
                 {count(k) > 0 && <span className="muted"> {count(k)}</span>}
@@ -51,6 +55,7 @@ export function ProjectPage({ project: p, schedules, tab: at, onTab, api, onClos
         {tab === 'notes' && <NotesView key={p.id} notes={p.notes ?? ''} onSave={notes => api.save({ notes })} />}
         {tab === 'tasks' && <Tasks schedules={schedules} api={api} />}
         {tab === 'memory' && <MemoryList key={p.id} memory={p.memory ?? []} save={memory => api.save({ memory })} />}
+        {tab === 'specs' && api.specs && <Specs key={p.id} specs={api.specs} />}
         {tab === 'settings' && (
           <div className="settings-main form pp-settings">
             <ProjectSection key={p.id} project={{ ...p, git: p.git !== false }} noNotes file={api.file} global={api.global} onGlobal={api.onGlobal} onSave={api.saveSettings} />
@@ -105,6 +110,54 @@ function Tasks({ schedules, api }: { schedules: Schedule[]; api: ProjectApi }) {
           <span>
             <b>No scheduled tasks in this project</b>
             <span className="muted small">Like “weekdays at 9:00: review yesterday's PRs”. Make one on the Scheduled tasks page.</span>
+          </span>
+        </div>
+      )}
+    </>
+  )
+}
+
+// the project's specs and brainstorms, newest first: a click opens it on the Specs page, where they're made and edited
+function Specs({ specs }: { specs: NonNullable<ProjectApi['specs']> }) {
+  const [list, setList] = useState<Plan[] | null>(null)
+  useEffect(() => void specs.list().then(setList, () => setList([])), [])
+  return (
+    <>
+      <div className="row">
+        <span className="muted small grow">Requirements to implement, and ideas to explore with Laki AI: each a folder outside the repo, with a README.md any agent can read.</span>
+        <button onClick={() => specs.open({ kind: 'spec' })}>
+          <Icon name="spec" /> Specs
+        </button>
+        <button onClick={() => specs.open({ kind: 'brainstorm' })}>
+          <Icon name="bulb" /> Brainstorms
+        </button>
+      </div>
+      {list === null ? (
+        <p className="muted small">Loading…</p>
+      ) : list.length ? (
+        <div className="sched-list">
+          {list.map(x => (
+            <div key={`${x.kind}/${x.slug}`} className="sched-row">
+              <span className="sched-icon">
+                <Icon name={x.kind === 'spec' ? 'spec' : 'bulb'} />
+              </span>
+              <button type="button" className="sched-main" data-tip="Open it on the Specs page" onClick={() => specs.open({ kind: x.kind, slug: x.slug })}>
+                <span className="sched-name">{x.title}</span>
+                <span className="sched-meta">
+                  <b>{x.kind}</b>
+                  <span>edited {ago(x.at)}</span>
+                  {x.files > 0 && <span>{x.files === 1 ? '1 file' : `${x.files} files`}</span>}
+                </span>
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="sched-empty">
+          <Icon name="spec" size={18} />
+          <span>
+            <b>No specs or brainstorms in this project</b>
+            <span className="muted small">Write one like a Notion page, with checklists, images and diagrams; Start a workspace from it, or have Laki AI brainstorm it.</span>
           </span>
         </div>
       )}

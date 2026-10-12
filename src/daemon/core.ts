@@ -450,7 +450,7 @@ export async function branches(projectRef: string) {
   return { current, branches: list.split('\n').filter(Boolean) }
 }
 
-const slug = (s: string) =>
+export const slug = (s: string) =>
   s
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, '-')
@@ -3470,7 +3470,7 @@ export async function fileNew(o: { ws: string; path: string; dir?: boolean }) {
   return { path: abs.slice(ws.path.length + 1) }
 }
 
-const IMAGES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', bmp: 'image/bmp' }
+export const IMAGES: Record<string, string> = { png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', gif: 'image/gif', webp: 'image/webp', svg: 'image/svg+xml', ico: 'image/x-icon', bmp: 'image/bmp' }
 const MAX_TEXT = 512 << 10
 
 // fileRead: a file for the preview: text (the first 512 KB), an image (up to 10 MB), or only its size. base: an image

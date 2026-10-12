@@ -45,6 +45,7 @@ export type Project = {
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
   memory?: Memory[] // the project page's Memory: the user's notes to keep, one each, newest last; never agents' (yet)
+  plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
 }
 // each mark unset: on; at: where a row shows them (unset: start, by the status circle)
 export type PRMarks = { approved?: boolean; mine?: boolean; commented?: boolean; at?: 'start' | 'name' | 'end' }
@@ -238,6 +239,8 @@ export type Settings = {
   env?: Record<string, string> // every session's, under the project's and the preset's
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
+  specs?: boolean // experimental (Settings › General): Specs & Brainstorms, off unless true
+  planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
@@ -424,7 +427,17 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // schedules and runs (newest first): scheduled tasks and their log
 export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; api?: number }
 
+// specs and brainstorms (experimental, settings.specs; daemon/plans.ts): a folder each, outside the repo. files: how
+// many beside the editor's own (attachments, a brainstorm's output)
+export const PLAN_KINDS = ['spec', 'brainstorm'] as const
+export type PlanKind = (typeof PLAN_KINDS)[number]
+export type Plan = { project: string; kind: PlanKind; slug: string; title: string; at: number; path: string; files: number }
+export type PlanFile = { path: string; size: number; at: number }
+// a template for a new one (the Specs page's Templates; settings.planTemplates, unset: PLAN_TEMPLATES): its Markdown is the
+// new one's README.md under its title. None picked: empty
+export type PlanTemplate = { name: string; kind: PlanKind; text: string }
+
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
-export const API = 48
+export const API = 50

@@ -2,6 +2,19 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- **Specs & Brainstorms** (experimental, Settings › General): write a project's requirements like a Notion page
+  (checklists, images, diagrams: flowcharts, architecture, ER, screen flows, wireframes), then *Start* a workspace
+  from one; or write an idea and *Brainstorm with Laki AI*, which writes options, a mind map, diagrams and clickable
+  prototypes beside it. Each is a folder outside the repo with a README.md any agent can read; the rail's *Specs*, a
+  project's *Specs* tab, the new-workspace page's *Spec* picker and MCP's `laki_plan_*` tools. The page goes from both
+  lists to one kind's to the spec alone, with breadcrumbs back, and full screen (⌘⇧⏎) for writing.
+- A brainstorm has its **own chat with Laki AI**, in a panel beside it; unused for 12 hours it ends, and what you type
+  next starts a new one (*Continue it* takes it up again).
+- **Templates** for specs and brainstorms (New ▾, *Templates*): two come with Laki, *Feature* and *Idea*; a new one
+  starts empty unless you pick one.
+
 ## 0.11.0 · Oct 11, 2026
 
 - **Linux and Windows through WSL (preview)**: `npm run pack:linux` builds an AppImage in Docker and runs the tests and

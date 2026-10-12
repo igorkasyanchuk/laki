@@ -1,6 +1,6 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, type LogLine, MODELS, prIn, type View } from '../../shared/types'
+import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, type LogLine, MODELS, type Plan, prIn, type View } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -585,9 +585,31 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       ],
       'right',
     )
+  // specs and brainstorms (experimental): one's README.md path goes into the prompt, for the agent to read
+  const [plans, setPlans] = useState<Plan[]>([])
+  useEffect(() => {
+    if (view.settings.specs && p.project) api.call<Plan[]>('planList', { project: p.project }).then(setPlans, () => setPlans([]))
+    else setPlans([])
+  }, [p.project, view.settings.specs])
+  const specMenu = (e: MouseEvent) =>
+    openMenu(
+      e,
+      [
+        { head: 'A spec or brainstorm: its path goes in the prompt' },
+        ...plans.map(x => ({ label: x.title, icon: x.kind === 'spec' ? 'spec' : 'bulb', sub: x.kind, run: () => set({ prompt: `${(p.prompt ?? '').trimEnd()}${p.prompt?.trim() ? '\n\n' : ''}${x.kind === 'spec' ? 'Spec' : 'Brainstorm'}: ${x.path}/README.md (read it, and the files beside it)` }) }) as MenuItem),
+      ],
+      'right',
+    )
   const other = OTHER_AGENTS.find(o => o[0] === p.preset)
   const pickers = (
     <>
+      {prompting && plans.length > 0 && (
+        <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Point the agent at a spec or brainstorm: its README.md's path goes in the prompt" onClick={specMenu}>
+          <Icon name="spec" />
+          <span>Spec</span>
+          <Icon name="chevron" size={11} />
+        </button>
+      )}
       {prompting && templates.length > 0 && (
         <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="A prompt template: your words go into it" onClick={tplMenu}>
           <Icon name="file" />

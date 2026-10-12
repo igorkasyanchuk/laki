@@ -53,6 +53,8 @@ const paths = {
   image: 'M2.5 3h11v10h-11zM2.5 11l3.2-3.2 2.6 2.6 1.7-1.7 3.5 3.5M10.5 6.2v.01',
   palette: 'M8 14a6 6 0 116-6c0 1.5-1.2 2.2-2.5 2.2H10a1.3 1.3 0 00-.9 2.2c.5.6.1 1.6-1.1 1.6zM5 7.5v.01M7 5v.01M10 5v.01',
   file: 'M4 1.5h5l3 3v10H4zM9 1.5v3h3',
+  spec: 'M3.5 1.5h9v13h-9zM5.5 5.2l.9.9 1.6-1.8M9.5 5h1.5M5.5 9.7l.9.9 1.6-1.8M9.5 9.5h1.5',
+  bulb: 'M8 1.5a4 4 0 0 0-2.5 7.1V11h5V8.6A4 4 0 0 0 8 1.5zM6 13h4M6.8 14.5h2.4',
   filePlus: 'M4 1.5h5l3 3v10H4zM9 1.5v3h3M8 7.5v4.5M5.75 9.75h4.5',
   import: 'M4 1.5h5l3 3v10H4zM9 1.5v3h3M8 12.5V7.5M6 9.5l2-2 2 2',
   refresh: 'M13 8a5 5 0 11-1.6-3.7M13.2 2v2.8h-2.8',
@@ -232,7 +234,8 @@ export function AskHost() {
 }
 
 // a page over the main area, as Settings is (the new-workspace form): its title, ✕ and Esc close it
-export function Page({ title, onClose, children, wide }: { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
+// head: what the header shows in place of the title (the Specs page's breadcrumbs); tools: buttons before its ✕
+export function Page({ title, head, tools, onClose, children, wide }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean }) {
   useEffect(() => {
     const f = (e: KeyboardEvent) => escapes(e) && onClose()
     window.addEventListener('keydown', f)
@@ -241,8 +244,9 @@ export function Page({ title, onClose, children, wide }: { title: string; onClos
   return (
     <div className="settings-page" role="dialog" aria-label={title}>
       <div className="settings-head">
-        <b>{title}</b>
+        {head ?? <b>{title}</b>}
         <span className="grow" />
+        {tools}
         <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
       </div>
       <div className={`page-body ${wide ? 'wide' : ''}`}>{children}</div>

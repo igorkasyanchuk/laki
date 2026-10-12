@@ -8,11 +8,13 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
-import { aiAnswer, aiAsk, aiKey, aiNew, aiQuestion, aiState, aiStop } from './ai.ts'
+import { aiAnswer, aiAsk, aiContinue, aiForget, aiKey, aiNew, aiQuestion, aiState, aiStop, aiTick } from './ai.ts'
+import { planChat } from '../shared/plans.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { refreshSkills, skills, skillSet } from './skill.ts'
 import { usage } from './usage.ts'
+import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 
 const { dir } = core
@@ -150,11 +152,13 @@ const api: Record<string, Handler> = {
   portKill: p => core.portKill(p),
   meme: () => meme(),
   aiAsk: p => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here
-  aiState: () => aiState(),
+  aiState: p => aiState(p), // chat: a spec's or brainstorm's (planChat), else the AI page's
   aiQuestion: p => aiQuestion(p), // the skill's laki_ask and laki_remove: a question with buttons, only while an ask works
   aiAnswer: p => aiAnswer(p, (method, params) => call(method, params) as Promise<any>), // the AI page's buttons: a removal is done here, on Yes
-  aiNew: () => aiNew(),
-  aiStop: () => aiStop(),
+  aiNew: p => aiNew(p),
+  aiStop: p => aiStop(p),
+  aiContinue: p => aiContinue(p), // an ended chat (a spec's, unused 12 hours) taken up again
+  aiTick: p => aiTick(p.now), // tests move the clock
   aiKey: p => aiKey(p),
   send: p => core.send(p),
   queueClear: p => core.clearQueue(p.target),
@@ -214,6 +218,18 @@ const api: Record<string, Handler> = {
   widgetFiles: p => widgetFiles(p),
   widgetWrite: p => widgetWrite(p), // Laki AI's and MCP's: saved off
   widgetTick: p => widgetTick(p.now), // tests move the clock
+  planList: p => planList(p), // specs and brainstorms (experimental): plans.ts
+  planNew: p => planNew(p),
+  planGet: p => planGet(p),
+  planSave: p => planSave(p),
+  planFile: p => planFile(p),
+  planUpload: p => planUpload(p),
+  planWrite: p => planWrite(p), // MCP's and Laki AI's laki_plan_write: never the editor's own files
+  planRm: p => {
+    const chat = planChat({ ...p, project: core.findProject(p.project).id }) // chats are by the project's id
+    planRm(p) // the app's Delete, after its confirm: never MCP's nor Laki AI's; its chat goes too
+    aiForget(chat)
+  },
   shutdown: () => void setTimeout(shutdown, 50),
 }
 
@@ -232,8 +248,9 @@ const server = createServer(async (req, res) => {
   if (req.method === 'GET') {
     const u = new URL(req.url ?? '/', 'http://x')
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
-    if (!w) return page(u.pathname, res) // no secrets: any origin
-    const r = widgetPage(w[1], u.searchParams)
+    const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
+    if (!w && !plan) return page(u.pathname, res) // no secrets: any origin
+    const r = w ? widgetPage(w[1], u.searchParams) : planPage(u.pathname, u.searchParams)
     res.writeHead(r.code, r.headers)
     return res.end(r.body)
   }
@@ -331,6 +348,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(15000, () => core.remoteTick())
   every(30000, () => core.scheduleTick())
   every(30000, () => widgetTick())
+  every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)
 })
 

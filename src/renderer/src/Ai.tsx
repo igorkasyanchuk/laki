@@ -74,7 +74,7 @@ export function AiPage({
     load()
     return api.on(m => {
       if (m.ev === 'open') return void load() // a daemon started again: its conversation, not the busy one we had
-      if (m.ev !== 'ai') return
+      if (m.ev !== 'ai' || m.of) return // a spec's or brainstorm's chat (the Specs page's)
       setD(x => x && { ...x, chat: m.chat, busy: m.busy })
       if (!m.busy) load() // the call just logged
     })
@@ -96,7 +96,7 @@ export function AiPage({
         images: sent.images.map(i => i.path),
       })
       .catch(e => {
-        if (!/^(Laki AI is off|ask something|the AI is still|no OpenRouter API key|not connected)/.test(e.message)) return
+        if (!/^(Laki AI is off|Laki AI is busy|ask something|the AI is still|no OpenRouter API key|not connected)/.test(e.message)) return
         setErr(e.message)
         setText(sent.text)
         setImages(sent.images)
@@ -184,7 +184,7 @@ export function AiPage({
                       <i />
                     </span>
                     Working…
-                    <button onClick={() => api.call('aiStop')}>Stop</button>
+                    <button onClick={() => api.call('aiStop', { chat: '' })}>Stop</button>
                   </div>
                 )}
                 <div ref={end} />
@@ -305,8 +305,8 @@ export function AiPage({
   )
 }
 
-// the conversation with each run of tool calls as one group
-const turns = (chat: AiMsg[]) =>
+// the conversation with each run of tool calls as one group (the Specs page's chats too)
+export const turns = (chat: AiMsg[]) =>
   chat.reduce<(AiMsg | AiMsg[])[]>((out, m) => {
     const last = out[out.length - 1]
     if (m.role !== 'tool') out.push(m)
@@ -322,7 +322,7 @@ const toolName = (m: AiMsg) =>
     .replace(/_/g, ' ')
 
 // a turn's tools, folded: their names in a line; open, each with what it was given
-function Tools({ list }: { list: AiMsg[] }) {
+export function Tools({ list }: { list: AiMsg[] }) {
   const names = [...new Set(list.map(toolName))]
   return (
     <details className="ai-tools">
@@ -357,7 +357,7 @@ function target(args: string): [string, string?] | undefined {
   } catch {}
 }
 
-function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: string) => string; busy: boolean; onPick: (id: string, n: number) => void }) {
+export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: string) => string; busy: boolean; onPick: (id: string, n: number) => void }) {
   const src = useMemo(() => link(m.text), [m.text, link])
   if (m.role === 'error') return <div className="ai-msg ai-error">{m.text}</div>
   if (m.role === 'user')

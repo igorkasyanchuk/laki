@@ -97,6 +97,12 @@ workspace each, so they run in parallel.
 An extension (also called a widget: a small live page in Laki's sidebar) is made with the laki-widget skill (Settings ›
 Agent skill installs it); \`laki widget\` lists and checks them.
 
+Specs and brainstorms (when the user turned them on: Settings › General › Experimental) are the user's own pages,
+folders outside the repo, each with a README.md: a spec says what to build, a brainstorm what to explore. A prompt that
+names one (\`Spec: <path>/README.md\`) means: read it and the files beside it first, then do what it says. Over MCP
+(\`laki mcp\`): \`laki_plans\` lists them, \`laki_plan_read\` reads one, \`laki_plan_new\` writes a new one for the user,
+\`laki_plan_write\` puts a file beside one (ideas, a prototype, a diagram); never README.md or spec.json, the user's.
+
 ### A new session (/laki:new)
 
 When the user writes \`/laki:new <task>\` (or \`laki:new\`), or asks for a new session for a task "with codex" or

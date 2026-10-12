@@ -172,6 +172,18 @@ or an open one's failing checks; a yellow ⚠ beside it: merge conflicts with it
 selected workspace's PR is in the status bar.
 - An open PR's marks, with GitHub's mark at the row's end: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
   else's PR. Settings › Appearance › *Pull request marks* turns each off and puts them by the status circle or after the name instead.
+
+  | mark | meaning |
+  |---|---|
+  | <img src="icons/pr-open.svg" width="14" alt="green GitHub mark"> | an open PR |
+  | <img src="icons/pr-draft.svg" width="14" alt="gray GitHub mark"> | a draft PR |
+  | <img src="icons/pr-merged.svg" width="14" alt="purple GitHub mark"> | merged |
+  | <img src="icons/pr-closed.svg" width="14" alt="red GitHub mark"> | closed, or an open PR's checks failing |
+  | <img src="icons/conflict.svg" width="14" alt="yellow warning sign"> | merge conflicts with its base |
+  | the author's picture | someone else's PR (yours has none) |
+  | <img src="icons/approved.svg" width="14" alt="check"> | approved |
+  | <img src="icons/approved-you.svg" width="14" alt="double check"> | approved, and by you too |
+  | 👀 | you commented on, or reviewed with comments, someone else's PR |
 - A line divides the projects; each one's workspaces hang under it, indented on a guide line.
 - *Diff size in the sidebar* (Settings › Appearance, off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
@@ -711,6 +723,44 @@ fetch from and show images of https sites; its data otherwise comes from its fet
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
 
+### Specs & Brainstorms (experimental)
+
+Turn them on in Settings › General › *Experimental*. Off, nothing of them shows.
+
+A **spec** is what you want built, written like a Notion page: headings, checklists, tables, code, images (paste or
+drop them in) and diagrams (type `/` for the menu: flowchart, architecture, state, ER, swimlane, screen flow and
+wireframes, drawn in a full-screen editor). A **brainstorm** is an idea to explore: write the idea, who it's for and
+the constraints, then *Brainstorm with Laki AI* (Laki AI must be on, Settings › AI): it reads the brief and the
+project's code and writes its options beside it (`ideas.md` with a mermaid mind map and diagrams, a clickable
+`prototype-<option>.html` per option, `<name>.diagram.json`), which show under the brief as they come.
+
+Each brainstorm has its own chat with Laki AI, in a panel on its right (the ✦ beside *Brainstorm with Laki AI* hides
+it): ask for another option, a darker prototype, a diagram of the flow; it knows which brainstorm it's in. *New chat*
+starts over. A chat unused for 12 hours ends: what was said stays to read, and what you type next starts a new chat;
+*Continue it* takes the old one up again (Claude and Codex go on with their session while they still have it). Laki AI
+works on one ask at a time, in whichever chat.
+
+*New spec* and *New brainstorm* start empty; their ▾ starts one from a template instead: its Markdown goes under the
+title (the headings, a checklist of the steps you want, questions to answer). *Templates* (on the first level, or
+▾ › *Edit templates…*) lists them: a name, spec or brainstorm, the Markdown, saved as you type. Laki comes with two,
+*Feature* (a spec: goal, context, steps, how to verify) and *Idea* (a brainstorm: the idea, who it's for, constraints,
+questions); *The ones Laki comes with* puts them back.
+
+They're on the rail's *Specs* (the sidebar's foot without the rail, ⌘K) for every project, and on a project's page,
+its *Specs* tab. The page goes down a level at a time, with the way back as breadcrumbs at its top (*Specs &
+Brainstorms › Specs › the spec*): first both lists, the newest of each, with a filter, a project and *New spec* / *New
+brainstorm*; then one kind's whole list; then the spec alone, the page's whole width. The ⤢ at the top (⌘⇧⏎) puts the
+page alone in the window, without the sidebar. Each is a folder outside your repo and its worktrees,
+`<data>/plans/<project>/specs|brainstorms/<name>/`: `spec.json` (the editor's), `README.md` (the same as Markdown,
+written on each save: what agents read; a diagram is its nodes and edges, with its picture in `files/`) and the files
+beside them. A README.md changed by someone else (an agent) since: the spec asks *Load it* or *Keep mine*.
+
+To hand one to an agent: a spec's *Start* opens the new-workspace page with a prompt naming its README.md (pick the
+agent, change the words, create); the new-workspace page's *Spec* picker adds any spec's or brainstorm's path to the
+prompt; the copy button copies the path. Agents with Laki's MCP server list, read and write them too
+(`laki_plans`, `laki_plan_read`, `laki_plan_new`, `laki_plan_write`: never README.md or spec.json, your words).
+A prototype runs in a sandboxed frame: no requests out, never the app or your files.
+
 ### Projects over SSH
 
 A project can be a folder on another machine: ⌘K › *Open a project over SSH…* (*Open a folder over SSH…* on the first
@@ -1078,7 +1128,7 @@ laki daemon                                             # run the daemon in the 
 `laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. Its tools: `laki_state`
 (projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
 `presets`), `laki_new_tab` (another agent in a workspace), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
-`laki_schedule_add`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an
+`laki_schedule_add`, and with Specs & Brainstorms on `laki_plans`, `laki_plan_read`, `laki_plan_new` and `laki_plan_write`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an
 agent asks you. Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
 
@@ -1163,6 +1213,7 @@ agents find their conversations by those paths. It holds:
 - `daemon.log`;
 - `claude-settings.json`: the hooks Claude gets through `--settings`;
 - `widgets/` (your extensions) and `widget-data/` (each one's settings and last data);
+- `plans/`: specs and brainstorms (experimental), a folder each;
 - Laki AI's: `ai-key` (the OpenRouter key, 0600), `ai-chat.json` (the conversation), `ai-calls.jsonl` (each ask's
   tokens and cost) and `ai/` (where claude -p and codex exec run);
 - `worktrees/` and `run/`.
