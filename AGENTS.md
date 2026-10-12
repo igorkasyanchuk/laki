@@ -88,7 +88,8 @@ workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`
 `mergeMethod` (`prAct`'s only; `projectSet` keeps it), `answer` `label`, `phoneTick`; 34: `quickNew`, a project's `kind`,
 a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`; 46: a PR's `approvedByMe`, `commentedByMe`; 47: `widgetFiles`, `widgetWrite`, a widget's `byAi`; 48: `widgetRm`, a widget's `place` and `net`, `widgetSet` `place`/`net`, `prList`, `aiQuestion`/`aiAnswer`, a chat message's `ask`, settings' `ai.skill` and `ai.hideCost`; 49: specs and brainstorms, `planList`/`planNew`/`planGet`/`planSave`/`planFile`/`planUpload`/`planWrite`/`planRm`, `GET /plan/…`, a project's `plans`; 50: a spec's or brainstorm's chat, `aiAsk`/`aiState`/`aiNew`/`aiStop`/`aiAnswer`
 `chat`, `aiContinue`, `aiTick`, the `ai` event's `of` and `ended`, settings' `planTemplates`; 51: a workspace's `railPin`, kept by
-`wsSet` (`RAIL_PINS` at most), `branches`' `main`, settings' `syncBase`). A
+`wsSet` (`RAIL_PINS` at most), `branches`' `main`, settings' `syncBase`; 52: a workspace's `related` and `from`, `wsSet` `unrelate`,
+`wsNew` `link`/`from`, `prDetach`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -97,7 +98,7 @@ setting the renderer adds needs no bump: `settingsSet` keeps any field.
   the project page's Memory, the whole list, likewise left out; `seps`: the sidebar's groups (the app's word: a
   named head over the workspaces up to the next one, its count beside it; a workspace dropped on it goes first in it (its top
   third: before it), `RowDrop` `into`, from `data-head`; a workspace's menu › *Move to group* (App's `groupItems`):
-  first in one, or *Out of its group* (before the first), a submenu; groups are made only from the project's ⋯, at the top), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it, over the last one used) and a `sort` (`WS_SORTS`; unset: the project's), and the project's own `sort` (unset: manual; App's `sortedRows`: each group's workspaces in its sort, rows unchanged; last active: `laki.active`), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects; `railPin`: the rail's quick access, the time
+  first in one, or *Out of its group* (before the first), a submenu; groups are made only from the project's ⋯, at the top), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it; none set: with no template, never the last one used) and a `sort` (`WS_SORTS`; unset: the project's), and the project's own `sort` (unset: manual; App's `sortedRows`: each group's workspaces in its sort, rows unchanged; last active: `laki.active`), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects; `railPin`: the rail's quick access, the time
 pinned (their order), refused past `RAIL_PINS`, 5), `projectFile` (the repo's `.laki.json`), `branches` (`main`: origin's
 HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`/`wsRm`/`wsArchive`/`wsRestore`/`wsFork`;
 - `wsNew` in a folder (or `local`) whose own workspace is there: an agent other than none, or a prompt, makes `another`
@@ -130,7 +131,12 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   --branch <b>` in it (`b`: the head branch, a fork's `<owner>/<branch>`; refused when a workspace or the repo has it
   checked out: "already checked out in workspace <id>", which the app offers to open). A prompt that names a PR
   (`prIn`, no `pr`: `fromPRLink`) only links it: the workspace keeps `linked` as `prUrl` and `prLinked` (`autoPR` skips it, the app shows no
-  switches: its branch isn't the PR's; a local one too: `scanPRs` takes any workspace with a `prUrl`) and, unnamed, is `pr-<n>-<slug>` (gh failing: `pr-<n>`); the renderer sends no
+  switches: its branch isn't the PR's; a local one too: `scanPRs` takes any workspace with a `prUrl`; a branch move keeps
+  it, `moveBranch`: a review's `gh pr checkout`; any `prUrl` scans as the workspace is made). Not with `from` (a session
+  another workspace's agent started: `laki new` in an agent's tab or one a shell tab runs (`$LAKI_TAB`'s kind or `runs`; yours
+  in a shell isn't), an agent's `laki mcp`, by `$LAKI_WORKSPACE`; Laki AI's has none): its prompt's PRs are what it came from, only `related`, unless `link` (`laki new --link`, MCP's `link`; gh
+  failing: refused) names the one it's about (`guessed` false: kept). Every other GitHub PR and issue the prompt names (`refsIn`; not an issue
+  workspace's: the issue's text names any) goes to `related` (`relate`: once, any case, the newest last, 20 at most) and, unnamed, is `pr-<n>-<slug>` (gh failing: `pr-<n>`); the renderer sends no
   template name for one. The base is the PR's, the name
   `pr-<n>-<slug>`; the workspace keeps `prUrl`, which `scanPR` asks for until `syncBranches` sees another branch, and a
   fork's `fork` (kept by `wsFork`): `projectConfig` reads the repo's `.laki.json`, never the fork's (its setup would run);
@@ -153,8 +159,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   squash/merge/rebase, saved as the project's `mergeMethod`, `deleteBranch`: `merge()`, `gh pr merge --<method>
   [--delete-branch] -R <host/owner/repo> -- <url>`: `-R` keeps gh off the worktree's git (no checkout, no local branch
   deleted), then a scan a second later), `prAttach` (`ws`, `pr`: a URL or number; the app's *Attach a PR…*, the status bar's *+ PR*, the info
-  panel: a git workspace on a branch, no PR found): `prHead`, then `prUrl`, and `prLinked` when its head isn't the
-  workspace's branch; a scan follows), `prDiff` (`gh pr diff` by the PR's URL, in `diff`'s shape: `diffFiles` reads each file's status and
+  panel: a git workspace on a branch, no PR found, and related's *Make it this workspace's PR*): `prHead`, then `prUrl`,
+  and `prLinked` when its head isn't the workspace's branch, the one before (`prUrl`, else the branch's) to `related`; a scan follows), `prDetach`
+  (`ws`: a linked `prUrl` to `related`, the PR ⋯'s *Not this workspace's PR*; its branch's own is refused: the scan
+  would find it again), `prDiff` (`gh pr diff` by the PR's URL, in `diff`'s shape: `diffFiles` reads each file's status and
   lines; Changes' *PR #n*), `prFiles` (GraphQL: the PR's node id and each file's `viewerViewedState`, VIEWED, UNVIEWED,
   DISMISSED; owner and repo from the PR's URL) and `prViewed` (`path`, `viewed`, `id`: `markFileAsViewed` /
   `unmarkFileAsViewed`; Changes' Viewed boxes, in both views, a ticked file folded and dimmed, *n/m viewed*), `prAct` (`act` approve or close: `gh pr review --approve` / `gh pr close` by the PR's URL, after the
@@ -428,7 +436,8 @@ and neither does a host.
   `portKill` (the status bar's ✕, after `ask`): that pid, if it still listens there and is yours (uid), gets SIGTERM,
   and SIGKILL 3 s later if `ps`'s uid and start time are the same. First,
   `syncBranches`: each workspace's `branch` follows its folder's HEAD (`headOf` reads the file, no git run; detached
-  stays), so an agent's `git checkout -b` moves the PR lookup, status bar, ship and restore with it, and scans PRs now.
+  stays), so an agent's `git checkout -b` moves the PR lookup, status bar, ship and restore with it (a PR only linked
+  stays: its branch's own replaces a guessed one once pushed), and scans PRs now.
   A turn's end scans PRs 2 s later too (`prSoon`, at most every 20 s): `gh pr create` shows up without the minute's wait.
 - Diff size (`scanStats`, every 10 s, `LAKI_STAT_SCAN_MS`; with `settings.diffStat === true`, off by default, and a race's
   always, for Compare): each live git
@@ -441,11 +450,15 @@ and neither does a host.
   (`PR_SCAN`, 1; `prTick`, each minute; `LAKI_PR_SCAN_MS`: tests' pace instead); one scan at a time (`scanPRs`), so `autoPR` never sends twice.
   `prRefresh` (the status bar PR's right click, a workspace's *Refresh PR status*) is `scanPRs` now. No PR on the
   branch (and no `prUrl`): `prFromSaid`, the one PR link its agent tabs' last answers name (one, of a repo of `git
-  remote -v`; each tried once per workspace, `saidTried`), attached as `prAttach` does, marked `prSaid` (kept in state.json: a PR
-  on its own branch, found at a later scan, replaces it; one you attach never is); a scheduled run's local workspace's at its
+  remote -v`; each tried once per workspace, `saidTried`), attached as `prAttach` does, marked `prSaid` (one in `related` never: you
+  moved it off); a scheduled run's local workspace's at its
   turn's end (scans skip local ones; the project's lasting local one would keep the first PR named). Each check has `took`, a finished one's seconds (`completedAt` − `startedAt`). The checks are
   `newest`'s: statusCheckRollup keeps a re-run's old run, so each check (workflow and name) counts by its latest
-  `startedAt` (none, or Go's zero time: queued, the newest), as `gh pr checks` does.
+  `startedAt` (none, or Go's zero time: queued, the newest), as `gh pr checks` does. The primary PR: a worktree's guessed
+  `prUrl` (`prSaid`: its prompt's, `guessed` in `fromPRLink`, or its agent's; never one attached or asked for with `link`)
+  gives way to its branch's own once the branch is on a remote (`onRemote`, `git for-each-ref refs/remotes/*/<branch>`:
+  no gh call for a branch nobody pushed), then `gh pr view <branch>`: that one is followed, the other `related` (the
+  same PR, as `gh pr checkout` gives: unlinked). Not a local workspace's: the folder's branch isn't its own.
 - `autoLand` (merge when green, `wsSet` refuses it where `prAllows(…, 'land')` is false): in `autoPR`, an open PR
   that isn't a draft, `checks` pass, `conflict` false, `review` none or APPROVED, `ready` not false and no agent tab running or with a queue is merged (`merge()`, the
   project's `mergeMethod` or squash, the branch deleted) once per head (`fix.land`; `wsSet` turning it on again clears it
@@ -608,7 +621,9 @@ one or two `rpc` calls (`tools(rpc)`: Laki AI passes the daemon's own); none del
 run) leaves out settings, projects' config, queued prompts and remote access's link: an agent's transcript keeps them. stdout is the protocol's, so the daemon starts at the first
 tool call (`ensureDaemon`), never before. `state` gives each project's `groups` (its seps' names) and each workspace's
 `group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupId`, refused
-when there's none of it) is `wsNew` `place`, and Laki AI's `SYSTEM` has it pick the group that fits. Tested in `test/cli.test.ts`.
+when there's none of it) is `wsNew` `place`, and Laki AI's `SYSTEM` has it pick the group that fits. Each workspace's
+`related` and `from` too; `laki_new_workspace` `link` is `wsNew`'s, and `tools(rpc, from)`'s `from` (the CLI's
+`$LAKI_WORKSPACE`; the daemon drops its own at start, so Laki AI's have none) its `from`. Tested in `test/cli.test.ts`.
 
 ### Links
 
@@ -786,6 +801,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       A reminder (a workspace's *Remind me…*, `RemindDialog`) is one with `then: 'remind'` and `ws`: it notifies about
       the workspace (the click: its first tab) and toasts *Open*; one due while the app was closed rings as it opens.
     - `laki.previewSize`: Preview's size (`{ w, h }`, null: the panel's).
+    - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
     - `laki.newDraft`: the new-workspace page's draft (`Draft`: the form, images, race, template), saved as it changes
       while something's typed, dropped as it's made (back if that fails) or *Clear*ed; `laki.scheduleDraft`: Scheduled
       tasks' open form (Cancel asks when it changed); `laki.settingsSec`: Settings' last section. Their forms don't
@@ -877,8 +893,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   queries unless it is the responder. xterm takes `allowTransparency` only as it opens, so App keys each
   `Term` on `transparent()`: turning glass on or off remounts the terminals. A keypress whose keydown it didn't see is dropped: Enter that closed a
   dialog (and so focused the terminal) would type a stray ⏎. On window focus or a page turning visible it sends
-  its size again, so a look is enough to get it back after a phone. OSC 8 links: http(s) open on a click, `file://` (or a
-  bare absolute path) on ⌘-click (`allowNonHttpProtocols`, a `title` hint on hover): App's `openPath`, a file of the
+  its size again, so a look is enough to get it back after a phone. OSC 8 links: http(s) open on a click (with the mouse
+  captured, `?1000h`…: only on ⌘-click, and a ⌘-press on a link (`over`, the link providers' hover) is kept from the
+  app's mouse report by `.xterm-screen`'s listener: codex opens its links itself, two tabs otherwise; in a browser
+  elsewhere, no `bridge`, a tap too), `file://` (or a
+  bare absolute path) on ⌘-click (⌃ too, unless the mouse is captured) (`allowNonHttpProtocols`, a `title` hint on hover): App's `openPath`, a file of the
   tab's workspace in the preview, else main's `open-path` (the app window's only: a folder in Finder, a document of
   `DOCS` in its app, anything else, bundles too, revealed). Files dropped on it (`bridge.pathOf`) are
   pasted as their paths, shell-quoted when they need it; its `preventDefault` keeps the window's folder drop out.
@@ -999,8 +1018,10 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   `withImages` appends their paths. The mic keeps the text box focused and starts dictation 150 ms later: macOS
   learns the web view's text field a moment after focus, and dictation started before that stops at once.
 - **`Info.tsx`**: the workspace info panel (`.info-facts`: a card of one-line `Row`s, the whole value in `data-tip`, a
-  copy button on hover; the path and storage `shortPath`'d, `$PORT` opens `localhost`, each public link: `WsInfo.tunnels`,
-  `onCopy`) and the status bar's PR (`PRStatus`, `AutoToggles`, `ciText`);
+  copy button on hover, a row's `acts` beside it; the path and storage `shortPath`'d, `$PORT` opens `localhost`, each
+  public link: `WsInfo.tunnels`, `onCopy`; *from* and *started*, the workspaces `from` ties (`onWs`: it selected), and
+  *related* (`refLabel`: PR #n · repo; a PR's *Make it this workspace's PR*, `onPrimary`: `prAttach`; ✕, `onUnrelate`:
+  `wsSet` `unrelate`; the PR shown below left out); the PR ⋯'s *Not this workspace's PR* for a linked one, `onDetach`: `prDetach`) and the status bar's PR (`PRStatus`, `AutoToggles`, `ciText`);
   each app maps its workspace to `WsInfo`. `PRSection` (the info panel's and Review's): title, a muted meta line, one row
   of Merge ▾ (`.split.green` when nothing `blocked` it: conflicts, failing or running checks, changes requested, `ready`
 false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) square at the end (neither Merge nor Approve:

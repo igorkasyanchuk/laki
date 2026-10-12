@@ -535,6 +535,9 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .bn-block-content[data-content-type='heading'][data-level='2'] { --level: 1.3em; }
 .bn-block-content[data-content-type='heading'][data-level='3'] { --level: 1.12em; }
 .bn-block-content[data-content-type='codeBlock'] { font-family: var(--mono); color: var(--fg); background: var(--panel); }
+/* a check list item's box: its wrapper (contenteditable=false) makes no box of its own, the box is the row's first flex
+   item; with one, Chromium's ↑ from the start of an item's text skips the item above (to the heading over the list) */
+.bn-block-content[data-content-type='checkListItem'] > div:has(> input) { display: contents; }
 .sd-block .row-actions { display: flex; gap: 4px; }
 .sd-block .row-actions button { padding: 2px 8px; font-size: 12px; }
 .sd-block .eyebrow, .sd-toolbar .eyebrow { font: 600 12px var(--ui-font); color: var(--fg); }

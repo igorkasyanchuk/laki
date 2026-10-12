@@ -446,6 +446,10 @@ test('a prompt naming a PR: the workspace named after it and linked to it (gh fa
   assert.deepEqual([b.id, b.prUrl, b.prLinked], ['pr-14080-lazy-load-gift-frames', url, true])
   assert.notEqual(b.branch, 'gifts') // linked, not checked out (that's --pr)
   await until(() => readFileSync(rig.env.FAKE_LOG, 'utf8').includes(`gh pr view ${url} --json number,state`), 'its PR, by URL')
+  // its agent checks the PR out (a review's gh pr checkout): the workspace follows the branch and keeps the PR
+  execFileSync('git', ['checkout', '-qb', 'gifts'], { cwd: b.path })
+  const moved = await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === b.id && w.branch === 'gifts'), 'the branch followed')
+  assert.deepEqual([moved.prUrl, moved.prLinked], [url, true])
   const c = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: url, name: 'mine' })
   assert.deepEqual([c.id, c.prUrl], ['mine', url])
   const plain = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: 'https://github.com/o/r/issues/3 and pull/4' })
@@ -519,10 +523,79 @@ test('a PR its agent names is linked when none is on the branch (a scheduled run
   await turn('Opened a draft PR: https://github.com/acme/shop/pull/12')
   await until(async () => (await prUrl()) === 'https://github.com/Acme/Shop/pull/12', 'linked') // gh's spelling
   assert.equal((await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id).prLinked, true) // its branch is perf/faster-query
-  // the agent opens one on the workspace's own branch: that one wins
+  // the agent opens one on the workspace's own branch: once pushed, that one wins, the other only related
   writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 13, state: 'OPEN', url: 'https://github.com/o/r/pull/13', statusCheckRollup: [] }))
   await rig.rpc('prRefresh')
+  assert.equal(await prUrl(), 'https://github.com/Acme/Shop/pull/12') // not pushed: GitHub isn't asked
+  execFileSync('git', ['update-ref', `refs/remotes/origin/${ws.branch}`, 'HEAD'], { cwd: ws.path })
+  await rig.rpc('prRefresh')
   await until(async () => (await prUrl()) === undefined && (await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id).pr?.number === 13, 'its own PR')
+  assert.deepEqual((await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === ws.id).related, ['https://github.com/Acme/Shop/pull/12'])
+  // related: never named back in
+  await turn('As in https://github.com/acme/shop/pull/12')
+  assert.equal(await prUrl(), undefined)
+})
+
+test('the primary PR and related links: an agent’s new session keeps its prompt’s PRs related (link makes one its PR); a linked one gives way to its own pushed PR; Not this workspace’s PR; Make it its PR', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const old = 'https://github.com/o/r/pull/14269'
+  const issue = 'https://github.com/o/r/issues/7'
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 14269, title: 'Universal chat', url: old, headRefName: 'universal', baseRefName: 'main', isCrossRepository: false }))
+  writeFileSync(join(gh, 'pr.json'), 'no pull requests found') // no branch has one yet
+  const wsOf = async (id: string) => (await rig.rpc('state')).workspaces.find((x: { id: string }) => x.id === id)
+  // you: the prompt's first PR is its PR, the rest related
+  const review = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: `investigate issues from ${old}/changes, see ${issue} and ${issue.replace('o/r', 'O/R')}` })
+  assert.deepEqual([review.prUrl, review.prLinked, review.related, review.from], [old, true, [issue], undefined])
+  // its agent's /laki:new: the PR it names is where it came from, not its PR
+  const fix = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: `fix the issue from ${old}`, from: review.id })
+  assert.deepEqual([fix.id, fix.prUrl, fix.related, fix.from], ['fix-the-issue-from', undefined, [old], review.id])
+  const gone = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: 'x', from: 'nope' })
+  assert.equal(gone.from, undefined)
+  // asked for (laki new --link): its PR, as yours would be
+  const look = await rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: 'review it', link: '14269', from: review.id })
+  assert.deepEqual([look.id.startsWith('pr-14269-universal-chat-'), look.prUrl, look.prLinked], [true, old, true]) // the review has the name
+  writeFileSync(join(gh, 'noauth'), '')
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', prompt: 'x', link: '14269' }), /gh isn't signed in/)
+  rmSync(join(gh, 'noauth'))
+  // Not this workspace's PR: related, and back with Make it its PR (prAttach), the one before related
+  await rig.rpc('prDetach', { ws: look.id })
+  assert.deepEqual([(await wsOf(look.id)).prUrl, (await wsOf(look.id)).related], [undefined, [old]])
+  await assert.rejects(rig.rpc('prDetach', { ws: look.id }), /has no PR|its PR is its branch's/)
+  await rig.rpc('prAttach', { ws: look.id, pr: old })
+  assert.deepEqual([(await wsOf(look.id)).prUrl, (await wsOf(look.id)).related], [old, undefined])
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 5, title: 'Five', url: 'https://github.com/o/r/pull/5', headRefName: 'five', baseRefName: 'main', isCrossRepository: false }))
+  await rig.rpc('prAttach', { ws: look.id, pr: '5' })
+  assert.deepEqual([(await wsOf(look.id)).prUrl, (await wsOf(look.id)).related], ['https://github.com/o/r/pull/5', [old]])
+  await assert.rejects(rig.rpc('prDetach', { ws: fix.id }), /has no PR/)
+  // the review opens its own PR: pushed, its branch's PR is its PR, the prompt's goes to related
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 15000, state: 'OPEN', url: 'https://github.com/o/r/pull/15000', statusCheckRollup: [] }))
+  execFileSync('git', ['update-ref', `refs/remotes/origin/${review.branch}`, 'HEAD'], { cwd: review.path })
+  await rig.rpc('prRefresh')
+  await until(async () => (await wsOf(review.id)).prUrl === undefined && (await wsOf(review.id)).pr?.number === 15000, 'its own PR')
+  assert.deepEqual([(await wsOf(review.id)).prLinked, (await wsOf(review.id)).related], [undefined, [issue, old]])
+  // one you pick stays: its own pushed branch's PR doesn't take it back, it's related
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 14269, title: 'Universal chat', url: old, headRefName: 'universal', baseRefName: 'main', isCrossRepository: false }))
+  await rig.rpc('prAttach', { ws: review.id, pr: old })
+  await rig.rpc('prRefresh')
+  await rig.rpc('prRefresh')
+  assert.deepEqual([(await wsOf(review.id)).prUrl, (await wsOf(review.id)).related], [old, [issue, 'https://github.com/o/r/pull/15000']])
+  // the info panel's ✕: that one off (any case)
+  await rig.rpc('wsSet', { id: review.id, unrelate: issue.replace('o/r', 'O/R') })
+  assert.deepEqual((await wsOf(review.id)).related, ['https://github.com/o/r/pull/15000'])
+  // a branch's own PR stays its PR; attached over it, it's related
+  await until(async () => (await wsOf(fix.id)).pr, "the fix's own branch PR")
+  await assert.rejects(rig.rpc('prDetach', { ws: fix.id }), /its PR is its branch's: it stays/)
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 5, title: 'Five', url: 'https://github.com/o/r/pull/5', headRefName: 'five', baseRefName: 'main', isCrossRepository: false }))
+  await rig.rpc('prAttach', { ws: fix.id, pr: '5' })
+  assert.deepEqual([(await wsOf(fix.id)).prUrl, (await wsOf(fix.id)).related], ['https://github.com/o/r/pull/5', [old, 'https://github.com/o/r/pull/15000']])
+  // an issue's workspace: link still makes its PR (the issue's text names none of it)
+  writeFileSync(join(gh, 'prhead.json'), JSON.stringify({ number: 14269, title: 'Universal chat', url: old, headRefName: 'universal', baseRefName: 'main', isCrossRepository: false }))
+  writeFileSync(join(gh, 'issue.json'), JSON.stringify({ number: 7, title: 'Chat breaks', body: 'see https://github.com/o/r/pull/1', url: issue }))
+  const iss = await rig.rpc('wsNew', { project: p.id, preset: 'none', issue: '7', link: old })
+  assert.deepEqual([iss.issue?.number, iss.prUrl, iss.prSaid, iss.related], [7, old, undefined, undefined])
 })
 
 test('Attach PR: one by URL or number becomes the workspace’s (asked for by URL); another branch’s only linked; a folder refused', async t => {

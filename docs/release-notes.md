@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A link clicked in Codex (or another app that takes the mouse) opens one browser tab, not two; ⌘-click opens it
+  in Laki, a plain click is the app's.
 - **Pin to the rail**: a workspace's menu puts it (a terminal or a browser too) on the rail below a line, a click away;
   5 at most, with a count when one needs you.
 - A workspace's right click has **Run ›**, the toolbar's Run ▾ for it (its script, localhost, your actions), and
@@ -12,6 +14,16 @@ version it builds, with the date. -->
   starts off it; the branch prefix, the worktrees folder, diff size and archive on merge moved there.
 - The new-workspace page starts off the repo's **main branch**, not whatever the repo has checked out; its ⌄ lists every
   branch (the box filtered them by what was in it). Opened for another project than your draft's, it starts empty there.
+- A group's head has a **+** on hover, as a project's has: a new workspace in that group. A group without a template
+  starts it with none, not the last one used elsewhere.
+- A workspace whose prompt names a PR (*review https://github.com/…/pull/12*) shows the PR's status and author at
+  once, and keeps it when its agent checks the PR out to review it (the link was lost then).
+- **A workspace's PR and related links**: once its own branch is pushed with a PR, that's its PR, and one its prompt
+  named moves to *related* in the info panel. A session an agent starts (`/laki:new`) keeps the PRs its prompt names as
+  related, so the PR it opens is its own (`laki new --link` for one it's about). The info panel also says which
+  workspace started it and which ones it started; *Not this workspace's PR* in the PR's ⋯ moves a wrong one off.
+- The status bar's branch is short (no `laki/`, cut): hover for all of it and its base, click to show it whole.
+- Specs: ↑ from the start of a check list item goes to the item above (it skipped it, to the heading over the list).
 - **Laki AI** puts a new workspace in the project's group that fits it (a review in *Reviews*); the bubbles' AI window
   is the chat alone, with a cleaner head.
 

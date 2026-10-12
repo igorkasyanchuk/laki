@@ -104,9 +104,11 @@ async function main() {
       return out(projects, projects.map(p => `${p.id}  ${p.host ? `${p.host}:` : ''}${p.path}`).join('\n'))
     }
     case 'new': {
-      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--fan claude,codex] [--prompt text]')
+      if (!rest[0]) throw new Error('usage: laki new <project> [--base b] [--preset p] [--model m] [--effort e] [--issue url|n] [--pr url|n] [--link url|n] [--fan claude,codex] [--prompt text]')
       // .: the project of the workspace this tab is in (an agent's /laki:new)
-      const here = rest[0] === '.' && ((await rpc('state')) as View).workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project
+      const v = process.env.LAKI_WORKSPACE ? ((await rpc('state')) as View) : undefined
+      const here = rest[0] === '.' && v?.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project
+      const tab = v?.tabs.find(t => t.id === process.env.LAKI_TAB)
       if (rest[0] === '.' && !here) throw new Error("laki new .: only in a Laki tab ($LAKI_WORKSPACE): name the project")
       const o = {
         project: here || rest[0],
@@ -120,6 +122,8 @@ async function main() {
         effort: flags.effort,
         issue: flags.issue || undefined,
         pr: flags.pr || undefined,
+        link: flags.link || undefined, // the PR it's about (a review), not checked out: its primary
+        from: tab && (tab.kind === 'agent' || tab.runs) ? tab.workspace : undefined, // an agent's (its tab, or typed in a shell): the prompt's PRs are only related; yours in a shell aren't
       }
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
       // a race: the same prompt to each preset, a worktree each

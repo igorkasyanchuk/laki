@@ -173,6 +173,7 @@ export function App() {
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
+  const [branchFull, setBranchFull] = useState(() => load('laki.branchFull', false)) // the status bar's branch: all of it, base too
   // full screen (⌘⇧⏎, the tab bar's ⤢): the tab's content alone, no rail, sidebar, tab bar, panels or status bar; the
   // window full screen too (main's, so Esc stays the terminal's)
   const [full, setFull] = useState(false)
@@ -257,6 +258,7 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.rail', JSON.stringify(railKind)), [railKind])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
+  useEffect(() => void localStorage.setItem('laki.branchFull', JSON.stringify(branchFull)), [branchFull])
   // a new workspace, and the one selected before it, stay in sight: their projects and seps unfold once the view has them
   const [reveal, setReveal] = useState<string[]>([])
   useEffect(() => {
@@ -1080,17 +1082,25 @@ export function App() {
   const runItems = (w: WorkspaceView): MenuItem[] => (kindOf(w) === 'projects' ? [{ label: 'Run', icon: 'run', key: 'n', items: runMenu(w) }] : [])
   // a git workspace on a branch with no PR found: one can be attached by hand (prAttach)
   const attachable = (w: WorkspaceView) => !w.pr && !!w.branch && view?.projects.find(p => p.id === w.project)?.git !== false
+  // the status bar's branch, short: Laki's prefix (Settings › Git & worktrees) off
+  const shortBranch = (b: string, pre = settings.branchPrefix?.trim() || 'laki/') => (b.startsWith(pre) ? b.slice(pre.length) : b)
   // a workspace for the info panel and the status bar's PR
   const cfgOf = (w: WorkspaceView) => view?.projects.find(p => p.id === w.project)?.config
   const allows = (w: WorkspaceView, k: 'approve' | 'close' | 'merge' | 'land') => prAllows(cfgOf(w), k)
-  const infoOf = (w: WorkspaceView, cfg = cfgOf(w)): WsInfo => ({
-    ...w,
-    allow: { approve: prAllows(cfg, 'approve'), close: prAllows(cfg, 'close'), merge: prAllows(cfg, 'merge'), land: prAllows(cfg, 'land') },
-    method: cfg?.mergeMethod,
-    ...(w.fix?.pr === w.pr?.number && { fixTries: w.fix?.tries, mergeTries: w.fix?.merges }), // this PR's counts only
-    prScan: settings.prScan || PR_SCAN,
-    prTries: settings.prTries || PR_TRIES,
-  })
+  const infoOf = (w: WorkspaceView, cfg = cfgOf(w)): WsInfo => {
+    const live = (id?: string) => view?.workspaces.find(x => x.id === id && !x.archived)
+    const from = live(w.from)
+    return {
+      ...w,
+      from: from && { id: from.id, name: wsName(from) },
+      started: view?.workspaces.filter(x => x.from === w.id && !x.archived).map(x => ({ id: x.id, name: wsName(x) })),
+      allow: { approve: prAllows(cfg, 'approve'), close: prAllows(cfg, 'close'), merge: prAllows(cfg, 'merge'), land: prAllows(cfg, 'land') },
+      method: cfg?.mergeMethod,
+      ...(w.fix?.pr === w.pr?.number && { fixTries: w.fix?.tries, mergeTries: w.fix?.merges }), // this PR's counts only
+      prScan: settings.prScan || PR_SCAN,
+      prTries: settings.prTries || PR_TRIES,
+    }
+  }
   // merge when green: asked once, as it's turned on
   const setAuto = async (w: WorkspaceView, k: AutoKey, v: boolean) => {
     if (k === 'autoLand' && v && !(await ask(`Merge ${w.pr ? `PR #${w.pr.number}` : 'the PR'} when it's green?`, { text: `Laki will ${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash'].toLowerCase()} it as you and delete its branch on GitHub, once every check passes, it has no conflicts, isn't a draft, is approved if the repo asks for a review and its agent isn't working.`, ok: 'Merge when green' }))) return
@@ -1701,6 +1711,7 @@ export function App() {
         {sum !== 'idle' && sum !== 'exited' && <Glyph s={sum} />}
         <span className="project-count">{n}</span>
         <span className="ws-acts" onPointerDown={e => e.stopPropagation()} onClick={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()}>
+          <IconButton icon="plus" title={`New workspace in ${s.name || 'this group'}`} onClick={() => newWs(p.id, { place: s.id })} />
           <IconButton icon="more" title="Group" onClick={e => openMenu(e, sepMenu(p, s))} />
         </span>
       </div>
@@ -2131,6 +2142,10 @@ export function App() {
               onRename={() => setDialog({ renameWs: ws.id })}
               onAttach={attachable(ws) ? () => setDialog({ attachPr: ws.id }) : undefined}
               onCopy={copy}
+              onWs={id => (setReveal(r => [...r, id]), setWsId(id))}
+              onPrimary={url => call('prAttach', { ws: ws.id, pr: url }).then(r => done(`PR #${(r as { number: number }).number} is this workspace's PR`), () => {})}
+              onUnrelate={url => call('wsSet', { id: ws.id, unrelate: url }).catch(() => {})}
+              onDetach={() => call('prDetach', { ws: ws.id }).then(() => done('Only related now: its own PR, once opened, is its PR'), () => {})}
               onStorage={bridge?.openPath && ws.storage ? () => void bridge!.openPath!(ws.storage!).then(r => r === 'missing' && toast('Nothing kept yet: its folder is made with its first tab')) : undefined}
             />
           )}
@@ -2391,10 +2406,15 @@ export function App() {
           {ws && ws.browser === undefined && ( // a page: no port, branch or folder of its own
             <>
               {git && (
-                <span title={ws.kind === 'worktree' ? `branch ${ws.branch}, from ${ws.base}` : 'the repo itself'}>
-                  ⎇ {ws.branch}
-                  {ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
-                </span>
+                // short (no branch prefix, cut), all of it on hover; a click shows it whole, its base too
+                <button
+                  className={`sb-branch ${branchFull ? 'full' : ''}`}
+                  data-tip={`${ws.kind === 'worktree' ? `${ws.branch} ← ${ws.base}` : `${ws.branch}, the repo itself`} · click: ${branchFull ? 'shorter' : 'all of it'}`}
+                  onClick={() => setBranchFull(f => !f)}
+                >
+                  ⎇ {branchFull ? ws.branch : shortBranch(ws.branch)}
+                  {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
+                </button>
               )}
               {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
               <span className="port-item">

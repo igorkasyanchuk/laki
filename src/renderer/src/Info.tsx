@@ -56,6 +56,9 @@ export type WsInfo = {
   prScan: number // minutes between PR checks (Settings › Pull requests)
   prTries: number // failing CI or conflicts go to the agent this many times in a row
   tunnels?: Tunnel[] // ports exposed to the world
+  related?: string[] // other GitHub PRs and issues it's about (not its PR): its prompt's, a PR its own replaced
+  from?: { id: string; name: string } // the workspace whose agent started it
+  started?: { id: string; name: string }[] // the ones its agents started
 }
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge' | 'autoLand'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
@@ -125,7 +128,7 @@ export const ago = (t?: string | number) => {
 export function AutoToggles({ w, onToggle, names = ['fix CI', 'review', 'fix conflicts', 'merge when green'], row, keys = w.allow?.land ? [...FIXES, 'autoLand'] : FIXES }: { w: WsInfo; onToggle: (k: AutoKey, v: boolean) => void; names?: string[]; row?: (k: AutoKey) => ReactNode; keys?: AutoKey[] }) {
   if (w.prLinked)
     return (
-      <span className="muted small" data-tip="The prompt named this PR; its branch isn't checked out here, so the agent couldn't push to it. A workspace from the PR (Pull request on the new-workspace page, laki new --pr) has the switches.">
+      <span className="muted small" data-tip="The prompt named this PR, or it was attached: its branch isn't checked out here, so the agent couldn't push to it (laki new --pr gives the switches). A prompt's gives way to a PR of this workspace's own branch, once pushed.">
         linked, not checked out
       </span>
     )
@@ -185,17 +188,24 @@ export function PRStatus({ w, onOpen, onToggle, onMenu }: { w: WsInfo; onOpen: (
   )
 }
 
-// a fact: its name, the value on one line (cut short, all of it in the tip), a copy button on hover
-function Row({ k, children, tip, copy }: { k: string; children: ReactNode; tip?: string; copy?: () => void }) {
+// a fact: its name, the value on one line (cut short, all of it in the tip), a copy button (and acts) on hover
+function Row({ k, children, tip, copy, acts }: { k: string; children: ReactNode; tip?: string; copy?: () => void; acts?: ReactNode }) {
   return (
     <div className="info-row">
       <span className="info-k">{k}</span>
       <span className="info-v" data-tip={tip}>
         {children}
       </span>
+      {acts}
       {copy && <IconButton icon="copy" title="Copy" onClick={copy} />}
     </div>
   )
+}
+
+// a GitHub PR or issue link as a few words: PR #12 · repo
+export const refLabel = (url: string) => {
+  const m = /github\.com\/[\w.-]+\/([\w.-]+)\/(pull|issues)\/(\d+)/.exec(url)
+  return m ? `${m[2] === 'pull' ? 'PR' : 'Issue'} #${m[3]} · ${m[1]}` : url
 }
 
 // checks, failing first, then running, passing, skipped
@@ -239,7 +249,7 @@ const SEND: Record<FixWhat, [string, string]> = {
 
 // the PR: title, state, actions, its description, checks, and what the agent fixes (info panel, side panel)
 // threads: its open review threads (the side panel's), unknown in the info panel: Send review comments shows then
-export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach }: { w: WsInfo; threads?: number; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onAttach?: () => void }) {
+export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach, onDetach }: { w: WsInfo; threads?: number; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onAttach?: () => void; onDetach?: () => void }) {
   const pr = w.pr
   const open = pr?.state === 'OPEN'
   const can = (k: PRPerm) => w.allow?.[k] ?? k !== 'land'
@@ -266,6 +276,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
     : [
         { label: 'Open its checks', icon: 'link', run: () => onOpen(`${pr.url}/checks`) },
         { label: 'Open its files', icon: 'diff', run: () => onOpen(`${pr.url}/files`) },
+        ...(w.prLinked && onDetach ? [{ label: 'Not this workspace’s PR', icon: 'link', sub: 'Only related: its own PR, once opened, shows here', run: onDetach } as MenuItem] : []),
         ...(open && can('close') ? [null, { label: 'Close pull request…', icon: 'x', danger: true, run: () => onAct('close') } as MenuItem] : []),
       ]
   // Send now: what there is to send, by hand (a linked PR, with no switches: each named)
@@ -384,6 +395,10 @@ export function InfoPanel(p: {
   onAttach?: () => void // a git workspace on a branch, with no PR: Attach a PR…
   onCopy: (text: string) => void
   onStorage?: () => void // its storage folder in Finder (the app's only)
+  onWs?: (id: string) => void // another workspace (from, started)
+  onPrimary?: (url: string) => void // a related PR as its PR
+  onUnrelate?: (url: string) => void // off the related list
+  onDetach?: () => void // its PR, only linked, to related
 }) {
   const { w } = p
   return (
@@ -449,9 +464,41 @@ export function InfoPanel(p: {
             </Row>
           ))}
           {w.created ? <Row k="created" tip={new Date(w.created).toLocaleString()}>{ago(w.created)}</Row> : null}
+          {w.from && (
+            <Row k="from" tip={`Its agent started this one: ${w.from.name}`}>
+              <a href="#" onClick={e => (e.preventDefault(), p.onWs?.(w.from!.id))}>
+                {w.from.name}
+              </a>
+            </Row>
+          )}
+          {w.started?.map((s, i) => (
+            <Row key={s.id} k={i ? '' : 'started'} tip={`Its agent started ${s.name}`}>
+              <a href="#" onClick={e => (e.preventDefault(), p.onWs?.(s.id))}>
+                {s.name}
+              </a>
+            </Row>
+          ))}
+          {w.related?.filter(u => u.toLowerCase() !== w.pr?.url.toLowerCase()).map((u, i) => ( // other PRs and issues it's about; its PR is the section below
+            <Row
+              key={u}
+              k={i ? '' : 'related'}
+              tip={u}
+              copy={() => p.onCopy(u)}
+              acts={
+                <>
+                  {p.onPrimary && u.includes('/pull/') && <IconButton icon="pr" title="Make it this workspace's PR" onClick={() => p.onPrimary!(u)} />}
+                  {p.onUnrelate && <IconButton icon="x" title="Not related" onClick={() => p.onUnrelate!(u)} />}
+                </>
+              }
+            >
+              <a href={u} onClick={e => (e.preventDefault(), p.onOpen(u))}>
+                {refLabel(u)}
+              </a>
+            </Row>
+          ))}
         </section>
 
-        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onAttach={p.onAttach} />
+        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onAttach={p.onAttach} onDetach={p.onDetach} />
       </div>
     </div>
   )

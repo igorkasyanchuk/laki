@@ -26,7 +26,7 @@ export async function state(rpc: Rpc = conn) {
   return {
     projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind, groups: p.seps?.length ? p.seps.map(s => s.name || 'Unnamed group') : undefined })), // kind: shells (the Terminals project) or browsers, the user's own; groups: the sidebar's, laki_new_workspace's group
     workspaces: live
-      .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review } })),
+      .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review }, related: w.related, from: live.some(x => x.id === w.from) ? w.from : undefined })), // related: other PRs and issues it's about; from: the workspace that started it
     tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
 }
@@ -41,7 +41,8 @@ async function groupId(rpc: Rpc, project: string, group: string) {
   return s.id
 }
 
-export const tools = (rpc: Rpc): Tool[] => [
+// from: the workspace whose agent runs this laki mcp ($LAKI_WORKSPACE): what it starts came from there
+export const tools = (rpc: Rpc, from?: string): Tool[] => [
   {
     name: 'laki_state',
     description: "Laki's projects, workspaces (a git worktree per task, or a folder) and tabs, with each tab's status: running (an agent's turn, or a shell's command), waiting (for a permission), idle or exited; done: finished while nobody looked; last: the agent's last answer. Terminals and Browsers (a project's kind shells or browsers) are the user's own terminals and web pages.",
@@ -63,6 +64,7 @@ export const tools = (rpc: Rpc): Tool[] => [
         effort: str('how hard it thinks: claude low…max, codex minimal…xhigh; default: the agent’s own'),
         issue: str('a GitHub issue (its URL or number) to work on: its title and text become the prompt, with the prompt above after them'),
         pr: str("a GitHub PR (its URL or number) to work on: the workspace is a worktree on its branch (forks too), named after it"),
+        link: str("a GitHub PR (its URL or number) the workspace is about without checking it out (a review): its primary PR, whose status Laki shows. From an agent's tab (this server under $LAKI_WORKSPACE), PRs the prompt only names are related, not its PR; the workspace's own PR, once it opens one, is"),
         presets: { type: 'array', items: { type: 'string' }, description: 'a race: 2–6 presets (claude, codex…) that each get a worktree on the same prompt, for the user to compare and keep one' },
         template: str("a prompt template's name (laki_templates): the prompt goes into it"),
         action: str("an agent action's name (Run ▾'s, laki_actions): its prompt is what the agent does, the prompt above added after it"),
@@ -73,7 +75,7 @@ export const tools = (rpc: Rpc): Tool[] => [
     run: async a => {
       const place = a.group ? await groupId(rpc, a.project, a.group) : undefined // before the prompt: a wrong group makes nothing
       const prompt = a.template || a.action ? await promptOf(rpc, a.project, a.prompt ?? '', a.template, a.action, a.pr, a.base) : a.prompt
-      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, place }
+      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, from, place }
       if (!prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },
@@ -380,7 +382,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
 ]
 
 let daemon: Promise<unknown> | undefined
-const TOOLS = [...tools(conn), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(conn) : [])]
+const TOOLS = [...tools(conn, process.env.LAKI_WORKSPACE || undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(conn) : [])]
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool) throw new Error(`no tool ${name}`)

@@ -10,7 +10,7 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
@@ -188,7 +188,10 @@ another session in it) with an agent started on the task. This session goes on a
 
        ${LAKI_CLI} new . --preset <agent> --prompt '<prompt>'
 
-   \`--name <short-name>\` names the workspace, \`--base <branch>\` starts it from another branch.
+   \`--name <short-name>\` names the workspace, \`--base <branch>\` starts it from another branch. PRs and issues
+   the prompt names are only its related links (it came from them; its own PR, once it opens one, is its PR). A
+   session about a PR without changing it (a review): \`--link <url>\` makes that PR its PR; working on the PR's own
+   branch: \`--pr <url>\`.
 4. Say in one line what it made: the workspace id it printed, and the agent.
 `,
 })
@@ -200,8 +203,8 @@ export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's o
 const LAKI_NOTE = () =>
   `You run in a tab of Laki, an app that runs coding agents side by side, each task in a workspace of its own (a git worktree or a folder). Its CLI is \`${LAKI_CLI}\`, \`laki\` below (\`laki help\` lists it all); \`.\` is your workspace ($LAKI_WORKSPACE). Use it when it helps, quietly:
 - \`laki rename . "<a few words>"\`: name the workspace after its task once the task is clear (the user sees the name in Laki's sidebar).
-- \`laki pr . <url|number>\`: attach the pull request you opened or work on, when it isn't one on this branch.
-- \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace.
+- \`laki pr . <url|number>\`: make the pull request you opened or work on this workspace's PR, when it isn't one on this branch (a PR of this branch, once pushed, is its PR on its own).
+- \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace (PRs the prompt names are only its related links; \`--link <url>\`: the PR it's about, as for a review).
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
 - ${STORAGE_NOTE}`
 
@@ -1205,12 +1208,13 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 }
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
-export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string }) {
+export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string; unrelate?: string }) {
   const w = findWs(o.id)
   if (o.railPin && !w.railPin && state.workspaces.filter(x => x.railPin && !x.archived).length >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
   if (o.browser !== undefined && (w.browser === undefined || !URL_OK.test(o.browser))) throw new Error('browser: a Browsers workspace and an http(s) page')
   if (o.browser !== undefined) w.browser = o.browser
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
+  if (typeof o.unrelate === 'string') unrelate(w, o.unrelate) // the info panel's ✕ on a related link: one at a time
   if (o.color !== undefined) w.color = o.color && o.color !== 'none' ? o.color : undefined
   if (o.name !== undefined) {
     const name = Array.from(o.name.trim()).slice(0, 60).join('') // by character: an emoji stays whole
@@ -1373,7 +1377,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string }
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1408,13 +1412,16 @@ async function fromIssue(proj: Project, o: NewWs): Promise<NewWs> {
 }
 
 // a prompt that names a GitHub PR (prIn: "review https://github.com/o/r/pull/12"; not --pr, which checks it out): the
-// workspace is named after it (pr-<n>-<title>; gh failing: pr-<n>) and linked to it (prUrl) for the PR status
+// workspace is named after it (pr-<n>-<title>; gh failing: pr-<n>) and linked to it (prUrl), its primary PR. Not a
+// session another workspace's agent started (from: its prompt's PRs are what it came from, only related), unless it
+// asks for one (link: laki new --link, MCP's link)
 async function fromPRLink(proj: Project, o: NewWs): Promise<NewWs> {
-  const url = o.pr?.trim() || o.linked || o.issued ? undefined : prIn(o.prompt) // an issue's: its text may name any PR
+  const asked = o.link?.trim()
+  const url = o.pr?.trim() || o.linked ? undefined : asked || (o.from || o.issued ? undefined : prIn(o.prompt)) // an issue's: its text may name any PR
   if (!url) return o
-  const pr = await prHead(proj, url).catch(() => undefined)
+  const pr = await prHead(proj, url).catch(e => (asked ? Promise.reject(e) : undefined)) // asked for: gh's reason
   const n = pr?.number ?? Number(url.split('/').pop())
-  return { ...o, linked: pr?.url ?? url, name: o.name || (pr ? `pr-${n}-${slug(pr.title).slice(0, 24)}`.replace(/-+$/, '') : `pr-${n}`) }
+  return { ...o, linked: pr?.url ?? url, guessed: !asked, name: o.name || (pr ? `pr-${n}-${slug(pr.title).slice(0, 24)}`.replace(/-+$/, '') : `pr-${n}`) }
 }
 
 // a race: one prompt to several agents, each in a worktree of its own (named <name>-<preset>), one after another (git
@@ -1497,7 +1504,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   const own = () => (o.local || proj.git === false ? state.workspaces.find(w => w.project === proj.id && w.kind === 'local' && !w.schedule) : undefined)
   // an agent or a prompt asked for there: another local workspace beside it, with that agent (a folder has its own
   // from the start, a shell: the new-workspace page's Create would give that back with no agent started)
-  if (own() && !o.another && (o.prompt?.trim() || (o.preset && o.preset !== 'none'))) {
+  if (own() && !o.another && (o.prompt?.trim() || o.link?.trim() || (o.preset && o.preset !== 'none'))) {
     o = { ...o, another: true, name: o.name || (o.prompt ?? '').split(/\s+/).slice(0, 4).join(' ') }
     step(`${own()!.id} is the folder's own workspace: another one beside it`)
   }
@@ -1553,13 +1560,16 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   if (proj.host) await readHostCfgs(ws) // its setup, env and ports
   if (o.race) ws.race = o.race
   if (o.issued) ws.issue = o.issued
-  if (o.linked && !ws.prUrl) Object.assign(ws, { prUrl: o.linked, prLinked: true })
+  if (o.linked && !ws.prUrl) Object.assign(ws, { prUrl: o.linked, prLinked: true, ...(o.guessed && { prSaid: true }) })
+  if (o.from && state.workspaces.some(w => w.id === o.from)) ws.from = o.from
+  if (!o.issued) for (const u of refsIn(o.prompt)) relate(ws, u) // the other PRs and issues it names (not an issue's text: any)
   if (o.browser !== undefined && proj.kind === 'browsers' && URL_OK.test(o.browser)) ws.browser = o.browser
   // a local one's id names nothing on disk: one taken meanwhile (another wsNew between uniqueWsId and here) gets a tail
   for (const base = ws.id; ws.kind === 'local' && state.workspaces.some(w => w.id === ws.id); ) ws.id = `${base}-${tail()}`
   state.workspaces.push(ws)
   placeWs(ws, o.place)
   save()
+  if (ws.prUrl) void scanPRs() // its PR's status now, not at the minute's scan
   forward(ws)
   const cfg = projectConfig(ws)
   step(`${ws.id}: ${ws.kind} at ${ws.path}${ws.branch ? `, branch ${ws.branch}` : ''}, port ${ws.port}`)
@@ -2105,10 +2115,29 @@ function syncBranches() {
 }
 function moveBranch(w: Workspace, b: string) {
   w.branch = b
-  w.prUrl = w.prLinked = w.prSaid = undefined // nor the PR it started from, or its agent named
   saidTried.delete(w.id) // a PR named again is tried again
-  prs.delete(w.id) // the old branch's PR isn't this one's
+  // a PR only linked (not its branch's: a prompt's, attached, its agent named) stays: a review that checks it out (gh pr
+  // checkout) is still about it, and its branch's own PR, once pushed, replaces a guessed one (scanPR). The old
+  // branch's isn't this one's
+  if (w.prLinked) return
+  w.prUrl = w.prSaid = undefined
+  prs.delete(w.id)
 }
+
+// related: the GitHub PRs and issues a workspace is about besides its primary PR, each once (any case), the newest
+// last, RELATED_MAX at most
+const RELATED_MAX = 20
+const sameRef = (a?: string, b?: string) => !!a && !!b && a.toLowerCase() === b.toLowerCase()
+function relate(w: Workspace, url?: string) {
+  if (!url || sameRef(url, w.prUrl)) return
+  w.related = [...(w.related ?? []).filter(u => !sameRef(u, url)), url].slice(-RELATED_MAX)
+}
+function unrelate(w: Workspace, url: string) {
+  const left = w.related?.filter(u => !sameRef(u, url))
+  w.related = left?.length ? left : undefined
+}
+// its branch is on a remote (pushed, or gh pr checkout's): a local look before asking GitHub for the branch's PR
+const onRemote = (w: Workspace) => git(w, 'for-each-ref', '--count=1', '--format=%(refname)', `refs/remotes/*/${w.branch}`).then(Boolean, () => false)
 
 // a host's worktree at each PR scan: its branch (git there; syncBranches reads a HEAD file here) and its .laki.json.
 // ponytail: a minute behind, not 5 s; a host's local workspace never moves
@@ -2565,7 +2594,10 @@ export async function prAttach(o: { ws: string; pr: string }, said = false) {
   if (!o.pr?.trim()) throw new Error('a PR: its URL or number')
   const pr = await prHead(proj, o.pr.trim())
   const head = pr.isCrossRepository && pr.headRepositoryOwner?.login ? `${pr.headRepositoryOwner.login}/${pr.headRefName}` : pr.headRefName
+  const was = w.prUrl ?? prs.get(w.id)?.url // the one before (its branch's, by the scan), still about it
   w.prUrl = pr.url
+  relate(w, was)
+  unrelate(w, pr.url)
   w.prLinked = head === w.branch ? undefined : true
   w.prSaid = said || undefined // yours stays; one its agent named gives way to its branch's
   prs.delete(w.id)
@@ -2576,6 +2608,22 @@ export async function prAttach(o: { ws: string; pr: string }, said = false) {
   return { number: pr.number, url: pr.url, linked: !!w.prLinked }
 }
 
+// its primary PR isn't its own (a prompt's that was only where it came from, an old guess): to related, and its
+// branch's PR, if any, is the one followed. Its branch's own (not linked) stays: the scan would find it again
+export function prDetach(o: { ws: string }) {
+  const w = findWs(o.ws)
+  if (!w.prUrl || !w.prLinked) throw new Error(w.prUrl || prs.get(w.id) ? `its PR is its branch's: it stays` : `${w.id} has no PR`)
+  const was = w.prUrl
+  w.prUrl = w.prLinked = w.prSaid = undefined
+  relate(w, was)
+  prs.delete(w.id)
+  wsLog(w, `PR: ${was} only related now`)
+  save()
+  changed()
+  void scanPRs()
+  return w
+}
+
 // a workspace with no PR on its branch (a worktree's scan found none; a scheduled run's local one at its agent's turn
 // end): the PR its
 // agent names in a last answer ("Opened a draft PR: https://github.com/o/r/pull/12"), as an agent that pushed under
@@ -2584,9 +2632,9 @@ export async function prAttach(o: { ws: string; pr: string }, said = false) {
 // (two: which?), each tried once per workspace (saidTried)
 async function prFromSaid(ws: Workspace) {
   if (ws.prUrl || ws.archived || state.projects.find(p => p.id === ws.project)?.git === false) return
-  const urls = new Set(tabsOf(ws.id).flatMap(t => (rtOf(t.id).last ?? '').match(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/g)?.map(u => u.toLowerCase()) ?? [])) // GitHub's names any case
+  const urls = new Set(tabsOf(ws.id).flatMap(t => refsIn(rtOf(t.id).last).filter(u => u.includes('/pull/')).map(u => u.toLowerCase()))) // GitHub's names any case
   const [url] = urls
-  if (urls.size !== 1 || saidTried.get(ws.id) === url) return
+  if (urls.size !== 1 || saidTried.get(ws.id) === url || ws.related?.some(u => sameRef(u, url))) return // related: you moved it off, or it was
   saidTried.set(ws.id, url)
   const repo = url.split('/').slice(3, 5).join('/').toLowerCase()
   const remotes = (await git(ws, 'remote', '-v').catch(() => '')).toLowerCase() // origin\tgit@github.com:o/r.git (fetch)
@@ -2662,13 +2710,16 @@ export async function prList(o: { project: string; who?: 'mine' | 'others' | 'al
 
 async function scanPR(ws: Workspace) {
   if (ws.host) await hostSync(ws)
-  // linked to a PR its agent named (prFromSaid): one on its own branch, once there, wins (a local one's by its URL:
-  // scans skip a local workspace without one)
-  const own = ws.prLinked && ws.prUrl && ws.prSaid ? await exec(ws, 'gh', ['pr', 'view', ws.branch, '--json', 'url'], { timeout: 20000 }).then(r => String(JSON.parse(r.stdout).url || '')).catch(() => '') : ''
+  // a worktree's primary PR guessed (prSaid: its prompt or its agent named it; not one you attached or asked for) gives
+  // way to its branch's own, once the branch is pushed (a session that opens its own PR: that's the one to follow), and
+  // goes to related. Not a local one's: the folder's branch isn't its own
+  const own = ws.kind === 'worktree' && ws.prSaid && ws.prUrl && (await onRemote(ws)) ? await exec(ws, 'gh', ['pr', 'view', ws.branch, '--json', 'url'], { timeout: 20000 }).then(r => String(JSON.parse(r.stdout).url || '')).catch(() => '') : ''
   if (own) {
-    wsLog(ws, `PR: ${own} on ${ws.branch} now, not ${ws.prUrl} its agent named`)
-    ws.prUrl = ws.kind === 'worktree' ? undefined : own
-    ws.prLinked = ws.prSaid = undefined
+    const was = ws.prUrl!
+    wsLog(ws, `PR: ${own} on ${ws.branch} now${sameRef(own, was) ? '' : `, ${was} only related`}`)
+    ws.prUrl = ws.prLinked = ws.prSaid = undefined // its branch's, scanned by the branch
+    relate(ws, was)
+    unrelate(ws, own)
     save()
   }
   let pr: PR

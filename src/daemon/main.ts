@@ -18,6 +18,9 @@ import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planU
 import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 
 const { dir } = core
+// a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
+delete process.env.LAKI_WORKSPACE
+delete process.env.LAKI_TAB
 mkdirSync(dir, { recursive: true, mode: 0o700 })
 chmodSync(dir, 0o700) // state, queued messages and agents' answers live here
 
@@ -144,7 +147,8 @@ const api: Record<string, Handler> = {
   prFix: p => core.prFix(p),
   logs: p => core.logs(p), // development mode's: ws:<id> or widget:<id>
   progress: p => core.progress(p),
-  prAttach: p => core.prAttach(p), // the app's Attach PR: { ws, pr: a URL or number }
+  prAttach: p => core.prAttach(p), // the app's Attach PR, related's Make primary: { ws, pr: a URL or number }
+  prDetach: p => core.prDetach(p), // { ws }: its linked PR to related (not its own)
   phoneTick: () => core.phoneTick(), // answers from the phone now (tests: not every 5 s)
   prList: p => core.prList(p), // Laki AI's laki_prs: a project's open PRs
   prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice

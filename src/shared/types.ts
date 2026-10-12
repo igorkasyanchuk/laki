@@ -88,9 +88,11 @@ export type Workspace = {
   fix?: PRFix // what autoFix/autoReview/autoMerge/autoLand did already
   race?: string // one prompt fanned out to several agents: the workspaces of one race share it (Compare)
   issue?: { number: number; url: string; title: string } // the GitHub issue it was started from (laki new --issue)
-  prUrl?: string // the GitHub PR it was started from (laki new --pr, or a prompt naming one): its PR by URL (a fork's, another repo's), until the branch moves
-  prLinked?: boolean // prUrl from a prompt: the PR isn't checked out here, so the auto switches (fix and push) stay off
-  prSaid?: boolean // prUrl a PR its agent named (prFromSaid): one on its own branch, once there, replaces it
+  prUrl?: string // its primary PR, by URL (a fork's, another repo's): laki new --pr's, a prompt's, one attached or its agent named; else its branch's
+  prLinked?: boolean // prUrl isn't its branch's (a prompt's, one attached): no auto switches (fix and push)
+  prSaid?: boolean // prUrl a guess, a PR its prompt or its agent (prFromSaid) named, not one attached or asked for (--link): a worktree's branch's own PR, once pushed, replaces it
+  related?: string[] // GitHub PRs and issues it's about, not its primary: its prompt's (a session an agent started), a primary its own PR replaced, one you moved off
+  from?: string // the workspace whose agent started it (laki new ., /laki:new, MCP): its prompt's PRs are only related
   autoArchived?: number // the merged PR it was archived for (settings.archiveMerged): once, so an Undo stays
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
   browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
@@ -115,6 +117,12 @@ export const PR_PROMPTS: Record<FixWhat, string> = {
 // the first GitHub PR a prompt names ("review https://github.com/o/r/pull/12"): the new workspace is named after it
 // and linked to it
 export const prIn = (text = '') => /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/.exec(text)?.[0]
+// every GitHub PR and issue a text names, each once (any case: GitHub's names are), as first written: a workspace's related
+export const refsIn = (text = '') => {
+  const seen = new Map<string, string>()
+  for (const [u] of text.matchAll(/https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/(?:pull|issues)\/\d+/g)) if (!seen.has(u.toLowerCase())) seen.set(u.toLowerCase(), u)
+  return [...seen.values()]
+}
 
 // {{name}} (spaces inside allowed) as vars say; an unknown one stays as it is (not {{constructor}}): prompt templates', PR_PROMPTS'.
 // The template's dates ({{DD-MM-YY HH:MM}}, when.ts' stamp) are now's; what vars bring in (a typed prompt) isn't stamped
@@ -443,4 +451,4 @@ export type PlanTemplate = { name: string; kind: PlanKind; text: string }
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 51
+export const API = 52

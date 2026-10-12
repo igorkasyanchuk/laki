@@ -8,6 +8,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
             [--model opus|sonnet|…] [--effort low|medium|high|xhigh|max (claude), minimal…xhigh (codex)]
             [--issue <url|number>]  a GitHub issue's title and text as the prompt (and the name)
             [--pr <url|number>]     a GitHub PR's branch (gh pr checkout, forks too), named pr-<n>-<title>
+            [--link <url|number>]   the PR it's about (a review), not checked out: its PR, named after it; in a
+                                    tab, a PR the prompt names is only related (its own PR is its PR)
             [--fan claude,codex]    a race: the same prompt to each, a worktree each (Compare in the app)
   laki rm <ws> | archive <ws> | restore <ws> | fork <ws>
   laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)

@@ -59,6 +59,7 @@ export function Term({
   const [closedAt, setClosedAt] = useState(findSeq) // ⌘F presses (findSeq) after this open the find bar
   const find = findSeq !== closedAt
   useEffect(() => {
+    let over = false // the pointer is on a link
     const term = new Terminal({
       fontFamily: fontStack(fontFamily),
       fontSize,
@@ -69,20 +70,33 @@ export function Term({
       macOptionIsMeta: true,
       theme: termTheme(),
       // OSC 8 links: a web one (claude's PR links) opened at once, as plain URLs are (xterm's own asks first; main opens
-      // http(s) only); a file:// one (claude's paths) on ⌘-click, as a terminal's, so a click to select or focus opens nothing
+      // http(s) only); a file:// one (claude's paths) on ⌘-click, as a terminal's, so a click to select or focus opens nothing.
+      // An app that has the mouse (codex) gets a plain click and opens its links itself: ours only on ⌘ then (`ours`)
       linkHandler: {
         allowNonHttpProtocols: true,
-        activate: (e, uri) => (/^https?:/i.test(uri) ? openExternal(uri) : filePath(uri) && (e.metaKey || e.ctrlKey) && file.current?.(filePath(uri))),
-        hover: (_e, uri) => box.current && filePath(uri) && (box.current.title = '⌘-click to open'),
-        leave: () => box.current && (box.current.title = ''),
+        activate: (e, uri) => (/^https?:/i.test(uri) ? ours(e) && openExternal(uri) : filePath(uri) && (e.metaKey || (e.ctrlKey && !tracked())) && file.current?.(filePath(uri))),
+        hover: (_e, uri) => ((over = true), box.current && filePath(uri) && (box.current.title = '⌘-click to open')),
+        leave: () => ((over = false), box.current && (box.current.title = '')),
       },
     })
     const fit = new FitAddon()
     term.loadAddon(fit)
-    term.loadAddon(new WebLinksAddon((_e, uri) => openExternal(uri)))
+    term.loadAddon(new WebLinksAddon((e, uri) => ours(e) && openExternal(uri), { hover: () => (over = true), leave: () => (over = false) }))
     const search = new SearchAddon()
     term.loadAddon(search)
     term.open(box.current!)
+    // ⌘-click on a link with the mouse captured: the link's ours, and the app never hears of it (it would open it too: two
+    // tabs). xterm's link handler is on .xterm-screen, its mouse report on .xterm above it: stop the press in between. In
+    // a browser elsewhere (a phone) a tap is ours too: the app's would open on the Mac
+    const tracked = () => term.modes.mouseTrackingMode !== 'none'
+    const ours = (e: MouseEvent) => e.metaKey || !tracked() || !bridge
+    term.element?.querySelector('.xterm-screen')?.addEventListener('mousedown', e => {
+      const m = e as MouseEvent
+      if (!m.metaKey || m.button !== 0 || !over || !tracked()) return
+      e.stopPropagation()
+      e.preventDefault()
+      term.focus()
+    })
     try {
       const gl = new WebglAddon()
       gl.onContextLoss(() => gl.dispose())

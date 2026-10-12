@@ -289,11 +289,20 @@ test('/laki:new: claude tabs get Laki’s plugin (its new command); laki new . i
   assert.notEqual(here.code, 0)
   assert.match(here.err, /only in a Laki tab/)
   rig.env.LAKI_WORKSPACE = ws.id
+  rig.env.LAKI_TAB = (await rig.rpc('state')).tabs.find((x: { workspace: string }) => x.workspace === ws.id).id // its claude tab
   const made = await rig.cli('new', '.', '--preset', 'codex', '--prompt', 'add the export button')
+  const shell = await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })
+  rig.env.LAKI_TAB = shell.id // you, in a shell tab: yours, from no workspace
+  const mine = await rig.cli('new', '.', '--preset', 'none', '--name', 'mine', '--prompt', 'review https://github.com/o/r/pull/3')
   delete rig.env.LAKI_WORKSPACE
+  delete rig.env.LAKI_TAB
   assert.equal(made.code, 0, made.err)
+  assert.equal(mine.code, 0, mine.err)
   const v = await rig.rpc('state')
   const w = v.workspaces.find((x: { id: string }) => x.id === 'add-the-export-button')
+  assert.equal(w.from, ws.id) // its agent started it
+  const m = v.workspaces.find((x: { id: string }) => x.id === 'mine')
+  assert.deepEqual([m.from, m.prUrl], [undefined, 'https://github.com/o/r/pull/3'])
   assert.deepEqual([w?.project, w?.kind], [p.id, 'worktree'])
   assert.equal(v.tabs.find((x: { workspace: string }) => x.workspace === w.id)?.preset, 'codex')
 })

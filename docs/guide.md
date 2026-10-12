@@ -29,8 +29,11 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Issues and PRs**: `laki new <project> --issue <url>` starts a workspace on a GitHub issue (its title and text as
   the prompt); `--pr <url>` on a PR's branch, a fork's too. A prompt
   that names a PR (`review https://github.com/o/r/pull/12`) names the workspace after it (`pr-12-<title>`) and links
-  it to that PR: its status and checks, without checking it out (so no fix/review switches: the agent couldn't push
-  to it; `--pr` gives those).
+  it to that PR: its status, author and checks from the start, without checking it out (so no fix/review switches:
+  the agent couldn't push to it; `--pr` gives those). The link stays when the agent checks the PR out to review it.
+  That's the workspace's **PR**, until its own branch has one: once the agent pushes and opens a PR, that one is its
+  PR and the other moves to *related* (a PR you attached or picked stays). A session an agent starts from another one (`/laki:new`) only lists the PRs its
+  prompt names as related, so the PR it opens is its PR (`--link <url>`: the PR it's about, as for a review).
 - **Terminals**: real PTYs in tmux-style tabs and panes (drag to split), kept by a daemon while the app is
   closed. ⌘F finds with every match in yellow; copy on select; drop files on one to type their paths; font,
   size, line height, weight, cursor and zoom, with a live preview.
@@ -289,10 +292,10 @@ selected workspace's PR is in the status bar.
   *Last active first* (its agents' latest turn) or *By name*; a group's own sort wins over the project's (*Like the
   project* gives it back), and a drag still moves a workspace into a group. A workspace's menu › *Move to group ›*: one of the project's groups (first in it), or *Out of its group*. A click folds it: they hide, the selected one too (the
   busiest one's mark stays on it), until another click. Drop a workspace on a group's head to put it first in
-  that group (a folded one opens). Drag the head like a workspace; double click to rename; right click (or its ⋯)
+  that group (a folded one opens). Drag the head like a workspace; double click to rename; its + (on hover, beside ⋯) is *New workspace here…*; right click (or its ⋯)
   for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
   put it first in this group), *Rename or set its template…* (a default prompt template: *New workspace here…* starts
-  with it rather than the last one used) and *Remove group* (its workspaces stay).
+  with it; a group without one starts with no template, never the last one used) and *Remove group* (its workspaces stay).
 - A workspace with someone else's PR shows its author's GitHub picture before the PR mark.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
@@ -344,7 +347,8 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 
     the focused tab if it's that agent, else its first tab, now or (while it works) when its turn ends.
   - *Terminal actions*: a command, typed into the focused shell, else the workspace's first, else a new one.
 
-**Status bar** (bottom): branch ← base, `$PORT` (green while something listens on it) and the other
+**Status bar** (bottom): the branch (short, without the branch prefix; hover for all of it and its base, click to
+show it whole: Laki remembers), `$PORT` (green while something listens on it) and the other
 listening ports (click one to open it in the browser; a name from `.laki.json`'s `ports` beside it; ✕ stops what
 listens there, after you confirm: SIGTERM, then SIGKILL 3 seconds later if it's still there; only your own processes
 of that workspace), the PR (click to open it), its CI (`✓ 4/4`,
@@ -526,10 +530,14 @@ before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 
 **Info panel** (ⓘ or ⌘I, open or closed per workspace; drag its left edge to make it wider, double-click it for the default): a card of the workspace's
 facts, a line each (rest on one for all of it; a copy button on hover): its id, branch, path, storage folder, `$PORT`
-(a click opens `localhost:<port>`), each public link (*public*: anyone with the link, *shared*: only some emails), when it was made; its PR's title, author, state,
+(a click opens `localhost:<port>`), each public link (*public*: anyone with the link, *shared*: only some emails), when it was made,
+*from* (the workspace whose agent started it) and *started* (the ones its agents started), a click opens one, and
+*related*: other PRs and issues it's about (the ones its prompt named, a PR its own replaced), each with *Make it this
+workspace's PR* and ✕ on hover; its PR's title, author, state,
 review decision, size, checks (each links to its run) and description, as in *Review*; the PR switches, with a note
 when *failing CI* or *conflicts* gave up (turn it off and on to try again), and *Send now* beside one when there's
-something to send to the agent now.
+something to send to the agent now. A PR only linked (another branch's) has *Not this workspace's PR* in its ⋯: it
+moves to *related*, and the branch's own PR, once there is one, shows instead.
 
 **PRs.** Laki finds the PR of each workspace's branch with `gh` (logged in) every minute (Settings › *Pull requests*:
 1 to 30 minutes), and a couple of seconds after an agent's turn ends (at most every 20 seconds), so a PR the agent just
@@ -821,7 +829,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | ⌘F | find in the terminal |
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
-| ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app or a script: shown in Finder) |
+| ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app or a script: shown in Finder). A web link opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |
@@ -1108,6 +1116,7 @@ laki new app --preset codex --base develop --name dark
 laki new app --model opus --effort high --prompt "…"   # the agent's model and effort
 laki new app --issue https://github.com/o/app/issues/12 # a GitHub issue as the prompt (gh)
 laki new app --pr 57 --prompt "address the review"     # a worktree on PR #57's branch (gh pr checkout, forks too)
+laki new app --link 57 --prompt "review it"            # about PR #57 without its branch: its status, checks and author
 laki new app --fan claude,codex --prompt "…"            # a race: a worktree each, Compare in the app
 laki new . --preset codex --prompt "…"                  # in a Laki tab: . is its own project (an agent's /laki:new)
 laki ls [--json]

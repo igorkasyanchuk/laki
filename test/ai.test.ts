@@ -288,6 +288,11 @@ test("ai: the skill's tools: templates and actions start workspaces, a shell get
   assert.deepEqual(st.projects.find((x: any) => x.id === p.id).groups, ['Reviews', 'Features'])
   assert.equal(st.workspaces.find((x: any) => x.id === g.id).group, 'Reviews')
   assert.equal(st.workspaces.find((x: any) => x.id === w.id).group, undefined)
+  // an agent's laki mcp (its $LAKI_WORKSPACE): what it starts came from there, the prompt's PRs only related
+  const spun: any = await tools(rig.rpc, g.id).find(x => x.name === 'laki_new_workspace')!.run({ project: p.id, prompt: 'fix what https://github.com/o/r/pull/7 broke', name: 'fx' })
+  assert.deepEqual([spun.from, spun.prUrl, spun.related], [g.id, undefined, ['https://github.com/o/r/pull/7']])
+  const st2 = await tool('laki_state')({})
+  assert.deepEqual([st2.workspaces.find((x: any) => x.id === spun.id).from, st2.workspaces.find((x: any) => x.id === spun.id).related], [g.id, ['https://github.com/o/r/pull/7']])
 
   // a shell action runs in a new shell tab; an agent's goes to the agent there
   const tabs0 = (await rig.rpc('state')).tabs.length

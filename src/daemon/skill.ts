@@ -108,7 +108,9 @@ names one (\`Spec: <path>/README.md\`) means: read it and the files beside it fi
 When the user writes \`/laki:new <task>\` (or \`laki:new\`), or asks for a new session for a task "with codex" or
 "with claude": \`laki new . --preset <the agent named; none: claude> --prompt "<the task>"\`. The \`.\` is this
 tab's project; the prompt is the task for an agent that hasn't seen this conversation (what to do, the files and
-facts that matter, how to tell it's done). Don't do the task here; say the workspace id it printed. In Laki's
+facts that matter, how to tell it's done). PRs and issues it names are only the new workspace's related links (its
+own PR, once opened, is its PR); \`--link <url>\` when it's about that PR without changing it (a review). Don't do the
+task here; say the workspace id it printed. In Laki's
 Claude Code tabs, \`/laki:new\` is a command of its own.
 
 A project can be on an SSH host (\`laki project add devbox:~/code/app\`; \`laki ls\` shows \`host:path\`): its
@@ -119,6 +121,9 @@ from the disk here. Its agents run there and have no \`laki\`.
   \`--prompt\` adds to it).
 - On a GitHub PR: \`laki new <project> --pr <url|number> --prompt "…"\` (a worktree on the PR's branch, a fork's
   too, named after it).
+- About a GitHub PR without its branch (a review, an investigation): \`laki new <project> --link <url|number> --prompt
+  "…"\` (its status, checks and author show on the workspace). From an agent's tab, a PR the prompt only names is a
+  related link, not the workspace's PR.
 - Two agents on the same task, to keep the better result: \`laki new <project> --fan claude,codex --prompt "…"\`
   (the user compares them in the app).
 

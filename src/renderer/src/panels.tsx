@@ -447,11 +447,14 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     if (notesOf(more).length) setP(x => ({ ...x, prompt: [x.prompt, ...notesOf(more)].filter(Boolean).join('\n\n') }))
   }, [shots])
   const [saving, setSaving] = useState(false) // an image isn't saved yet
-  // a prompt template's name ('' none): another project's of the same name too; opened from a group, its default first
+  // a prompt template's name ('' none): another project's of the same name too. Opened from a group: its own, else
+  // none (a draft from that group: its pick), never the last one used elsewhere
   const [tplName, setTplName] = useState(() => {
     const pr = view.projects.find(x => x.id === project)
-    const t = pr?.seps?.find(s => s.id === initial?.place)?.template
-    return (t && templatesFor(view.settings.templates, pr?.config?.templates).some(x => x.name === t) ? t : draft ? draft.tpl : last.tpl) || ''
+    const sep = pr?.seps?.find(s => s.id === initial?.place)
+    const t = sep?.template
+    if (t && templatesFor(view.settings.templates, pr?.config?.templates).some(x => x.name === t)) return t
+    return (sep ? (draft?.p.place === sep.id ? draft.tpl : '') : draft ? draft.tpl : last.tpl) || ''
   })
   const [adv, setAdv] = useState(false) // More: shut as it opens, a race and a typed model in it
   const set = (k: Partial<NewWsParams>) => setP(x => ({ ...x, ...k }))

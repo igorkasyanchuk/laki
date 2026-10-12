@@ -104,10 +104,10 @@ textarea { resize: vertical; font-family: inherit; }
 .rail-count { position: absolute; top: -4px; right: -6px; min-width: 17px; height: 17px; padding: 0 4px; box-sizing: border-box; border-radius: 9px; border: 2px solid var(--rail-bg); background: var(--waiting); color: var(--on-waiting); font-size: 10px; font-weight: 700; line-height: 13px; text-align: center; }
 .rail-dot { position: absolute; top: 2px; right: 2px; width: 7px; height: 7px; border-radius: 50%; background: var(--running); }
 .rail-dot.bad { background: var(--error); }
-/* the rail's quick access: a line, then the pinned workspaces (initials in their color), terminals and browsers */
+/* the rail's quick access: a line, then the pinned workspaces (initials in their color), terminals and browsers, bare as
+   the buttons above */
 .rail-sep { flex: none; width: 32px; height: 1px; margin: 6px 0; background: color-mix(in srgb, var(--fg) 22%, transparent); }
 .rail-mark { font: 700 12px/1 var(--ui-font); letter-spacing: 0.02em; }
-.rail-pin .rail-icon { box-shadow: inset 0 0 0 1.5px color-mix(in srgb, var(--tab-c, var(--muted)) 55%, transparent); }
 .rail-pin .rail-icon:has(.rail-mark) { color: var(--tab-c, inherit); }
 .rail-pin .rail-label { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500; }
 /* the sidebar's filter, under its head */
@@ -376,6 +376,10 @@ textarea { resize: vertical; font-family: inherit; }
 .status button { min-height: 20px; }
 .status :is(.usage-btn, .tunnel-btn, .port-stop) { min-width: 20px; justify-content: center; }
 .status .pr.pr-attach { color: var(--muted); }
+/* the branch: its name cut short, all of it (and its base) on a click */
+.status .sb-branch { display: inline-block; flex: none; max-width: 24ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; line-height: 20px; padding: 0; border: none; background: none; color: inherit; }
+.status .sb-branch.full { max-width: none; flex: 0 1 auto; min-width: 12ch; }
+.status .sb-branch:hover { color: var(--fg); background: none; }
 .status .pr.pr-attach:hover { color: var(--accent-ink); }
 .warn-soft { color: var(--waiting); }
 .mono { font-family: var(--mono); font-size: 12px; }
