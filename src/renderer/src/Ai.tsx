@@ -53,6 +53,7 @@ export function AiPage({
   onSettings,
   onLater,
   compact,
+  context,
 }: {
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
@@ -60,6 +61,7 @@ export function AiPage({
   onSettings?: () => void
   onLater?: (text: string) => void // Send later's dialog for Laki AI, with what's typed (the app's; not the AI window's)
   compact?: boolean // the bubbles' AI window: the chat alone under a head of its own (no Calls, Info or cost)
+  context?: () => Promise<string> // where the user is as they ask (the floating chat's): for the model, not the conversation
 }) {
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
@@ -68,6 +70,9 @@ export function AiPage({
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const end = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null) // compact: the panel
+  const closeRef = useRef(onClose) // the app's is a new function each render: the Esc listener stays put
+  closeRef.current = onClose
   // the answers' links: made again only as the workspaces' names change (the app's view comes every few ms meanwhile)
   const names = workspaces.map(w => `${w.id}\n${w.name}`).join('\n')
   const link = useMemo(() => linkWorkspaces(workspaces), [names])
@@ -92,11 +97,14 @@ export function AiPage({
     setText('')
     setImages([])
     // refused before it asked: said here, and back in the box; an ask that failed says so in the conversation
-    api
-      .call('aiAsk', {
-        text: sent.text,
-        images: sent.images.map(i => i.path),
-      })
+    ;(context ? context().catch(() => '') : Promise.resolve(''))
+      .then(where =>
+        api.call('aiAsk', {
+          text: sent.text,
+          images: sent.images.map(i => i.path),
+          ...(where && { context: where }),
+        }),
+      )
       .catch(e => {
         if (!/^(Laki AI is off|Laki AI is busy|ask something|the AI is still|no OpenRouter API key|not connected)/.test(e.message)) return
         setErr(e.message)
@@ -133,12 +141,13 @@ export function AiPage({
   ) : null
 
   const newChat = () => api.call('aiNew').then(load, e => setErr(e.message))
+  const groups = d ? turns(d.chat) : []
   const chat = (
           <>
             <div className="ai-thread" aria-live="polite">
               <div className="ai-col">
                 {note && <div className="ai-note">{note}</div>}
-                {!d?.chat.length ? (
+                {!groups.length ? (
                   <div className="ai-hello">
                     <span className="ai-mark">
                       <Icon name="ai" size={22} />
@@ -149,12 +158,13 @@ export function AiPage({
                       {EXAMPLES.map(x => (
                         <button key={x} onClick={() => (setText(x), document.querySelector<HTMLTextAreaElement>('.ai-composer textarea')?.focus())}>
                           {x}
+                          <Icon name="arrowRight" size={12} />
                         </button>
                       ))}
                     </div>
                   </div>
                 ) : (
-                  turns(d.chat).map((g, i) => (Array.isArray(g) ? <Tools key={i} list={g} /> : <Message key={i} m={g} link={link} busy={!!d.busy || !ready || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
+                  groups.map((g, i) => (Array.isArray(g) ? <Tools key={i} list={g} live={!!d?.busy && i === groups.length - 1} /> : <Message key={i} m={g} link={link} busy={!!d?.busy || !ready || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
                 )}
                 {d?.busy && (
                   <div className="ai-working">
@@ -163,8 +173,10 @@ export function AiPage({
                       <i />
                       <i />
                     </span>
-                    Working…
-                    <button onClick={() => api.call('aiStop', { chat: '' })}>Stop</button>
+                    <span className="ai-shimmer">Working…</span>
+                    <button className="ai-stop" onClick={() => api.call('aiStop', { chat: '' }).catch(e => setErr(e.message))}>
+                      <Icon name="stop" size={10} /> Stop
+                    </button>
                   </div>
                 )}
                 <div ref={end} />
@@ -212,18 +224,23 @@ export function AiPage({
   )
   useEffect(() => {
     if (!compact) return
-    const f = (e: KeyboardEvent) => escapes(e) && onClose()
+    // Esc in it, or with nothing focused and no page or dialog to close: the main window's floating chat stays while
+    // Esc goes to a terminal, a page or a dialog
+    const f = (e: KeyboardEvent) => escapes(e) && (!box.current || box.current.contains(document.activeElement) || (document.activeElement === document.body && !document.querySelector('.settings-page, .overlay'))) && closeRef.current()
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
-  }, [compact, onClose])
+  }, [compact])
   if (compact)
     return (
-      <div className="ai-window" role="dialog" aria-label="Laki AI">
+      <div className={`ai-window ${d?.busy ? 'busy' : ''}`} role="dialog" aria-label="Laki AI" ref={box}>
         <div className="ai-win-head drag">
-          <span className="ai-mark small">
-            <Icon name="ai" size={13} />
+          <span className="ai-mark">
+            <Icon name="ai" size={14} />
           </span>
-          <b>Laki AI</b>
+          <span className="ai-title">
+            <b>Laki AI</b>
+            <span className="ai-sub">{d?.busy ? 'Working…' : ready ? runs : 'not set up'}</span>
+          </span>
           <span className="grow" />
           <button className="ai-new nodrag" disabled={!d?.chat.length || d.busy} data-tip="Start a new conversation" onClick={newChat}>
             <Icon name="plus" size={12} /> New chat
@@ -356,14 +373,18 @@ const toolName = (m: AiMsg) =>
     .replace(/^laki_/, '')
     .replace(/_/g, ' ')
 
-// a turn's tools, folded: their names in a line; open, each with what it was given
-export function Tools({ list }: { list: AiMsg[] }) {
+// a turn's tools, folded: their names in a line; open, each with what it was given. live: the turn is still at
+// work (a spinner: only calls are kept, so which one runs, if any, isn't known)
+export function Tools({ list, live }: { list: AiMsg[]; live?: boolean }) {
   const names = [...new Set(list.map(toolName))]
   return (
-    <details className="ai-tools">
+    <details className={`ai-tools ${live ? 'live' : ''}`}>
       <summary>
-        <Icon name="run" size={10} /> {list.length === 1 ? 'Used' : `Used ${list.length} tools:`} {names.slice(0, 4).join(', ')}
-        {names.length > 4 ? '…' : ''}
+        {live ? <span className="btn-spin" /> : <Icon name="gear" size={11} />}
+        <span>
+          {list.length === 1 ? `Used ${names[0]}` : `Used ${list.length} tools: ${names.slice(0, 4).join(', ')}${names.length > 4 ? '…' : ''}`}
+        </span>
+        <Icon name="chevronRight" size={10} />
       </summary>
       {list.map((m, i) => {
         const a = m.text.slice(m.text.indexOf(' ') + 1)

@@ -1210,7 +1210,8 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
 // preview each), a click shows it big, ← → (or the keys) go through the others. n: their count, a change reloads them
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
-export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void }
+// menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
+export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void }
 const host = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string } | { error: string }
@@ -1248,6 +1249,14 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   })
+  // a right click: a link's Open and Copy link, a file's the app's menu
+  const rightClick = (e: MouseEvent, f: Artifact) => {
+    const l = linkOf(f.path)
+    const items: MenuItem[] = l ? [{ label: 'Open in the browser', icon: 'globe', run: () => openExternal(l.url) }, ...(a.copy ? [{ label: 'Copy link', icon: 'copy', key: 'c', run: () => a.copy!(l.url) } as MenuItem] : [])] : (a.menu?.(f.path) ?? [])
+    if (!items.length) return
+    e.preventDefault()
+    openMenu(e, items)
+  }
   const look = (f: Artifact, full = false) => {
     const l = linkOf(f.path)
     if (l)
@@ -1297,6 +1306,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
             className={`art-card ${linkOf(f.path) ? 'link' : ''}`}
             data-tip={linkOf(f.path) ? `${linkOf(f.path)!.url} · open in the browser` : `${f.path} · ${sizeOf(f.size)} · ${new Date(f.at).toLocaleString()}`}
             onClick={() => (linkOf(f.path) ? openExternal(linkOf(f.path)!.url) : setBig(f.path))}
+            onContextMenu={e => rightClick(e, f)}
           >
             <span className="art-thumb">{look(f)}</span>
             <span className="art-name">{linkOf(f.path)?.title ?? f.path.split('/').pop()}</span>
@@ -1305,7 +1315,9 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
       </div>
       {at && files && (
         <Modal title={`${at.path} · ${i + 1} of ${files.length}`} onClose={() => setBig(null)} wide loose>
-          <div className="art-big">{look(at, true)}</div>
+          <div className="art-big" onContextMenu={e => rightClick(e, at)}>
+            {look(at, true)}
+          </div>
           <div className="buttons">
             <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
             {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}

@@ -1,10 +1,10 @@
 // Bird view (experimental, settings.birdView; the eye beside Help, ⌘K): every live session at once, grouped by
-// workspace, each a card with its screen as it is now (the daemon's `screen`, polled while the page is open). A click
-// opens that tab.
+// workspace (tiles in masonry columns), each a card with its screen as it is now (the daemon's `screen`, polled while
+// the page is open). A click opens that tab.
 import { useEffect, useState } from 'react'
-import type { TabView, View } from '../../shared/types'
+import { rowsOf, type TabView, type View } from '../../shared/types'
 import { Glyph, rollup } from './Glyph'
-import { Icon, Page } from './ui'
+import { colorVar, Icon, Page, TAB_COLORS } from './ui'
 
 export type BirdApi = {
   screen: (tab: string) => Promise<string>
@@ -29,6 +29,15 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
   const project = (id: string) => view.projects.find(p => p.id === id)?.name ?? ''
   const live = view.tabs.filter(t => t.status !== 'exited')
   const test = (s: Show, t: TabView) => (s === 'needs' ? api.needs(t) : s === 'working' ? t.status === 'running' : true) // a shell runs while a command does
+  // each tile tinted by its group: the workspace's own color, else its sidebar group's, else one per project
+  const tint = new Map<string, string>()
+  view.projects.forEach((p, i) => {
+    let sep: string | undefined
+    for (const x of rowsOf(p, view.workspaces)) {
+      if (!('path' in x)) sep = x.color
+      else tint.set(x.id, [x.color, sep, TAB_COLORS[(6 + i * 3) % TAB_COLORS.length] /* blue first: red reads as an error */].find(c => c && c !== 'none')!)
+    }
+  })
   const groups = view.projects
     .filter(p => !browsers.has(p.id))
     .flatMap(p => view.workspaces.filter(w => w.project === p.id && !w.archived)) // the sidebar's project order
@@ -84,33 +93,36 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
       }
     >
       {!shown.length && <p className="muted bird-none">{groups.length ? 'Nothing here right now.' : 'No live sessions.'}</p>}
-      {shown.map(({ w, tabs }) => (
-        <section key={w.id} className="bird-ws">
-          <h3>
-            <Glyph s={w.setup ? 'setup' : rollup(tabs)} />
-            <span className="bird-ws-name">{w.name || w.id}</span>
-            <span className="muted">{project(w.project)}</span>
-          </h3>
-          <div className="bird-cards">
-            {tabs.map(t => {
-              const needs = api.needs(t)
-              const text = (screens[t.id] ?? '').replace(/\s+$/, '')
-              return (
-                <button key={t.id} type="button" className={`bird-card${needs ? ' needs' : ''}${t.asleep ? ' asleep' : ''}`} onClick={() => api.open(w.id, t.id)} aria-label={`${t.name}, ${w.name || w.id}${needs ? ', needs you' : ''}`} data-tip={t.asleep ? 'Asleep: a click wakes it' : undefined}>
-                  <div className="bird-card-head">
-                    <Icon name={t.kind === 'agent' ? 'agent' : 'terminal'} size={14} />
-                    <span className="bird-card-name">{t.name}</span>
-                    <Glyph s={rollup([t])} /> {/* the sidebar's marks: waiting, done… (the card's border says it needs you) */}
-                  </div>
-                  <div className="bird-screen">
-                    <pre>{text.split('\n').slice(-LINES).join('\n')}</pre>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </section>
-      ))}
+      {/* masonry: each workspace a tile in columns, its cards stacked, a card as tall as its screen's text (up to a cap) */}
+      <div className="bird">
+        {shown.map(({ w, tabs }) => (
+          <section key={w.id} className="bird-ws" style={colorVar(tint.get(w.id))}>
+            <h3>
+              <Glyph s={w.setup ? 'setup' : rollup(tabs)} />
+              <span className="bird-ws-name">{w.name || w.id}</span>
+              <span className="muted">{project(w.project)}</span>
+            </h3>
+            <div className="bird-cards">
+              {tabs.map(t => {
+                const needs = api.needs(t)
+                const text = (screens[t.id] ?? '').replace(/\s+$/, '')
+                return (
+                  <button key={t.id} type="button" className={`bird-card${needs ? ' needs' : ''}${t.asleep ? ' asleep' : ''}`} onClick={() => api.open(w.id, t.id)} aria-label={`${t.name}, ${w.name || w.id}${needs ? ', needs you' : ''}`} data-tip={t.asleep ? 'Asleep: a click wakes it' : undefined}>
+                    <div className="bird-card-head">
+                      <Icon name={t.kind === 'agent' ? 'agent' : 'terminal'} size={14} />
+                      <span className="bird-card-name">{t.name}</span>
+                      <Glyph s={rollup([t])} /> {/* the sidebar's marks: waiting, done… (the card's border says it needs you) */}
+                    </div>
+                    <div className="bird-screen">
+                      <pre>{text.split('\n').slice(-LINES).join('\n')}</pre>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </section>
+        ))}
+      </div>
     </Page>
   )
 }

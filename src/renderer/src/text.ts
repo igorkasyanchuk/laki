@@ -157,7 +157,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {
@@ -224,4 +224,27 @@ export const browserUrl = (s: string) => {
   if (/^(localhost|\d{1,3}(\.\d{1,3}){3})(:\d+)?(\/\S*)?$/i.test(t)) return `http://${t}` // this Mac, or a device on the network (a router): plain http
   if (/^[\w-]+(\.[\w-]+)+(:\d+)?(\/\S*)?$/.test(t)) return `https://${t}`
   return `https://duckduckgo.com/?q=${encodeURIComponent(t)}`
+}
+
+// a diff's lines side by side, as GitHub's split view: a context line on both sides, a run of removed lines beside the
+// added lines right after it, pair by pair; anything else (a hunk's @@, "\ No newline") across both
+export type SplitRow<T> = { left?: T; right?: T; full?: T }
+export function splitRows<T extends { old?: number; new?: number }>(lines: T[]): SplitRow<T>[] {
+  const rows: SplitRow<T>[] = []
+  const del = (l?: T) => !!l && l.old !== undefined && l.new === undefined
+  const add = (l?: T) => !!l && l.new !== undefined && l.old === undefined
+  for (let i = 0; i < lines.length; ) {
+    const l = lines[i]
+    if (!del(l) && !add(l)) {
+      rows.push(l.old !== undefined ? { left: l, right: l } : { full: l })
+      i++
+      continue
+    }
+    const dels: T[] = []
+    const adds: T[] = []
+    while (del(lines[i])) dels.push(lines[i++])
+    while (add(lines[i])) adds.push(lines[i++])
+    for (let k = 0; k < Math.max(dels.length, adds.length); k++) rows.push({ left: dels[k], right: adds[k] })
+  }
+  return rows
 }

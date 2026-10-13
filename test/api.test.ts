@@ -596,6 +596,46 @@ test('answer a menu, unread, a race, an issue, the agent browser', async t => {
   await assert.rejects(rig.rpc('browse', { ws: ws.id, op: 'click', selector: '#nope' }), /no element matches #nope/)
 })
 
+test('the view goes out only when it changed: tool calls that keep a tab running send none', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
+  const tab = await rig.tab(ws.id)
+  const app = await connect(rig)
+  t.after(() => app.close())
+  await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: 'PreToolUse' } })
+  await until(() => app.events.some((m: any) => m.ev === 'state' && m.view.tabs.find((x: any) => x.id === tab.id)?.status === 'running' && m.view.workspaces[0].pr), 'running, its PR scanned')
+  await new Promise(r => setTimeout(r, 300)) // anything else under way goes out
+  app.events.splice(0)
+  for (const h of ['PostToolUse', 'PreToolUse', 'PostToolUse']) await rig.rpc('hook', { tab: tab.id, state: 'running', payload: { hook_event_name: h } })
+  await new Promise(r => setTimeout(r, 200))
+  assert.equal(app.events.filter((m: any) => m.ev === 'state').length, 0)
+  await rig.rpc('hook', { tab: tab.id, state: 'idle', payload: { last_assistant_message: 'done' } })
+  await until(() => app.events.some((m: any) => m.ev === 'state' && m.view.tabs.find((x: any) => x.id === tab.id)?.status === 'idle'), 'idle goes out')
+})
+
+test("Laki AI's timers: checked here, done by the app's window, its answer back", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await assert.rejects(rig.rpc('timer', { act: 'nap' }), /one of timer, remind/)
+  await assert.rejects(rig.rpc('timer', { act: 'timer' }), /for how long/)
+  await assert.rejects(rig.rpc('timer', { act: 'remind', minutes: 5, ws: 'nope' }), /nope/)
+  await assert.rejects(rig.rpc('timer', { act: 'send', minutes: 5, tab: 'nope', text: 'hi' }), /an agent tab's id/)
+  await assert.rejects(rig.rpc('timer', { act: 'timer', minutes: 5 }), /open the app/)
+  const app = await connect(rig)
+  t.after(() => app.close())
+  app.notify('view', { tab: null, tabs: [], focused: false, browse: true })
+  const got: any[] = []
+  const relay = setInterval(() => {
+    for (const m of app.events.splice(0)) if (m.ev === 'timer') (got.push(m), app.call('browseDone', m.act === 'stop' ? { id: m.req, ok: false, error: `no timer or stopwatch ${m.which}` } : { id: m.req, ok: true, result: { id: 'x1' } }))
+  }, 20)
+  t.after(() => clearInterval(relay))
+  await until(async () => (await rig.rpc('timer', { act: 'remind', minutes: 0.5, ws: ws.id, note: ' stand up ' }).catch(() => null))?.id === 'x1', 'the app answers')
+  assert.deepEqual([got.at(-1).act, got.at(-1).ms, got.at(-1).ws, got.at(-1).note], ['remind', 30000, ws.id, 'stand up'])
+  await assert.rejects(rig.rpc('timer', { act: 'stop', id: 'zz' }), /no timer or stopwatch zz/)
+})
+
 test('an image as it was where the changes start (Changes before and after), and as it is now', async t => {
   const rig = await fresh(t)
   const png = (n: number) => Buffer.from([0x89, 0x50, 0x4e, 0x47, n])

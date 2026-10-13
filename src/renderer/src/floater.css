@@ -1,21 +1,24 @@
 /* the floating bubbles' circles (floater.html), also Settings' previews of their styles: [data-fstyle] on a parent
    says how a working agent's circle looks (glow, the default; gradient; arc; bricks; comet; wave; still); a waiting one pulses in each */
 .fl-dot { --c: var(--running); position: relative; width: 28px; height: 28px; box-sizing: border-box; border-radius: 50%; border: 1.5px solid color-mix(in srgb, var(--c) 55%, transparent); display: grid; place-items: center; font: 600 10px/1 var(--font, var(--ui-font, system-ui)); letter-spacing: 0.02em; color: var(--ink, var(--fg)); background: color-mix(in srgb, var(--c) 12%, var(--bg)); }
-.fl-dot.waiting { --c: var(--waiting); border-color: var(--c); animation: fl-pulse 1.8s ease-in-out infinite; }
+/* every animation here moves or fades a layer (transform, opacity): the compositor's alone, no repaint per frame. The
+   bubbles are on screen while Laki is in the background, so they must cost next to nothing; a halo is a pseudo-element
+   with its shadow drawn once, fading in and out */
+.fl-dot.waiting { --c: var(--waiting); border-color: var(--c); }
+.fl-dot.waiting::after, [data-done='on'] .fl-dot.done::after, [data-fstyle='glow'] .fl-dot.running::after { content: ''; position: absolute; inset: -1.5px; border-radius: 50%; pointer-events: none; opacity: 0; box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); animation: fl-fade 1.8s ease-in-out infinite; }
 /* recent ones (Settings' Recent sessions too): idle or finished, dimmer and still */
 .fl-dot:is(.idle, .done) { --c: var(--idle, var(--muted)); opacity: 0.72; }
 .fl-dot.done { --c: var(--done); }
-@keyframes fl-pulse { 50% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--c) 30%, transparent); } }
+@keyframes fl-fade { 50% { opacity: 1; } }
 /* finished and not seen yet (Settings: Finished ones stand out): filled green, a slow pulse, until a click or a look in Laki */
-[data-done='on'] .fl-dot.done { opacity: 1; border-color: var(--c); color: #fff; background: color-mix(in srgb, var(--c) 78%, #000); text-shadow: 0 1px 1px rgb(0 0 0 / 0.35); animation: fl-done 2.6s ease-in-out infinite; }
-@keyframes fl-done { 50% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent), 0 0 12px 2px color-mix(in srgb, var(--c) 45%, transparent); } }
+[data-done='on'] .fl-dot.done { opacity: 1; border-color: var(--c); color: #fff; background: color-mix(in srgb, var(--c) 78%, #000); text-shadow: 0 1px 1px rgb(0 0 0 / 0.35); }
+[data-done='on'] .fl-dot.done::after { box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 35%, transparent), 0 0 12px 2px color-mix(in srgb, var(--c) 45%, transparent); animation-duration: 2.6s; }
 /* glow: a soft halo, breathing */
-[data-fstyle='glow'] .fl-dot.running { animation: fl-glow 2.8s ease-in-out infinite; }
-@keyframes fl-glow { 0%, 100% { box-shadow: 0 0 3px 0 color-mix(in srgb, var(--c) 25%, transparent); } 50% { box-shadow: 0 0 9px 1px color-mix(in srgb, var(--c) 45%, transparent); } }
-/* gradient: the agent's color turning slowly inside */
-@property --fl-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
-[data-fstyle='gradient'] .fl-dot.running { border-color: color-mix(in srgb, var(--c) 35%, transparent); background: conic-gradient(from var(--fl-a), color-mix(in srgb, var(--c) 38%, var(--bg)), var(--bg) 40%, color-mix(in srgb, var(--c) 22%, var(--bg)) 70%, color-mix(in srgb, var(--c) 38%, var(--bg))); animation: fl-turn 5s linear infinite; }
-@keyframes fl-turn { to { --fl-a: 360deg; } }
+[data-fstyle='glow'] .fl-dot.running { box-shadow: 0 0 3px 0 color-mix(in srgb, var(--c) 25%, transparent); }
+[data-fstyle='glow'] .fl-dot.running::after { box-shadow: 0 0 9px 1px color-mix(in srgb, var(--c) 45%, transparent); animation-duration: 2.8s; }
+/* gradient: the agent's color turning slowly inside (a gradient drawn once, behind the initials, turned) */
+[data-fstyle='gradient'] .fl-dot.running { border-color: color-mix(in srgb, var(--c) 35%, transparent); background: var(--bg); isolation: isolate; }
+[data-fstyle='gradient'] .fl-dot.running::before { content: ''; position: absolute; z-index: -1; inset: 0; border-radius: 50%; background: conic-gradient(color-mix(in srgb, var(--c) 38%, var(--bg)), var(--bg) 40%, color-mix(in srgb, var(--c) 22%, var(--bg)) 70%, color-mix(in srgb, var(--c) 38%, var(--bg))); animation: fl-spin 5s linear infinite; }
 /* arc: an arc going round */
 [data-fstyle='arc'] .fl-dot.running::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; border: 1.5px solid transparent; border-top-color: var(--c); animation: fl-spin 1.4s linear infinite; }
 @keyframes fl-spin { to { transform: rotate(360deg); } }

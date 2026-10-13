@@ -27,6 +27,22 @@ process.stdin.on('data', d => {
   for (const ch of d.toString().replace(/\x1b\[20[01]~/g, '')) {
     if (ch === '\r') {
       const t = line; line = ''
+      const tell = (id, msg) => notify && execFileSync(notify[0], [...notify.slice(1), JSON.stringify({ type: 'agent-turn-complete', 'thread-id': id, 'last-assistant-message': msg })], { stdio: 'ignore' })
+      // "sub…": a sub-agent's turn ends (its notify) while the chat's own goes on, then that one ends
+      if (t.startsWith('sub')) {
+        process.stdout.write('\r\n• Working (0s • esc to interrupt)')
+        setTimeout(() => { try { tell('thread-sub', 'sub-agent done') } catch {} }, 100)
+        setTimeout(() => { process.stdout.write(`\r\x1b[2Kanswer: ${t}\r\n> `); try { tell(thread, `answer: ${t}`) } catch {} }, 3500)
+        continue
+      }
+      // "near…": the same, but the chat's own end notifies before its screen loses the Working line
+      if (t.startsWith('near')) {
+        process.stdout.write('\r\n• Working (0s • esc to interrupt)')
+        setTimeout(() => { try { tell('thread-sub', 'sub-agent done') } catch {} }, 100)
+        setTimeout(() => { try { tell(thread, `answer: ${t}`) } catch {} }, 600)
+        setTimeout(() => process.stdout.write(`\r\x1b[2Kanswer: ${t}\r\n> `), 900)
+        continue
+      }
       process.stdout.write(`\r\nanswer: ${t}\r\n${t.includes('limit') ? "■ You've hit your usage limit. Try again in 2 hours.\r\n" : ''}> `)
       if (notify) setTimeout(() => { try { execFileSync(notify[0], [...notify.slice(1), JSON.stringify({ type: 'agent-turn-complete', 'thread-id': thread, 'last-assistant-message': `answer: ${t}` })], { stdio: 'ignore' }) } catch {} }, 100)
     } else if (ch === '\x03') process.exit(130)

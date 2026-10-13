@@ -63,7 +63,7 @@ const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
 
 export let state: State = { projects: [], workspaces: [], tabs: [] }
 export const sessions = new Map<string, Session>()
-type Runtime = { progress?: { pct: number; note?: string }; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; askKey?: string; published?: Published[] } // askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
+type Runtime = { progress?: { pct: number; note?: string }; status: Status; done: boolean; limit?: number; last?: string; seen?: number; escAt?: number; since?: number; hooked?: boolean; runAt?: number; idleAt?: number; askKey?: string; published?: Published[]; later?: NodeJS.Timeout } // later: a codex turn's end waiting to see whether it was the chat's (hook); askKey: the ask the last pushed view gave; idleAt: since when it's idle (sleepy); published: what its publish tools made this turn (keepPublished)
 const rt = new Map<string, Runtime>()
 const ports = new Map<string, number[]>()
 const procs = new Map<string, Record<number, Proc>>() // what listens on each port, by workspace (scanPorts)
@@ -428,6 +428,14 @@ export function view(): View {
 }
 
 let pending: NodeJS.Timeout | null = null
+// the view as last sent: the same again isn't (claude's every tool call says running; each view the app gets, it
+// draws again whole). A client that connects gets one of its own (main.ts)
+let sent = ''
+// a client that connects: the view now, and the next change goes out to all, whatever was sent before it came
+export function hello(c: Conn) {
+  sent = ''
+  c.send({ ev: 'state', view: view() })
+}
 export function changed() {
   if (pending) return
   pending = setTimeout(() => {
@@ -435,7 +443,11 @@ export function changed() {
     const v = view()
     for (const t of v.tabs) rtOf(t.id).askKey = JSON.stringify(t.ask ?? null) // what the clients were given
     for (const w of state.workspaces) worked(w.id, v.tabs.some(t => t.workspace === w.id && t.status === 'running' && tracked(t))) // an agent's: a shell's command isn't
-    for (const c of clients) c.send({ ev: 'state', view: v })
+    if (!clients.size) return void (sent = '') // nobody to send it to
+    const json = JSON.stringify({ ev: 'state', view: v }) // once for every client
+    if (json === sent) return
+    sent = json
+    for (const c of clients) c.send(json)
   }, 30)
 }
 
@@ -804,6 +816,7 @@ export function projectRm(ref: string) {
   state.projects = state.projects.filter(x => x !== p)
   state.schedules = state.schedules?.filter(s => s.project !== p.id) // its tasks go with it
   state.todos = state.todos?.filter(t => t.project !== p.id) // and its board's to-dos
+  if (state.settings?.railPlans) state.settings.railPlans = state.settings.railPlans.filter(x => x.project !== p.id) // and its specs' rail pins
   if (p.host && !state.projects.some(x => x.host === p.host)) void hosts.get(p.host)?.then(h => h.master.kill(), () => {}) // its host's last
   save()
   changed()
@@ -1307,9 +1320,11 @@ export function tabSet(o: { id: string; name?: string; color?: string; muted?: b
 }
 
 // a workspace's sidebar color, name, notifications, pin, and whether CI failures and review comments go to its agent
+// the rail's pins: workspaces, and specs and brainstorms (settings.railPlans, while Specs is on), RAIL_PINS in all
+const railTaken = () => state.workspaces.filter(x => x.railPin && !x.archived).length + (state.settings?.specs === true ? (state.settings.railPlans?.length ?? 0) : 0)
 export function wsSet(o: { id: string; color?: string; name?: string; autoFix?: boolean; autoReview?: boolean; autoMerge?: boolean; autoLand?: boolean; muted?: boolean; pinned?: boolean; railPin?: boolean; browser?: string; unrelate?: string }) {
   const w = findWs(o.id)
-  if (o.railPin && !w.railPin && state.workspaces.filter(x => x.railPin && !x.archived).length >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
+  if (o.railPin && !w.railPin && railTaken() >= RAIL_PINS) throw new Error(`the rail holds ${RAIL_PINS}: unpin one first`)
   if (o.browser !== undefined && (w.browser === undefined || !URL_OK.test(o.browser))) throw new Error('browser: a Browsers workspace and an http(s) page')
   if (o.browser !== undefined) w.browser = o.browser
   if (o.autoLand && !prAllows(state.projects.find(p => p.id === w.project)?.config, 'land')) throw new Error("merge when green is off for this project: its settings' Pull requests")
@@ -1820,7 +1835,7 @@ export async function wsRestore(ref: string) {
   if (ws.host) await readHostCfgs(ws)
   else await copyIncludes(proj, ws) // archiving took them with the worktree
   ws.archived = false
-  if (ws.railPin && state.workspaces.filter(w => w.railPin && !w.archived).length > RAIL_PINS) ws.railPin = undefined // the rail filled up meanwhile
+  if (ws.railPin && railTaken() > RAIL_PINS) ws.railPin = undefined // the rail filled up meanwhile
   ws.port = allocPort()
   save()
   forward(ws)
@@ -1946,7 +1961,24 @@ function bringBack(s: Session, cmd: string, run: boolean) {
 // ---------- agent status (hooks)
 
 export function hook(p: { tab: string; state: string; payload?: any }) {
-  if (state.tabs.some(t => t.id === p.tab)) rtOf(p.tab).hooked = true
+  const tab = state.tabs.find(t => t.id === p.tab)
+  if (tab) rtOf(p.tab).hooked = true
+  // codex's notify comes as any of its threads ends a turn: a sub-agent's (multi-agent) or its auto-review's while the
+  // chat's own turn goes on, "esc to interrupt" still on screen. Its own turn's end clears that line as it calls
+  // notify: busy after a moment more, it's another thread's, dropped (its thread id isn't the chat's either)
+  // ponytail: by the screen; codex's payload doesn't say which thread is the chat's
+  const busy = () => {
+    const s = sessions.get(p.tab)
+    return !!s && !s.exited && BUSY.codex.test(`${s.title}\n${s.screenText(15)}`)
+  }
+  if (tab?.preset === 'codex' && p.state === 'done') {
+    const r = rtOf(tab.id)
+    clearTimeout(r.later) // a newer end: the one waiting was another thread's (the chat's own comes last)
+    // still busy, the chat's own turn ended meanwhile (its notify came and set it idle) or the tab started again: another
+    // thread's, dropped
+    const s0 = sessions.get(p.tab)
+    if (busy()) return void (r.later = setTimeout(() => (sessions.get(p.tab) !== s0 || busy() || r.status !== 'running' ? wsLog({ id: tab.workspace }, `${tab.name}: a codex thread ended (${p.payload?.['thread-id'] ?? '?'}), not the chat's turn`) : turn(p)), 1500))
+  }
   turn(p)
 }
 
@@ -3530,8 +3562,33 @@ export async function browse(p: { ws: string; op: string; url?: string; selector
   if (p.op !== 'screenshot') return r.result
   return { url: r.result.url, path: imageSave({ data: r.result.png, ext: 'png' }) }
 }
+// the app's answer to a browse or a timer event, by its req
 export function browseDone(p: { id: string; ok: boolean; result?: any; error?: string }) {
   browsing.get(p.id)?.done(p)
+}
+
+// the sidebar's timers and stopwatches (Laki AI's laki_timer): they live in the app's window (its localStorage), so the
+// newest client that is the app (view.browse, as the agent browser) does it and answers with browseDone
+export const TIMER_ACTS = ['timer', 'remind', 'send', 'stopwatch', 'list', 'stop'] as const
+export async function timer(p: { act: string; minutes?: number; note?: string; ws?: string; tab?: string; text?: string; id?: string }) {
+  if (!(TIMER_ACTS as readonly string[]).includes(p.act)) throw new Error(`timer: ${p.act}? one of ${TIMER_ACTS.join(', ')}`)
+  const ms = Math.round(Number(p.minutes) * 60000)
+  if (['timer', 'remind', 'send'].includes(p.act) && !(ms >= 1000 && ms <= 7 * 86400000)) throw new Error('for how long? minutes, more than 0, a week at most')
+  const ws = p.act === 'remind' ? findWs(p.ws ?? '').id : undefined
+  const tab = p.act === 'send' ? state.tabs.find(t => t.id === p.tab) : undefined
+  const text = typeof p.text === 'string' ? p.text.trim() : ''
+  if (p.act === 'send' && (!tab || tab.kind !== 'agent' || !text)) throw new Error("send: an agent tab's id (laki_state) and the text")
+  if (p.act === 'stop' && !p.id) throw new Error('stop: which one? its id (list them first)')
+  const host = [...clients].reverse().find(c => c.view?.browse)
+  if (!host) throw new Error("timers live in Laki's window: open the app on this Mac")
+  const id = randomUUID()
+  const r = await new Promise<{ ok: boolean; result?: any; error?: string }>(done => {
+    const t = setTimeout(() => (browsing.delete(id), done({ ok: false, error: "Laki's window didn't answer" })), 10000)
+    browsing.set(id, { done: r => (clearTimeout(t), browsing.delete(id), done(r)) })
+    host.send({ ev: 'timer', req: id, act: p.act, ms, note: typeof p.note === 'string' ? p.note.trim().slice(0, 120) || undefined : undefined, ws, ...(tab && { ws: tab.workspace, tab: tab.id, text }), which: p.id }) // which, not id: an event with an id is taken for a reply
+  })
+  if (!r.ok) throw new Error(r.error || 'the timer failed')
+  return r.result
 }
 
 // the first-run screen's checks

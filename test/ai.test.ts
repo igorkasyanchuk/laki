@@ -6,7 +6,7 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { skillTools, tools } from '../src/cli/mcp.ts'
 import { aiTotals } from '../src/shared/types.ts'
-import { fresh, until } from './helpers.ts'
+import { connect, fresh, until } from './helpers.ts'
 
 // a fake OpenRouter: each request to `answers`' next, recorded
 async function openrouter(t: { after: (f: () => void) => void }, answers: object[]) {
@@ -195,7 +195,7 @@ test("ai: Laki's skill asks with options, writes memory, and removes only on the
   // a question: its options in the chat, the turn ends there; a pick goes on as the next ask
   assert.deepEqual(await rig.rpc('aiAsk', { text: 'do the thing' }), { text: '' })
   const names = or.hits[0].body.tools.map((x: any) => x.function.name)
-  for (const n of ['laki_ask', 'laki_remove', 'laki_prs', 'laki_project', 'laki_memory_write', 'laki_notes_write', 'laki_run_action', 'laki_templates', 'laki_shell']) assert.ok(names.includes(n), n)
+  for (const n of ['laki_ask', 'laki_remove', 'laki_prs', 'laki_project', 'laki_memory_write', 'laki_notes_write', 'laki_run_action', 'laki_templates', 'laki_shell', 'laki_run']) assert.ok(names.includes(n), n)
   assert.match(or.hits[0].body.messages[0].content, /laki_ask/, "the skill's words in its instructions")
   assert.match(or.hits[0].body.messages[0].content, /own instructions for you[^\n]*\nOur staging is on fly\.io\.$/, 'Your instructions, last')
   assert.equal(or.hits.length, 1, 'no round after the question')
@@ -304,6 +304,29 @@ test("ai: the skill's tools: templates and actions start workspaces, a shell get
   assert.deepEqual([sh.workspace, sh.typed], [w.id, true])
   const screen = await until(() => rig.rpc('screen', { target: `${w.id}/${sh.tab}`, lines: 10 }).then((x: any) => (JSON.stringify(x).includes('echo typed-not-run') ? x : null)), 'the command typed')
   assert.doesNotMatch(JSON.stringify(screen), /\\ntyped-not-run/, 'not run')
+  // run when asked: in a new shell, then again in that same tab; an agent's tab gets it as a message
+  const sh2 = await tool('laki_shell')({ ws: w.id, command: 'echo ran-$((40+2))', run: true })
+  assert.equal(sh2.ran, true)
+  await until(() => rig.rpc('screen', { target: sh2.tab, lines: 10 }).then((x: string) => x.includes('ran-42')), 'run in a new shell')
+  const again = await tool('laki_run')({ tab: sh2.tab, text: 'echo again-$((1+1))' })
+  assert.equal(again.sent, true)
+  await until(() => rig.rpc('screen', { target: sh2.tab, lines: 10 }).then((x: string) => x.includes('again-2')), 'run in the same tab')
+  const agentTab = (await rig.rpc('state')).tabs.find((t: any) => t.workspace === w.id && t.kind === 'agent')
+  const msg = await tool('laki_run')({ tab: `${w.id}/${agentTab.id}`, text: 'look again' })
+  assert.ok(msg.sent || msg.queued, 'sent, or queued until its turn ends')
+  await assert.rejects(tool('laki_run')({ tab: 'nope', text: 'x' }), /no tab nope/)
+  await assert.rejects(tool('laki_run')({ tab: sh2.tab, text: '  ' }), /the text is empty/)
+  // a half-typed line is cleared first; a shell busy with a command takes nothing (it would go to that program)
+  await rig.rpc('send', { target: sh2.tab, text: 'echo half', enter: false })
+  await rig.rpc('input', { tab: sh2.tab, data: '\x1b[D\x1b[D' }) // the cursor back into the line: all of it goes all the same
+  await tool('laki_run')({ tab: `${w.id}/${(await rig.rpc('state')).tabs.find((t: any) => t.id === sh2.tab).name}`, text: 'echo clean-$((2+3))' }) // by its name
+  const cleaned = (await until(() => rig.rpc('screen', { target: sh2.tab, lines: 10 }).then((x: string) => (x.includes('clean-5') ? x : null)), 'run on a cleared line')) as string
+  assert.doesNotMatch(cleaned, /halfecho|ececho|lfecho|5lf/, 'the half-typed words went, both sides of the cursor')
+  const app = await connect(rig) // shells are scanned for a running command while the app is open
+  await tool('laki_run')({ tab: sh2.tab, text: 'sleep 30' })
+  await until(() => rig.rpc('state').then((v: any) => v.tabs.find((t: any) => t.id === sh2.tab).status === 'running'), 'the shell busy')
+  await assert.rejects(tool('laki_run')({ tab: sh2.tab, text: 'ls' }), /is running something/)
+  app.ws.close()
 
   // notes: added to the end, or replaced; a workspace renamed
   await tool('laki_notes_write')({ project: p.id, text: 'one' })

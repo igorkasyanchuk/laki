@@ -201,6 +201,30 @@ test('codex: notify ends a turn and records the thread id', async t => {
   assert.match(tv.resumeId, /^thread-/)
 })
 
+test("codex: a sub-agent's turn end leaves the chat's own turn running", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'codex' })
+  const tab = await rig.tab(ws.id)
+  await until(async () => (await rig.screen(tab.id)).includes('fake codex'), 'codex up')
+  await rig.rpc('send', { target: ws.id, text: 'sub task' })
+  await new Promise(r => setTimeout(r, 2500)) // the sub-agent's notify came, and the wait after it
+  let tv = await rig.tab(ws.id)
+  assert.equal(tv.status, 'running')
+  assert.equal(tv.resumeId, undefined) // not the sub-agent's thread
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: sub task', 'its own end')
+  tv = await rig.tab(ws.id)
+  assert.equal(tv.status, 'idle')
+  assert.match(tv.resumeId, /^thread-(?!sub)/)
+  // the chat's own end comes while the screen still says Working: it, not the sub-agent's before it, ends the turn
+  await rig.rpc('send', { target: ws.id, text: 'near task' })
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: near task', 'its own end, late')
+  await new Promise(r => setTimeout(r, 1700)) // past both waits
+  tv = await rig.tab(ws.id)
+  assert.equal(tv.last, 'answer: near task')
+  assert.match(tv.resumeId, /^thread-(?!sub)/)
+})
+
 test('grok: Laki picks its chat id, a quiet screen ends its turn, a restart resumes the chat', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

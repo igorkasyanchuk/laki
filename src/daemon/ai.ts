@@ -154,7 +154,9 @@ type Run = { text: string; model: string; calls: number; in: number; out: number
 type Opts = { t: Thread; ask: string; images: string[]; rpc: Rpc; signal: AbortSignal; spawned: (c: ChildProcess) => void; r: Run }
 
 // chat: a spec's or brainstorm's (planChat), else the AI page's; one that ended starts again, empty
-export async function aiAsk(p: { text?: string; images?: string[]; chat?: string }, rpc: Rpc) {
+// context: where the user is as they ask (the floating chat's: the page, workspace and tab), for the model only: the
+// conversation keeps their words alone
+export async function aiAsk(p: { text?: string; images?: string[]; chat?: string; context?: string }, rpc: Rpc) {
   const s = state.settings?.ai ?? {}
   if (!s.on) throw new Error('Laki AI is off: Settings › AI')
   const ask = (p.text ?? '').trim()
@@ -172,7 +174,8 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   asked = false
   const t0 = Date.now()
   const r: Run = { text: '', model: s.models?.[backend] || (backend === 'openrouter' ? AI_MODEL : backend), calls: 0, in: 0, out: 0 }
-  const o: Opts = { t, ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
+  const where = typeof p.context === 'string' ? p.context.trim().slice(0, CONTEXT_MAX) : ''
+  const o: Opts = { t, ask: where ? `${ask || 'See the image.'}\n\n[Where the user is in Laki as they ask this: ${where}]` : ask, images, rpc, signal: ctl.signal, spawned: c => (child = c), r }
   const call: AiCall = { at: t0, backend, model: r.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: ask.slice(0, 120) }
   try {
     await (backend === 'claude' ? claude(o) : backend === 'codex' ? codex(o) : openrouter(o))

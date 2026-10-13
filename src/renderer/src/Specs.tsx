@@ -32,6 +32,8 @@ export type SpecsApi = {
   reveal: (path: string) => void
   full: boolean // the app's full screen (⌘⇧⏎): only the page, no sidebar or rail
   toggleFull: () => void
+  pinned?: (r: Ref) => boolean // on the rail (the rail on: App passes these)
+  pin?: (r: Ref & { title: string }, on: boolean) => void
 }
 type Ref = { project: string; kind: PlanKind; slug: string }
 type Got = { plan: Plan; doc: { title?: string; blocks?: unknown[] } | null; markdown: string; outside: boolean; files: PlanFile[] }
@@ -55,6 +57,8 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
   const [sel, setSel] = useState<Ref | null>(at?.project && at.kind && at.slug ? { project: at.project, kind: at.kind, slug: at.slug } : null)
   const [selTitle, setSelTitle] = useState('')
   const refresh = () => api.call<Plan[]>('planList', {}).then(setList, () => setList([]))
+  useEffect(() => void (sel && selTitle && api.pinned?.(sel) && api.pin!({ ...sel, title: selTitle }, true)), [selTitle]) // a pin's tip follows a rename
+  const pinItem = (p: Ref & { title: string }): MenuItem[] => (api.pin ? [api.pinned!(p) ? { label: 'Unpin from the rail', icon: 'pin', run: () => api.pin!(p, false) } : { label: 'Pin to the rail', icon: 'pin', sub: 'A click away, whatever page is open', run: () => api.pin!(p, true) }] : [])
   useEffect(() => {
     if (sel) return // one open: the list isn't on screen
     void refresh()
@@ -118,7 +122,7 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
     </nav>
   )
   const row = (p: Plan) => (
-    <button key={`${p.project}/${p.kind}/${p.slug}`} className="plans-row" onClick={() => open(p)}>
+    <button key={`${p.project}/${p.kind}/${p.slug}`} className="plans-row" onClick={() => open(p)} onContextMenu={e => api.pin && (e.preventDefault(), openMenu(e, pinItem(p)))}>
       <Icon name={kindIcon(p.kind)} />
       <span className="plans-title">{p.title}</span>
       <span className="plans-meta muted small">
@@ -152,7 +156,18 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
     )
   }
   return (
-    <Page title="Specs & Brainstorms" head={crumbs} tools={<IconButton icon={api.full ? 'minimize' : 'maximize'} title={api.full ? 'Exit full screen (⌘⇧⏎)' : 'Full screen: just this page (⌘⇧⏎)'} onClick={api.toggleFull} />} wide onClose={onClose}>
+    <Page
+      title="Specs & Brainstorms"
+      head={crumbs}
+      tools={
+        <>
+          {sel && api.pin && (on => <IconButton icon="pin" on={on} title={on ? 'Unpin from the rail' : 'Pin to the rail: a click away, whatever page is open'} onClick={() => api.pin!({ ...sel, title: selTitle || 'Untitled' }, !on)} />)(api.pinned!(sel))}
+          <IconButton icon={api.full ? 'minimize' : 'maximize'} title={api.full ? 'Exit full screen (⌘⇧⏎)' : 'Full screen: just this page (⌘⇧⏎)'} onClick={api.toggleFull} />
+        </>
+      }
+      wide
+      onClose={onClose}
+    >
       {menu}
       {level === 'templates' && !sel ? (
         <Templates templates={api.templates} save={api.saveTemplates} />
@@ -294,7 +309,7 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
         clearTimeout(timer.current)
         pending.current = null
         latest.current = null
-        api.call('planRm', at).then(onGone, () => {})
+        api.call('planRm', at).then(() => (api.pinned?.(at) && api.pin!({ ...at, title: '' }, false), onGone()), () => {})
       },
     )
   const showChat = (on: boolean) => (setChatOn(on), keep('laki.planChat', on))
@@ -457,7 +472,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
             )}
           </div>
         ) : (
-          turns(d.chat).map((g, i) => (Array.isArray(g) ? <Tools key={i} list={g} /> : <Message key={i} m={g} link={same} busy={d.busy || !api.aiOn || !!d.ended || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
+          turns(d.chat).map((g, i, all) => (Array.isArray(g) ? <Tools key={i} list={g} live={d.busy && i === all.length - 1} /> : <Message key={i} m={g} link={same} busy={d.busy || !api.aiOn || !!d.ended || (!!g.ask && !open.has(g.ask.id))} onPick={pick} />))
         )}
         {d?.ended && (
           <div className="plan-bar small">

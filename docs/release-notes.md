@@ -4,6 +4,35 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: a space (or a new line in a prompt) typed in a name, a description or a block's field stays; it used to
+  vanish as you typed it.
+- **Text size per tab**: ⌘+ / ⌘− make the text bigger or smaller in the tab with the keyboard only, and it keeps
+  its size; ⌘0 puts it back to Settings' size, which is every other tab's. Settings and Help keep their own ⌘± size.
+- **Laki AI everywhere**: a chat button at the bottom right of every page but AI, Settings, Help, Specs and Workflows
+  opens a small chat that knows where you are (the page, the workspace, the tab, its status and its last 40 lines);
+  Settings › AI › *Chat button* turns it off. Laki AI now knows the built-in tools too and can start a timer, a
+  stopwatch, a reminder or a Send later for you.
+- **Laki AI runs commands where you are**: *fix this and run it here* in the chat button's chat types the command into
+  the tab you're on and runs it (a shell), or sends it (an agent), then reads what happened; name another tab, or ask for
+  a new shell, to run it there. It asks first before anything that deletes, resets or force-pushes.
+- **Laki AI's chat, redone**: the small chat and its window get a lighter head that names how it runs, a glow and
+  a circling mark while it works, a spinner on its tools until it answers, workspaces as chips you click, your messages
+  in the theme's color and a thin scrollbar.
+- **Progress in the sidebar**: Settings › General's *Show progress*: on the tab, in the sidebar, or both; the sidebar's
+  as a percentage, a line under the row, or both.
+- **Pin specs and brainstorms** to the rail (the pin in a spec's header, or a right click in the list): five pins in
+  all, workspaces and specs together. Pinned workspaces on the rail take their color.
+- **Changes in two columns**: the side panel's Changes shows a file side by side, old and new, like GitHub; the
+  button beside Expand all switches, and Laki remembers it.
+- **Artifacts**: a bigger view, and a right click on one to copy the file itself (a picture as a picture), its text or
+  its path, open it or show it in Finder.
+- **Bird view** lays its cards out in columns of their own heights, each workspace tinted with its color.
+- A new workspace made while you're elsewhere no longer takes you there: a toast says it's ready, with *Open*.
+- **Scheduled tasks** is a page of its own: Esc no longer closes it.
+- **Resources** shows CPU next to memory, a graph of the last minutes, and sorts by memory or CPU.
+- Lighter in the background: the window repaints only when something changed, its animations pause while Laki
+  isn't in front, and the floating bubbles' glows and spins run on the GPU.
+- Codex: a turn with sub-agents keeps its spinner until the chat itself is done.
 - Polish: the Board's columns run the page's height (an empty one is still a place to drop a to-do), the status bar
   and Board draw their checks, conflicts and branch marks as icons, menus in Settings get the theme's chevron, the
   new-workspace prompt grows as you type, selected text takes the accent, and Get started lights only the next step.

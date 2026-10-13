@@ -29,21 +29,21 @@ worktree. Agents keep running when the window is closed.
   too, 👀 you commented), sent to the agent if you like; ship (commit, push, PR) in one step; merge
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
   merged, if you like.
-- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (comment on a line; images before and after;
+- **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (one column or two side by side; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`).
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports) and
   links to what they publish (Claude artifacts, sites, gists: kept on their own as an agent publishes them): counted in the status bar, a gallery of previews (links first,
-  opened in the browser) a click away, in Finder or the side panel's Files too, the links in the info panel.
+  opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the info panel.
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only (or anyone with the
   link, if you type *confirm*: a red warning says what that risks).
-- **Resources**: memory and CPU for Laki and each agent; put an idle agent to sleep (now, or after a while) and it wakes as you
+- **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
   look; the video, extensions, the preview or the floating bubbles stop with a click.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
 - **Rail**: like Slack's (Projects, Board, Schedule, Terminal, Browser, with what needs you on each) beside a list of
-  the one you pick.
+  the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
 - **Looks**: six Dock icons to pick from; 98 themes, 80 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
 - **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar or the status bar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
@@ -56,8 +56,9 @@ worktree. Agents keep running when the window is closed.
 - **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it starts workspaces, reviews
   PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); with Laki's skill it also
   lists your PRs and others', runs your actions and templates, keeps a project's notes and memory, and asks you with options when unsure (it
-  removes something only when you press Yes); on OpenRouter or claude -p / codex exec, every ask's cost logged (shown or hidden).
-- **Keyboard and CLI**: ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
+  removes something only when you press Yes); a chat button on every page that knows what you're looking at; timers, reminders and messages for later on request;
+  on OpenRouter or claude -p / codex exec, every ask's cost logged (shown or hidden).
+- **Keyboard and CLI**: ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
 
 ## Install
 

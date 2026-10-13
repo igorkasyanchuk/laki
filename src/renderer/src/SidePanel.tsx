@@ -8,7 +8,7 @@ import { PanelHandle } from './Panes'
 import { Folded, Markdown } from './MarkdownView'
 import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
-import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, toCsv } from './text'
+import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, splitRows, toCsv } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
 
 export type PanelTab = 'files' | 'changes' | 'review' | 'preview'
@@ -376,6 +376,9 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
     return i < 0 ? lines.length - 1 : i
   }
   const toggle = (p: string) => setOpen(o => (o.has(p) ? (o.delete(p), new Set(o)) : new Set(o.add(p))))
+  const [split, setSplit] = useState(() => localStore('laki.diffSplit') === 'split') // side by side, as GitHub's split view; the last one picked
+  const pickSplit = (on: boolean) => (setSplit(on), localStore('laki.diffSplit', on ? 'split' : 'unified'))
+  const lineClass = (l: DiffLine) => `dl ${l.text.startsWith('@@') ? 'dl-hunk' : l.new === undefined && l.old !== undefined ? 'dl-del' : l.old === undefined && l.new !== undefined ? 'dl-add' : ''}${(l.old ?? l.new) !== undefined ? ' dl-line' : ''}`
   const files = d?.files ?? []
   // Viewed, as on GitHub's Files changed: a box for each file in the PR (in both views); ticked, it folds and dims.
   // DISMISSED (viewed, then changed by a commit) is unticked. mine: ticks made here until GitHub's next answer has them
@@ -414,6 +417,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
             {viewed}/{inPR.length} viewed
           </span>
         )}
+        <IconButton icon={split ? 'unsplit' : 'splitRight'} title={split ? 'One column: the changes in one' : 'Two columns: before and after side by side'} on={split} onClick={() => pickSplit(!split)} />
         {pr && <IconButton icon="github" title="Files changed, on GitHub" onClick={() => onOpen(`${pr.url}/files`)} />}
         {files.some(f => open.has(f.path)) ? <IconButton icon="collapse" title="Collapse all" onClick={() => setOpen(new Set())} /> : <IconButton icon="expand" title={viewed ? 'Expand all but the viewed ones' : 'Expand all'} onClick={() => setOpen(new Set(files.filter(f => viewedOf(f.path) !== 'VIEWED').map(f => f.path)))} />}
         <IconButton icon="refresh" title="Refresh" onClick={reload} />
@@ -445,18 +449,33 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
             </div>
             {open.has(f.path) && IMAGE.test(f.path) && !all && <ImageDiff api={api} path={f.path} status={f.status} />}
             {open.has(f.path) && (!IMAGE.test(f.path) || all) /* the PR's images: GitHub has them */ && (
-              <div className="sp-diff">
+              <div className={`sp-diff ${split ? 'split' : ''}`}>
                 {(lines => {
                   const box = boxAt(f.path, lines)
+                  const comment = at && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr?.number} api={api} onClose={() => setAt(null)} />
+                  if (split) {
+                    // two columns: the base's lines on the left, the branch's on the right, without their - and +
+                    const cell = (l?: DiffLine) => (l ? <div className={lineClass(l)} onClick={() => pick(f.path, l)}>{l.text.slice(1) || ' '}</div> : <div className="dl dl-none" />)
+                    return splitRows(lines).map((r, i) => (
+                      <Fragment key={i}>
+                        {r.full ? (
+                          <div className={`${lineClass(r.full)} dl-full`}>{r.full.text || ' '}</div>
+                        ) : (
+                          <>
+                            {cell(r.left)}
+                            {cell(r.right)}
+                          </>
+                        )}
+                        {at && box >= 0 && [r.full, r.left, r.right].includes(lines[box]) && comment}
+                      </Fragment>
+                    ))
+                  }
                   return lines.map((l, i) => (
                     <Fragment key={i}>
-                      <div
-                        className={`dl ${l.text.startsWith('@@') ? 'dl-hunk' : l.new === undefined && l.old !== undefined ? 'dl-del' : l.old === undefined && l.new !== undefined ? 'dl-add' : ''}${(l.old ?? l.new) !== undefined ? ' dl-line' : ''}`}
-                        onClick={() => pick(f.path, l)}
-                      >
+                      <div className={lineClass(l)} onClick={() => pick(f.path, l)}>
                         {l.text || ' '}
                       </div>
-                      {at && i === box && <CommentBox path={f.path} line={at.line} text={at.text} setText={text => setAt(a => a && { ...a, text })} pr={pr?.number} api={api} onClose={() => setAt(null)} />}
+                      {i === box && comment}
                     </Fragment>
                   ))
                 })(byFile.get(f.path) ?? [{ text: '(no text diff: binary, or past the size cap)' }])}

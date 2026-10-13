@@ -6,7 +6,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/renderer/src/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/renderer/src/markdown.ts'
-import { actionsFor, importable, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, importable, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { fillTemplate, isAgent, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
@@ -212,3 +212,17 @@ test("taskTitle: a prompt's first words for a tab's name, less links, paths, fla
   assert.ok(taskTitle('x'.repeat(80)).endsWith('…') && taskTitle('x'.repeat(80)).length === 36)
 })
 
+
+test("splitRows: a diff side by side, removed lines beside the added ones after them", () => {
+  const L = (text: string, old?: number, now?: number) => ({ text, old, new: now })
+  const hunk = L('@@ -1,4 +1,4 @@'), ctx = L(' a', 1, 1), d1 = L('-b', 2), d2 = L('-c', 3), a1 = L('+B', undefined, 2), ctx2 = L(' d', 4, 3), a2 = L('+e', undefined, 4), end = L('\\ No newline at end of file')
+  assert.deepEqual(splitRows([hunk, ctx, d1, d2, a1, ctx2, a2, end]), [
+    { full: hunk },
+    { left: ctx, right: ctx },
+    { left: d1, right: a1 },
+    { left: d2, right: undefined },
+    { left: ctx2, right: ctx2 },
+    { left: undefined, right: a2 },
+    { full: end },
+  ])
+})

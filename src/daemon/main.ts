@@ -134,6 +134,7 @@ const api: Record<string, Handler> = {
   answer: p => core.answer(p),
   unread: p => core.unread(p.tab),
   browse: p => core.browse(p),
+  timer: p => core.timer(p),
   browseDone: p => core.browseDone(p),
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
@@ -304,11 +305,11 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         // a stalled client (asleep, hung): drop it rather than buffer without bound; it reconnects and
         // re-attaches from a snapshot
         if (ws.bufferedAmount > 32 << 20) return ws.terminate()
-        ws.send(JSON.stringify(msg))
+        ws.send(typeof msg === 'string' ? msg : JSON.stringify(msg)) // a string: JSON already (core's state, made once for all)
       },
     }
     core.clients.add(c)
-    c.send({ ev: 'state', view: core.view() })
+    core.hello(c)
     if (core.clients.size === 1) widgetTick() // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }

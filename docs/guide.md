@@ -424,10 +424,17 @@ workspace ABC and start a new codex session to review it*, or paste a screenshot
 each in its own workspace: it reads the workspaces, their PRs and agents' last answers, then starts workspaces (a PR's
 on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. A project with
 groups gets each new workspace in the group whose name fits it (a review in *Reviews*), or none. The bubbles' window is
-the chat alone: no Calls, Info or cost (the app's AI page has them). *Laki's skill*
+the chat alone: no Calls, Info or cost (the app's AI page has them). The chat button at the window's bottom right (every
+page but AI, Settings, Help, Specs and Workflows; Settings › AI › *Chat button* hides it) opens the same chat over what
+you're doing, and each ask tells it where you are: the page, the workspace, the tab, its status, progress and last
+answer, and the tab's last 40 lines. It knows Laki's built-in tools too (timers, the stopwatch, reminders, Send later,
+Bird view…) and starts a timer, a stopwatch, a reminder or a Send later when you ask (*remind me about the login PR
+in an hour*). *Laki's skill*
 (Settings › AI, on by default) gives it more of Laki: your open PRs and everyone else's in your projects' repos, a
 project's notes, memory, templates, actions and to-dos (it writes notes and memory, adds to-dos), renaming and pinning
-workspaces and tabs, a shell with a command typed for you to run, your actions (*start the review action on each PR in
+workspaces and tabs, commands run in a tab that's open (*fix this and run it here*: the tab you're on, or one you
+name; a shell runs it, an agent gets it as a message; it asks first before anything that deletes or resets), a new
+shell with a command typed for you to run (or run, when you ask), your actions (*start the review action on each PR in
 this screenshot, a workspace each*; a terminal's command is typed, for you to run) and prompt templates for new
 workspaces. When it isn't sure, it asks with a few options as buttons: a click answers, and it goes on (until you ask
 something else: then that question is closed). It removes a memory item, a scheduled task, a tab or a to-do only
@@ -457,7 +464,8 @@ are, how you name things, what it should know. It can't lift what Laki AI may no
 **Scheduled tasks** (the clock at the bottom of the sidebar, *Schedule* on the rail in Rail and list, *Scheduled tasks* in ⌘K, or a project's ⋯ menu for its own): a prompt for an agent at
 times you write in plain English. *New task* opens the form: the prompt, with the agent under it, then *When*, then
 the project, where it runs and a name as chips, the way the new-workspace page has them. A form you leave (Esc, a click elsewhere) is there when the page opens again;
-*Cancel* asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't).
+*Cancel* asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't). It's a page of
+its own: Esc doesn't close it (its ✕, or another page, does).
 - Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
   OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
   project's own checkout or folder, a new agent and sidebar row every run; *In its folder, one session*: the same
@@ -500,7 +508,8 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
   folders get a dot. Refresh, collapse all.
 - *Changes*: the files changed against the base branch (committed, uncommitted and new) with +/−; click one
   for its diff, with links to preview the file or open it in the editor (*Expand all* opens every file's, then
-  *Collapse all* closes them). With a PR, *Here* / *PR #n* switch to the
+  *Collapse all* closes them); the button beside it shows the diffs in two columns, old and new side by side like
+  GitHub's split view, and Laki remembers it. With a PR, *Here* / *PR #n* switch to the
   whole PR as GitHub has it (`gh pr diff`; first for a workspace that only links its PR), and the GitHub mark opens
   its *Files changed* there. Each file in the PR has a *Viewed* box, in both views, the same one as on GitHub's
   *Files changed* (ticked here, it's ticked there): a viewed file folds and dims, *Expand all* skips it, and the bar
@@ -669,7 +678,8 @@ installed (Settings › Agent skill) take `/laki:new …` in a prompt the same w
 
 With *Progress on tabs* on (Settings › General), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
-the tab shows `40%` over a bar, its tooltip what they're on, until the turn ends. Other agents get `LAKI_PROGRESS=1`
+the tab shows `40%` over a bar, its tooltip what they're on, until the turn ends. *Show progress* puts it on the tab,
+in the sidebar (the workspace's row: `40%`, a line under it, or both) or both. Other agents get `LAKI_PROGRESS=1`
 and report through the laki skill (Settings › Agent skill) or MCP's `laki_progress`.
 
 **The rail**, like Slack's: a narrow rail on the left with *Projects*, *Board*, *Schedule* (a red dot: a run failed),
@@ -680,8 +690,9 @@ list shows the kind you pick, and its rail button goes back to the last workspac
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the
 filter looks through every kind. Below a line, up to 5 workspaces, terminals or browsers you pinned there (a
 workspace's menu › *Pin to the rail*): their initials in their color (a terminal's or browser's icon), with a count when
-one needs you; a click opens it, a right click its menu (a pinned one isn't lit while open: its kind's button is). A
-phone always has one sidebar.
+one needs you; a click opens it, a right click its menu (a pinned one isn't lit while open: its kind's button is).
+Specs and brainstorms pin there too (the pin in an open one's header, or a right click on it in the list), counted in
+the same 5. A phone always has one sidebar.
 
 **The sidebar's style** (Settings › Appearance › Sidebar): *Compact* (a short line: the state and the name),
 *Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
@@ -842,7 +853,8 @@ laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 
 Turn it on in Settings › General › *Experimental*; the eye beside Help (⌘K too) opens it. Every live session, agents
 and terminals, as a card under its workspace with its screen as it is now (read every few seconds while it's open);
-*All*, *Working* or *Needs you* (a red dot on those). A click opens that session.
+*All*, *Working* or *Needs you* (a red dot on those). A click opens that session. The cards stand in columns, each as
+tall as its screen, and each workspace is tinted with its color (its group's, else one of its own).
 
 ### Projects over SSH
 
@@ -900,7 +912,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | ⌘B | hide / show the sidebar |
 | ⌘, | settings |
 | ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
-| ⌘+ / ⌘− / ⌘0 | terminal font bigger / smaller / default (Settings or Help open: their size) |
+| ⌘+ / ⌘− / ⌘0 | text in the tab with the keyboard bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size) |
 
 Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
 stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motion* stops its animations.
@@ -1026,7 +1038,7 @@ lit for a moment.
   night teal).
   Terminals take its 16 colors.
 - *Terminal*: font (JetBrains Mono by default; Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist
-  Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (also ⌘+ / ⌘− / ⌘0),
+  Mono, Hack, Iosevka, Inconsolata, Roboto Mono and Victor Mono are built in too; the monospace fonts you have, or any other by name), font size (every tab's; ⌘+ / ⌘− / ⌘0 change one tab's, which keeps it),
   line height, letter spacing, font weight, minimum contrast (text lightens or darkens to stay readable),
   cursor style (block, bar, underline) and blinking, *Padding* (the space around the text: tiny, normal or roomy), *Scroll speed* (lines per wheel step: 3× by default, xterm's own
   is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default), *Mac editing keys* (⌘← and
@@ -1053,7 +1065,9 @@ lit for a moment.
   workspace's first tab and keeps its path when the workspace is renamed. Ask an agent to put screenshots, reports
   or exports there; the info panel's *Storage* opens it, and the status bar's *Artifacts: n* (the files in it, hidden
   ones not counted; none at 0) shows them here (⌘⇧A shows or hides them): a strip of previews over the status bar, newest
-  first; click one for a big view (images, text, Markdown rendered), ← and → for the others. The strip's ⋯ has *Show in
+  first; click one for a big view (images, text, Markdown rendered), ← and → for the others. A right click on one (in the strip,
+the big view or Files) copies the file itself (a picture as a picture, to paste into a chat or a document), its text
+or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   Finder* and *Open in Files*: the side panel's Files with its *Artifacts* tab (beside *Workspace*), a tree of them to
   search, preview (read-only) and open in their app. A link to whatever an
   agent publishes for you (a Claude artifact, a deployed site, a gist) is kept there too, as a `<title>.url` file
@@ -1119,7 +1133,8 @@ lit for a moment.
   process. What the daemon runs besides tabs gets a row each: *Laki AI* (its `claude -p` or `codex exec` while it
   answers), *Expose to the world* (each tunnel's cloudflared), *Remote access*, *SSH* (a host's connection) and a
   extension's fetch; *Stop* ends the AI's answer, a tunnel or remote access. The daemon's short commands (git, gh) count
-  under *Laki itself*. Then each tab, biggest first, with its processes under it (a click). *Sleep* ends an idle Claude or Codex
+  under *Laki itself*. Then each tab, biggest first (or busiest first: *By CPU*), with its processes under it (a
+  click); the total has CPU beside memory (100% is one core) and a graph of both over the last minutes. *Sleep* ends an idle Claude or Codex
   tab's process now; *Open* goes to the tab.
   *Sleep idle agents after* (never by default; 15 minutes to 8 hours) does it on its own for an idle Claude or Codex
   tab nobody is looking at, quiet that long. A sleeping tab keeps its screen and says so; looking at it, a key, or a

@@ -16,6 +16,8 @@ type Bridge = {
   pathOf?(f: File): string
   openExternal(url: string): void
   openPath?(path: string, root?: string): Promise<{ rel: string } | 'opened' | 'missing'> // a ⌘-clicked file:// link (main's open-path)
+  onFront?(cb: (on: boolean) => void): void // Laki became the front app, or another app did (main's setFront)
+  copyFile?(path: string): Promise<'image' | 'file' | 'missing'> // an artifact to the clipboard: a picture as one, else the file (main's copy-file)
   dictate?(): void
   dictationSettings?(): void
   glass?(on: boolean): void

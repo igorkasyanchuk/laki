@@ -164,6 +164,8 @@ export type AppSettings = Paint & {
   workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
   birdView?: boolean // experimental: Bird view (Bird.tsx), every live session's screen at once, off unless true
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
+  progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
+  progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
   railLabels?: boolean // the rail's words under its icons (unset: on)
   sideStyle?: SideStyle // the sidebar's rows
 }
@@ -392,6 +394,13 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
           {said && <p className="muted small">{said}</p>}
         </Group>
       )}
+      <Group title="Chat button" hint="A button in the window's bottom right corner opens Laki AI over what you're doing, the same conversation as the AI page; with each ask it tells the AI the page, workspace and tab you're on and the tab's screen">
+        <div className="setting-box">
+          <Switch className="switch-row" on={ai.float !== false} onChange={v => onChange({ ...ai, float: v })}>
+            <Says title="Chat button in the corner" hint="Everywhere but the AI page, Settings, Help, and where a chat is on screen already: Specs & Brainstorms, Workflows" />
+          </Switch>
+        </div>
+      </Group>
       <Group title="Steps" hint="OpenRouter: how many rounds of tool calls one ask may take before it stops, a guard against a model that loops (claude -p and codex exec keep their own)">
         <label>
           Rounds at most
@@ -952,6 +961,9 @@ const FIND: [string, string, string?][] = [
   ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule delete remove uninstall top bar status bar where place network internet https'],
   ['widgets', 'More folders', 'extensions widgets'],
   ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
+  ['general', 'Show progress', 'percent sidebar tab both'],
+  ['general', 'Progress in the sidebar', 'percent line bar row'],
+  ['ai', 'Chat button in the corner', 'floating chat ask laki ai anywhere'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
   ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
@@ -1003,7 +1015,10 @@ export type ResourcesApi = {
   widgetName: (id: string) => string
 }
 const SLEEP: [number, string][] = [[0, 'Never'], [15, '15 minutes'], [30, '30 minutes'], [60, '1 hour'], [120, '2 hours'], [240, '4 hours'], [480, '8 hours']]
-const KIND: Record<string, string> = { main: 'Laki', renderer: 'window', 'gpu-process': 'GPU', network: 'network', daemon: 'daemon' }
+const KIND: Record<string, string> = { main: 'Laki: the app (windows, menus, notifications)', renderer: 'a window: what it draws and runs', 'gpu-process': 'GPU: drawing every window and the bubbles', network: 'network', audio: 'audio', storage: 'storage', daemon: 'the daemon: sessions, hooks, scans, the API' }
+// the last 5 minutes of the totals, a sample every 3 s while the page is open (kept while the app runs): the graph
+const HISTORY: { at: number; kb: number; cpu: number }[] = []
+const cpuText = (cpu: number) => (cpu >= 1 ? `${Math.round(cpu)}%` : '')
 // KB as MB, or GB from 1 GB
 const size = (kb: number) => (kb >= 1 << 20 ? `${(kb / (1 << 20)).toFixed(2)} GB` : `${Math.round(kb / 1024)} MB`)
 const total = (ps: { rss: number }[]) => ps.reduce((n, p) => n + p.rss, 0)
@@ -1016,9 +1031,33 @@ function Procs({ ps }: { ps: (ProcUse & { kind?: string })[] }) {
       {[...ps].sort((a, b) => b.rss - a.rss).map(p => (
         <div key={p.pid} data-tip={`${p.pid}: ${p.cmd}`}>
           <span className="mono">{p.kind ? (KIND[p.kind] ?? p.kind) : short(p.cmd)}</span>
+          <span className="num muted">{cpuText(p.cpu)}</span>
           <span className="num">{size(p.rss)}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+// the totals over the last minutes: memory (the accent) and CPU (the running color), each on its own scale
+function ResGraph() {
+  if (HISTORY.length < 2) return null
+  const from = HISTORY[0].at
+  const span = Math.max(HISTORY.at(-1)!.at - from, 1)
+  const line = (k: 'kb' | 'cpu') => {
+    const hi = Math.max(...HISTORY.map(x => x[k]), k === 'cpu' ? 10 : 1)
+    return HISTORY.map(x => `${(((x.at - from) / span) * 100).toFixed(1)},${(38 - (x[k] / hi) * 34).toFixed(1)}`).join(' ')
+  }
+  const peak = Math.max(...HISTORY.map(x => x.cpu))
+  return (
+    <div className="res-graph" data-tip={`The last ${Math.max(1, Math.round(span / 60000))} min, a sample every 3 seconds while this page is open`}>
+      <svg viewBox="0 0 100 40" preserveAspectRatio="none" aria-hidden="true">
+        <polyline className="g-mem" points={line('kb')} />
+        <polyline className="g-cpu" points={line('cpu')} />
+      </svg>
+      <span className="muted small">
+        <i className="g-mem" /> memory · <i className="g-cpu" /> CPU, at most {Math.round(peak)}% · the last {Math.max(1, Math.round(span / 60000))} min
+      </span>
     </div>
   )
 }
@@ -1028,6 +1067,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
   const [named, setNamed] = useState<{ pid: number; name: string; stop?: string }[]>([])
   const [open, setOpen] = useState<string | null>(null) // the row whose processes show
   const [said, setSaid] = useState('') // a Sleep that was refused
+  const [by, setBy] = useState<'rss' | 'cpu'>('rss') // the rows' order: memory, or CPU now
   useEffect(() => {
     let on = true
     const load = () => !document.hidden && Promise.all([api.load(), api.procs?.().catch(() => []) ?? []]).then(([x, n]) => on && (setR(x), setNamed(n)), () => {}) // not while the window is hidden
@@ -1049,9 +1089,16 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
   const app = r ? [...r.app.filter(p => !held.some(h => h.pid === p.pid)), { ...r.daemon, kind: 'daemon' }] : []
   const own = total(app)
   const live = (r?.tabs ?? []).filter(x => tabOf(x.tab))
-  const rows = live.filter(x => !tabOf(x.tab)!.asleep).sort((a, b) => b.rss - a.rss) // an asleep one still exiting: its own row, below
+  const rows = live.filter(x => !tabOf(x.tab)!.asleep).sort((a, b) => b[by] - a[by]) // an asleep one still exiting: its own row, below
   const others = r?.others ?? [] // what the daemon runs besides tabs: Laki AI, tunnels, remote access, SSH, widgets
   const all = own + total(held) + total(live) + total(others)
+  const cpu = (ps: { cpu: number }[]) => ps.reduce((n, p) => n + p.cpu, 0)
+  const allCpu = cpu(app) + cpu(held) + cpu(live) + cpu(others)
+  useEffect(() => {
+    if (!r) return
+    HISTORY.push({ at: Date.now(), kb: all, cpu: allCpu })
+    while (HISTORY.length > 100 || (HISTORY.length && Date.now() - HISTORY[0].at > 5 * 60000)) HISTORY.shift()
+  }, [r])
   // what the sidebar's Terminals and Browsers hold: shell tabs (anywhere), Browsers pages and their sign-in windows
   const shells = total(live.filter(x => tabOf(x.tab)!.kind === 'shell'))
   const browsers = total(held.filter(p => p.name.includes('Browser: ')))
@@ -1063,7 +1110,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
         <span>{name}</span>
         <i className="res-bar" style={{ width: `${all ? (kb / all) * 100 : 0}%` }} />
       </span>
-      <span className="num muted">{cpu >= 1 ? `${Math.round(cpu)}%` : ''}</span>
+      <span className="num muted">{cpuText(cpu)}</span>
       <span className="num">{size(kb)}</span>
       <span className="res-acts" onClick={e => e.stopPropagation()}>
         {acts}
@@ -1086,6 +1133,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
           <>
             <div className="res-total">
               <b>{size(all)}</b>
+              <b className="res-cpu" data-tip="CPU now, all of it: 100% is one core busy">{Math.round(allCpu)}% CPU</b>
               <span className="muted">
                 Laki itself {size(own + total(held) - browsers)} · agents and tabs {size(total(live) - shells)}
                 {shells > 0 && ` · shells ${size(shells)}`}
@@ -1093,8 +1141,20 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
                 {others.length > 0 && ` · Laki AI and connections ${size(total(others))}`}
               </span>
             </div>
+            <ResGraph />
+            <div className="res-head muted small">
+              <span className="grow">Click a row for its processes</span>
+              <span className="seg" role="radiogroup" aria-label="Order">
+                <button type="button" className={by === 'rss' ? 'on' : ''} onClick={() => setBy('rss')}>
+                  By memory
+                </button>
+                <button type="button" className={by === 'cpu' ? 'on' : ''} onClick={() => setBy('cpu')}>
+                  By CPU
+                </button>
+              </span>
+            </div>
             <div className="res-rows">
-              {row('laki', 'Laki itself', own, app.reduce((n, p) => n + p.cpu, 0))}
+              {row('laki', 'Laki itself', own, cpu(app))}
               {open === 'laki' && <Procs ps={app} />}
               {held.map(p => (
                 <div key={p.pid}>
@@ -2055,6 +2115,26 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={!!s.progress} onChange={v => set({ progress: v })}>
                   <Says title="Progress on tabs" hint="Claude and Codex estimate how far along their task is and report it every 20-30 seconds, shown on the tab; agents started from now on (other agents need the laki skill, Settings › Agent skill)" />
                 </Switch>
+                {s.progress && (
+                  <label className="switch-row">
+                    <select value={s.progressAt ?? 'tab'} onChange={e => set({ progressAt: e.target.value as AppSettings['progressAt'] })}>
+                      <option value="tab">On the tab</option>
+                      <option value="sidebar">In the sidebar</option>
+                      <option value="both">Both</option>
+                    </select>
+                    <Says title="Show progress" hint="Where an agent's percent shows: its tab, its workspace's row in the sidebar, or both" />
+                  </label>
+                )}
+                {s.progress && (s.progressAt === 'sidebar' || s.progressAt === 'both') && (
+                  <label className="switch-row">
+                    <select value={s.progressLook ?? 'pct'} onChange={e => set({ progressLook: e.target.value as AppSettings['progressLook'] })}>
+                      <option value="pct">42%</option>
+                      <option value="bar">A line</option>
+                      <option value="both">Both</option>
+                    </select>
+                    <Says title="Progress in the sidebar" hint="On a workspace's row: its percent, a line along the row's bottom that fills, or both" />
+                  </label>
+                )}
               </div>
               </Group>
               <Group title="Development">
@@ -2490,7 +2570,7 @@ export function SettingsPage(p: {
                 </label>
                 <label>
                   <span>
-                    Font size <span className="muted">· ⌘+ / ⌘− / ⌘0</span>
+                    Font size <span className="muted">· every tab's (⌘+ / ⌘− / ⌘0: one tab's)</span>
                   </span>
                   <select value={s.fontSize ?? FONT_SIZE} onChange={e => set({ fontSize: Number(e.target.value) })}>
                     {[...new Set([...FONT_SIZES, s.fontSize ?? FONT_SIZE])]

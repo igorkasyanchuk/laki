@@ -1,8 +1,8 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { API, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
-import { api, bridge, notify, type NotifyAction, onLakiLink, openExternal } from './api'
+import { api, bridge, type Msg, notify, type NotifyAction, onLakiLink, openExternal } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
@@ -56,6 +56,8 @@ const colorOf = (t?: TabView) => t?.color ?? AGENT_COLORS[t?.preset ?? '']
 const EDITOR_IDS = ['cursor', 'zed', 'vscode', 'windsurf', 'antigravity', 'sublime', 'webstorm', 'intellij', 'xcode', 'custom']
 type Where = { ws?: string; project?: string; widget?: string; file?: string } // what Open in opens: a folder (a widget's too), or a file in a workspace
 const WEB = /\.(x?html?|svg|pdf|xml|json|png|jpe?g|gif|webp)$/i // what browsers show
+const PICTURE = /\.(png|jpe?g|gif|webp|heic|tiff?|bmp)$/i // what Copy puts on the clipboard as a picture (main's PICS)
+const PLAIN = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|html?|css|svg|[cm]?[jt]sx?|py|rb|go|rs|sh|sql|diff|patch)$/i // Copy text: files that are text
 const appIcon = (id: string): IconName => (id === 'finder' ? 'folder' : EDITOR_IDS.includes(id) ? 'code' : 'terminal')
 
 // Settings › Appearance › Project names: what's not the theme's goes on the sidebar, as data-ph-* (styles.css) and
@@ -148,6 +150,20 @@ export function App() {
   const made = useRef({ key: 0, page: 0 }) // making's keys; page: the new-workspace page's closes (one closed mid-create isn't the one open now)
   const [wsId, setWsId] = useState<string | null>(() => load('laki.ws', null))
   const [tabByWs, setTabByWs] = useState<Record<string, string>>(() => load('laki.tabs', {})) // the focused pane's session
+  const [aiFloat, setAiFloat] = useState(false) // the floating Laki AI chat, open
+  // another app in front: the window's animations (spinners, lines, a look's effects) stop where they are, so a window
+  // in sight but not in use draws only what changes (styles.css' html.away); the bubbles say who's at work meanwhile
+  useEffect(() => {
+    // main says when another app is in front (a click into a Browsers page or the preview blurs the window, but Laki is
+    // still in front); a browser: the page's focus, read once it has moved (into one of its frames: still focused)
+    const away = (on: boolean) => void document.documentElement.classList.toggle('away', on)
+    away(!document.hasFocus())
+    if (bridge?.onFront) return void bridge.onFront(on => away(!on))
+    const f = () => void setTimeout(() => away(!document.hasFocus()))
+    window.addEventListener('focus', f)
+    window.addEventListener('blur', f)
+    return () => (window.removeEventListener('focus', f), window.removeEventListener('blur', f))
+  }, [])
   const [dialog, setDialog] = useState<Dialog>(null)
   const settingsKey = useMemo(() => ++requests, [dialog]) // each request remounts the settings page where it asks
   const [newFor, setNewFor] = useState<string>() // a project just opened: its new-workspace dialog
@@ -316,6 +332,28 @@ export function App() {
   const [watches, setWatches] = useState<Watch[]>(() => (l => (Array.isArray(l) ? l.filter((w: Watch) => typeof w?.id === 'string' && typeof w.ms === 'number' && (w.from === undefined || typeof w.from === 'number')) : []))(load<unknown>('laki.watches', [])))
   useEffect(() => void localStorage.setItem('laki.watches', JSON.stringify(watches)), [watches])
   const setWatch = (id: string, f: (w: Watch) => Watch | null) => setWatches(l => l.map(w => (w.id === id ? f(w) : w)).filter((w): w is Watch => !!w))
+  const watchesRef = useRef(watches)
+  watchesRef.current = watches
+  // Laki AI's timers (laki_timer, through the daemon): a timer, a reminder about a workspace, a message for later or a
+  // stopwatch; what runs; one stopped
+  const timerAct = useRef<(m: { act: string; ms: number; note?: string; ws?: string; tab?: string; text?: string; which?: string }) => unknown>(() => {})
+  timerAct.current = m => {
+    const id = Math.random().toString(36).slice(2, 10)
+    if (m.act === 'stopwatch') return (setWatches(l => [...l, { id, ms: 0, from: Date.now() }]), { id, stopwatch: 'running' })
+    if (m.act === 'list')
+      return {
+        timers: timersRef.current.map(t => ({ id: t.id, kind: t.then === 'remind' ? 'reminder' : t.then === 'send' ? 'send later' : 'timer', secondsLeft: Math.round((t.left ?? t.end - Date.now()) / 1000), paused: t.left !== undefined, note: t.note, ws: t.ws, text: t.text })),
+        stopwatches: watchesRef.current.map(w => ({ id: w.id, seconds: Math.round((w.ms + (w.from ? Date.now() - w.from : 0)) / 1000), running: !!w.from })),
+      }
+    if (m.act === 'stop') {
+      if (timersRef.current.some(t => t.id === m.which)) return (setTimer(m.which!, () => null), { stopped: m.which })
+      if (watchesRef.current.some(w => w.id === m.which)) return (setWatch(m.which!, () => null), { stopped: m.which })
+      throw new Error(`no timer or stopwatch ${m.which}`)
+    }
+    const then: Partial<Timer> = m.act === 'remind' ? { then: 'remind', ws: m.ws } : m.act === 'send' ? { then: 'send', ws: m.ws, tab: m.tab, text: m.text } : {}
+    setTimers(l => [...l, { id, end: Date.now() + m.ms, ms: m.ms, then: 'notify', ...then, ...(m.note && { note: m.note }) }])
+    return { id, rings: new Date(Date.now() + m.ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) }
+  }
   const addTimer = (ms: number, more: Partial<Timer> = {}) => setTimers(l => [...l, { id: Math.random().toString(36).slice(2, 10), end: Date.now() + ms, ms, then: 'notify', ...more }])
   const setTimer = (id: string, f: (t: Timer) => Timer | null) => setTimers(l => l.map(t => (t.id === id ? f(t) : t)).filter((t): t is Timer => !!t)) // null: gone
   const pause = (id: string) => setTimer(id, x => (x.left === undefined ? { ...x, left: Math.max(1000, x.end - Date.now()) } : { ...x, end: Date.now() + x.left, left: undefined })) // or go on
@@ -577,6 +615,14 @@ export function App() {
           archived.current = []
           for (const id of all) call('wsRestore', { id }).catch(() => {})
         })
+      } else if (m.ev === 'timer') {
+        // Laki AI's laki_timer: the sidebar's timers live here; the answer goes back as the agent browser's does
+        new Promise(ok => ok(timerAct.current(m as Msg & { act: string; ms: number })))
+          .then(
+            result => api.call('browseDone', { id: m.req, ok: true, result }),
+            e => api.call('browseDone', { id: m.req, ok: false, error: String((e as Error).message) }),
+          )
+          .catch(() => {})
       } else if (m.ev === 'browse' && bridge?.browse) {
         // the agent browser (laki browser): main drives a hidden window; its answer goes back to the daemon
         const { req: id, ev: _, ...r } = m // req: an event with an id would be taken for a reply
@@ -855,14 +901,20 @@ export function App() {
           files: () => api.call<{ path: string }[]>('artifactList', { ws: w.id }).then(l => ({ files: l.map(f => f.path), changed: {} })),
           preview: async path => (await leavePreview()) && setPreview({ ws: w.id, path, n: ++requests, storage: true }),
           open: path => void bridge?.openPath?.(`${w.storage}/${path}`), // a document in its app, else shown in Finder
-          menu: (e, path) =>
-            openMenu(e, [
-              ...(bridge?.openPath ? [{ label: 'Open', icon: 'file', run: () => void bridge!.openPath!(`${w.storage}/${path}`) } as MenuItem, { label: 'Show in Finder', icon: 'folder', run: () => revealArt(w, path) } as MenuItem, null] : []),
-              { label: 'Copy path', icon: 'copy', key: 'c', run: () => copy(`${w.storage}/${path}`) },
-            ]),
+          menu: (e, path) => openMenu(e, artMenu(w, path)),
         }
       : undefined,
   })
+  // an artifact's right click (Files' Artifacts, the status bar's strip and its big view): open it, Finder, the clipboard
+  const artMenu = (w: WorkspaceView, path: string): MenuItem[] => {
+    const full = `${w.storage}/${path}`
+    return [
+      ...(bridge?.openPath ? [{ label: 'Open', icon: 'file', run: () => void bridge!.openPath!(full) } as MenuItem, { label: 'Show in Finder', icon: 'folder', run: () => revealArt(w, path) } as MenuItem, null] : []),
+      ...(bridge?.copyFile ? [{ label: 'Copy', icon: 'copy', key: 'c', sub: PICTURE.test(path) ? 'The picture' : 'The file: paste it in Finder, Slack or mail', run: () => void bridge!.copyFile!(full).then(k => (k === 'missing' ? toast(`${path} is gone`) : done(k === 'image' ? 'Picture copied' : 'File copied')), fail) } as MenuItem] : []),
+      ...(PLAIN.test(path) ? [{ label: 'Copy text', icon: 'copy', key: 't', run: () => void api.call<FileContent>('fileRead', { ws: w.id, path, storage: true }).then(c => (c.text === undefined ? toast(`${path} isn't text`) : c.cut ? toast(`${path} is too big to copy as text: Copy puts the file itself there`) : copy(c.text)), fail) } as MenuItem] : []),
+      { label: 'Copy path', icon: 'copy', key: 'p', run: () => copy(full) },
+    ]
+  }
   // an artifact's folder in Finder ('': the storage folder): open-path would open a document in its app
   const revealArt = (w: WorkspaceView, path: string) => void bridge?.openPath?.(`${w.storage}/${path.replace(/\/?[^/]*$/, '')}`)
   // the Artifacts in the side panel's Files (the strip's ⋯ › Open in Files)
@@ -953,14 +1005,23 @@ export function App() {
     settings: () => setDialog({ section: 'widgets' }),
     key: view?.widgetKey,
   }
-  const fontSize = settings.fontSize ?? FONT_SIZE
-  const zoomed = useRef(fontSize) // the size asked for last: quick presses add up before the view comes back
+  const fontSize = settings.fontSize ?? FONT_SIZE // Settings' size: every tab's, less its own zoom
+  // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), Settings and
+  // Help their own size
+  const [zooms, setZooms] = useState<Record<string, number>>(() => (z => (z && typeof z === 'object' && !Array.isArray(z) ? z : {}))(load<unknown>('laki.zoom', {})) as Record<string, number>)
+  useEffect(() => void localStorage.setItem('laki.zoom', JSON.stringify(zooms)), [zooms])
+  const sizeOf = (id: string) => Math.min(32, Math.max(8, fontSize + (Number(zooms[id]) || 0)))
   const zoom = (d: number) => {
     if (pageOpen) return zoomPage(d)
-    zoomed.current = d ? Math.min(32, Math.max(8, zoomed.current + d)) : FONT_SIZE
-    call('settingsSet', { fontSize: zoomed.current }).catch(() => {})
+    if (!tab || dialog) return // a page or dialog over the terminals: not the tab you'd see grow
+    const size = d ? Math.min(32, Math.max(8, sizeOf(tab.id) + d)) : fontSize
+    if (size === sizeOf(tab.id)) return // as big or as small as it goes, or at Settings' size already
+    const { [tab.id]: _, ...rest } = zooms
+    setZooms(size === fontSize ? rest : { ...rest, [tab.id]: size - fontSize })
+    toast(size === fontSize ? `${tab.name}: Settings' size, ${fontSize}` : `${tab.name}: text ${size} (⌘0: back to ${fontSize})`, undefined, undefined, true)
   }
-  useEffect(() => void (zoomed.current = fontSize), [fontSize])
+  const tabIds = view?.tabs.map(t => t.id).join() // closed tabs' zooms go
+  useEffect(() => void (view && setZooms(z => (Object.keys(z).every(id => view.tabs.some(t => t.id === id)) ? z : Object.fromEntries(Object.entries(z).filter(([id]) => view.tabs.some(t => t.id === id)))))), [tabIds])
   // Settings and Help: ⌘± zoom them (Appearance's Settings & Help size), over the terminal font's size they follow
   const pageOpen = settingsOf(dialog) || dialog === 'help'
   const pageZoom = PAGE_ZOOMS.includes(settings.pageZoom as number) ? settings.pageZoom! : 1
@@ -1064,7 +1125,7 @@ export function App() {
     { label: w.muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => call('wsSet', { id: w.id, muted: !w.muted }) },
     { label: 'Remind me…', icon: 'timer', key: 'e', run: () => setDialog({ remind: w.id }) },
     { label: w.pinned ? 'Unpin' : 'Pin to top', icon: 'pin', key: 'p', run: () => call('wsSet', { id: w.id, pinned: !w.pinned }) },
-    ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(() => {}) } as MenuItem] : []),
+    ...(rail ? [{ label: w.railPin ? 'Unpin from the rail' : 'Pin to the rail', icon: 'pin', key: 'k', run: () => call('wsSet', { id: w.id, railPin: !w.railPin }).catch(fail) } as MenuItem] : []), // full (pinned specs count too): says so
     ...(agentTab(w.id) ? [{ label: 'Mark as unread', icon: 'unread', key: 'u', run: () => markUnread(agentTab(w.id)!.id) } as MenuItem] : []),
     ...(w.race ? [{ label: 'Compare the race', icon: 'race', key: 'c', run: () => setDialog({ compare: w.race! }) } as MenuItem] : []),
     ...(w.branch ? [{ label: 'Copy branch name', icon: 'copy', key: 'b', run: () => copy(w.branch) } as MenuItem] : []),
@@ -1510,6 +1571,7 @@ export function App() {
   // sidebar's order)
   const sideStyle = settings.sideStyle ?? 'default'
   const more = sideStyle === 'extended' || sideStyle === 'cards' // a second line under each row
+  const pctSide = settings.progressAt === 'sidebar' || settings.progressAt === 'both' // an agent's percent on its row (the second line has its own)
   const wsRow = (w: WorkspaceView, pin = false) => {
     const wt = view.tabs.filter(t => t.workspace === w.id)
     const queued = wt.reduce((n, t) => n + (t.queue?.length ?? 0), 0)
@@ -1540,6 +1602,7 @@ export function App() {
         {pin && <span className="ws-proj">{view.projects.find(p => p.id === w.project)?.name}</span>}
         {queued > 0 && <span className="badge">+{queued}</span>}
         <span className="spacer" />
+        {pctSide && !more && settings.progressLook !== 'bar' && (top => top >= 0 && <span className="tab-pct" style={{ '--p': `${top}%` } as CSSProperties} data-tip={wt.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}%${t.progress!.note ? `, ${t.progress!.note}` : ''}`).join(' · ')}>{top}%</span>)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1)))}
         {settings.timers && <TurnTime tabs={wt} />}
         {w.stat && (w.stat.add > 0 || w.stat.del > 0) && settings.diffStat === true && (
           <span className="ws-stat">
@@ -1609,6 +1672,7 @@ export function App() {
         )}
         {sideStyle === 'cards' && last && <div className="ws-last">{last}</div>}
         {status && <span className={`ws-line ${pct >= 0 ? 'pct' : ''}`} />}
+        {!status && pctSide && settings.progressLook && settings.progressLook !== 'pct' && (top => top >= 0 && <span className="ws-line pct" style={{ '--p': `${top}%` } as CSSProperties} />)(Math.max(-1, ...wt.map(t => t.progress?.pct ?? -1))) /* the status style's line, filling as it goes */}
       </div>
     )
   }
@@ -1798,7 +1862,7 @@ export function App() {
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
-            {ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
+            {settings.progressAt !== 'sidebar' && ts.map(t => t.progress && <span key={t.id} className="tab-pct" style={{ '--p': `${t.progress.pct}%` } as CSSProperties}>{t.progress.pct}%</span>)}
             {settings.timers && <TurnTime tabs={ts} />}
             {ts.some(t => t.muted) && (
               <span className="ws-mark">
@@ -1871,6 +1935,38 @@ export function App() {
       </button>
     )
   }
+  // specs and brainstorms pinned there (settings.railPlans), after the workspaces: a click opens it on the Specs page
+  const planPins = rail && specsOn ? (settings.railPlans ?? []).slice(0, RAIL_PINS - railPins.length) : [] // the same 5 places as the workspaces'
+  const samePlan = (a: PlanPin, b: { project: string; kind: PlanKind; slug: string }) => a.project === b.project && a.kind === b.kind && a.slug === b.slug
+  const pinPlan = (r: PlanPin, on: boolean) => {
+    const was = settings.railPlans ?? []
+    const had = was.find(x => samePlan(x, r))
+    if (on && had?.title === r.title) return
+    if (on && !had && railPins.length + was.length >= RAIL_PINS) return toast(`The rail holds ${RAIL_PINS} pins: unpin one first`)
+    void call('settingsSet', { railPlans: on ? (had ? was.map(x => (x === had ? r : x)) : [...was, r]) : was.filter(x => x !== had) }).catch(fail)
+  }
+  const planButton = (p: PlanPin) => {
+    const words = p.kind === 'spec' ? 'Spec' : 'Brainstorm'
+    const tip = `${words}: ${p.title || 'Untitled'} · ${view.projects.find(x => x.id === p.project)?.name ?? ''} · right click: unpin`
+    return (
+      <button key={`plan:${p.project}/${p.kind}/${p.slug}`} type="button" className="rail-kind rail-pin nodrag" aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog({ specs: p.project, kind: p.kind, slug: p.slug }))} onContextMenu={e => (e.preventDefault(), openMenu(e, [{ label: 'Open', icon: (p.kind === 'spec' ? 'spec' : 'bulb'), run: () => setDialog({ specs: p.project, kind: p.kind, slug: p.slug }) }, { label: 'Unpin from the rail', icon: 'pin', run: () => pinPlan(p, false) }]))}>
+        <span className="rail-icon">
+          <Icon name={(p.kind === 'spec' ? 'spec' : 'bulb')} size={18} />
+        </span>
+        {railWords && <span className="rail-label">{p.title || 'Untitled'}</span>}
+      </button>
+    )
+  }
+  // the floating chat (Settings › AI's Chat button): Laki AI over any page but its own and those with a chat on them
+  const aiFab = !!settings.ai?.on && settings.ai.float !== false && !narrow && dialog !== 'ai' && dialog !== 'help' && !specsOf(dialog) && !flowsOf(dialog) && !settingsOf(dialog)
+  // what it tells the model with each ask: the page open, the workspace and tab, as they are now, and the tab's screen
+  const whereNow = async () => {
+    const page = dialog === null ? 'the workspace below (no page over it)' : typeof dialog === 'string' ? `the ${dialog} page` : `the ${Object.keys(dialog)[0]} page`
+    const w = ws && [`workspace "${wsName(ws)}" (id ${ws.id}) in project ${project?.name ?? ws.project}`, ws.branch && `branch ${ws.branch}`, ws.pr && `PR #${ws.pr.number} "${ws.pr.title}" ${ws.pr.state.toLowerCase()} ${ws.pr.url}`].filter(Boolean).join(', ')
+    const t = tab && [`tab "${tab.name}" (id ${tab.id}, ${tab.kind === 'agent' ? tab.preset ?? 'agent' : tab.kind}) ${STATE_WORDS[tab.status] ?? tab.status}`, tab.progress && `${tab.progress.pct}% done`, tab.last && `its last answer: ${tab.last.trim().replace(/\s+/g, ' ').slice(0, 400)}`].filter(Boolean).join(', ')
+    const screen = tab && tab.status !== 'exited' ? await api.call<string>('screen', { target: tab.id, lines: 40 }).catch(() => '') : ''
+    return [`On ${page}`, w && `selected: ${w}`, t, screen.trim() && `the tab's screen now (its last 40 lines):\n${screen.replace(/\s+$/gm, '').slice(-5000)}`].filter(Boolean).join('; ')
+  }
   const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   const railBar = rail && sideOpen && (
@@ -1881,8 +1977,9 @@ export function App() {
       {specsOn && railButton('specs', 'spec', 'Specs', !!specsOf(dialog), SPECS_TIP, toSpecs)}
       {flowsOn && railButton('workflows', 'flow', 'Flows', !!flowsOf(dialog), FLOWS_TIP, toFlows, flowsAsk > 0 && <span className="rail-count">{flowsAsk}</span>)}
       {RAIL.slice(1).map(kindButton)}
-      {railPins.length > 0 && <span className="rail-sep" />}
+      {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
       {railPins.map(pinButton)}
+      {planPins.map(planButton)}
       <span className="spacer" />
       {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
       {railButton('settings', 'gear', 'Settings', settingsOf(dialog), 'Settings (⌘,)', toSettings)}
@@ -2099,7 +2196,7 @@ export function App() {
                     tab={id}
                     active={id === tab?.id && !dialog}
                     findSeq={finds[id] ?? 0}
-                    fontSize={narrow ? Math.min(fontSize, 11) : fontSize /* ponytail: a phone's own size, not a setting */}
+                    fontSize={narrow ? Math.min(sizeOf(id), 11) : sizeOf(id) /* ponytail: a phone's own size, not a setting */}
                     fontFamily={settings.fontFamily}
                     copyOnSelect={settings.copyOnSelect !== false}
                     editKeys={settings.editKeys !== false}
@@ -2311,6 +2408,7 @@ export function App() {
                   reveal: path => void bridge?.openPath?.(path),
                   full,
                   toggleFull: () => toggleFull(),
+                  ...(rail && { pinned: r => (settings.railPlans ?? []).some(x => samePlan(x, r)), pin: pinPlan }),
                 }}
               />
             </Suspense>
@@ -2441,8 +2539,12 @@ export function App() {
                     },
                   )
               ).finally(gone)
+              if (page !== made.current.page) {
+                // closed meanwhile: you went on with something else, which keeps the focus; the new one is a click away
+                setReveal(r => [...r, ...got.map(w => w.id)])
+                return toast(`${wsName(got[0])}${got.length > 1 ? ` and ${got.length - 1} more` : ''} ready`, () => showNew(got[0].id, ...got.slice(1).map(w => w.id)), 'Open', true)
+              }
               showNew(got[0].id, ...got.slice(1).map(w => w.id))
-              if (page !== made.current.page) return // closed meanwhile: whatever is open now (another new page too) stays
               setDialog(d => (d !== 'new' ? d : p.fan && got[0].race ? { compare: got[0].race } : null))
               setNewFor(undefined)
               setNewInit(undefined)
@@ -2461,6 +2563,8 @@ export function App() {
               read: path => api.call<FileContent>('fileRead', { ws: ws.id, path, storage: true }),
               reveal: bridge?.openPath && (path => revealArt(ws, path)),
               files: artifactsInFiles,
+              menu: path => artMenu(ws, path),
+              copy,
             }}
           />
         )}
@@ -2549,6 +2653,18 @@ export function App() {
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
           <WidgetStrip widgets={view.widgets ?? []} api={widgetApi} place="status" />
         </div>
+        )}
+        {aiFab && (
+          <>
+            {aiFloat && (
+              <div className="ai-float">
+                <AiPage compact settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setAiFloat(false)} context={whereNow} />
+              </div>
+            )}
+            <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)}>
+              <Icon name={aiFloat ? 'x' : 'ai'} size={17} />
+            </button>
+          </>
         )}
       </main>
 

@@ -311,6 +311,9 @@ export type Settings = {
   railLabels?: boolean // the rail layout's words under its icons; off: icons only, a narrower rail (unset: on)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
   progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)
+  progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
+  progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
+  railPlans?: PlanPin[] // specs and brainstorms pinned to the rail (RAIL_PINS at most), oldest first
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
@@ -323,7 +326,7 @@ export type AiBackend = 'openrouter' | 'claude' | 'codex'
 // preset: an agent preset of the backend's agent (claude, codex), its env for an account of its own
 // skill: Laki's skill for it (unset: on): more tools (PRs, projects' notes and memory, tabs and shells, actions, templates) and
 // asking you with options; hideCost: no $ on the AI page
-export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string } // context: the user's own instructions, after the system prompt
+export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean } // context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
 export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
 export const AI_STEPS = 20
 export const AI_CONTEXT_MAX = 8000 // Your instructions' characters
@@ -469,9 +472,10 @@ export type PlanFile = { path: string; size: number; at: number }
 // a template for a new one (the Specs page's Templates; settings.planTemplates, unset: PLAN_TEMPLATES): its Markdown is the
 // new one's README.md under its title. None picked: empty
 export type PlanTemplate = { name: string; kind: PlanKind; text: string }
+export type PlanPin = { project: string; kind: PlanKind; slug: string; title: string } // its title as last seen: the rail's tip
 
 // The API this build's daemon speaks and its renderer expects: a running daemon with a lower one (it
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 57
+export const API = 58

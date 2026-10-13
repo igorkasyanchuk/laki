@@ -148,7 +148,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const valid = !!rule && !('error' in rule)
 
   return (
-    <Page title="Scheduled tasks" onClose={onClose}>
+    <Page title="Scheduled tasks" esc={false} onClose={onClose}>
       <div className="schedules">
         <header className="sched-hero">
           <span className="sched-hero-icon">

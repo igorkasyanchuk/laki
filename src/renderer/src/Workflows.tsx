@@ -5,7 +5,7 @@
 // where it is and where it went, with what it asks you, its decisions, its variables, and its whole log. Esc doesn't
 // close the page: it stays open while runs go. The engine is the daemon's (daemon/workflow.ts). Loaded as the page
 // opens (App's lazy import).
-import { type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { ACTIONS, BAD_EXITS, BLOCK_NAMES, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
@@ -257,6 +257,19 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
       {menu}
     </Page>
   )
+}
+
+// a field whose text goes through the workflow's Markdown and back (parse trims it and joins its lines; a number left
+// empty is its default): what's typed stays as typed while it has the focus, or a space before the next word, a new
+// line or an emptied number would be gone as it's typed. A value changed elsewhere meanwhile (the File tab) wins
+function Typed({ area, value, onText, ...rest }: { area?: boolean; value: string | number; onText: (v: string) => void; rows?: number; placeholder?: string; disabled?: boolean; 'aria-label'?: string; type?: string; min?: number; max?: number; className?: string }) {
+  const [typed, setTyped] = useState<string | null>(null)
+  const was = useRef<string | null>(null) // the value as the last keystroke left it
+  const now = String(value)
+  if (typed === null) was.current = null
+  else if (was.current === null) was.current = now
+  const p = { ...rest, value: typed !== null && was.current === now ? typed : now, onChange: (e: ChangeEvent<HTMLInputElement & HTMLTextAreaElement>) => ((was.current = null), setTyped(e.target.value), onText(e.target.value)), onBlur: () => setTyped(null) }
+  return area ? <textarea {...p} /> : <input {...p} />
 }
 
 const BLANK = toFile({ id: 'workflow', name: 'New workflow', desc: 'What it does, in a line.', where: 'worktree', session: 'new', blocks: [
@@ -584,20 +597,20 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
         <p className="wf-hint">Pick a block to change it. Drag blocks to move them; + Block adds one after the picked block.</p>
         <div className="wf-field">
           <label>Name</label>
-          <input value={wf.name} onChange={e => edit(w => void (w.name = e.target.value))} />
+          <Typed value={wf.name} onText={v => edit(w => void (w.name = v))} />
         </div>
         <div className="wf-field">
           <label>What it does</label>
-          <input value={wf.desc ?? ''} onChange={e => edit(w => void (w.desc = e.target.value || undefined))} />
+          <Typed value={wf.desc ?? ''} onText={v => edit(w => void (w.desc = v || undefined))} />
         </div>
         <div className="wf-row2">
           <div className="wf-field">
             <label>Runs at once</label>
-            <input type="number" min={1} max={99} value={wf.runs ?? 3} onChange={e => edit(w => void (w.runs = Number(e.target.value) || undefined))} />
+            <Typed type="number" min={1} max={99} value={wf.runs ?? 3} onText={v => edit(w => void (w.runs = Number(v) || undefined))} />
           </div>
           <div className="wf-field">
             <label>Agent turns per run</label>
-            <input type="number" min={1} max={99} value={wf.turns ?? 30} onChange={e => edit(w => void (w.turns = Number(e.target.value) || undefined))} />
+            <Typed type="number" min={1} max={99} value={wf.turns ?? 30} onText={v => edit(w => void (w.turns = Number(v) || undefined))} />
           </div>
         </div>
       </div>
@@ -620,7 +633,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
     </div>
   )
   const text = (v: string | undefined, f: (x: Block, v: string) => void, area = false, ph = '') =>
-    area ? <textarea value={v ?? ''} placeholder={ph} rows={5} onChange={e => set(x => f(x, e.target.value))} /> : <input value={v ?? ''} placeholder={ph} onChange={e => set(x => f(x, e.target.value))} />
+    <Typed area={area} rows={area ? 5 : undefined} value={v ?? ''} placeholder={ph} onText={t => set(x => f(x, t))} />
   const agents = wf.blocks.filter(x => x.kind === 'agent' && x.id !== b.id)
   return (
     <div className="wf-insp">
@@ -699,7 +712,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
       {b.kind === 'run' && (
         <>
           {field('Command', text(b.cmd, (x, v) => (x.cmd = v), false, 'npm test'), 'In the run’s folder; its exit code picks ok or fail. Variables are quoted.')}
-          {field('Timeout (minutes)', <input type="number" min={1} value={b.timeout ?? 10} onChange={e => set(x => void (x.timeout = Number(e.target.value) || undefined))} />)}
+          {field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 10} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />)}
         </>
       )}
       {b.kind === 'ask' && (
@@ -743,7 +756,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
           )}
         </>
       )}
-      {b.kind === 'wait' && field('Timeout (minutes)', <input type="number" min={1} value={b.timeout ?? 60} onChange={e => set(x => void (x.timeout = Number(e.target.value) || undefined))} />, 'Until its PR’s checks pass or fail')}
+      {b.kind === 'wait' && field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 60} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />, 'Until its PR’s checks pass or fail')}
       {b.kind === 'save' && (
         <>
           {field(
@@ -807,7 +820,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
               <div key={i} className="wf-branch">
                 <div className="wf-exit">
                   <span className="wf-exit-name">{i ? 'elsif' : 'if'}</span>
-                  <input value={cur.of ?? ''} placeholder={b.of || 'a variable'} aria-label="Its variable" onChange={e => put({ of: e.target.value.trim() || undefined })} />
+                  <Typed value={cur.of ?? ''} placeholder={b.of || 'a variable'} aria-label="Its variable" onText={v => put({ of: v.trim() || undefined })} />
                   {(b.options?.length ?? 0) > 2 && <IconButton icon="x" title="Remove this branch" onClick={() => set(x => void x.options!.splice(i, 1))} />}
                 </div>
                 <div className="wf-exit">
@@ -816,7 +829,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
                       <option key={t}>{t}</option>
                     ))}
                   </select>
-                  <input value={cur.value} placeholder="text" aria-label="Its text" onChange={e => put({ value: e.target.value })} />
+                  <Typed value={cur.value} placeholder="text" aria-label="Its text" onText={v => put({ value: v })} />
                 </div>
                 <div className="wf-exit">
                   <span>→</span>
@@ -849,7 +862,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
         <>
           {(b.options ?? []).map((o, i) => (
             <div key={i} className="wf-exit">
-              <input value={o.label} disabled={b.kind === 'choice'} onChange={e => set(x => void (x.options![i].label = e.target.value))} />
+              <Typed value={o.label} disabled={b.kind === 'choice'} onText={v => set(x => void (x.options![i].label = v))} />
               <span>→</span>
               {target(o.to, v => set(x => void (x.options![i].to = v)))}
               {b.kind === 'ask' && (b.options?.length ?? 0) > 2 && <IconButton icon="x" title="Remove this option" onClick={() => set(x => void x.options!.splice(i, 1))} />}
@@ -874,7 +887,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
       {b.kind !== 'start' && b.kind !== 'end' && (
         <div className="wf-exit">
           <span className="wf-exit-name">at most</span>
-          <input type="number" min={0} className="wf-num" value={b.max?.n ?? ''} placeholder="∞" onChange={e => set(x => void (x.max = Number(e.target.value) > 0 ? { n: Number(e.target.value), to: x.max?.to } : undefined))} />
+          <Typed type="number" min={0} className="wf-num" value={b.max?.n ?? ''} placeholder="∞" onText={v => set(x => void (x.max = Number(v) > 0 ? { n: Number(v), to: x.max?.to } : undefined))} />
           <span>then</span>
           {b.max ? target(b.max.to, v => set(x => void (x.max = { n: x.max!.n, to: v }))) : <span className="wf-hint">times</span>}
         </div>

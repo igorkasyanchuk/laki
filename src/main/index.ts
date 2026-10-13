@@ -1,13 +1,13 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
+import { app, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
 import { execFile } from 'node:child_process'
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import type { View } from '../shared/types.ts'
 
@@ -764,10 +764,11 @@ ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
 // in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
 // takes the click), so being active alone isn't it: the drop would hide under the pointer as a drag starts
 const own = (w: BrowserWindow | null) => !!w && w !== floater && w !== card && w !== menu && w !== voice && w !== newWin && w !== aiW // the bubbles stay over another app while the new-workspace or AI window is up
-const setFront = (on: boolean) => on !== front && ((front = on), placeFloater())
+const setFront = (on: boolean) => on !== front && ((front = on), placeFloater(), win?.webContents.send('front', on)) // the app window: its animations pause behind another app (App's away)
 app.on('browser-window-focus', (_e, w) => own(w) && setFront(true))
 app.on('did-become-active', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // the focus comes after
 app.on('did-resign-active', () => setFront(false))
+if (!mac) app.on('browser-window-blur', () => setTimeout(() => setFront(own(BrowserWindow.getFocusedWindow())), 100)) // no did-resign-active there: none of Laki's windows has the focus
 
 // the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels; a
 // screen: its rectangle, -R in the same global points as Electron's bounds; none: the main one), then the editor window
@@ -903,6 +904,20 @@ ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
   return 'opened'
 })
 
+// an artifact to the clipboard (the app window's, right click › Copy): a picture as a picture, any other file as the file
+// itself (Finder, Slack and mail paste it); its text the renderer copies on its own
+const PICS = /\.(png|jpe?g|gif|webp|heic|tiff?|bmp)$/i
+ipcMain.handle('copy-file', async (e, path: unknown) => {
+  if (!win || e.sender !== win.webContents || typeof path !== 'string' || !path.startsWith('/')) return 'missing'
+  const real = await realpath(path).catch(() => '')
+  if (!real || !(await stat(real).catch(() => null))?.isFile()) return 'missing'
+  const img = PICS.test(real) ? nativeImage.createFromPath(real) : null
+  if (img && !img.isEmpty()) return (await clipboard.write([new ClipboardItem({ 'image/png': new Blob([new Uint8Array(img.toPNG())], { type: 'image/png' }) })]), 'image')
+  if (mac) await clipboard.write([new ClipboardItem({ 'electron application/osclipboard;format="public.file-url"': pathToFileURL(real).href })]) // what Finder's Copy puts there
+  else await clipboard.writeText(real) // ponytail: off macOS, its path
+  return 'file'
+})
+
 // Quit Completely: the daemon too, so every agent stops (they resume when the app opens again)
 async function quitCompletely() {
   const v = await rpc<View>('state', {}, 3000).catch(() => null)
@@ -989,9 +1004,9 @@ Menu.setApplicationMenu(
         { type: 'separator' },
         key('Command Palette…', 'CmdOrCtrl+K', 'k'),
         { type: 'separator' },
-        key('Bigger', 'CmdOrCtrl+Plus', '='),
-        key('Smaller', 'CmdOrCtrl+-', '-'),
-        key('Default Font Size', 'CmdOrCtrl+0', '0'),
+        key('Bigger Text in This Tab', 'CmdOrCtrl+Plus', '='),
+        key('Smaller Text in This Tab', 'CmdOrCtrl+-', '-'),
+        key('Default Text Size in This Tab', 'CmdOrCtrl+0', '0'),
         { type: 'separator' },
         { role: 'togglefullscreen' },
         { type: 'separator' },
