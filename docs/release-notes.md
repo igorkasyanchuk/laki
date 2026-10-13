@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.13.0 · Oct 13, 2026
 
 - **Project memory for agents**: Claude and Codex get a project's memory at every start there. It has two lists of 50:
   *yours*, and *learned by agents* (auto-memory), which agents add to as they find things worth keeping (`laki memory
