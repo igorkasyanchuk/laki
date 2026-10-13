@@ -4,6 +4,28 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Project memory for agents**: Claude and Codex get a project's memory at every start there. It has two lists of 50:
+  *yours*, and *learned by agents* (auto-memory), which agents add to as they find things worth keeping (`laki memory
+  add`); the oldest learned one goes past 50, and a pin keeps one as yours.
+- **Workflows** (experimental: Settings › General): graphs of blocks Laki runs for a task (agents, commands,
+  choices, questions for you, a PR, CI checks), drawn on a canvas or written as Markdown. Each run gets its own
+  worktree, asks before it opens a PR, approves or merges, keeps its decisions, variables and log, and goes on at its
+  block after a restart. None come with it: yours, or a project's in its repo; `laki flow` and MCP's `laki_workflow_*` too.
+  Its page lists them and their runs like Scheduled tasks and stays open on Esc; an agent block can use one of Run ▾'s
+  agent actions; *Save* keeps text, a file or a link in the workspace's Artifacts; a run's *Log* shows everything it
+  sent, got and ran; a run can be deleted; a workflow has 100 blocks at most; Laki AI and the agent skill know how to
+  write and change workflows.
+- The rail's **AI** sits at its bottom, over Settings.
+- **Bird view** (experimental: Settings › General): the eye beside Help shows every live session at once, a card each
+  under its workspace with its screen as it is now; *All*, *Working* or *Needs you*; a click opens it.
+- With the rail, the sidebar keeps a **width per kind** (Projects, Terminals, Browsers); a pinned rail item isn't lit
+  as the open one.
+- Workflows: a **Case** block (if / elsif / else: branches in order, each on a variable, else last) beside *If / else*;
+  a running run shows its working block's turning gear and the arrow it took flowing; a run and its sessions link both
+  ways (the status bar shows the run, the run opens an agent block's tab).
+- Each action (Settings › Actions, and a project's) has a **slug**, unique and kept through a rename: a workflow's
+  agent block uses the action by it. A workflow now finds a project's own actions (it saw only the global ones).
+- *Restart Laki's daemon* shows after any app update whose daemon is from an older build, not only a lower API.
 - A link clicked in Codex (or another app that takes the mouse) opens one browser tab, not two; ⌘-click opens it
   in Laki, a plain click is the app's.
 - **Pin to the rail**: a workspace's menu puts it (a terminal or a browser too) on the rail below a line, a click away;

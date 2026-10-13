@@ -448,12 +448,7 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .sd-edit textarea { font-family: var(--mono); }
 
 
-/* the Specs & Brainstorms page: breadcrumbs in its header; the index (both kinds) or a kind's list, then one alone */
-.crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 13px; }
-.crumb { flex: none; padding: 2px 6px; border: none; border-radius: var(--rs, 6px); background: none; color: var(--muted); cursor: pointer; }
-.crumb:hover { background: var(--hover); color: var(--fg); }
-.crumb.here { flex: 0 1 auto; min-width: 0; padding: 2px 6px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.crumb-sep { flex: none; color: var(--muted); }
+/* the Specs & Brainstorms page: breadcrumbs in its header (styles.css' .crumbs); the index (both kinds) or a kind's list, then one alone */
 .page-body.wide > .plans-index { max-width: 900px; width: 100%; margin: 0 auto; display: flex; flex-direction: column; gap: 22px; }
 .page-body.wide > .plan { max-width: 1100px; width: 100%; margin: 0 auto; }
 .page-body.wide > .plan.with-chat { max-width: 1560px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(320px, 400px); gap: 24px; align-items: start; }

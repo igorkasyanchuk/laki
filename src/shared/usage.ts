@@ -14,6 +14,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki rm <ws> | archive <ws> | restore <ws> | fork <ws>
   laki rename <ws|.> <name>                   name a workspace (in a tab, . is its own)
   laki pr <ws|.> <url|number>                 attach a GitHub PR to a workspace
+  laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
+  laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours)
+  laki memory rm <project>|. <id>             forget one agents learned
   laki tab <ws> [--preset p] [--cmd c]        a new tab
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
@@ -27,6 +30,9 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               a prompt for an agent at those times; {{DD-MM-YY}} in the name or
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
+  laki flow [ls]                             workflows (experimental: Settings › General) and their runs
+  laki flow run <workflow> <project> <task> [--dry]  start a run (--dry: a PR, approve, merge said, not done)
+  laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id>                 show or hide one | run its fetch now
   laki widget render <id> [--full]            the HTML it shows now, filled from its data

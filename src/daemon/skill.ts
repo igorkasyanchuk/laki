@@ -103,6 +103,22 @@ names one (\`Spec: <path>/README.md\`) means: read it and the files beside it fi
 (\`laki mcp\`): \`laki_plans\` lists them, \`laki_plan_read\` reads one, \`laki_plan_new\` writes a new one for the user,
 \`laki_plan_write\` puts a file beside one (ideas, a prototype, a diagram); never README.md or spec.json, the user's.
 
+Project memory: what Laki keeps about a project for every session in it, the user's items and what agents learned
+(50 each). \`laki memory .\` reads it (claude and codex get it at their start already); when you learn something
+general and lasting about the project (an approach that works or doesn't, a gotcha, a convention, how to run or test
+it), \`laki memory add . "<a line or two>"\` keeps it for later sessions (not task notes, progress or secrets); a
+learned one that's wrong: \`laki memory rm . <id>\`. MCP: \`laki_memory\`, \`laki_remember\`.
+
+Workflows (when the user turned them on: Settings › General › Experimental) are graphs of blocks Laki runs for a task,
+each run in a workspace of its own: agent blocks (a prompt, or one of the user's agent actions with \`use: <its slug>\`, which \`laki_workflows\` lists), run
+(a shell command), ask (the user picks), choice (if/else by what a block said), case (if/elsif/else: branches tested in order, else last), action (open a PR, approve, merge, dev server,
+archive: asks the user first), wait (its PR's checks), save (text, a file of the workspace, or a link into the
+workspace's Artifacts) and end. Each is one Markdown file: yours in Laki, or a project's in \`.laki/workflows/<id>.md\`.
+Over MCP: \`laki_workflows\` lists them and their runs (with an id: that one's whole file); \`laki_workflow_write\`
+writes one, the whole file (its description has the format and every block); to change one, take its file from
+\`laki_workflows\` with its id, edit it and write it back with the same id and project; \`laki_workflow_run\` starts a run. One you wrote runs only after the
+user reads and saves it in Laki. The CLI: \`laki flow ls\`, \`laki flow run <workflow> <project> <task>\`.
+
 ### A new session (/laki:new)
 
 When the user writes \`/laki:new <task>\` (or \`laki:new\`), or asks for a new session for a task "with codex" or

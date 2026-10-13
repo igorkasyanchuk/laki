@@ -5,16 +5,17 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, REMOTE, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, type Memory, REMOTE, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
+import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { describe } from '../shared/when.ts'
 
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -152,6 +153,31 @@ async function main() {
       const r = await rpc(m, { id: rest[0] }, 120000)
       return out(r ?? { ok: true }, r?.id ? `${r.id}  ${r.path}` : 'ok')
     }
+    case 'memory': {
+      // a project's memory: laki memory [ls] [<project>|.] | add <project>|. <text…> [--mine] | rm <project>|. <id>
+      // `.` is the tab's own project; add is an agent's (auto-memory) unless --mine
+      const [a, b, ...words] = rest
+      const sub = ['ls', 'add', 'rm'].includes(a) ? a : 'ls'
+      const ref = sub === 'ls' && a !== 'ls' ? a : b
+      const v: View = await rpc('state')
+      const project = !ref || ref === '.' ? v.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project : ref
+      if (!project) throw new Error(ref === '.' ? `laki memory ${sub} .: only in a Laki tab ($LAKI_WORKSPACE): name the project` : `which project? laki memory ${sub === 'ls' ? '' : `${sub} `}<project>…`)
+      if (sub === 'add') {
+        const text = words.join(' ')
+        if (!text.trim()) throw new Error('usage: laki memory add <project>|. "<what to remember>" [--mine]')
+        const m = await rpc('memoryAdd', { project, text, auto: !flags.mine, tab: process.env.LAKI_TAB })
+        return out(m, `remembered (${m.id})`)
+      }
+      if (sub === 'rm') {
+        if (!words[0]) throw new Error('usage: laki memory rm <project>|. <id>')
+        return out(await rpc('memoryRm', { project, id: words[0] }), `forgot ${words[0]}`)
+      }
+      const p = v.projects.find(x => x.id === project || x.name === project)
+      if (!p) throw new Error(`no project ${project}`)
+      const mem = p.memory ?? []
+      const line = (m: Memory) => `${m.id}  ${new Date(m.at).toISOString().slice(0, 10)}  ${m.text.replace(/\s*\n\s*/g, ' ')}`
+      return out(mem, [`${p.name}: yours`, ...mem.filter(m => !m.auto).map(line), '', 'learned by agents', ...mem.filter(m => m.auto).map(line)].join('\n'))
+    }
     case 'rename':
     case 'pr': {
       // laki rename <ws|.> <name> | laki pr <ws|.> <url|number>: `.` is the tab's own workspace ($LAKI_WORKSPACE)
@@ -216,6 +242,35 @@ async function main() {
       }
       if (sub === 'rm') return out((await rpc('scheduleRm', { id })) ?? { ok: true }, `removed ${id}`)
       throw new Error(`usage: laki schedule [ls] | log | add <project> --when "…" <prompt> | on|off|run|rm <id>`)
+    }
+    case 'flow':
+    case 'flows':
+    case 'workflow': {
+      // workflows (experimental): laki flow [ls] | run <workflow> <project> <task…> [--dry] | show|stop <run> | answer <run> <n> [words]
+      const [sub = 'ls', id, ...words] = rest
+      const status = (r: FlowView | FlowRun) => `${r.status}${!FLOW_ENDED.includes(r.status) && r.cur ? ` at ${r.cur}` : ''}`
+      if (sub === 'ls') {
+        const list: WorkflowItem[] = await rpc('flowList', {})
+        const runs: FlowView[] = (await rpc('state')).flows ?? []
+        return out({ workflows: list.map(({ text, blocks, ...w }) => w), runs }, [
+          ...list.map(w => `${w.id}  ${w.source === 'project' ? `${w.project}'s` : w.source}  ${w.name}${w.problems.length ? `  ⚠ ${w.problems[0]}` : ''}`),
+          ...(runs.length ? ['', ...runs.map(r => `${r.id}  ${status(r)}  ${r.name}: ${r.task}`)] : []),
+        ].join('\n'))
+      }
+      if (sub === 'run') {
+        const [project, ...task] = words
+        if (!id || !project) throw new Error('usage: laki flow run <workflow> <project> <task…> [--dry]')
+        const r: FlowRun = await rpc('flowStart', { workflow: id, project, task: task.join(' '), dry: !!flags.dry }, 180000)
+        return out(r, `${r.id}  ${status(r)}  in ${r.ws}`)
+      }
+      if (sub === 'show') {
+        const r: FlowRun = await rpc('flowGet', { id })
+        const ask = r.wait && 'options' in r.wait ? [`asks: ${r.wait.question}`, ...r.wait.options.map((o, n) => `  ${n}. ${o}`)] : []
+        return out(r, [`${r.flow.name}: ${r.task}  ${status(r)}`, ...ask, '', ...r.decisions.map(d => `${blockName(r.flow.blocks.find(b => b.id === d.block) ?? { id: d.block, kind: 'agent' })} → ${d.exit}: ${d.why}`)].join('\n'))
+      }
+      if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
+      if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
+      throw new Error('usage: laki flow [ls] | run <workflow> <project> <task…> [--dry] | show|stop <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { AGENT_NAMES, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { actionSlug, AGENT_NAMES, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
@@ -161,6 +161,8 @@ export type AppSettings = Paint & {
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
   specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
+  workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
+  birdView?: boolean // experimental: Bird view (Bird.tsx), every live session's screen at once, off unless true
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
   railLabels?: boolean // the rail's words under its icons (unset: on)
   sideStyle?: SideStyle // the sidebar's rows
@@ -686,14 +688,24 @@ function TemplatesField({ value = [], onChange }: { value?: Template[]; onChange
   )
 }
 
-function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange: (v: RunAction[]) => void }) {
+// taken: the other lists' slugs (the daemon keeps them unique everywhere: one taken elsewhere gets a -2 there)
+function ActionsField({ value = [], onChange, taken = [] }: { value?: RunAction[]; onChange: (v: RunAction[]) => void; taken?: (string | undefined)[] }) {
   const keys = useRef<number[]>([]) // like keys, for the cards
   while (keys.current.length < value.length) keys.current.push(Math.random())
+  const fresh = useRef(new Set<number>()) // cards made here: the slug follows the name until it's typed
   const [only, setOnly] = useState<RunAction['target'] | ''>('') // the filter: one target's, or all
   const setAt = (i: number, a: Partial<RunAction>) => onChange(value.map((x, j) => (j === i ? { ...x, ...a } : x)))
+  const others = (i: number) => new Set([...taken, ...value.filter((_, j) => j !== i).map(a => a.slug)].filter((x): x is string => !!x))
+  const named = (i: number, name: string) => setAt(i, fresh.current.has(keys.current[i]) ? { name, slug: name.trim() ? actionSlug(name, others(i)) : undefined } : { name })
   const drop = (i: number) => (keys.current.splice(i, 1), onChange(value.filter((_, j) => j !== i)))
   // a copy right under it, for another agent: the filter would hide it, so it goes
-  const clone = (i: number) => (keys.current.splice(i + 1, 0, Math.random()), setOnly(''), onChange([...value.slice(0, i + 1), { ...value[i] }, ...value.slice(i + 1)]))
+  const clone = (i: number) => {
+    const k = Math.random()
+    keys.current.splice(i + 1, 0, k)
+    fresh.current.add(k)
+    setOnly('')
+    onChange([...value.slice(0, i + 1), { ...value[i], slug: actionSlug(value[i].slug || value[i].name, new Set([...taken, ...value.map(a => a.slug)].filter((x): x is string => !!x))) }, ...value.slice(i + 1)])
+  }
   const used = TARGETS.filter(([v]) => value.some(a => a.target === v))
   const show = used.length > 1 && used.some(([v]) => v === only) ? only : '' // the last of a target gone: all again
   return (
@@ -715,7 +727,7 @@ function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange:
         show && a.target !== show ? null : (
           <div key={keys.current[i]} className="preset">
             <div className="row">
-              <input value={a.name} placeholder="name, as Run ▾ shows it" onChange={e => setAt(i, { name: e.target.value })} />
+              <input value={a.name} placeholder="name, as Run ▾ shows it" onChange={e => named(i, e.target.value)} />
               <select value={a.target} onChange={e => setAt(i, { target: e.target.value as RunAction['target'] })}>
                 {TARGETS.map(([v, label]) => (
                   <option key={v} value={v}>
@@ -727,11 +739,26 @@ function ActionsField({ value = [], onChange }: { value?: RunAction[]; onChange:
               <IconButton icon="trash" title="Remove action" onClick={() => drop(i)} />
             </div>
             <textarea className="mono" rows={2} spellCheck={false} value={a.text} placeholder={ACTION_EG[a.target]} onChange={e => setAt(i, { text: e.target.value })} />
+            {a.target !== 'shell' && (
+              <label className="action-slug-row muted small">
+                Slug
+                <input
+                  className={`mono action-slug${a.slug && others(i).has(a.slug) ? ' bad' : ''}`}
+                  value={a.slug ?? ''}
+                  placeholder={actionSlug(a.name, others(i))}
+                  aria-label="Slug"
+                  spellCheck={false}
+                  data-tip={a.slug && others(i).has(a.slug) ? 'Another action has it: this one gets a -2' : 'Its slug, unique: a workflow’s agent block uses it (use: …). Set from the name; type your own'}
+                  onChange={e => (fresh.current.delete(keys.current[i]), setAt(i, { slug: e.target.value.toLowerCase().replace(/[^a-z0-9-]+/g, '-').slice(0, 40) || undefined }))}
+                />
+                <span>a workflow's agent block uses it</span>
+              </label>
+            )}
           </div>
         ),
       )}
       <div className="row">
-        <button type="button" onClick={() => onChange([...value, { name: '', target: show || 'claude', text: '' }])}>
+        <button type="button" onClick={() => (keys.current.push(Math.random()), fresh.current.add(keys.current[value.length]), onChange([...value, { name: '', target: show || 'claude', text: '' }]))}>
           <Icon name="plus" /> Add action
         </button>
       </div>
@@ -746,6 +773,7 @@ export function ProjectSection(p: {
   rename?: boolean
   script?: keyof Scripts
   global?: { actions?: RunAction[]; templates?: Template[] } // Settings' own, which go with this project's
+  taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
   onSave: (o: { name?: string; config: ProjectConfig; notes?: string }) => unknown
 }) {
@@ -831,7 +859,7 @@ export function ProjectSection(p: {
           {count(mergeActions(p.global?.actions).length, mergeActions([], c.actions).length, mergeActions(p.global?.actions, c.actions).length)}. One here with
           a global one's name and kind replaces it.
         </Scope>
-        <ActionsField value={c.actions} onChange={actions => setC(y => ({ ...y, actions }))} />
+        <ActionsField value={c.actions} taken={[...(p.global?.actions?.map(a => a.slug) ?? []), ...(p.taken ?? [])]} onChange={actions => setC(y => ({ ...y, actions }))} />
       </Group>
       <Group title="Prompt templates">
         <Scope tag="This project">
@@ -929,6 +957,8 @@ const FIND: [string, string, string?][] = [
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
+  ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
+  ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
@@ -1899,6 +1929,7 @@ export function SettingsPage(p: {
               rename={p.renameProjects}
               script={p.script}
               global={{ actions: s.actions, templates: s.templates }}
+              taken={p.projects?.filter(x => x.id !== project.id).flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])}
               onGlobal={openSec}
               onSave={o => p.onSaveProject?.(project.id, o)}
             />
@@ -2045,6 +2076,12 @@ export function SettingsPage(p: {
               <div className="setting-box">
                 <Switch className="switch-row" on={s.specs === true} onChange={v => set({ specs: v })}>
                   <Says title="Specs & Brainstorms" hint="Write a project's requirements like a Notion page (checklists, images, diagrams) and brainstorm ideas with Laki AI (options, a mind map, diagrams, clickable prototypes). Each is a folder outside the repo with a README.md any agent can read. Shows the rail's Specs and a project's Specs tab" />
+                </Switch>
+                <Switch className="switch-row" on={s.workflows === true} onChange={v => set({ workflows: v })}>
+                  <Says title="Workflows" hint="Blocks Laki runs for a task: agents, commands, choices, questions for you, a PR, CI. Each run keeps its decisions and log, and resumes after a restart. Shows the rail's Flows" />
+                </Switch>
+                <Switch className="switch-row" on={s.birdView === true} onChange={v => set({ birdView: v })}>
+                  <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
                 </Switch>
               </div>
               </Group>
@@ -2612,7 +2649,7 @@ export function SettingsPage(p: {
                 A prompt goes to its agent's tab (the focused one first), queued while the agent works; it's listed only while that agent runs there. A
                 command goes to a terminal: the focused one, any other, or a new one. The copy button makes the same for another agent.
               </p>
-              <ActionsField value={s.actions} onChange={actions => set({ actions })} />
+              <ActionsField value={s.actions} taken={p.projects?.flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])} onChange={actions => set({ actions })} />
             </>
           )}
           {sec === 'presets' && (

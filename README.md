@@ -9,11 +9,13 @@ worktree. Agents keep running when the window is closed.
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too). Agents resume after a
   restart or a usage limit.
-- **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (things to keep about it) and its
+- **Projects**: a page each (a click on its name): notes, scheduled tasks, memory (yours and what agents learned, 50 each, given to Claude and Codex at every start) and its
   settings.
 - **Specs & Brainstorms** (experimental): write what to build like a Notion page (checklists, images, diagrams), from
   your own templates, then start a workspace from it; or brainstorm an idea with Laki AI in a chat beside it, which writes
   options, a mind map, diagrams and clickable prototypes. Folders outside the repo that any agent can read.
+- **Workflows** (experimental): blocks Laki runs for a task, drawn on a canvas or written as Markdown (say, a plan you
+  approve, the build, tests until they pass, a PR, CI until green). Each run keeps its decisions and log.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an

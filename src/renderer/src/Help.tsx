@@ -94,6 +94,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
     [`${cli} browser <ws> open /login · screenshot · click "<css>" · fill "<css>" "text" · text`, 'the agent browser: the dev server in a hidden window of the app'],
     [`${cli} send <ws>[/<tab>] "run the tests"`, 'type into an agent now; --when-idle waits for its turn to end'],
     [`${cli} progress 40 "writing tests"`, "in an agent's tab: how far along it is, on the tab (Settings › General › Progress on tabs)"],
+    [`${cli} memory . · memory add . "tests: npm test" · memory rm . <id>`, "a project's memory (in a Laki tab, . is its project): read it, keep a learned item, drop one; --mine: yours"],
     [`${cli} screen <ws>[/<tab>]`, 'the bottom of a tab’s screen'],
     [`${cli} tab <ws> --preset codex`, 'a new tab (a shell by default)'],
     [`${cli} run <ws>`, 'the run script, in a dev tab'],
@@ -101,6 +102,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
     [`${cli} archive <ws> · restore <ws> · fork <ws> · rm <ws>`, 'put a workspace away, bring it back, branch off it, delete it'],
     [`${cli} schedule add <project> --when "weekdays at 9am" "…"`, 'a prompt on repeat (--where new|folder|<ws>, --name "Nightly {{DD-MM}}"); schedule, schedule log, on|off|run|rm <id>'],
     [`${cli} widget · widget reload · widget run <id> · widget render <id> --full`, "the sidebar's extensions (widgets): list them, read their folders again, fetch one now, the HTML it shows"],
+    [`${cli} flow · flow run <workflow> <project> "…" · flow show <run>`, 'workflows (Settings › General › Experimental): list them and their runs, start one on a task, see where it is'],
     [`${cli} ai "what are my agents doing?"`, 'ask Laki AI (Settings › AI); --image <png> with a screenshot; ai log: each call and its cost; ai new: start over'],
     [`${cli} mcp`, 'an MCP server for Claude Code, Codex…: Settings › Agent skill has the command that adds it'],
     [`${cli} stop`, 'stop the daemon: agents resume when it starts again'],
@@ -191,6 +193,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
         { id: 'agents', k: 'Agents', v: "The new workspace page picks the agent, its model and effort under the prompt (type in a picker to filter it, ⏎ picks). The Dock icon and the menu bar count tabs that need you or finished unseen; Settings › Phone pushes sends them to your phone. Settings › Appearance › Turn timers: how long each turn has gone. In a Claude Code tab, /laki:new <the task> with codex starts it in a new workspace of the project." },
         { id: 'widgets', k: 'Extensions', v: 'Extensions (also called widgets or plugins): live tiles in the sidebar, the top bar or the status bar (a click opens the full view): each a folder with widget.json and widget.html, fed by a command on a schedule while the app is open. Settings › Extensions lists them, each with its switch; a click on one places it (sidebar, top bar, status bar), sizes it (and its full view: small, medium, large), sets it up, gives a JS one network access, opens its folder or deletes it; the Extension creator skill (Settings › Agent skill) has your agent make new ones, or Make one with AI there gives a prompt for any AI chat. Laki AI makes them too, saved off until you turn them on.' },
         { id: 'board', k: 'Board', v: 'The columns icon at the bottom of the sidebar: every workspace by where it is (running, needs you, done, PR open, merged); click one to open it. To do holds prompts: ▷, or a drag onto a column, starts a workspace on one.' },
+        { id: 'bird', k: 'Bird view', v: 'Experimental (Settings › General): the eye beside Help shows every live session at once, a card each under its workspace with its screen as it is now; All, Working or Needs you. A click opens it.' },
         { id: 'ai', k: 'AI', v: "Settings › AI turns it on (OpenRouter with your key, or claude -p / codex exec), then AI on the rail, in ⌘K or in the floating bubbles' +: ask in plain words (⏎ asks, ⇧⏎ a new line), or paste a screenshot of PR links, and it starts workspaces, opens tabs, sends prompts and attaches PRs. It never archives, deletes, ships or merges. Calls: each ask with its tokens and cost." },
         {
           id: 'scheduled',

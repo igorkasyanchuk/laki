@@ -369,3 +369,47 @@ test('agents are told about Laki (a preset can say no); a storage folder per wor
   await new Promise(r => setTimeout(r, 200))
   assert.ok(existsSync(dir3), 'kept')
 })
+
+test('project memory: yours and what agents learned, 50 each, given to claude at its start; laki memory', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('projectSet', { id: p.id, memory: [{ id: 'm1', text: 'deploys go\nthrough\u0000 fly', at: 1 }] }) // a NUL would fail the spawn
+  // an agent's: auto, the same text only dated anew, the oldest past 50 goes
+  const first = await rig.rpc('memoryAdd', { project: p.id, text: 'tests: npm test' })
+  assert.equal(first.auto, true)
+  assert.equal((await rig.rpc('memoryAdd', { project: p.id, text: 'Tests: npm test' })).id, first.id)
+  for (let i = 0; i < 50; i++) await rig.rpc('memoryAdd', { project: p.id, text: `fact ${i}` })
+  const mem = (await rig.rpc('state')).projects[0].memory
+  assert.equal(mem.filter((m: any) => m.auto).length, 50)
+  assert.ok(!mem.some((m: any) => m.text === 'tests: npm test'), 'the oldest learned one went')
+  assert.deepEqual(mem.filter((m: any) => !m.auto).map((m: any) => m.id), ['m1'])
+  await assert.rejects(rig.rpc('memoryAdd', { project: p.id, text: 'x'.repeat(700) }), /600 characters at most/)
+  await assert.rejects(rig.rpc('memoryRm', { project: p.id, id: 'm1' }), /that one is the user's/)
+  // yours: 50 at most
+  const many = Array.from({ length: 51 }, (_, i) => ({ id: `u${i}`, text: `mine ${i}`, at: i + 1 }))
+  await assert.rejects(rig.rpc('projectSet', { id: p.id, memory: [...mem, ...many] }), /keeps 50 memories of yours/)
+
+  // claude gets both at its start, with how to add to it (allowed without asking)
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'work' })
+  const started = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find((l: any) => l.bin === 'claude'), 'claude started')
+  const note = started.args[started.args.indexOf('--append-system-prompt') + 1]
+  assert.match(note, /From the user \(follow these\):\n- 1970-01-01: deploys go\n {2}through fly/)
+  assert.match(note, /Learned by agents [^\n]*\n(- \[\w+\] \d{4}-\d\d-\d\d: fact \d+\n?){50}/)
+  assert.match(note, /`laki memory add \. "<what to remember>"`/)
+  const allow: string[] = JSON.parse(readFileSync(started.args[started.args.indexOf('--settings') + 1], 'utf8')).permissions.allow
+  assert.ok(allow.some(a => a.endsWith(' memory add .:*)')), allow.join(', '))
+
+  // the CLI in a tab: `.` is its project, an agent's memory with who said it; rm only a learned one
+  rig.env.LAKI_WORKSPACE = ws.id
+  rig.env.LAKI_TAB = started.tab ?? ''
+  t.after(() => (delete rig.env.LAKI_WORKSPACE, delete rig.env.LAKI_TAB))
+  const add = await rig.cli('memory', 'add', '.', 'the', 'API', 'is', 'in', 'api/')
+  assert.equal(add.code, 0, add.err)
+  const id = /remembered \((\w+)\)/.exec(add.out)![1]
+  assert.match((await rig.cli('memory')).out, new RegExp(`learned by agents[\\s\\S]*${id}  \\d{4}-\\d\\d-\\d\\d  the API is in api/`))
+  assert.match((await rig.cli('memory', 'add', '.', 'mine', 'too', '--mine')).out, /remembered/)
+  assert.equal((await rig.cli('memory', 'rm', '.', id)).code, 0)
+  const after = (await rig.rpc('state')).projects[0].memory
+  assert.ok(!after.some((m: any) => m.id === id))
+  assert.ok(after.some((m: any) => m.text === 'mine too' && !m.auto))
+})

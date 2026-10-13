@@ -382,6 +382,7 @@ test('side panel: files with their changes, new files and folders, only inside t
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), []) // no PR yet: the fake gh gives every branch one at the first scan, 2 s after the daemon starts
   writeFileSync(join(ws.path, 'README.md'), 'changed\n')
   mkdirSync(join(ws.path, 'src'))
   writeFileSync(join(ws.path, 'src', 'new.ts'), 'x\n')
@@ -412,7 +413,6 @@ test('side panel: files with their changes, new files and folders, only inside t
   assert.equal((await rig.rpc('fileRead', { ws: ws.id, path: 'readme' })).text, 'changed\n')
   f = await rig.rpc('files', { ws: ws.id })
   assert.ok(f.files.includes('src/lib/a.ts'))
-  assert.deepEqual(await rig.rpc('prThreads', { ws: ws.id }), []) // no PR
   // the preview: text, an image, a binary file
   assert.deepEqual(await rig.rpc('fileRead', { ws: ws.id, path: 'README.md' }), { size: 8, text: 'changed\n' })
   writeFileSync(join(ws.path, 'dot.png'), Buffer.from([0x89, 0x50, 0x4e, 0x47]))
@@ -593,7 +593,7 @@ test('a folder without git is a project (local workspaces only); project setting
   ]
   const templates = [{ name: 'fix', text: 'Fix {{prompt}}', extra: 1 }, { name: 'bad' }, { text: 'no name' }]
   const withActions = await rig.rpc('projectSet', { id: p.id, config: { run: 'echo from-app', actions, templates } })
-  assert.deepEqual(withActions.config.actions, [actions[0], actions[1], actions[2], actions[4]])
+  assert.deepEqual(withActions.config.actions, [actions[0], actions[1], actions[2], actions[4]].map((a, i) => ({ ...a, slug: ['review', 'migrate', 'action', 'y'][i] }))) // each with a slug
   assert.deepEqual(withActions.config.templates, [{ name: 'fix', text: 'Fix {{prompt}}' }])
   // and the run script still comes from the config with them in it
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', local: true })

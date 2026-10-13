@@ -1,5 +1,6 @@
 // Shapes shared by the daemon, the CLI and the renderer.
 import { type Rule, stamp } from './when.ts'
+import type { FlowRun, FlowView } from './workflow.ts'
 
 // the coding agents Laki starts by name (a preset's agent; the command is the id), and what they're called
 export const AGENTS = ['claude', 'codex', 'gemini', 'grok', 'opencode'] as const
@@ -16,7 +17,7 @@ export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opu
 // expose: who Expose to the world lets in by default (emails, *@domains; empty: anyone with the link)
 // actions: Run ▾'s for the project's workspaces, after the global ones (one of the same name and target replaces it);
 // target any: whichever agent runs (the focused one first)
-export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: string }
+export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: string; slug?: string } // slug: unique across Settings' and every project's (actionSlug), what a workflow's use: names
 // a prompt template: {{prompt}} (what's typed), {{project}}, {{base}}; settings.templates and a project's own
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
@@ -44,12 +45,14 @@ export type Project = {
   notes?: string // Project notes: the user's Markdown (links, how-tos), its ⋯ menu's Notes and Settings; never agents'
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
-  memory?: Memory[] // the project page's Memory: the user's notes to keep, one each, newest last; never agents' (yet)
+  memory?: Memory[] // the project page's Memory, newest last: the user's (MEMORY_MAX) and what agents learned (auto, MEMORY_MAX); claude and codex get both at every start
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
 }
 // each mark unset: on; at: where a row shows them (unset: start, by the status circle)
 export type PRMarks = { approved?: boolean; mine?: boolean; commented?: boolean; at?: 'start' | 'name' | 'end' }
-export type Memory = { id: string; text: string; at: number; edited?: number } // at: when it was added
+export type Memory = { id: string; text: string; at: number; edited?: number; auto?: boolean; by?: string } // at: when it was added; auto: an agent's (auto-memory), else the user's; by: who (an agent, its workspace)
+export const MEMORY_MAX = 50 // each kind's: the user's (refused past it), agents' (the oldest goes)
+export const MEMORY_AUTO_LEN = 600 // an agent's memory: the gist, in a line or two
 export type Sep = { id: string; name: string; color?: string; template?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; sort: its workspaces' (unset: the project's)
 // the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
 export const WS_SORTS = ['manual', 'created', 'activity', 'name'] as const
@@ -97,6 +100,7 @@ export type Workspace = {
   fork?: boolean // a fork's PR (or a fork of one): its .laki.json isn't read, the repo's is
   browser?: string // a Browsers workspace: the page it's on (the app shows it instead of terminals)
   storage?: string // its tabs' $LAKI_STORAGE_FOLDER (storageOf: made at its first tab, removed with it unless settings.keepStorage)
+  flow?: string // the workflow run that made it (its mark in the sidebar)
 }
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
@@ -145,6 +149,22 @@ export function templated(t: Template | undefined, prompt: string, vars: Record<
   const taken = uses('pr') && !!vars.pr && [vars.pr, vars.pr.replace('#', '')].includes(prompt.trim())
   return uses('prompt') || !prompt.trim() || taken ? text : `${text}\n\n${prompt}`
 }
+// an action's slug: its own (typed) or its name's, lowercase words and dashes, 40 at most; -2, -3… past one taken
+export function actionSlug(want: string, taken: Set<string> = new Set()) {
+  const base = want.toLowerCase().normalize('NFKD').replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40).replace(/-+$/, '') || 'action'
+  let s = base
+  for (let n = 2; taken.has(s); n++) s = `${base.slice(0, 40 - String(n).length - 1)}-${n}`
+  taken.add(s)
+  return s
+}
+// the action a workflow's use: names, by its slug, else its name (any case); the merged list first, then the global
+// ones a project's replaced
+export function findAction(global: RunAction[] = [], project: RunAction[] = [], use?: string) {
+  const u = use?.trim()
+  if (!u) return undefined
+  const all = [...mergeActions(global, project), ...mergeActions(global)] // unfinished ones (no name or text) aren't actions
+  return all.find(a => a.slug === u) ?? all.find(a => a.name.trim().toLowerCase() === u.toLowerCase())
+}
 // the global actions and a project's together: a project's one with a global one's name and target replaces it
 export function mergeActions(global: RunAction[] = [], project: RunAction[] = []) {
   const same = (a: RunAction, b: RunAction) => a.target === b.target && (a.name ?? '').trim() === (b.name ?? '').trim() // a hand-edited one may lack a name
@@ -172,6 +192,7 @@ export type Tab = {
   id: string
   workspace: string
   name: string
+  flow?: string // the workflow run that last sent it a block's prompt (the status bar links to it)
   kind: TabKind
   preset?: string // an Agent or custom: what the agent is (hooks, resume)
   profile?: string // the preset (Settings) it started from: its args and env
@@ -249,6 +270,8 @@ export type Settings = {
   tunnelMails?: string[] // who the last tunnel let in (Expose to the world)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   specs?: boolean // experimental (Settings › General): Specs & Brainstorms, off unless true
+  workflows?: boolean // experimental (Settings › General): Workflows, off unless true
+  birdView?: boolean // experimental (Settings › General): the eye beside Help, every live session's screen at once, off unless true
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
@@ -357,7 +380,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[] }
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; flows?: FlowRun[]; flowsByAgent?: string[] }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -435,7 +458,7 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; api?: number }
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; flows?: FlowView[]; api?: number; built?: string } // built: its build's time (none from source)
 
 // specs and brainstorms (experimental, settings.specs; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
@@ -451,4 +474,4 @@ export type PlanTemplate = { name: string; kind: PlanKind; text: string }
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 52
+export const API = 57

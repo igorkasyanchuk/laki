@@ -15,6 +15,7 @@ import * as core from './core.ts'
 import { refreshSkills, skills, skillSet } from './skill.ts'
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
+import { flowAnswer, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
 import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 
 const { dir } = core
@@ -71,6 +72,7 @@ if (process.env.LAKI_FROM_APP) core.adoptLoginPath()
 core.load()
 core.writeHooks()
 core.restoreAll()
+flowResume() // workflow runs back at their blocks
 scanWidgets()
 try {
   refreshSkills()
@@ -119,6 +121,8 @@ const api: Record<string, Handler> = {
   projectAdd: p => core.projectAdd(p.path),
   projectRm: p => core.projectRm(p.id),
   projectSet: p => core.projectSet(p.id, p),
+  memoryAdd: p => core.memoryAdd(p), // an agent's (auto-memory), or --mine
+  memoryRm: p => core.memoryRm(p), // an agent's only
   projectFile: p => core.projectFileConfig(p.id),
   branches: p => core.branches(p.project),
   wsNew: p => core.wsNew(p),
@@ -234,6 +238,15 @@ const api: Record<string, Handler> = {
     planRm(p) // the app's Delete, after its confirm: never MCP's nor Laki AI's; its chat goes too
     aiForget(chat)
   },
+  flowList: p => flowList(p), // workflows (experimental): workflow.ts
+  flowSave: p => flowSave(p),
+  flowRm: p => flowRm(p), // the app's Delete, after its confirm
+  flowStart: p => flowStart(p),
+  flowStop: p => flowStop(p),
+  flowAnswer: p => flowAnswer(p),
+  flowGet: p => flowGet(p),
+  flowForget: p => flowForget(p),
+  flowTick: p => flowTick(p.now), // tests move the clock
   shutdown: () => void setTimeout(shutdown, 50),
 }
 
@@ -352,6 +365,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(15000, () => core.remoteTick())
   every(30000, () => core.scheduleTick())
   every(30000, () => widgetTick())
+  every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)
 })
@@ -361,6 +375,7 @@ function shutdown() {
   timers.forEach(clearInterval)
   core.stopTunnels()
   core.remoteStop()
+  flowStopAll() // a run block's command
   aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
   core.stopHosts()
   try {

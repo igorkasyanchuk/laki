@@ -1,9 +1,9 @@
-// A project's page (a click on its name in the sidebar): its Notes, its Scheduled tasks, Memory (the user's notes to
-// keep, one each: add, edit, delete), its Specs (experimental: settings.specs; the Specs page opens one) and its
-// Settings (Settings' own project section). Notes and memory are the
-// user's: kept with the project in the daemon, never given to agents (yet). App.tsx passes a ProjectApi.
+// A project's page (a click on its name in the sidebar): its Notes, its Scheduled tasks, Memory (the user's items to
+// keep, and what agents learned, auto-memory: MEMORY_MAX each; claude and codex get both at every start), its Specs
+// (experimental: settings.specs; the Specs page opens one) and its Settings (Settings' own project section). Notes are
+// the user's alone: kept with the project in the daemon. App.tsx passes a ProjectApi.
 import { useEffect, useState } from 'react'
-import type { Memory, Plan, PlanKind, Project, ProjectConfig, RunAction, Schedule, Template } from '../../shared/types'
+import { type Memory, MEMORY_MAX, type Plan, type PlanKind, type Project, type ProjectConfig, type RunAction, type Schedule, type Template } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { describe } from '../../shared/when'
 import { Markdown } from './MarkdownView'
@@ -165,12 +165,18 @@ function Specs({ specs }: { specs: NonNullable<ProjectApi['specs']> }) {
   )
 }
 
-// Memory: what to keep about the project, one note each (Markdown), newest first; the whole list is saved each time
+// Memory: what to keep about the project, one item each (Markdown), newest first: yours, then what agents learned
+// (auto-memory: laki memory add, MCP's laki_remember); the whole list is saved each time
 const newId = () => `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
 function MemoryList({ memory, save }: { memory: Memory[]; save: (m: Memory[]) => Promise<unknown> }) {
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
-  const add = () => draft.trim() && save([...memory, { id: newId(), text: draft.trim(), at: Date.now() }]).then(() => setDraft(''), () => {})
+  const mine = memory.filter(m => !m.auto)
+  const learned = memory.filter(m => m.auto)
+  const full = mine.length >= MEMORY_MAX
+  const add = () => draft.trim() && !full && save([...memory, { id: newId(), text: draft.trim(), at: Date.now() }]).then(() => setDraft(''), () => {})
+  // a learned one kept as yours: the agents' rolling list no longer drops it
+  const keep = (m: Memory) => !full && save([...memory.filter(x => x.id !== m.id), { ...m, auto: undefined, by: undefined, edited: Date.now() }]).catch(() => {})
   const update = () => editing?.text.trim() && save(memory.map(m => (m.id === editing.id ? { ...m, text: editing.text.trim(), edited: Date.now() } : m))).then(() => setEditing(null), () => {})
   const remove = (m: Memory) => void ask('Delete this memory?', { text: m.text.length > 120 ? `${m.text.slice(0, 120)}…` : m.text, ok: 'Delete', danger: true }).then(y => y && save(memory.filter(x => x.id !== m.id)).catch(() => {}))
   // ⌘⏎ does it; Esc leaves the box (the page's Esc would close it, the text with it)
@@ -181,14 +187,32 @@ function MemoryList({ memory, save }: { memory: Memory[]; save: (m: Memory[]) =>
       <div className="mem-new">
         <textarea rows={3} value={draft} aria-label="A new memory" placeholder="Something to keep about this project: a decision, a gotcha, who to ask… (Markdown)" onChange={e => setDraft(e.target.value)} onKeyDown={keys(add)} />
         <div className="row">
-          <span className="muted small grow">Kept with the project in Laki; agents don't see them (yet) · ⌘⏎ adds it</span>
-          <button className="primary" disabled={!draft.trim()} onClick={add}>
+          <span className="muted small grow">{full ? `${MEMORY_MAX} of yours at most: delete one to add another` : 'Claude and Codex get these at every start in this project · ⌘⏎ adds it'}</span>
+          <button className="primary" disabled={!draft.trim() || full} onClick={add}>
             Add
           </button>
         </div>
       </div>
-      {!memory.length && <p className="muted small">Nothing yet.</p>}
-      {[...memory].reverse().map(m =>
+      <div className="mem-head">
+        <b>Yours</b>
+        <span className="muted small">
+          {mine.length}/{MEMORY_MAX}
+        </span>
+      </div>
+      {!mine.length && <p className="muted small">Nothing yet.</p>}
+      {[...mine].reverse().map(m => item(m))}
+      <div className="mem-head">
+        <b>Learned by agents</b>
+        <span className="muted small" data-tip={`Agents add what they learn about the project (laki memory add); past ${MEMORY_MAX}, the oldest goes`}>
+          {learned.length}/{MEMORY_MAX} · auto-memory
+        </span>
+      </div>
+      {!learned.length && <p className="muted small">Nothing yet: agents add what they learn as they work here.</p>}
+      {[...learned].reverse().map(m => item(m))}
+    </>
+  )
+  function item(m: Memory) {
+    return (
         editing?.id === m.id ? (
           <div key={m.id} className="mem editing">
             <textarea autoFocus rows={Math.min(14, Math.max(3, editing.text.split('\n').length + 1))} value={editing.text} aria-label="The memory" onChange={e => setEditing({ id: m.id, text: e.target.value })} onKeyDown={keys(update)} />
@@ -208,13 +232,14 @@ function MemoryList({ memory, save }: { memory: Memory[]; save: (m: Memory[]) =>
             <div className="mem-foot">
               <span className="muted small grow" data-tip={new Date(m.edited ?? m.at).toLocaleString()}>
                 {m.edited ? `edited ${ago(m.edited)}` : `added ${ago(m.at)}`}
+                {m.by ? ` · ${m.by}` : ''}
               </span>
+              {m.auto && <IconButton icon="pin" title={full ? `${MEMORY_MAX} of yours at most` : 'Keep it as yours'} onClick={() => void keep(m)} />}
               <IconButton icon="pencil" title="Edit" onClick={() => setEditing({ id: m.id, text: m.text })} />
               <IconButton icon="trash" title="Delete" onClick={() => remove(m)} />
             </div>
           </div>
-        ),
-      )}
-    </>
-  )
+        )
+    )
+  }
 }

@@ -3,8 +3,9 @@
 import { createInterface } from 'node:readline'
 import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { BRAINSTORM_OUTPUT } from '../shared/plans.ts'
-import { AI_ACTS, API, mergeActions, prRef, rowsOf, templated, templatesFor, type View } from '../shared/types.ts'
+import { AI_ACTS, API, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, mergeActions, prRef, rowsOf, templated, templatesFor, type View } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
+import { WORKFLOW_FORMAT } from '../shared/workflow.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 
 export type Tool = { name: string; description: string; inputSchema: object; max?: number; run: (a: any) => Promise<unknown> } // max: what Laki AI's model may read of its result (TOOL_TEXT)
@@ -120,6 +121,31 @@ export const tools = (rpc: Rpc, from?: string): Tool[] => [
     inputSchema: obj({ pct: { type: 'number', description: '0 to 100: how much of the whole task is done' }, note: str('what you are on now, a few words') }, ['pct']),
     run: a => rpc('progress', { tab: process.env.LAKI_TAB, pct: a.pct, note: a.note }),
   },
+  // a project's memory (agents': Laki AI keeps the user's with laki_memory_write)
+  {
+    name: 'laki_memory',
+    description: "A project's memory: the user's items (follow these) and what agents learned (auto-memory), each with its id and when it was added. claude and codex get it at their start already.",
+    inputSchema: obj({ project: str("a project id (default: your workspace's)") }),
+    run: async a => {
+      const v: View = await rpc('state')
+      const id = a.project || v.workspaces.find(w => w.id === from)?.project
+      const p = v.projects.find(x => x.id === id)
+      if (!p) throw new Error(id ? `no project ${id}` : 'which project? (project)')
+      const day = (m: Memory) => ({ id: m.id, text: m.text, added: new Date(m.at).toISOString().slice(0, 10) })
+      return { project: p.id, yours: (p.memory ?? []).filter(m => !m.auto).map(day), learned: (p.memory ?? []).filter(m => m.auto).map(day) }
+    },
+  },
+  {
+    name: 'laki_remember',
+    description: `Save something general and lasting about a project for its later sessions (auto-memory): an approach that works or doesn't, a gotcha, a convention, where things live, how to run or test it. A line or two (${MEMORY_AUTO_LEN} characters at most); not this task's notes, progress or secrets. The ${MEMORY_MAX} newest learned ones are kept.`,
+    inputSchema: obj({ text: str('what to remember, the gist'), project: str("a project id (default: your workspace's)") }, ['text']),
+    run: async a => {
+      const project = a.project || ((await rpc('state')) as View).workspaces.find(w => w.id === from)?.project
+      if (!project) throw new Error('which project? (project)')
+      const m = await rpc('memoryAdd', { project, text: a.text, tab: process.env.LAKI_TAB })
+      return { ok: true, id: m.id }
+    },
+  },
   {
     name: 'laki_screen',
     description: "The last lines of a tab's terminal: what the agent or command shows now.",
@@ -219,6 +245,43 @@ export const tools = (rpc: Rpc, from?: string): Tool[] => [
     inputSchema: obj({ project: str('its project id'), kind: { type: 'string', enum: ['spec', 'brainstorm'] }, slug: str('its slug'), path: str('the file, relative to its folder: ideas.md, prototype-cards.html…'), text: str('the whole file') }, ['project', 'kind', 'slug', 'path', 'text']),
     run: a => rpc('planWrite', { project: a.project, kind: a.kind, slug: a.slug, path: a.path, text: a.text }),
   },
+  // workflows (experimental: off, the daemon says so)
+  {
+    name: 'laki_workflows',
+    description: "The user's workflows in Laki (graphs of blocks Laki runs for a task: agents, commands, questions for the user, a PR, CI, files for its Artifacts) and their runs: each run's status and block. With id: that workflow's whole file as Markdown, what laki_workflow_write takes back to change it. Also the agent actions an agent block can use (use: <slug>): Settings', and the project's with project.",
+    inputSchema: obj({ project: str('a project id (laki_state): its own workflows too; with id, the project whose workflow it is; default: all, or yours'), id: str("a workflow's id: its whole file") }),
+    max: 60000,
+    run: async a => {
+      type W = { id: string; source: string; project?: string; name: string; desc?: string; problems: string[]; text: string }
+      const list: W[] = await rpc('flowList', { project: a.project || undefined })
+      const { v, actions: all } = await kit(rpc, a.project || undefined)
+      const actions = all.filter(x => x.target !== 'shell').map(x => ({ slug: x.slug, name: x.name, agent: x.target }))
+      if (a.id) {
+        const w = list.find(x => x.id === a.id && (a.project ? x.project === a.project : x.source === 'yours')) ?? list.find(x => x.id === a.id)
+        if (!w) throw new Error(`no workflow ${a.id}`)
+        return { id: w.id, source: w.source, project: w.project, name: w.name, problems: w.problems, file: w.text, actions }
+      }
+      return { workflows: list.map(w => ({ id: w.id, source: w.source, project: w.project, name: w.name, desc: w.desc, problems: w.problems })), actions, runs: (v.flows ?? []).map((r: { id: string; name: string; task: string; status: string; block?: string; ws?: string }) => ({ id: r.id, workflow: r.name, task: r.task, status: r.status, block: r.block, workspace: r.ws })) }
+    },
+  },
+  {
+    name: 'laki_workflow_write',
+    description: `Write a workflow for the user (yours: in Laki for any project; or a project's: in its repo's .laki/workflows). The whole file. To change one: its whole file from laki_workflows with its id, edited, written back with the same id (and project, for a project's). The user reads it in Laki and runs it first: one you wrote, laki_workflow_run refuses until they save it there.\n${WORKFLOW_FORMAT}`,
+    inputSchema: obj({ id: str('its file name: letters, digits, - _'), text: str('the whole Markdown file'), project: str('a project id: saved in that repo; default: yours') }, ['id', 'text']),
+    run: async a => {
+      const w = await rpc('flowSave', { id: a.id, text: a.text, source: a.project ? 'project' : 'yours', project: a.project || undefined, by: 'agent' })
+      return { id: w.id, source: w.source, name: w.name, problems: w.problems }
+    },
+  },
+  {
+    name: 'laki_workflow_run',
+    description: 'Start a run of a workflow on a task, in a project: a worktree of its own (or the project folder), its blocks one by one; what it asks goes to the user in Laki. dry: opening a PR, approving, merging and archiving are said, not done.',
+    inputSchema: obj({ workflow: str('its id (laki_workflows)'), project: str('a project id'), task: str('what it works on'), dry: { type: 'boolean' } }, ['workflow', 'project', 'task']),
+    run: async a => {
+      const r = await rpc('flowStart', { workflow: a.workflow, project: a.project, task: a.task, dry: !!a.dry, by: 'agent', trigger: 'an agent' }, 180000)
+      return { id: r.id, status: r.status, workspace: r.ws }
+    },
+  },
 ]
 
 // a project's prompt templates and Run ▾'s actions, as the app has them (templatesFor, mergeActions)
@@ -296,7 +359,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
   },
   {
     name: 'laki_memory_write',
-    description: "Add an item to a project's memory (a fact to keep: a decision, a how-to), or change one by its id.",
+    description: `Add an item of the user's to a project's memory (a fact to keep: a decision, a how-to; ${MEMORY_MAX} at most), or change one by its id. Its claude and codex sessions get the memory at their start.`,
     inputSchema: obj({ project: str('a project id'), text: str('the item, a line or a few'), id: str("an item's id to change it (default: a new one)") }, ['project', 'text']),
     run: async a => {
       const { p } = await kit(rpc, a.project)
@@ -335,7 +398,7 @@ export const skillTools = (rpc: Rpc): Tool[] => [
   },
   {
     name: 'laki_actions',
-    description: "The user's actions (Run ▾): prompts for an agent and commands for a terminal, global and the project's, by name.",
+    description: "The user's actions (Run ▾): prompts for an agent and commands for a terminal, global and the project's, by name; each with its slug (what a workflow's use: names).",
     inputSchema: obj({ project: str('a project id') }),
     run: async a => (await kit(rpc, a.project)).actions,
   },

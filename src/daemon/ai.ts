@@ -35,6 +35,7 @@ A project with groups (laki_state's groups, the sidebar's headings): put each ne
 Find workspaces by name, branch, PR number or PR title. You cannot archive or delete workspaces, ship or merge: say so if asked.
 Link each workspace or tab you name, so the user opens it with a click: [its name](laki://ws/<workspace id>), or [its name](laki://ws/<workspace id>?tab=<tab id>) for a tab.
 A screenshot may hold PR links or other work: act on each item.
+Workflows, when the user turned them on: blocks Laki runs for a task, one after another (agents, commands, questions for the user, a PR, its checks, files for its Artifacts). laki_workflows lists them and their runs, and with an id gives that one's whole file; laki_workflow_write writes one, the whole file in the format its description gives (an agent block's use: names one of the user's agent actions, Run ▾'s, by the slug laki_workflows lists); to change one, take its file from laki_workflows with its id, edit it and write it back with the same id and project. The user reads and saves it in Laki before it runs; then laki_workflow_run starts it on a task.
 Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made, yourself (the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
 Answer in a few plain sentences: what you did (workspace names) or what you found.`
 
@@ -48,9 +49,9 @@ const system = (t: Thread) => {
   const about = plan && `This chat is about one ${plan.kind} of the user's (project ${plan.project}, kind ${plan.kind}, slug ${plan.slug}, folder ${plan.folder}): read it with laki_plan_read (it may have changed since), and put your work into it with laki_plan_write.`
   return [SYSTEM, skilled() && SKILL, about, own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
 }
-// the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress (an agent's own),
+// the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress and agents' memory (an agent's own; it keeps the user's with laki_memory_write),
 // and the skill's
-const toolsFor = (rpc: Rpc) => [...tools(rpc).filter(t => t.name !== 'laki_progress'), ...(skilled() ? skillTools(rpc) : [])]
+const toolsFor = (rpc: Rpc) => [...tools(rpc).filter(t => !['laki_progress', 'laki_memory', 'laki_remember'].includes(t.name)), ...(skilled() ? skillTools(rpc) : [])]
 
 // ---------- the key: a file only you can read, never in state.json or the view
 

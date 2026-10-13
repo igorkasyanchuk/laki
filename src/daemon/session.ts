@@ -69,6 +69,7 @@ export class Session {
   exited = false
   exitCode = 0
   note = '' // what end() said: printed instead of the exit line
+  readonly born = Date.now()
   lastOutput = Date.now() // when the program last printed
   lookedAt = 0 // when a client last stopped looking (detach): a sleep counts from then too
   title = '' // the window title it set (OSC 0/2): gemini's and grok's say whether they work or ask

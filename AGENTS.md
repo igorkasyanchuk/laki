@@ -73,7 +73,8 @@ browser elsewhere ─ cloudflared ─ GET / ───▶   the built renderer (r
 ### API
 
 `src/daemon/main.ts` `api`: the same methods over HTTP and WebSocket. `API` (`src/shared/types.ts`) is in
-every view as `api`; a running daemon below the renderer's (it outlives app updates) gets a yellow bar at the
+every view as `api`; a running daemon below the renderer's (it outlives app updates), or from an older build (the view's `built`:
+electron.vite.config.ts' `__BUILT__`, the build's time, in the daemon and the renderer alike; none from source), gets a yellow bar at the
 top of the main area, *Restart Laki's daemon* (`StaleDaemon` in `ui.tsx`, `.stale-bar`; two clicks: `shutdown`, then main starts the new one).
 Bump `API` when the renderer starts relying on a new method or daemon behavior (1: the tunnel methods; 2: a
 project's `expose`, kept by `projectSet` and returned by `cloudflared`; 3: a project's `actions`, kept by `projectSet`;
@@ -89,13 +90,14 @@ workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`
 a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`; 46: a PR's `approvedByMe`, `commentedByMe`; 47: `widgetFiles`, `widgetWrite`, a widget's `byAi`; 48: `widgetRm`, a widget's `place` and `net`, `widgetSet` `place`/`net`, `prList`, `aiQuestion`/`aiAnswer`, a chat message's `ask`, settings' `ai.skill` and `ai.hideCost`; 49: specs and brainstorms, `planList`/`planNew`/`planGet`/`planSave`/`planFile`/`planUpload`/`planWrite`/`planRm`, `GET /plan/…`, a project's `plans`; 50: a spec's or brainstorm's chat, `aiAsk`/`aiState`/`aiNew`/`aiStop`/`aiAnswer`
 `chat`, `aiContinue`, `aiTick`, the `ai` event's `of` and `ended`, settings' `planTemplates`; 51: a workspace's `railPin`, kept by
 `wsSet` (`RAIL_PINS` at most), `branches`' `main`, settings' `syncBase`; 52: a workspace's `related` and `from`, `wsSet` `unrelate`,
-`wsNew` `link`/`from`, `prDetach`). A
+`wsNew` `link`/`from`, `prDetach`; 53: workflows, `flowList`/`flowSave`/`flowRm`/`flowStart`/`flowStop`/`flowAnswer`/`flowGet`/`flowForget`/`flowTick`, the view's `flows`, a workspace's `flow`, the `flow` event; 54: the view's `built`, an older build's daemon gets the bar; 55: `memoryAdd`/`memoryRm`, a memory's `auto` and `by`, `MEMORY_MAX` each kind; 56: an action's `slug`, kept by `projectSet`, a workflow's `use:` by it; 57: workflows' `case` block, a tab's `flow`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `notes`: the user's Markdown, the
   project's ⋯ › Notes (`ProjectNotes`, panels.tsx), its page and Settings, left out of MCP's and `ls --json`'s state; `memory`:
-  the project page's Memory, the whole list, likewise left out; `seps`: the sidebar's groups (the app's word: a
+  the project page's Memory, the whole list (the user's `MEMORY_MAX`, refused past it unless it had more; agents'
+  `auto` ones, the newest `MEMORY_MAX`), likewise left out of MCP's state (MCP's `laki_memory` reads it); `seps`: the sidebar's groups (the app's word: a
   named head over the workspaces up to the next one, its count beside it; a workspace dropped on it goes first in it (its top
   third: before it), `RowDrop` `into`, from `data-head`; a workspace's menu › *Move to group* (App's `groupItems`):
   first in one, or *Out of its group* (before the first), a submenu; groups are made only from the project's ⋯, at the top), each with a `color` of `TAB_COLORS` or none and a `template` (a prompt template's name: the new-workspace page opened from the group starts with it; none set: with no template, never the last one used) and a `sort` (`WS_SORTS`; unset: the project's), and the project's own `sort` (unset: manual; App's `sortedRows`: each group's workspaces in its sort, rows unchanged; last active: `laki.active`), and `rows`: their ids and its workspaces' in order; no seps, no rows), `reorder` (projects or workspaces by id; with a sep's id, its project's `rows` too), `wsSet` (color, `muted`, `pinned`: the sidebar's Pinned, above the projects; `railPin`: the rail's quick access, the time
@@ -105,11 +107,21 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   beside it (named by the prompt's first words); none gives it back as it is (scheduled tasks' `local`). In development
   mode each step goes to `devLog('new', …)` (Settings › General › *Creation log*) and, once it has an id, the
   workspace's own log; `spawnTab` logs each tab's command line there;
+- project memory: `memoryAdd` (`project`, `text`, `auto`: unset an agent's, `MEMORY_AUTO_LEN`; `tab`: `by`, the agent and
+  its workspace; the same text again dated anew; the oldest learned one past `MEMORY_MAX` goes; the user's, `auto`
+  false, refused past it), `memoryRm` (a learned one only); the CLI's `laki memory`, MCP's `laki_memory` and
+  `laki_remember` (not Laki AI's: its `laki_memory_write` keeps the user's). `memoryNote` gives both lists to claude and
+  codex at every start with Laki's note (the preset's `laki`), each item cut at 2,000 characters, the newest within
+  40,000, and how to add to it (claude's settings allow `laki memory add .` and `rm .`);
 - `quickNew` (`kind` shells or browsers, a browser's `url`; the sidebar's + › Terminal and Browser): the `Terminals` (`load` renames a `Shells` from 0.7) or
   `Browsers` project (`kind`, your home folder, `git: false`; made by the first one; never the home folder's own
   project: `projectAdd` and `findProject`'s path match skip it), then `wsNew` `local` `another` named `terminal <n>` (a
   shell tab) or `browser <n>` (no tabs, the workspace's `browser`: the page, `URL_OK`, http(s) or about:blank; `wsSet`
   `browser` and `name` follow the page and its title); one at a time (`quick`: two clicks would pick the same id);
+- an action's `slug` (`RunAction`, `shared/types.ts` `actionSlug`): `slugActions` keeps every one unique across
+  `settings.actions` and each project's `config.actions` (at `load`, for older ones; in `settingsSet` and `projectSet`, the
+  list just saved yielding to the others: one without gets its name's, a taken one `-2`); Settings' `ActionsField` shows
+  it, a new card's following its name until typed (`fresh`), and flags one another list has (`taken`);
 - `wsNew`/`wsFan` `place` (`placeWs`, as a drag would: `top`, first in the project, or a sep's id, first under it; a
   race in its order; none: last, as the CLI's and scheduled runs are);
 - the board's to-dos (`state.todos`, `view.todos`; a project's go with it): `todoAdd` (`project`, `text`), `todoRm`;
@@ -294,7 +306,7 @@ Commands run as `$SHELL -lic '<cmd>'`. The environment adds:
   or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
   for Terminals, Browsers and hosts. `wsRm` and `projectRm` delete it (`rmStorage`: only a `…<id>` folder) unless `settings.keepStorage`; archive keeps it.
 
-Claude and Codex are told about Laki at every start (`LAKI_NOTE`, unless the preset's `laki` is false; then
+Claude and Codex are told about Laki at every start (`LAKI_NOTE` and the project's memory, `memoryNote`, unless the preset's `laki` is false; then
 `PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
 the preset's args set their own, nor for codex when its `config.toml` has `developer_instructions` (`codexOwn`: `-c` would
 replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki new .`, `laki browser`,
@@ -613,6 +625,49 @@ page. The new-workspace page's *Spec* picker (`planList` of its project) adds `S
 MCP's `laki_plans`, `laki_plan_read`, `laki_plan_new`, `laki_plan_write` (`BRAINSTORM_OUTPUT`: what to write). Tested in
 `test/plans.test.ts`.
 
+### Workflows
+
+Experimental (`settings.workflows`, Settings › General › *Experimental*; off: no rail button, foot button or ⌘K item,
+the view has no `flows`, and every `flow*` method refuses). `shared/workflow.ts`: the model (`BLOCKS`, each kind's
+`EXITS`, a choice's and an ask's options as exits, `max` per block), the file (`parse`/`toFile`: `# Name`, a
+description, `runs in: · session: · at once: · turns:`, a `## id` per block, its first kind key, `> ` text, `- label →
+id`, `next:`/`ok:`… lines, `max: 3 → id`, `at: x,y`), `check` (no start, an exit to no block, nothing leads to a block,
+no way out, a loop with no `max` and no ask: Tarjan's; a case's `caseProblems`), `fill` (`{{name}}`), `choice` (*If / else*, `if:` the same
+key: one test, two options) and `case` (`branchOf`/`branchLabel`: each option's label is its test, `[var] contains|matches|equals
+"text"` or `else`, last and needed; `holds`, shared with the daemon's `valueOf`: the first that holds is the exit), `MAX_BLOCKS` (100: past it `check` says so), `WORKFLOW_FORMAT` (MCP's words), `FlowRun` and `flowView` (the view's light copy). `daemon/workflow.ts`: the
+sources (none come with Laki: yours `<data>/workflows/<id>.md`, a project's `.laki/workflows/<id>.md`; not a host's), and the
+engine. A run (`state.flows`: live ones and the last 100 ended) copies its workflow (`flow`: pinned), makes its
+workspace (`wsNew` `preset: 'none'`: a worktree named by the task, its `flow` the run's id; or `local`, the folder's
+own), then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
+log, 1000 entries, each a line and its detail after a newline: the prompt, the answer, the output). Agent blocks: `session` run (`tabs['run:<preset>']`), new, or another block's tab; `send` `whenIdle` to a
+live one (`queued`: while the prompt is in the tab's queue, a turn's end is an earlier turn's), else `addTab` with the prompt (a shared session: the last run's live tab
+in the same workspace, else `forkOf` its `resume`); a tab that just started waits until drawn (`Session.born`, quiet
+500 ms; a run block waits for the setup script, `settingUp`); `use`: an agent action by its slug, else its name
+(`findAction` over Settings' and the project's own `config.actions`, the app's as Run ▾ has them; not a shell's), its
+text stamped and first, the block's after. Core's `turnEnds` (in `turn()`'s idle/done/failed) ends the block 900 ms later (after core's
+`deliver`): this turn's answer as `steps.<id>.answer`, a
+`failed` turn the error exit, a usage limit `paused` (`wait.kind` limit) until `watchLimits`'s continue ends a turn. Run
+blocks: `$SHELL -lc` in the workspace with its env (`PORT`, `LAKI_WORKSPACE`, `LAKI_FLOW`, `LAKI_STORAGE_FOLDER`,
+`CI=1`), every variable shell-quoted, its own process group (`kill`), `timeout` (10 min); output's last 80 lines. Actions:
+`ship` (its tab's `onExit`), `prAct`, `runDev`, `wsArchive`; outward ones (`OUTWARD`) `ask` `confirm` first unless
+`ask first: no`, a dry run says them. Save blocks (`keep`): text, `from` (a file or folder of the workspace, realpath inside it, `cpSync`) or `link` (http(s),
+`<file>.url`), into `storageOf`. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
+already reported waits for a new one. An exit with no block: a bad one `stuck` (*Try again* resets the block's count
+and the turns), a good one ends the run. `flowAnswer` (`n`, `text`: `{{answer}}`). `flowForget` deletes a run (a live one finishes stopped first) and its row's mark. `flowResume` at start: each live run
+not waiting re-enters its block 8 s later (an agent's prompt sent again). Agents (MCP's `laki_workflow_write`, `by:
+'agent'`) mark what they write in `state.flowsByAgent` until the user saves it; `flowStart` `by: 'agent'` refuses those.
+`broadcast` `flow` (waiting, end with `notify` or a failure): App's notification and toast. A tab an agent block sends a
+prompt gets `flow` (the run; `flowForget` clears it), and the status bar's `.sb-flow` shows the run of the focused tab, else of the
+workspace (`ws.flow`), a click opens it; the run's `openTab` (WorkflowsApi) opens an agent block's tab (`r.tabs[block]`). The renderer's
+`Workflows.tsx` (lazy, `workflows.css`; `Page` `esc={false}`: Esc doesn't close it): the index (Scheduled tasks' `.sched-*`:
+hero, stats, the workflows' rows, the runs'), then one workflow or run, breadcrumbs back (styles.css' `.crumbs`), `Editor` (`Canvas`: `geo`'s bezier arrows, drag snaps to 10;
+`Inspector`, a case's branches as `.wf-branch` cards; File: the Markdown), `StartRun`, `RunView` (the canvas' `Lit`: `taken` arrows, `live`
+the one into the working block while it runs (`.wf-e.live` flowing, an `animateMotion` dot), the working block's gear badge
+(`.wf-gear`) and shimmer; reduced motion: none; the ask, decisions, state; `RunLog`: the whole log, details folded, a filter; `flowGet` again as the view's
+entry moves, every 3 s while the log shows). The CLI's `laki flow`. Tested in `test/workflow.test.ts`.
+ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on an SSH host, the prompt sent again whole
+after a restart.
+
 ### MCP
 
 `src/cli/mcp.ts`, `laki mcp`: JSON-RPC 2.0 over stdio, a message per line (`initialize` echoes the client's
@@ -776,7 +831,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.ws`: the selected workspace;
     - `laki.tabs`: the selected tab per workspace;
     - `laki.groups`: each workspace's tabs, each a split tree of sessions;
-    - `laki.side`: the sidebar width; `laki.sideOpen`: whether it's shown; `laki.info`: the workspaces whose info panel is open (⌘I, per workspace);
+    - `laki.sideW`: the sidebar's width per `RailKind` (`sideKind`: the rail's kind, projects without the rail; `laki.side`, the
+      one width before, seeds each); `laki.sideOpen`: whether it's shown; `laki.info`: the workspaces whose info panel is open (⌘I, per workspace);
     - `laki.rail`: the rail layout's kind (`RailKind`: projects, shells, browsers);
     - `laki.folded`: the projects whose workspaces the sidebar hides (a click on the project's head; `rows.dragged`
       keeps a drag's click from folding it), and the seps whose workspaces up to the next sep it hides (`shownRows`);
@@ -878,9 +934,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - The rail (`rail`: always, but on a phone, whose sidebar is a drawer; Settings › Appearance › Rail) puts `railBar`
     (`.rail`, `railW` as `--rail-w` on `.app`, `.rail-on`) left of the sidebar: a `railButton` per `RAIL` kind (a project's
     `kind`, none: projects) with `railSays` (`needsYou`'s count, a dot while a tab runs), Board and Schedule (`runFailed`: a
-    red dot) right after Projects, and Settings at its bottom, which leave the list's `.side-foot` (Video, Meme, Timer stay); Schedule's and Board's pages hide the list (`listOff`: the aside `hidden`, `.list-off`); the list is `listed`, that kind's projects, and `inList` its pinned (a filter: all). An
+    red dot) right after Projects, and AI (when on) over Settings at its bottom, which leave the list's `.side-foot` (Video, Meme, Timer stay); Schedule's and Board's pages hide the list (`listOff`: the aside `hidden`, `.list-off`); the list is `listed`, that kind's projects, and `inList` its pinned (a filter: all). An
     effect on the selected workspace sets the kind (`lastIn`: each kind's last, where `railTo` goes back); below `.rail-sep`,
-    `railPins` (`pinButton`: `initials` in the workspace's color, a terminal's or browser's icon, `needsYou`'s count; a
+    `railPins` (`pinButton`: `initials` in the workspace's color, a terminal's or browser's icon, `needsYou`'s count; never lit, its kind's button is; a
     right click is `wsMenu`); `moveWs`
     keeps to the list; `SideHandle` `at`. Its one setting, `railLabels` (off:
     `data-bare`, icons only, `railW` 52).
@@ -1043,8 +1099,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 - **`Project.tsx`**: a project's page (a click on its name in the sidebar, its ⋯ › *Open project page*; dialog
   `{ project, tab? }`: its ⋯ › Settings opens that tab, else the last one, `laki.projectTab`): Notes (panels.tsx' `NotesView`, also the ⋯ › Notes dialog's:
   an edit saved as it unmounts), Scheduled tasks (Schedules.tsx' rows, a switch each; changes on that page), Memory
-  (`Project.memory`, `{ id, text, at, edited }`, the whole list through `projectSet`, which keeps 1000 with an id and
-  text; never in MCP's state or `ls --json`) and Settings (Settings.tsx' `ProjectSection`, `noNotes`). The sidebar's
+  (`Project.memory`, `{ id, text, at, edited, auto, by }`, the whole list through `projectSet`: *Yours* and *Learned by
+  agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`) and Settings (Settings.tsx' `ProjectSection`, `noNotes`). The sidebar's
   arrow folds; Terminals and Browsers have no page.
 - **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size times `settings.pageZoom`
   (`PAGE_ZOOMS`, Appearance's *Settings & Help size*; ⌘± while it or Help is open; Help takes the same zoom; its
@@ -1092,6 +1148,10 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   right after the new-workspace page's *Race* makes one): a column per live workspace of the race with its status,
   diff size, the agent's last answer and the files `diff` lists (again as `stat` moves); *Keep this one* archives
   the others (`wsArchive`, after a confirm) with *Undo* (`wsRestore`). App.tsx passes a `CompareApi`.
+- **`Bird.tsx`**: Bird view (experimental, `settings.birdView`; the side head's eye beside Help, ⌘K; dialog `'bird'`):
+  every live tab (not exited) of each live workspace, Browsers' left out, by workspace in project order, a card each
+  with the daemon's `screen` (40 lines, every 2.5 s while open and the page is visible; a `<pre>` whose newest lines
+  show), *All* / *Working* / *Needs you* (App's `needsYou`); a click is `selectTab`. App.tsx passes a `BirdApi`.
 - **`Board.tsx`**: the Board page (`Page` `wide`; the sidebar foot's columns icon, ⌘K, `laki://board`): the
   workspaces (not Terminals' or Browsers') in columns by `columnOf` (`rollup` from `Glyph.tsx`, then the PR's state), cards that open one (a right
   click or `.board-more`: `BoardApi.menu`, App's open, archive, delete; Merged's ⋯: `archiveAll`, one by one), and To
@@ -1154,6 +1214,9 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/plans.ts` | specs and brainstorms (experimental): their folders, the editor's save, files, agents' output, a prototype's page |
 | `src/renderer/src/Specs.tsx` | the Specs & Brainstorms page; `SpecEditor.tsx` (BlockNote), `diagram.tsx` (React Flow), `specmd.ts` (blocks → Markdown), `plans.css`: ported from specdrop |
 | `src/shared/plans.ts` | specs' and brainstorms' words for agents: the prompts, what a brainstorm writes, the diagram format |
+| `src/daemon/workflow.ts` | workflows (experimental): the sources, the engine (runs, decisions, asks, agents' turns, commands, PR waits), resume |
+| `src/shared/workflow.ts` | workflows' model and Markdown file, `check`, the format in words (MCP's and Laki AI's) |
+| `src/renderer/src/Workflows.tsx` | the Workflows page: list, canvas, inspector, file, runs |
 | `src/daemon/ai.ts` | Laki AI: OpenRouter's tool loop, claude -p and codex exec with `laki mcp`, the conversation, the key, the call log |
 | `src/renderer/src/Ai.tsx` | the AI page: Chat (a thread, the composer) and Calls tabs, the info panel |
 | `src/shared/widget.ts` | widgets' template language, views, base CSS, a JS widget's page |

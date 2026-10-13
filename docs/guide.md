@@ -204,8 +204,18 @@ selected workspace's PR is in the status bar.
   *Collapse all projects* and *Expand all projects* are in ⌘K. (Terminals and Browsers fold on a click anywhere.)
 - Click a project's name for its page (also ⋯ › *Open project page*), in tabs: *Notes* (yours, in Markdown; *Edit*,
   saved as you leave), *Scheduled tasks* (its tasks, each with its switch; a click or *New task* goes to the Scheduled
-  tasks page), *Memory* (things to keep about it, one each, in Markdown: add with ⌘⏎, edit, delete; agents don't see
-  them yet) and *Settings* (the same as Settings' section for it). The tab you were on is the one the next opens on.
+  tasks page), *Memory* (things to keep about it, one each, in Markdown) and *Settings* (the same as Settings' section
+  for it). The tab you were on is the one the next opens on.
+- **Project memory** has two lists of 50 each. *Yours*: add with ⌘⏎, edit, delete. *Learned by agents*
+  (auto-memory): what agents found worth keeping as they worked there (an approach that works, a gotcha, a
+  convention), each with when and who added it; past 50 the oldest goes, and the pin keeps one as yours. Claude and
+  Codex get both lists at every start in the project, with how to add to them (unless the preset's *Tell it about
+  Laki* is off); other agents read them with `laki memory`. Edits reach a session at its next start.
+  ```bash
+  laki memory [.]                         # this project's memory (in a tab, . is its project)
+  laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours
+  laki memory rm . <id>                   # a learned one (yours you delete in the app)
+  ```
 - ＋ on a project creates a new workspace in it.
 - ＋ at the sidebar's top: *Project folder…* (⌘O), *Terminal* or *Browser*. *Terminal* opens a shell in your home
   folder, without a terminal app: a workspace of the *Terminals* project (made by the first one; terminal 1, terminal
@@ -269,8 +279,8 @@ selected workspace's PR is in the status bar.
   - *Scheduled tasks…* (the project's tasks and runs; the count of its tasks on the right);
   - *Remove project*;
   - its archived workspaces, which you click to restore.
-- Drag the sidebar's right edge to resize it; double-click the edge to reset. ⌘B (or the sidebar icon) hides
-  and shows it.
+- Drag the sidebar's right edge to resize it; double-click the edge to reset. With the rail, each kind (Projects,
+  Terminals, Browsers) keeps its own width. ⌘B (or the sidebar icon) hides and shows it.
 - ⋯ (or a right click) also opens the project in any editor, Finder or terminal app you have.
 - Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
   *Info*, *Mute notifications*, *Remind me…*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
@@ -406,7 +416,7 @@ aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on
 *Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
-**AI** (Settings › *AI* turns it on; then *AI* on the rail, *AI* in ⌘K,
+**AI** (Settings › *AI* turns it on; then *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
 `laki://ai`, `laki ai` in a terminal, or *Ask Laki AI* in the floating bubbles' +: a small window of its own over the app
 you're in): Laki's own assistant, one conversation that works Laki with the same tools as
 `laki mcp`. Ask *what are my agents doing?*, *start a code review of the PR with the login form*, *take the PR from
@@ -664,13 +674,14 @@ and report through the laki skill (Settings › Agent skill) or MCP's `laki_prog
 
 **The rail**, like Slack's: a narrow rail on the left with *Projects*, *Board*, *Schedule* (a red dot: a run failed),
 *Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
-*Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail). Board and Schedule are pages
+*AI* (when it's on) over *Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail). Board and Schedule are pages
 over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
 list shows the kind you pick, and its rail button goes back to the last workspace you had there.
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the
 filter looks through every kind. Below a line, up to 5 workspaces, terminals or browsers you pinned there (a
 workspace's menu › *Pin to the rail*): their initials in their color (a terminal's or browser's icon), with a count when
-one needs you; a click opens it, a right click its menu. A phone always has one sidebar.
+one needs you; a click opens it, a right click its menu (a pinned one isn't lit while open: its kind's button is). A
+phone always has one sidebar.
 
 **The sidebar's style** (Settings › Appearance › Sidebar): *Compact* (a short line: the state and the name),
 *Default* (the marks: PR, its author, timers), *Extended* (a second line: the branch, what the agent is doing, its
@@ -778,6 +789,60 @@ agent, change the words, create); the new-workspace page's *Spec* picker adds an
 prompt; the copy button copies the path. Agents with Laki's MCP server list, read and write them too
 (`laki_plans`, `laki_plan_read`, `laki_plan_new`, `laki_plan_write`: never README.md or spec.json, your words).
 A prototype runs in a sandboxed frame: no requests out, never the app or your files.
+
+### Workflows (experimental)
+
+Turn them on in Settings › General › *Experimental*; the rail's *Flows* opens them (⌘K too). The page lists your
+workflows and their runs, like Scheduled tasks; a click opens one, and the breadcrumbs go back. Esc doesn't close it:
+it stays open while runs go (✕ does).
+
+A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
+happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,
+picked from + *Block* › *Agent action* or in the block, `use: <its slug>` in the file; it waits for the turn to end),
+*Run command* (`npm test`: ok or fail by its exit code), *If / else* (two ways, by what a block said: contains, matches,
+equals), *Case* (if / elsif / else: its branches in order, the first that holds wins, *else* last; each tests the case's
+variable or one of its own, so *if the change is only specs → approve, else → a full review* is a Case on what an agent
+answered: tell it to answer `only_specs` or `code`), *Ask you* (a question with buttons; words you add are `{{answer}}`), *Laki action* (open a PR, approve,
+merge, the dev server, archive), *Wait* (until its PR's checks pass or fail), *Save* (into the workspace's storage
+folder, its Artifacts: text such as an agent's answer, a file or folder of the workspace, or a link such as its PR) and
+*End*. Variables carry results along: `{{task}}`, `{{steps.plan.answer}}`, `{{steps.test.output}}`,
+`{{pr.url}}`. Every loop needs a limit (*at most 3 times, then…*) or an *Ask you* in it.
+
+None come with Laki: *New workflow* makes one, yours (any project) or a project's (in its repo,
+`.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most); a row's copy button copies it.
+Laki AI and your agents (the laki skill) write them too: ask for one, read it, then *Save* it before it runs. For example: a plan
+you approve, the build, tests until they pass (at most 3 fixes), a PR, CI until green. A workflow opens on a canvas: drag blocks, pick one to change it
+on the right (its prompt, model, where each exit goes), + *Block* adds one after the picked block. *File* shows the
+same workflow as Markdown, the way agents write one (`laki_workflow_write`).
+
+*Run* asks for a project and a task. Each run works in a new worktree (a sidebar row, with a workflow mark) or the
+project's folder, with a new AI session or one shared with the workflow's earlier runs. Opening a PR, approving,
+merging and archiving ask you first unless the block says not to; *Dry run* says them instead of doing them. A run
+keeps the version it started with, so editing a workflow never moves one under way. Several run at once (*Runs at
+once*, 3 unless changed), and a run asks you before more agent turns than the workflow allows (30).
+
+A run opens on the same canvas, lit where it is and where it went: the working block's gear turns and the arrow it took
+flows, with what it asks you on top (also a notification),
+its **decisions** (each block's exit and why: the agent's answer, the exit code, your pick) and its **state** (the
+variables, how many times each block ran). *Log* shows all of it in order, the prompts sent, the agents' answers and
+the commands' output folded under each line, with a filter and Copy. A run and its sessions link both ways: its
+workspace's status bar (or an agent tab's it sent a prompt to) shows the run and its block, a click opens it; in the run,
+an agent block's decision (or *open its session* with the block picked) opens its tab. The trash can deletes a run (one under way stops
+first), after you confirm; its workspace and tabs stay. A run stopped by a restart goes on at its block (an agent is
+asked again), one at a usage limit waits for the reset, and a block that fails with nowhere to go asks you: *Try
+again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
+
+```bash
+laki flow                                      # workflows and runs
+laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done
+laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
+```
+
+### Bird view (experimental)
+
+Turn it on in Settings › General › *Experimental*; the eye beside Help (⌘K too) opens it. Every live session, agents
+and terminals, as a card under its workspace with its screen as it is now (read every few seconds while it's open);
+*All*, *Working* or *Needs you* (a red dot on those). A click opens that session.
 
 ### Projects over SSH
 
@@ -1023,7 +1088,9 @@ lit for a moment.
 - *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent, *Any agent*: whichever runs, or a terminal) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
   findings` for Codex, `bundle exec rails db:migrate` for a terminal. The copy button duplicates one (to make the
-  same for another agent); *Show* lists one agent's.
+  same for another agent); *Show* lists one agent's. Each has a slug beside its name (`xhigh-code-review`), set from
+  the name as you type it and kept when you rename it, unique across your actions and every project's (type your own;
+  one taken gets a `-2`): a workflow's agent block names the action by it (`use: xhigh-code-review`).
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
@@ -1129,9 +1196,12 @@ laki browser fix-the-login fill "#email" a@b.c | click "button[type=submit]" | t
 laki archive fix-the-login | restore … | fork … | rm …
 laki rename . "fix the login redirect"                  # in a Laki tab: . is its own workspace
 laki pr . 42                                            # attach a PR (URL or number) to the workspace
+laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the project's memory (Project memory)
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
+laki flow run my-flow app "add CSV export" [--dry]     # a workflow run (experimental: Workflows, below)
+laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
 laki widget on|off|run <id>                             # show or hide one | fetch now
 laki widget render <id> --full                          # the HTML its full view shows now
@@ -1150,7 +1220,7 @@ laki daemon                                             # run the daemon in the 
 `laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. Its tools: `laki_state`
 (projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
 `presets`), `laki_new_tab` (another agent in a workspace), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
-`laki_schedule_add`, and with Specs & Brainstorms on `laki_plans`, `laki_plan_read`, `laki_plan_new` and `laki_plan_write`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an
+`laki_schedule_add`, with Specs & Brainstorms on `laki_plans`, `laki_plan_read`, `laki_plan_new` and `laki_plan_write`, and with Workflows on `laki_workflows`, `laki_workflow_write` (saved for you to read: an agent can't run one it wrote until you save it in the app) and `laki_workflow_run`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an
 agent asks you. Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
 

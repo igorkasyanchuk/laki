@@ -10,6 +10,7 @@ import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, 
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { AiPage } from './Ai'
 import { ProjectPage, type ProjectTab } from './Project'
+import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
 import { type WidgetApi, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
@@ -29,14 +30,21 @@ import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunne
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
-const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
+declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
+// a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
+const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
 
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string }
+const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
+const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // experimental: loaded as it opens
+
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
 // the Specs page (experimental): specs is a project's id, '' all; kind and slug, the one to open
 const specsOf = (d: Dialog) => (d && typeof d === 'object' && 'specs' in d ? d : undefined)
+// the Workflows page (experimental): run, the run to open
+const flowsOf = (d: Dialog) => (d && typeof d === 'object' && 'workflows' in d ? d : undefined)
 // the Settings page, in any of its forms: all of it, a project's, or a section asked for
 const settingsOf = (d: Dialog) => d === 'settings' || (typeof d === 'object' && !!d && ('settings' in d || 'section' in d))
 
@@ -156,7 +164,14 @@ export function App() {
   const [infoW, setInfoW] = useState<number>(() => load('laki.infoW', INFO_WIDTH))
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
-  const [sideW, setSideW] = useState<number>(() => load('laki.side', SIDE))
+  // the sidebar's width per rail kind (projects, terminals, browsers: each its own); one from before, every kind's
+  const [sideWs, setSideWs] = useState<Partial<Record<RailKind, number>>>(() => {
+    const old = load<unknown>('laki.side', SIDE)
+    const one = typeof old === 'number' && old > 0 ? old : SIDE
+    const m = load<unknown>('laki.sideW', null)
+    const ok = Object.entries(m && typeof m === 'object' ? m : {}).filter(([, w]) => typeof w === 'number' && w >= 160 && w <= 480) // SideHandle's range
+    return { projects: one, shells: one, browsers: one, ...Object.fromEntries(ok) }
+  })
   const [sideOpen, setSideOpen] = useState<boolean>(() => load('laki.sideOpen', true))
   const [railKind, setRailKind] = useState<RailKind>(() => load('laki.rail', 'projects')) // the rail layout's list: which kind
   const [folded, setFolded] = useState<string[]>(() => load('laki.folded', [])) // projects and seps whose workspaces are hidden
@@ -254,7 +269,7 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
-  useEffect(() => void localStorage.setItem('laki.side', JSON.stringify(sideW)), [sideW])
+  useEffect(() => void localStorage.setItem('laki.sideW', JSON.stringify(sideWs)), [sideWs])
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.rail', JSON.stringify(railKind)), [railKind])
   useEffect(() => void localStorage.setItem('laki.folded', JSON.stringify(folded)), [folded])
@@ -545,6 +560,14 @@ export function App() {
         }
         if (m.kind === 'waiting') setTimeout(post, 800)
         else post()
+      } else if (m.ev === 'flow') {
+        // a workflow run asks you, or ended (a notify end, or a failure)
+        const s = viewRef.current?.settings
+        if (s?.notify === false || (m.kind === 'end' && !m.notify)) return
+        const open = () => setDialog({ workflows: '', run: m.id })
+        const body = m.kind === 'waiting' ? `asks you: ${m.text}` : `${m.status}: ${m.text}`
+        notify(`Workflow · ${m.name}`, body.slice(0, 200), '', open, s?.notifySound)
+        if (m.kind === 'waiting') toast(`${m.name} asks you: ${m.text}`.slice(0, 160), open, 'Open')
       } else if (m.ev === 'archived') {
         // several at once (the setting just turned on): one message, whose Undo brings them all back
         const all = (archived.current = [...archived.current, m.ws])
@@ -857,6 +880,9 @@ export function App() {
   const rail = !narrow
   const railWords = settings.railLabels !== false // its own setting: words under its icons, or icons only (narrower)
   const railW = railWords ? 68 : 52
+  const sideKind: RailKind = rail ? railKind : 'projects' // a phone's drawer, or no rail: one width
+  const sideW = sideWs[sideKind] ?? SIDE
+  const setSideW = (w: number) => setSideWs(m => ({ ...m, [sideKind]: w }))
   const kindOf = (w: WorkspaceView): RailKind => view?.projects.find(p => p.id === w.project)?.kind ?? 'projects'
   const lastIn = useRef<Partial<Record<RailKind, string>>>({}) // each kind's last workspace: its rail button goes back there
   useEffect(() => {
@@ -1382,6 +1408,8 @@ export function App() {
     a({ label: 'Scheduled tasks', icon: 'clock', run: () => setDialog('schedules') })
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
     if (settings.specs === true) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
+    if (settings.workflows === true) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
+    if (settings.birdView === true) a({ label: 'Bird view: every live session and its screen', icon: 'eye', run: () => setDialog('bird') })
     a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
@@ -1537,6 +1565,11 @@ export function App() {
         {w.schedule && (
           <span className="ws-sched">
             <Icon name="clock" size={11} />
+          </span>
+        )}
+        {w.flow && settings.workflows === true && (
+          <span className="ws-sched" data-tip={(f => (f ? `Workflow ${f.name}: ${f.status}${f.block ? ` · ${f.block}` : ''}` : 'From a workflow run'))(view.flows?.find(f => f.id === w.flow))}>
+            <Icon name="flow" size={11} />
           </span>
         )}
         {w.pr?.conflict && w.pr.state === 'OPEN' && settings.prIcon !== false && (
@@ -1788,6 +1821,10 @@ export function App() {
   const specsOn = settings.specs === true // experimental: Settings › General
   const toSpecs = () => setDialog(d => (specsOf(d) ? null : { specs: '' }))
   const SPECS_TIP = 'Specs & Brainstorms (experimental): requirements to implement, ideas to explore with Laki AI'
+  const flowsOn = settings.workflows === true // experimental: Settings › General
+  const toFlows = () => setDialog(d => (flowsOf(d) ? null : { workflows: '' }))
+  const flowsAsk = (view?.flows ?? []).filter(r => r.status === 'waiting').length
+  const FLOWS_TIP = `Workflows (experimental): blocks Laki runs for a task${flowsAsk ? ` · ${flowsAsk} ask${flowsAsk > 1 ? '' : 's'} you` : ''}`
   const toAi = () => setDialog(d => (d === 'ai' ? null : 'ai'))
   const AI_TIP = 'AI: ask Laki to start, check and steer your agents'
   const toSettings = () => setDialog(d => (settingsOf(d) ? null : 'settings'))
@@ -1822,9 +1859,10 @@ export function App() {
     const n = mine.filter(needsYou).length
     const k = kindOf(w)
     const tip = `${wsName(w)}${k === 'projects' ? ` · ${view.projects.find(p => p.id === w.project)?.name ?? ''}` : ''}${n ? ` · ${n} need${n === 1 ? 's' : ''} you` : ''} · right click: its menu`
-    const on = ws?.id === w.id && !onPage
+    // never lit as the open one: its kind's button above is, and the list shows the row; a mouse click lets go of the
+    // focus (a key pressed later would ring it, :focus-visible), Enter or Space keeps a keyboard user's place
     return (
-      <button key={`pin:${w.id}`} type="button" className={`rail-kind rail-pin nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} onClick={() => (setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
+      <button key={`pin:${w.id}`} type="button" className="rail-kind rail-pin nodrag" aria-current={ws?.id === w.id && !onPage ? 'true' : undefined} aria-label={tip} data-tip={tip} onClick={e => (e.detail && e.currentTarget.blur(), setDialog(null), setWsId(w.id))} onContextMenu={e => (e.preventDefault(), openMenu(e, wsMenu(w)))}>
         <span className="rail-icon" style={colorVar(w.color)}>
           {k === 'projects' ? <span className="rail-mark">{pinMarks[i]}</span> : <Icon name={k === 'shells' ? 'terminal' : 'globe'} size={18} />}
           {n > 0 ? <span className="rail-count">{n}</span> : mine.some(t => t.status === 'running') && <span className="rail-dot" />}
@@ -1833,19 +1871,20 @@ export function App() {
       </button>
     )
   }
-  const onPage = schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || !!specsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
-  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || (specsOn && !!specsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
+  const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
+  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   const railBar = rail && sideOpen && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }}>
       {kindButton(RAIL[0])}
       {railButton('board', 'board', 'Board', dialog === 'board', BOARD_TIP, toBoard)}
       {railButton('schedules', 'clock', 'Schedule', schedulesFor !== undefined, `${schedTip}${runFailed ? ' · a run failed' : ''}`, toSchedules, runFailed && <span className="rail-dot bad" />)}
       {specsOn && railButton('specs', 'spec', 'Specs', !!specsOf(dialog), SPECS_TIP, toSpecs)}
-      {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
+      {flowsOn && railButton('workflows', 'flow', 'Flows', !!flowsOf(dialog), FLOWS_TIP, toFlows, flowsAsk > 0 && <span className="rail-count">{flowsAsk}</span>)}
       {RAIL.slice(1).map(kindButton)}
       {railPins.length > 0 && <span className="rail-sep" />}
       {railPins.map(pinButton)}
       <span className="spacer" />
+      {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
       {railButton('settings', 'gear', 'Settings', settingsOf(dialog), 'Settings (⌘,)', toSettings)}
     </nav>
   )
@@ -1868,6 +1907,7 @@ export function App() {
           <span className="spacer" />
           <IconButton icon="filter" title={find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR'} on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
           <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
+          {settings.birdView === true && <IconButton icon="eye" title="Bird view: every live session and its screen" on={dialog === 'bird'} onClick={() => setDialog(d => (d === 'bird' ? null : 'bird'))} />}
           <IconButton icon="help" title="Help: keys and commands (⌘/)" on={dialog === 'help'} onClick={() => setDialog(d => (d === 'help' ? null : 'help'))} />
         </div>
         {find && (
@@ -1983,6 +2023,7 @@ export function App() {
               <IconButton icon="clock" title={schedTip} on={schedulesFor !== undefined} className={runFailed ? 'dot' : ''} label={labels ? 'Schedule' : undefined} onClick={toSchedules} />
               <IconButton icon="board" title={BOARD_TIP} label={labels ? 'Board' : undefined} on={dialog === 'board'} onClick={toBoard} />
               {specsOn && <IconButton icon="spec" title={SPECS_TIP} label={labels ? 'Specs' : undefined} on={!!specsOf(dialog)} onClick={toSpecs} />}
+              {flowsOn && <IconButton icon="flow" title={FLOWS_TIP} label={labels ? 'Flows' : undefined} on={!!flowsOf(dialog)} className={flowsAsk ? 'dot' : ''} onClick={toFlows} />}
               {settings.ai?.on && <IconButton icon="ai" title={AI_TIP} label={labels ? 'AI' : undefined} on={dialog === 'ai'} onClick={toAi} />}
             </>
           )}
@@ -2036,7 +2077,7 @@ export function App() {
             </div>
           )}
         </div>
-        {connected && (view.api ?? 0) < API && <StaleDaemon restart={() => api.call('shutdown')} />}
+        {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown')} />}
         <div className="body">
           {tabsAt === 'left' && tabStrip}
           <div className="term-wrap">
@@ -2274,6 +2315,29 @@ export function App() {
               />
             </Suspense>
           ))(specsOf(dialog))}
+        {(o =>
+          o &&
+          flowsOn && (
+            <Suspense fallback={null}>
+              <WorkflowsPage
+                key={o.run ?? ''}
+                view={view}
+                projects={view.projects.filter(p => !p.kind)}
+                presets={view.presets.filter(p => !p.off)}
+                actions={settings.actions}
+                at={{ run: o.run }}
+                onClose={() => setDialog(null)}
+                api={{ call, openWs: id => (setDialog(null), setWsId(id)), openTab: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })), toast: text => toast(text) }}
+              />
+            </Suspense>
+          ))(flowsOf(dialog))}
+        {dialog === 'bird' && settings.birdView === true && (
+          <BirdPage
+            view={view}
+            onClose={() => setDialog(null)}
+            api={{ screen: tab => api.call<string>('screen', { target: tab, lines: 40 }) /* no toast: a tab closed meanwhile */, open: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })), needs: needsYou }}
+          />
+        )}
         {dialog === 'board' && (
           <BoardPage
             view={view}
@@ -2416,6 +2480,19 @@ export function App() {
                   {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
                 </button>
               )}
+              {(f =>
+                f && (
+                  // the workflow run that made this workspace, or sent the focused tab its last block: a click opens it
+                  <button className="sb-flow" data-status={f.status} data-tip={`Workflow run: ${f.name} · ${f.status}${f.block ? ` at ${f.block}` : ''} · click: open it`} onClick={() => setDialog({ workflows: '', run: f.id })}>
+                    <span className="sb-flow-icon">
+                      <Icon name={f.status === 'running' ? 'gear' : 'flow'} size={12} />
+                    </span>
+                    <span className="sb-flow-name">
+                      {f.name}
+                      {f.block && ['running', 'waiting', 'paused'].includes(f.status) && <span className="muted"> · {f.block}</span>}
+                    </span>
+                  </button>
+                ))(flowsOn ? [tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's */}
               {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
               <span className="port-item">
                 <button
