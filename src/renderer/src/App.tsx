@@ -5,7 +5,7 @@ import { stamp } from '../../shared/when'
 import { api, bridge, notify, type NotifyAction, onLakiLink, openExternal } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { type AutoKey, Avatar, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
+import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
 import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { AiPage } from './Ai'
@@ -1483,7 +1483,7 @@ export function App() {
     }
     return (
       <button className="port-stop" data-tip={`stop ${p.cmd} (pid ${p.pid})`} aria-label={`stop ${p.cmd} on port ${port}`} onClick={stop}>
-        ×
+        <Icon name="x" size={10} />
       </button>
     )
   }
@@ -1684,7 +1684,7 @@ export function App() {
             </a>
             <div className="wp-pr-meta">
               {pr.author && !pr.mine && <span>by {pr.author}</span>}
-              {pr.list?.length || pr.checks ? <span className={`ci-${pr.checks}`}>{ciText(pr)}</span> : null}
+              {pr.list?.length || pr.checks ? <span className={`ci-${pr.checks}`}><CiMark pr={pr} /></span> : null}
               {pr.review && REVIEW[pr.review] && <span>{REVIEW[pr.review]}</span>}
               {pr.conflict && pr.state === 'OPEN' && <span className="ci-fail">conflicts</span>}
               {(pr.additions || pr.deletions) ? <span className="ws-stat"><span className="add">+{short(pr.additions ?? 0)}</span> <span className="del">−{short(pr.deletions ?? 0)}</span></span> : null}
@@ -1806,8 +1806,8 @@ export function App() {
               </span>
             )}
             {queued > 0 && <span className="badge">+{queued}</span>}
-            <button className="x" data-tip="Close (⌘W)" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
-              ×
+            <button className="x" data-tip="Close (⌘W)" aria-label="Close tab" onPointerDown={e => e.stopPropagation()} onDoubleClick={e => e.stopPropagation()} onClick={e => (e.stopPropagation(), closeTabs(ts))}>
+              <Icon name="x" size={10} />
             </button>
           </div>
         )
@@ -2476,7 +2476,8 @@ export function App() {
                   data-tip={`${ws.kind === 'worktree' ? `${ws.branch} ← ${ws.base}` : `${ws.branch}, the repo itself`} · click: ${branchFull ? 'shorter' : 'all of it'}`}
                   onClick={() => setBranchFull(f => !f)}
                 >
-                  ⎇ {branchFull ? ws.branch : shortBranch(ws.branch)}
+                  <Icon name="fork" size={11} />
+                  {branchFull ? ws.branch : shortBranch(ws.branch)}
                   {branchFull && ws.kind === 'worktree' && <span className="muted"> ← {ws.base}</span>}
                 </button>
               )}

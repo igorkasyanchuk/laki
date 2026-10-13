@@ -1025,7 +1025,7 @@ function CsvTable({ path, text, edit, onText }: { path: string; text: string; ed
                 {i + 1}
                 {edit && (
                   <button className="csv-del" aria-label={`Delete row ${i + 1}`} data-tip="Delete this row" onClick={() => commit(rows.filter((_, j) => j !== i + 1), quoted.filter((_, j) => j !== i + 1))}>
-                    ×
+                    <Icon name="x" size={10} />
                   </button>
                 )}
               </td>

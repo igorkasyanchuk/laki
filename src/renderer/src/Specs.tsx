@@ -114,6 +114,7 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
       {level === 'templates' && <b className="crumb here">Templates</b>}
       {sel && <span className="crumb-sep">›</span>}
       {sel && <b className="crumb here">{selTitle || 'Untitled'}</b>}
+      <span className="wf-beta">experimental</span>
     </nav>
   )
   const row = (p: Plan) => (
@@ -446,7 +447,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
         {!d?.chat.length ? (
           <div className="plan-chat-hello muted small">
             <p>Talk the idea through: Laki AI reads the brief and the project's code, and writes its options, diagrams, a mind map and prototypes into this brainstorm.</p>
-            <button className="primary" disabled={!api.aiOn || !!d?.elsewhere} onClick={() => void ask(brainstormPrompt(plan))}>
+            <button disabled={!api.aiOn || !!d?.elsewhere} onClick={() => void ask(brainstormPrompt(plan))}>
               <Icon name="ai" /> Brainstorm with Laki AI
             </button>
             {!api.aiOn && (

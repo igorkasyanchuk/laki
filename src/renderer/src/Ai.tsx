@@ -265,7 +265,7 @@ export function AiPage({
                 <div className="sched-list ai-calls">
                   {d.calls.map(c => (
                     <div key={c.at} className="ai-call" data-tip={c.error ? `Failed: ${c.error}` : c.ask}>
-                      <span className={`ai-ok ${c.ok ? 'ok' : 'bad'}`}>{c.ok ? '✓' : '✗'}</span>
+                      <span className={`ai-ok ${c.ok ? 'ok' : 'bad'}`} role="img" aria-label={c.ok ? 'ok' : 'failed'}><Icon name={c.ok ? 'check' : 'x'} size={12} /></span>
                       <span className="ai-ask">{c.ask || '(an image)'}</span>
                       {cost && <span className="mono">{c.backend === 'codex' ? 'plan' : money(c.cost)}</span>}
                       <span className="ai-meta">
@@ -276,7 +276,13 @@ export function AiPage({
                   ))}
                 </div>
               ) : (
-                <p className="muted ai-none">None yet. Each ask is logged here: tokens, cost, how long it took.</p>
+                <div className="sched-empty ai-none">
+                  <Icon name="ai" size={18} />
+                  <span>
+                    <b>No asks yet</b>
+                    <span className="muted small">Each ask is logged here: tokens, cost, how long it took.</span>
+                  </span>
+                </div>
               )}
             </div>
           </div>

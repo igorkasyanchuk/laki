@@ -1,4 +1,4 @@
-// Phone pushes (Settings › Notifications webhook): each format's request, and a fake agent's turns against a local server.
+// Phone pushes (Settings › Phone pushes): each format's request, and a fake agent's turns against a local server.
 import assert from 'node:assert/strict'
 import { createServer } from 'node:http'
 import { test } from 'node:test'

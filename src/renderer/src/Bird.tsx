@@ -65,6 +65,12 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
   return (
     <Page
       title="Bird view"
+      head={
+        <>
+          <b>Bird view</b>
+          <span className="wf-beta">experimental</span>
+        </>
+      }
       onClose={onClose}
       wide
       tools={
@@ -94,7 +100,7 @@ export function BirdPage({ view, api, onClose }: { view: View; api: BirdApi; onC
                   <div className="bird-card-head">
                     <Icon name={t.kind === 'agent' ? 'agent' : 'terminal'} size={14} />
                     <span className="bird-card-name">{t.name}</span>
-                    {needs ? <span className="bird-dot" aria-label="needs you" /> : <Glyph s={rollup([t])} />}
+                    <Glyph s={rollup([t])} /> {/* the sidebar's marks: waiting, done… (the card's border says it needs you) */}
                   </div>
                   <div className="bird-screen">
                     <pre>{text.split('\n').slice(-LINES).join('\n')}</pre>

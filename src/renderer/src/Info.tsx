@@ -66,14 +66,25 @@ export type PRAct = 'approve' | 'close' | 'merge' // prAct: gh as you, after a c
 export const MERGE_WORDS: Record<MergeMethod, string> = { squash: 'Squash and merge', merge: 'Create a merge commit', rebase: 'Rebase and merge' }
 const FIXES: AutoKey[] = ['autoFix', 'autoReview', 'autoMerge']
 
-// CI in a few characters: ✓ 5/5, ✗ 2 failing, … 3 running
-export function ciText(pr: PRInfo) {
+// CI in a few characters: ✓ 5/5, ✗ 2 failing, … 3 running; bare: without the mark (CiMark draws it)
+export function ciText(pr: PRInfo, bare = false) {
   const n = (s?: Check['state']) => pr.list?.filter(c => (s ? c.state === s : c.state !== 'skip')).length ?? 0
   const some = (s: Check['state']) => (n(s) ? `${n(s)} ` : '')
-  if (pr.checks === 'fail') return `✗ ${some('fail')}failing`
-  if (pr.checks === 'pending') return `… ${some('pending')}running`
-  if (pr.checks === 'pass') return n() ? `✓ ${n('pass')}/${n()}` : '✓'
+  const mark = (g: string, s: string) => (bare ? s : s ? `${g} ${s}` : g)
+  if (pr.checks === 'fail') return mark('✗', `${some('fail')}failing`)
+  if (pr.checks === 'pending') return mark('…', `${some('pending')}running`)
+  if (pr.checks === 'pass') return mark('✓', n() ? `${n('pass')}/${n()}` : '')
   return 'no checks'
+}
+// ciText with its mark drawn, as the checks list draws it (the status bar's, the board's, a row's card)
+export function CiMark({ pr }: { pr: PRInfo }) {
+  if (!pr.checks) return <span className="ci-mark">{ciText(pr)}</span>
+  return (
+    <span className="ci-mark">
+      <Icon name={CK[pr.checks].icon} size={11} />
+      {ciText(pr, true) || CK[pr.checks].word /* a bare ✓ (nothing counted): words, so the mark isn't all there is */}
+    </span>
+  )
 }
 
 // a PR author's GitHub picture (the CSP lets avatars.githubusercontent.com in); a bot's (app/…) has none, nor a
@@ -174,11 +185,11 @@ export function PRStatus({ w, onOpen, onToggle, onMenu }: { w: WsInfo; onOpen: (
       {pr.state === 'OPEN' && (
         <>
           <button className={`pr pr-${pr.checks || 'none'}`} data-tip="Checks on GitHub · right click to refresh" onClick={() => onOpen(`${pr.url}/checks`)}>
-            {ciText(pr)}
+            <CiMark pr={pr} />
           </button>
           {pr.conflict && (
             <button className="pr pr-conflict" data-tip="Merge conflicts with its base branch: merge or rebase it" onClick={() => onOpen(pr.url)}>
-              ⚠ conflicts
+              <Icon name="conflict" size={11} /> conflicts
             </button>
           )}
           <AutoToggles w={w} onToggle={onToggle} />
@@ -408,9 +419,7 @@ export function InfoPanel(p: {
         <b>{w.name || w.id}</b>
         <IconButton icon="pencil" title="Rename" onClick={p.onRename} />
         <span className="spacer" />
-        <button className="icon small" onClick={p.onClose} title="Close (⌘I)">
-          ×
-        </button>
+        <IconButton icon="x" title="Close (⌘I)" onClick={p.onClose} />
       </div>
       <div className="info-body">
         <section className="info-facts">

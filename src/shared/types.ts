@@ -346,7 +346,7 @@ export function aiTotals(calls: AiCall[], now = new Date()): AiTotals {
   return { today: sum(new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime()), month: sum(new Date(now.getFullYear(), now.getMonth(), 1).getTime()) }
 }
 
-// Settings › Notifications webhook: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
+// Settings › Phone pushes: where a waiting (unset: on) or done (unset: off) agent is pushed, in which format
 // answer: Answer from the phone (Telegram's and ntfy's buttons; off: the choices as text only); replyTopic: the random
 // part of ntfy's reply topic (<topic>-<it>), made as answer turns on
 export type Webhook = { url?: string; format?: 'ntfy' | 'slack' | 'telegram' | 'json'; waiting?: boolean; done?: boolean; answer?: boolean; replyTopic?: string }

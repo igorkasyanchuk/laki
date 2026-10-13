@@ -189,6 +189,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
 
 export function Onboarding({ done, onGo, onTick, onSkip, onOff }: { done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void }) {
   const n = STEPS.filter(x => done.has(x.id)).length
+  const next = STEPS.find(x => !done.has(x.id))?.id // the one step in the accent: the rest wait their turn
   return (
     <Modal title="Get started with Laki" onClose={onSkip} wide>
       <div className="onboard">
@@ -204,7 +205,7 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff }: { done: Set<st
               <b>{x.title}</b>
               <span className="muted small">{x.hint}</span>
             </div>
-            <button className={done.has(x.id) ? '' : 'primary'} onClick={() => onGo(x.id)}>
+            <button className={x.id === next ? 'primary' : ''} onClick={() => onGo(x.id)}>
               {x.go}
             </button>
           </div>
@@ -213,7 +214,7 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff }: { done: Set<st
         <div className="row">
           <button onClick={onOff}>Don't show again</button>
           <span className="grow" />
-          <button className="primary" onClick={onSkip}>
+          <button className={next ? '' : 'primary'} onClick={onSkip}>
             {n === STEPS.length ? 'Close' : 'Skip for now'}
           </button>
         </div>

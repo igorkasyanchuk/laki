@@ -2,7 +2,6 @@
    a run's canvas and log. Loaded with the page only. */
 .page-body.wide:has(> .wf-page) { padding: 0; overflow: hidden; }
 .page-body > .wf-page { flex: 1; min-height: 0; margin: 0; max-width: none; display: flex; flex-direction: column; }
-.wf-beta { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--waiting) 22%, transparent); color: var(--fg); font: 600 10px/1.4 var(--ui-font); flex: none; }
 .wf-index .sched-stats > .warn b { color: var(--waiting); }
 .wf-index .tag.warn { color: var(--fg); border-color: var(--waiting); }
 .wf-bad { color: var(--error); font-weight: 500; }

@@ -183,7 +183,7 @@ const PR_KINDS: [FixWhat, string, string][] = [
   ['conflict', 'Fix conflicts', ''],
 ]
 
-// the webhook's formats (Settings › Notifications webhook): id, name, an example URL
+// the webhook's formats (Settings › Phone pushes): id, name, an example URL
 const FORMATS: [NonNullable<Webhook['format']>, string, string][] = [
   ['ntfy', 'ntfy', 'https://ntfy.sh/a-topic-only-you-know'],
   ['slack', 'Slack', 'https://hooks.slack.com/services/…'],
@@ -202,7 +202,7 @@ function WebhookSection({ w, onChange, test }: { w: Webhook; onChange: (w: Webho
   }
   return (
     <>
-      <h2>Notifications webhook</h2>
+      <h2>Phone pushes</h2>
       <p className="muted small">
         Pushes to your phone when an agent waits for you or finishes, posted to this URL and nowhere else. ntfy: a topic's URL, which the ntfy app
         subscribes to; Slack: an incoming webhook; Telegram: your bot's whole sendMessage URL, chat_id included; generic JSON gets{' '}
@@ -565,7 +565,7 @@ export function EnvField({ value, onChange, placeholder = 'KEY=value, one per li
   const [text, setText] = useState(() => envText(value))
   return (
     <textarea
-      className="mono"
+      className="mono env-field"
       rows={text ? Math.min(8, text.split('\n').length + 1) : 1 /* empty: one line, it grows as you type */}
       value={text}
       placeholder={placeholder}
@@ -884,7 +884,7 @@ const FIND: [string, string, string?][] = [
   ['git', 'Sync the base branch', 'fetch pull origin main master up to date latest fast-forward worktree'],
   ['general', 'macOS notifications', 'notify waiting done limit mute'],
   ['general', 'Sound', 'notification'],
-  ['webhook', 'Notifications webhook', 'phone push ntfy slack telegram json notify waiting done'],
+  ['webhook', 'Phone pushes', 'notifications webhook phone push ntfy slack telegram json notify waiting done'],
   ['notes', 'Release notes', "what's new changelog version changes added recently"],
   ['ai', 'Turn on Laki AI', 'assistant orchestrate llm chat openrouter'],
   ['ai', 'Runs with', 'backend openrouter claude -p codex exec model'],
@@ -1358,7 +1358,7 @@ function SkillSection({ api }: { api: SkillApi }) {
                 <span className={r.state === 'installed' ? 'small' : 'muted small'}>{r.state === 'installed' ? 'installed' : r.state === 'outdated' ? 'out of date' : 'not installed'}</span>
                 <span className="grow" />
                 {r.state !== 'installed' && (
-                  <button className="primary" disabled={busy} onClick={() => set(r.agent, true, r.skill)}>
+                  <button className={r.state === 'outdated' ? 'primary' : ''} disabled={busy} onClick={() => set(r.agent, true, r.skill)}>
                     {r.state === 'missing' ? 'Install' : 'Update'}
                   </button>
                 )}
@@ -1719,7 +1719,7 @@ export function SettingsPage(p: {
   remote?: RemoteApi
   widgets?: WidgetsApi
   resources?: ResourcesApi
-  webhookTest?: (w: Webhook) => Promise<unknown> // Notifications webhook's Send test
+  webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   presets: Preset[] // the daemon's: the settings', or its defaults
   onSection?: (id: string) => void // each section it shows (Get started's steps)
@@ -2430,7 +2430,7 @@ export function SettingsPage(p: {
                                 <span style={{ background: accent }} />
                                 {on && (
                                   <b className="theme-check" style={{ background: fg, color: bg }}>
-                                    ✓
+                                    <Icon name="check" size={10} />
                                   </b>
                                 )}
                               </span>

@@ -1,4 +1,4 @@
-// Pushes to your phone (Settings › Notifications webhook): an agent waiting for you or done, posted to the URL you give
+// Pushes to your phone (Settings › Phone pushes): an agent waiting for you or done, posted to the URL you give
 // as ntfy, Slack, Telegram (its whole sendMessage URL, chat_id included) or plain JSON wants it. Only to that URL: no
 // telemetry. Fire and forget, 5 s at most; the caller logs a failure. A waiting agent's menu goes as lines of text;
 // with Answer from the phone (webhook.answer), Telegram and ntfy get a button per choice, whose tap comes back

@@ -2,6 +2,16 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Polish: the Board's columns run the page's height (an empty one is still a place to drop a to-do), the status bar
+  and Board draw their checks, conflicts and branch marks as icons, menus in Settings get the theme's chevron, the
+  new-workspace prompt grows as you type, selected text takes the accent, and Get started lights only the next step.
+- Polish on every page: one filled button per view (a skill's Install, the brainstorm chat's start), Bird view's cards
+  with the sidebar's marks, Bird view and Specs tagged *experimental*, Laki AI's Calls with drawn marks and an empty
+  state, Scheduled tasks without an empty Tasks head over the form and with switched-off tasks dimmed but readable,
+  Settings' *Phone pushes*, and close buttons drawn as icons.
+
 ## 0.13.0 · Oct 13, 2026
 
 - **Project memory for agents**: Claude and Codex get a project's memory at every start there. It has two lists of 50:

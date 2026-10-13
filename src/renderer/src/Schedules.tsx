@@ -269,6 +269,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
           </form>
         )}
 
+        {(schedules.length > 0 || !form) && ( // none yet and the form open: no heading over nothing
         <section>
           <div className="sched-head">
             <h3>Tasks</h3>
@@ -308,17 +309,16 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               ))}
             </div>
           ) : (
-            !form && (
-              <div className="sched-empty">
-                <Icon name="clock" size={18} />
-                <span>
-                  <b>No scheduled tasks{only ? ' in this project' : ''}</b>
-                  <span className="muted small">Like “weekdays at 9:00: review yesterday's PRs”. New task makes one.</span>
-                </span>
-              </div>
-            )
+            <div className="sched-empty">
+              <Icon name="clock" size={18} />
+              <span>
+                <b>No scheduled tasks{only ? ' in this project' : ''}</b>
+                <span className="muted small">Like “weekdays at 9:00: review yesterday's PRs”. New task makes one.</span>
+              </span>
+            </div>
           )}
         </section>
+        )}
 
         <section>
           <div className="sched-head">

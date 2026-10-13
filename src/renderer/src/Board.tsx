@@ -5,7 +5,7 @@
 import { type DragEvent, type FormEvent, type MouseEvent, useState } from 'react'
 import type { TabView, Todo, View, WorkspaceView } from '../../shared/types'
 import { Glyph, rollup } from './Glyph'
-import { ciText, prState } from './Info'
+import { CiMark, prState } from './Info'
 import { Icon, IconButton, Page, TurnTime } from './ui'
 
 export type BoardApi = {
@@ -153,7 +153,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                     {w.pr && (
                       <div className={`ws-pr board-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
                         <Icon name="github" size={11} /> #{w.pr.number}
-                        {w.pr.checks ? ` · ${ciText(w.pr)}` : ''}
+                        {w.pr.checks ? <> · <CiMark pr={w.pr} /></> : ''}
                         {w.pr.conflict && w.pr.state === 'OPEN' ? ' · conflicts' : ''}
                       </div>
                     )}

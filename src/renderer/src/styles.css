@@ -67,6 +67,12 @@ button.link { background: none; border: none; color: var(--accent-ink); padding:
 input, select, textarea { font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: var(--radius); padding: 6px 8px; outline: none; width: 100%; }
 input:focus, select:focus, textarea:focus { border-color: var(--accent); }
 textarea { resize: vertical; font-family: inherit; }
+.env-field { resize: none; field-sizing: content; max-height: 50vh; } /* it grows with its lines: no grip */
+/* a select's arrow: a chevron in the theme's muted color, inset like the app's own (the system's hugs the edge, in its gray);
+   !important: some looks set the whole background (classic, notebook), which would drop it */
+select:not([multiple], [size]) { appearance: none; padding-right: 26px; background-image: linear-gradient(45deg, transparent calc(50% - 0.8px), var(--muted) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px)), linear-gradient(-45deg, transparent calc(50% - 0.8px), var(--muted) calc(50% - 0.8px) calc(50% + 0.8px), transparent calc(50% + 0.8px)) !important; background-position: right 14px center, right 9px center !important; background-size: 5px 5px !important; background-repeat: no-repeat !important; }
+select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
+::selection { background: color-mix(in srgb, var(--accent) 32%, transparent); }
 .spacer, .grow { flex: 1; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
@@ -186,7 +192,7 @@ textarea { resize: vertical; font-family: inherit; }
 .preset .row.wc-head { align-items: center; flex-wrap: wrap; gap: 6px; }
 .preset .row.wc-head > * { flex: none; white-space: nowrap; }
 .preset .row.wc-head > .grow { flex: 1; min-width: 0; }
-.preset .row.wc-head select { width: auto; padding: 4px 6px; }
+.preset .row.wc-head select { width: auto; padding: 4px 24px 4px 6px; }
 .preset .row.wc-head .wc-every { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; }
 .wc-every input { width: 52px; padding: 4px 6px; }
 .ib.spin svg { animation: spin 0.8s linear infinite; } /* fetching */
@@ -282,6 +288,8 @@ textarea { resize: vertical; font-family: inherit; }
 .main:has(> .settings-page) > .body { visibility: hidden; } /* nothing under a page shows through it (glass, a see-through theme) */
 .settings-head { height: 38px; flex: none; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 16px; border-bottom: 1px solid var(--line); background: var(--side); -webkit-app-region: drag; }
 .settings-head button { -webkit-app-region: no-drag; }
+/* an experimental page's tag beside its title (Workflows, Specs & Brainstorms, Bird view) */
+.wf-beta { margin-left: 4px; padding: 1px 6px; border-radius: 999px; background: color-mix(in srgb, var(--waiting) 22%, transparent); color: var(--fg); font: 600 10px/1.4 var(--ui-font); flex: none; }
 .electron.side-closed .settings-head { padding-left: 76px; }
 .electron.list-off .settings-head { padding-left: max(16px, calc(76px - var(--rail-w, 68px))); } /* the rail's page: past the traffic lights */
 .settings-body { flex: 1; display: flex; min-height: 0; }
@@ -348,7 +356,7 @@ textarea { resize: vertical; font-family: inherit; }
 .tabbar > .tab:not(.sel):hover::after, .tabbar > .tab:hover + .tab::after { display: none; }
 .electron.side-closed .tabbar { padding-left: 76px; }
 .tabbar > .side-show { margin: 0 6px 0 0; }
-.tab .x { background: none; border: none; padding: 0 4px; min-width: 20px; min-height: 20px; color: var(--muted); visibility: hidden; }
+.tab .x { display: inline-grid; place-items: center; background: none; border: none; padding: 0 4px; min-width: 20px; min-height: 20px; color: var(--muted); visibility: hidden; }
 .tab:hover .x, .tab.sel .x { visibility: visible; }
 .tab:is(:hover, .sel) .x { color: color-mix(in srgb, currentColor 75%, transparent); } /* the tab's own text color: a look's bright or dark tab keeps it readable */
 .tabbar > .ib { align-self: center; margin-left: 2px; }
@@ -374,7 +382,9 @@ textarea { resize: vertical; font-family: inherit; }
 .term { position: absolute; inset: 6px 4px 4px 10px; }
 .empty { height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--muted); }
 .status { height: 22px; flex: none; display: flex; align-items: center; gap: 10px; padding: 0 10px; font-size: 11px; color: var(--muted); border-top: 1px solid var(--line); background: var(--side); font-family: var(--mono); white-space: nowrap; min-width: 0; overflow: hidden; }
-.status .pr { border: none; background: none; padding: 0; }
+.status .pr { border: none; background: none; padding: 0; display: inline-flex; align-items: center; gap: 3px; }
+.ci-mark { display: inline-flex; align-items: center; gap: 3px; }
+.status .sb-branch svg { vertical-align: -1px; margin-right: 4px; }
 /* every control in the bar at least 20px (macOS's smallest), the icon-only ones that wide too */
 .status button { min-height: 20px; }
 .status :is(.usage-btn, .tunnel-btn, .port-stop) { min-width: 20px; justify-content: center; }
@@ -507,7 +517,7 @@ textarea { resize: vertical; font-family: inherit; }
 /* the card is the box: its prompt is see-through and follows its corners (a look's or glass's field rules would give it a
    square box of its own, poking out of the card's top corners) */
 .nw-card.nw-composer :is(textarea, .nw-cmd) { border: none; background: transparent; border-radius: calc(var(--radius) + 3px) calc(var(--radius) + 3px) 0 0; padding: 14px 16px 6px; font-size: 13.5px; line-height: 1.5; box-shadow: none; }
-.nw-composer textarea { resize: vertical; min-height: 120px; }
+.nw-composer textarea { resize: none; field-sizing: content; min-height: 120px; max-height: 50vh; } /* it grows with what's typed, as Laki AI's does */
 .nw-composer .prompt-images { padding: 4px 16px 6px; }
 .nw-composer .prompt-tools { padding: 4px 8px 8px; gap: 2px; }
 .nw-quiet { padding: 16px 16px 8px; color: var(--muted); font-size: 13px; }
@@ -995,6 +1005,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .narrow .settings-body { flex-direction: column; }
 .narrow .settings-nav { width: auto; flex-direction: row; overflow-x: auto; padding: 6px; border-right: none; border-bottom: 1px solid var(--line); scrollbar-width: none; }
 .narrow .settings-nav button { flex: none; }
+.narrow .settings-nav input { flex: 0 0 150px; } /* Find a setting: first in the scrolling row, not squeezed to a square */
 .narrow .settings-nav-head { display: none; }
 .narrow .settings-main, .narrow .page-body { padding: 16px 14px 40px; }
 .narrow .board { flex-direction: column; align-items: stretch; } /* the board's columns one under another */
@@ -1046,7 +1057,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 /* the new-workspace window (NewWindow.tsx, main's newWsWin): the form alone, from the top, tight; the window takes its height */
 .new-window .page-body { padding: 12px 14px 14px; }
 .new-window .page-body > .new-ws { max-width: none; margin: 0; gap: 10px; }
-.new-window .nw-composer textarea { min-height: 64px; height: 92px; }
+.new-window .nw-composer textarea { min-height: 64px; height: 92px; resize: vertical; }
 .new-window .new-ws .buttons { margin-top: 0; }
 .schedules { display: flex; flex-direction: column; gap: 20px; }
 .schedules p { margin: 0; }
@@ -1150,7 +1161,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-window .ai-thread { padding: 18px 16px 10px; }
 .ai-window .ai-dock { padding: 6px 12px 12px; }
 .ai-window .ai-hello h2 { font-size: 19px; }
-.ai-none { margin: 40px 0; text-align: center; }
+.ai-none { margin: 24px 0; } /* the Calls tab with none: Scheduled tasks' empty box */
 /* Info: how it runs and pays, what it spent, what it can do */
 .ai-info { gap: 26px; font-size: 13px; line-height: 1.5; }
 .ai-info h4 { margin: 0 0 8px; color: var(--muted); font-size: 11px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
@@ -1174,11 +1185,12 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-call > .mono { font-size: 12px; }
 .ai-meta { grid-column: 2 / -1; color: var(--muted); font-size: 11.5px; }
 .ai-meta > .mono { font-size: 11px; }
+.ai-ok { display: grid; place-items: center; }
 .ai-ok.ok { color: var(--done); }
 .ai-ok.bad { color: var(--error); }
 .sched-icon { flex: none; display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--radius); color: var(--accent-ink); background: color-mix(in srgb, var(--accent) 12%, transparent); }
-.sched-row.off :is(.sched-main, .sched-icon) { opacity: 0.5; }
-.sched-row.off .sched-icon { color: var(--muted); background: var(--hover); }
+.sched-row.off .sched-icon { opacity: 0.6; color: var(--muted); background: var(--hover); }
+.sched-row.off :where(.sched-name, .sched-meta > b) { color: var(--muted); } /* off: muted, still readable (half opacity took its text under 3:1); :where: a hover still lights the name */
 .sched-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 0; border: none; background: none; color: var(--fg); text-align: left; cursor: pointer; }
 .sched-main:hover { background: none; }
 .sched-main:hover .sched-name { color: var(--accent-ink); }
@@ -1228,7 +1240,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .pr-acts .split.green button.merge .icon-svg, .pr-acts button.approve .icon-svg { color: var(--tc-green); }
 /* a row's diff size; on hover its ⋯ grows in after the marks */
 .port-name { margin-left: 4px; color: var(--muted); }
-.port-stop { background: none; border: none; padding: 0 2px; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
+.port-stop { display: inline-grid; place-items: center; background: none; border: none; padding: 0 2px; color: var(--muted); font-size: 13px; line-height: 1; cursor: pointer; }
 .port-stop:hover { color: var(--error); }
 .ws-merged { flex: none; font-size: 10px; color: var(--tc-purple); opacity: 0.85; }
 .ws-stat { display: inline-flex; gap: 3px; flex: none; font-family: var(--mono); font-size: 10px; opacity: 0.85; }
@@ -1321,8 +1333,8 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .crumb.here { flex: 0 1 auto; min-width: 0; padding: 2px 6px; color: var(--fg); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .crumb-sep { flex: none; color: var(--muted); }
 .page-body.wide { padding: 20px 20px 32px; }
-.board { display: flex; gap: 12px; align-items: flex-start; overflow-x: auto; flex: 1; min-height: 0; }
-.board-col { flex: 1 0 210px; max-width: 320px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--radius); background: var(--side); border: 1px solid var(--line); }
+.board { display: flex; gap: 12px; align-items: stretch; overflow-x: auto; flex: 1; min-height: 0; } /* each column the page's height: an empty one is still a lane, and a drop target */
+.board-col { flex: 1 0 210px; max-width: 320px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: var(--radius); background: var(--side); border: 1px solid var(--line); min-height: 0; overflow-y: auto; }
 .board-col.over { border-color: var(--accent); }
 .board-col h3 { margin: 0 2px 2px; font-size: 12px; font-weight: 600; color: var(--muted); display: flex; gap: 6px; }
 .board-count { font-weight: 400; }
@@ -1334,18 +1346,17 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .bird-show button { font: inherit; font-size: 12px; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--line); background: none; color: var(--fg); cursor: pointer; }
 .bird-show button.on { background: var(--sel); border-color: var(--sel); }
 .bird-none { padding: 24px 0; }
-.bird-ws { margin: 0 0 22px; }
+.page-body > .bird-ws { margin: 0 0 28px; } /* a group's gap above its name, wider than the name's to its cards */
 .bird-ws h3 { display: flex; align-items: center; gap: 8px; margin: 0 0 10px; font-size: 13px; font-weight: 600; }
 .bird-ws h3 .muted { font-weight: 400; }
 .bird-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
 .bird-card { display: flex; flex-direction: column; min-width: 0; padding: 0; text-align: left; font: inherit; color: var(--fg); background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; cursor: pointer; }
 .bird-card:hover { border-color: var(--muted); }
 .bird-card:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
-.bird-card.needs { border-color: color-mix(in srgb, var(--error) 60%, var(--line)); }
+.bird-card.needs { border-color: color-mix(in srgb, var(--accent) 70%, var(--line)); } /* needs you: the accent, as the sidebar's bold name; red is for errors */
 .bird-card.asleep { opacity: 0.6; }
 .bird-card-head { display: flex; align-items: center; gap: 7px; padding: 7px 10px; font-size: 12px; border-bottom: 1px solid var(--line); }
 .bird-card-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.bird-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--error); flex: none; }
 .bird-screen { height: 190px; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; background: var(--term-bg); padding: 6px 8px; }
 .bird-screen pre { flex: none; margin: 0; font: 8px/1.3 var(--mono); color: var(--fg); white-space: pre; } /* taller than the box: its top is cut, the newest lines show */
 .board-col h3 { align-items: center; }
@@ -1364,7 +1375,9 @@ button.board-name:hover { background: none; }
 .board-last { font-size: 12px; color: var(--muted); display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; overflow-wrap: anywhere; }
 .board-pr { display: flex; align-items: center; gap: 4px; font-size: 11.5px; } /* with .ws-pr: its colors */
 .board-add { display: flex; flex-direction: column; gap: 6px; }
-.board-add textarea { resize: vertical; font: inherit; }
+.board-add textarea { resize: none; field-sizing: content; min-height: 64px; max-height: 12em; font: inherit; }
+/* a browser without field-sizing (remote access in another one): the prompts can't grow, so they keep the grip (after the rules it undoes) */
+@supports not (field-sizing: content) { :is(.nw-composer, .board-add, .ai-composer) textarea, .env-field { resize: vertical; } }
 .ws-pr.draft { color: var(--muted); }
 .ws-pr.closed { color: var(--error); }
 .ws-pr.merged { color: var(--tc-purple); }
@@ -1430,7 +1443,7 @@ button.board-name:hover { background: none; }
 .csv td:has(> .csv-input), .csv th:has(> .csv-input) { padding: 0; }
 .csv-input { width: 100%; min-width: 120px; border: none; outline: 2px solid var(--accent); outline-offset: -2px; border-radius: 0; padding: 3px 8px; font: inherit; background: var(--bg); color: var(--fg); }
 .csv-del { display: none; position: absolute; left: 2px; top: 50%; translate: 0 -50%; border: none; background: none; padding: 0 3px; color: var(--muted); cursor: pointer; }
-.csv tr:hover .csv-del { display: inline; }
+.csv tr:hover .csv-del { display: inline-grid; place-items: center; }
 .csv-del:hover { color: var(--error); }
 /* a Markdown file's ```mermaid diagram (MarkdownView.tsx) */
 .md .mermaid { margin: 0 0 12px; overflow-x: auto; text-align: center; }
