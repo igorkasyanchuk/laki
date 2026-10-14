@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.14.0 · Oct 14, 2026
 
 - **Voice in the cloud, hold Fn to talk** (experimental: Settings › General › *Experimental*): Settings › Voice picks
   how the mic turns speech into text: macOS dictation
