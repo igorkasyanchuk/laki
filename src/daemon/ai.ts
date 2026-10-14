@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
-import { AI_ACTS, AI_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, aiTotals, type View } from '../shared/types.ts'
+import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, aiTotals, type View } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 import { planOfChat } from './plans.ts'
@@ -70,6 +70,43 @@ export function aiKey(o: { key?: string | null }) {
   writeFileSync(keyPath, key + '\n', { mode: 0o600 })
   return { key: true }
 }
+
+// ---------- voice (Settings › Voice, cloud): a recording, WAV in base64, written down by OpenRouter's speech-to-text
+// with the same key. Nothing is kept: not the audio, not the text
+const MAX_AUDIO = 24 << 20 // OpenRouter's 25 MB: about 9 minutes of the renderer's 16 kHz mono
+export async function voiceText(o: { audio?: unknown }) {
+  if (state.settings?.voice?.on !== true) throw new Error('Voice is off: turn it on in Settings › General › Experimental')
+  const audio = typeof o.audio === 'string' ? o.audio : ''
+  if (!audio) throw new Error('no audio')
+  if (audio.length > MAX_AUDIO) throw new Error('a recording up to 9 minutes')
+  const key = readKey()
+  if (!key) throw new Error('no OpenRouter API key: Settings › Voice')
+  const m: unknown = state.settings?.voice?.model
+  const model = (typeof m === 'string' && m.trim()) || VOICE_MODEL
+  // rate-limited (429) or the provider busy (5xx): tried again after VOICE_AGAIN, then said so with OpenRouter's words
+  // ponytail: fixed waits, not Retry-After (OpenRouter's STT sends none)
+  for (let n = 0; ; n++) {
+    const res = await fetch(`${api()}/audio/transcriptions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
+      body: JSON.stringify({ model, input_audio: { data: audio, format: 'wav' } }),
+      signal: AbortSignal.timeout(90000),
+    }).catch((e: Error) => {
+      throw new Error(`Can't reach OpenRouter: ${e.name === 'TimeoutError' ? 'no answer in 90 seconds' : e.message}`)
+    })
+    const j: any = await res.json().catch(() => ({}))
+    if (res.ok && !j.error) return { text: String(j.text ?? '').trim() }
+    const busy = res.status === 429 || res.status >= 500
+    if (busy && n < VOICE_AGAIN.length) {
+      await new Promise(r => setTimeout(r, VOICE_AGAIN[n]))
+      continue
+    }
+    const raw = j.error?.metadata?.raw // the provider's own error: words, or its JSON
+    const said = (j.error?.message ?? res.statusText) + (raw ? `: ${(typeof raw === 'string' ? raw : JSON.stringify(raw)).slice(0, 200)}` : '')
+    throw new Error(`OpenRouter ${res.status}: ${said}${busy ? ` (${model} is busy: try again in a moment, or another model in Settings › Voice)` : ''}`)
+  }
+}
+const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map(Number) // ms before each try again (tests: shorter)
 
 // ---------- the conversations: '' the AI page's, plan:<project>/<kind>/<slug> a spec's or brainstorm's (plans.ts)
 

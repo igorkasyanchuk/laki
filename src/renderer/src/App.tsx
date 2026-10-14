@@ -9,6 +9,7 @@ import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, INFO_WIDTH, InfoPan
 import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { AiPage } from './Ai'
+import { VoiceBar } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
@@ -2672,6 +2673,7 @@ export function App() {
       <Tips />
       {peek && (w => w && peekCard(w))(live.find(w => w.id === peek.id))}
       <AskHost />
+      <VoiceBar />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {note && (
         <div className={`toast ${note.undo ? 'has-undo' : ''} ${note.ok || note.busy ? 'ok' : ''}`} role="status">

@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { browserUrl, csvSep, fillTemplate, importable, initials, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize } from '../src/renderer/src/text.ts'
+import { browserUrl, csvSep, fillTemplate, importable, initials, parseCsv, toCsv, MAIL_OK, nameOf, parseMails, shortPath, templated, templatesFor, youtubeEmbed, parseDuration, parseLater, laterText, clock, prRef, previewUrl, previewAddr, parseSize, wavOf } from '../src/renderer/src/text.ts'
 
 test('prompt templates: variables, unknown ones kept, a template without {{prompt}} gets it after', () => {
   assert.equal(fillTemplate('Fix {{ prompt }} in {{project}} from {{base}}; {{who}}', { prompt: 'login', project: 'app', base: 'main' }), 'Fix login in app from main; {{who}}')
@@ -259,4 +259,19 @@ test("a Browsers page's address bar: URLs, sites, else a search", () => {
   assert.equal(browserUrl('how to tar'), 'https://duckduckgo.com/?q=how%20to%20tar')
   assert.equal(browserUrl('javascript:alert(1)'), 'https://duckduckgo.com/?q=javascript%3Aalert(1)')
   assert.equal(browserUrl(''), '')
+})
+
+test("Voice's recording as WAV: a 44-byte header, then 16-bit samples, clipped", () => {
+  const w = wavOf(new Float32Array([0, 1, -1, 2]), 16000)
+  const d = new DataView(w.buffer)
+  const str = (at: number, n: number) => String.fromCharCode(...w.subarray(at, at + n))
+  assert.equal(w.length, 44 + 8)
+  assert.equal(str(0, 4), 'RIFF')
+  assert.equal(d.getUint32(4, true), 36 + 8)
+  assert.equal(str(8, 8), 'WAVEfmt ')
+  assert.deepEqual([d.getUint16(20, true), d.getUint16(22, true), d.getUint32(24, true), d.getUint32(28, true), d.getUint16(34, true)], [1, 1, 16000, 32000, 16])
+  assert.equal(str(36, 4), 'data')
+  assert.equal(d.getUint32(40, true), 8)
+  assert.deepEqual([0, 1, 2, 3].map(i => d.getInt16(44 + i * 2, true)), [0, 32767, -32767, 32767])
+  assert.deepEqual(importable({ voice: 'cloud' }).bad, ['voice'])
 })

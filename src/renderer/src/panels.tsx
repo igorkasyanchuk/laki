@@ -472,6 +472,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
   const racers = view.presets.filter(x => x.name !== p.preset && x.agent !== 'command' && !x.off).map(x => x.name)
   const racing = !p.local && !plain && isAgent(starts) && rivals.some(r => racers.includes(r))
   const fan = racing ? [p.preset, ...rivals.filter(r => racers.includes(r))] : undefined
+  // opened for a project the view didn't have yet (the first one, from Welcome: projectAdd answers before the state
+  // does): it once the view has it
+  useEffect(() => void (project && !proj && set({ project })), [project])
   useEffect(() => {
     if (!p.project) return
     api.call('branches', { project: p.project }).then(
@@ -519,6 +522,13 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
     }
   }
+  // specs and brainstorms (experimental): one's README.md path goes into the prompt, for the agent to read. Above the
+  // return below: the first project, opened from Welcome, renders this page again with it (more hooks: React's #310)
+  const [plans, setPlans] = useState<Plan[]>([])
+  useEffect(() => {
+    if (view.settings.specs && p.project) api.call<Plan[]>('planList', { project: p.project }).then(setPlans, () => setPlans([]))
+    else setPlans([])
+  }, [p.project, view.settings.specs])
   if (!view.projects.length)
     return (
       <Page title="New workspace" onClose={onClose}>
@@ -600,12 +610,6 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       ],
       'right',
     )
-  // specs and brainstorms (experimental): one's README.md path goes into the prompt, for the agent to read
-  const [plans, setPlans] = useState<Plan[]>([])
-  useEffect(() => {
-    if (view.settings.specs && p.project) api.call<Plan[]>('planList', { project: p.project }).then(setPlans, () => setPlans([]))
-    else setPlans([])
-  }, [p.project, view.settings.specs])
   const specMenu = (e: MouseEvent) =>
     openMenu(
       e,

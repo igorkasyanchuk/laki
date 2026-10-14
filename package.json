@@ -83,7 +83,10 @@
       "target": "dir",
       "category": "public.app-category.developer-tools",
       "identity": "-",
-      "hardenedRuntime": false
+      "hardenedRuntime": false,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "Laki listens while you dictate a prompt: the mic in a prompt box, or holding Fn (Settings › Voice)."
+      }
     },
     "linux": {
       "target": "AppImage",

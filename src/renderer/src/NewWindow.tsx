@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react'
 import type { View, WorkspaceView } from '../../shared/types'
 import { api, bridge } from './api'
 import { AiPage } from './Ai'
+import { VoiceBar } from './PromptInput'
 import { NewWorkspace } from './panels'
 import { applyTheme, type Paint, paintOf } from './themes'
 import { AskHost, load, Tips } from './ui'
@@ -40,6 +41,7 @@ export function AiWindow() {
     <>
       <AiPage compact settings={view.settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: w.name || w.id }))} onClose={() => window.close()} />
       <AskHost />
+      <VoiceBar />
       <Tips />
     </>
   )
@@ -90,6 +92,7 @@ export function NewWindow() {
         </div>
       )}
       <AskHost />
+      <VoiceBar />
       <Tips />
     </>
   )

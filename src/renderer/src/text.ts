@@ -157,7 +157,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {
@@ -247,4 +247,24 @@ export function splitRows<T extends { old?: number; new?: number }>(lines: T[]):
     for (let k = 0; k < Math.max(dels.length, adds.length); k++) rows.push({ left: dels[k], right: adds[k] })
   }
   return rows
+}
+
+// Voice's recording as a WAV file (voice.ts, for OpenRouter's speech-to-text): one channel of samples (-1..1) as 16-bit PCM
+export function wavOf(samples: Float32Array, rate: number) {
+  const b = new DataView(new ArrayBuffer(44 + samples.length * 2))
+  const str = (at: number, s: string) => [...s].forEach((c, i) => b.setUint8(at + i, c.charCodeAt(0)))
+  str(0, 'RIFF')
+  b.setUint32(4, 36 + samples.length * 2, true)
+  str(8, 'WAVEfmt ')
+  b.setUint32(16, 16, true) // the fmt chunk's size
+  b.setUint16(20, 1, true) // PCM
+  b.setUint16(22, 1, true) // one channel
+  b.setUint32(24, rate, true)
+  b.setUint32(28, rate * 2, true) // bytes a second
+  b.setUint16(32, 2, true) // bytes a sample
+  b.setUint16(34, 16, true) // bits
+  str(36, 'data')
+  b.setUint32(40, samples.length * 2, true)
+  samples.forEach((v, i) => b.setInt16(44 + i * 2, Math.max(-1, Math.min(1, v)) * 0x7fff, true))
+  return new Uint8Array(b.buffer)
 }

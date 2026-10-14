@@ -525,6 +525,16 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .prompt-tools-end { display: flex; align-items: center; gap: 2px; margin-left: auto; min-width: 0; flex-wrap: wrap; justify-content: flex-end; }
 .mic-split { display: inline-flex; align-items: center; }
 .mic-split .ib.caret { width: 16px; }
+/* Voice's cloud (voice.ts): the mic while it listens or writes it down, and the bar at the window's bottom (VoiceBar) */
+.ib.voice-listening { color: var(--error); animation: voice-pulse 1.2s ease-in-out infinite; }
+.ib.voice-writing { opacity: 0.6; }
+@keyframes voice-pulse { 50% { opacity: 0.45; } }
+.voice-bar { position: fixed; bottom: 36px; left: 50%; transform: translateX(-50%); z-index: 30; display: flex; align-items: center; gap: 8px; max-width: min(560px, calc(100vw - 32px)); padding: 7px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--panel); color: var(--fg); font-size: 12px; box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35); animation: voice-in 0.18s ease-out; }
+@keyframes voice-in { from { opacity: 0; transform: translate(-50%, 8px); } }
+html.away .voice-bar { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
+.voice-bar.listening { border-color: var(--error); }
+.voice-bar.listening .icon-svg { color: var(--error); animation: voice-pulse 1.2s ease-in-out infinite; }
+@media (prefers-reduced-motion: reduce) { .ib.voice-listening, .voice-bar, .voice-bar .icon-svg { animation: none; } }
 /* the composer's pickers (template, agent, model): words with a caret, not buttons; a hover shows they're a menu */
 .nw-pick { display: inline-flex; align-items: center; gap: 4px; height: 26px; max-width: 220px; padding: 0 6px; border: none; background: none; border-radius: var(--rs, 6px); color: var(--muted); font: inherit; font-size: 12px; white-space: nowrap; box-shadow: none; }
 .nw-pick > span { overflow: hidden; text-overflow: ellipsis; }

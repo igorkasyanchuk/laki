@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { actionSlug, AGENT_NAMES, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { actionSlug, AGENT_NAMES, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
@@ -142,6 +142,7 @@ export type AppSettings = Paint & {
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (0: always)
   webhook?: Webhook // pushes to your phone
   ai?: AiSettings // Laki AI (Settings › AI)
+  voice?: VoiceSettings // the mic and hold Fn (Settings › Voice)
   archiveMerged?: boolean // a merged PR's clean workspace archived, with Undo
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched first ('': off)
   menuBar?: boolean // the menu bar's item (unset: on)
@@ -278,11 +279,143 @@ const AI_HOW: [AiBackend, string][] = [
   ['claude', 'Claude Code in the background (claude -p), on your Claude plan or its API key'],
   ['codex', 'Codex in the background (codex exec), on your ChatGPT plan'],
 ]
+// the OpenRouter key's field: Laki AI's and Voice's cloud share one key, in a file only you can read (never shown again)
+const KEY_HINT = "Kept in a file only you can read, in Laki's data folder: never in its settings, never shown again. Laki AI and Voice share it"
+function OpenRouterKey({ has, save }: { has?: boolean; save: (key: string) => Promise<{ key: boolean }> }) {
+  const [key, setKey] = useState('')
+  const [said, setSaid] = useState('')
+  const go = (k: string) => save(k).then(r => (setKey(''), setSaid(r.key ? 'Saved' : 'Removed')), e => setSaid(e.message))
+  return (
+    <>
+      <div className="row-buttons">
+        <input
+          className="mono grow"
+          type="password"
+          autoComplete="off"
+          value={key}
+          placeholder={has ? '•••••••• saved: paste another to replace it' : 'sk-or-v1-…'}
+          spellCheck={false}
+          aria-label="OpenRouter API key"
+          onChange={e => (setKey(e.target.value), setSaid(''))}
+          onKeyDown={e => e.key === 'Enter' && key.trim() && go(key)}
+        />
+        <button type="button" className="primary" disabled={!key.trim()} onClick={() => go(key)}>
+          Save
+        </button>
+        {has && (
+          <button type="button" onClick={() => go('')}>
+            Remove
+          </button>
+        )}
+      </div>
+      {said && <p className="muted small">{said}</p>}
+    </>
+  )
+}
+
+// Settings › Voice (voice.ts): the mic and hold Fn, on this Mac (macOS dictation) or in the cloud (Laki records,
+// OpenRouter's speech-to-text writes it down). The models: OpenRouter's speech-to-text ones, the first the default;
+// Another model… takes any id
+const VOICE_MODELS: [string, string][] = [
+  [VOICE_MODEL, 'MAI-Transcribe 2 · Microsoft: 60 languages, mixed in one sentence too'],
+  ['openai/whisper-large-v3-turbo', 'Whisper Large v3 Turbo · about 100 languages, fast and cheap'],
+  ['nvidia/parakeet-tdt-0.6b-v3', 'Parakeet TDT v3 · NVIDIA: 25 European languages'],
+  ['openai/gpt-4o-transcribe', 'GPT-4o Transcribe · OpenAI'],
+  ['openai/gpt-4o-mini-transcribe', 'GPT-4o mini Transcribe · OpenAI'],
+  ['elevenlabs/scribe-v2', 'Scribe v2 · ElevenLabs'],
+  ['deepgram/nova-3', 'Nova-3 · Deepgram'],
+  ['google/gemini-3.5-transcribe', 'Gemini 3.5 Transcribe · Google'],
+  ['mistralai/voxtral-mini-transcribe', 'Voxtral Mini Transcribe · Mistral'],
+]
+function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi; onChange: (v: VoiceSettings) => void }) {
+  const [has, setHas] = useState<boolean>()
+  useEffect(() => void keyApi.state().then(st => setHas(st.key), () => {}), [])
+  const cloud = v.engine === 'cloud'
+  const model = v.model || VOICE_MODEL
+  const [other, setOther] = useState(!VOICE_MODELS.some(m => m[0] === model)) // Another model…: a typed id
+  return (
+    <>
+      <h2>
+        Voice <span className="wf-beta">experimental</span>
+      </h2>
+      <p className="muted small">
+        The mic in every prompt box, and in the cloud hold Fn: talk instead of typing. On this Mac it's macOS dictation; in the cloud Laki records you,
+        a speech-to-text model on OpenRouter writes it down, and the text goes where your cursor is.
+      </p>
+      <Group title="Speech to text">
+        <div className="grid2">
+          <label>
+            Engine
+            <select value={cloud ? 'cloud' : 'device'} onChange={e => onChange({ ...v, engine: e.target.value === 'cloud' ? 'cloud' : undefined })}>
+              <option value="device">On this Mac: macOS dictation</option>
+              <option value="cloud">Cloud: OpenRouter</option>
+            </select>
+          </label>
+        </div>
+        <p className="muted small">
+          {cloud
+            ? 'Your recording goes to OpenRouter and the model you pick below, then is gone: Laki keeps neither the audio nor the text. Paid per minute of audio with your OpenRouter key, about $0.10 an hour with MAI-Transcribe 2.'
+            : 'Free, and on this Mac where macOS can (System Settings › Keyboard › Dictation: its languages and microphone). Press Fn twice anywhere to start it. Cloud adds a choice of model and hold Fn to talk.'}
+        </p>
+      </Group>
+      {cloud && (
+        <>
+          <Group title="Model" hint="A speech-to-text model on OpenRouter (openrouter.ai/models, Speech to text); the language is found by itself">
+            <label>
+              Model
+              <select
+                value={other ? '' : model}
+                onChange={e => (e.target.value ? (setOther(false), onChange({ ...v, model: e.target.value === VOICE_MODEL ? undefined : e.target.value })) : setOther(true))}
+              >
+                {VOICE_MODELS.map(([id, says]) => (
+                  <option key={id} value={id}>
+                    {says}
+                    {id === VOICE_MODEL ? ' (default)' : ''}
+                  </option>
+                ))}
+                <option value="">Another model…</option>
+              </select>
+            </label>
+            {other ? (
+              <label>
+                Model id
+                <input className="mono" value={v.model ?? ''} placeholder={VOICE_MODEL} spellCheck={false} autoFocus onChange={e => onChange({ ...v, model: e.target.value.trim() || undefined })} />
+              </label>
+            ) : (
+              <p className="muted small mono">{model}</p>
+            )}
+          </Group>
+          {/Mac/.test(navigator.userAgent) /* a Mac's (Linux's Fn seldom reaches an app) */ && (
+          <Group title="Hold Fn" hint="Fn is the 🌐 key on newer Macs">
+            <div className="setting-box">
+              <Switch className="switch-row" on={v.fn !== false} onChange={fn => onChange({ ...v, fn })}>
+                <Says title="Hold Fn to talk" hint="Anywhere in Laki: hold Fn, talk, let go, and it's typed where your cursor is: a prompt, a field, a terminal. Another key while you hold it, or Esc, drops it" />
+              </Switch>
+            </div>
+            <p className="muted small">
+              So that macOS doesn't open its emoji picker or dictation as well, set System Settings › Keyboard › Press 🌐 key to: Do Nothing.
+            </p>
+            {bridge?.dictationSettings && (
+              <div className="row-buttons">
+                <button type="button" onClick={() => bridge!.dictationSettings!()}>
+                  Open Keyboard settings
+                </button>
+              </div>
+            )}
+          </Group>
+          )}
+          <Group title="OpenRouter API key" hint={KEY_HINT}>
+            <OpenRouterKey has={has} save={k => keyApi.key(k).then(r => (setHas(r.key), r))} />
+          </Group>
+        </>
+      )}
+    </>
+  )
+}
+
 // presets: Agent presets of claude or codex, each a backend of its own (its env: an account of its own)
 function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings; presets: Preset[]; onChange: (ai: AiSettings) => void }) {
   const [st, setSt] = useState<{ key: boolean; totals: AiTotals }>()
-  const [key, setKey] = useState('')
-  const [said, setSaid] = useState('')
   useEffect(() => void api.state().then(setSt, () => {}), [])
   const backend = ai.backend ?? 'openrouter'
   // the agents' presets, but the plain ones (claude, codex as they are: the options above them)
@@ -292,7 +425,6 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
     const p = v.startsWith('preset:') ? mine.find(x => x.name === v.slice(7)) : undefined
     onChange({ ...ai, backend: (p?.agent ?? v) as AiBackend, preset: p?.name })
   }
-  const saveKey = (k: string) => api.key(k).then(r => (setSt(x => x && { ...x, key: r.key }), setKey(''), setSaid(r.key ? 'Saved' : 'Removed')), e => setSaid(e.message))
   const sum = (k: 'today' | 'month', label: string) => (
     <div>
       <b>{money(st?.totals[k].cost ?? 0)}</b>
@@ -370,28 +502,8 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
         )}
       </Group>
       {backend === 'openrouter' && (
-        <Group title="OpenRouter API key" hint="Kept in a file only you can read, in Laki's data folder: never in its settings, never shown again">
-          <div className="row-buttons">
-            <input
-              className="mono grow"
-              type="password"
-              autoComplete="off"
-              value={key}
-              placeholder={st?.key ? '•••••••• saved: paste another to replace it' : 'sk-or-v1-…'}
-              spellCheck={false}
-              onChange={e => (setKey(e.target.value), setSaid(''))}
-              onKeyDown={e => e.key === 'Enter' && key.trim() && saveKey(key)}
-            />
-            <button type="button" className="primary" disabled={!key.trim()} onClick={() => saveKey(key)}>
-              Save
-            </button>
-            {st?.key && (
-              <button type="button" onClick={() => saveKey('')}>
-                Remove
-              </button>
-            )}
-          </div>
-          {said && <p className="muted small">{said}</p>}
+        <Group title="OpenRouter API key" hint={KEY_HINT}>
+          <OpenRouterKey has={st?.key} save={k => api.key(k).then(r => (setSt(x => x && { ...x, key: r.key }), r))} />
         </Group>
       )}
       <Group title="Chat button" hint="A button in the window's bottom right corner opens Laki AI over what you're doing, the same conversation as the AI page; with each ask it tells the AI the page, workspace and tab you're on and the tab's screen">
@@ -964,6 +1076,9 @@ const FIND: [string, string, string?][] = [
   ['general', 'Show progress', 'percent sidebar tab both'],
   ['general', 'Progress in the sidebar', 'percent line bar row'],
   ['ai', 'Chat button in the corner', 'floating chat ask laki ai anywhere'],
+  ['voice', 'Speech to text', 'voice dictation dictate microphone mic speak talk speech transcribe whisper cloud openrouter engine'],
+  ['voice', 'Model', 'voice speech to text transcribe mai whisper parakeet openrouter'],
+  ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
   ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
@@ -971,6 +1086,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
   ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
+  ['general', 'Voice', 'experimental voice dictation dictate speech to text cloud hold fn mic talk whisper'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
@@ -994,6 +1110,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Agents' },
   { id: 'skill', label: 'Agent skill', icon: 'import', group: 'Agents' },
   { id: 'ai', label: 'AI', icon: 'ai', group: 'Agents' },
+  { id: 'voice', label: 'Voice', icon: 'mic', group: 'Agents' },
   { id: 'open', label: 'Open in', icon: 'code', group: 'Connect' },
   { id: 'webhook', label: 'Phone pushes', icon: 'bell', group: 'Connect' },
   { id: 'widgets', label: 'Extensions', icon: 'panel', group: 'Connect' },
@@ -1787,8 +1904,8 @@ export function SettingsPage(p: {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
-  const [sec, setSec] = useState(() => p.section ?? (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(load('laki.settingsSec', 'general')))
+  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || (p.ai && s.voice?.on === true)) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
+  const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
   useEffect(() => {
     keep('laki.settingsSec', sec)
     p.onSection?.(sec)
@@ -2163,6 +2280,11 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.birdView === true} onChange={v => set({ birdView: v })}>
                   <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
                 </Switch>
+                {p.ai && (
+                  <Switch className="switch-row" on={s.voice?.on === true} onChange={on => set({ voice: { ...s.voice, on } })}>
+                    <Says title="Voice" hint="Talk instead of typing: speech to text in the cloud (OpenRouter, a model you pick) and hold Fn to talk, typed where the cursor is. Shows Settings › Voice; off, the mic is macOS dictation" />
+                  </Switch>
+                )}
               </div>
               </Group>
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
@@ -2667,6 +2789,7 @@ export function SettingsPage(p: {
             </>
           )}
           {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} presets={presets} onChange={ai => set({ ai })} />}
+          {sec === 'voice' && p.ai && s.voice?.on === true && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (
             <>

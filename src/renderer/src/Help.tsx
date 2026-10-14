@@ -40,6 +40,7 @@ const KEYS: [string, string][] = [
   ['⌘,', 'settings'],
   ['⌘+ / ⌘− / ⌘0', "text in this tab bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size)"],
   ['⌘/', 'this page'],
+  ['hold Fn', "talk, let go: it's typed where the cursor is (experimental: Settings › Voice's cloud; Esc or another key drops it)"],
   ['Esc', 'close a page, dialog or menu; in an agent, interrupt its turn'],
 ]
 

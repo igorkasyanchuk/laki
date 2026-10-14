@@ -317,7 +317,15 @@ export type Settings = {
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
+  voice?: VoiceSettings // Settings › Voice: how the mic and hold Fn turn speech into text
 }
+
+// Settings › Voice: engine device, macOS dictation (the mic starts it; Fn Fn is macOS's own); cloud, Laki records and
+// OpenRouter's speech-to-text (daemon/ai.ts voiceText, the AI key) writes it down. model: an OpenRouter speech-to-text
+// model's id (unset: VOICE_MODEL). fn: cloud only, hold Fn to talk anywhere in Laki, let go to insert (unset: on)
+// on: experimental (Settings › General), off unless true: the mic is macOS dictation, no Voice section, no hold Fn
+export type VoiceSettings = { on?: boolean; engine?: 'device' | 'cloud'; model?: string; fn?: boolean }
+export const VOICE_MODEL = 'microsoft/mai-transcribe-2'
 
 // Laki's own AI (daemon/ai.ts): optional (on), it works Laki through the MCP server's tools, only when asked. backend:
 // OpenRouter (its key in <data>/ai-key, never here) or a CLI agent in the background (claude -p, codex exec); models:
@@ -478,4 +486,4 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 58
+export const API = 59

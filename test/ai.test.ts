@@ -17,7 +17,7 @@ async function openrouter(t: { after: (f: () => void) => void }, answers: object
     hits.push({ auth: q.headers.authorization, body: JSON.parse(body) })
     const a = answers[hits.length - 1] ?? { error: { message: 'no more answers' } }
     if ('slow' in a) return // never answers: a stop ends it
-    r.writeHead('error' in a ? 400 : 200, { 'content-type': 'application/json' }).end(JSON.stringify(a))
+    r.writeHead('status' in a ? Number(a.status) : 'error' in a ? 400 : 200, { 'content-type': 'application/json' }).end(JSON.stringify(a))
   })
   await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
   t.after(() => (srv.closeAllConnections(), srv.close()))
@@ -87,6 +87,36 @@ test('ai: OpenRouter runs the laki tools until it answers; the key stays in its 
   assert.deepEqual((await rig.rpc('aiState')).chat, [])
   assert.deepEqual(await rig.rpc('aiKey', { key: '' }), { key: false })
   assert.equal((await rig.rpc('aiState')).key, false)
+})
+
+test("voice: the cloud's recording goes to OpenRouter's speech-to-text with the AI's key; Settings › Voice picks the model", async t => {
+  const busy = { status: 429, error: { code: 429, message: 'Provider returned error', metadata: { raw: 'rate-limited upstream' } } }
+  const down = { status: 502, error: { code: 502, message: 'Provider returned error', metadata: { raw: { error: 'quota' } } } } // raw: the provider's JSON
+  const or = await openrouter(t, [{ text: ' make the button blue ' }, { text: 'hi' }, { text: 'hi' }, { error: { message: 'model not found' } }, busy, { text: 'again' }, busy, busy, busy, ...Array(3).fill(down)])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url, LAKI_VOICE_AGAIN: '10,20' } }) // the waits before trying again, short
+  const wav = Buffer.from('RIFF fake wav').toString('base64')
+  await assert.rejects(rig.rpc('voiceText', { audio: wav }), /Voice is off: turn it on in Settings › General › Experimental/)
+  await rig.rpc('settingsSet', { voice: { on: true } })
+  await assert.rejects(rig.rpc('voiceText', {}), /no audio/)
+  await assert.rejects(rig.rpc('voiceText', { audio: wav }), /no OpenRouter API key: Settings › Voice/)
+  await rig.rpc('aiKey', { key: 'sk-or-v1-voice' })
+  assert.deepEqual(await rig.rpc('voiceText', { audio: wav }), { text: 'make the button blue' })
+  assert.equal(or.hits[0].auth, 'Bearer sk-or-v1-voice')
+  assert.deepEqual(or.hits[0].body, { model: 'microsoft/mai-transcribe-2', input_audio: { data: wav, format: 'wav' } })
+  await rig.rpc('settingsSet', { voice: { on: true, engine: 'cloud', model: 'openai/whisper-large-v3-turbo' } })
+  await rig.rpc('voiceText', { audio: wav })
+  assert.equal(or.hits[1].body.model, 'openai/whisper-large-v3-turbo')
+  await rig.rpc('settingsSet', { voice: { on: true, engine: 'cloud', model: 5 } }) // not a string (an odd import): the default
+  await rig.rpc('voiceText', { audio: wav })
+  assert.equal(or.hits[2].body.model, 'microsoft/mai-transcribe-2')
+  await assert.rejects(rig.rpc('voiceText', { audio: wav }), /OpenRouter 400: model not found$/)
+  assert.deepEqual(await rig.rpc('voiceText', { audio: wav }), { text: 'again' }) // a 429, then tried again
+  await assert.rejects(rig.rpc('voiceText', { audio: wav }), /OpenRouter 429: Provider returned error: rate-limited upstream \(microsoft\/mai-transcribe-2 is busy: try again in a moment, or another model in Settings › Voice\)/)
+  await assert.rejects(rig.rpc('voiceText', { audio: wav }), /OpenRouter 502: Provider returned error: \{"error":"quota"\} \(/)
+  const ws = await rig.connect() // the app's way: the socket takes 32 MB, HTTP 16
+  t.after(() => ws.close())
+  await assert.rejects(ws.call('voiceText', { audio: 'x'.repeat(25 << 20) }), /up to 9 minutes/)
+  assert.equal(or.hits.length, 12) // 3 tries at most
 })
 
 test('ai: a pasted image goes to OpenRouter as a data URL; one from elsewhere never does; Stop ends an ask', async t => {

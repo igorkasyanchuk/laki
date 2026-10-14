@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
-import { aiAnswer, aiAsk, aiContinue, aiForget, aiKey, aiNew, aiQuestion, aiState, aiStop, aiTick } from './ai.ts'
+import { aiAnswer, aiAsk, aiContinue, aiForget, aiKey, aiNew, aiQuestion, aiState, aiStop, aiTick, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
@@ -169,6 +169,7 @@ const api: Record<string, Handler> = {
   aiContinue: p => aiContinue(p), // an ended chat (a spec's, unused 12 hours) taken up again
   aiTick: p => aiTick(p.now), // tests move the clock
   aiKey: p => aiKey(p),
+  voiceText: p => voiceText(p), // Settings › Voice's cloud: { audio: WAV in base64 } → { text }
   send: p => core.send(p),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),

@@ -631,7 +631,8 @@ workspace is never hidden: a folded project or group holding it, or the one you 
 - paste a screenshot (⌘V), drop image files on it, or pick them with ＋; each shows as a thumbnail, and its path
   goes after your text;
 - the mic starts macOS dictation (or press Fn twice). Its ⌄ says where the microphone and languages are picked
-  (System Settings › Keyboard › Dictation) and opens it;
+  (System Settings › Keyboard › Dictation) and opens it. With Voice on (experimental) and on *Cloud*, the mic records instead: a
+  click, talk, a click again (or hold Fn) and the text is typed where the cursor is;
 - *Template* (once you have one in Settings → *Prompt templates* or in the project's settings; the project's come
   first): the prompt goes in its `{{prompt}}`; the box below shows what the agent will get;
 - *Race* (an agent, in a worktree): ＋ adds other presets; each gets a worktree of its own (named
@@ -913,6 +914,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | ⌘, | settings |
 | ⌘/ | help: keys, status glyphs, the main CLI commands, with a filter (⌘F or /; Esc clears it) and a link to this guide (also the ? at the top of the sidebar) |
 | ⌘+ / ⌘− / ⌘0 | text in the tab with the keyboard bigger / smaller / back to Settings' size; each tab keeps its own (Settings or Help open: their size) |
+| hold Fn | talk, let go: the text is typed where the cursor is, a prompt, a field or a terminal (experimental: Settings › Voice on *Cloud*; another key while you hold it, or Esc, drops it) |
 
 Laki follows macOS's System Settings › Accessibility › Display: *Increase contrast* makes hints and lines
 stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motion* stops its animations.
@@ -1105,6 +1107,15 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   same for another agent); *Show* lists one agent's. Each has a slug beside its name (`xhigh-code-review`), set from
   the name as you type it and kept when you rename it, unique across your actions and every project's (type your own;
   one taken gets a `-2`): a workflow's agent block names the action by it (`use: xhigh-code-review`).
+- *Voice* (experimental: turn it on in General › *Experimental*; off, the mic is macOS dictation and the section
+  isn't there): how the prompt boxes' mic turns speech into text. *On this Mac* (the default) is macOS dictation, free
+  (Fn twice starts it anywhere). *Cloud* has Laki record you and a speech-to-text model on OpenRouter write it down,
+  with the OpenRouter key Laki AI uses (one key for both, set in either section): *Model* picks it (MAI-Transcribe 2
+  by default: 60 languages, mixed in one sentence too, about $0.10 an hour of audio; Whisper, Parakeet, GPT-4o
+  Transcribe and others, or *Another model…* for any id). Neither the audio nor the text is kept. *Hold Fn to talk*
+  (on): hold Fn anywhere in Laki, talk, let go, and the text is typed where your cursor is; another key while you
+  hold it, or Esc, drops it. Set System Settings › Keyboard › *Press 🌐 key to* to *Do Nothing*, so macOS doesn't
+  open its emoji picker or dictation as well (*Open Keyboard settings*).
 - *Agent skill*: installs a skill for Claude Code, Codex, Gemini, Grok or OpenCode in your home folder
   (`~/.claude/skills/laki`, `~/.codex/…`, `~/.gemini/…`, `~/.grok/…`, `~/.config/opencode/…`), so every session knows Laki: what it is, and how to drive it with its CLI (list
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).

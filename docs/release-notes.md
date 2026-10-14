@@ -4,6 +4,13 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Voice in the cloud, hold Fn to talk** (experimental: Settings › General › *Experimental*): Settings › Voice picks
+  how the mic turns speech into text: macOS dictation
+  as before, or *Cloud*, a speech-to-text model on OpenRouter with Laki AI's key (MAI-Transcribe 2 by default: 60
+  languages, mixed in one sentence too; Whisper, Parakeet, GPT-4o Transcribe and more in its list, or any id). In
+  the cloud, hold Fn anywhere in Laki, talk, let go: the text is typed where your cursor is, a prompt or a terminal.
+  A model that's busy is tried again twice before Laki says so.
+- Opening your first project from the welcome screen no longer leaves the window black.
 - Workflows: a space (or a new line in a prompt) typed in a name, a description or a block's field stays; it used to
   vanish as you typed it.
 - **Text size per tab**: ⌘+ / ⌘− make the text bigger or smaller in the tab with the keyboard only, and it keeps

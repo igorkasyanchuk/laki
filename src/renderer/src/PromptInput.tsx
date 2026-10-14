@@ -1,9 +1,11 @@
 // A prompt for an agent: text, screenshots pasted or dropped in (the daemon saves them; their paths go
-// after the text, and the agent opens them), and macOS dictation. Its toolbar, as Claude's: + (images), the mic and
-// its ⌄ (dictation: start, microphone and language), then tools (the caller's pickers) on the right. App.tsx passes
-// in how the daemon saves an image and how dictation starts.
+// after the text, and the agent opens them), and voice: macOS dictation, or Settings › Voice's cloud (voice.ts). Its
+// toolbar, as Claude's: + (images), the mic and its ⌄ (start, the microphone and language, or Voice's settings), then
+// tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
 import { type ReactNode, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { openExternal } from './api'
 import { Icon, useMenu } from './ui'
+import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 
 export type Img = { path: string; url: string } // saved file, and a data: URL for its thumbnail
 
@@ -42,6 +44,10 @@ export function PromptInput(p: {
   // dictation types into what macOS sees as the text field, which it learns from the web view a moment after focus:
   // started at once, it finds none and stops (the start sound, then nothing)
   const dictate = () => (box.current?.focus(), setTimeout(() => p.dictate!(), 150))
+  // Voice's cloud: a click starts recording into this box, the next one writes it down here (as letting go of Fn does)
+  const voice = useVoice()
+  const cloud = cloudVoice()
+  const talk = () => (voice.phase === 'listening' ? voiceStop() : (box.current?.focus(), void voiceStart()))
   const saving = useRef(0)
   const add = async (files: File[]) => {
     setErr('')
@@ -108,25 +114,42 @@ export function PromptInput(p: {
           <Icon name="plus" />
           <input type="file" accept="image/*" multiple hidden onChange={e => (add(images(e.target.files!)), (e.target.value = ''))} />
         </label>
-        {p.dictate && (
+        {(cloud || p.dictate) && (
           <span className="mic-split">
-            <button type="button" className="ib" aria-label="Dictate" data-tip="Dictate (macOS dictation; or press Fn twice)" onMouseDown={e => e.preventDefault() /* the text box keeps the focus */} onClick={dictate}>
+            <button
+              type="button"
+              className={`ib${cloud && voice.phase !== 'idle' ? ` voice-${voice.phase}` : ''}`}
+              aria-label={cloud && voice.phase === 'listening' ? 'Stop and insert' : 'Dictate'}
+              data-tip={cloud ? (voice.phase === 'listening' ? 'Stop and insert (or let go of Fn); Esc drops it' : 'Dictate: click, talk, click again; or hold Fn') : 'Dictate (macOS dictation; or press Fn twice)'}
+              disabled={cloud && voice.phase === 'writing'}
+              onMouseDown={e => e.preventDefault() /* the text box keeps the focus */}
+              onClick={cloud ? talk : dictate}
+            >
               <Icon name="mic" />
             </button>
-            {p.dictationSettings && (
+            {(cloud || p.dictationSettings) && (
               <button
                 type="button"
                 className="ib caret"
                 aria-label="Dictation options"
                 aria-haspopup="menu"
-                data-tip="Dictation: microphone and language"
+                data-tip={cloud ? 'Voice: cloud' : 'Dictation: microphone and language'}
                 onMouseDown={e => e.preventDefault()}
                 onClick={e =>
-                  openMenu(e, [
-                    { head: 'Dictation · macOS' },
-                    { label: 'Start dictating', icon: 'mic', hint: 'Fn Fn', run: dictate },
-                    { label: 'Microphone and language…', icon: 'settings', hint: 'System Settings › Keyboard', run: p.dictationSettings! },
-                  ])
+                  openMenu(
+                    e,
+                    cloud
+                      ? [
+                          { head: 'Voice · cloud' },
+                          { label: voice.phase === 'listening' ? 'Stop and insert' : 'Start dictating', icon: 'mic', hint: 'hold Fn', run: talk },
+                          { label: 'Voice settings…', icon: 'settings', hint: 'Settings › Voice', run: () => openExternal('laki://settings/voice') },
+                        ]
+                      : [
+                          { head: 'Dictation · macOS' },
+                          { label: 'Start dictating', icon: 'mic', hint: 'Fn Fn', run: dictate },
+                          { label: 'Microphone and language…', icon: 'settings', hint: 'System Settings › Keyboard', run: p.dictationSettings! },
+                        ],
+                  )
                 }
               >
                 <Icon name="chevron" size={11} />
@@ -138,6 +161,18 @@ export function PromptInput(p: {
         {p.tools && <span className="prompt-tools-end">{p.tools}</span>}
       </div>
       {menu}
+    </div>
+  )
+}
+
+// what Voice's cloud is doing, wherever it started (the mic, hold Fn): listening, writing it down, then a line to say
+// (it failed, or the text went to the clipboard). App's and the new-workspace and AI windows'
+export function VoiceBar() {
+  const v = useVoice()
+  if (v.phase === 'idle' && !v.said) return null
+  return (
+    <div className={`voice-bar ${v.phase}`} role="status">
+      {v.phase === 'idle' ? v.said : <><Icon name="mic" /> {v.phase === 'listening' ? 'Listening… let go of Fn, or click the mic, to insert; Esc drops it' : 'Writing it down… Esc drops it'}</>}
     </div>
   )
 }
