@@ -10,9 +10,11 @@ import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, AGENTS, API, type Agent, type Check, type Doctor, EFFORTS, fillTemplate, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, AGENTS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
+import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { flowView } from '../shared/workflow.ts'
+import { accountEnv, accountFor, accountIds, accounts, loginCmd } from './accounts.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
@@ -418,6 +420,7 @@ export function view(): View {
     schedules: state.schedules,
     runs: state.runs?.slice(0, RUNS_SHOWN),
     todos: state.todos,
+    layouts: state.layouts,
     widgets: widgetsView(),
     widgetKey,
     widgetHome: widgetHome(),
@@ -1079,6 +1082,7 @@ function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, ho
     ...state.settings?.env, // Settings → General: every session's
     ...projectConfig(ws).env,
     ...presetOf(tab)?.env,
+    ...(!ws.host && accountEnv(tab.account)), // its account's config folder (accounts.ts): none for the agent's own
     ...(tab.kind === 'agent' && state.settings?.progress && { LAKI_PROGRESS: '1' }), // the laki skill: report how far along with laki progress
     TERM: 'xterm-256color',
     COLORTERM: 'truecolor',
@@ -1129,7 +1133,10 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   }
   // the tab's model and effort (only claude and codex take one: EFFORTS), after the preset's args: picked for this
   // workspace, they win over a preset's own
-  const flags = [...(tab.model ? [tab.preset === 'claude' ? '--model' : '-m', tab.model] : []), ...(tab.effort ? (tab.preset === 'claude' ? ['--effort', tab.effort] : ['-c', `model_reasoning_effort=${JSON.stringify(tab.effort)}`]) : [])]
+  // a profile's model and effort when the workspace picked none
+  const model = tab.model || pr?.model?.trim()
+  const effort = tab.effort || (EFFORTS[tab.preset as Agent]?.includes(pr?.effort ?? '') ? pr!.effort : undefined)
+  const flags = [...(model ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : [])]
   // a preset's args go in as written (a shell runs the line), before the prompt
   return [argv.map(q).join(' '), pr?.args?.trim(), flags.map(q).join(' '), ask.map(q).join(' ')].filter(Boolean).join(' ')
 }
@@ -1149,6 +1156,9 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   else args = ['-lic', wait + (o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, o.prompt, !!o.resume) : tab.cmd || 'true'))]
   sessions.get(tab.id)?.kill()
   asleep.delete(tab.id)
+  // its account (claude, codex on this Mac): kept from its first start, so a restart or a resume stays on it
+  const account = ws.host ? undefined : accountFor(tab, presetOf(tab)?.account)
+  if (account !== tab.account) (tab.account = account), save()
   const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
   wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
   sessions.set(tab.id, s)
@@ -1209,7 +1219,7 @@ const CHAT_GONE = /no (conversation|saved session|session|rollout)\b[^\n]*found|
 function presetCheck(preset?: string, cmd?: string) {
   if (preset === 'custom' && !cmd?.trim()) throw new Error('custom preset: command missing')
   if (preset && !isAgent(preset) && preset !== 'shell' && preset !== 'custom' && !presetNamed(preset))
-    throw new Error(`unknown preset ${preset} (see Settings: Agent presets)`)
+    throw new Error(`unknown preset ${preset} (see Settings › Agents & profiles)`)
 }
 
 // a model and effort for an agent's flags: a name (it goes on the command line, quoted), an effort it takes
@@ -1218,7 +1228,7 @@ function modelCheck(agent: string, model?: string, effort?: string) {
   if (effort && !EFFORTS[agent as Agent]?.includes(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
 }
 
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string }): Tab {
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; vars?: boolean }): Tab {
   const ws = findWs(wsRef)
   if (ws.browser !== undefined) throw new Error(`${ws.name ?? ws.id} is a browser page: it has no tabs`) // its page covers the terminals' place
   if (!o.kind) presetCheck(o.preset, o.cmd)
@@ -1242,7 +1252,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   state.tabs.push(tab)
   save()
   try {
-    spawnTab(tab, { prompt: o.prompt })
+    spawnTab(tab, { prompt: o.prompt && o.vars ? varsIn(tab, o.prompt) : o.prompt })
   } catch (e) {
     state.tabs = state.tabs.filter(t => t !== tab)
     save()
@@ -1402,6 +1412,8 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 export function settingsSet(o: Settings) {
   const dirsWere = JSON.stringify(state.settings?.widgetDirs ?? [])
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
+  const { accounts: _, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
+  o = rest
   state.settings = { ...state.settings, ...o }
   if (Array.isArray(o.actions)) slugActions(state.settings.actions)
   save()
@@ -1492,7 +1504,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string }
+export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1694,7 +1706,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
   }
   try {
-    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort }).name} (its command: the workspace's Logs)`)
+    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, vars: o.vars }).name} (its command: the workspace's Logs)`)
     else step('no agent (none)')
   } finally {
     changed() // the workspace is made, even when its agent didn't start
@@ -1778,6 +1790,7 @@ async function teardown(ws: Workspace) {
 const saidTried = new Map<string, string>() // prFromSaid's: the PR link each workspace's agents named last, tried
 function dropWs(ws: Workspace) {
   saidTried.delete(ws.id)
+  if (state.layouts?.[ws.id]) delete state.layouts[ws.id]
   stopTunnels(ws.id)
   forward(ws, false)
   for (const t of tabsOf(ws.id)) {
@@ -1949,12 +1962,15 @@ export function rerun(pid: number, args: string): { cmd: string; run?: boolean }
 // types what a shell ran back into it once its prompt is up (it printed, then quiet for half a second; 10 s at most)
 function bringBack(s: Session, cmd: string, run: boolean) {
   s.output(`\x1b[2m[${run ? 'Laki restarted · resuming it' : 'Laki restarted · this was running here: ⏎ runs it again'}]\x1b[0m\r\n`)
-  const from = s.lastOutput
+  whenPrompt(s, () => typeInto(s, cmd, run), s.lastOutput) // its note isn't the prompt
+}
+// a new shell's prompt is up: it printed since `from` (its start), then 500 ms quiet (10 s at most)
+function whenPrompt(s: Session, then: () => void, from = s.born) {
   const wait = setInterval(() => {
     if (s.exited || sessions.get(s.tab) !== s) return clearInterval(wait)
     if ((s.lastOutput === from || Date.now() - s.lastOutput < 500) && Date.now() - from < 10000) return // the prompt, then quiet
     clearInterval(wait)
-    typeInto(s, cmd, run)
+    then()
   }, 100)
 }
 
@@ -2092,6 +2108,17 @@ export function typeInto(s: Session, text: string | Promise<string>, enter = tru
 }
 
 // what's typed into a tab: on an SSH host, with the images it names copied there (toHost); never fails
+// the agent variables ({{branch}}…, shared/types.ts AGENT_VARS) in a text going to a tab: an action's, a template's,
+// a scheduled prompt's (vars), never a message as typed
+export function varsIn(tab: Tab, text: string) {
+  const ws = state.workspaces.find(w => w.id === tab.workspace)
+  if (!ws || !text.includes('{{')) return text
+  const vars = agentVars(ws, { project: state.projects.find(p => p.id === ws.project)?.name, pr: prOf(ws.id)?.url ?? ws.prUrl, tab })
+  // a shell runs what it's typed: a value it would read as code (a branch named a;$(…), a tab's name) goes in quoted
+  if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@%+=:,./-]+$/.test(v)) vars[k] = q(v)
+  return fillVars(text, vars)
+}
+
 function textFor(tab: Tab, text: string): string | Promise<string> {
   const host = state.workspaces.find(w => w.id === tab.workspace)?.host
   if (!host || !text.includes(join(dir, 'images'))) return text
@@ -2101,8 +2128,9 @@ function textFor(tab: Tab, text: string): string | Promise<string> {
 // enter: false types it into the prompt for the user to finish (the preview's picked element): no turn starts
 // agent: only an agent's tab, and not typed into a question it asks (MCP's laki_send, Laki AI's: a model steered by
 // what it reads must not run a shell command or answer a permission prompt)
-export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean; agent?: boolean }) {
+export function send(p: { target: string; text: string; whenIdle?: boolean; enter?: boolean; agent?: boolean; vars?: boolean }) {
   const tab = resolveTarget(p.target)
+  if (p.vars) p = { ...p, text: varsIn(tab, p.text) } // an action's: its {{branch}}… now, queued or not
   if (p.agent && !tracked(tab)) throw new Error(`${tab.name} isn't an agent: messages go to agents only`)
   if (p.agent && !p.whenIdle && rtOf(tab.id).status === 'waiting') throw new Error(`${tab.name} is asking the user something: only they answer it (or send with when_idle)`)
   if (p.enter === false && asleep.has(tab.id)) throw new Error(`${tab.name} is asleep: look at it to wake it, then send again`)
@@ -3439,6 +3467,98 @@ export function wake(id: string) {
   return true
 }
 
+// ---------- layouts: each workspace's tabs as the app shows them, a split tree of sessions each (shared/layout.ts),
+// kept here so every window, the phone, the CLI and Laki AI see one arrangement
+
+// a workspace's tabs: the stored ones less ended sessions, then one per session in none
+export const layoutOf = (ws: string) => groupsOf(state.layouts?.[ws], tabsOf(ws).map(t => t.id))
+
+// a Layout from a client: its shape checked, its sessions this workspace's, its splits within 10-90%
+function layoutCheck(l: unknown, depth = 0): Layout | null {
+  if (!l || typeof l !== 'object' || depth > 20) return null
+  const x = l as Record<string, unknown>
+  if (typeof x.tab === 'string') return { tab: x.tab }
+  if (x.dir !== 'row' && x.dir !== 'col') return null
+  const a = layoutCheck(x.a, depth + 1)
+  const b = layoutCheck(x.b, depth + 1)
+  return a && b ? { dir: x.dir, a, b, at: Math.min(0.9, Math.max(0.1, Number(x.at) || 0.5)) } : null
+}
+export function layoutSet(p: { ws: string; groups: unknown }) {
+  const ws = findWs(p.ws)
+  if (!Array.isArray(p.groups)) throw new Error('groups: a list of tabs')
+  const groups = groupsOf(p.groups.map(g => layoutCheck(g)).filter((g): g is Layout => !!g), tabsOf(ws.id).map(t => t.id))
+  state.layouts = { ...state.layouts, [ws.id]: groups }
+  save()
+  changed()
+  return groups
+}
+
+// the pane a viewer is on in that workspace: the newest focused window's, else any's
+function paneOn(ws: string) {
+  const mine = (c: Conn) => (c.view?.tab && state.tabs.find(t => t.id === c.view!.tab)?.workspace === ws ? c.view.tab : undefined)
+  const cs = [...clients].reverse()
+  return cs.filter(c => c.view?.focused).map(mine).find(Boolean) ?? cs.map(mine).find(Boolean)
+}
+
+// a new tab's place: beside a pane (edge: right unless said), or with settings.splitNew beside the pane you're on;
+// else a tab of its own (beside: null)
+export function layoutPlace(t: Tab, beside?: string | null, edge: Edge = 'right') {
+  const near = beside === null ? undefined : (beside ?? (state.settings?.splitNew ? paneOn(t.workspace) : undefined))
+  if (!near || near === t.id) return
+  const groups = layoutOf(t.workspace)
+  if (!groups.some(g => paneTabs(g).includes(near))) return
+  layoutSet({ ws: t.workspace, groups: move(groups, t.id, false, { pane: near, edge: EDGES.includes(edge) ? edge : 'right' }) })
+}
+const EDGES: Edge[] = ['left', 'right', 'top', 'bottom']
+
+// Laki AI's and the CLI's: move a pane beside another (a split), or to a tab of its own
+export function layoutMove(p: { tab: string; beside?: string; edge?: Edge }) {
+  const t = findTab(p.tab)
+  const groups = layoutOf(t.workspace)
+  if (!p.beside) return layoutSet({ ws: t.workspace, groups: move(groups, t.id, false, 'bar') })
+  const b = findTab(p.beside)
+  if (b.workspace !== t.workspace) throw new Error(`${b.name} is in another workspace`)
+  if (b.id === t.id) throw new Error('beside itself?')
+  return layoutSet({ ws: t.workspace, groups: move(groups, t.id, false, { pane: b.id, edge: p.edge && EDGES.includes(p.edge) ? p.edge : 'right' }) })
+}
+
+// the app's windows select a tab (Laki AI's "show me"): every window on the socket (the phone's too)
+export function tabFocus(p: { tab: string }) {
+  const t = findTab(p.tab)
+  broadcast({ ev: 'focus', tab: t.id })
+  return { ok: true }
+}
+
+// ---------- accounts (accounts.ts): a tab moved to another, a sign-in
+
+// Restart on another account: the tab's chat again on that account (the chats are shared: accounts.ts SHARED). A
+// turn at work stops (the app asks first)
+export function tabAccount(p: { tab: string; account: string }) {
+  const t = findTab(p.tab)
+  if (!isAccountAgent(t.preset)) throw new Error(`${t.name} isn't claude or codex: no accounts`)
+  if (findWs(t.workspace).host) throw new Error(`${t.name} runs on an SSH host: its sign-in is that machine's`)
+  if (!accountIds(t.preset).includes(p.account)) throw new Error(`no ${t.preset} account ${p.account}`)
+  t.account = p.account
+  save()
+  spawnTab(t, { resume: true })
+  changed()
+  return t
+}
+
+// Sign in: a new terminal running the agent's login in the account's folder (its own: the agent's), as you'd type it
+export async function accountLogin(p: { id: string; agent: string }) {
+  const agent = p.agent
+  if (!isAccountAgent(agent) || !accountIds(agent).includes(p.id)) throw new Error(`no ${agent} account ${p.id}`)
+  const ws = await quickNew({ kind: 'shells' })
+  ws.name = `sign in: ${accounts().find(a => a.id === p.id)?.name ?? 'Default'}`
+  save()
+  changed()
+  const t = tabsOf(ws.id)[0]
+  const s = t && sessions.get(t.id)
+  if (s) whenPrompt(s, () => typeInto(s, loginCmd(p.id, agent), true))
+  return ws
+}
+
 // ---------- diff, dev server, ship
 
 // what a workspace's changes are against: a worktree's merge base with its base branch, else HEAD
@@ -4032,7 +4152,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
     if (s.ws === 'new' || s.ws === 'local-new') {
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
       const title = wsTitle(s, now)
-      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, ...(s.ws === 'local-new' && { local: true, another: true }) })
+      const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws === 'local-new' && { local: true, another: true }) })
       // told apart in the sidebar, as its id is: Check 05-10-k3x9 (an hourly 'Check {{DD-MM}}'), with the id's tail
       const taken = (n: string) => state.workspaces.some(w => w !== ws && !w.archived && (w.name || w.id) === n)
       const own = ws.id.startsWith(`${slug(title)}-`) ? ws.id.slice(slug(title).length) : ''
@@ -4051,11 +4171,11 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       r.ws = ws.id
       const live = tabsOf(ws.id).find(t => t.kind === 'agent' && (t.profile ?? t.preset) === s.preset && isLive(t))
       if (live) {
-        const sent = send({ target: live.id, text: prompt, whenIdle: tracked(live) })
+        const sent = send({ target: live.id, text: prompt, whenIdle: tracked(live), vars: true })
         r.tab = live.id
         r.what = 'queued' in sent ? `queued for its tab, ${live.name} (it was working)` : `sent to its tab, ${live.name}`
       } else {
-        const t = addTab(ws.id, { preset: s.preset, prompt })
+        const t = addTab(ws.id, { preset: s.preset, prompt, vars: true })
         r.tab = t.id
         r.what = `started in a new tab, ${t.name}`
       }

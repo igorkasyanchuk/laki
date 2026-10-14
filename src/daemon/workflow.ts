@@ -8,7 +8,7 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
-import { findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
+import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, BAD_EXITS, blockName, branchOf, check, exitsOf, fill, FLOW_ENDED, holds, ID, OUTWARD, parse, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, broadcast, changed, dir, findProject, isLive, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
@@ -169,7 +169,9 @@ const touch = () => (save(), changed())
 function varsOf(r: FlowRun): Record<string, string> {
   const ws = wsOf(r)
   const pr = ws && prOf(ws.id)
-  return { ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
+  // the agent variables ({{branch}}, {{path}}…: what actions and templates take) under the run's own
+  const agent = ws ? Object.fromEntries(Object.entries(agentVars(ws, { project: state.projects.find(p => p.id === ws.project)?.name, pr: pr?.url })).filter((e): e is [string, string] => e[1] !== undefined)) : {}
+  return { ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
 }
 
 export async function flowStart(o: { workflow: string; source?: WorkflowSource; project: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent' }) {

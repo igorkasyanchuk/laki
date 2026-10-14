@@ -13,6 +13,7 @@ import { type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
 import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, aiTotals, type View } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
+import { accountEnv, accountUsed } from './accounts.ts'
 import { planOfChat } from './plans.ts'
 
 const keyPath = join(dir, 'ai-key')
@@ -330,7 +331,7 @@ const sessionKey = (agent: AiBackend) => `${agent}:${presetOf(agent)?.name ?? ''
 function cli(o: Opts, cmd: AiBackend, args: string[], line: (j: any) => void) {
   mkdirSync(home, { recursive: true })
   return new Promise<void>((resolve, reject) => {
-    const env = { ...process.env, ...state.settings?.env, ...presetOf(cmd)?.env, MCP_TOOL_TIMEOUT: '300000' }
+    const env = { ...process.env, ...state.settings?.env, ...presetOf(cmd)?.env, ...(cmd !== 'openrouter' && accountEnv(presetOf(cmd)?.account ?? accountUsed(cmd))), MCP_TOOL_TIMEOUT: '300000' } // its account: the preset's, else the default
     const c = spawn(cmd, args, { cwd: home, env, stdio: ['ignore', 'pipe', 'pipe'] })
     o.spawned(c)
     own(c, `Laki AI · ${cmd}`, 'ai')

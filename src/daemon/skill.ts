@@ -83,8 +83,9 @@ ${USAGE}
 
 ## Start work
 
-1. \`laki ls --json\`: the projects (ids), workspaces (id, branch, path) and tabs with their status.
-2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode] [--name short-name] [--base <branch>]\`:
+1. \`laki ls --json\`: the projects (ids), workspaces (id, branch, path; \`tabs\`: how its tabs are split, \`a | b\` side by
+   side, \`a / b\` stacked) and tabs with their status.
+2. \`laki new <project> --prompt "<task>" [--preset claude|codex|gemini|grok|opencode|<profile>] [--name short-name] [--base <branch>]\`:
    a new worktree on a new branch, set up by the project's setup script, with the agent started on the
    prompt. \`--local\` works in the repo itself; \`--preset shell\` or \`none\` starts no agent; \`--model\` and
    \`--effort\` pick the agent's (blank: its own).
@@ -166,7 +167,8 @@ more than 30 minutes late is skipped and logged as missed).
   session and sidebar row each run) or a workspace id (its running agent gets the prompt, queued while it works).
 - \`--preset claude|codex|gemini|grok|opencode|<preset>\`; \`--name "Nightly deps {{DD-MM}}"\`: \`{{DD-MM-YY}}\`, \`{{YYYY-MM-DD}}\`,
   \`{{HH:mm}}\` or \`{{ddd D MMM}}\` in the name or the prompt become the run's date, so each run's workspace
-  has its own name.
+  has its own name; \`{{branch}}\`, \`{{path}}\`, \`{{port}}\`, \`{{pr}}\`, \`{{workspace}}\`, \`{{tab}}\` in the prompt
+  become the run's workspace's and tab's.
 - \`laki schedule\` lists them (id, next run), \`laki schedule log\` the last runs; \`on\`, \`off\`, \`run\` (now)
   and \`rm\` take an id.
 

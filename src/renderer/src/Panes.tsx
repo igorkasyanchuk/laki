@@ -1,7 +1,7 @@
 // A tab's terminal area split into panes (layout.ts), panes and tabs dragged around, and the sidebar's
 // resize handle. Panes are absolutely placed siblings keyed by session, so splitting never remounts a terminal.
 import { useRef, useState, type MouseEvent, type PointerEvent as PE, type ReactNode } from 'react'
-import { type Bar, type Layout, place, type Spot } from './layout'
+import { type Bar, type Layout, place, type Spot } from '../../shared/layout'
 import { colorVar } from './ui'
 
 export type Drag = { tab: string; whole: boolean; x: number; y: number; over?: Spot; line?: { left: number; top: number; width: number; height: number } }
@@ -168,7 +168,13 @@ export function PanelHandle({ onWidth, init }: { onWidth: (w: number) => void; i
       className="sp-handle"
       data-tip="Drag to resize · double-click to reset"
       onPointerDown={grab}
-      onPointerMove={e => held(e) && onWidth(Math.round(Math.min(760, Math.max(240, window.innerWidth - e.clientX))))}
+      onPointerMove={e => {
+        if (!held(e)) return
+        // as wide as you like, the terminals keep 280px (a tab strip beside them aside; CSS too, as the window narrows)
+        const panel = e.currentTarget.parentElement!
+        const terms = panel.parentElement!.querySelector<HTMLElement>(':scope > .term-wrap')?.offsetWidth ?? 0
+        onWidth(Math.round(Math.max(240, Math.min(panel.offsetWidth + terms - 280, panel.getBoundingClientRect().right - e.clientX))))
+      }}
       onDoubleClick={() => onWidth(init)}
     />
   )

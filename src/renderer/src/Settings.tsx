@@ -3,10 +3,10 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { actionSlug, AGENT_NAMES, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { type Account, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
-import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, type Template, templatesFor } from './text'
+import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge } from './api'
 import { DOCK_ICONS } from './dock'
@@ -14,7 +14,7 @@ import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, tr
 import './floater.css'
 import { ask, Icon, IconButton, type IconName, keep, load, Switch } from './ui'
 import { QR } from './Tunnel'
-import { USAGE_AGENTS } from './Usage'
+import { mostRoom, USAGE_AGENTS } from './Usage'
 import { BACKENDS, money, tokens } from './Ai'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
@@ -121,6 +121,7 @@ export type AppSettings = Paint & {
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
   dimPanes?: boolean // a split's other panes faded (unset: off)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
+  splitNew?: boolean // a new tab opens beside the pane you're on (the daemon's layoutPlace)
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
   pageZoom?: number // Settings and Help's size, one of PAGE_ZOOMS (unset: 1)
   worktrees?: string // where new worktrees go, a folder per project inside (unset: <data>/worktrees)
@@ -135,6 +136,7 @@ export type AppSettings = Paint & {
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   usage?: Record<string, boolean> // claude, codex: the status bar shows its plan's limits (unset: on)
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
+  accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   remoteMail?: string // the one address remote access lets in
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
@@ -468,7 +470,7 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
                 </option>
               ))}
               {mine.length > 0 && (
-                <optgroup label="Your agent presets">
+                <optgroup label="Your profiles">
                   {mine.map(p => (
                     <option key={p.name} value={`preset:${p.name}`}>
                       {p.name} · {BACKENDS[p.agent as AiBackend]}
@@ -481,9 +483,9 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
         </div>
         <p className="muted small">
           {preset
-            ? `Your preset ${preset.name}: ${BACKENDS[backend]} with its env${Object.keys(preset.env ?? {}).length ? ` (${Object.keys(preset.env!).join(', ')})` : ''}, for an account of its own. Its args are for a tab, not used here.`
+            ? `Your profile ${preset.name}: ${BACKENDS[backend]} on its account (none: the default) with its env${Object.keys(preset.env ?? {}).length ? ` (${Object.keys(preset.env!).join(', ')})` : ''}. Its model, effort and flags are a tab's, not used here.`
             : AI_HOW.find(x => x[0] === backend)?.[1]}
-          {backend !== 'openrouter' && !preset && ' Another account (CLAUDE_CONFIG_DIR, CODEX_HOME): make an agent preset with that env, then pick it here.'}
+          {backend !== 'openrouter' && !preset && ' Another account: a profile on it (Agents & profiles), then pick it here; none: the default account.'}
         </p>
         <label>
           Model
@@ -736,23 +738,27 @@ const ACTION_EG: Record<RunAction['target'], string> = {
 }
 // a preset's args, for example
 const ARGS_EG: Record<Agent, string> = {
-  claude: '--model opus --permission-mode acceptEdits',
-  codex: '--model gpt-5 --full-auto',
-  gemini: '--model gemini-2.5-pro --approval-mode auto_edit',
-  grok: '--model grok-4.5 --permission-mode acceptEdits',
-  opencode: '--model anthropic/claude-sonnet-4-5 --agent build',
+  claude: '--permission-mode acceptEdits',
+  codex: '--full-auto',
+  gemini: '--approval-mode auto_edit',
+  grok: '--permission-mode acceptEdits',
+  opencode: '--agent build',
 }
 
 // actions (Settings › Actions, a project's): a name, who it's for, and the prompt or command
 // prompt templates (Settings › Prompt templates, and a project's own): a name and a text with {{prompt}}
 // what a template and a preset's command line can use, shown as chips under the field
+const DATE_VAR: [string, string] = ['{{DD-MM-YY HH:MM}}', "now: any of YYYY YY MMMM MMM MM DD D dddd ddd HH H hh mm ss A, in any order (MM after an hour is minutes)"]
 const TEMPLATE_VARS: [string, string][] = [
   ['{{prompt}}', 'what you type on the new-workspace page (without it, the typed text goes after the template)'],
   ['{{project}}', "the project's name"],
   ['{{base}}', 'the base branch'],
   ['{{pr}}', 'the PR: a PR link in the prompt, or a prompt of only #123'],
-  ['{{DD-MM-YY HH:MM}}', "now: any of YYYY YY MMMM MMM MM DD D dddd ddd HH H hh mm ss A, in any order (MM after an hour is minutes)"],
+  DATE_VAR,
+  ...AGENT_VARS.filter(([v]) => !['{{project}}', '{{base}}', '{{pr}}'].includes(v)), // the workspace's, once it's made
 ]
+// an action's: the agent variables, a date of any shape
+const ACTION_VARS: [string, string][] = [...AGENT_VARS, DATE_VAR]
 const ENV_VARS: [string, string][] = [
   ['$PORT', "the workspace's port, for a dev server"],
   ['$LAKI_WORKSPACE', "the workspace's id"],
@@ -860,6 +866,7 @@ function ActionsField({ value = [], onChange, taken = [] }: { value?: RunAction[
               <IconButton icon="trash" title="Remove action" onClick={() => drop(i)} />
             </div>
             <textarea className="mono" rows={2} spellCheck={false} value={a.text} placeholder={ACTION_EG[a.target]} onChange={e => setAt(i, { text: e.target.value })} />
+            <VarChips vars={ACTION_VARS} value={a.text} onChange={text => setAt(i, { text })} />
             {a.target !== 'shell' && (
               <label className="action-slug-row muted small">
                 Slug
@@ -1057,9 +1064,11 @@ const FIND: [string, string, string?][] = [
   ['terminal', 'Mac editing keys: ⌘← ⌘→ ⌥← ⌥→ ⌘⌫', 'cmd option arrow keys line start end word caret cursor home natural text editing iterm'],
   ['terminal', 'Dim other panes', 'split focus fade'],
   ['terminal', 'Focus the pane under the mouse', 'split hover caret cursor follows'],
+  ['terminal', 'New tabs open as a split', 'pane panel nested inside tab beside'],
   ['open', 'Default', 'editor cursor vs code zed windsurf antigravity sublime jetbrains xcode open in'],
   ['open', 'Custom command', 'editor'],
-  ['presets', 'Agent presets', 'claude codex gemini args env model'],
+  ['presets', 'Agents & profiles', 'claude codex gemini args flags env model effort presets'],
+  ['presets', 'Accounts', 'sign in login switch account claude max codex plan another second CLAUDE_CONFIG_DIR CODEX_HOME'],
   ['pr', 'Check pull requests every', 'pr github scan frequency interval minutes how often'],
   ['git', 'Archive workspace when its PR merges', 'merged auto archive clean cleanup'],
   ['pr', 'Tries in a row', 'pr fix ci conflicts limit attempts how many times'],
@@ -1090,6 +1099,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
+  ['general', 'Reset the interface', 'reset ui layout default widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
@@ -1104,7 +1114,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'terminal', label: 'Terminal', icon: 'terminal', group: 'Laki' },
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
   { id: 'notes', label: 'Release notes', icon: 'file', group: 'Laki' },
-  { id: 'presets', label: 'Agent presets', icon: 'agent', group: 'Agents' },
+  { id: 'presets', label: 'Agents & profiles', icon: 'agent', group: 'Agents' },
   { id: 'templates', label: 'Prompt templates', icon: 'pencil', group: 'Agents' },
   { id: 'actions', label: 'Actions', icon: 'run', group: 'Agents' },
   { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Agents' },
@@ -1498,6 +1508,50 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
 
 export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's) or laki-widget
 // how an app reads and writes its skill; app: its name, for the text
+// what Reset the interface keeps: what you made (timers, stopwatches, Send later, drafts) and Get started's done
+const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.onboard']
+
+// Settings › Agents & profiles' accounts (the daemon's accounts.ts): who each signs in as, and what to do with them
+export type AccountsApi = { load: () => Promise<AccountView[]>; usage: () => Promise<AgentUsage[]>; add: (agent: AccountAgent, name: string) => Promise<Account>; rename: (id: string, name: string) => Promise<unknown>; remove: (a: AccountView) => Promise<unknown>; login: (a: AccountView) => Promise<unknown> }
+
+// an agent's accounts: its own sign-in, then the ones added; a click on the circle makes one the default for new
+// sessions (running tabs keep theirs), Sign in opens a terminal with the agent's login in its folder
+function AccountsBlock({ agent, api, views, usage, use, onUse, reload }: { agent: AccountAgent; api: AccountsApi; views: AccountView[]; usage: AgentUsage[]; use: string; onUse: (id: string) => void; reload: () => void }) {
+  const [names, setNames] = useState<Record<string, string>>({})
+  const mine = views.filter(v => v.agent === agent)
+  const most = mostRoom(usage, agent)
+  return (
+    <div className="accounts" role="radiogroup" aria-label={`${AGENT_NAMES[agent]} accounts`}>
+      {mine.map(v => (
+        <div key={v.id} className={`account-row${v.id === use ? ' on' : ''}`}>
+          <button type="button" role="radio" aria-checked={v.id === use} className="account-pick" data-tip={v.id === use ? 'New sessions start on it' : 'Make it the default for new sessions (running tabs keep theirs)'} onClick={() => onUse(v.id)} />
+          <div className="account-who">
+            {v.id === HOME_ACCOUNT ? (
+              <b>Default sign-in</b>
+            ) : (
+              <input value={names[v.id] ?? v.name} aria-label="Account name" onChange={e => setNames(n => ({ ...n, [v.id]: e.target.value }))} onBlur={e => (e.target.value.trim() ? e.target.value !== v.name && api.rename(v.id, e.target.value).then(reload, () => {}) : setNames(({ [v.id]: _, ...n }) => n)) /* blank: its name back */} />
+            )}
+            <span className="muted small">
+              {[v.email ?? (v.signedIn ? 'signed in' : 'not signed in'), v.plan && v.plan[0].toUpperCase() + v.plan.slice(1), v.id === HOME_ACCOUNT ? shortPath(v.dir) : null].filter(Boolean).join(' · ')}
+            </span>
+          </div>
+          {most === v.id && <span className="tag tag-open" data-tip="The most room left in its shortest limit (the status bar's ring)">most room</span>}
+          {!v.signedIn && <span className="tag tag-conflict">not signed in</span>}
+          <button type="button" onClick={() => api.login(v)}>
+            {v.signedIn ? 'Sign in again' : 'Sign in'}
+          </button>
+          {v.id !== HOME_ACCOUNT && <IconButton icon="trash" title="Remove account (its sign-in too)" onClick={() => api.remove(v).then(reload, () => {})} />}
+        </div>
+      ))}
+      <div className="row">
+        <button type="button" onClick={() => api.add(agent, '').then(a => api.login({ ...a, signedIn: false, default: false }), () => {})}>
+          <Icon name="plus" /> Add {AGENT_NAMES[agent]} account
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean, skill?: string) => Promise<SkillInfo[]> }
 // the skills Settings offers, in its order: what each teaches
 const SKILL_KINDS: [string, string, string][] = [
@@ -1899,6 +1953,7 @@ export function SettingsPage(p: {
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   presets: Preset[] // the daemon's: the settings', or its defaults
+  accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
   onSection?: (id: string) => void // each section it shows (Get started's steps)
 }) {
   const { settings, apps, onSave, onClose } = p
@@ -2008,6 +2063,24 @@ export function SettingsPage(p: {
   }, [onClose])
 
   const presets = s.presets ?? p.presets
+  // Development › Reset the interface: this viewer's laki.* (App.tsx' localStorage), then a reload
+  const resetUi = async () => {
+    if (!(await ask('Reset the interface?', { text: 'Widths, open panels, folded projects, the selected workspace and tabs, text sizes and the like go back to how Laki starts. Projects, workspaces, sessions, settings, timers and drafts stay.', ok: 'Reset' }))) return
+    for (const k of Object.keys(localStorage)) if (k.startsWith('laki.') && !UI_KEEP.includes(k)) localStorage.removeItem(k)
+    location.reload()
+  }
+  const freeProfile = (base: string) => (presets.some(x => x.name === base) ? `${base}-${[...Array(99).keys()].find(n => n > 1 && !presets.some(x => x.name === `${base}-${n}`))}` : base)
+  // the accounts and their limits while Agents & profiles is open (a sign-in in its terminal shows up)
+  const [accts, setAccts] = useState<AccountView[]>([])
+  const [usage, setUsage] = useState<AgentUsage[]>([])
+  const loadAccts = () => void p.accounts?.load().then(setAccts, () => {})
+  useEffect(() => {
+    if (sec !== 'presets' || !p.accounts) return
+    loadAccts()
+    p.accounts.usage().then(setUsage, () => {})
+    const t = setInterval(() => !document.hidden && loadAccts(), 10000) // each read asks the Keychain: not too often
+    return () => clearInterval(t)
+  }, [sec, !!p.accounts])
   const setPreset = (i: number, p: Partial<Preset>) => set({ presets: presets.map((x, j) => (j === i ? { ...x, ...p } : x)) })
   // a key per preset card that survives removing one above it (names change as you type)
   const keys = useRef<number[]>([])
@@ -2267,6 +2340,12 @@ export function SettingsPage(p: {
                     </button>
                   </div>
                 )}
+                <div className="button-row">
+                  <Says title="Reset the interface" hint="The window's layout as Laki starts: widths, open panels, folded projects, text sizes. Projects, workspaces, sessions and settings stay" />
+                  <button type="button" onClick={resetUi}>
+                    <Icon name="restore" /> Reset
+                  </button>
+                </div>
               </div>
               </Group>
               <Group title="Experimental" hint="New things to try: they may change, or go">
@@ -2728,6 +2807,9 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={!!s.hoverFocus} onChange={v => set({ hoverFocus: v })}>
                     Focus the pane under the mouse
                   </Switch>
+                  <Switch className="switch-row" on={!!s.splitNew} onChange={v => set({ splitNew: v })}>
+                    <Says title="New tabs open as a split" hint="A new tab (⌘⇧N, the + menu, Laki AI's) goes beside the pane you're on, in the same tab, instead of a tab of its own" />
+                  </Switch>
                 </div>
               </div>
               </Group>
@@ -2857,54 +2939,101 @@ export function SettingsPage(p: {
           )}
           {sec === 'presets' && (
             <>
-              <h2>Agent presets</h2>
+              <h2>Agents & profiles</h2>
               <p className="muted small">
-                How agents start. Each preset that's on is in the new-tab menu, the new-workspace page and scheduled tasks; switch off the ones you don't use
-                (their tabs still start). Args go after the command, before the prompt, through the shell (so the variables work); env goes on top of the
-                project's.
+                An agent is a CLI Laki starts (Claude Code, Codex…); a profile is how it starts: its model, effort, account, flags and env. Each profile
+                that's on is in the new-tab menu, the new-workspace page and scheduled tasks; switch off the ones you don't use (their tabs still start). Flags go
+                after the command, before the prompt, through the shell (so the variables work); env goes on top of the project's.
               </p>
-              {presets.map((p, i) => (
-                <div key={keys.current[i]} className={`preset ${p.off ? 'off' : ''}`}>
-                  <div className="row preset-head">
-                    <Switch on={!p.off} onChange={on => setPreset(i, { off: on ? undefined : true })} tip={p.off ? `${p.name}: off, not in the pickers` : `${p.name}: on`} />
-                    <input className="mono" value={p.name} placeholder="name" onChange={e => setPreset(i, { name: e.target.value.replace(/\s+/g, '-') })} />
-                    <select value={p.agent} onChange={e => setPreset(i, { agent: e.target.value as Preset['agent'] })}>
-                      {AGENTS.map(a => (
-                        <option key={a} value={a}>
-                          {AGENT_NAMES[a]}
-                        </option>
-                      ))}
-                      <option value="command">Command</option>
-                    </select>
-                    <IconButton icon="trash" title="Remove preset" onClick={() => setPresets(presets.filter((_, j) => j !== i), i)} />
+              {[...new Set<Preset['agent']>([...ACCOUNT_AGENTS, ...presets.map(x => x.agent)])].map(agent => (
+                <Group key={agent} title={agent === 'command' ? 'Commands' : AGENT_NAMES[agent]} hint={isAccountAgent(agent) ? 'Accounts: its sign-ins. New sessions start on the default (a profile can pick one); a tab keeps its own, and its menu restarts it on another' : undefined}>
+                  {isAccountAgent(agent) && p.accounts && (
+                    <AccountsBlock agent={agent} api={p.accounts} views={accts} usage={usage} use={accts.find(v => v.agent === agent && v.default)?.id ?? HOME_ACCOUNT} onUse={id => (set({ accountUse: { ...s.accountUse, [agent]: id } }), setAccts(v => v.map(x => (x.agent === agent ? { ...x, default: x.id === id } : x))))} reload={loadAccts} />
+                  )}
+                  {presets.map((pr, i) =>
+                    pr.agent !== agent ? null : (
+                      <div key={keys.current[i]} className={`preset ${pr.off ? 'off' : ''}`}>
+                        <div className="row preset-head">
+                          <Switch on={!pr.off} onChange={on => setPreset(i, { off: on ? undefined : true })} tip={pr.off ? `${pr.name}: off, not in the pickers` : `${pr.name}: on`} />
+                          <input className="mono" value={pr.name} placeholder="name" aria-label="Profile name" onChange={e => setPreset(i, { name: e.target.value.replace(/\s+/g, '-') })} />
+                          <select value={pr.agent} aria-label="Agent" onChange={e => setPreset(i, { agent: e.target.value as Preset['agent'], model: undefined, effort: undefined, account: undefined })}>
+                            {AGENTS.map(a => (
+                              <option key={a} value={a}>
+                                {AGENT_NAMES[a]}
+                              </option>
+                            ))}
+                            <option value="command">Command</option>
+                          </select>
+                          <IconButton icon="trash" title="Remove profile" onClick={() => setPresets(presets.filter((_, j) => j !== i), i)} />
+                        </div>
+                        {pr.agent !== 'command' && (
+                          <div className="row profile-picks">
+                            <input className="mono" value={pr.model ?? ''} placeholder={`model: ${MODELS[pr.agent]?.join(', ') || "the agent's own"}`} aria-label="Model" list={`models-${pr.agent}`} onChange={e => setPreset(i, { model: e.target.value.trim() || undefined })} />
+                            {MODELS[pr.agent] && (
+                              <datalist id={`models-${pr.agent}`}>
+                                {MODELS[pr.agent]!.map(m => (
+                                  <option key={m} value={m} />
+                                ))}
+                              </datalist>
+                            )}
+                            {EFFORTS[pr.agent] && (
+                              <select value={pr.effort ?? ''} aria-label="Effort" onChange={e => setPreset(i, { effort: e.target.value || undefined })}>
+                                <option value="">effort: its own</option>
+                                {EFFORTS[pr.agent]!.map(x => (
+                                  <option key={x} value={x}>
+                                    {x}
+                                  </option>
+                                ))}
+                              </select>
+                            )}
+                            {isAccountAgent(pr.agent) && (
+                              <select value={pr.account ?? ''} aria-label="Account" onChange={e => setPreset(i, { account: e.target.value || undefined })}>
+                                <option value="">account: the default</option>
+                                {accts
+                                  .filter(v => v.agent === pr.agent)
+                                  .map(v => (
+                                    <option key={v.id} value={v.id}>
+                                      {v.id === HOME_ACCOUNT ? 'Default sign-in' : v.name}
+                                      {v.email ? ` · ${v.email}` : ''}
+                                    </option>
+                                  ))}
+                              </select>
+                            )}
+                          </div>
+                        )}
+                        {pr.agent === 'command' ? (
+                          <input className="mono" value={pr.cmd ?? ''} placeholder="aider --model sonnet" onChange={e => setPreset(i, { cmd: e.target.value })} />
+                        ) : (
+                          <input className="mono" value={pr.args ?? ''} placeholder={`flags: ${ARGS_EG[pr.agent as Agent]}`} aria-label="Flags" onChange={e => setPreset(i, { args: e.target.value })} />
+                        )}
+                        <VarChips vars={ENV_VARS} value={(pr.agent === 'command' ? pr.cmd : pr.args) ?? ''} onChange={v => setPreset(i, pr.agent === 'command' ? { cmd: v } : { args: v })} />
+                        <EnvField value={pr.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
+                        {(pr.agent === 'claude' || pr.agent === 'codex') && (
+                          <Switch className="switch-row" on={pr.laki !== false} onChange={on => setPreset(i, { laki: on ? undefined : false })}>
+                            <Says title="Tell it about Laki" hint="A note at each start: it runs in Laki, can name its workspace, attach a PR, start another workspace, and keep files for you in $LAKI_STORAGE_FOLDER" />
+                          </Switch>
+                        )}
+                      </div>
+                    ),
+                  )}
+                  <div className="row">
+                    <button onClick={() => setPresets([...presets, { name: freeProfile(agent === 'command' ? 'command' : agent), agent }])}>
+                      <Icon name="plus" /> Add {agent === 'command' ? 'command' : `${AGENT_NAMES[agent]} profile`}
+                    </button>
                   </div>
-                  {p.agent === 'command' ? (
-                    <input className="mono" value={p.cmd ?? ''} placeholder="aider --model sonnet" onChange={e => setPreset(i, { cmd: e.target.value })} />
-                  ) : (
-                    <input
-                      className="mono"
-                      value={p.args ?? ''}
-                      placeholder={ARGS_EG[p.agent as Agent]}
-                      onChange={e => setPreset(i, { args: e.target.value })}
-                    />
-                  )}
-                  <VarChips
-                    vars={ENV_VARS}
-                    value={(p.agent === 'command' ? p.cmd : p.args) ?? ''}
-                    onChange={v => setPreset(i, p.agent === 'command' ? { cmd: v } : { args: v })}
-                  />
-                  <EnvField value={p.env} onChange={env => setPreset(i, { env: Object.keys(env).length ? env : undefined })} placeholder="env: KEY=value, one per line" />
-                  {(p.agent === 'claude' || p.agent === 'codex') && (
-                    <Switch className="switch-row" on={p.laki !== false} onChange={on => setPreset(i, { laki: on ? undefined : false })}>
-                      <Says title="Tell it about Laki" hint="A note at each start: it runs in Laki, can name its workspace, attach a PR, start another workspace, and keep files for you in $LAKI_STORAGE_FOLDER" />
-                    </Switch>
-                  )}
-                </div>
+                </Group>
               ))}
               <div className="row">
-                <button onClick={() => setPresets([...presets, { name: `claude-${presets.length + 1}`, agent: 'claude' }])}>
-                  <Icon name="plus" /> Add preset
-                </button>
+                <select value="" aria-label="Add a profile for another agent" onChange={e => e.target.value && setPresets([...presets, { name: freeProfile(e.target.value), agent: e.target.value as Preset['agent'] }])}>
+                  <option value="">Add a profile for…</option>
+                  {[...AGENTS, 'command' as const]
+                    .filter(a => !presets.some(x => x.agent === a) && !isAccountAgent(a))
+                    .map(a => (
+                      <option key={a} value={a}>
+                        {a === 'command' ? 'A command' : AGENT_NAMES[a]}
+                      </option>
+                    ))}
+                </select>
                 {s.presets && (
                   <button className="link" onClick={() => setPresets(null)}>
                     Reset to the agents installed

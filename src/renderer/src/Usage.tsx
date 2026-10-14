@@ -4,9 +4,8 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { IconButton } from './ui'
 
-// note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
-export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
-export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number }
+import { type AgentUsage, HOME_ACCOUNT, type UsageWindow } from '../../shared/types'
+export type { AgentUsage, UsageWindow } // a window's note: what the % is of, for an amount rather than a rate limit (extra usage): the ring leaves it out
 
 // the agents whose plans have limits to read
 export const USAGE_AGENTS: Record<string, string> = { claude: 'Claude Code', codex: 'Codex' }
@@ -19,6 +18,12 @@ const level = (p: number) => (p >= 90 ? 'high' : p >= 70 ? 'mid' : 'low')
 const topOf = (r: AgentUsage, now: number) => {
   const w = r.windows.find(w => !w.note)
   return w && live(w, now)
+}
+
+// the account of an agent with clearly more room left in its shortest window: marked only 20 points past the next
+export function mostRoom(rows: AgentUsage[], agent: string, now = Date.now()) {
+  const left = rows.filter(r => r.agent === agent).map(r => [r.account ?? HOME_ACCOUNT, 100 - (topOf(r, now) ?? 100)] as const).sort((a, b) => b[1] - a[1])
+  return left.length > 1 && left[0][1] - left[1][1] >= 20 ? left[0][0] : undefined
 }
 
 export function resetsIn(t: number, now: number) {
@@ -39,7 +44,8 @@ function Ring({ p }: { p?: number }) {
   )
 }
 
-export function UsageButton({ load }: { load: () => Promise<AgentUsage[]> }) {
+// onUse: an account made the default for new sessions (the popup's Use)
+export function UsageButton({ load, onUse }: { load: () => Promise<AgentUsage[]>; onUse?: (agent: string, account: string) => void }) {
   const [rows, setRows] = useState<AgentUsage[] | null>(null)
   const [at, setAt] = useState<DOMRect | null>(null)
   const loader = useRef(load)
@@ -57,21 +63,25 @@ export function UsageButton({ load }: { load: () => Promise<AgentUsage[]> }) {
   }, [])
   if (!rows?.length) return null
   const now = Date.now()
-  const tops = rows.map(r => topOf(r, now))
+  const used = rows.filter(r => r.default !== false) // the ring: each agent's default account (an older daemon's: its one)
+  const tops = used.map(r => topOf(r, now))
   const known = tops.filter(p => p !== undefined)
   const top = known.length ? Math.max(...known) : undefined
-  const tip = `Plan limits · ${rows.map((r, i) => `${NAMES[r.agent] ?? r.agent} ${tops[i] === undefined ? '–' : `${tops[i]}%`}`).join(' · ')}`
+  const tip = `Plan limits · ${used.map((r, i) => `${nameOf(r, rows)} ${tops[i] === undefined ? '–' : `${tops[i]}%`}`).join(' · ')}`
   return (
     <>
       <button className="usage-btn" data-tip={tip} aria-label={tip} onClick={e => setAt(e.currentTarget.getBoundingClientRect())}>
         <Ring p={top} />
       </button>
-      {at && <UsagePop anchor={at} rows={rows} top={top} onClose={() => setAt(null)} />}
+      {at && <UsagePop anchor={at} rows={rows} top={top} onUse={onUse && ((a, id) => (onUse(a, id), setRows(r => r?.map(x => (x.agent === a ? { ...x, default: (x.account ?? HOME_ACCOUNT) === id } : x)) ?? r)))} onClose={() => setAt(null)} />}
     </>
   )
 }
 
-function UsagePop({ anchor, rows, top, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; onClose: () => void }) {
+// an agent's name, and its account's when it has more than one
+const nameOf = (r: AgentUsage, rows: AgentUsage[]) => [NAMES[r.agent] ?? r.agent, rows.filter(x => x.agent === r.agent).length > 1 && (r.account === HOME_ACCOUNT ? 'Default' : r.name)].filter(Boolean).join(' · ')
+
+function UsagePop({ anchor, rows, top, onUse, onClose }: { anchor: DOMRect; rows: AgentUsage[]; top?: number; onUse?: (agent: string, account: string) => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
   useEffect(() => {
     const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), onClose())
@@ -96,10 +106,22 @@ function UsagePop({ anchor, rows, top, onClose }: { anchor: DOMRect; rows: Agent
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
         </div>
         {rows.map(r => (
-          <section key={r.agent} className="usage-agent">
+          <section key={`${r.agent}:${r.account ?? ''}`} className={`usage-agent${r.default === false ? ' other' : ''}`}>
             <div className="usage-name">
-              <b>{NAMES[r.agent] ?? r.agent}</b>
+              <b>{nameOf(r, rows)}</b>
               {r.plan && <span className="muted">{r.plan[0].toUpperCase() + r.plan.slice(1)}</span>}
+              <span className="grow" />
+              {mostRoom(rows, r.agent, now) === (r.account ?? HOME_ACCOUNT) && <span className="tag tag-open">most room</span>}
+              {rows.filter(x => x.agent === r.agent).length > 1 &&
+                (r.default !== false ? (
+                  <span className="tag" data-tip="New sessions start on it">default</span>
+                ) : (
+                  onUse && (
+                    <button type="button" className="link small" data-tip="Make it the default for new sessions (running tabs keep theirs)" onClick={() => onUse(r.agent, r.account ?? HOME_ACCOUNT)}>
+                      Use
+                    </button>
+                  )
+                ))}
             </div>
             {r.windows.map(w => {
               const p = live(w, now)
@@ -118,7 +140,7 @@ function UsagePop({ anchor, rows, top, onClose }: { anchor: DOMRect; rows: Agent
           </section>
         ))}
         <p className="muted small">
-          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each agent's own sign-in, at most every 5 minutes. Settings › Appearance picks the agents.
+          Read {ago < 1 ? 'just now' : `${ago} min ago`} with each account's own sign-in, at most every 5 minutes. Settings › Agents & profiles has the accounts; Appearance picks the agents.
         </p>
       </div>
     </div>

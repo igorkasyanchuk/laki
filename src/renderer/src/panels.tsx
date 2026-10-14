@@ -1,6 +1,6 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { AGENT_NAMES, type Doctor, EFFORTS, isAgent, type LogLine, MODELS, type Plan, prIn, type View } from '../../shared/types'
+import { AGENT_NAMES, type Doctor, HOME_ACCOUNT, EFFORTS, isAgent, type LogLine, MODELS, type Plan, prIn, type View } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -375,7 +375,7 @@ export function About({ onClose }: { onClose: () => void }) {
 // fan: a race, the presets that each get a worktree on the same prompt (the preset first)
 // pr: a GitHub PR's number or URL: the worktree on its branch (gh pr checkout), named after it
 // place: the sidebar's place, 'top' of the project or a sep's id (first under it)
-export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[]; pr?: string; place?: string }
+export type NewWsParams = { project: string; base?: string; preset: string; cmd?: string; prompt?: string; name?: string; local?: boolean; model?: string; effort?: string; fan?: string[]; pr?: string; place?: string; vars?: boolean } // vars: a template's agent variables ({{branch}}…), the daemon's to fill
 
 // the page's last choices, kept per viewer (not the prompt, name, PR or a race: those are one workspace's, and a race
 // kept would make several worktrees from a folded More)
@@ -516,7 +516,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       const prompt = withImages(filled, images) || undefined
       const own = isAgent(starts) && !fan // a race's agents keep their own models
       const place = p.place && proj?.seps?.some(s => s.id === p.place) ? p.place : 'top' // under its sep, else first in the project
-      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan })
+      await onCreate({ ...p, place, pr: undefined /* a PR's branch: laki new --pr; a prompt naming one links it */, prompt, name: p.name || (tpl && !prIn(p.prompt) ? nameOf(p.prompt ?? '') : undefined) /* a PR's: the daemon's, after its title */, local: p.local || plain, preset: p.preset === 'custom' ? 'custom' : p.preset, cmd: p.preset === 'custom' ? p.cmd : undefined, model: own ? p.model?.trim() || undefined : undefined, effort: own ? p.effort || undefined : undefined, fan, ...(tpl && { vars: true }) })
     } catch {
       setBusy(false)
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
@@ -560,7 +560,8 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
     ])
   // a preset's line: its command, or the agent and its args; none when it would only say its name again (codex: Codex)
   const presetSays = (x: (typeof view.presets)[number]) => {
-    const say = x.agent === 'command' ? x.cmd || 'A command' : [AGENT_NAMES[x.agent], x.args].filter(Boolean).join(' · ')
+    const acct = x.account && (x.account === HOME_ACCOUNT ? 'default sign-in' : view.settings.accounts?.find(a => a.id === x.account)?.name)
+    const say = x.agent === 'command' ? x.cmd || 'A command' : [AGENT_NAMES[x.agent], x.model, x.effort, acct, x.args].filter(Boolean).join(' · ')
     return say.toLowerCase() === x.name.toLowerCase() ? undefined : say
   }
   const on = view.presets.filter(x => !x.off)

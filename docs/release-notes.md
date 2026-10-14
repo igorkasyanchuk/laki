@@ -11,6 +11,21 @@ version it builds, with the date. -->
   the cloud, hold Fn anywhere in Laki, talk, let go: the text is typed where your cursor is, a prompt or a terminal.
   A model that's busy is tried again twice before Laki says so.
 - Opening your first project from the welcome screen no longer leaves the window black.
+- **Agents & profiles**: Settings' agent presets are profiles now, grouped by agent, each with its model, effort and
+  account besides its flags and env; the new-workspace page's agent menu says them.
+- **Accounts**: more than one Claude Code or Codex sign-in (*Add account* signs it in, in a terminal). Settings, skills,
+  plugins and chats are shared, so a tab's right click › *Restart on another account* resumes its chat there. New
+  sessions start on the default (the circle, ⌘K's *Switch …*, the plan limits' *Use*); the ring's popup shows every
+  account's limits and marks the one with the most room.
+- **Splits kept by Laki**: how a workspace's tabs are split lives in the daemon, so every window, the phone, the CLI
+  and Laki AI see the same thing, and Laki AI can arrange them (*put codex beside claude*, *open a shell under it*).
+  Settings › Terminal › *New tabs open as a split* puts a new tab beside the pane you're on.
+- **Agent variables**: `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}`, `{{tab}}`, `{{workspace}}`, `{{date}}` and more
+  become the workspace's and the tab's in actions, templates, scheduled prompts and workflows (the chips under an
+  action or a template in Settings list them).
+- Settings › General › Development › *Reset the interface*: the window's layout back to how Laki starts (widths, open
+  panels, folded projects, text sizes); projects, workspaces, sessions and settings stay.
+- The right panel and the info panel drag as wide as you like (they stopped at 760px); the terminals keep 280px.
 - Workflows: a space (or a new line in a prompt) typed in a name, a description or a block's field stays; it used to
   vanish as you typed it.
 - **Text size per tab**: ⌘+ / ⌘− make the text bigger or smaller in the tab with the keyboard only, and it keeps

@@ -20,10 +20,8 @@ export function groupsOf(stored: Layout[] | undefined, ids: string[]): Layout[] 
   const seen = new Set<string>()
   const out: Layout[] = []
   for (const g of stored ?? []) {
-    const k = keep(g, id => ids.includes(id) && !seen.has(id))
-    if (!k) continue
-    tabsOf(k).forEach(id => seen.add(id))
-    out.push(k)
+    const k = keep(g, id => ids.includes(id) && !seen.has(id) && !!seen.add(id)) // once in all, within a tab too
+    if (k) out.push(k)
   }
   return [...out, ...ids.filter(id => !seen.has(id)).map(tab => ({ tab }))]
 }
@@ -88,4 +86,11 @@ export function place(l: Layout, box: Box = { x: 0, y: 0, w: 1, h: 1 }, path = '
   place(l.b, b, path + 'b', out)
   out.bars.push({ path, dir: l.dir, box, at: l.at })
   return out
+}
+
+// a tab in words, for Laki AI and the CLI: a | b side by side, a / b stacked (a above), nested in parentheses
+export function describe(l: Layout, name: (tab: string) => string = t => t): string {
+  if ('tab' in l) return name(l.tab)
+  const part = (x: Layout) => ('tab' in x || x.dir === l.dir ? describe(x, name) : `(${describe(x, name)})`)
+  return `${part(l.a)} ${l.dir === 'row' ? '|' : '/'} ${part(l.b)}`
 }

@@ -186,6 +186,28 @@ test('hooks drive status; queue delivered on Stop; done until viewed', async t =
   watcher.close()
 })
 
+test('agent variables: {{branch}}, {{tab}}… filled where asked (vars: a template, an action, a schedule), a message as typed', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'on {{ branch }} at {{port}}', vars: true })
+  await until(async () => (await rig.tab(ws.id)).last === `answer: on ${ws.branch} at ${ws.port}`, 'first prompt filled')
+  const tab = await rig.tab(ws.id) // named by its first prompt by now
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id)?.pr, 'its PR scanned')
+  // an action's: the fake gh has PR 42 for every branch; an unknown {{name}} and a date token stay
+  await rig.rpc('send', { target: ws.id, text: '{{tab}}/{{agent}} in {{project}} ({{workspace}}), {{pr}}, {{nope}} {{DD}}', vars: true })
+  await until(async () => /^answer: .+\/claude in repo \(.+\), https:\/\/\S+\/42, \{\{nope\}\} \{\{DD\}\}$/.test((await rig.tab(ws.id)).last), 'action filled')
+  assert.ok((await rig.tab(ws.id)).last.startsWith(`answer: ${tab.name}/claude in repo (${ws.name ?? ws.id})`))
+  // a message as typed: left alone
+  await rig.rpc('send', { target: ws.id, text: 'keep {{branch}}' })
+  await until(async () => (await rig.tab(ws.id)).last === 'answer: keep {{branch}}', 'message kept')
+  // a shell's: a value it would read as code goes in quoted, a plain one as it is
+  const sh = await rig.rpc('tabNew', { ws: ws.id, preset: 'shell' })
+  await rig.rpc('tabSet', { id: sh.id, name: 'x;echo PWNED' })
+  await new Promise(r => setTimeout(r, 800)) // its prompt
+  await rig.rpc('send', { target: sh.id, text: 'echo {{tab}} > {{path}}/vars.txt', vars: true })
+  await until(() => existsSync(join(ws.path, 'vars.txt')) && readFileSync(join(ws.path, 'vars.txt'), 'utf8') === 'x;echo PWNED\n', 'quoted for the shell')
+})
+
 test('codex: notify ends a turn and records the thread id', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

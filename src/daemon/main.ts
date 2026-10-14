@@ -13,6 +13,7 @@ import { planChat } from '../shared/plans.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
 import { refreshSkills, skills, skillSet } from './skill.ts'
+import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './accounts.ts'
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
@@ -138,7 +139,14 @@ const api: Record<string, Handler> = {
   browseDone: p => core.browseDone(p),
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
-  tabNew: p => core.addTab(p.ws, p),
+  tabNew: p => {
+    const t = core.addTab(p.ws, p)
+    core.layoutPlace(t, p.beside, p.edge) // beside a pane, or the one you're on (settings.splitNew)
+    return t
+  },
+  layoutSet: p => core.layoutSet(p),
+  layoutMove: p => core.layoutMove(p),
+  tabFocus: p => core.tabFocus(p),
   todoAdd: p => core.todoAdd(p),
   todoRm: p => core.todoRm(p),
   tabClose: p => core.closeTab(p.id),
@@ -189,7 +197,13 @@ const api: Record<string, Handler> = {
   prViewed: p => core.prViewed(p),
   run: p => core.runDev(p.ws),
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
-  usage: () => usage(core.state.settings?.usage),
+  usage: () => usage(core.state.settings?.usage, usageWho()),
+  accounts: () => accountViews(),
+  accountAdd: p => accountAdd(p),
+  accountSet: p => accountSet(p),
+  accountRm: p => accountRm(p),
+  accountLogin: p => core.accountLogin(p),
+  tabAccount: p => core.tabAccount(p),
   resources: () => core.resources(),
   // Resources' Stop for what the daemon runs (resources' others): Laki AI's ask, a tunnel, remote access
   resourceStop: p => {

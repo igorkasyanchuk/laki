@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { API, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { type Account, type AccountView, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, type Msg, notify, type NotifyAction, onLakiLink, openExternal } from './api'
@@ -7,7 +7,7 @@ import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
 import { About, AddProject, type Artifact, ArtifactsBar, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
-import { type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
+import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook } from './Settings'
 import { AiPage } from './Ai'
 import { VoiceBar } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
@@ -20,7 +20,7 @@ import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
 import { Term, xterms } from './Term'
-import { groupsOf, type Layout, move, resize, tabsOf } from './layout'
+import { groupsOf, type Layout, move, resize, tabsOf } from '../../shared/layout'
 import { parseLink, wsLink } from './links'
 import { Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
@@ -180,7 +180,10 @@ export function App() {
   const [infoOn, setInfoOn] = useState<string[]>(() => (x => (Array.isArray(x) ? x.filter(i => typeof i === 'string') : []))(load<unknown>('laki.info', [])))
   const [infoW, setInfoW] = useState<number>(() => load('laki.infoW', INFO_WIDTH))
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
-  const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {})) // tabs (of panes) per workspace
+  // tabs (of panes) per workspace: the daemon's (view.layouts, API 60: every window, the phone, Laki AI see one), kept
+  // here too for the first paint and an older daemon
+  const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {}))
+  const pushes = useRef<Record<string, ReturnType<typeof setTimeout> | true>>({}) // a change of ours on its way: it wins
   // the sidebar's width per rail kind (projects, terminals, browsers: each its own); one from before, every kind's
   const [sideWs, setSideWs] = useState<Partial<Record<RailKind, number>>>(() => {
     const old = load<unknown>('laki.side', SIDE)
@@ -286,6 +289,22 @@ export function App() {
   useEffect(() => void localStorage.setItem('laki.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
+  const layoutsOn = (view?.api ?? 0) >= 60
+  const migrated = useRef(false)
+  useEffect(() => {
+    if (!layoutsOn || !view) return
+    const l = view.layouts ?? {}
+    // the first time: what this window arranged before the daemon kept layouts
+    if (!migrated.current) {
+      migrated.current = true
+      for (const [id, g] of Object.entries(stored)) if (!l[id] && view.workspaces.some(w => w.id === id) && g.some(x => !('tab' in x))) call('layoutSet', { ws: id, groups: g }).catch(() => {})
+    }
+    setStored(m => {
+      let n = m
+      for (const [id, g] of Object.entries(l)) if (!pushes.current[id] && JSON.stringify(g) !== JSON.stringify(m[id])) n = { ...n, [id]: g }
+      return n
+    })
+  }, [view?.layouts, layoutsOn])
   useEffect(() => void localStorage.setItem('laki.sideW', JSON.stringify(sideWs)), [sideWs])
   useEffect(() => void localStorage.setItem('laki.sideOpen', JSON.stringify(sideOpen)), [sideOpen])
   useEffect(() => void localStorage.setItem('laki.rail', JSON.stringify(railKind)), [railKind])
@@ -569,7 +588,20 @@ export function App() {
     setTabByWs(m => ({ ...m, [t.workspace]: t.id }))
   }, [])
   const selectGroup = (g: Layout) => selectTab(mru.current.find(id => tabsOf(g).includes(id)) ?? tabsOf(g)[0])
-  const setGroups = (next: Layout[]) => ws && !narrow && setStored(m => ({ ...m, [ws.id]: next })) // narrow shows them flat: kept as they were
+  // narrow shows them flat: kept as they were. To the daemon a moment later (a divider's drag is many)
+  const setGroups = (next: Layout[]) => {
+    if (!ws || narrow) return
+    const id = ws.id
+    setStored(m => ({ ...m, [id]: next }))
+    if (!layoutsOn) return
+    clearTimeout(pushes.current[id] as ReturnType<typeof setTimeout>)
+    pushes.current[id] = setTimeout(() => {
+      pushes.current[id] = true
+      call('layoutSet', { ws: id, groups: next })
+        .catch(() => {})
+        .finally(() => pushes.current[id] === true && delete pushes.current[id])
+    }, 250)
+  }
 
   // the daemon connection
   useEffect(() => {
@@ -607,6 +639,8 @@ export function App() {
         const body = m.kind === 'waiting' ? `asks you: ${m.text}` : `${m.status}: ${m.text}`
         notify(`Workflow · ${m.name}`, body.slice(0, 200), '', open, s?.notifySound)
         if (m.kind === 'waiting') toast(`${m.name} asks you: ${m.text}`.slice(0, 160), open, 'Open')
+      } else if (m.ev === 'focus') {
+        selectTab(m.tab) // Laki AI's "show me": that tab, in its workspace
       } else if (m.ev === 'archived') {
         // several at once (the setting just turned on): one message, whose Undo brings them all back
         const all = (archived.current = [...archived.current, m.ws])
@@ -748,8 +782,8 @@ export function App() {
   // a new shell next to the focused pane
   const split = async (edge: 'right' | 'bottom', next = tab?.id) => {
     if (!ws || !next) return
-    const t = await call<TabView>('tabNew', { ws: ws.id, preset: 'shell' })
-    setGroups(move([...groups, { tab: t.id }], t.id, false, { pane: next, edge }))
+    const t = await call<TabView>('tabNew', { ws: ws.id, preset: 'shell', beside: next, edge }) // the daemon puts it there
+    if (!layoutsOn) setGroups(move([...groups, { tab: t.id }], t.id, false, { pane: next, edge }))
     selectTab(t)
   }
 
@@ -816,6 +850,25 @@ export function App() {
   // a workspace's first agent tab; ● again on a tab, as if its turn ended unseen (until it's looked at again)
   const agentTab = (id: string) => view?.tabs.find(t => t.workspace === id && t.kind === 'agent')
   const markUnread = (id: string) => call('unread', { tab: id }).catch(() => {})
+  // claude's and codex's accounts by name (Settings › Agents & profiles): the agent's own sign-in first
+  const accountsOf = (agent?: string) => (isAccountAgent(agent) ? [{ id: HOME_ACCOUNT, name: 'Default sign-in' }, ...(view?.settings.accounts ?? []).filter(a => a.agent === agent)] : [])
+  // Restart on another account: the same chat there (a turn at work stops: asked first)
+  const restartOn = async (t: TabView, account: string, name: string) => {
+    if (t.status === 'running' && !(await ask(`Restart ${t.name} on ${name}?`, { text: 'Its turn at work stops; the chat resumes there.', ok: 'Restart' }))) return
+    call('tabAccount', { tab: t.id, account }).then(() => toast(`${t.name}: on ${name} now`, undefined, undefined, true), () => {})
+  }
+  // Settings › Agents & profiles' accounts: Sign in opens its terminal (Settings closes: the sign-in is there)
+  const accountsApi: AccountsApi = {
+    load: () => api.call<AccountView[]>('accounts'),
+    usage: () => api.call<AgentUsage[]>('usage'),
+    add: (agent, name) => call<Account>('accountAdd', { agent, name }),
+    rename: (id, name) => call('accountSet', { id, name }),
+    remove: async a => {
+      if (!(await ask(`Remove the account ${a.name}?`, { text: `Its sign-in goes with it (${a.email ?? 'its folder'}, and Claude's Keychain item for it). Its chats stay: they're shared. Tabs on it start on the default next time.`, ok: 'Remove', danger: true }))) throw new Error('kept')
+      return call('accountRm', { id: a.id })
+    },
+    login: a => call<WorkspaceView>('accountLogin', { id: a.id, agent: a.agent }).then(w => (setDialog(null), showNew(w.id))),
+  }
   const showNew = (id: string, ...more: string[]) => (setReveal(r => [...r, ...(wsId ? [wsId] : []), id, ...more]), setWsId(id))
   const forkWs = (w: WorkspaceView) => call<WorkspaceView>('wsFork', { id: w.id }).then(x => showNew(x.id), () => {})
 
@@ -835,7 +888,7 @@ export function App() {
     const t = tab ? byId(tab) : await call<TabView>('tabNew', { ws: w.id, preset: 'shell' }).catch(() => null)
     if (!t) return
     selectTab(t)
-    const r = await call<{ queued?: number }>('send', { target: t.id, text: stamp(a.text, Date.now()), whenIdle: a.target !== 'shell' }).catch(() => null) // its {{HH:mm}}-style dates: now's
+    const r = await call<{ queued?: number }>('send', { target: t.id, text: stamp(a.text, Date.now()), whenIdle: a.target !== 'shell', vars: true }).catch(() => null) // its {{HH:mm}}-style dates: now's; its {{branch}}…: the daemon's
     if (r?.queued) toast(`${a.name}: queued for when the agent's turn ends`)
   }
   // Run ▾'s actions for a workspace (the sidebar's right click: any workspace's, its own tabs and project)
@@ -1251,6 +1304,9 @@ export function App() {
           : [{ label: 'Move to its own tab', icon: 'unsplit', run: () => setGroups(move(groups, ids[0], false, 'bar')) } as MenuItem]
         : []),
       ...(ended.length ? [{ label: 'Restart', icon: 'restore', run: () => ended.forEach(t => api.send('input', { tab: t.id, data: '\r' })) } as MenuItem] : []),
+      ...(ts.length === 1 && accountsOf(ts[0].preset).length > 1 && !view?.workspaces.find(w => w.id === ts[0].workspace)?.host
+        ? [{ label: 'Restart on another account', icon: 'restore', items: accountsOf(ts[0].preset).map(a => ({ label: a.name, hint: (ts[0].account ?? HOME_ACCOUNT) === a.id ? ON : undefined, run: () => (ts[0].account ?? HOME_ACCOUNT) !== a.id && restartOn(ts[0], a.id, a.name) }) as MenuItem) } as MenuItem]
+        : []),
       null,
       { label: ids.length > 1 ? 'Close tab' : 'Close', icon: 'x', hint: '⌘W', run: () => closeTabs(ts) },
       ...(ids.length > 1 || !g || tabsOf(g).length === 1 ? (others.length ? [{ label: 'Close other tabs', icon: 'x', danger: true, run: () => closeTabs(others) } as MenuItem] : []) : []),
@@ -1516,6 +1572,10 @@ export function App() {
       if (project && !project.kind) a({ label: `Project settings: ${project.name}`, icon: 'settings', run: () => setDialog({ settings: project.id }) })
     }
     for (const w of view?.workspaces.filter(w => w.archived) ?? []) a({ label: `Restore ${wsName(w)}`, icon: 'restore', hint: 'archived', run: () => restore(w.id) })
+    // the default account for new sessions (Settings › Agents & profiles)
+    for (const agent of ['claude', 'codex'] as const)
+      for (const x of accountsOf(agent))
+        if ((settings.accountUse?.[agent] ?? HOME_ACCOUNT) !== x.id) a({ label: `Switch ${AGENT_NAMES[agent]} to ${x.name}`, icon: 'agent', hint: 'new sessions', run: () => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: x.id } }).then(() => toast(`New ${AGENT_NAMES[agent]} sessions start on ${x.name}`, undefined, undefined, true), () => {}) })
     return items
   }, [view, live, ws, tab, group, sideOpen, apps, previewed, video, timers.length, find, gallery, full])
 
@@ -1859,7 +1919,7 @@ export function App() {
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
@@ -2318,6 +2378,7 @@ export function App() {
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             renameProjects
             skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }) }}
+            accounts={layoutsOn ? accountsApi : undefined}
             ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
             webhookTest={w => api.call('webhookTest', w)}
             resources={{
@@ -2571,7 +2632,7 @@ export function App() {
         )}
         {(ws?.browser === undefined || !connected) && ( // a browser page: none, unless something's wrong
         <div className="status">
-          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage')} /> /* remounts as agents are turned on or off */}
+          {tracked.length > 0 && ws?.browser === undefined && <UsageButton key={tracked.join()} load={() => api.call<AgentUsage[]>('usage')} onUse={(agent, id) => call('settingsSet', { accountUse: { ...settings.accountUse, [agent]: id } }).catch(() => {})} /> /* remounts as agents are turned on or off */}
           {ws && ws.browser === undefined && ( // a page: no port, branch or folder of its own
             <>
               {git && (

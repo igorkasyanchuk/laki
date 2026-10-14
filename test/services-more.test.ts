@@ -87,8 +87,9 @@ test('usage: which sign-in, plans with no limits, an API key, and each way the s
   const file = (o: object | string) => writeFileSync(join(home, '.claude', '.credentials.json'), typeof o === 'string' ? o : JSON.stringify({ claudeAiOauth: o }))
   const auth = (o: object) => writeFileSync(join(home, '.codex', 'auth.json'), JSON.stringify(o))
   let now = Date.now()
-  const claude = async (at = (now += 3_600_000)) => (await usage({ codex: false }, at))[0]
-  const codex = async (at = (now += 3_600_000)) => (await usage({ claude: false }, at))[0]
+  const own = ['claude', 'codex'].map(agent => ({ agent, account: 'home', name: 'Default', default: true }))
+  const claude = async (at = (now += 3_600_000)) => (await usage({ codex: false }, own, at))[0]
+  const codex = async (at = (now += 3_600_000)) => (await usage({ claude: false }, own, at))[0]
 
   // an empty token and a file that isn't JSON: not signed in, nothing asked
   keychain({ accessToken: '' })

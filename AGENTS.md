@@ -90,7 +90,10 @@ workspace's `host`; 19: a workspace's `pinned`, kept by `wsSet`; 20: `fileWrite`
 a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteStart` `open`, a remote's `open`; 36: `quickNew`'s Terminals, `terminal <n>` and a page's host as its name; 37: a project's `sort` and a sep's `sort`, kept by `projectSet`; 38: `prFiles`/`prViewed`, a PR's `approved` and `changes`, a tab's `runs`, a workspace's `artifacts`, `artifactList`, `fileRead` `storage`; 39: a workspace's `links`; 40: `keepPublished`, what agents publish kept as links; 41: `keepShells`, shells brought back after a restart; 42: Laki AI: `aiAsk`, `aiState`, `aiNew`, `aiStop`, `aiKey`, the `ai` event; 43: settings' `ai.preset`, the AI's links to workspaces; 44: `resources`' `others`, `resourceStop`; 45: a project's `memory`, kept by `projectSet`; 46: a PR's `approvedByMe`, `commentedByMe`; 47: `widgetFiles`, `widgetWrite`, a widget's `byAi`; 48: `widgetRm`, a widget's `place` and `net`, `widgetSet` `place`/`net`, `prList`, `aiQuestion`/`aiAnswer`, a chat message's `ask`, settings' `ai.skill` and `ai.hideCost`; 49: specs and brainstorms, `planList`/`planNew`/`planGet`/`planSave`/`planFile`/`planUpload`/`planWrite`/`planRm`, `GET /plan/…`, a project's `plans`; 50: a spec's or brainstorm's chat, `aiAsk`/`aiState`/`aiNew`/`aiStop`/`aiAnswer`
 `chat`, `aiContinue`, `aiTick`, the `ai` event's `of` and `ended`, settings' `planTemplates`; 51: a workspace's `railPin`, kept by
 `wsSet` (`RAIL_PINS` at most), `branches`' `main`, settings' `syncBase`; 52: a workspace's `related` and `from`, `wsSet` `unrelate`,
-`wsNew` `link`/`from`, `prDetach`; 53: workflows, `flowList`/`flowSave`/`flowRm`/`flowStart`/`flowStop`/`flowAnswer`/`flowGet`/`flowForget`/`flowTick`, the view's `flows`, a workspace's `flow`, the `flow` event; 54: the view's `built`, an older build's daemon gets the bar; 55: `memoryAdd`/`memoryRm`, a memory's `auto` and `by`, `MEMORY_MAX` each kind; 56: an action's `slug`, kept by `projectSet`, a workflow's `use:` by it; 57: workflows' `case` block, a tab's `flow`; 58: `aiAsk` `context` (the floating chat's), `timer` (Laki AI's `laki_timer`, done by the app's window); 59: `voiceText`, settings' `voice`). A
+`wsNew` `link`/`from`, `prDetach`; 53: workflows, `flowList`/`flowSave`/`flowRm`/`flowStart`/`flowStop`/`flowAnswer`/`flowGet`/`flowForget`/`flowTick`, the view's `flows`, a workspace's `flow`, the `flow` event; 54: the view's `built`, an older build's daemon gets the bar; 55: `memoryAdd`/`memoryRm`, a memory's `auto` and `by`, `MEMORY_MAX` each kind; 56: an action's `slug`, kept by `projectSet`, a workflow's `use:` by it; 57: workflows' `case` block, a tab's `flow`; 58: `aiAsk` `context` (the floating chat's), `timer` (Laki AI's `laki_timer`, done by the app's window); 59: `voiceText`, settings' `voice`; 60: accounts (`accounts`,
+`accountAdd`/`accountSet`/`accountRm`/`accountLogin`, `tabAccount`, a tab's `account`, a preset's `model`, `effort` and
+`account`, settings' `accountUse`, `usage` per account), layouts (`layoutSet`, `layoutMove`, `tabFocus` and the `focus`
+event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `send`/`tabNew`/`wsNew` `vars`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -264,6 +267,48 @@ WebSocket events:
 
 `view` carries `tab` (the pane with the keyboard), `tabs` (every pane on screen), `focused` and `browse` (the app's
 window: it can run the agent browser). Tabs on screen in a focused window get no ● (`viewed`/`setView` in `core.ts`).
+
+### Profiles and accounts
+
+Settings › *Agents & profiles* (the code's word stays *preset*): each preset can carry `model` and `effort` (`agentCmd`:
+the tab's own, from the new-workspace page, wins) and, for claude and codex, `account`. `daemon/accounts.ts`: an
+`Account` (`settings.accounts`, only through `accountAdd`/`accountSet`/`accountRm`: `settingsSet` drops `accounts`, so an
+import never brings folders) is a folder `<data>/accounts/<agent>-<id>` given as `CLAUDE_CONFIG_DIR` / `CODEX_HOME`
+(`accountEnv`, in `lakiEnv`, not on a host); `HOME_ACCOUNT` (`home`) is the agent's own sign-in, no env at all (that
+variable set to `~/.claude` would read another Keychain item). `linkShared` links `SHARED` (claude: projects, file-history,
+todos, plans, skills, plugins, commands, agents, hooks, output-styles, settings.json, CLAUDE.md, keybindings.json; codex: sessions, archived_sessions,
+skills, prompts, config.toml, AGENTS.md) from the agent's own folder, at its making and each start, so a chat resumes on
+any account (claude's missing folders made in `~/.claude` first; `~/.codex` is never written: only what's there). `spawnTab` keeps `tab.account` (`accountFor`: its own, else its profile's, else `settings.accountUse`, else
+home; a removed one: home); `tabAccount` (a tab's right click › *Restart on another account*) sets it and resumes.
+`accountLogin` opens a Terminals workspace `sign in: <name>` and types the agent's login there once its prompt is up
+(`whenPrompt`, `loginCmd`). `accountView`: claude's email from the folder's `.claude.json` (home: `~/.claude.json`),
+signed in when `usage.ts` `claudeCred(dir)` finds a token: the Keychain item `Claude Code-credentials-<sha256(dir)[:8]>`
+(`keychainService`, the folder as given) or the folder's `.credentials.json`; codex's from `auth.json`'s id_token.
+`usage` takes `usageWho()` (each agent's accounts, `default` marked), cached per folder; the ring shows the defaults,
+the popup each (Usage.tsx `mostRoom`: 20 points ahead). `accountRm` (refused while a live tab is on it) removes the folder (one under `<data>/accounts`; the
+links, not their targets) and claude's Keychain item. Laki AI's claude/codex backends take the preset's account, else
+the default. Tested in `test/accounts.test.ts` (the fake `security` keeps an account's item in `$HOME/keychain-<name>`).
+
+### Layouts
+
+A workspace's tabs, each a split tree of sessions (`shared/layout.ts`), are the daemon's: `state.layouts` (by workspace,
+dropped with it), the view's `layouts`, `layoutOf` (`groupsOf`: ended sessions out, a tab per session in none).
+`layoutSet` (`layoutCheck`: shapes, this workspace's sessions, splits 10-90%) from the app: App keeps `laki.groups` for
+the first paint and an older daemon, pushes a change 250 ms later (`pushes`: a change on its way wins over a view),
+and takes the view's otherwise; the first view with API 60 sends what this window had. `tabNew` `beside`/`edge`
+(`layoutPlace`: a split there; `beside: null`, a tab of its own; none with `settings.splitNew`, beside `paneOn`: the
+pane the newest focused window is on). `layoutMove` (beside another pane, or none: a tab of its own) and `tabFocus` (a
+`focus` event: App's `selectTab`) are Laki AI's `laki_panes`; MCP's state gives each workspace's `tabs` in words
+(`describe`: `a | b` side by side, `a / b` stacked). Tested in `test/layout.test.ts`.
+
+### Agent variables
+
+`shared/types.ts` `AGENT_VARS`/`agentVars`: `{{workspace}}`, `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}` (its URL),
+`{{project}}`, `{{base}}`, `{{storage}}`, `{{tab}}`, `{{agent}}`, `{{date}}`, `{{time}}`, filled by `core.ts` `varsIn`
+(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in `q`-quoted) where the caller says `vars`: `send` (before a queue), `addTab`'s
+prompt, `wsNew`'s (the new-workspace page with a template, Run ▾'s actions, MCP's `laki_run_action` and
+`laki_new_workspace` with a template or an action, scheduled runs). A message as typed never. Workflows add them under
+their own (`varsOf`). Settings' chips under an action or a template list them.
 
 ### Asks
 
@@ -849,14 +894,14 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - Per-viewer UI state is in `localStorage`:
     - `laki.ws`: the selected workspace;
     - `laki.tabs`: the selected tab per workspace;
-    - `laki.groups`: each workspace's tabs, each a split tree of sessions;
+    - `laki.groups`: each workspace's tabs, each a split tree of sessions (the daemon's `layouts`, kept here for the first paint);
     - `laki.sideW`: the sidebar's width per `RailKind` (`sideKind`: the rail's kind, projects without the rail; `laki.side`, the
       one width before, seeds each); `laki.sideOpen`: whether it's shown; `laki.info`: the workspaces whose info panel is open (⌘I, per workspace);
     - `laki.rail`: the rail layout's kind (`RailKind`: projects, shells, browsers);
     - `laki.folded`: the projects whose workspaces the sidebar hides (a click on the project's head; `rows.dragged`
       keeps a drag's click from folding it), and the seps whose workspaces up to the next sep it hides (`shownRows`);
     - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel; `laki.infoW`: the info panel's width (both
-      `Panes.tsx` `PanelHandle`);
+      `Panes.tsx` `PanelHandle`: no cap but the terminals' 280px, also `max-width` in styles.css);
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.active`: when each agent tab last worked or waited (ms), for the bubbles' recent ones; closed tabs drop out.
     - `laki.runsSeen`: the newest run the Scheduled tasks page showed (the clock's dot: a failed one after it).
@@ -886,6 +931,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       submit on Enter (`onSubmit` prevents it; ⌘⏎ or the button), and `Page`'s and `Modal`'s Esc is `escapes` (not one
       a menu or field took, nor an IME's); a `Modal` with something typed in it nods at a click outside instead of closing
       (`loose`: the palette closes anyway).
+    - Settings › General › Development › *Reset the interface* (`resetUi`) removes every `laki.*` key but `UI_KEEP`
+      (timers, stopwatches, drafts, `laki.onboard`), then reloads: add a key that holds what the user made there.
     - `laki.onboard`: Get started (`panels.tsx` `Onboarding`, `STEPS`): `done` (ticked, or seen done by App's
       `onboardDone`: a project, a workspace, Settings' sections through `SettingsPage` `onSection`, Shells or Browsers),
       `seen` (it opened once by itself), `off` (Don't show again: no `OnboardBar` at the sidebar's foot either).
@@ -979,7 +1026,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   tab's workspace in the preview, else main's `open-path` (the app window's only: a folder in Finder, a document of
   `DOCS` in its app, anything else, bundles too, revealed). Files dropped on it (`bridge.pathOf`) are
   pasted as their paths, shell-quoted when they need it; its `preventDefault` keeps the window's folder drop out.
-- **`layout.ts`**: tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
+- **`shared/layout.ts`** (the daemon's too): tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
   session is in exactly one tab and nothing nests. Pure functions: `groupsOf` (stored tabs minus ended
   sessions, plus one tab per unplaced session), `move` (a pane or a whole tab to a `Spot`: beside a pane,
   onto its center to trade places with it, or into the tab bar at an index, its own tab; no change: `groups` itself), `insert`, `keep`, `resize`, `place`. Tested in `test/layout.test.ts`.
@@ -1231,6 +1278,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the + menu, the voice prompt), onNewPrompt and fitNew (the new-workspace window's), capture, browse |
 | `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
+| `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page |
 | `src/daemon/plans.ts` | specs and brainstorms (experimental): their folders, the editor's save, files, agents' output, a prototype's page |

@@ -16,6 +16,9 @@ worktree. Agents keep running when the window is closed.
   options, a mind map, diagrams and clickable prototypes. Folders outside the repo that any agent can read.
 - **Workflows** (experimental): blocks Laki runs for a task, drawn on a canvas or written as Markdown (say, a plan you
   approve, the build, tests until they pass, a PR, CI until green). Each run keeps its decisions and log.
+- **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
+  Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
+  with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
 - **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an

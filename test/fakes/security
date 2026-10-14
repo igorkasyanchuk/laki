@@ -1,6 +1,12 @@
 #!/bin/sh
-# fake macOS security: Claude Code's Keychain item is $HOME/keychain when there (tests never read the real Keychain)
+# fake macOS security: Claude Code's Keychain item is $HOME/keychain when there, an account's (-s "Claude Code-credentials-<hash>")
+# $HOME/keychain-<that name> (tests never read the real Keychain)
 echo "security $*" >> "${FAKE_LOG:-/dev/null}"
-[ "$1" = find-generic-password ] && [ -f "$HOME/keychain" ] && { cat "$HOME/keychain"; exit 0; }
+svc=; prev=
+for a; do [ "$prev" = -s ] && svc=$a; prev=$a; done
+f="$HOME/keychain"
+[ -n "$svc" ] && [ "$svc" != "Claude Code-credentials" ] && f="$HOME/keychain-$svc"
+[ "$1" = find-generic-password ] && [ -f "$f" ] && { cat "$f"; exit 0; }
+[ "$1" = delete-generic-password ] && [ -f "$f" ] && { rm -f "$f"; exit 0; }
 echo "security: SecKeychainSearchCopyNext: The specified item could not be found in the keychain." >&2
 exit 44

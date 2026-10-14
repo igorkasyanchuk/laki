@@ -309,7 +309,10 @@ selected workspace's PR is in the status bar.
 - A workspace with someone else's PR shows its author's GitHub picture before the PR mark.
 
 **Tabs and panes**, tmux style: a tab holds one terminal or several, split side by side or stacked.
-- ＋ in the tab bar (⌘⇧N from the keyboard) opens a new tab: shell (⌘T), one of your agent presets (claude, codex, gemini, …) or a command.
+- ＋ in the tab bar (⌘⇧N from the keyboard) opens a new tab: shell (⌘T), one of your profiles (claude, codex, gemini, …) or a command.
+  With Settings › Terminal › *New tabs open as a split* it opens beside the pane you're on instead, in the same tab.
+- How a workspace's tabs are split is kept by Laki itself (not each window): the app, a phone over remote access, the
+  CLI (`laki ls --json`'s `tabs`) and Laki AI see the same arrangement, and it survives a restart.
 - Splitting:
   - Drag a tab onto a pane's edge: it moves into that tab, on that side. Onto a pane's center: they trade places.
   - *Split right* / *Split down* (⋯ menu or ⌘K) open a new shell next to the active pane.
@@ -434,7 +437,9 @@ in an hour*). *Laki's skill*
 project's notes, memory, templates, actions and to-dos (it writes notes and memory, adds to-dos), renaming and pinning
 workspaces and tabs, commands run in a tab that's open (*fix this and run it here*: the tab you're on, or one you
 name; a shell runs it, an agent gets it as a message; it asks first before anything that deletes or resets), a new
-shell with a command typed for you to run (or run, when you ask), your actions (*start the review action on each PR in
+shell with a command typed for you to run (or run, when you ask), the panes split inside a workspace's tabs (*put
+codex beside claude*, *move the shell to its own tab*, *open a shell under the agent*, *show me the review tab*;
+closing one is a question you answer, as below), your actions (*start the review action on each PR in
 this screenshot, a workspace each*; a terminal's command is typed, for you to run) and prompt templates for new
 workspaces. When it isn't sure, it asks with a few options as buttons: a click answers, and it goes on (until you ask
 something else: then that question is closed). It removes a memory item, a scheduled task, a tab or a to-do only
@@ -452,8 +457,8 @@ for, what it spent today and this month (also in Settings › AI), and what it c
 - **claude -p** or **codex exec**: the agent in the background on your plan, in `<data>/ai`, with `laki mcp` as its only
   tools (claude: Read too, for a screenshot; codex: read-only, without your config.toml's MCP servers), going on with
   the same session ask after ask (one conversation, it remembers; *New chat* starts a new session). claude's
-  cost is Claude Code's own estimate; codex's is your plan's. *Your agent presets* in the Backend list run it as one of
-  yours: a claude or codex preset with its env, another account (`CLAUDE_CONFIG_DIR`, `CODEX_HOME`), each with a session
+  cost is Claude Code's own estimate; codex's is your plan's. *Your profiles* in the Backend list run it as one of
+  yours: a claude or codex profile with its env and account (none: the agent's default account), each with a session
   of its own.
 
 *Steps* (unset: 20) caps the rounds of tool calls one ask may make. *Show costs ($)* (Settings › AI › Spending, on by
@@ -930,7 +935,7 @@ lit for a moment.
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
-  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; and per extension, *Logs* in Settings › Extensions: each fetch, how
+  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Reset the interface*: the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes) back to how Laki starts, nothing else; and per extension, *Logs* in Settings › Extensions: each fetch, how
   long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), *Close tabs without asking* (off by default: closing a tab whose agent or server still runs asks first), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
@@ -1049,11 +1054,23 @@ lit for a moment.
   *Dim other panes* (in a split, the panes without the keyboard fade back; off by default) and *Focus the pane under
   the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; off by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
-- *Agent presets*: how agents start. A preset is an agent (Claude Code, Codex, Gemini, Grok, OpenCode) with extra
-  arguments (e.g. `--model opus --permission-mode acceptEdits`), or any command, plus environment variables. Each
+- *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Gemini, Grok, OpenCode, or any command); a
+  profile is how it starts, grouped under its agent: a model and an effort (a workspace that picks its own wins),
+  an account (Claude Code and Codex), flags (e.g. `--permission-mode acceptEdits`) and environment variables. Each
   one is in the new-tab menu, the new-workspace page (and its races) and scheduled tasks; its switch takes one you
   don't use out of them (its tabs still start and resume). The defaults are the agents on your PATH (*Reset to the
-  agents installed* goes back to them). Edit `claude` or `codex` to change how every new one starts; a tab started from a preset uses its current settings when it restarts or resumes.
+  agents installed* goes back to them; *Add a profile for…* adds another agent's). Edit `claude` or `codex` to change how every new one starts; a tab started from a profile uses its current settings when it restarts or resumes.
+- *Accounts* (Claude Code and Codex, at the top of each one's group in *Agents & profiles*): your other sign-ins, say a
+  work and a personal plan. *Add … account* makes a folder for it in Laki's data folder (given to the agent as
+  `CLAUDE_CONFIG_DIR` or `CODEX_HOME`) and opens a terminal with the agent's own sign-in there (`claude auth login`,
+  `codex login`); *Sign in again* does that later. Its settings, skills, plugins, commands, agents and chats are your
+  own folder's (`~/.claude`, `~/.codex`), linked in, so a chat resumes on any account; only the sign-in is its own
+  (and Claude's ↑ prompt history). Each row says who it signs in as, its plan, and *most room* on the one with clearly
+  more of its 5-hour window left. The circle picks the default: new sessions start on it (a profile can pick one of
+  its own); a tab keeps the account it started on, and its right click › *Restart on another account* moves its chat
+  to another (a turn at work stops first). ⌘K's *Switch Claude Code to …* and the plan limits' popup (*Use*) change the
+  default too. The ring in the status bar shows each agent's default account; its popup lists them all. Removing one
+  removes its folder and Claude's Keychain item for it; its chats stay.
   The chips under the arguments (`$PORT`, `$LAKI_WORKSPACE`, `$LAKI_TAB`, `$LAKI_PROJECT_PATH`, `$LAKI_STORAGE_FOLDER`) put a variable in at the
   cursor: the line goes through the shell, so they work there. Every tab also gets `LAKI_APP=true` (a program or
   skill can tell it runs in Laki), and an agent's `FORCE_HYPERLINK=1` (Claude Code's links show as their text, a click
@@ -1101,6 +1118,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   HH-MM}}` → *051026 07-05* (`MM` right after an hour is the minutes; `mm` always is). They work in actions and
   the PR prompts too; what you type for `{{prompt}}` is left as it is. *Add template* starts from an example; the
   chips under each one put a variable in at the cursor. A project can have its own (its settings, below).
+- *Agent variables*: `{{workspace}}`, `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}` (its link), `{{project}}`,
+  `{{base}}`, `{{storage}}`, `{{tab}}`, `{{agent}}` (claude, codex…), `{{date}}` (YYYY-MM-DD) and `{{time}}` (HH:MM)
+  become the workspace's and the tab's as an action, a template, a scheduled prompt or a workflow reaches it: *Run the
+  tests on {{branch}}, then comment on {{pr}}*. One with nothing to give (no PR yet) stays as it is, and a message you
+  type is left alone.
 - *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent, *Any agent*: whichever runs, or a terminal) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
   findings` for Codex, `bundle exec rails db:migrate` for a terminal. The copy button duplicates one (to make the
@@ -1245,7 +1267,7 @@ laki daemon                                             # run the daemon in the 
 
 `laki mcp` is an MCP server on stdio, for Claude Code, Codex, Gemini, Grok, OpenCode or any MCP client. Its tools: `laki_state`
 (projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
-`presets`), `laki_new_tab` (another agent in a workspace), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
+`presets`), `laki_new_tab` (another agent in a workspace; `beside` a tab: a split in its tab), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
 `laki_schedule_add`, with Specs & Brainstorms on `laki_plans`, `laki_plan_read`, `laki_plan_new` and `laki_plan_write`, and with Workflows on `laki_workflows`, `laki_workflow_write` (saved for you to read: an agent can't run one it wrote until you save it in the app) and `laki_workflow_run`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an
 agent asks you. Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:

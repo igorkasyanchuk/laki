@@ -2,7 +2,7 @@
 // fake codex: records its args; each Enter ends a turn by running the notify program from -c notify=[…]
 const fs = require('fs'), { execFileSync } = require('child_process')
 const args = process.argv.slice(2)
-fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'codex', tab: process.env.LAKI_TAB, args }) + '\n')
+fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'codex', tab: process.env.LAKI_TAB, args, env: { CODEX_HOME: process.env.CODEX_HOME } }) + '\n')
 // exec --json (Laki's AI): one laki_state call through the -c mcp_servers.laki server; "fail…" fails
 if (args[0] === 'exec') {
   const out = o => process.stdout.write(JSON.stringify(o) + '\n')

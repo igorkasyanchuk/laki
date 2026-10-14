@@ -70,7 +70,7 @@ export class Session {
   exitCode = 0
   note = '' // what end() said: printed instead of the exit line
   readonly born = Date.now()
-  lastOutput = Date.now() // when the program last printed
+  lastOutput = this.born // when the program last printed (born until it does: whenPrompt waits for a change)
   lookedAt = 0 // when a client last stopped looking (detach): a sleep counts from then too
   title = '' // the window title it set (OSC 0/2): gemini's and grok's say whether they work or ask
   onExit: (code: number) => void = () => {}

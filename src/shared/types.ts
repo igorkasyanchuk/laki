@@ -1,4 +1,5 @@
 // Shapes shared by the daemon, the CLI and the renderer.
+import type { Layout } from './layout.ts'
 import { type Rule, stamp } from './when.ts'
 import type { FlowRun, FlowView } from './workflow.ts'
 
@@ -130,8 +131,42 @@ export const refsIn = (text = '') => {
 
 // {{name}} (spaces inside allowed) as vars say; an unknown one stays as it is (not {{constructor}}): prompt templates', PR_PROMPTS'.
 // The template's dates ({{DD-MM-YY HH:MM}}, when.ts' stamp) are now's; what vars bring in (a typed prompt) isn't stamped
-export const fillTemplate = (text: string, vars: Record<string, string | undefined>, at = Date.now()) =>
-  stamp(text, at).replace(/\{\{\s*(\w+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
+export const fillTemplate = (text: string, vars: Record<string, string | undefined>, at = Date.now()) => fillVars(stamp(text, at), vars)
+// {{name}} and {{ws.branch}}-style names as vars say, nothing else: no dates (a typed prompt's {{DD}} stays)
+export const fillVars = (text: string, vars: Record<string, string | undefined>) => text.replace(/\{\{\s*([\w.]+)\s*\}\}/g, (m, k: string) => (Object.hasOwn(vars, k) ? (vars[k] ?? m) : m))
+// agent variables (Maestro's {{AGENT_PATH}}…, Laki's lowercase like {{prompt}}): what an action (Run ▾), a prompt
+// template, a scheduled prompt and a workflow are filled with as they reach a workspace's agent or terminal (the daemon,
+// asked with vars: a message you type is left as it is); one without a value (no PR yet) stays. Settings' chips list them
+export const AGENT_VARS: [string, string][] = [
+  ['{{workspace}}', "the workspace's name"],
+  ['{{branch}}', "the workspace's branch"],
+  ['{{path}}', "the workspace's folder (its worktree)"],
+  ['{{port}}', "the workspace's $PORT"],
+  ['{{pr}}', "the workspace's PR (its link)"],
+  ['{{project}}', "the project's name"],
+  ['{{base}}', 'the base branch'],
+  ['{{storage}}', "the workspace's storage folder ($LAKI_STORAGE_FOLDER)"],
+  ['{{tab}}', 'the tab it goes to (its name)'],
+  ['{{agent}}', 'the agent there: claude, codex…'],
+  ['{{date}}', 'today: YYYY-MM-DD'],
+  ['{{time}}', 'now: HH:MM'],
+]
+export function agentVars(w: { id: string; name?: string; path: string; branch?: string; base?: string; port?: number; storage?: string }, o: { project?: string; pr?: string; tab?: { name: string; preset?: string } } = {}, at = Date.now()): Record<string, string | undefined> {
+  return {
+    workspace: w.name || w.id,
+    branch: w.branch || undefined,
+    path: w.path,
+    port: w.port ? String(w.port) : undefined,
+    pr: o.pr,
+    project: o.project,
+    base: w.base || undefined,
+    storage: w.storage,
+    tab: o.tab?.name,
+    agent: o.tab?.preset,
+    date: stamp('{{YYYY-MM-DD}}', at),
+    time: stamp('{{HH:mm}}', at),
+  }
+}
 // a project's templates first, then the global ones it doesn't replace (one of the same name)
 export const templatesFor = (global: Template[] = [], project: Template[] = []) => [...project, ...global.filter(g => !project.some(t => t.name.trim() === g.name.trim()))]
 // a PR as the new-workspace page has it: the PR field (#123 or its URL), else a PR's URL in the prompt, else a prompt
@@ -204,6 +239,7 @@ export type Tab = {
   muted?: boolean // no notifications from it
   model?: string // the agent's --model (unset: its own default), kept for restarts
   effort?: string // and its effort (EFFORTS)
+  account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
 }
@@ -231,7 +267,21 @@ export function taskTitle(prompt: string, words = 6) {
 
 // how an agent starts: one of AGENTS with extra args, or any command; env on top of the project's
 // off: switched off in Settings: out of the pickers (new tab, new workspace, races, scheduled tasks); its tabs still start
-export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean } // laki: false: no note about Laki at its starts (unset: told)
+// a profile (Settings › Agents & profiles; the code's word is preset): how an agent starts. laki: false: no note about
+// Laki at its starts (unset: told); model, effort: its tabs' unless a workspace picks its own; account: an Account's id
+// or HOME_ACCOUNT (unset: the agent's default, settings.accountUse)
+export type Preset = { name: string; agent: Agent | 'command'; args?: string; cmd?: string; env?: Record<string, string>; off?: boolean; laki?: boolean; model?: string; effort?: string; account?: string }
+
+// another sign-in of claude or codex: a config folder of its own (CLAUDE_CONFIG_DIR, CODEX_HOME) that Laki made, its
+// settings, skills and chats shared with the agent's own (links), its sign-in not
+export type AccountAgent = 'claude' | 'codex'
+export const ACCOUNT_AGENTS: AccountAgent[] = ['claude', 'codex']
+export const isAccountAgent = (a?: string): a is AccountAgent => a === 'claude' || a === 'codex'
+export type Account = { id: string; agent: AccountAgent; name: string; dir: string }
+// the agent's own sign-in (~/.claude, ~/.codex): an account with no folder of Laki's
+export const HOME_ACCOUNT = 'home'
+// who an account signs in as (accounts): its email and plan, read from its folder; signedIn: it has a sign-in
+export type AccountView = { id: string; agent: AccountAgent; name: string; dir: string; email?: string; plan?: string; signedIn: boolean; default: boolean }
 
 // what a notification is about: an agent waiting for you, done with its turn, at a usage limit
 export type NotifyKind = 'waiting' | 'done' | 'limit'
@@ -254,6 +304,8 @@ export type Settings = {
   timerAlert?: 'dialog' | 'notification' // what a sidebar timer's end shows (unset: Laki's dialog)
   timerSound?: string // a macOS sound or 'none' as a timer ends (unset: Glass)
   presets?: Preset[] | null // null: the defaults
+  accounts?: Account[] // claude's and codex's other sign-ins (the agent's own is HOME_ACCOUNT)
+  accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: HOME_ACCOUNT)
   theme?: string
   glass?: boolean // a see-through, blurred window
   glassWindow?: number // how see-through glass makes the window, the sidebar, the terminals: %
@@ -281,6 +333,7 @@ export type Settings = {
   dimPanes?: boolean // a split's other panes dimmed (unset: off)
   termPad?: 'tiny' | 'normal' | 'roomy' // Settings › Terminal › Padding: the space around a terminal's text (unset: normal)
   hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
+  splitNew?: boolean // a new tab opens as a split beside the pane you're on, not a tab of its own (layoutPlace)
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
   pageZoom?: number // Settings and Help's size (0.9–1.5, renderer's PAGE_ZOOMS; unset: 1)
   storageDir?: string // where workspaces' storage folders go (unset: <data>/storage; ~ is home)
@@ -381,7 +434,8 @@ export type Remote = { mail: string; open?: boolean; until?: number; url?: strin
 // a plan's limit (daemon/usage.ts): used %, when it resets (ms); note: what the % is of, for an amount (extra usage)
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
 // an agent's limits; error: why there are none (signed out…); at: when they were read
-export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number }
+// account: whose (an Account's id or HOME_ACCOUNT), name to tell them apart, default: the one new sessions use
+export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[]; error?: string; at: number; account?: string; name?: string; default?: boolean }
 
 // a scheduled task: at the times `when` says (rule: what it said when saved, shared/when.ts), its prompt goes to an
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
@@ -391,7 +445,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; flows?: FlowRun[]; flowsByAgent?: string[] }
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; flows?: FlowRun[]; flowsByAgent?: string[] }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -469,7 +523,7 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; flows?: FlowView[]; api?: number; built?: string } // built: its build's time (none from source)
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; flows?: FlowView[]; api?: number; built?: string } // built: its build's time (none from source)
 
 // specs and brainstorms (experimental, settings.specs; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
@@ -486,4 +540,4 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 59
+export const API = 60

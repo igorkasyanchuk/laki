@@ -4,6 +4,7 @@
 // /usage screen asks. Read-only: a token is never refreshed (a second client refreshing it can sign the agent out);
 // an expired one waits for the agent's next run.
 import { execFile } from 'node:child_process'
+import { createHash } from 'node:crypto'
 import { readFile } from 'node:fs/promises'
 import { homedir, userInfo } from 'node:os'
 import { join } from 'node:path'
@@ -23,10 +24,9 @@ export const base = (real: string) => {
 }
 
 type Got = Omit<AgentUsage, 'agent' | 'at'> & { again?: boolean }
-const AGENTS: { id: string; load: () => Promise<Got> }[] = [
-  { id: 'claude', load: claude },
-  { id: 'codex', load: codex },
-]
+// whose limits: an agent's own sign-in (no dir) or an account's folder (accounts.ts)
+export type Who = { agent: string; account: string; name: string; dir?: string; default: boolean }
+const LOADERS: Record<string, (dir?: string) => Promise<Got>> = { claude, codex }
 
 const pct = (n: number) => Math.max(0, Math.round(n))
 const failed = (e: any) =>
@@ -65,13 +65,18 @@ export function claudeWindows(u: any): UsageWindow[] {
 
 type ClaudeCred = { accessToken: string; expiresAt?: number; subscriptionType?: string }
 
-// the freshest of Claude Code's Keychain items (the login user's, else the first) and its credentials file
-async function claudeCred(): Promise<ClaudeCred | undefined> {
-  const keychain = (...a: string[]) => run('security', ['find-generic-password', ...a, '-s', 'Claude Code-credentials', '-w'], { timeout: 5000 }).then(r => r.stdout)
+// Claude Code's Keychain item for a config folder (CLAUDE_CONFIG_DIR): its name's hash, the folder as given
+export const keychainService = (d: string) => `Claude Code-credentials-${createHash('sha256').update(d.normalize('NFC')).digest('hex').slice(0, 8)}`
+
+// the freshest of Claude Code's Keychain items (the login user's, else the first) and its credentials file; d: an
+// account's folder (its own item and file), else the agent's own
+export async function claudeCred(d?: string): Promise<ClaudeCred | undefined> {
+  const service = d ? keychainService(d) : 'Claude Code-credentials'
+  const keychain = (...a: string[]) => run('security', ['find-generic-password', ...a, '-s', service, '-w'], { timeout: 5000 }).then(r => r.stdout)
   const reads = await Promise.allSettled([
     Promise.resolve().then(() => keychain('-a', userInfo().username)), // userInfo throws without a passwd entry
     keychain(),
-    readFile(join(homedir(), '.claude', '.credentials.json'), 'utf8'),
+    readFile(join(d ?? join(homedir(), '.claude'), '.credentials.json'), 'utf8'),
   ])
   let best: ClaudeCred | undefined
   for (const read of reads) {
@@ -83,9 +88,9 @@ async function claudeCred(): Promise<ClaudeCred | undefined> {
   return best
 }
 
-async function claude(): Promise<Got> {
-  const c = await claudeCred()
-  if (!c) return { windows: [], error: 'Not signed in to a Claude plan: run claude, then /login', again: true }
+async function claude(d?: string): Promise<Got> {
+  const c = await claudeCred(d)
+  if (!c) return { windows: [], error: d ? 'Not signed in: Settings › Agents & profiles, Sign in' : 'Not signed in to a Claude plan: run claude, then /login', again: true }
   const plan = c.subscriptionType || undefined
   const expired = 'Sign-in expired: Claude Code renews it on its next run'
   if (c.expiresAt && c.expiresAt < Date.now()) return { plan, windows: [], error: expired, again: true }
@@ -123,10 +128,10 @@ export function codexWindows(u: any, now = Date.now()): UsageWindow[] {
   return out
 }
 
-async function codex(): Promise<Got> {
+async function codex(d?: string): Promise<Got> {
   let auth: any
   try {
-    auth = JSON.parse(await readFile(join(process.env.CODEX_HOME || join(homedir(), '.codex'), 'auth.json'), 'utf8'))
+    auth = JSON.parse(await readFile(join(d ?? (process.env.CODEX_HOME || join(homedir(), '.codex')), 'auth.json'), 'utf8'))
   } catch {
     return { windows: [], error: 'Not signed in: run codex login', again: true }
   }
@@ -150,22 +155,24 @@ async function codex(): Promise<Got> {
 type Entry = { at: number; ttl: number; p?: Promise<AgentUsage> }
 const cache = new Map<string, Entry>()
 
-// on: Settings' usage (an agent set to false isn't asked)
-export function usage(on: Record<string, boolean> = {}, now = Date.now()): Promise<AgentUsage[]> {
+// on: Settings' usage (an agent set to false isn't asked); who: each agent's accounts, its own first
+export function usage(on: Record<string, boolean> = {}, who: Who[] = [], now = Date.now()): Promise<AgentUsage[]> {
   return Promise.all(
-    AGENTS.filter(a => on[a.id] !== false).map(a => {
-      const c = cache.get(a.id)
-      if (c?.p && now - c.at < c.ttl) return c.p
+    who.filter(w => on[w.agent] !== false && LOADERS[w.agent]).map(w => {
+      const key = `${w.agent}:${w.dir ?? ''}`
+      const mine = (r: Omit<AgentUsage, 'account' | 'name' | 'default'>): AgentUsage => ({ ...r, account: w.account, name: w.name, default: w.default })
+      const c = cache.get(key)
+      if (c?.p && now - c.at < c.ttl) return c.p.then(mine) // a rename, another default: now's
       const entry: Entry = { at: now, ttl: USAGE_TTL }
-      entry.p = a.load().then(
+      entry.p = LOADERS[w.agent](w.dir).then(
         ({ again, ...r }) => {
           if (again) entry.ttl = AGAIN
-          return { agent: a.id, ...r, at: Date.now() }
+          return { agent: w.agent, ...r, at: Date.now() }
         },
-        e => ((entry.ttl = AGAIN), { agent: a.id, windows: [], error: failed(e), at: Date.now() }),
+        e => ((entry.ttl = AGAIN), { agent: w.agent, windows: [], error: failed(e), at: Date.now() }),
       )
-      cache.set(a.id, entry)
-      return entry.p
+      cache.set(key, entry)
+      return entry.p.then(mine)
     }),
   )
 }
