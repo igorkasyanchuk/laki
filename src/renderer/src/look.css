@@ -136,6 +136,9 @@ label.switch-row select { flex: none; width: auto; }
 .remote-form .seg button { min-width: 3.2em; }
 .remote-risk { display: flex; flex-direction: column; gap: 8px; margin: 0; padding: 10px 12px; border: 1px solid var(--error); border-radius: var(--rs, 10px); background: color-mix(in srgb, var(--error) 12%, transparent); color: var(--fg); } /* remote access without an email */
 .remote-risk b { color: var(--error); }
+/* Laki's PIN for the remote page, big enough to read across a desk */
+.remote-pin-box { display: flex; flex-direction: column; gap: 4px; }
+.remote-pin { font: 700 28px var(--mono); letter-spacing: 0.12em; color: var(--fg); }
 .remote-risk label { display: flex; flex-direction: column; gap: 4px; }
 .remote-risk input { max-width: 220px; }
 .remote-tip { margin-top: 18px; padding-top: 12px; border-top: 1px solid var(--line); max-width: 560px; } /* cloudflared tunnel login */

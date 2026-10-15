@@ -104,6 +104,7 @@ const paths = {
   pr: 'M5.8 3a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM5.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM12.8 13a1.3 1.3 0 11-2.6 0 1.3 1.3 0 012.6 0zM4.5 4.3v7.4M11.5 11.7V7.5a2 2 0 00-2-2H7M8.5 4L7 5.5 8.5 7',
 }
 export type IconName = keyof typeof paths
+export const isIconName = (s: unknown): s is IconName => typeof s === 'string' && Object.hasOwn(paths, s) // an extension's icon
 
 export function Icon({ name, size = 14 }: { name: IconName; size?: number }) {
   return (
@@ -142,9 +143,9 @@ export function TurnTime({ tabs }: { tabs: { runAt?: number }[] }) {
 }
 
 // an on/off switch: the status bar's auto toggles, Settings' options (a row: className="switch-row")
-export function Switch({ on, onChange, tip, className = '', children }: { on?: boolean; onChange: (v: boolean) => void; tip?: string; className?: string; children?: ReactNode }) {
+export function Switch({ on, onChange, tip, className = '', disabled, children }: { on?: boolean; onChange: (v: boolean) => void; tip?: string; className?: string; disabled?: boolean; children?: ReactNode }) {
   return (
-    <button type="button" role="switch" aria-checked={!!on} aria-label={children ? undefined : tip} className={`toggle ${on ? 'on' : ''} ${className}`} data-tip={tip} onClick={() => onChange(!on)}>
+    <button type="button" role="switch" aria-checked={!!on} aria-label={children ? undefined : tip} className={`toggle ${on ? 'on' : ''} ${className}`} data-tip={tip} disabled={disabled} onClick={() => onChange(!on)}>
       <span className="toggle-track">
         <span className="toggle-knob" />
       </span>

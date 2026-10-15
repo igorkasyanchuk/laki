@@ -5,7 +5,7 @@ import { ntfyReplies, pushRequest, pushText, replies } from '../src/daemon/push.
 import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
-import { inline, markdown } from '../src/renderer/src/markdown.ts'
+import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, importable, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { fillTemplate, isAgent, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -131,6 +131,7 @@ test('pushes: titles, Telegram without a bot path or chat, ntfy reply topics onl
   const p = { event: 'done', workspace: 'w', tab: 't', agent: 'codex' } as const
   assert.deepEqual(pushText({ ...p, event: 'test' }), { title: 'Laki: pushes reach you', body: '', text: 'Laki: pushes reach you' })
   assert.equal(pushText(p).title, 'codex in w is done')
+  assert.equal(pushText({ ...p, title: 'Workflow Triage in w failed' }).title, 'Workflow Triage in w failed') // a workflow's own
   for (const url of ['https://example.com/hook', 'https://api.telegram.org/botT/sendMessage']) assert.equal(JSON.parse(String(pushRequest({ format: 'telegram', url }, p).body)).chat_id, undefined)
   assert.equal(ntfyReplies({ url: 'https://ntfy.sh/mine' }), undefined)
   assert.equal(ntfyReplies({ replyTopic: 'x' }), undefined)

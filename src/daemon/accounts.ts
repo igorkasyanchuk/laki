@@ -45,7 +45,7 @@ function linkShared(a: Account) {
 }
 
 export const accounts = (agent?: AccountAgent): Account[] => (state.settings?.accounts ?? []).filter(a => !agent || a.agent === agent)
-const accountNamed = (id?: string) => accounts().find(a => a.id === id)
+export const accountNamed = (id?: string) => accounts().find(a => a.id === id)
 const ok = (agent: AccountAgent, id?: string) => (id && (id === HOME_ACCOUNT || accountNamed(id)?.agent === agent) ? id : undefined)
 
 // the account a tab starts on: its own (kept from its first start), else its profile's, else the agent's default;

@@ -464,9 +464,6 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .plan-chat-hello .primary { display: inline-flex; align-items: center; gap: 6px; }
 .plan-chat-dock { display: flex; flex-direction: column; gap: 4px; padding: 8px; border-top: 1px solid var(--line); }
 .plan-chat .ai-err { padding: 0 4px; }
-.plans-new { display: inline-flex; }
-.plans-new > button:first-child { border-top-right-radius: 0; border-bottom-right-radius: 0; }
-.plans-new > button.caret { width: 24px; padding: 0; justify-content: center; border-left-color: transparent; border-top-left-radius: 0; border-bottom-left-radius: 0; box-shadow: inset 1px 0 color-mix(in srgb, var(--fg) 18%, transparent); }
 .plans-tpl { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1px solid var(--line); border-radius: var(--rs, 8px); background: var(--panel); }
 .plans-tpl textarea { width: 100%; resize: vertical; font-size: 12.5px; line-height: 1.5; }
 .plans-says { margin: 0; line-height: 1.5; }
@@ -474,9 +471,6 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .plans-bar input { flex: 1 1 220px; width: auto; min-width: 0; }
 .plans-bar select { flex: none; width: auto; max-width: 220px; }
 .plans-bar button { display: inline-flex; align-items: center; gap: 5px; }
-.plans-block { display: flex; flex-direction: column; gap: 6px; }
-.plans-block-head { display: flex; align-items: center; gap: 8px; }
-.plans-block-head .link { display: inline-flex; align-items: center; gap: 6px; color: var(--fg); }
 .plans-rows { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--rs, 8px); overflow: hidden; }
 .plans-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 12px; text-align: left; border: none; border-radius: 0; background: none; color: var(--fg); cursor: pointer; }
 .plans-row + .plans-row { border-top: 1px solid var(--line); }
@@ -484,6 +478,11 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .plans-row .icon-svg { flex: none; color: var(--muted); }
 .plans-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plans-meta { flex: none; }
+.plans-kinds { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.plans-kinds .seg button { display: inline-flex; align-items: center; gap: 5px; }
+.plans-kind { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 11px; color: var(--muted); border: 1px solid var(--line); }
+.plans-kind.brainstorm { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }
+.plans-kind.spec { color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent) 40%, transparent); }
 .plans-empty { padding: 10px 12px; border: 1px dashed var(--line); border-radius: var(--rs, 8px); line-height: 1.5; }
 .plan-head { display: flex; align-items: center; gap: 10px; }
 .plan-title { flex: 1; min-width: 0; font: 700 24px/1.25 var(--ui-font); letter-spacing: -0.01em; padding: 4px 0; border: none; border-bottom: 1px solid transparent; border-radius: 0; background: none; color: var(--fg); outline: none; }

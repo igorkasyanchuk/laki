@@ -93,7 +93,11 @@ a workspace's `browser`, kept by `wsSet`; a shell tab's `running`; 35: `remoteSt
 `wsNew` `link`/`from`, `prDetach`; 53: workflows, `flowList`/`flowSave`/`flowRm`/`flowStart`/`flowStop`/`flowAnswer`/`flowGet`/`flowForget`/`flowTick`, the view's `flows`, a workspace's `flow`, the `flow` event; 54: the view's `built`, an older build's daemon gets the bar; 55: `memoryAdd`/`memoryRm`, a memory's `auto` and `by`, `MEMORY_MAX` each kind; 56: an action's `slug`, kept by `projectSet`, a workflow's `use:` by it; 57: workflows' `case` block, a tab's `flow`; 58: `aiAsk` `context` (the floating chat's), `timer` (Laki AI's `laki_timer`, done by the app's window); 59: `voiceText`, settings' `voice`; 60: accounts (`accounts`,
 `accountAdd`/`accountSet`/`accountRm`/`accountLogin`, `tabAccount`, a tab's `account`, a preset's `model`, `effort` and
 `account`, settings' `accountUse`, `usage` per account), layouts (`layoutSet`, `layoutMove`, `tabFocus` and the `focus`
-event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `send`/`tabNew`/`wsNew` `vars`). A
+event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `send`/`tabNew`/`wsNew` `vars`; 61: `remoteStart` `pin`, a remote's `pin` and `tries`,
+`POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
+`share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
+`workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -338,7 +342,7 @@ again 300 ms later (`spawnTab`'s `onOutput`), and a view goes out when it isn't 
 ### Sleep
 
 `core.ts` `sleepTick`: an idle claude or codex tab (`sleepy`: `cantSleep` says nothing, no attached client, idle
-`settings.sleepAfter` minutes by `idleAt` (set in `view` like `runAt`; not the last output: a TUI may redraw); not on a host, not in a workspace with a PR switch on, none of the workspace's
+`settings.sleepAfter` minutes (unset: `SLEEP_AFTER`, 480; 0: never) by `idleAt` (set in `view` like `runAt`; not the last output: a TUI may redraw); not on a host, not in a workspace with a PR switch on, none of the workspace's
 listening ports (`procs`) in its tree) is put to sleep: `asleep` (in memory) and `Session.end`, which SIGHUPs the job
 (SIGKILL 5 s later if it's still there) but keeps the screen, the clients and a note instead of the exit line; `onExit`
 leaves it be. Its view is `idle`, `asleep: true` (the tab bar dims it, its tooltip says so); `onExit` ignores a session no longer in `sessions` (replaced or dropped). `wake` (an attach in `main.ts`, any `input` but xterm's own focus and mouse reports (`REPORTS`; the key is
@@ -496,9 +500,10 @@ and neither does a host.
 - Artifacts (`scanArtifacts`, with the port scan): the files in each live workspace's storage folder, hidden files and folders not
   counted, one scan at a time, as `WorkspaceView.artifacts`: the status bar's *Artifacts: n* (a menu: Finder, or *Show here*: panels.tsx
   `ArtifactsBar`, a strip of previews over the status bar from `artifactList` (newest first, 500 at most) and `fileRead`
-  `storage` (the folder as the root, `inside`'s checks), a click shows one big, ← → the others), none at 0. Its `.url` files
-  (http(s) only) are `WorkspaceView.links` (newest first): the info panel's *links* rows, and first in the gallery,
-  where a click opens them in the browser. `keepPublished`, at each turn's end (`turn`'s idle/done/failed), writes
+  `storage` (the folder as the root, `inside`'s checks), a click shows one big, ← → the others; the folder's folders first,
+  a click goes in (`dir`), the head's path or ← back out), none at 0. Its `.url` files
+  (`urlOf`: http(s), or `file:///`) are `WorkspaceView.links` (newest first): the info panel's *links* rows, and first in the gallery,
+  where a click opens them in the browser (the renderer's `openKeptLink`: a `file:///` one through main's `open-path`; `openExternal`, every other link's, never opens files). `keepPublished`, at each turn's end (`turn`'s idle/done/failed), writes
   `<title>.url` for each link the agent published and the folder hasn't (`sameUrl`): its publish tools' (`publishedBy`, from
   claude's PostToolUse payload, buffered as `Runtime.published`: the Artifact tool's publish, not its read/list/asset, or an
   `mcp__` tool named publish/deploy/upload/share: the first https link it returned, named by its `title`/`name`/file) and
@@ -506,6 +511,9 @@ and neither does a host.
   github.io…; named by `[text](url)`, else its sentence's words less "I published", else the host).
 - Ports: the `ps` process tree of each workspace's tabs, matched against `lsof -iTCP -sTCP:LISTEN -Fpcn`, every 5s
   (`procs`: each port's pid and command, `WorkspaceView.procs`; `.laki.json` `ports`, strings only, as `portNames`).
+  An agent tab's own processes (its pid and what it runs with no shell between: `ps`'s `comm`, `SHELLS`; its browser
+  bridge, an MCP server, the browser that drives) and any `BROWSER` listen for the agent: `own` in `procs` (sleep still
+  sees them), left out of `ports`; what its shell tool starts (a dev server) is the workspace's.
   `portKill` (the status bar's ✕, after `ask`): that pid, if it still listens there and is yours (uid), gets SIGTERM,
   and SIGKILL 3 s later if `ps`'s uid and start time are the same. First,
   `syncBranches`: each workspace's `branch` follows its folder's HEAD (`headOf` reads the file, no git run; detached
@@ -559,6 +567,18 @@ output that isn't `login.`. No emails: public, anyone with the link (the popup's
 cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. Tunnels live in the daemon's memory (`tunnels`, in `WorkspaceView.tunnels`): stopped by
 `tunnelStop`, a workspace's teardown, and shutdown; a daemon restart ends them. One per workspace and port.
 
+Shared tabs (`core.ts` `shareStart`, `daemon/share.ts`): a tab as a read-only page at `<tunnel>/s/<uuid>`. The pages
+have their own `node:http` server on 127.0.0.1 (`shareServe`: `/s/<id>`, `.md` (`?download`), `.json?v=`; anything
+else 404), so the one tunnel (`cloudflare`, no mails, Resources' `share`) never reaches the daemon's API; both start
+with the first share and stop with the last (`stopShares`: a tab, a workspace's teardown, a closed tab, Resources,
+shutdown). In memory only (`shares`), like tunnels; the view's `TabView.share` is `{url, until}` (`shareLink`):
+`hours` (`SHARE_HOURS`) sets `until`; `shareTick` (every 15 s) and a reader's next ask stop one past it. `shareRead`
+(at most every 1.5 s, on a request): claude's or codex's transcript (`transcriptOf`: the tab's account's folder, else
+the agent's own; read on from `pos`, whole lines, into `said` by `chatOf`), else `screen` (5000 lines); a change bumps
+`v`. `shareMd` (Copy, Download), `shareBody`/`sharePage` (`shared/markdown.ts`' tree, every string escaped, links
+http(s)/mailto only; a CSP with a nonce, no inline styles); the page asks `.json?v=` every 2.5 s and swaps `main`.
+Tested in `test/share.test.ts`.
+
 ### Remote access
 
 `core.ts` `remoteStart`: the same `cloudflare()` as a tunnel, in front of the daemon itself
@@ -570,7 +590,12 @@ hash), which the renderer (`api.ts`: no port) uses on the page's own origin, the
 (`pageToken`: `replaceState`, kept in the tab's `sessionStorage` `laki.token` for reconnects; Cloudflare's sign-in page,
 an earlier history entry, still holds the link). While it runs, `main.ts`
 takes the tunnel's URL as an Origin, and that token only with it (a client with no Origin needs the daemon's own);
-`remoteStop` drops both, so an old link is dead. The page (`api.ts` `whyNot`), when its socket won't open twice: a
+`remoteStop` drops both, so an old link is dead. `pin` (Settings' *Sign in with* › PIN, `settings.remoteAuth`): no
+`--allowed-mail`; a 6-digit `pin` (`randomInt`, shown in Settings) and an `access` token: the link's token is then good
+for `POST /pin` only (`remotePin`, main.ts: from the tunnel's origin; `{ token }` says `need`, `{ token, pin }` gives
+`access`, which `remoteToken` is); a wrong PIN counts `left` down from `settings.remoteTries` (1-10, `REMOTE_TRIES` 2), the
+last stops it and broadcasts `remote` (App: a toast and a notification). The page (`api.ts`) asks `/pin` before its
+first connect (`pinNeed`), and App's splash shows `PinForm` (`api.pin`: the access token kept as the tab's token). The page (`api.ts` `whyNot`), when its socket won't open twice: a
 `fetch` of itself that redirects is Cloudflare's sign-in run out (a reload signs in again, once per 30 s), a 401/403 from
 `/rpc` is a dead link, no answer or a 5xx is the Mac out of reach; App shows it on the splash and in the status bar
 (the `problem` event). Retries back off to 10 s. `page` serves the HTML `no-store`, so a tab brought back or Back
@@ -589,7 +614,9 @@ Origin: the files hold no secrets. Paths that leave the folder, or don't decode,
 `once`/`tomorrow`), kept with the text so "tomorrow" means the day it was saved; `nextRun` gives `next`; `stamp` fills `{{DD-MM-YY}}`-style
 dates (only braces of date tokens, any of them in any order; `MM` right after an hour is the minutes) in the name and
 prompt with the run's time; `fillTemplate` stamps a template's text the same way before its vars (a typed prompt isn't),
-and App's `runAction` an action's. A run (ws) makes a new workspace
+and App's `runAction` an action's. A task with `workflow` (and `source`) starts that workflow instead
+(`flowHooks.start`/`find`, which workflow.ts sets: no import cycle) with the prompt as its task, trigger
+`schedule <id>`, skipped while its last run is live. A run (ws) makes a new workspace
 (`new`: `wsNew` with the preset and prompt; `wsTitle` names it, with the id's random tail when another workspace has that name; the task's `schedule` id marks
 it: the sidebar's clock),
 or a new session in the project's own folder (`local-new`: `wsNew` `local` + `another`, a local workspace beside the one
@@ -670,10 +697,11 @@ images; nothing out).
 
 The renderer's `Specs.tsx` (`SpecsPage`, App's `lazy` import with its `SpecEditor.tsx`, `diagram.tsx` and `plans.css`:
 BlockNote, Mantine and React Flow load only as it opens; dialog `{ specs: <project or ''>, kind?, slug? }`; the rail's
-*Specs* after Schedule, the foot's without the rail, ⌘K, a project page's *Specs* tab (`ProjectApi.specs`)): three
-levels as breadcrumbs in `Page`'s header (`head`; its `tools`: the app's full screen, `toggleFull`): the index (both kinds'
-newest, `ON_INDEX`, a filter, a project, *New spec* / *New brainstorm*), a kind's whole list (refreshed every 5 s while
-shown), and the open one alone, 1100px at most: its title (the last crumb, `onTitle`), the editor (saved 600 ms after a
+*Specs* after Schedule, the foot's without the rail, ⌘K, a project page's *Specs* tab (`ProjectApi.specs`)): two
+levels as breadcrumbs in `Page`'s header (`head`; its `tools`: the app's full screen, `toggleFull`): the list (both kinds
+in one, newest first, each row's kind a tag; a filter, a project, `only`: All / Specs / Brainstorms, *New* ▾ (`newMenu`:
+either kind, empty or from a template; *Edit templates…*, the Templates crumb); refreshed every 5 s while shown), and
+the open one alone, 1100px at most: its title (the last crumb, `onTitle`), the editor (saved 600 ms after a
 change and as it closes; a title change saves what the editor holds, `onReady`), its files (`OutFile`: `.md` through
 `Markdown` (mermaid too), `.html` in an iframe `sandbox="allow-scripts"` from `GET /plan/`, `.diagram.json`
 (`normalizeDiagram`) through `DiagramView`, images, text), *Start* (a spec: App's new-workspace page, `specPrompt`) or
@@ -686,8 +714,9 @@ toggle kept as `laki.planChat`; mounted while hidden, so its ask is followed; Ai
 dropped; `resolveFileUrl` turns `files/…` into data URLs); `diagram.tsx` is specdrop's `web/diagram.tsx` as it is (its
 styles in `plans.css`, specdrop's tokens as `--sd-*` from the theme's); `useEscape` keeps Esc in a modal from closing the
 page. The new-workspace page's *Spec* picker (`planList` of its project) adds `Spec: <path>/README.md` to the prompt.
-MCP's `laki_plans`, `laki_plan_read`, `laki_plan_new`, `laki_plan_write` (`BRAINSTORM_OUTPUT`: what to write). Tested in
-`test/plans.test.ts`.
+MCP's `laki_plans`, `laki_plan_read` (with `file`: one of its files' text, `planFile`), `laki_plan_new`, `laki_plan_write`
+(`BRAINSTORM_OUTPUT`: what to write). A plan's chat (`ai.ts` `aboutPlan`) puts its title, README.md (12k characters, read
+at each ask) and its files' names into the instructions. Tested in `test/plans.test.ts`.
 
 ### Workflows
 
@@ -715,12 +744,44 @@ blocks: `$SHELL -lc` in the workspace with its env (`PORT`, `LAKI_WORKSPACE`, `L
 `CI=1`), every variable shell-quoted, its own process group (`kill`), `timeout` (10 min); output's last 80 lines. Actions:
 `ship` (its tab's `onExit`), `prAct`, `runDev`, `wsArchive`; outward ones (`OUTWARD`) `ask` `confirm` first unless
 `ask first: no`, a dry run says them. Save blocks (`keep`): text, `from` (a file or folder of the workspace, realpath inside it, `cpSync`) or `link` (http(s),
-`<file>.url`), into `storageOf`. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
+`<file>.url`), into `storageOf`. AI call blocks (`llm`): `ai.ts`' `aiComplete` (one OpenRouter `/chat/completions`, no tools, `model` or
+Settings' OpenRouter model, logged in `ai-calls.jsonl` as `<workflow> · <block>`), the answer `steps.<id>.answer`.
+Webhook blocks (`hook`): `fill` the URL (http(s)) and `header:` lines with the run's variables and `env.NAME` (Settings'
+and the project's env; the log masks them, shows the URL without its query), the body `from` a workspace file (realpath
+inside it, 10 MB, `Blob`), the text (a JSON template's values escaped), else `task` and `steps.*` as JSON; `steps.<id>.status`,
+`.output`, ok on 2xx; 429, 5xx and network errors again (`TRIES` 3, after `Retry-After` up to 30 s, else 2 s, 6 s).
+All three via `request` (`calls`: an `AbortController` per run, `kill0` aborts, `timeout` 2 min) and `sent` (a `Send`'s
+`Got`: exit, vars, outs). An llm with `out:` asks for `response_format` json; `system`, `temperature` go along.
+Decision blocks (`decide`): `aiDecide` (POST `<api without /v1>/alpha/decisions`, `apiQuestions`: yes/no is the API's
+`noul`); the state is the text through `jsonFill` (a bare `{{var}}` raw when it's JSON, else a JSON string; in quotes
+escaped), parsed when it's JSON, empty: the block before's answer; each answer `steps.<id>.<q>` (`yes`/`no`, the label,
+a score's level index with `.level`), `.p`/`.confidence`, `steps.<id>.answers` the JSON; under `sure` (`SURE` 0.7; 0.5…0.99)
+`''` and `unsure` waits (`wait.kind` decide, one question at a time; `flowAnswer` sets it and `.you`). Case branches:
+`NUM_TESTS` compare numbers (`''` never holds), `js` runs `node:vm` (200 ms; `vars`, `num`, `json`; not a sandbox: a
+workflow runs commands anyway, and runs only once saved). Popup blocks (`popup`): title and body filled (body capped
+`SHOWN_MAX`), kept in `r.shown` (last 20, not in `flowView`), `broadcast` `flow` `show`: App's `ShownDialog`
+(`Shown.tsx`: HTML in a sandboxed frame without scripts, else Markdown), a queue of 10. `flowTest` (Test it) runs an
+llm, decide or webhook block alone with typed vars: exit, why, vars, missing, unsure, log. A decide's `route: <question>`
+(`routesOf`: yes/no, a choice's labels, a score's level index) makes its exit that answer (`decideSend`, `routeOf` after
+you settle one), each answer's block an option `- <answer> → id` (only those with one written), plus `error`. An llm's
+`json` (unset: `!!out`) is `response_format`; an agent's `json` adds `jsonAsk` (unless `out:` asks already) and its
+answer becomes `lastJson` of it (none: its words, said). An end's text is its notification (`fill`, else the block's name);
+`phone` on an end or popup with `notify` also `flowPhone` (core: `pushTo` Settings' phone webhook, event `done`).
+`flowVars` lists a workflow's variables (the run's, each block's) for the Variables list; `renameBlock` changes an id
+and every exit, route, session, `of` and `{{steps.<id>.…}}` (the inspector's ID field). `flowSave`/`flowRm` bump
+core's `flowFiles.at` (the view's `flowFiles`): the list refreshes, an open workflow not edited (or written by an agent)
+takes the file. `workflowAsk` is *Make it with Laki AI*'s ask (laki_ask questions first); the Editor sets api.ts'
+`pageNow.workflow` (its id, source, unsaved changes, the file), App's `whereNow` sends it with the floating chat's asks.
+`out:` (`OUT_KINDS`: agent, llm, run, webhook; names `OUT_NAME`, not `OUT_TAKEN`): an agent's or llm's prompt gets
+`outAsk`, its result (answer, output, response) `outsOf` (the last ```json block, all of it, else the last `{…}` that
+parses; non-strings as JSON, a missing name `''` and said) into `steps.<id>.<name>`. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
 already reported waits for a new one. An exit with no block: a bad one `stuck` (*Try again* resets the block's count
 and the turns), a good one ends the run. `flowAnswer` (`n`, `text`: `{{answer}}`). `flowForget` deletes a run (a live one finishes stopped first) and its row's mark. `flowResume` at start: each live run
-not waiting re-enters its block 8 s later (an agent's prompt sent again). Agents (MCP's `laki_workflow_write`, `by:
+not waiting re-enters its block 8 s later (an agent's prompt sent again); with workflows off it waits for `flowTick`
+to see them on, and only runs started before the daemon (`boot`) come back. Agents (MCP's `laki_workflow_write`, `by:
 'agent'`) mark what they write in `state.flowsByAgent` until the user saves it; `flowStart` `by: 'agent'` refuses those.
-`broadcast` `flow` (waiting, end with `notify` or a failure): App's notification and toast. A tab an agent block sends a
+`broadcast` `flow` (waiting, end with `notify` or a failure, show): App's notification and toast (api.ts reads a
+message with `ev` as an event, though it has an `id`: the run's). A tab an agent block sends a
 prompt gets `flow` (the run; `flowForget` clears it), and the status bar's `.sb-flow` shows the run of the focused tab, else of the
 workspace (`ws.flow`), a click opens it; the run's `openTab` (WorkflowsApi) opens an agent block's tab (`r.tabs[block]`). The renderer's
 `Workflows.tsx` (lazy, `workflows.css`; `Page` `esc={false}`: Esc doesn't close it): the index (Scheduled tasks' `.sched-*`:
@@ -791,8 +852,11 @@ native setter and fires input and change), then wait 300 ms.
 
 ### Widgets
 
-`daemon/widgets.ts` (the SDK for people: `docs/extensions.md`): a widget is a folder with `widget.json` (`Manifest`: name, `place` (`WIDGET_PLACES`: side, top,
-status; the store's wins, `placeOf`), size in cells (down 1–4 or 0.5: half a cell, `down`; the grid's
+`daemon/widgets.ts` (the SDK for people: `docs/extensions.md`): every one off until turned on (`onOf`: the store's `on`). A widget is a folder with `widget.json` (`Manifest`: name, `place` (`WIDGET_PLACES`: side, top,
+status, rail, foot; the store's wins, `placeOf`), a button's `icon` (`iconOf`: a name, the renderer's `isIconName`, or an
+emoji), `label`, `badge`, `tip` (templates over its data, `faceOf`: plain text, kept as the entry's `face`, filled at scan,
+after each fetch and settings change) and `click` (`clickOf`: one of its `actions`); the view's `button`: a
+`BUTTON_PLACES` place or no preview in widget.html (`preview`), size in cells (down 1–4 or 0.5: half a cell, `down`; the grid's
 rows are half cells, `span size*2`), `every` minutes,
 `view` (the full view's dialog: `s`, `m`, `l`, `WidgetSize`; `.modal.widget-modal.<size>`), `config` (each setting a
 default or a `Spec`: `type` text, number, bool, choice, list, `label`, `hint`, `choices`; `optionsOf` gives the view's
@@ -822,7 +886,9 @@ allow-scripts; default-src 'none'` (no network, an opaque origin), the theme's v
 `window.laki` and a click bridge that posts `open`, `refresh`, `full` and `run` to the app; the store's `net` (Settings'
 *Network access*, a JS widget's only, never widget.json's) adds `connect-src https:` and https images and fonts (`netOf`). The renderer's
 `Widgets.tsx`: `WidgetStrip` (`place` top: the tab bar after its spacer; status: the status bar's end; each `Cell` as wide
-as its cells across, `--widget-cell`, a line high), `WidgetGrid` (the sidebar's, `place` side or none: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
+as its cells across, `--widget-cell`, a line high), `WidgetButtons` (rail: `rail-kind` buttons after the pins; foot: `ib`
+buttons after Timer, the rail's too without the rail; a `button` widget in a `Cell` is `CellButton`; a click: `click`'s
+action, else the full view, else a fetch), `WidgetGrid` (the sidebar's, `place` side or none: plain values, no tiles, no head; a line between widgets: each `.widget` draws its left and top border over its neighbour's, the grid clips the outer ones), `WidgetDialog` (the full view), `WidgetBody`
 (a template widget in a shadow root after `clean`, the sanitizer: no scripts, frames, forms, `on…` attributes or
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
@@ -931,8 +997,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       submit on Enter (`onSubmit` prevents it; ⌘⏎ or the button), and `Page`'s and `Modal`'s Esc is `escapes` (not one
       a menu or field took, nor an IME's); a `Modal` with something typed in it nods at a click outside instead of closing
       (`loose`: the palette closes anyway).
-    - Settings › General › Development › *Reset the interface* (`resetUi`) removes every `laki.*` key but `UI_KEEP`
-      (timers, stopwatches, drafts, `laki.onboard`), then reloads: add a key that holds what the user made there.
+    - Settings › General › Development › *Reset the interface* (`resetUi`): the daemon's `uiReset` (core.ts: every setting
+      but `SETTINGS_KEPT`, what the user set up or wrote, back to unset, the experimental ones too; `widgetsOff`: every
+      extension off), then removes every `laki.*` key but `UI_KEEP` (timers, stopwatches, drafts; Get started shows
+      again), then reloads: add a key that holds what the user made there, and a setting that's set up or written to
+      `SETTINGS_KEPT`.
     - `laki.onboard`: Get started (`panels.tsx` `Onboarding`, `STEPS`): `done` (ticked, or seen done by App's
       `onboardDone`: a project, a workspace, Settings' sections through `SettingsPage` `onSection`, Shells or Browsers),
       `seen` (it opened once by itself), `off` (Don't show again: no `OnboardBar` at the sidebar's foot either).
@@ -1122,7 +1191,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   new row's like the row above, a new column's like the cell before; LF only: FilePreview's save puts CRLF back), saved like the
   text edit. ```` ```mermaid ```` blocks: `MarkdownView.tsx` `Mermaid`, the `mermaid` package imported on first use
   (`securityLevel: strict`).
-- **`markdown.ts`**: `markdown` (blocks) and `inline`: a Markdown file as a tree (GitHub's common subset), which
+- **`shared/markdown.ts`**: `markdown` (blocks) and `inline` (shared: a shared tab's page renders it too): a Markdown file as a tree (GitHub's common subset), which
   `MarkdownView.tsx`'s `Markdown` (and `Folded`: a few lines, Show more) renders as React nodes (code blocks through `highlight`; links open in the browser,
   images show as links: the preview fetches nothing). `FilePreview` switches Rendered / Raw (`laki.md`; a jump to a
   line opens Raw). Tested in `test/markdown.test.ts`.
@@ -1212,11 +1281,19 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
 - **`Tunnel.tsx`**: Expose to the world: the status bar's globe next to each port (`TunnelButton`) and its
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
   or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
-  as SVG, also Remote access's.
+  as SVG, also Remote access's. `SharePop`: Share a tab's popover (for how long, `SHARE_FOR`; then the QR code, the
+  link, `timeLeft`, Stop sharing).
+- **`Shown.tsx`**: a workflow's Show you window (`ShownDialog`, App's `shown` queue): HTML in a sandboxed `srcDoc`
+  frame with a CSP and the app's colors, else Markdown; Close or Next, the run's button.
 - **`Compare.tsx`**: a race's page (`Page` `wide`; dialog `{ compare: <race> }`: a race workspace's menu, ⌘K, and
   right after the new-workspace page's *Race* makes one): a column per live workspace of the race with its status,
   diff size, the agent's last answer and the files `diff` lists (again as `stat` moves); *Keep this one* archives
   the others (`wsArchive`, after a confirm) with *Undo* (`wsRestore`). App.tsx passes a `CompareApi`.
+- **Laki AI's glow** (experimental, `settings.aiGlow`): Laki AI's looks (`mcp.ts`' `aiRpc`: its tools' `screen` and
+  `browse` with `by: 'ai'`; the OpenRouter backend's `toolsFor`, the claude/codex one's `laki mcp` with `LAKI_AI=1`; the
+  chat's `whereNow` screen too) make core's `screen`/`browse` broadcast `peek` (ws, tab). App's `PeekGlow`: over that
+  tab's `[data-pane]` when shown, else the window (`.ai-peek`, a conic `--peek-a` edge turning once and inset shadows,
+  2.6 s, its own `animationend` clears it); none while `html.away`.
 - **`Bird.tsx`**: Bird view (experimental, `settings.birdView`; the side head's eye beside Help, ⌘K; dialog `'bird'`):
   every live tab (not exited) of each live workspace, Browsers' left out, by workspace in project order, a card each
   with the daemon's `screen` (40 lines, every 2.5 s while open and the page is visible; a `<pre>` whose newest lines
@@ -1281,6 +1358,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page |
+| `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the read-only page |
 | `src/daemon/plans.ts` | specs and brainstorms (experimental): their folders, the editor's save, files, agents' output, a prototype's page |
 | `src/renderer/src/Specs.tsx` | the Specs & Brainstorms page; `SpecEditor.tsx` (BlockNote), `diagram.tsx` (React Flow), `specmd.ts` (blocks → Markdown), `plans.css`: ported from specdrop |
 | `src/shared/plans.ts` | specs' and brainstorms' words for agents: the prompts, what a brainstorm writes, the diagram format |

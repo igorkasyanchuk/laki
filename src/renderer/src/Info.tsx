@@ -325,7 +325,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
             {pr.conflict && open && <span className="tag tag-conflict">merge conflicts</span>}
             {pr.author && (
               <span className="pr-by">
-                by {!pr.mine && <Avatar login={pr.author} />} {pr.mine ? 'you' : pr.author}
+                by <Avatar login={pr.author} /> {pr.mine ? 'you' : pr.author}
               </span>
             )}
             {!!(pr.additions || pr.deletions) && (

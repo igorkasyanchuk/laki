@@ -21,7 +21,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 ```
 
 1. Laki finds extensions in `<data>/widgets/<id>/` (Laki's own folder), the folders you add in Settings › Extensions,
-   then the ones it comes with. The first folder of an id wins.
+   then the ones it comes with. The first folder of an id wins. Each starts off: turn it on in Settings › Extensions.
 2. While the app is open (and within *Working hours*, if set), each extension that is on runs its `fetch` every
    `every` minutes, and when it's turned on, when its settings change, on *Reload extensions* and on `laki widget run`.
 3. What the fetch prints must be JSON: it is kept as `data`. A failure keeps the last data and shows a red dot with why.
@@ -31,8 +31,8 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 
 | file | what |
 |---|---|
-| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `actions` (commands its buttons run) |
-| `widget.html` | `<template preview>` (where it sits), `<template full>` (the dialog a click opens, optional), shared `<style>` outside both |
+| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `actions` (commands its buttons run); as a button: `icon`, `label`, `badge`, `tip`, `click` |
+| `widget.html` | `<template preview>` (where it sits), `<template full>` (the dialog a click opens, optional), shared `<style>` outside both; none for a button that has no full view |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
 
 ### Settings (`config`)
@@ -92,9 +92,39 @@ the daemon either way.
 | `side` (default) | the sidebar's grid, above its buttons | its cells across × down |
 | `top` | the top bar, left of its buttons | a line high, its cells across wide |
 | `status` | the status bar's right end (a Browsers page has none) | a line high, its cells across wide |
+| `rail` | a button among the rail's icons (no rail: the sidebar's foot) | a button |
+| `foot` | a button in the sidebar's foot, beside Video, Meme and Timer | a button |
 
 `widget.json`'s `place` is where it starts; the user moves it in its settings (Settings › Extensions › the extension ›
-*Sidebar / Top bar / Status bar*). For the bars, design it ½ high: a number and a word, a few links.
+*Sidebar / Top bar / Status bar / Rail / Sidebar foot*). For the bars, design it ½ high: a number and a word, a few links.
+
+## Buttons
+
+On the rail and in the foot an extension is a button, and so is one with no preview in `widget.html` (or no
+`widget.html`) wherever it sits: an icon, a label and a badge, kept up to date by its fetch in the background, and a
+click that does something.
+
+| field | what |
+|---|---|
+| `icon` | one of Laki's icons by name (`pr`, `github`, `bell`, `clock`, `board`, `globe`, `check`, `refresh`, `bulb`, `timer`, `terminal`, `link`, `file`, `folder`…), or an emoji; none: its name's first letter |
+| `label` | its words, a template over its data: `"{{open}} open"`; none: its name |
+| `badge` | a short count on the icon: `"{{#if failing}}{{failing}}{{/if}}"`; empty: none |
+| `tip` | its tooltip, a template too; none: its name |
+| `click` | one of its `actions`, run on a click (its toast or dialog as any action's), then it fetches again; none: its full view, else a fetch now |
+
+```json
+{
+  "name": "My PRs",
+  "place": "rail",
+  "icon": "pr",
+  "label": "PRs",
+  "badge": "{{#if open}}{{open}}{{/if}}",
+  "every": 5,
+  "fetch": "gh search prs --author @me --state open --json number --jq '{open: length}'",
+  "click": "github",
+  "actions": { "github": "open https://github.com/pulls" }
+}
+```
 
 ## Managing them
 

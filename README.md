@@ -13,14 +13,19 @@ worktree. Agents keep running when the window is closed.
   settings.
 - **Specs & Brainstorms** (experimental): write what to build like a Notion page (checklists, images, diagrams), from
   your own templates, then start a workspace from it; or brainstorm an idea with Laki AI in a chat beside it, which writes
-  options, a mind map, diagrams and clickable prototypes. Folders outside the repo that any agent can read.
+  options, a mind map, diagrams and clickable prototypes. Both in one list, filtered by kind, and *New* ▾ for either.
+  Folders outside the repo that any agent can read.
 - **Workflows** (experimental): blocks Laki runs for a task, drawn on a canvas or written as Markdown (say, a plan you
-  approve, the build, tests until they pass, a PR, CI until green). Each run keeps its decisions and log.
+  approve, the build, tests until they pass, a PR, CI until green). Blocks can call a model on OpenRouter or a webhook,
+  ask a decision model yes/no, choice or score questions (a way out per answer, or asking you when it isn't sure),
+show you a window with what a run made, and name outputs (`{{steps.sum.title}}`) the next blocks use. A schedule can
+start one, and Laki AI makes or changes one with you. Each run keeps its decisions and log.
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
 - **Race**: one prompt to several agents, a worktree each; compare them side by side and keep the best.
-- **Terminals**: tabs and tmux-style splits, kept alive by a daemon; a spinner while a shell runs a command (an agent
+- **Terminals**: tabs and tmux-style splits, kept alive by a daemon; their dev servers' ports in the status bar (not
+  what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
   update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in
   your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top.
@@ -31,17 +36,22 @@ worktree. Agents keep running when the window is closed.
   <img src="docs/icons/approved.svg" width="13" alt="✓"> approved, <img src="docs/icons/approved-you.svg" width="13" alt="✓✓"> by you
   too, 👀 you commented), sent to the agent if you like; ship (commit, push, PR) in one step; merge
   (squash, merge or rebase), approve or close from the app, or merge when green, each allowed per project; archived once
-  merged, if you like.
+  merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
+  number, and a right click on the PR in the status bar copies its link or `#number`.
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (one column or two side by side; comment on a line; images before and after;
   a Viewed box per file, the same as GitHub's), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`).
-- **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports) and
-  links to what they publish (Claude artifacts, sites, gists: kept on their own as an agent publishes them): counted in the status bar, a gallery of previews (links first,
+- **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in
+  folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
+  kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
   opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the info panel.
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
-- **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only (or anyone with the
-  link, if you type *confirm*: a red warning says what that risks).
+- **Share a tab**: right click › *Share read-only link*: an agent's chat (or a terminal's text) as a live page anyone
+  with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.
+- **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only; or with Laki's own
+  PIN instead (shown on your Mac, a new one each time; a wrong one, twice unless you pick otherwise, stops it); or for
+  anyone with the link, if you type *confirm* (a red warning says what that risks).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
   look; the video, extensions, the preview or the floating bubbles stop with a click.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
@@ -49,8 +59,10 @@ worktree. Agents keep running when the window is closed.
   the one you pick, and up to 5 pins: workspaces in their color, specs and brainstorms.
 - **Looks**: six Dock icons to pick from; 98 themes, 80 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
-- **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar or the status bar (your PRs counted and grouped, your team's PRs, links you open often, or any you make
-  with an agent's laki-widget skill, Laki AI, or any AI chat: Settings has the prompt), each fed by a command on a schedule (within working hours, if
+- **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar or the status bar (your
+  PRs counted and grouped, your team's PRs, links you open often, or any you make with an agent's laki-widget skill,
+  Laki AI, or any AI chat: Settings has the prompt), or buttons on the rail and in the sidebar's foot (an icon, a label,
+  a count, a click that runs something), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.
   The SDK: [docs/extensions.md](docs/extensions.md).
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new

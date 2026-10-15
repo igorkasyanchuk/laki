@@ -71,6 +71,12 @@ they take, never go back down, and send \`100\` when it's done. Laki shows it on
 the sidebar, as the user picked) until your turn ends.
 Unset: don't.
 
+## Your pull request
+
+A PR of your workspace's branch shows on the workspace on its own once pushed (its status, checks, author). One you
+opened on another branch, or in another repo, doesn't: attach it right after \`gh pr create\`, \`laki pr . <url>\`
+(MCP: \`laki_attach_pr\`).
+
 ## Keep files and links for the user
 
 ${STORAGE_NOTE}
@@ -115,7 +121,12 @@ Workflows (when the user turned them on: Settings › General › Experimental) 
 each run in a workspace of its own: agent blocks (a prompt, or one of the user's agent actions with \`use: <its slug>\`, which \`laki_workflows\` lists), run
 (a shell command), ask (the user picks), choice (if/else by what a block said), case (if/elsif/else: branches tested in order, else last), action (open a PR, approve, merge, dev server,
 archive: asks the user first), wait (its PR's checks), save (text, a file of the workspace, or a link into the
-workspace's Artifacts) and end. Each is one Markdown file: yours in Laki, or a project's in \`.laki/workflows/<id>.md\`.
+workspace's Artifacts), llm (one prompt to a model on OpenRouter), webhook (a request to another system; secrets as
+{{env.NAME}}), decide (an OpenRouter decision model answers yes/no, choice or score questions about a JSON state:
+\`steps.<block>.<question>\` and its \`.p\`; unsure, the run asks the user; \`route: <question>\` gives a line per answer),
+popup (a window over Laki with HTML or Markdown: a result to read) and end (\`notify: yes\`, \`phone: yes\`); llm's
+\`json: yes\` is JSON mode (an agent's too: its answer the JSON it ends with); case branches can test numbers (\`>= 0.8\`) or JS; \`out: a, b\` on an agent, llm, run or webhook block names outputs the next blocks use as
+{{steps.<block>.a}}. Each is one Markdown file: yours in Laki, or a project's in \`.laki/workflows/<id>.md\`.
 Over MCP: \`laki_workflows\` lists them and their runs (with an id: that one's whole file); \`laki_workflow_write\`
 writes one, the whole file (its description has the format and every block); to change one, take its file from
 \`laki_workflows\` with its id, edit it and write it back with the same id and project; \`laki_workflow_run\` starts a run. One you wrote runs only after the
@@ -197,7 +208,7 @@ more than 30 minutes late is skipped and logged as missed).
 // laki-widget: the widget creator, a skill of its own
 const widgetSkill = (cli: string) => `---
 name: laki-widget
-description: Make Laki extensions, also called widgets (one and the same thing), the small live pages in the Laki app's sidebar, top bar or status bar (a clock, a count of PRs, a chart, a table) with a full view a click away, each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki extension or widget (or a tile, panel or plugin for Laki's sidebar).
+description: Make Laki extensions, also called widgets (one and the same thing), the small live pages in the Laki app's sidebar, top bar or status bar (a clock, a count of PRs, a chart, a table) with a full view a click away, or buttons on its rail and sidebar foot (an icon, a label, a badge count, a click that runs an action), each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki extension or widget (or a tile, panel, button or plugin for Laki's sidebar or rail).
 ---
 
 # Making a Laki extension (a widget)

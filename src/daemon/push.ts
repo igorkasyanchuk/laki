@@ -6,10 +6,10 @@
 import { type Webhook, webhookUrl } from '../shared/types.ts'
 
 export type Option = { n: number; label: string }
-export type Push = { event: 'waiting' | 'done' | 'test'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string }
+export type Push = { event: 'waiting' | 'done' | 'test'; workspace: string; tab: string; agent: string; question?: string; options?: Option[]; nonce?: string; title?: string } // title: its own (a workflow's)
 
 export function pushText(p: Push) {
-  const title = p.event === 'test' ? 'Laki: pushes reach you' : `${p.agent} in ${p.workspace} is ${p.event === 'waiting' ? 'waiting for you' : 'done'}`
+  const title = p.title ?? (p.event === 'test' ? 'Laki: pushes reach you' : `${p.agent} in ${p.workspace} is ${p.event === 'waiting' ? 'waiting for you' : 'done'}`)
   const body = [p.question, ...(p.options ?? []).map(o => `${o.n}. ${o.label}`)].filter(Boolean).join('\n')
   return { title, body, text: body ? `${title}\n${body}` : title }
 }

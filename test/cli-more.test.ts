@@ -247,6 +247,8 @@ test('cli: widget ls, reload, run, on/off, render, action, as the app would show
   let r = await rig.cli('widget', 'reload')
   assert.deepEqual([r.code, r.out], [0, 'reloaded\n'], r.err)
   const find = async (id: string) => ((await rig.rpc('state')).widgets ?? []).find((w: any) => w.id === id)
+  assert.match((await rig.cli('widgets')).out, /^cnt {2}off /m, 'every extension starts off')
+  for (const id of ['cnt', 'bad', 'still']) assert.equal((await rig.cli('widget', 'on', id)).out, `${id} on\n`)
   await until(async () => (await find('cnt'))?.at && !(await find('cnt')).running && (await find('bad'))?.error && !(await find('bad')).running, 'both fetched')
 
   r = await rig.cli('widgets')

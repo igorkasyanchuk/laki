@@ -20,7 +20,9 @@ test('resources lists each tab and its processes; an idle agent sleeps, and a me
   assert.ok(r.daemon.rss > 0 && r.daemon.heap > 0)
 
   const later = () => Date.now() + 3 * 3600e3
-  assert.deepEqual(await rig.rpc('sleepTick', { now: later() }), []) // off unless set
+  assert.deepEqual(await rig.rpc('sleepTick', { now: later() }), []) // unset: 8 hours
+  await rig.rpc('settingsSet', { sleepAfter: 0 })
+  assert.deepEqual(await rig.rpc('sleepTick', { now: Date.now() + 9 * 3600e3 }), []) // Never
   await rig.rpc('settingsSet', { sleepAfter: 60 })
   assert.deepEqual(await rig.rpc('sleepTick', { now: Date.now() }), []) // not quiet for an hour yet
   await rig.rpc('wsSet', { id: ws.id, autoFix: true })

@@ -49,6 +49,8 @@
 .wf-node.dragging { cursor: grabbing; z-index: 3; box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
 .wf-node.pill { border-radius: 29px; padding-left: 16px; }
 .wf-node.sel { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 30%, transparent); z-index: 2; }
+.wf-node.doomed { border-color: var(--error); box-shadow: 0 0 0 3px color-mix(in srgb, var(--error) 30%, transparent); } /* its trash is under the pointer */
+.wf-doom { display: contents; }
 .wf-node .k { display: flex; align-items: center; gap: 5px; font: 600 9.5px/1 var(--ui-font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--kc); }
 .wf-node .k i { width: 7px; height: 7px; background: var(--kc); border-radius: 2px; }
 .wf-node.pill .k i { border-radius: 50%; }
@@ -82,7 +84,8 @@
   .wf-node[data-state='running'], .wf-node[data-state='running']::after, .wf-gear, .wf-e.live, .wf-node[data-state='waiting'] .badge, [data-status='running'] > .wf-status-dot { animation: none; }
   .wf-run-dot { display: none; }
 }
-.wf-insp { width: 320px; flex: none; overflow-y: auto; border-left: 1px solid var(--line); padding: 12px 14px 24px; display: flex; flex-direction: column; gap: 10px; }
+.wf-insp { width: 320px; flex: none; overflow-y: auto; border-left: 1px solid var(--line); padding: 12px 14px 72px; /* the Laki AI button floats over its bottom corner */ display: flex; flex-direction: column; gap: 10px; }
+.wf-insp > * { flex-shrink: 0; } /* it scrolls: nothing in it squeezed (a textarea to one line) */
 .wf-insp-head { display: flex; align-items: center; gap: 8px; }
 .wf-insp-head .k { font: 600 10px/1 var(--ui-font); letter-spacing: 0.08em; text-transform: uppercase; color: var(--kc); }
 .wf-insp-head code { color: var(--muted); font-size: 11px; }
@@ -146,3 +149,32 @@
 .wf-agent { color: var(--waiting); font-size: 11.5px; }
 .wf-pill .wf-gear { display: inline-grid; vertical-align: -2px; margin-right: 5px; }
 .wf-dec-open { align-self: flex-start; margin-top: 3px; font-size: 11.5px; }
+.wf-qhead { display: flex; align-items: center; gap: 8px; }
+.wf-qhead .seg.small button { padding: 2px 8px; font-size: 11px; text-transform: none; letter-spacing: 0; }
+.wf-mono, textarea.wf-mono { font: 12px/1.45 var(--mono); }
+.wf-opt { width: 96px; }
+.wf-testbox { border: 1px dashed var(--line); border-radius: var(--rs, 7px); padding: 6px 8px; display: flex; flex-direction: column; gap: 8px; }
+.wf-testbox[open] { gap: 8px; }
+.wf-testbox > summary { cursor: pointer; color: var(--muted); font-size: 12px; }
+.wf-testbox > * + * { margin-top: 8px; }
+.wf-testlog { max-height: 220px; overflow: auto; font: 11px/1.45 var(--mono); white-space: pre-wrap; overflow-wrap: anywhere; margin: 6px 0 0; padding: 6px 8px; background: var(--bg); border-radius: var(--rs, 6px); }
+.wf-shown { margin: 12px 16px 0; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+/* a decision's + Question: its kinds as cards (the Decisions API's noul, choice, score) */
+.wf-qkinds { display: flex; flex-direction: column; gap: 6px; }
+.wf-qkind { display: grid; gap: 2px; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--panel); color: var(--fg); cursor: pointer; }
+.wf-qkind:hover { border-color: var(--accent); }
+.wf-qkind code { justify-self: start; font: 11px var(--mono); padding: 1px 5px; border: 1px solid var(--line); border-radius: 4px; color: var(--muted); }
+.wf-qkind b { font-weight: 500; font-size: 12.5px; }
+.wf-qkind i { color: var(--muted); font-size: 12px; }
+/* a block's id: on its node, in the Variables list */
+.wf-id { margin-left: auto; font: 10px var(--mono); color: var(--muted); text-transform: none; letter-spacing: 0; max-width: 90px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-vars { display: grid; gap: 14px; max-height: 60vh; overflow-y: auto; }
+.wf-vars h4 { display: flex; gap: 8px; align-items: baseline; margin: 0 0 4px; font-size: 12px; color: var(--muted); }
+.wf-vars h4 .wf-id { margin-left: 0; }
+.wf-var { display: grid; grid-template-columns: minmax(180px, 1fr) 2fr; gap: 10px; width: 100%; text-align: left; padding: 4px 6px; border: none; border-radius: 5px; background: none; color: var(--fg); cursor: pointer; }
+.wf-var:hover { background: var(--hover); }
+.wf-var code { font: 12px var(--mono); overflow-wrap: anywhere; }
+.wf-var span { color: var(--muted); font-size: 12.5px; }
+/* Workflows: Make it with Laki AI */
+.wf-make { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--muted); }
+.wf-make input { flex: 1; min-width: 0; border: none; background: none; color: var(--fg); font: inherit; outline: none; }

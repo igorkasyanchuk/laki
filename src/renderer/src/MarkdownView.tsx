@@ -4,7 +4,7 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { openExternal } from './api'
 import { highlight } from './highlight'
-import { type Block, type Inline, markdown } from './markdown'
+import { type Block, type Inline, markdown } from '../../shared/markdown'
 
 // a Markdown file as the page it's written to be (markdown.ts' tree, as React nodes: nothing in it is HTML); links
 // open in the browser, images show as links (a preview fetches nothing)

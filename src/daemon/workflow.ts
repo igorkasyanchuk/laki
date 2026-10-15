@@ -6,16 +6,20 @@
 // ponytail: runs only while the daemon is up (the Mac awake); a run command runs on this Mac (not an SSH host)
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
+import { runInNewContext } from 'node:vm'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, BAD_EXITS, blockName, branchOf, check, exitsOf, fill, FLOW_ENDED, holds, ID, OUTWARD, parse, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, broadcast, changed, dir, findProject, isLive, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
+import { ACTIONS, apiQuestions, jsonFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, isLive, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
+import { aiComplete, aiDecide } from './ai.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
 const RUN_TIMEOUT = 10 // a run block's minutes, unless it says
+const CALL_TIMEOUT = 2 // an AI call's or a webhook's
+const BODY_MAX = 10 << 20 // a webhook's file
 const WAIT_TIMEOUT = 60 // a wait block's
 const ANSWER_MAX = 20000 // an agent's answer kept in a variable
 const OUTPUT_LINES = 80 // a command's last lines kept
@@ -113,6 +117,8 @@ export function flowSave(o: Ref & { text: string; by?: 'agent' }): WorkflowItem 
   mkdirSync(f.d, { recursive: true })
   writeFileSync(f.path, text)
   markAgent(agentKey(o.source ?? 'yours', o.id, f.project), o.by === 'agent')
+  flowFiles.at = Date.now()
+  changed()
   return item(readFileSync(f.path, 'utf8'), o.id, o.source ?? 'yours', f.project, f.path)
 }
 
@@ -122,6 +128,8 @@ export function flowRm(o: Ref) {
   if (!existsSync(f.path)) throw new Error(`no workflow ${o.id}`)
   rmSync(f.path)
   markAgent(agentKey(o.source ?? 'yours', o.id, f.project), false)
+  flowFiles.at = Date.now()
+  changed()
   return { ok: true }
 }
 
@@ -130,6 +138,7 @@ export function flowRm(o: Ref) {
 const runs = () => (state.flows ??= [])
 const live = (r: FlowRun) => !FLOW_ENDED.includes(r.status)
 const procs = new Map<string, ChildProcess>() // a run block's command, by run
+const calls = new Map<string, AbortController>() // an AI call's or a webhook's request, by run
 const blockOf = (r: FlowRun, id?: string) => r.flow.blocks.find(b => b.id === id)
 const wsOf = (r: FlowRun) => state.workspaces.find(w => w.id === r.ws)
 const clip = (s: string, n = 100) => {
@@ -236,15 +245,27 @@ async function work(r: FlowRun, b: Block) {
     case 'start':
       return leave(r, b, 'next', r.dry ? 'started (dry run: outward actions are said, not done)' : 'started')
     case 'end':
-      return finish(r, b.result === 'stopped' ? 'stopped' : b.result === 'failed' ? 'failed' : 'done', blockName(b), b.notify)
+      // its words (none: its name) end the log, and the notification it asks for
+      return finish(r, b.result === 'stopped' ? 'stopped' : b.result === 'failed' ? 'failed' : 'done', fill(b.text ?? '', vars).trim().slice(0, 500) || blockName(b), b.notify, b.notify && b.phone)
     case 'agent':
       return agent(r, b)
     case 'run':
       return command(r, b)
+    case 'llm':
+      return sent(r, b, llmSend(b, vars, `${r.flow.name} · ${blockName(b)}`))
+    case 'decide':
+      return sent(r, b, decideSend(b, vars, before(r, vars), `${r.flow.name} · ${blockName(b)}`))
+    case 'webhook': {
+      const ws = wsOf(r)
+      const send = hookSend(b, vars, envOf(ws), ws?.path, runBody(r))
+      return r.dry ? leave(r, b, 'ok', send.dry) : sent(r, b, send)
+    }
     case 'choice': {
       const want = b.value ?? ''
       const yes = holds(valueOf(r, vars, b.of), b.test, want)
       const opt = b.options![yes ? 0 : 1]
+      const v = valueOf(r, vars, b.of)
+      if (NUM_TESTS.includes(b.test ?? '')) return leave(r, b, opt.label, `${b.of} is ${clip(v.trim() || 'empty', 30)}: ${yes ? '' : 'not '}${b.test} ${want}`)
       return leave(r, b, opt.label, `${b.of} ${yes ? '' : "doesn't "}${b.test === 'matches' ? 'match' : b.test === 'equals' ? 'equal' : 'contain'}${yes ? (b.test === 'matches' ? 'es' : 's') : ''} "${want}"`)
     }
     case 'case': {
@@ -253,9 +274,13 @@ async function work(r: FlowRun, b: Block) {
         const br = branchOf(o.label)
         if (!br) throw new Error(`“${o.label}” isn't a branch`)
         if (br === 'else') return leave(r, b, o.label, 'nothing above matched: else')
+        if (br.test === 'js') {
+          if (js(br.value, vars)) return leave(r, b, o.label, `js: ${clip(br.value, 60)}`)
+          continue
+        }
         const of = br.of ?? b.of ?? ''
         const v = valueOf(r, vars, of)
-        if (holds(v, br.test, br.value)) return leave(r, b, o.label, `${of} ${br.test === 'matches' ? 'matches' : br.test} "${br.value}" (${clip(v.replace(/\s+/g, ' ').trim() || 'empty', 60)})`)
+        if (holds(v, br.test, br.value)) return leave(r, b, o.label, `${of} ${br.test === 'matches' ? 'matches' : br.test} ${NUM_TESTS.includes(br.test) ? br.value : `"${br.value}"`} (${clip(v.replace(/\s+/g, ' ').trim() || 'empty', 60)})`)
       }
       throw new Error('no branch matched, and no else')
     }
@@ -271,11 +296,40 @@ async function work(r: FlowRun, b: Block) {
       return waitTick(r, b, Date.now())
     case 'save':
       return keep(r, b, vars)
+    case 'popup': {
+      // a window in Laki, read and closed: the run goes on
+      const title = fill(b.title ?? '', vars).trim() || blockName(b)
+      const body = fill(b.text ?? '', vars).slice(0, SHOWN_MAX)
+      r.shown = [...(r.shown ?? []), { at: Date.now(), block: b.id, title, body }].slice(-20)
+      say(r, `${blockName(b)}: shows you “${clip(title, 80)}”`, body)
+      broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'show', name: r.flow.name, text: title, body, notify: !!b.notify })
+      if (b.notify && b.phone) flowPhone(r.flow.name, wsOf(r)?.name, 'shows you', title)
+      return leave(r, b, 'next', `showed you “${clip(title, 60)}”`)
+    }
   }
 }
 
 // what a choice or a case tests: a variable, else a block's answer, else its output (none: empty)
 const valueOf = (r: FlowRun, vars: Record<string, string>, of = '') => r.vars[of] ?? vars[of] ?? r.vars[`steps.${of}.answer`] ?? r.vars[`steps.${of}.output`] ?? ''
+
+// a case's js: branch: a JS expression over the run's variables (vars, num(name): NaN when it's empty, json(name)), 200
+// ms at most; one that throws stops the run on that block (Try again or Stop), saying why. ponytail: node:vm is no sandbox, but it runs what a run: block could
+// (an agent's workflow runs only after you save it)
+function js(expr: string, vars: Record<string, string>) {
+  const v = Object.freeze({ ...vars })
+  const json = (k: string) => {
+    try {
+      return JSON.parse(v[k] ?? '')
+    } catch {
+      return undefined
+    }
+  }
+  try {
+    return !!runInNewContext(`(${expr})`, { vars: v, num: (k: string) => (v[k]?.trim() ? Number(v[k]) : NaN), json }, { timeout: 200 })
+  } catch (e) {
+    throw new Error(`js: ${clip(expr, 60)}: ${(e as Error).message}`)
+  }
+}
 
 // a save block: text, a file or folder of the workspace, or a link (<file>.url), into its storage folder (its Artifacts)
 function keep(r: FlowRun, b: Block, vars: Record<string, string>) {
@@ -320,7 +374,7 @@ function agent(r: FlowRun, b: Block) {
   const action = findAction(g, own, b.use)
   if (b.use && !action) throw new Error(`no agent action “${b.use}” here (Settings › Actions, or the project's)${(x => (x.length ? `: ${x.join(', ')}` : ''))(mergeActions(g, own).map(a => a.slug ?? a.name))}`)
   const vars = varsOf(r)
-  const prompt = [action && stamp(action.text, Date.now()), b.text].filter(t => t?.trim()).map(t => fill(t!, vars)).join('\n\n')
+  const prompt = [...[action && stamp(action.text, Date.now()), b.text].filter(t => t?.trim()).map(t => fill(t!, vars)), b.out?.length ? outAsk(b.out) : b.json && jsonAsk].filter(Boolean).join('\n\n')
   const preset = b.agent || 'claude'
   if (presets().find(p => p.name === preset)?.agent === 'command') throw new Error(`${preset} is a command, not an agent: it doesn't say when it's done`)
   // session: run (the run's tab of that agent), new (a tab of its own), or another block's tab
@@ -379,7 +433,11 @@ turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) =
       continue
     }
     if (tab.resumeId) for (const [k, id] of Object.entries(r.tabs)) if (id === tab.id && k.startsWith('run:')) (r.resume ??= {})[k] = tab.resumeId
-    r.vars[`steps.${b.id}.answer`] = String(o.last ?? '').slice(-ANSWER_MAX)
+    // JSON mode: its answer is the JSON it ended with (none: its words, and said)
+    const j = b.json ? lastJson(String(o.last ?? '')) : undefined
+    if (b.json && j === undefined && o.last && !o.failed) say(r, `${blockName(b)}: no JSON in its answer (its words kept)`)
+    r.vars[`steps.${b.id}.answer`] = j !== undefined ? JSON.stringify(j).slice(0, ANSWER_MAX) : String(o.last ?? '').slice(-ANSWER_MAX) // JSON: its start, as out:'s
+    if (b.out?.length) outs(r, b, String(o.last ?? ''))
     if (o.last) say(r, `${tab.name} answered`, String(o.last))
     Object.assign(r, { status: 'running' as FlowStatus, wait: undefined })
     // on after core's deliver (800 ms: the agent redraws its prompt after the hook), so what was queued goes first
@@ -415,6 +473,7 @@ function command(r: FlowRun, b: Block) {
     const lines = out.replace(/\x1b\[[0-?]*[ -/]*[@-~]/g, '').replace(/\r/g, '').trimEnd().split('\n')
     r.vars[`steps.${b.id}.output`] = lines.slice(-OUTPUT_LINES).join('\n')
     r.vars[`steps.${b.id}.code`] = String(code ?? -1)
+    if (b.out?.length) outs(r, b, lines.join('\n'))
     if (lines.join('').trim()) say(r, `${blockName(b)}: its output`, lines.slice(-OUTPUT_LINES).join('\n'))
     leave(r, b, code === 0 ? 'ok' : 'fail', late ? `stopped after ${min} min` : signal ? `killed (${signal})` : `exit ${code}${code ? `: ${clip(lines.at(-1) ?? '', 80)}` : ''}`)
   })
@@ -431,6 +490,221 @@ function kill(c: ChildProcess) {
       } catch {}
     }, 3000).unref()
   } catch {}
+}
+
+// out: its names' values as {{steps.<id>.<name>}}, from its result (an answer's JSON, a command's, a response's)
+function outs(r: FlowRun, b: Block, text: string) {
+  const { vars, missing } = outsOf(text, b.out!)
+  for (const [k, v] of Object.entries(vars)) r.vars[`steps.${b.id}.${k}`] = v.slice(0, ANSWER_MAX) // its start: a list's JSON stays whole up to there
+  if (missing.length) say(r, `${blockName(b)}: no ${missing.join(', ')} in what it gave (empty)`)
+}
+
+// ---------- AI call, AI decision and webhook blocks: one request each (a webhook's tried again on a 429 or a 5xx),
+// stopped with the run (kill0). The same requests go alone as the inspector's Test (flowTest). Each kind's *Send checks
+// the block first (what's wrong throws: the run asks you), then gives what sends it
+
+// what a request gave: its exit and why, the variables it sets, the text out: reads, what a decision isn't sure of
+type Got = { exit: string; why: string; vars: Record<string, string>; text?: string; unsure?: string[] }
+type Send = (signal: AbortSignal, say: (line: string, detail?: string) => void) => Promise<Got>
+
+// a request under way for this run: its signal (the block's timeout, or a stop), and whether it still counts
+function request(r: FlowRun, b: Block) {
+  kill0(r)
+  const ctl = new AbortController()
+  calls.set(r.id, ctl)
+  const min = b.timeout ?? CALL_TIMEOUT
+  r.wait = { kind: 'run' }
+  touch()
+  return { signal: AbortSignal.any([ctl.signal, AbortSignal.timeout(min * 60000)]), mine: () => calls.get(r.id) === ctl && (calls.delete(r.id), true), min }
+}
+const why = (e: unknown, min: number) => ((e as Error).name === 'TimeoutError' ? `nothing after ${min} min` : (e as Error).message)
+
+async function sent(r: FlowRun, b: Block, send: Send) {
+  const q = request(r, b)
+  try {
+    const got = await send(q.signal, (line, detail) => say(r, line, detail))
+    if (!q.mine()) return
+    Object.assign(r.vars, got.vars)
+    if (b.out?.length && got.text !== undefined) outs(r, b, got.text)
+    if (got.unsure?.length) return unsure(r, b, got.unsure)
+    leave(r, b, got.exit, got.why)
+  } catch (e) {
+    if (q.mine()) leave(r, b, 'error', why(e, q.min))
+  }
+}
+
+// an AI call: the prompt (and out:'s ask) to OpenRouter, its answer as {{steps.<id>.answer}}
+function llmSend(b: Block, vars: Record<string, string>, ask: string): Send {
+  const prompt = [fill(b.text ?? '', vars), b.out?.length && outAsk(b.out)].filter(Boolean).join('\n\n')
+  return async (signal, say) => {
+    say(`${blockName(b)}: asks ${b.model || 'Settings › AI’s model'}`, prompt)
+    const a = await aiComplete({ model: b.model, prompt, system: b.system && fill(b.system, vars), temperature: b.temperature, json: b.json ?? !!b.out?.length, signal, ask })
+    say(`${a.model} answered${a.cost ? ` ($${a.cost.toFixed(4)})` : ''}`, a.text)
+    return { exit: 'ok', why: `${a.model}: “${clip(a.text, 80)}”`, vars: { [`steps.${b.id}.answer`]: a.text.slice(-ANSWER_MAX) }, text: a.text }
+  }
+}
+
+// an AI decision: the state (its template filled, JSON's values escaped; else what the block before gave) and the
+// questions to the Decisions API. Each answer is steps.<id>.<name> (yes/no, the option, the level's number) with .p,
+// .confidence and .score; one under sure is left to you (unsure)
+function decideSend(b: Block, vars: Record<string, string>, before: string, ask: string): Send {
+  const text = b.text?.trim() ? jsonFill(b.text, vars) : before
+  let st: unknown = text
+  let words = false // a template that isn't JSON once filled (an unknown {{var}}): sent as words, and said
+  try {
+    st = JSON.parse(text)
+  } catch {
+    words = /^\s*[[{]/.test(text)
+  }
+  const model = b.model || DECIDE_MODELS[0].id
+  const qs = b.qs ?? []
+  const sure = b.sure ?? SURE
+  return async (signal, say) => {
+    say(`${blockName(b)}: asks ${model} ${qs.map(q => q.name).join(', ')}${words ? ' (its state isn’t JSON: sent as words)' : ''}`, clip(text, LOG_DETAIL))
+    const a = await aiDecide({ model, state: st, questions: apiQuestions(qs), signal, ask })
+    const got: Record<string, string> = { [`steps.${b.id}.answers`]: JSON.stringify(a.answers) }
+    const unsure: string[] = []
+    const said: string[] = []
+    for (const q of qs) {
+      const x = a.answers[q.name]
+      if (!x) throw new Error(`${a.model} gave no answer to ${q.name}`)
+      const k = `steps.${b.id}.${q.name}`
+      const pct = (n: number) => `${Math.round(n * 100)}%`
+      if (q.type === 'yes/no') {
+        const p = Number(x.noul)
+        got[k] = p >= sure ? 'yes' : p <= 1 - sure ? 'no' : ''
+        got[`${k}.p`] = String(p)
+        said.push(`${q.name}: ${got[k] || '?'} (yes ${pct(p)})`)
+      } else {
+        const conf = Number(x.confidence ?? 1)
+        const level = q.type === 'score' ? Math.round(Number(x.score)) : -1
+        const bad = q.type === 'score' ? !q.opts[level] : !q.opts.some(o => o.label === x.choice) // not one it could be: yours
+        got[k] = q.type === 'choice' ? String(x.choice ?? '') : String(level)
+        got[`${k}.confidence`] = String(conf)
+        got[`${k}.p`] = String(x.probabilities?.[got[k]] ?? conf)
+        if (q.type === 'score') (got[`${k}.score`] = String(x.score)), (got[`${k}.level`] = q.opts[level]?.text ?? '')
+        if (conf < sure || bad) got[k] = ''
+        said.push(`${q.name}: ${got[k] === '' ? '?' : q.type === 'score' ? `${got[`${k}.score`]} (${q.opts[level]?.text ?? level})` : got[k]}, ${pct(conf)} sure`)
+      }
+      if (got[k] === '') unsure.push(q.name)
+    }
+    say(`${a.model} decided${a.cost ? ` ($${a.cost.toFixed(5)})` : ''}`, said.join('\n'))
+    // routed: the way its question's answer names (one it isn't sure of: yours, once you settle it)
+    return { exit: b.route ? got[`steps.${b.id}.${b.route}`] || 'ok' : 'ok', why: said.join(' · '), vars: got, unsure }
+  }
+}
+// a decision's way out: its route question's answer (yes, an option, a level's number), else ok
+const routeOf = (r: FlowRun, b: Block) => (b.route ? r.vars[`steps.${b.id}.${b.route}`] || 'ok' : 'ok')
+// what a decision isn't sure of, one question at a time: the options are the answers it could be, yours is kept
+function unsure(r: FlowRun, b: Block, names: string[]) {
+  const [key, ...rest] = names
+  const q = b.qs?.find(x => x.name === key)
+  if (!q) return leave(r, b, routeOf(r, b), 'decided')
+  let a: any = {}
+  try {
+    a = JSON.parse(r.vars[`steps.${b.id}.answers`] ?? '{}')[key] ?? {}
+  } catch {}
+  const options = q.type === 'yes/no' ? ['yes', 'no'] : q.type === 'choice' ? q.opts.map(o => o.label) : q.opts.map((o, i) => `${i}: ${clip(o.text, 40)}`)
+  const odds = q.type === 'yes/no' ? `yes ${Math.round(Number(a.noul) * 100)}%` : Object.entries(a.probabilities ?? {}).map(([k, p]) => `${q.type === 'score' ? (q.opts[Number(k)]?.text ?? k) : k} ${Math.round(Number(p) * 100)}%`).join(', ')
+  Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind: 'decide', question: `${blockName(b)}: ${q.ask}`, show: `The model isn't sure${odds ? `: ${odds}` : ''}. Your answer is ${q.name}'s.`, options, key, rest } })
+  say(r, `asks you: ${q.ask}`, odds)
+  touch()
+  broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: q.ask })
+}
+
+// a webhook: its URL, headers and body filled ({{env.NAME}} too: Settings' and the project's env, never kept in the
+// run), a JSON body's values escaped; or a file of the workspace (root); or the run's variables as JSON. dry: what a
+// dry run says instead
+const TYPES: Record<string, string> = { json: 'application/json', html: 'text/html', txt: 'text/plain', md: 'text/markdown', csv: 'text/csv', xml: 'application/xml', pdf: 'application/pdf', png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg', zip: 'application/zip' }
+const TRIES = 3 // a webhook's: again after a 429 or a 5xx, or no answer at all
+function hookSend(b: Block, vars: Record<string, string>, envs: Record<string, string>, root: string | undefined, all: Record<string, string>): Send & { dry: string } {
+  const env = Object.fromEntries(Object.entries(envs).map(([k, v]) => [`env.${k}`, String(v)]))
+  const masked = Object.fromEntries(Object.keys(env).map(k => [k, '••••']))
+  // a value after the ? is encoded (an answer's & or # stays in its parameter); before it, as it is (a URL a step gave)
+  const tpl = b.url ?? ''
+  const q0 = tpl.indexOf('?')
+  const enc = Object.fromEntries(Object.entries(vars).map(([k, v]) => [k, encodeURIComponent(v)]))
+  const urlOf = (e: Record<string, string>) => (q0 < 0 ? fill(tpl, { ...vars, ...e }) : `${fill(tpl.slice(0, q0), { ...vars, ...e })}?${fill(tpl.slice(q0 + 1), { ...enc, ...e })}`).trim()
+  const url = urlOf(env)
+  if (!/^https?:\/\/\S+$/i.test(url)) throw new Error(`${b.url}: not an http(s) URL`)
+  const method = b.method ?? 'POST'
+  const headers: Record<string, string> = {}
+  for (const h of b.headers ?? []) {
+    const i = h.indexOf(':')
+    headers[h.slice(0, i).trim().toLowerCase()] = fill(h.slice(i + 1).trim(), { ...vars, ...env })
+  }
+  let body: string | Blob | undefined
+  let shown: string | undefined // the body as the log has it: never a secret
+  let type = 'application/json'
+  if (method !== 'GET') {
+    if (b.from) {
+      if (!root) throw new Error('a file body needs a workspace')
+      const top = realpathSync(root)
+      const src = resolve(root, fill(b.from, vars).trim())
+      if (!existsSync(src) || !within(top, realpathSync(src)) || !statSync(src).isFile()) throw new Error(`${b.from}: no such file in the workspace`)
+      if (statSync(src).size > BODY_MAX) throw new Error(`${b.from}: over 10 MB`)
+      body = new Blob([readFileSync(src)])
+      type = TYPES[src.split('.').pop()!.toLowerCase()] ?? 'application/octet-stream'
+    } else if (b.text?.trim()) {
+      body = jsonFill(b.text, { ...vars, ...env })
+      shown = jsonFill(b.text, { ...vars, ...masked })
+      type = /^\s*[[{]/.test(b.text) ? 'application/json' : 'text/plain; charset=utf-8'
+    } else body = shown = JSON.stringify(all)
+    headers['content-type'] ??= type
+  }
+  const send: Send = async (signal, say) => {
+    say(`${blockName(b)}: ${method} ${urlOf(masked).replace(/\?.*$/, '?…')}`, body instanceof Blob ? `(${b.from}, ${body.size} bytes)` : shown)
+    for (let n = 1; ; n++) {
+      let res: Response | undefined
+      try {
+        res = await fetch(url, { method, headers, body, signal, redirect: 'follow' })
+      } catch (e) {
+        if (signal.aborted || n >= TRIES) throw e
+      }
+      if (res && (n >= TRIES || (res.status !== 429 && res.status < 500))) {
+        const text = (await res.text()).slice(0, ANSWER_MAX)
+        if (text.trim()) say(`${blockName(b)}: ${res.status}`, text)
+        return { exit: res.ok ? 'ok' : 'error', why: `${res.status} ${res.statusText}`.trim(), vars: { [`steps.${b.id}.status`]: String(res.status), [`steps.${b.id}.output`]: text }, text }
+      }
+      // Retry-After's seconds (30 at most), else 2 s, then 6 s
+      const after = Math.min(30, Number(res?.headers.get('retry-after')) || 2 * 3 ** (n - 1))
+      await res?.body?.cancel().catch(() => {}) // its socket back
+      say(`${blockName(b)}: ${res ? res.status : 'no answer'}, again in ${after} s`)
+      await new Promise<void>((ok, fail) => {
+        const stop = () => (clearTimeout(t), fail(signal.reason))
+        const t = setTimeout(() => (signal.removeEventListener('abort', stop), ok()), after * 1000)
+        signal.addEventListener('abort', stop, { once: true })
+      })
+    }
+  }
+  return Object.assign(send, { dry: `dry run: would ${method} ${new URL(url).origin}` })
+}
+const envOf = (ws?: Workspace) => ({ ...state.settings?.env, ...(ws && projectConfig(ws).env) }) as Record<string, string>
+// a run's variables as a webhook's default body: the task and what the blocks gave
+const runBody = (r: FlowRun) => ({ task: r.task, ...Object.fromEntries(Object.entries(r.vars).filter(([k]) => k.startsWith('steps.'))) })
+// what the block before gave: its answer, else its output (an AI decision's default state)
+const before = (r: FlowRun, vars: Record<string, string>) => (id => (id ? valueOf(r, vars, id) : '') || r.task)(r.decisions.at(-1)?.block)
+
+// the inspector's Test: an AI call, an AI decision or a webhook sent once, alone, with the variables given (a project's
+// env and folder, when it names one); what it says and gives back, never a run
+export async function flowTest(o: { block: Block; vars?: Record<string, string>; project?: string }) {
+  on()
+  const b = o.block
+  if (!b || !['llm', 'decide', 'webhook'].includes(b.kind)) throw new Error('Test sends an AI call, an AI decision or a webhook')
+  const proj = o.project ? findProject(o.project) : undefined
+  const vars: Record<string, string> = { task: 'a test task', ...Object.fromEntries(Object.entries(o.vars ?? {}).map(([k, v]) => [k, String(v)])) }
+  const ask = `Test · ${blockName(b)}`
+  const log: string[] = []
+  const t0 = Date.now()
+  try {
+    const send = b.kind === 'llm' ? llmSend(b, vars, ask) : b.kind === 'decide' ? decideSend(b, vars, vars.task, ask) : hookSend(b, vars, envOf(proj && ({ project: proj.id, path: proj.path } as Workspace)), proj?.path, { task: vars.task })
+    const got = await send(AbortSignal.timeout((b.timeout ?? CALL_TIMEOUT) * 60000), (line, detail) => log.push(detail ? `${line}\n${detail}` : line))
+    const o2 = b.out?.length && got.text !== undefined ? outsOf(got.text, b.out) : undefined
+    const outVars = Object.fromEntries(Object.entries(o2?.vars ?? {}).map(([k, v]) => [`steps.${b.id}.${k}`, v]))
+    return { exit: got.exit, why: got.why, vars: { ...got.vars, ...outVars }, missing: o2?.missing ?? [], unsure: got.unsure ?? [], log, ms: Date.now() - t0 }
+  } catch (e) {
+    return { exit: 'error', why: (e as Error).name === 'TimeoutError' ? 'no answer in time' : (e as Error).message, vars: {}, missing: [], unsure: [], log, ms: Date.now() - t0 }
+  }
 }
 
 // ---------- actions, waits, asks
@@ -504,6 +778,17 @@ export function flowAnswer(o: { id: string; n: number; text?: string }) {
   if (w.kind === 'ask') r.vars.answer = typed || label // yours: a confirm's or a retry's button isn't words for a prompt
   r.wait = undefined
   r.status = 'running'
+  if (w.kind === 'decide') {
+    // yours is the answer (a score's: its level's number), then the next it isn't sure of
+    const k = `steps.${b.id}.${w.key}`
+    r.vars[k] = /^\d+: /.test(label) ? label.slice(0, label.indexOf(':')) : label
+    r.vars[`${k}.you`] = 'yes'
+    const q = b.qs?.find(x => x.name === w.key)
+    if (q?.type === 'score') (r.vars[`${k}.score`] = r.vars[k]), (r.vars[`${k}.level`] = q.opts[Number(r.vars[k])]?.text ?? '')
+    say(r, `${blockName(b)}: ${w.key} is ${label}, you said`)
+    if (w.rest.length) return unsure(r, b, w.rest), r
+    return leave(r, b, routeOf(r, b), `you settled ${w.key}: ${label}`, true), r
+  }
   if (w.kind === 'ask') return leave(r, b, label, `you: ${label}${typed ? ` · “${clip(typed, 80)}”` : ''}`, true), r
   if (o.n === w.options.length - 1) return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
   decide(r, b, w.kind === 'confirm' ? 'yes' : 'again', `you: ${label}`, true)
@@ -520,9 +805,11 @@ function kill0(r: FlowRun) {
   const c = procs.get(r.id)
   procs.delete(r.id)
   if (c) kill(c)
+  calls.get(r.id)?.abort()
+  calls.delete(r.id)
 }
 
-function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean) {
+function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, phone?: boolean) {
   if (!live(r)) return
   kill0(r)
   Object.assign(r, { status, ended: Date.now(), wait: undefined })
@@ -533,6 +820,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean) {
   for (const x of [...ended].sort((a, b) => (a.ended ?? 0) - (b.ended ?? 0)).slice(0, -DETAILED)) if (x.log.some(l => l.includes('\n'))) x.log = x.log.map(bare) // the ones that ended before: their lines
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed' })
+  if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
 }
 
 export function flowStop(o: { id: string }) {
@@ -576,10 +864,11 @@ export function flowTick(now = Date.now()) {
 // resumes its chat first); a command runs again; asks wait on
 // ponytail: the prompt goes again whole; the agent may redo work it had done
 let resumeLater = false
+const boot = Date.now() // runs started since were never cut short
 export function flowResume() {
   resumeLater = state.settings?.workflows !== true
   if (resumeLater) return // off: they wait until it's on again
-  const back = runs().filter(r => live(r) && r.status !== 'waiting')
+  const back = runs().filter(r => live(r) && r.status !== 'waiting' && r.started < boot)
   const was = new Map(back.map(r => [r, r.cur]))
   for (const r of back) say(r, `Laki restarted: back at ${blockName(blockOf(r, r.cur) ?? ({ id: '?' } as Block))}`)
   if (!back.length) return
@@ -594,4 +883,8 @@ export function flowResume() {
   }, RESUME_AFTER).unref()
 }
 
-export const flowStopAll = () => [...procs.keys()].forEach(id => kill0({ id } as FlowRun)) // shutdown
+export const flowStopAll = () => [...new Set([...procs.keys(), ...calls.keys()])].forEach(id => kill0({ id } as FlowRun)) // shutdown
+
+// a scheduled task's workflow (core.ts' runSchedule): its run, through this file
+flowHooks.start = o => flowStart(o)
+flowHooks.find = o => flowFind(o)

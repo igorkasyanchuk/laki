@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { type Account, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
@@ -116,6 +116,7 @@ export type AppSettings = Paint & {
   env?: Record<string, string> // every session's
   notify?: boolean
   prIcon?: boolean // the sidebar's GitHub mark on a workspace with a PR (unset: on)
+  ownAvatar?: boolean // your GitHub picture on your own PR's mark (unset: on)
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   timers?: boolean // a turn's time on its tab and row (unset: off)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
@@ -138,10 +139,12 @@ export type AppSettings = Paint & {
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   remoteMail?: string // the one address remote access lets in
+  remoteAuth?: 'email' | 'pin' // remote access by Cloudflare's email code (unset too) or Laki's PIN
+  remoteTries?: number // wrong PINs that stop it (unset: REMOTE_TRIES)
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
   prTries?: number // fix CI's and fix conflicts' tries in a row
-  sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (0: always)
+  sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER, 8 hours; 0: always)
   webhook?: Webhook // pushes to your phone
   ai?: AiSettings // Laki AI (Settings › AI)
   voice?: VoiceSettings // the mic and hold Fn (Settings › Voice)
@@ -166,6 +169,7 @@ export type AppSettings = Paint & {
   specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
   workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
   birdView?: boolean // experimental: Bird view (Bird.tsx), every live session's screen at once, off unless true
+  aiGlow?: boolean // experimental: Laki AI's glow (App's PeekGlow) over what it looks at, off unless true
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
@@ -1002,6 +1006,7 @@ export function ProjectSection(p: {
 }
 
 const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' }
+const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', dimPanes: false, hoverFocus: false, splitNew: false, scrollSpeed: SCROLL, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
 const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
 
 // Find a setting (the nav's search box): each setting's title as the page writes it, its section, words it goes by.
@@ -1026,6 +1031,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Menu bar item', 'tray status count waiting needs you'],
   ['appearance', 'Fun button', 'meme reddit smiley break joke'],
   ['appearance', 'Pull requests in the sidebar', 'pr github icon'],
+  ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
   ['appearance', 'Pull request marks', 'approved approval check double eyes commented review me sidebar'],
   ['appearance', 'Turn timers', 'elapsed time'],
   ['git', 'Diff size in the sidebar', 'lines added removed changes stat'],
@@ -1095,11 +1101,12 @@ const FIND: [string, string, string?][] = [
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
   ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
+  ['general', "Laki AI's glow", 'experimental ai glow animation computer use screen reading looking peek effect gradient'],
   ['general', 'Voice', 'experimental voice dictation dictate speech to text cloud hold fn mic talk whisper'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
-  ['general', 'Reset the interface', 'reset ui layout default widths sidebar panels broken localstorage development'],
+  ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
   ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
@@ -1370,6 +1377,7 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
             {(SLEEP.some(([m]) => m === sleepAfter) ? SLEEP : [...SLEEP, [sleepAfter, `${sleepAfter} minutes`] as [number, string]]).map(([m, name]) => (
               <option key={m} value={m}>
                 {name}
+                {m === SLEEP_AFTER ? ' (default)' : ''}
               </option>
             ))}
           </select>
@@ -1380,26 +1388,29 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
 }
 
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
-// link, after a typed confirm); no link yet: starting
-export type Remote = { mail: string; open?: boolean; until?: number; url?: string; link?: string }
-export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+// link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page); no link yet: starting
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string }
+export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
-function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; onMail: (mail: string) => void }) {
+const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
+type RemoteOpts = { mail: string; pin: boolean; tries: number }
+function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; set: (o: Partial<RemoteOpts>) => void }) {
+  const { mail, pin, tries } = opts
   const [hours, setHours] = useState(1)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [sure, setSure] = useState('') // no email: confirm, typed
   const r = api.state
-  const open = !mail.trim()
-  const ok = open ? sure.trim().toLowerCase() === 'confirm' : ONE_MAIL.test(mail.trim())
+  const open = !pin && !mail.trim()
+  const ok = pin || (open ? sure.trim().toLowerCase() === 'confirm' : ONE_MAIL.test(mail.trim()))
   const fail = (e: unknown) => setErr(String((e as Error).message ?? e))
   const start = async () => {
     if (busy || !ok) return
     setBusy(true)
     setErr('')
-    await api.start(hours, mail.trim(), open).then(() => setSure(''), fail) // the next start without an email asks again
+    await api.start(hours, mail.trim(), open, pin).then(() => setSure(''), fail) // the next start without an email asks again
     setBusy(false)
   }
   const stop = () => (setErr(''), api.stop().catch(fail))
@@ -1410,7 +1421,9 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
       <p className="muted small">
         This app in a browser on another computer or a phone: its terminals and agents, as if you sat here. cloudflared publishes Laki's daemon at a
         random trycloudflare.com address; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of
-        its own (without an email, that key is the only lock). It stops after the time you pick (or never: Forever), when you stop it, or with the daemon, and a stopped link never works again.
+        its own (without an email, that key is the only lock). With a PIN instead, there's no Cloudflare sign-in: the page asks for a PIN Laki shows
+        here, and a wrong one (twice, unless you pick otherwise) stops remote access. It stops after the time you pick (or never: Forever), when you
+        stop it, or with the daemon, and a stopped link never works again.
       </p>
       <p className="warn-soft small">Whoever gets in has a shell on this Mac as you: use an address only you read.</p>
       {r?.link ? (
@@ -1422,7 +1435,15 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
               <IconButton icon="copy" title="Copy the link" onClick={() => api.copy(r.link!)} />
               <IconButton icon="link" title="Open" onClick={() => api.open(r.link!)} />
             </div>
-            {r.open ? (
+            {r.pin ? (
+              <div className="remote-pin-box">
+                <span className="small muted">PIN</span>
+                <code className="remote-pin">{`${r.pin.slice(0, 3)} ${r.pin.slice(3)}`}</code>
+                <span className="muted small">
+                  The page asks for it. {r.tries === 1 ? 'One more wrong PIN stops' : `${r.tries} wrong PINs stop`} remote access. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
+                </span>
+              </div>
+            ) : r.open ? (
               <div className="remote-risk" role="alert">
                 <b>Anyone with this link gets in.</b>
                 <span className="small">
@@ -1452,11 +1473,36 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
         </>
       ) : (
         <form className="remote-form" onSubmit={e => (e.preventDefault(), start())}>
+          <div className="field">
+            <span>Sign in with</span>
+            <div className="seg" role="radiogroup" aria-label="Sign in with">
+              {([[false, 'Email (Cloudflare)'], [true, 'PIN (Laki)']] as const).map(([v, label]) => (
+                <button key={label} type="button" role="radio" aria-checked={pin === v} className={pin === v ? 'on' : ''} onClick={() => set({ pin: v })}>
+                  {label}
+                </button>
+              ))}
+            </div>
+          </div>
+          {pin ? (
+            <div className="field">
+              <span>
+                Wrong PINs before it stops <span className="muted">· a new PIN each start, shown here</span>
+              </span>
+              <div className="seg" role="radiogroup" aria-label="Wrong PINs before it stops">
+                {TRIES.map(n => (
+                  <button key={n} type="button" role="radio" aria-checked={n === tries} className={n === tries ? 'on' : ''} onClick={() => set({ tries: n })}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+            </div>
+          ) : (
+          <>
           <label>
             <span>
               Email <span className="muted">· the only one let in (optional, but leave it out only if you must)</span>
             </span>
-            <input value={mail} inputMode="email" autoComplete="email" spellCheck={false} placeholder="you@example.com" onChange={e => onMail(e.target.value)} />
+            <input value={mail} inputMode="email" autoComplete="email" spellCheck={false} placeholder="you@example.com" onChange={e => set({ mail: e.target.value })} />
           </label>
           {!open && !ok && <span className="field-err">One email address, like you@example.com</span>}
           {open && (
@@ -1474,6 +1520,8 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
               </label>
             </div>
           )}
+          </>
+          )}
           <div className="field">
             <span>For</span>
             <div className="seg" role="radiogroup" aria-label="For how long">
@@ -1486,7 +1534,7 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
           </div>
           <div className="row">
             <button type="submit" className={open ? 'danger' : 'primary'} disabled={!ok || busy}>
-              {busy ? 'Starting…' : open ? 'Start without an email' : 'Start remote access'}
+              {busy ? 'Starting…' : open ? 'Start without an email' : pin ? 'Start with a PIN' : 'Start remote access'}
             </button>
           </div>
         </form>
@@ -1508,8 +1556,8 @@ function RemoteSection({ api, mail, onMail }: { api: RemoteApi; mail: string; on
 
 export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's) or laki-widget
 // how an app reads and writes its skill; app: its name, for the text
-// what Reset the interface keeps: what you made (timers, stopwatches, Send later, drafts) and Get started's done
-const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.onboard']
+// what Reset the interface keeps of this viewer's: what you made (timers, stopwatches, drafts). Get started shows again
+const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft']
 
 // Settings › Agents & profiles' accounts (the daemon's accounts.ts): who each signs in as, and what to do with them
 export type AccountsApi = { load: () => Promise<AccountView[]>; usage: () => Promise<AgentUsage[]>; add: (agent: AccountAgent, name: string) => Promise<Account>; rename: (id: string, name: string) => Promise<unknown>; remove: (a: AccountView) => Promise<unknown>; login: (a: AccountView) => Promise<unknown> }
@@ -1644,6 +1692,7 @@ export type WidgetsApi = {
   open: (id: string) => void // its full view
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
   logs?: (id: string) => void // development mode's: its fetches and actions
+  ai?: (want: string) => void // Make it with Laki AI: its chat, asked to make one (unset: Laki AI is off)
 }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
@@ -1651,6 +1700,8 @@ const PLACES: [WidgetPlace, string, string][] = [
   ['side', 'Sidebar', 'In the sidebar, above its buttons'],
   ['top', 'Top bar', 'In the top bar, left of its buttons: a line high'],
   ['status', 'Status bar', "At the status bar's right end: a line high"],
+  ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
+  ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside Video, Meme and Timer'],
 ]
 const VIEWS: [WidgetSize, string][] = [
   ['s', 'Small'],
@@ -1748,13 +1799,13 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             </option>
           ))}
         </select>
-        <select className="wc-size" value={w.size.join('x')} data-tip={(w.place ?? 'side') === 'side' ? 'Size in the sidebar: cells across × down' : 'Its width: cells across (a bar is a line high)'} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
+        {!['rail', 'foot'].includes(w.place ?? 'side') && <select className="wc-size" value={w.size.join('x')} data-tip={(w.place ?? 'side') === 'side' ? 'Size in the sidebar: cells across × down' : 'Its width: cells across (a bar is a line high)'} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
           {SIZES.map(([a, d]) => (
             <option key={`${a}x${d}`} value={`${a}x${d}`}>
               {a}×{d === 0.5 ? '½' : d}
             </option>
           ))}
-        </select>
+        </select>}
         {w.every !== undefined && (
           <label className="wc-every" data-tip="Fetches every this many minutes, while the app is open">
             <input
@@ -1871,16 +1922,32 @@ function WidgetList({ api }: { api: WidgetsApi }) {
 }
 
 // the prompt that makes a widget in any AI chat: what's wanted, then the whole format
-function WidgetPrompt({ home }: { home: string }) {
+// ai: Laki AI makes it in its chat, asking first
+function WidgetPrompt({ home, ai }: { home: string; ai?: (want: string) => void }) {
   const [want, setWant] = useState('')
   const [copied, setCopied] = useState(false)
   const text = widgetPrompt(want, home.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')) // ~, not your account's name, to a chat elsewhere
   const copy = () => navigator.clipboard.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 2000)))
+  const make = () => ai && want.trim() && (ai(want), setWant(''))
   return (
-    <Group title="Make one with AI" hint="Describe it, copy the prompt, paste it into any AI chat, then save the files it gives you in Laki's folder and press Reload.">
+    <Group
+      title="Make one with AI"
+      hint={
+        ai
+          ? 'Describe it and press Make it with Laki AI: its chat opens, asks you a few questions about it, then writes it (saved off until you turn it on). Or copy the prompt below into any AI chat.'
+          : "Describe it, copy the prompt, paste it into any AI chat, then save the files it gives you in Laki's folder and press Reload. With Laki AI on (Settings › AI), it makes one right here."
+      }
+    >
       <label>
         What should it show?
-        <input value={want} onChange={e => setWant(e.target.value)} placeholder="e.g. open Sentry issues of my project, by count; a table in the full view" />
+        <span className="widget-make">
+          <input value={want} onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), make())} placeholder="e.g. open Sentry issues of my project, by count; a table in the full view" />
+          {ai && (
+            <button type="button" className="primary" disabled={!want.trim()} onClick={make}>
+              <Icon name="ai" /> Make it with Laki AI
+            </button>
+          )}
+        </span>
       </label>
       <div className="prompt-box">
         <textarea className="mono" readOnly rows={6} value={text} onFocus={e => e.currentTarget.select()} />
@@ -1897,12 +1964,12 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
     <>
       <h2>Extensions</h2>
       <p className="muted">
-        Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 3 cells across, or a line high in the top bar or the status bar: each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
+        Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 3 cells across, a line high in the top bar or the status bar, or buttons on the rail and in the sidebar's foot (an icon, a label, a count, a click that runs something): each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
         schedule) and widget.html (what it shows, and its full view, a click away). A click on one below sets it up. Ask an agent with the Extension creator skill (Agent skill) to make one, or any AI with the prompt below.
       </p>
       <WidgetList api={api} />
       {!api.list.length && <p className="muted">No extensions in these folders yet.</p>}
-      {api.home && <WidgetPrompt home={api.home} />}
+      {api.home && <WidgetPrompt home={api.home} ai={api.ai} />}
       <Group title="Folders">
         <div className="muted small">
           Laki's own: <span className="mono">{api.home}</span>
@@ -1951,6 +2018,7 @@ export function SettingsPage(p: {
   widgets?: WidgetsApi
   resources?: ResourcesApi
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
+  uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   presets: Preset[] // the daemon's: the settings', or its defaults
   accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
@@ -2063,9 +2131,15 @@ export function SettingsPage(p: {
   }, [onClose])
 
   const presets = s.presets ?? p.presets
-  // Development › Reset the interface: this viewer's laki.* (App.tsx' localStorage), then a reload
+  // Development › Reset the interface: Laki as it starts. The daemon's settings (uiReset), then this viewer's laki.*
+  // (App.tsx' localStorage), then a reload
   const resetUi = async () => {
-    if (!(await ask('Reset the interface?', { text: 'Widths, open panels, folded projects, the selected workspace and tabs, text sizes and the like go back to how Laki starts. Projects, workspaces, sessions, settings, timers and drafts stay.', ok: 'Reset' }))) return
+    if (!(await ask('Reset the interface?', { text: 'Every setting goes back to its default: the theme, the rail and sidebar, the terminal, notifications, the experimental features. Every extension turns off, Get started shows again, and widths, open panels and text sizes go back to how Laki starts. Projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, timers and drafts stay.', ok: 'Reset', danger: true }))) return
+    try {
+      await p.uiReset?.()
+    } catch (e) {
+      return void ask("Couldn't reset the interface", { text: (e as Error).message })
+    }
     for (const k of Object.keys(localStorage)) if (k.startsWith('laki.') && !UI_KEEP.includes(k)) localStorage.removeItem(k)
     location.reload()
   }
@@ -2111,6 +2185,41 @@ export function SettingsPage(p: {
       </label>
     )
   }
+  // a setting-box row: its words on the left, a select (row) or a segmented control (seg) on the right
+  const row = <K extends keyof AppSettings, V extends string | number>(title: string, hint: string | undefined, k: K, def: V, opts: V[], text: (v: V) => string = String) => {
+    const v = (s[k] ?? def) as V
+    return (
+      <label className="switch-row">
+        <select value={String(v)} onChange={e => set({ [k]: typeof def === 'number' ? Number(e.target.value) : e.target.value } as Partial<AppSettings>)}>
+          {[...new Set([...opts, v])].map(o => (
+            <option key={o} value={String(o)}>
+              {text(o)}
+              {o === def ? ' (default)' : ''}
+            </option>
+          ))}
+        </select>
+        <Says title={title} hint={hint} />
+      </label>
+    )
+  }
+  const seg = <K extends keyof AppSettings>(title: string, hint: string | undefined, k: K, def: string, opts: [string, string, string?][]) => {
+    const v = String(s[k] ?? def)
+    return (
+      <div className="switch-row">
+        <div className="seg" role="radiogroup" aria-label={title}>
+          {opts.map(([o, label, glyph]) => (
+            <button key={o} type="button" role="radio" aria-checked={v === o} className={v === o ? 'on' : ''} onClick={() => set({ [k]: o } as Partial<AppSettings>)}>
+              {glyph && <span className="seg-glyph">{glyph}</span>}
+              {label}
+            </button>
+          ))}
+        </div>
+        <Says title={title} hint={hint} />
+      </div>
+    )
+  }
+  // the Terminal page's Reset: each of its settings as Laki has it (stated: an unset key wouldn't replace the saved one)
+  const termChanged = (Object.keys(TERM_DEFAULTS) as (keyof typeof TERM_DEFAULTS)[]).some(k => (String(s[k] ?? TERM_DEFAULTS[k]) || String(TERM_DEFAULTS[k])) !== String(TERM_DEFAULTS[k]))
   // Find a setting: every word typed in a setting's title, words or section (and projects by name)
   const words = findQ.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const hits = (text: string) => words.every(w => text.toLowerCase().includes(w))
@@ -2341,7 +2450,7 @@ export function SettingsPage(p: {
                   </div>
                 )}
                 <div className="button-row">
-                  <Says title="Reset the interface" hint="The window's layout as Laki starts: widths, open panels, folded projects, text sizes. Projects, workspaces, sessions and settings stay" />
+                  <Says title="Reset the interface" hint="Laki as it starts: every setting at its default (the theme, the rail, the experimental features), every extension off, Get started again, the window's layout. Projects, workspaces, sessions, profiles, accounts, keys and connections stay" />
                   <button type="button" onClick={resetUi}>
                     <Icon name="restore" /> Reset
                   </button>
@@ -2358,6 +2467,9 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.birdView === true} onChange={v => set({ birdView: v })}>
                   <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
+                </Switch>
+                <Switch className="switch-row" on={s.aiGlow === true} onChange={v => set({ aiGlow: v })}>
+                  <Says title="Laki AI's glow" hint="As Laki AI reads a tab's screen or uses the agent browser, a moving glow around that tab (else the window): it was looking. Off by default" />
                 </Switch>
                 {p.ai && (
                   <Switch className="switch-row" on={s.voice?.on === true} onChange={on => set({ voice: { ...s.voice, on } })}>
@@ -2478,6 +2590,11 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.prIcon !== false} onChange={v => set({ prIcon: v })}>
                   <Says title="Pull requests in the sidebar" hint="GitHub's mark on a workspace with a PR: green open, purple merged, red failing checks, gray draft or closed" />
                 </Switch>
+                {s.prIcon !== false && (
+                  <Switch className="switch-row sub" on={s.ownAvatar !== false} onChange={v => set({ ownAvatar: v })}>
+                    <Says title="Your picture on your PRs" hint="Your GitHub picture beside the mark on your own PRs, as others' show theirs; off: the mark alone on yours" />
+                  </Switch>
+                )}
                 <Switch className="switch-row" on={!!s.timers} onChange={v => set({ timers: v })}>
                   <Says title="Turn timers" hint="How long each agent has been at its turn, on its tab and in the sidebar" />
                 </Switch>
@@ -2748,83 +2865,89 @@ export function SettingsPage(p: {
           {sec === 'terminal' && (
             <>
               <h2>Terminal</h2>
-              <Group title="Font and cursor">
-              <div className="grid2">
-                <label>
-                  Font
-                  <select
-                    value={otherFont ? 'other' : font}
-                    onChange={e => {
-                      setOtherFont(e.target.value === 'other')
-                      if (e.target.value !== 'other') set({ fontFamily: e.target.value }) // '': the default (undefined wouldn't be saved)
-                    }}
-                  >
-                    <option value="">Default (JetBrains Mono)</option>
-                    {font && !otherFont && !fonts.includes(font) && <option value={font}>{font} (not found)</option>}
-                    {fonts.map(f => (
-                      <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>
-                        {f}
-                      </option>
-                    ))}
-                    <option value="other">Other…</option>
-                  </select>
-                </label>
-                <label>
-                  <span>
-                    Font size <span className="muted">· every tab's (⌘+ / ⌘− / ⌘0: one tab's)</span>
-                  </span>
-                  <select value={s.fontSize ?? FONT_SIZE} onChange={e => set({ fontSize: Number(e.target.value) })}>
-                    {[...new Set([...FONT_SIZES, s.fontSize ?? FONT_SIZE])]
-                      .sort((a, b) => a - b)
-                      .map(n => (
-                        <option key={n} value={n}>
-                          {n}px{n === FONT_SIZE ? ' (default)' : ''}
+              <p className="muted">How every tab's terminal looks and behaves: agents', shells' and dev servers'. The preview changes as you do.</p>
+              <section className="set-group term-top">
+                <div className="term-top-head">
+                  <div className="set-head">
+                    <h3>Preview</h3>
+                    <p className="muted small">
+                      {font || 'JetBrains Mono'} · {s.fontSize ?? FONT_SIZE}px · {WEIGHTS[s.fontWeight || '400']} · {s.lineHeight ?? 1.15} line height · click it for the cursor
+                    </p>
+                  </div>
+                  <button type="button" disabled={!termChanged} data-tip="Every setting on this page back to Laki's" onClick={() => (setOtherFont(false), set(TERM_DEFAULTS))}>
+                    <Icon name="refresh" /> Reset to defaults
+                  </button>
+                </div>
+                <div style={{ zoom: 1 / scale }}>
+                  <TermPreview key={String(transparent())} s={s} />
+                </div>
+              </section>
+              <Group title="Text" hint="Ligatures (=> as one glyph) aren't drawn: xterm needs an add-on for them that Laki doesn't ship.">
+                <div className="setting-box">
+                  <label className="switch-row">
+                    <select
+                      value={otherFont ? 'other' : font}
+                      onChange={e => {
+                        setOtherFont(e.target.value === 'other')
+                        if (e.target.value !== 'other') set({ fontFamily: e.target.value }) // '': the default (undefined wouldn't be saved)
+                      }}
+                    >
+                      <option value="">JetBrains Mono (default)</option>
+                      {font && !otherFont && !fonts.includes(font) && <option value={font}>{font} (not found)</option>}
+                      {fonts.map(f => (
+                        <option key={f} value={f} style={{ fontFamily: fontStack(f) }}>
+                          {f}
                         </option>
                       ))}
-                  </select>
-                </label>
-                {otherFont && <input className="span2" value={s.fontFamily ?? ''} placeholder="a font's name, as in Font Book" onChange={e => set({ fontFamily: e.target.value })} autoFocus />}
-                {pick('Line height', 'lineHeight', 1.15, [1, 1.1, 1.15, 1.2, 1.25, 1.3, 1.4, 1.5, 1.6, 1.8])}
-                {pick('Letter spacing', 'letterSpacing', 0, [-1, -0.5, 0, 0.5, 1, 1.5, 2, 3], n => `${n}px`)}
-                {pick('Font weight', 'fontWeight', '400', ['300', '400', '500', '600', '700'], w => `${w} · ${WEIGHTS[w]}`)}
-                {pick('Minimum contrast', 'minContrast', 1, [1, 3, 4.5, 7], n => CONTRAST[n])}
-                {pick('Cursor style', 'cursorStyle', 'block', ['block', 'bar', 'underline'], c => c[0].toUpperCase() + c.slice(1))}
-                {pick('Padding', 'termPad', 'normal', ['tiny', 'normal', 'roomy'], p => p[0].toUpperCase() + p.slice(1))}
-                {pick('Scroll speed', 'scrollSpeed', SCROLL, [1, 2, 3, 4, 5, 8], n => `${n}×${n === 1 ? ' · xterm’s' : ''} · ⌥ ${n * 3}×`)}
-                <div className="checks">
+                      <option value="other">Other…</option>
+                    </select>
+                    <Says title="Font" hint="The monospace fonts on this Mac; Other… takes any by its name" />
+                  </label>
+                  {otherFont && (
+                    <label className="switch-row sub">
+                      <input className="term-font-name" value={s.fontFamily ?? ''} placeholder="As in Font Book" onChange={e => set({ fontFamily: e.target.value })} autoFocus />
+                      <Says title="Font name" />
+                    </label>
+                  )}
+                  {row('Size', "Every tab's; ⌘+ ⌘− ⌘0 change one tab's", 'fontSize', FONT_SIZE, FONT_SIZES, n => `${n}px`)}
+                  {row('Weight', undefined, 'fontWeight', '400', ['300', '400', '500', '600', '700'], w => `${w} · ${WEIGHTS[w]}`)}
+                  {row('Line height', undefined, 'lineHeight', 1.15, [1, 1.1, 1.15, 1.2, 1.25, 1.3, 1.4, 1.5, 1.6, 1.8])}
+                  {row('Letter spacing', undefined, 'letterSpacing', 0, [-1, -0.5, 0, 0.5, 1, 1.5, 2, 3], n => `${n}px`)}
+                  {row('Minimum contrast', 'Lifts colors too faint to read on the background', 'minContrast', 1, [1, 3, 4.5, 7], n => CONTRAST[n])}
+                </div>
+              </Group>
+              <Group title="Cursor">
+                <div className="setting-box">
+                  {seg('Style', undefined, 'cursorStyle', 'block', [['block', 'Block', '█'], ['bar', 'Bar', '▏'], ['underline', 'Underline', '▁']])}
                   <Switch className="switch-row" on={s.cursorBlink !== false} onChange={v => set({ cursorBlink: v })}>
-                    Blinking cursor
+                    <Says title="Blink" hint="In the tab you're typing in" />
                   </Switch>
-                  <Switch className="switch-row" on={s.copyOnSelect !== false} onChange={v => set({ copyOnSelect: v })}>
-                    Copy selected text
-                  </Switch>
-                  <Switch className="switch-row" on={s.editKeys !== false} onChange={v => set({ editKeys: v })}>
-                    Mac editing keys: ⌘← ⌘→ ⌥← ⌥→ ⌘⌫
-                  </Switch>
+                </div>
+              </Group>
+              <Group title="Panes and tabs">
+                <div className="setting-box">
+                  {seg('Padding', 'Room between the text and the pane\'s edges', 'termPad', 'normal', [['tiny', 'Tiny'], ['normal', 'Normal'], ['roomy', 'Roomy']])}
                   <Switch className="switch-row" on={!!s.dimPanes} onChange={v => set({ dimPanes: v })}>
-                    Dim other panes
+                    <Says title="Dim other panes" hint="In a split, the panes you're not typing in fade back" />
                   </Switch>
                   <Switch className="switch-row" on={!!s.hoverFocus} onChange={v => set({ hoverFocus: v })}>
-                    Focus the pane under the mouse
+                    <Says title="Focus the pane under the mouse" hint="Type into a split without clicking it first" />
                   </Switch>
                   <Switch className="switch-row" on={!!s.splitNew} onChange={v => set({ splitNew: v })}>
                     <Says title="New tabs open as a split" hint="A new tab (⌘⇧N, the + menu, Laki AI's) goes beside the pane you're on, in the same tab, instead of a tab of its own" />
                   </Switch>
                 </div>
-              </div>
               </Group>
-              <Group title="Live preview">
-              <div className="preview-head muted small">
-                <span>Live preview · click it for the cursor</span>
-                <span className="grow" />
-                <span>
-                  {s.fontSize ?? FONT_SIZE}px · {s.lineHeight ?? 1.15} line height · {s.fontWeight || '400'}
-                </span>
-              </div>
-              <div style={{ zoom: 1 / scale }}>
-                <TermPreview key={String(transparent())} s={s} />
-              </div>
-              <p className="muted small">Ligatures (=&gt; as one glyph) aren't drawn: xterm needs an add-on for them that Laki doesn't ship.</p>
+              <Group title="Keyboard, mouse and clipboard">
+                <div className="setting-box">
+                  {row('Scroll speed', 'With ⌥: three times that', 'scrollSpeed', SCROLL, [1, 2, 3, 4, 5, 8], n => `${n}×${n === 1 ? ' · xterm\u2019s' : ''}`)}
+                  <Switch className="switch-row" on={s.copyOnSelect !== false} onChange={v => set({ copyOnSelect: v })}>
+                    <Says title="Copy selected text" hint="What you select is on the clipboard, no ⌘C needed" />
+                  </Switch>
+                  <Switch className="switch-row" on={s.editKeys !== false} onChange={v => set({ editKeys: v })}>
+                    <Says title="Mac editing keys" hint="⌘← ⌘→ to the line's start and end, ⌥← ⌥→ a word at a time, ⌘⌫ the line before the cursor" />
+                  </Switch>
+                </div>
               </Group>
             </>
           )}
@@ -2859,8 +2982,14 @@ export function SettingsPage(p: {
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
           {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} />}
-          {sec === 'remote' && p.remote && <RemoteSection api={p.remote} mail={s.remoteMail ?? ''} onMail={remoteMail => set({ remoteMail })} />}
-          {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? 0} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
+          {sec === 'remote' && p.remote && (
+            <RemoteSection
+              api={p.remote}
+              opts={{ mail: s.remoteMail ?? '', pin: s.remoteAuth === 'pin', tries: s.remoteTries ?? REMOTE_TRIES }}
+              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.pin !== undefined && { remoteAuth: o.pin ? 'pin' : 'email' }), ...(o.tries !== undefined && { remoteTries: o.tries }) })}
+            />
+          )}
+          {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'notes' && (
             <>
               <h2>Release notes</h2>

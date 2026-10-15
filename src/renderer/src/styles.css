@@ -86,6 +86,9 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .splash .logo img { width: 96px; height: 96px; filter: drop-shadow(0 12px 28px rgba(255, 122, 69, 0.22)); }
 .splash-problem { max-width: 420px; margin: 8px 16px 0; padding: 10px 14px; text-align: center; color: var(--fg); background: var(--panel); border: 1px solid var(--waiting); border-radius: var(--radius); }
 .splash .wordmark { padding-left: 0.14em; } /* the spacing after the last letter, matched before the first */
+.splash-pin { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 320px; margin: 8px 16px 0; text-align: center; }
+.splash-pin input { width: 180px; text-align: center; font: 600 22px var(--mono); letter-spacing: 0.2em; }
+.splash-pin button { min-width: 180px; }
 
 .app { display: flex; height: 100%; position: relative; }
 .sidebar { width: 240px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
@@ -176,6 +179,15 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .widget-strip.top .widget { border-radius: var(--rs, 6px); border: none; }
 .widget-strip .widget-dot { top: 3px; right: 3px; }
 .widget-dot { position: absolute; top: 4px; right: 4px; width: 6px; height: 6px; border-radius: 50%; background: var(--running); }
+/* a widget as a button (Widgets.tsx): in a cell, on the rail, in the sidebar's foot; its icon, label and badge */
+.widget.is-button { padding: 0; }
+.widget-button { display: flex; align-items: center; gap: 6px; width: 100%; height: 100%; min-height: 24px; padding: 0 9px; border: none; border-radius: 0; background: none; color: var(--fg); font: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.widget-button:hover { background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.widget-button-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.widget-glyph { display: inline-flex; align-items: center; justify-content: center; min-width: 1.15em; line-height: 1; font-weight: 600; }
+.widget-badge { flex: none; min-width: 16px; padding: 0 5px; border-radius: 8px; background: var(--accent); color: var(--accent-fg); font-size: 10.5px; font-weight: 600; line-height: 16px; text-align: center; }
+.ib.widget-foot { position: relative; }
+.ib.widget-foot .widget-badge { margin-left: 2px; }
 .widget-dot.bad { background: var(--error); }
 .widget-msg { position: absolute; inset: 0; padding: 6px; overflow: auto; background: var(--panel); }
 .widget-parked { position: absolute; inset: 0; width: 100%; background: none; border: 1px dashed var(--line); border-radius: inherit; }
@@ -425,6 +437,8 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .ib { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; padding: 0; background: none; border: none; border-radius: var(--rs, 5px); color: var(--muted); flex: none; }
 .ib:hover { background: var(--hover); color: var(--fg); }
 .ib.on { color: var(--accent-ink); background: var(--hover); }
+.ib.danger { color: color-mix(in srgb, var(--error) 70%, var(--muted)); } /* deletes: red at a glance */
+.ib.danger:hover { color: var(--error); background: color-mix(in srgb, var(--error) 14%, transparent); }
 .ib.labeled { width: auto; gap: 5px; padding: 0 7px 0 5px; font-size: 11.5px; }
 .ib-label { white-space: nowrap; }
 .menu-backdrop { position: fixed; inset: 0; z-index: 50; -webkit-app-region: no-drag; }
@@ -725,6 +739,12 @@ kbd { font-family: var(--mono); }
 .art-big .art-link { padding: 30px 0; gap: 12px; }
 .art-big .art-host { max-width: none; font-size: 13px; }
 .art-name { font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* a folder of the storage folder: its card (its files' count), and the head's path back out */
+.art-card.dir .art-thumb { background: var(--side); }
+.art-crumbs { display: inline-flex; align-items: center; gap: 2px; min-width: 0; }
+.art-crumb { min-height: 0; padding: 0 2px; background: none; border: none; font: inherit; color: var(--muted); cursor: pointer; }
+.art-crumb:hover:not(:disabled) { background: none; color: var(--fg); text-decoration: underline; }
+.art-crumb:disabled { opacity: 1; color: var(--fg); cursor: default; }
 .art-big { flex: 1; min-height: 120px; overflow: auto; display: flex; align-items: flex-start; justify-content: center; margin-bottom: 8px; }
 /* the big view: most of the window, a picture as large as fits */
 .modal:has(> .art-big) { width: min(1400px, calc(100vw - 48px)); height: 88vh; max-height: 88vh; }
@@ -893,6 +913,16 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .preview-head { display: flex; gap: 8px; margin-top: 6px; }
 .term-preview { height: 190px; padding: 8px 10px; background: var(--term-bg); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
 .term-preview .xterm { height: 100%; }
+/* Settings › Terminal: the preview on top, its summary and Reset beside the title; a segment's glyph (the cursor's shape) */
+.term-top-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.term-top-head button { flex: none; display: inline-flex; align-items: center; gap: 6px; }
+.seg-glyph { display: inline-block; width: 1em; margin-right: 5px; font-family: var(--mono); color: var(--accent-ink); }
+.setting-box .switch-row .seg button { display: inline-flex; align-items: center; padding: 3px 10px; font-size: 12px; }
+.term-font-name { width: 220px; }
+/* Settings › Extensions' Make one with AI: the description and Laki AI's button on one line */
+.widget-make { display: flex; gap: 8px; }
+.widget-make input { flex: 1; min-width: 0; }
+.widget-make button { flex: none; display: inline-flex; align-items: center; gap: 6px; }
 .side-panel .row { display: flex; flex-wrap: wrap; gap: 6px; }
 .side-panel .toggle { font-size: 12px; }
 /* file preview and finder (SidePanel.tsx), projects in Settings: as in the other app */
@@ -1246,6 +1276,14 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ai-float .ai-window { position: relative; flex: 1; min-width: 0; background: var(--bg); }
 .ai-float .ai-win-head, .ai-float .ai-win-head * { -webkit-app-region: no-drag; } /* in the main window a drag region would move the window */
 @media (prefers-reduced-motion: reduce) { .ai-fab, .ai-window::before { transition: none; } .ai-float, .ai-shimmer, .ai-window .ai-mark::after { animation: none; } }
+/* Laki AI's glow (experimental): what it looked at, lit once by a turning rainbow edge and a soft inner light */
+@property --peek-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
+.ai-peek { position: fixed; z-index: 9; pointer-events: none; border-radius: var(--rs, 8px); box-shadow: inset 0 0 18px 3px color-mix(in srgb, var(--accent) 60%, transparent), inset 0 0 48px 10px color-mix(in srgb, var(--tc-purple) 34%, transparent), inset 0 0 110px 24px color-mix(in srgb, var(--tc-pink) 16%, transparent); animation: ai-peek 2.6s ease-out forwards; }
+.ai-peek.whole { inset: 0; border-radius: 10px; }
+.ai-peek::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 2.5px; background: conic-gradient(from var(--peek-a), var(--accent), var(--tc-purple), var(--tc-pink), var(--tc-orange), var(--tc-teal), var(--accent)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; animation: ai-peek-turn 2.6s linear; }
+@keyframes ai-peek { 0% { opacity: 0; } 12% { opacity: 1; } 70% { opacity: 1; } 100% { opacity: 0; } }
+@keyframes ai-peek-turn { to { --peek-a: 360deg; } }
+@media (prefers-reduced-motion: reduce) { .ai-peek::before { animation: none; } }
 .ai-none { margin: 24px 0; } /* the Calls tab with none: Scheduled tasks' empty box */
 /* Info: how it runs and pays, what it spent, what it can do */
 .ai-info { gap: 26px; font-size: 13px; line-height: 1.5; }
@@ -1656,3 +1694,10 @@ button.board-name:hover { background: none; }
 
 /* the plan limits' popup with several accounts: the ones other than the default a little dimmer */
 .usage-agent.other .usage-row { opacity: 0.8; }
+/* a workflow's Show you (Shown.tsx): what a run shows, scrollable, Close */
+.modal.shown-modal { width: 760px; height: 72vh; }
+.shown-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shown-frame { flex: 1; min-height: 0; width: 100%; border: none; background: var(--panel); }
+.shown-md { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px; }
+.shown-foot { flex: none; display: flex; justify-content: flex-end; padding: 8px 10px; border-top: 1px solid var(--line); }
+.share-pop { top: 64px; left: 50%; transform: translateX(-50%); width: 420px; }

@@ -2,7 +2,7 @@ import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEff
 import { type Account, type AccountView, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
-import { api, bridge, type Msg, notify, type NotifyAction, onLakiLink, openExternal } from './api'
+import { api, bridge, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, INFO_WIDTH, InfoPanel, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
@@ -13,8 +13,9 @@ import { VoiceBar } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
-import { type WidgetApi, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
+import { type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
+import { widgetAsk } from '../../shared/widgetGuide'
 import { ComparePage } from './Compare'
 import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
@@ -27,12 +28,23 @@ import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFind
 import { SchedulesPage } from './Schedules'
 import { actionsFor, clock, initials, mergeActions, nameOf, parseDuration, type RunAction, shortPath, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
-import { type Cloudflared, portsOf, TunnelButton, type TunnelApi } from './Tunnel'
+import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
+import { ShownDialog, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag } from './ui'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
+// Laki AI's glow (experimental): a moving border and a soft inner light over the pane of the tab it looked at, else the
+// whole window; once (its own animation's end clears it)
+function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
+  const el = tab ? document.querySelector(`[data-pane="${CSS.escape(tab)}"]`) : null
+  const r = el?.getBoundingClientRect() // ponytail: measured as it starts; a resize meanwhile leaves it where it was
+  // seen: its middle or a corner is the pane's, not a page's or a panel's over it
+  const at = (x: number, y: number) => document.elementFromPoint(x, y)?.closest('[data-pane]') === el
+  const on = !!r?.width && !!r.height && [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]].some(([fx, fy]) => at(r.left + r.width * fx, r.top + r.height * fy))
+  return <div className={`ai-peek ${on ? '' : 'whole'}`} style={on ? { left: r!.left, top: r!.top, width: r!.width, height: r!.height } : undefined} onAnimationEnd={e => e.animationName === 'ai-peek' && onDone()} aria-hidden />
+}
 const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
 
 const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
@@ -103,6 +115,34 @@ type RailKind = 'projects' | 'shells' | 'browsers'
 const RAIL: [RailKind, string, IconName][] = [['projects', 'Projects', 'fork'], ['shells', 'Terminal', 'terminal'], ['browsers', 'Browser', 'globe']]
 let requests = 0
 const wsName = (w: { id: string; name?: string }) => w.name || w.id
+// remote access's page, with Laki's PIN: the code shown in Settings › Remote access on the Mac (api.pin); a wrong one
+// counts down, the last stops remote access
+function PinForm({ left }: { left?: number }) {
+  const [code, setCode] = useState('')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [over, setOver] = useState(false) // stopped: nothing more to try here
+  const send = () => {
+    if (busy || over || !code.trim()) return
+    setBusy(true)
+    api.pin(code).then(
+      () => (setErr(''), setBusy(false)), // the socket opens next (or the splash says why not)
+      e => (setErr((e as Error).message), setCode(''), /stopped/.test((e as Error).message) && setOver(true), setBusy(false)),
+    )
+  }
+  return (
+    <form className="splash-pin" onSubmit={e => (e.preventDefault(), send())}>
+      <label htmlFor="pin">The PIN in Laki on your Mac (Settings › Remote access)</label>
+      <input id="pin" value={code} autoFocus disabled={over} inputMode="numeric" autoComplete="one-time-code" maxLength={7} placeholder="000000" onChange={e => setCode(e.target.value.normalize('NFKC').replace(/[^\d ]/g, ''))} />
+      <button type="submit" className="primary" disabled={busy || over || !code.trim()}>
+        {busy ? 'Checking…' : 'Open Laki'}
+      </button>
+      {err ? <div className="field-err" role="alert">{err}</div> : left !== undefined && <div className="muted small">{left === 1 ? 'One wrong PIN stops remote access.' : `${left} wrong PINs stop remote access.`}</div>}
+    </form>
+  )
+}
+// its PR as #n (the scan's, else the linked URL's): ⌘K and the sidebar's filter find a workspace by its PR's number
+const prNum = (w: WorkspaceView) => (n => (n ? `#${n}` : undefined))(w.pr?.number ?? /\/pull\/(\d+)/.exec(w.prUrl ?? '')?.[1])
 
 // the last theme (and glass, font), until the daemon's settings arrive
 applyTheme(load<string | Paint>('laki.theme', ''))
@@ -145,7 +185,9 @@ function KeyBar({ onKey }: { onKey: (data: string) => void }) {
 export function App() {
   const [view, setView] = useState<View | null>(null)
   const [connected, setConnected] = useState(false)
+  const [glow, setGlow] = useState<{ tab?: string; n: number } | null>(null) // Laki AI just looked (Settings › Experimental › Laki AI's glow)
   const [problem, setProblem] = useState<string | undefined>() // the remote page: why it can't connect
+  const [pinAsk, setPinAsk] = useState<{ left?: number } | null>(null) // the remote page: Laki's PIN, asked for on the splash
   const [going, setGoing] = useState<Record<string, string>>({}) // workspaces being archived or deleted: a spinner on their rows
   const [making, setMaking] = useState<{ key: number; project: string; place?: string; name: string }[]>([]) // new ones on their way: a row each
   const made = useRef({ key: 0, page: 0 }) // making's keys; page: the new-workspace page's closes (one closed mid-create isn't the one open now)
@@ -205,6 +247,8 @@ export function App() {
     return src ? { src } : null
   })
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
+  const [shown, setShown] = useState<ShownWin[]>([]) // what workflows' Show you blocks show, in turn
+  const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, showMenu] = useMenu()
   const [gallery, setGallery] = useState<string | null>(null) // the workspace whose Artifacts show over the status bar
@@ -272,7 +316,11 @@ export function App() {
   const pinned = byProject.filter(w => w.pinned) // the sidebar's top
   // the sidebar's order: Pinned, then each project's (⌘↑/⌘↓, ⌘J, the palette)
   const order = [...pinned, ...byProject.filter(w => !w.pinned)]
-  const ws = live.find(w => w.id === wsId) ?? order[0] ?? null
+  // what's on screen stays there: a pick that's gone (archived, removed) or not in the view yet falls back to the one
+  // shown, not to the first row, which a new workspace (placed on top, or sorted by last active) would take
+  const shownWs = useRef<string | null>(null)
+  const ws = live.find(w => w.id === wsId) ?? live.find(w => w.id === shownWs.current) ?? order[0] ?? null
+  shownWs.current = ws?.id ?? null
   const info = !!ws && infoOn.includes(ws.id)
   const setInfo = (on: boolean, id = ws?.id) => void (id && setInfoOn(l => (on ? (l.includes(id) ? l : [...l, id]) : l.filter(x => x !== id))))
   const previewed = ws && preview?.ws === ws.id ? preview : null // the file preview, when it's this workspace's
@@ -282,7 +330,9 @@ export function App() {
   const byId = (id: string) => tabs.find(t => t.id === id)
   const placed = groupsOf(stored[ws?.id ?? ''], tabs.map(t => t.id))
   const groups = narrow ? placed.flatMap(g => tabsOf(g).map(tab => ({ tab }))) : placed // too narrow for splits: a tab per pane
-  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
+  const shownTab = useRef<string | null>(null) // likewise the tab: a new one doesn't take the pane's place
+  const tab = tabs.find(t => t.id === tabByWs[ws?.id ?? '']) ?? tabs.find(t => t.id === shownTab.current) ?? tabs.find(t => t.kind === 'agent') ?? tabs[0] ?? null
+  shownTab.current = tab?.id ?? null
   const group = groups.find(g => tabsOf(g).includes(tab?.id ?? '')) ?? null
   const visible = tabsOf(group)
 
@@ -608,9 +658,15 @@ export function App() {
     const off = api.on(m => {
       if (m.ev === 'state') setView(m.view)
       else if (m.ev === 'problem') setProblem(m.text)
-      else if (m.ev === 'open') {
+      else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
+      else if (m.ev === 'remote') {
+        // remote access stopped by a wrong PIN on its page: said here, and as a notification
+        toast(m.text, () => setDialog({ section: 'remote' }), 'Settings')
+        notify('Remote access', m.text, '', () => setDialog({ section: 'remote' }), viewRef.current?.settings.notifySound)
+      } else if (m.ev === 'open') {
         setConnected(true)
         setProblem(undefined)
+        setPinAsk(null)
         api.call<AppInfo[]>('apps').then(setApps, () => {})
       }
       else if (m.ev === 'close') setConnected(false)
@@ -632,10 +688,15 @@ export function App() {
         if (m.kind === 'waiting') setTimeout(post, 800)
         else post()
       } else if (m.ev === 'flow') {
-        // a workflow run asks you, or ended (a notify end, or a failure)
+        // a workflow run asks you, shows you something (a window, maybe a notification), or ended (a notify end, a failure)
         const s = viewRef.current?.settings
-        if (s?.notify === false || (m.kind === 'end' && !m.notify)) return
         const open = () => setDialog({ workflows: '', run: m.id })
+        if (m.kind === 'show') {
+          setShown(q => [...q, { run: m.id, name: m.name, title: m.text, body: m.body ?? '' }].slice(-10))
+          if (m.notify && s?.notify !== false) notify(`Workflow · ${m.name}`, String(m.text).slice(0, 200), '', open, s?.notifySound)
+          return
+        }
+        if (s?.notify === false || (m.kind === 'end' && !m.notify)) return
         const body = m.kind === 'waiting' ? `asks you: ${m.text}` : `${m.status}: ${m.text}`
         notify(`Workflow · ${m.name}`, body.slice(0, 200), '', open, s?.notifySound)
         if (m.kind === 'waiting') toast(`${m.name} asks you: ${m.text}`.slice(0, 160), open, 'Open')
@@ -658,6 +719,10 @@ export function App() {
             e => api.call('browseDone', { id: m.req, ok: false, error: String((e as Error).message) }),
           )
           .catch(() => {})
+      } else if (m.ev === 'peek') {
+        // Laki AI looked at a tab (lit where it's shown, else the window) or used the agent browser (the window); Laki in
+        // the background (away: animations paused): none, not a late one when you're back
+        if (viewRef.current?.settings?.aiGlow === true && !document.documentElement.classList.contains('away')) setGlow({ tab: shownTabs.current.includes(m.tab) ? m.tab : undefined, n: Date.now() })
       } else if (m.ev === 'browse' && bridge?.browse) {
         // the agent browser (laki browser): main drives a hidden window; its answer goes back to the daemon
         const { req: id, ev: _, ...r } = m // req: an event with an id would be taken for a reply
@@ -1271,7 +1336,14 @@ export function App() {
   }
   const prMenu = (w: WorkspaceView): MenuItem[] => [
     { label: 'Refresh from GitHub', icon: 'refresh', key: 'r', run: refreshPR },
-    ...(w.pr ? [{ label: 'Open the PR', icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem, { label: 'Open its checks', icon: 'link', key: 'c', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem] : []),
+    ...(w.pr
+      ? [
+          { label: 'Open the PR', icon: 'link', key: 'o', run: () => openExternal(w.pr!.url) } as MenuItem,
+          { label: 'Open its checks', icon: 'link', key: 'c', run: () => openExternal(`${w.pr!.url}/checks`) } as MenuItem,
+          { label: 'Copy PR link', icon: 'copy', key: 'l', run: () => copy(w.pr!.url) } as MenuItem,
+          { label: `Copy #${w.pr.number}`, icon: 'copy', key: 'n', run: () => copy(`#${w.pr!.number}`) } as MenuItem,
+        ]
+      : []),
     ...(w.pr?.state === 'OPEN'
       ? [
           null,
@@ -1295,6 +1367,17 @@ export function App() {
       { label: 'Mark as unread', icon: 'unread', key: 'u', run: () => ts.forEach(t => markUnread(t.id)) },
       ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
       ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),
+      ts[0].share
+        ? {
+            label: 'Shared read-only',
+            icon: 'globe',
+            items: [
+              { label: 'Link and QR code…', icon: 'globe', run: () => setSharing(ts[0].id) },
+              { label: 'Copy share link', icon: 'link', run: () => copy(ts[0].share!.url) },
+              { label: 'Stop sharing', icon: 'x', danger: true, run: () => void call('shareStop', { tab: ts[0].id }).then(() => done(`${ts[0].name} isn't shared any more: its link is dead`)) },
+            ],
+          }
+        : { label: 'Share read-only link…', icon: 'globe', run: () => setSharing(ts[0].id) },
       null,
       { label: 'Split right', icon: 'splitRight', run: () => (selectTab(ts[0].id), split('right', ts[0].id)) },
       { label: 'Split down', icon: 'splitDown', run: () => (selectTab(ts[0].id), split('bottom', ts[0].id)) },
@@ -1503,7 +1586,7 @@ export function App() {
     const items: PaletteItem[] = []
     const a = (x: Action) => items.push({ ...x, hint: x.hint ?? 'action' })
     if (ws) a({ label: 'Find files…', icon: 'search', hint: '⌘P', run: () => setDialog('files') }) // first: it opens a search of its own
-    for (const w of order) items.push({ label: wsName(w), hint: `${w.branch || 'folder'} · workspace`, glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
+    for (const w of order) items.push({ label: wsName(w), hint: [w.branch || 'folder', prNum(w), 'workspace'].filter(Boolean).join(' · '), glyph: rollup(view!.tabs.filter(t => t.workspace === w.id)), run: () => setWsId(w.id) })
     for (const t of view?.tabs ?? []) {
       const w = live.find(w => w.id === t.workspace)
       if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
@@ -1546,7 +1629,9 @@ export function App() {
     if (ws) a({ label: `Remind me about ${wsName(ws)}…`, icon: 'timer', run: () => setDialog({ remind: ws.id }) })
     a({ label: find ? 'Stop filtering the sidebar' : 'Filter the sidebar…', icon: 'filter', run: () => (setSideOpen(true), setFind(f => (f ? null : { q: '' }))) })
     if (!view?.remote) {
-      if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
+      // the way Settings has it: Laki's PIN, or the saved email
+      if (settings.remoteAuth === 'pin') a({ label: 'Start remote access with a PIN, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, pin: true }).catch(() => {}), setDialog({ section: 'remote' })) })
+      else if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
       a({ label: 'Remote access…', icon: 'link', run: () => setDialog({ section: 'remote' }) })
     } else {
       a({ label: 'Remote access: the link and QR code', icon: 'link', run: () => setDialog({ section: 'remote' }) })
@@ -1586,7 +1671,7 @@ export function App() {
           <img src={icon} alt="" />
           <span className="wordmark">Laki</span>
         </div>
-        <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>
+        {pinAsk && !connected ? <PinForm left={pinAsk.left} /> : <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>}
         {problem && !connected && <div className="splash-problem">{problem}</div>}
       </div>
     )
@@ -1709,7 +1794,7 @@ export function App() {
         {marksAt === 'end' && yes}
         {w.pr && settings.prIcon !== false && (
           <span className={`ws-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
-            {!w.pr.mine && <Avatar login={w.pr.author} size={16} />}
+            {(!w.pr.mine || settings.ownAvatar !== false) && <Avatar login={w.pr.author} size={16} />}
             <Icon name="github" size={11} />
           </span>
         )}
@@ -1801,7 +1886,7 @@ export function App() {
         {pr && (
           <div className="wp-pr">
             <a href={pr.url} onClick={e => (e.preventDefault(), openExternal(pr.url))}>
-              {!pr.mine && <Avatar login={pr.author} size={16} />}
+              {(!pr.mine || settings.ownAvatar !== false) && <Avatar login={pr.author} size={16} />}
               <span className={`wp-pr-state ${prState(pr)}`}>{prState(pr)}</span>
               <span className="wp-pr-title">
                 #{pr.number} {pr.title}
@@ -1841,7 +1926,7 @@ export function App() {
     if (!find) return true
     const q = find.q.trim().toLowerCase()
     const wt = view.tabs.filter(t => t.workspace === w.id)
-    if (q && ![wsName(w), w.branch, w.pr?.title, w.pr?.author, w.pr && `#${w.pr.number}`].some(x => x?.toLowerCase().includes(q))) return false
+    if (q && ![wsName(w), w.branch, w.pr?.title, w.pr?.author, prNum(w)].some(x => x?.toLowerCase().includes(q))) return false
     return find.only === 'needs' ? wt.some(needsYou) : find.only === 'busy' ? !!w.setup || wt.some(t => t.status === 'running') : find.only === 'pr' ? !!w.pr : true
   }
   const found = find && live.filter(shows).length
@@ -1919,7 +2004,7 @@ export function App() {
             onContextMenu={e => openMenu(e, tabMenu(tabsOf(g)))}
             onPointerDown={e => !narrow && ts[0] && start(e, ts[0].id, true) /* a phone: no splits, tabs in their order */}
             onAuxClick={e => e.button === 1 && closeTabs(ts)}
-            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
+            data-tip={[...ts.filter(t => t.runs).map(t => `${t.name}: ${t.runs} runs in it (its status read off the screen)`), ...ts.filter(t => t.progress).map(t => `${t.name}: ${t.progress!.pct}% done, its own estimate${t.progress!.note ? `: ${t.progress!.note}` : ''}`), ...ts.filter(t => t.asleep).map(t => `${t.name} is asleep to free memory: a look resumes it`), ...ts.filter(t => t.share).map(t => `${t.name} is shared read-only${t.share!.until ? `, ${timeLeft(t.share!.until)} left` : ''} (right click: its link, stop)`), ...ts.filter(t => t.kind === 'agent' && t.status === 'exited').map(t => `${t.name} ended: ⏎ in it starts it again`), ...ts.filter(t => t.model || t.effort).map(t => `${t.name}: ${[t.model, t.effort].filter(Boolean).join(', ')}`), ...ts.filter(t => t.account && t.account !== HOME_ACCOUNT).map(t => `${t.name}: on ${accountsOf(t.preset).find(a => a.id === t.account)?.name ?? 'another account'}`), `⌘${groups.indexOf(g) + 1}`, 'double click to rename', 'drag to reorder, or onto a pane to split', 'right click for more'].join(' · ')}
           >
             <Glyph s={ts.length > 1 ? rollup(ts) : ts[0] ? tabGlyph(ts[0]) : 'idle'} />
             <span>{ts.map(t => t.name).join(' · ')}</span>
@@ -1928,6 +2013,11 @@ export function App() {
             {ts.some(t => t.muted) && (
               <span className="ws-mark">
                 <Icon name="bellOff" size={11} />
+              </span>
+            )}
+            {ts.some(t => t.share) && (
+              <span className="ws-mark">
+                <Icon name="globe" size={11} />
               </span>
             )}
             {queued > 0 && <span className="badge">+{queued}</span>}
@@ -2019,13 +2109,15 @@ export function App() {
     )
   }
   // the floating chat (Settings › AI's Chat button): Laki AI over any page but its own and those with a chat on them
-  const aiFab = !!settings.ai?.on && settings.ai.float !== false && !narrow && dialog !== 'ai' && dialog !== 'help' && !specsOf(dialog) && !flowsOf(dialog) && !settingsOf(dialog)
+  const aiFab = !!settings.ai?.on && settings.ai.float !== false && !narrow && dialog !== 'ai' && dialog !== 'help' && !specsOf(dialog) && !settingsOf(dialog)
   // what it tells the model with each ask: the page open, the workspace and tab, as they are now, and the tab's screen
   const whereNow = async () => {
     const page = dialog === null ? 'the workspace below (no page over it)' : typeof dialog === 'string' ? `the ${dialog} page` : `the ${Object.keys(dialog)[0]} page`
     const w = ws && [`workspace "${wsName(ws)}" (id ${ws.id}) in project ${project?.name ?? ws.project}`, ws.branch && `branch ${ws.branch}`, ws.pr && `PR #${ws.pr.number} "${ws.pr.title}" ${ws.pr.state.toLowerCase()} ${ws.pr.url}`].filter(Boolean).join(', ')
     const t = tab && [`tab "${tab.name}" (id ${tab.id}, ${tab.kind === 'agent' ? tab.preset ?? 'agent' : tab.kind}) ${STATE_WORDS[tab.status] ?? tab.status}`, tab.progress && `${tab.progress.pct}% done`, tab.last && `its last answer: ${tab.last.trim().replace(/\s+/g, ' ').slice(0, 400)}`].filter(Boolean).join(', ')
-    const screen = tab && tab.status !== 'exited' ? await api.call<string>('screen', { target: tab.id, lines: 40 }).catch(() => '') : ''
+    const flow = flowsOf(dialog) && pageNow.workflow?.() // the Workflows page: the workflow open there, and its file
+    if (flow) return `On the Workflows page, with ${flow}`
+    const screen = tab && tab.status !== 'exited' ? await api.call<string>('screen', { target: tab.id, lines: 40, by: 'ai' }).catch(() => '') : '' // by: Laki AI looks (its glow)
     return [`On ${page}`, w && `selected: ${w}`, t, screen.trim() && `the tab's screen now (its last 40 lines):\n${screen.replace(/\s+$/gm, '').slice(-5000)}`].filter(Boolean).join('; ')
   }
   const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
@@ -2041,6 +2133,7 @@ export function App() {
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
       {railPins.map(pinButton)}
       {planPins.map(planButton)}
+      <WidgetButtons widgets={view.widgets ?? []} api={widgetApi} places={['rail']} look="rail" words={railWords} />
       <span className="spacer" />
       {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
       {railButton('settings', 'gear', 'Settings', settingsOf(dialog), 'Settings (⌘,)', toSettings)}
@@ -2188,6 +2281,7 @@ export function App() {
           <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
           <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
+          <WidgetButtons widgets={view.widgets ?? []} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={labels} />
           {!rail && (
             <>
               <span className="spacer" />
@@ -2236,6 +2330,7 @@ export function App() {
           )}
         </div>
         {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown')} />}
+        {glow && <PeekGlow key={glow.n} tab={glow.tab} onDone={() => setGlow(null)} />}
         <div className="body">
           {tabsAt === 'left' && tabStrip}
           <div className="term-wrap">
@@ -2334,7 +2429,7 @@ export function App() {
               width={infoW}
               onWidth={setInfoW}
               onClose={() => setInfo(false)}
-              onOpen={openExternal}
+              onOpen={url => void openKeptLink(url).catch(fail) /* its .url links too: a file:/// one */}
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
               onAct={(act, method) => prAct(ws, act, method)}
@@ -2381,6 +2476,7 @@ export function App() {
             accounts={layoutsOn ? accountsApi : undefined}
             ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
             webhookTest={w => api.call('webhookTest', w)}
+            uiReset={() => api.call('uiReset')}
             resources={{
               load: () => api.call<Resources>('resources'),
               tabs: view.tabs,
@@ -2393,7 +2489,7 @@ export function App() {
               stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
               widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
             }}
-            remote={{ state: view.remote, start: (hours, mail, open) => api.call('remoteStart', { hours, mail, open }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+            remote={{ state: view.remote, start: (hours, mail, open, pin) => api.call('remoteStart', { hours, mail, open, pin }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             widgets={{
               list: view.widgets ?? [],
               home: view.widgetHome,
@@ -2407,6 +2503,7 @@ export function App() {
                 openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])
               },
               logs: settings.devMode ? id => setDialog({ logs: `widget:${id}`, title: `Logs · ${view.widgets?.find(x => x.id === id)?.name ?? id}` }) : undefined,
+              ai: settings.ai?.on ? want => (setDialog('ai'), void api.call('aiAsk', { text: widgetAsk(want) }).catch(fail)) : undefined, // its chat shows the ask and the questions
             }}
             logs={(key, title) => setDialog({ logs: key, title })}
             section={settingsFor ? `project:${settingsFor.id}` : section}
@@ -2414,6 +2511,22 @@ export function App() {
             spot={typeof dialog === 'object' && dialog && 'spot' in dialog ? dialog.spot : undefined}
           />
         )}
+        {shown[0] && <ShownDialog s={shown[0]} left={shown.length - 1} onOpenRun={() => (setDialog({ workflows: '', run: shown[0].run }), setShown([]))} onClose={() => setShown(q => q.slice(1))} />}
+        {(t =>
+          t && (
+            <SharePop
+              name={t.name}
+              share={t.share}
+              onClose={() => setSharing(null)}
+              api={{
+                // the link copied as it's made: what you share it for
+                start: hours => api.call<{ url: string }>('shareStart', { tab: t.id, hours }).then(r => navigator.clipboard.writeText(r.url).then(() => done('Share link copied'), () => {})),
+                stop: () => api.call('shareStop', { tab: t.id }),
+                open: openExternal,
+                copy,
+              }}
+            />
+          ))(sharing ? byId(sharing) : undefined)}
         {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? view.widgets?.find(x => x.id === dialog.widget) : undefined)}
         {dialog === 'help' && <HelpPage cli="laki" ship zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
@@ -2487,7 +2600,16 @@ export function App() {
                 actions={settings.actions}
                 at={{ run: o.run }}
                 onClose={() => setDialog(null)}
-                api={{ call, openWs: id => (setDialog(null), setWsId(id)), openTab: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })), toast: text => toast(text) }}
+                api={{
+                  call,
+                  openWs: id => (setDialog(null), setWsId(id)),
+                  openTab: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })),
+                  toast: text => toast(text),
+                  phone: !!settings.webhook?.url?.trim(),
+                  settings: section => setDialog({ section }),
+                  // Laki AI's floating chat over the page (it knows the open workflow); an ask: sent there, as you'd type it
+                  ai: settings.ai?.on ? ask => (setAiFloat(true), ask && void whereNow().then(context => api.call('aiAsk', { text: ask, context })).catch(fail)) : undefined,
+                }}
               />
             </Suspense>
           ))(flowsOf(dialog))}
@@ -2557,6 +2679,7 @@ export function App() {
               set: s => api.call('scheduleSet', s),
               rm: id => api.call('scheduleRm', { id }),
               run: id => api.call('scheduleRun', { id }),
+              flows: settings.workflows === true ? () => api.call('flowList', {}) : undefined,
               open: (w, t) => (setDialog(null), t && view.tabs.some(x => x.id === t) ? selectTab(t) : setWsId(w)),
               pick: async () => {
                 const path = bridge ? await bridge.pickFolder() : prompt('The folder’s full path') // a browser has no folder picker

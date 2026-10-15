@@ -1,24 +1,26 @@
 // The daemon's model: projects, workspaces (git worktrees), tabs (PTY sessions), agent status from hooks,
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
-import { createHash, randomBytes, randomUUID } from 'node:crypto'
+import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 import { readdir, readFile, rm, stat } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
 import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, userInfo } from 'node:os'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, AGENTS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
-import { flowView } from '../shared/workflow.ts'
-import { accountEnv, accountFor, accountIds, accounts, loginCmd } from './accounts.ts'
+import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
+import { accountEnv, accountFor, accountIds, accountNamed, accounts, homeDir, loginCmd } from './accounts.ts'
+import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from './share.ts'
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetHome, widgetKey, widgetsView, widgetTick } from './widgets.ts'
+import { scanWidgets, widgetDir, widgetHome, widgetKey, widgetsOff, widgetsView, widgetTick } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -205,7 +207,7 @@ another session in it) with an agent started on the task. This session goes on a
 })
 
 // the storage folder, for the start note and the laki skill (skill.ts): files, and links to what an agent publishes
-export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's own folder, outside the repo, for what you make for the user to keep (screenshots, reports, exports, notes); every tab of the workspace shares it, and Laki shows it as the workspace's Artifacts. Save there when the user asks for such files or mentions the storage folder. Whatever you publish for the user (a Claude artifact, a deployed site, a gist, a hosted page or file) gets a link there, without being asked: give its link in your last answer, as \`[a few words](link)\`, and Laki keeps Claude artifacts and sites on the usual hosts (vercel.app, netlify.app, pages.dev, github.io, gists…) on its own; anything else, save yourself as \`<a few words>.url\` holding \`[InternetShortcut]\` and, on the next line, \`URL=<the link>\` (\`printf '[InternetShortcut]\\nURL=%s\\n' "<link>" > "$LAKI_STORAGE_FOLDER/<a few words>.url"\`). Laki lists links first and opens them in the browser.`
+export const STORAGE_NOTE = `$LAKI_STORAGE_FOLDER (when set): this workspace's own folder, outside the repo, for what you make for the user to keep (screenshots, reports, exports, notes); every tab of the workspace shares it, and Laki shows it as the workspace's Artifacts. Group related files in a subfolder (\`screenshots/\`, \`review-1234/\`): Laki shows each folder, and the user opens it. Save there when the user asks for such files or mentions the storage folder. Whatever you publish for the user (a Claude artifact, a deployed site, a gist, a hosted page or file) gets a link there, without being asked: give its link in your last answer, as \`[a few words](link)\`, and Laki keeps Claude artifacts and sites on the usual hosts (vercel.app, netlify.app, pages.dev, github.io, gists…) on its own; anything else, save yourself as \`<a few words>.url\` holding \`[InternetShortcut]\` and, on the next line, \`URL=<the link>\` (\`printf '[InternetShortcut]\\nURL=%s\\n' "<link>" > "$LAKI_STORAGE_FOLDER/<a few words>.url"\`): https, or \`file:///<path>\` for a page you made on this Mac outside the folder. Laki lists links first and opens them in the browser.`
 
 // What Laki is and what its CLI does for an agent (a preset's laki, unset: on): told to claude and codex at every start
 const LAKI_NOTE = () =>
@@ -403,7 +405,7 @@ export function view(): View {
     if (status === 'idle' || status === 'exited') r.progress = undefined // the turn's estimate goes with it, however it ended (an Esc, sweepRunning)
     if (status === 'running') pushed.delete(t.id) // its next wait or end pushes again
     const ask = status === 'waiting' && s ? askOf(s.screenText(16)) : undefined
-    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }) }
+    return { ...t, status, code: s?.exited && !asleep.has(t.id) ? s.exitCode : undefined, done: r.done, limit: r.limit, last: r.last, runAt: r.runAt, ask, ...(asleep.has(t.id) && { asleep: true }), ...(r.progress && { progress: r.progress }), ...(shellAgents.has(t.id) && { runs: shellAgents.get(t.id)!.agent }), ...(l => l && { share: l })(shareLink(t.id)) }
   })
   return {
     projects: state.projects,
@@ -424,7 +426,7 @@ export function view(): View {
     widgets: widgetsView(),
     widgetKey,
     widgetHome: widgetHome(),
-    ...(state.settings?.workflows === true && { flows: state.flows?.map(flowView) }),
+    ...(state.settings?.workflows === true && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at }),
     api: API,
     built: BUILT,
   }
@@ -1423,6 +1425,19 @@ export function settingsSet(o: Settings) {
   return state.settings
 }
 
+// what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
+// access, env, actions, templates, prompts, folders, your editor, rail pins). The rest, the experimental ones too: defaults
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'editor', 'editorCmd', 'railPlans']
+export function uiReset() {
+  const s = state.settings ?? {}
+  state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
+  if (state.settings.voice?.on) state.settings.voice = { ...state.settings.voice, on: undefined } // its setup kept, its experimental switch off
+  widgetsOff() // every extension off
+  save()
+  changed()
+  return state.settings
+}
+
 const branchPrefix = () => state.settings?.branchPrefix?.trim() || 'laki/'
 
 // what a folder can open in, by macOS app name (open -a <app> <folder>)
@@ -1496,6 +1511,7 @@ export function closeTab(id: string) {
   asleep.delete(id)
   rt.delete(id)
   state.tabs = state.tabs.filter(x => x !== t)
+  stopShares({ tab: id })
   save()
   changed()
 }
@@ -1761,6 +1777,7 @@ async function copyIncludes(proj: Project, ws: Workspace) {
 
 async function teardown(ws: Workspace) {
   stopTunnels(ws.id)
+  stopShares({ ws: ws.id })
   forward(ws, false)
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
@@ -1792,6 +1809,7 @@ function dropWs(ws: Workspace) {
   saidTried.delete(ws.id)
   if (state.layouts?.[ws.id]) delete state.layouts[ws.id]
   stopTunnels(ws.id)
+  stopShares({ ws: ws.id })
   forward(ws, false)
   for (const t of tabsOf(ws.id)) {
     sessions.get(t.id)?.kill()
@@ -1833,6 +1851,7 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
   ws.archived = true
   ws.port = 0
   stopTunnels(ws.id) // one started during the teardown
+  stopShares({ ws: ws.id })
   state.tabs = state.tabs.filter(t => t.workspace !== ws.id || t.kind === 'agent' || t.kind === 'shell')
   save()
   changed()
@@ -2328,8 +2347,9 @@ function prSoon() {
 const artifacts = new Map<string, number>()
 const links = new Map<string, Link[]>() // its .url files' links, newest first: the info panel's, the gallery's first
 let artifacting = false
-// a .url file's link (an Internet shortcut: [InternetShortcut], URL=…), http(s) only
-export const urlOf = (text: string) => /^URL=(https?:\/\/\S+)\s*$/im.exec(text)?.[1]
+// a .url file's link (an Internet shortcut: [InternetShortcut], URL=…): http(s), or file:/// (a page an agent made on
+// this Mac, opened by main's open-path: a document only)
+export const urlOf = (text: string) => /^URL=(https?:\/\/\S+|file:\/\/\/[^\r\n]*?)\s*$/im.exec(text)?.[1] // a path may have spaces (Application Support)
 // the files under dir (relative paths), hidden files and folders left out
 const walkFiles = async (dir: string, rel = ''): Promise<string[]> => {
   const out: string[] = []
@@ -2447,23 +2467,38 @@ export async function artifactList(ref: string) {
   return list.filter(x => !!x).sort((a, b) => Number(/\.url$/i.test(b.path)) - Number(/\.url$/i.test(a.path)) || b.at - a.at).slice(0, 500) // links first
 }
 
+// what an agent runs without a shell between (its browser bridge, an MCP server, the browser that one drives) and any
+// browser listen for the agent, not as the workspace's servers: kept in procs (sleep sees them), left out of ports (the
+// status bar's ↗, the menus). What it starts through its shell tool (a dev server) is the workspace's
+const SHELLS = /^-?(?:ba|z|fi|da|k|tc|c)?sh$/
+const BROWSER = /chrom|firefox|webkit|msedge|headless/i
 export async function scanPorts() {
   syncBranches()
   void scanArtifacts()
   const root = new Map<number, string>()
+  const agents: number[] = [] // agent tabs' pids
   for (const [id, s] of sessions) {
     const t = state.tabs.find(t => t.id === id)
-    if (t && !s.exited) root.set(s.pty.pid, t.workspace)
+    if (t && !s.exited) root.set(s.pty.pid, t.workspace), t.kind === 'agent' && agents.push(s.pty.pid)
   }
   const next = new Map<string, number[]>()
   const nextProcs = new Map<string, Record<number, Proc>>()
   if (root.size) {
     const kids = new Map<number, number[]>()
-    const { stdout: ps } = await run('ps', ['-axo', 'pid=,ppid=']).catch(() => ({ stdout: '' }))
+    const comm = new Map<number, string>() // each one's program, by name
+    const { stdout: ps } = await run('ps', ['-axo', 'pid=,ppid=,comm=']).catch(() => ({ stdout: '' }))
     for (const l of ps.split('\n')) {
-      const [pid, ppid] = l.trim().split(/\s+/).map(Number)
-      if (pid) kids.set(ppid, [...(kids.get(ppid) ?? []), pid])
+      const m = /^\s*(\d+)\s+(\d+)\s*(.*)$/.exec(l)
+      if (!m || !Number(m[1])) continue
+      kids.set(Number(m[2]), [...(kids.get(Number(m[2])) ?? []), Number(m[1])])
+      comm.set(Number(m[1]), basename(m[3].trim()))
     }
+    const own = new Set<number>()
+    const mine = (pid: number) => {
+      own.add(pid)
+      for (const k of kids.get(pid) ?? []) if (!own.has(k) && !SHELLS.test(comm.get(k) ?? '')) mine(k)
+    }
+    agents.forEach(mine)
     const owner = new Map<number, string>()
     const walk = (pid: number, ws: string) => {
       owner.set(pid, ws)
@@ -2483,8 +2518,9 @@ export async function scanPorts() {
         const port = Number(l.slice(l.lastIndexOf(':') + 1))
         const ws = owner.get(pid)
         if (!ws || !port) continue
-        if (!next.get(ws)?.includes(port)) next.set(ws, [...(next.get(ws) ?? []), port].sort((a, b) => a - b))
-        nextProcs.set(ws, { ...nextProcs.get(ws), [port]: { pid, cmd } })
+        const inner = own.has(pid) || BROWSER.test(cmd)
+        if (!inner && !next.get(ws)?.includes(port)) next.set(ws, [...(next.get(ws) ?? []), port].sort((a, b) => a - b))
+        nextProcs.set(ws, { ...nextProcs.get(ws), [port]: { pid, cmd, ...(inner && { own: true }) } })
       }
     }
   }
@@ -2655,34 +2691,169 @@ export function stopTunnels(ws?: string) {
   for (const t of [...tunnels.values()]) if (!ws || t.ws === ws) tunnelStop({ ws: t.ws, port: t.port })
 }
 
+// ---------- shared tabs (share.ts): a tab as a read-only page at <a quick tunnel>/s/<uuid> for anyone with the link,
+// kept up to date (the page asks every 2.5 s). The pages have a server of their own on 127.0.0.1, so the tunnel reaches
+// them and never the daemon's API; one tunnel for all, both stopped with the last share. Like tunnels, they live in
+// this process only: a restart ends them (a quick tunnel's URL is new each time anyway).
+type ShareRun = { id: string; tab: string; ws: string; until?: number; v: number; title: string; sub: string; md: string; body: string; read?: number; key?: string; file?: string; looked?: number; pos?: number; said?: Said[] }
+const SHARE_READ = 32 << 20 // a transcript's most read at once: a longer one starts there (ponytail: its start is left out)
+const shares = new Map<string, ShareRun>()
+type Sharing = { server: Server; cf?: Cf; base: Promise<string | undefined> } // base: the tunnel's URL
+let sharing: Sharing | undefined
+const shareOf = (tab: string) => [...shares.values()].find(s => s.tab === tab)
+export const shareLink = (tab: string) => (s => s && sharedAt ? { url: `${sharedAt}/s/${s.id}`, ...(s.until && { until: s.until }) } : undefined)(shareOf(tab))
+export const SHARE_HOURS = [1, 8, 24, 0] // how long a link lasts: 0, until you stop it
+let sharedAt: string | undefined // the tunnel's URL, once it gave one
+
+export async function shareStart(o: { tab: string; hours?: number }): Promise<{ url: string; until?: number }> {
+  const tab = resolveTarget(o.tab)
+  const hours = Number(o.hours ?? 0)
+  if (!SHARE_HOURS.includes(hours)) throw new Error(`for how long: ${SHARE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
+  await cfReady(false)
+  const s: ShareRun = shareOf(tab.id) ?? { id: randomUUID(), tab: tab.id, ws: tab.workspace, v: 0, title: tab.name, sub: '', md: '', body: '' }
+  if (o.hours !== undefined) s.until = hours ? Date.now() + hours * 3600e3 : undefined // asked again: from now
+  shares.set(s.id, s)
+  if (!sharing) {
+    // set at once: a second share started meanwhile waits for this one's tunnel
+    const server = createServer((q, r) => void shareServe(q, r).catch(e => (log('share', e), r.headersSent || r.writeHead(500).end())))
+    const at: Sharing = { server, base: Promise.resolve(undefined) }
+    at.base = new Promise<void>((ok, fail) => server.once('error', fail).listen(0, '127.0.0.1', ok)).then(() => {
+      if (sharing !== at) return undefined // stopped meanwhile
+      const { cf, url } = cloudflare(`http://127.0.0.1:${(server.address() as { port: number }).port}`, [], why => (log(`shared tabs' tunnel ended (${why})`), stopShares()), ['Shared tabs', 'share'])
+      at.cf = cf
+      return url
+    })
+    sharing = at
+  }
+  const at = sharing
+  let base: string | undefined
+  try {
+    base = await at.base
+  } catch (e) {
+    if (sharing === at) stopShares()
+    throw e
+  }
+  if (!base || !shares.has(s.id)) throw new Error('sharing was stopped')
+  sharedAt = base
+  changed()
+  return { url: `${base}/s/${s.id}`, ...(s.until && { until: s.until }) }
+}
+
+// every 15 s (main.ts): links past their hours stop
+export function shareTick(now = Date.now()) {
+  for (const s of shares.values()) if (s.until && now >= s.until) stopShares({ tab: s.tab })
+}
+
+// a tab's share, or every one (Resources' Stop), or a workspace's tabs' and closed tabs' (archived, closed)
+export function stopShares(o: { tab?: string; ws?: string } = {}) {
+  const n = shares.size
+  for (const s of [...shares.values()]) if ((!o.tab && !o.ws) || s.tab === o.tab || s.ws === o.ws || !state.tabs.some(t => t.id === s.tab)) shares.delete(s.id)
+  if (shares.size === n) return
+  if (!shares.size && sharing) {
+    sharing.cf?.stop()
+    sharing.server.close()
+    sharing.server.closeAllConnections()
+    sharing = sharedAt = undefined
+  }
+  changed()
+}
+
+// what the tab shows now: its chat (claude's or codex's transcript, read as it grows), else its terminal's text; at
+// most every 1.5 s however many look
+async function shareRead(s: ShareRun) {
+  const tab = state.tabs.find(t => t.id === s.tab)
+  if (!tab || (s.read && Date.now() - s.read < 1500)) return
+  s.read = Date.now()
+  const agent = tab.preset ?? ''
+  const name = AGENT_NAMES[agent as Agent] ?? tab.name
+  let said: Said[] | undefined
+  let key: string | undefined
+  if ((agent === 'claude' || agent === 'codex') && tab.resumeId && !state.workspaces.find(w => w.id === tab.workspace)?.host) {
+    // looked for again every 10 s at most (codex's: a walk of every session): a new chat's is written at its first turn
+    if (!s.file?.endsWith(`${tab.resumeId}.jsonl`) && Date.now() - (s.looked ?? 0) > 10000) (s.looked = Date.now()), (s.file = transcriptOf(agent, accountNamed(tab.account)?.dir ?? homeDir(agent), tab.resumeId)), (s.pos = 0), (s.said = [])
+    if (!s.file?.endsWith(`${tab.resumeId}.jsonl`)) s.file = undefined // another chat's: the screen until this one's is found
+    const size = s.file ? (statSync(s.file, { throwIfNoEntry: false })?.size ?? 0) : 0
+    if (s.file && size) {
+      if (size < (s.pos ?? 0)) (s.pos = 0), (s.said = []) // written anew
+      if (size - s.pos! > SHARE_READ) s.pos = size - SHARE_READ // the line it lands in is cut off: JSON.parse skips it
+      if (size > s.pos!) {
+        const buf = Buffer.alloc(size - s.pos!)
+        const fd = openSync(s.file, 'r')
+        try {
+          readSync(fd, buf, 0, buf.length, s.pos!)
+        } finally {
+          closeSync(fd)
+        }
+        const cut = buf.lastIndexOf(10) + 1 // whole lines only: the last may be half written
+        chatOf(agent, buf.subarray(0, cut).toString('utf8'), s.said!)
+        s.pos! += cut
+      }
+      said = s.said!
+      key = `${s.file}:${s.pos}`
+    }
+  }
+  if (!said) {
+    const text = await screen(tab.id, 5000)
+    said = text.trim() ? [{ who: 'screen', text }] : []
+    key = text
+  }
+  if (key === s.key && s.title === tab.name) return
+  Object.assign(s, { key, title: tab.name, md: shareMd(tab.name, name, said), body: shareBody(name, said), v: s.v + 1 })
+}
+
+async function shareServe(q: IncomingMessage, r: ServerResponse) {
+  const u = new URL(q.url ?? '/', 'http://x')
+  const m = /^\/s\/([0-9a-f-]{36})(\.md|\.json)?$/.exec(u.pathname)
+  const s = m && shares.get(m[1])
+  if (s?.until && Date.now() >= s.until) stopShares({ tab: s.tab }) // its hours are up: a tick may not have come yet
+  const head = { 'cache-control': 'no-store', 'x-content-type-options': 'nosniff', 'referrer-policy': 'no-referrer', 'x-robots-tag': 'noindex' }
+  if (q.method !== 'GET' || !s || !shares.has(s.id)) return void r.writeHead(404, { ...head, 'content-type': 'text/plain' }).end('This share has ended, or never was.')
+  await shareRead(s)
+  if (!state.tabs.some(t => t.id === s.tab)) s.sub = 'The tab was closed: this is what it showed last'
+  else s.sub = 'Live · read-only · updates as it goes'
+  if (m[2] === '.md') {
+    const file = `${s.title.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '') || 'shared'}.md`
+    return void r.writeHead(200, { ...head, 'content-type': 'text/markdown; charset=utf-8', ...(u.searchParams.has('download') && { 'content-disposition': `attachment; filename="${file}"` }) }).end(s.md)
+  }
+  if (m[2] === '.json') return void r.writeHead(200, { ...head, 'content-type': 'application/json' }).end(JSON.stringify({ v: s.v, title: s.title, sub: s.sub, ...(Number(u.searchParams.get('v')) !== s.v && { body: s.body }) }))
+  const nonce = randomBytes(16).toString('base64')
+  const csp = `default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; img-src https: data:; connect-src 'self'; base-uri 'none'; form-action 'none'; frame-ancestors 'none'`
+  r.writeHead(200, { ...head, 'content-type': 'text/html; charset=utf-8', 'content-security-policy': csp }).end(sharePage({ id: s.id, title: s.title, sub: s.sub, body: s.body, v: s.v, nonce }))
+}
+
 // ---------- remote access: this daemon, and the app's page it serves (main.ts), at a trycloudflare.com URL for the
 // one email in Settings: Cloudflare Access sends it a one-time code, and the link carries a token of its own (open:
-// no email, asked for in so many words (Settings' typed confirm), the token the only lock: anyone with the link). It
-// ends after the hours asked for (remoteTick; 0: forever, no until), on remoteStop, or with the daemon; a new token each
-// time, so a stopped link is dead.
+// no email, asked for in so many words (Settings' typed confirm), the token the only lock: anyone with the link; pin:
+// no email either, the link's key and a PIN Laki shows here, typed on the page (remotePin), give the page its token,
+// and a wrong PIN settings.remoteTries times stops it). It ends after the hours asked for (remoteTick; 0: forever, no
+// until), on remoteStop, or with the daemon; a new token each time, so a stopped link is dead.
 export const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0]
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
-type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf }
+// pin: the PIN; access: the token it gives (token, the link's, is then good for remotePin only); left: wrong tries left
+type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access?: string; left?: number }
 let remote: RemoteRun | undefined
 let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
-export const remoteToken = () => remote?.token
+export const remoteToken = () => (remote?.pin ? remote.access : remote?.token)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(!remote.mail && { open: true }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
+  remote && { mail: remote.mail, ...(!remote.mail && !remote.pin && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
+const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 
-export async function remoteStart(o: { hours: number; mail?: string; open?: boolean }): Promise<Remote | undefined> {
+export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean }): Promise<Remote | undefined> {
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
-  const open = o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
-  const mail = open ? '' : (o.mail ?? state.settings?.remoteMail ?? '').trim()
-  if (!open && !ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
-  if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open keeps the saved one
+  const pin = o.pin === true // Laki's PIN, no email
+  const open = !pin && o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
+  const mail = open || pin ? '' : (o.mail ?? state.settings?.remoteMail ?? '').trim()
+  if (!open && !pin && !ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
+  if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open and pin keep the saved one
   if (remote) return remoteView()
-  await cfReady(!open)
+  await cfReady(!!mail)
   if (remote) return remoteView() // started meanwhile
-  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, open ? [] : [mail], why => (log(`remote access ended (${why})`), remoteStop()), ['Remote access', 'remote'])
+  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, mail ? [mail] : [], why => (log(`remote access ended (${why})`), remoteStop()), ['Remote access', 'remote'])
   const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf }
+  if (pin) Object.assign(r, { pin: String(randomInt(0, 1e6)).padStart(6, '0'), access: randomBytes(32).toString('hex'), left: triesOf() })
   remote = r
   changed()
   try {
@@ -2692,7 +2863,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
     throw e
   }
   if (remote !== r) return undefined // stopped meanwhile
-  log(`remote access at ${r.url} for ${mail || 'anyone with the link (no email)'}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
+  log(`remote access at ${r.url} for ${mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
   return remoteView()
 }
@@ -2703,6 +2874,32 @@ export function remoteStop() {
   remote = undefined
   r.cf.stop()
   changed()
+}
+
+// a secret compared in constant time (none wanted: no; main.ts' tokens too), as bytes: a multibyte one as long in
+// characters isn't timingSafeEqual's throw
+export function same(a: string, b: string | undefined) {
+  if (!b) return false
+  const [x, y] = [Buffer.from(a), Buffer.from(b)]
+  return x.length === y.length && timingSafeEqual(x, y)
+}
+// the PIN page (main.ts' POST /pin, from the page's origin): the link's key alone says whether it needs a PIN (need:
+// false, a token that isn't it: email, open, or the PIN's token already); with the PIN, the token the page connects
+// with. A wrong one counts down; the last stops remote access, and the app says so
+export function remotePin(p: { token?: unknown; pin?: unknown }): { need: boolean; left?: number } | { token: string } {
+  const r = remote
+  if (!r?.pin || typeof p.token !== 'string' || !same(p.token, r.token)) return { need: false }
+  if (p.pin === undefined) return { need: true, left: r.left }
+  if (typeof p.pin === 'string' && same(p.pin.normalize('NFKC').replace(/\s+/g, ''), r.pin)) return { token: r.access! }
+  r.left = (r.left ?? 1) - 1
+  if (r.left > 0) {
+    changed()
+    throw new Error(`Wrong PIN: ${r.left} more ${r.left === 1 ? 'try' : 'tries'}, then remote access stops`)
+  }
+  log('remote access ended: a wrong PIN')
+  remoteStop()
+  broadcast({ ev: 'remote', text: 'Remote access stopped: a wrong PIN was typed on its page. Start it again for a new link and PIN.' })
+  throw new Error('Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.')
 }
 
 // remote access past its time ends (main.ts asks every 15 s; tests move the clock)
@@ -3115,6 +3312,13 @@ export async function phoneTick() {
   }
 }
 
+// a workflow's notify with phone: yes (workflow.ts): a push like an agent's done one, when Settings has phone pushes
+// what: how it says it (shows you, is done, failed)
+export function flowPhone(name: string, ws: string | undefined, what: string, text: string) {
+  const w = state.settings?.webhook
+  if (!w?.url?.trim()) return
+  pushTo(w, { event: 'done', workspace: ws ?? 'Laki', tab: '', agent: `Workflow ${name}`, title: `Workflow ${name}${ws ? ` in ${ws}` : ''} ${what}`, question: text.slice(0, 500) }).catch(e => log(`push ${name}: ${e.message}`))
+}
 // Settings' Send test: the webhook as the page has it, answered (not fired and forgotten)
 export const webhookTest = (w: Webhook) => pushTo(w ?? {}, { event: 'test', workspace: '', tab: '', agent: 'Laki' }).then(() => true)
 
@@ -3418,7 +3622,7 @@ function cantSleep(t: Tab) {
 // quiet: idle since (view sets idleAt) and since anyone last looked at it, not since it last printed: a TUI may redraw
 // while it waits (a status line)
 function sleepy(t: Tab, now: number) {
-  const min = Number(state.settings?.sleepAfter) || 0
+  const min = Number(state.settings?.sleepAfter ?? SLEEP_AFTER) || 0 // 0: never
   const s = sessions.get(t.id)
   const ws = state.workspaces.find(w => w.id === t.workspace)
   return !!(min > 0 && s && !s.exited && !asleep.has(t.id) && !s.attachedClients().length && !cantSleep(t) && now - Math.max(rt.get(t.id)?.idleAt ?? now, s.lookedAt) > min * 60000 && ws && !ws.archived && !ws.autoFix && !ws.autoReview && !ws.autoMerge)
@@ -3662,8 +3866,12 @@ export async function scanStats(): Promise<void> {
 // through the newest connected app window; a page on this Mac only (main checks too). screenshot: a PNG in images/
 const BROWSE_OPS = ['open', 'screenshot', 'click', 'fill', 'text']
 const browsing = new Map<string, { done: (r: { ok: boolean; result?: any; error?: string }) => void }>()
-export async function browse(p: { ws: string; op: string; url?: string; selector?: string; text?: string }) {
+// Laki AI looked at a tab, or used the agent browser (no tab: a window of its own): the app's glow over that tab's pane,
+// else its window, with Settings › General › Experimental › Laki AI's glow on (the renderer's)
+const peek = (ws: string, tab?: string) => broadcast({ ev: 'peek', ws, tab })
+export async function browse(p: { ws: string; op: string; url?: string; selector?: string; text?: string; by?: string }) {
   const ws = findWs(p.ws)
+  if (p.by === 'ai') peek(ws.id)
   if (!BROWSE_OPS.includes(p.op)) throw new Error(`browser: ${p.op}? one of ${BROWSE_OPS.join(', ')}`)
   if ((p.op === 'click' || p.op === 'fill') && !p.selector?.trim()) throw new Error(`browser ${p.op}: which element? a CSS selector`)
   // a path is on the workspace's $PORT, localhost:3000 gets its http://
@@ -4059,8 +4267,10 @@ export async function prThreads(ref: string) {
   }))
 }
 
-export function screen(target: string, lines = 30) {
+// by: 'ai', Laki AI looking (its tools, its chat's context): the app lights the tab (peek)
+export function screen(target: string, lines = 30, by?: string) {
   const tab = resolveTarget(target)
+  if (by === 'ai') peek(tab.workspace, tab.id)
   const s = sessions.get(tab.id)
   return s ? s.flushed().then(() => s.screenText(lines)) : ''
 }
@@ -4079,8 +4289,12 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on'] as const // what a client sets: the daemon works out the rest
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source'] as const
+// workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again
+export const flowFiles = { at: 0 }
+// workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
+export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' } } = {} // what a client sets: the daemon works out the rest
 
 export function scheduleSet(o: ScheduleIn): Schedule {
   const old = o.id ? findSchedule(o.id) : undefined
@@ -4102,9 +4316,15 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     const agent = state.settings?.agent
     s.preset ||= agent && presetNamed(agent) && presetNamed(agent)!.agent !== 'command' ? agent : 'claude'
   }
+  if (!s.workflow) delete s.workflow, delete s.source // '' clears it: a prompt again
   const pr = presetNamed(s.preset) // an agent's: a command preset takes no prompt
-  if (!(pr ? pr.agent !== 'command' : isAgent(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't an agent's preset`)
-  if (s.ws === 'new') {
+  if (s.workflow) {
+    if (state.settings?.workflows !== true || !flowHooks.find) throw new Error('turn Workflows on first: Settings › General › Experimental')
+    s.source = flowHooks.find({ id: s.workflow, source: s.source, project: proj.id }).source // throws: no such workflow
+  } else if (!(pr ? pr.agent !== 'command' : isAgent(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't an agent's preset`)
+  if (s.workflow) {
+    // its runs go where the workflow says
+  } else if (s.ws === 'new') {
     if (proj.git === false) throw new Error(`${proj.name} isn't a git repository: run it in its folder instead of a new workspace`)
   } else if (s.ws !== 'local' && s.ws !== 'local-new') {
     const ws = findWs(s.ws)
@@ -4112,7 +4332,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     s.ws = ws.id
   }
   s.prompt = s.prompt?.trim() ?? ''
-  if (!s.prompt) throw new Error('the prompt is empty')
+  if (!s.prompt) throw new Error(s.workflow ? 'what should the workflow work on? (its task)' : 'the prompt is empty')
   s.name = s.name?.trim() || undefined
   if (!old || o.when !== undefined) {
     const r = parseWhen(s.when ?? '')
@@ -4149,7 +4369,15 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
   const prompt = stamp(s.prompt, now)
   s.last = now
   try {
-    if (s.ws === 'new' || s.ws === 'local-new') {
+    if (s.workflow) {
+      // a workflow's run, unless the last one this task started is still going
+      const going = state.flows?.find(f => !FLOW_ENDED.includes(f.status) && f.workflow === s.workflow && f.source === (s.source ?? 'yours') && f.project === s.project && f.trigger === `schedule ${s.id}`)
+      if (going) throw new Error(`skipped: its last run (${going.id}) is still going`)
+      if (!flowHooks.start || state.settings?.workflows !== true) throw new Error('Workflows are off: Settings › General › Experimental')
+      const run = await flowHooks.start({ workflow: s.workflow, source: s.source, project: s.project, task: prompt, trigger: `schedule ${s.id}` })
+      r.ws = run.ws
+      r.what = `started a run of ${s.workflow} (${run.id})`
+    } else if (s.ws === 'new' || s.ws === 'local-new') {
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
       const title = wsTitle(s, now)
       const ws = await wsNew({ project: s.project, preset: s.preset, prompt, name: title, vars: true, ...(s.ws === 'local-new' && { local: true, another: true }) })

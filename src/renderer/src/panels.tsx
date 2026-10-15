@@ -1,7 +1,7 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
 import { AGENT_NAMES, type Doctor, HOME_ACCOUNT, EFFORTS, isAgent, type LogLine, MODELS, type Plan, prIn, type View } from '../../shared/types'
-import { api, bridge, openExternal } from './api'
+import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
@@ -1212,12 +1212,13 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
 }
 
 // the status bar's Artifacts, in the app: a strip of the storage folder's files over the status bar (newest first, a
-// preview each), a click shows it big, ← → (or the keys) go through the others. n: their count, a change reloads them
+// preview each), a click shows it big, ← → (or the keys) go through the others. Its folders come first: a click goes in,
+// the head's path (or ←) back out. n: their count, a change reloads them
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
 // menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
 export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void }
-const host = (url: string) => url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]
+const host = (url: string) => (fileOf(url) ? fileOf(url).split('/').pop()! : url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]) // a file:/// link: its file's name
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string } | { error: string }
 // links: its .url files (what its agents published): first, a click opens them in the browser
@@ -1227,11 +1228,30 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   const [files, setFiles] = useState<Artifact[] | null>(null)
   const [err, setErr] = useState('')
   const [big, setBig] = useState<string | null>(null) // the file shown big, by path: a reload (a new one first) keeps it
+  const [dir, setDir] = useState('') // the folder shown, '' the storage folder itself
   const [seen, setSeen] = useState<Record<string, Seen>>({}) // each file's content, by path and time: read once
   const asked = useRef(new Set<string>())
   const api = useRef(a)
   api.current = a
   useEffect(() => void api.current.list().then(f => (setFiles(f), setErr('')), e => setErr(String(e?.message ?? e))), [ws, n])
+  useEffect(() => setDir(''), [ws])
+  // dir's own files (links first, newest first, as listed) and its folders (each with its files' count, the newest first)
+  const under = (f: Artifact) => !dir || f.path.startsWith(`${dir}/`)
+  const rest = (f: Artifact) => (dir ? f.path.slice(dir.length + 1) : f.path)
+  const here = useMemo(() => files?.filter(f => under(f) && !rest(f).includes('/')) ?? null, [files, dir])
+  const folders = useMemo(() => {
+    const m = new Map<string, { n: number; at: number }>()
+    for (const f of files ?? []) {
+      const r = rest(f)
+      if (!under(f) || !r.includes('/')) continue
+      const name = r.slice(0, r.indexOf('/'))
+      const x = m.get(name)
+      m.set(name, { n: (x?.n ?? 0) + 1, at: Math.max(x?.at ?? 0, f.at) })
+    }
+    return [...m].sort((a, b) => b[1].at - a[1].at)
+  }, [files, dir])
+  useEffect(() => void (files && dir && !files.some(under) && setDir(dir.includes('/') ? dir.slice(0, dir.lastIndexOf('/')) : '')), [files, dir]) // emptied: a level up
+  const into = (name: string) => (setDir(dir ? `${dir}/${name}` : name), setBig(null))
   const key = (f: Artifact) => `${f.path}@${f.at}`
   const need = (f: Artifact) => {
     if (asked.current.has(key(f))) return
@@ -1239,10 +1259,10 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     api.current.read(f.path).then(c => setSeen(s => ({ ...s, [key(f)]: c })), e => setSeen(s => ({ ...s, [key(f)]: { error: String(e?.message ?? e) } })))
   }
   // ponytail: previews for the newest 60 of 2 MB or less (a picture comes whole); the rest load as they're opened
-  useEffect(() => void files?.slice(0, 60).forEach(f => f.size <= 2 << 20 && !linkOf(f.path) && need(f)), [files])
-  const i = files && big !== null ? files.findIndex(f => f.path === big) : -1
-  const at = files && i >= 0 ? files[i] : null
-  const step = (d: number) => files?.length && i >= 0 && setBig(files[(i + d + files.length) % files.length].path)
+  useEffect(() => void here?.slice(0, 60).forEach(f => f.size <= 2 << 20 && !linkOf(f.path) && need(f)), [here])
+  const i = here && big !== null ? here.findIndex(f => f.path === big) : -1
+  const at = here && i >= 0 ? here[i] : null
+  const step = (d: number) => here?.length && i >= 0 && setBig(here[(i + d + here.length) % here.length].path)
   useEffect(() => void (at && !linkOf(at.path) && need(at)), [at])
   useEffect(() => {
     if (big === null) return
@@ -1254,10 +1274,11 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   })
+  const go = (url: string) => void openKeptLink(url).catch(e => setErr((e as Error).message)) // a link's: its file gone, said
   // a right click: a link's Open and Copy link, a file's the app's menu
   const rightClick = (e: MouseEvent, f: Artifact) => {
     const l = linkOf(f.path)
-    const items: MenuItem[] = l ? [{ label: 'Open in the browser', icon: 'globe', run: () => openExternal(l.url) }, ...(a.copy ? [{ label: 'Copy link', icon: 'copy', key: 'c', run: () => a.copy!(l.url) } as MenuItem] : [])] : (a.menu?.(f.path) ?? [])
+    const items: MenuItem[] = l ? [{ label: 'Open in the browser', icon: 'globe', run: () => go(l.url) }, ...(a.copy ? [{ label: 'Copy link', icon: 'copy', key: 'c', run: () => a.copy!(l.url) } as MenuItem] : [])] : (a.menu?.(f.path) ?? [])
     if (!items.length) return
     e.preventDefault()
     openMenu(e, items)
@@ -1270,7 +1291,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
           <Icon name="globe" size={full ? 28 : 18} />
           <span className="art-host">{host(l.url)}</span>
           {full && (
-            <button className="primary" onClick={() => openExternal(l.url)}>
+            <button className="primary" onClick={() => go(l.url)}>
               Open {l.url.length > 60 ? `${l.url.slice(0, 60)}…` : l.url}
             </button>
           )}
@@ -1286,7 +1307,26 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
   return (
     <div className="artifacts">
       <div className="art-head">
-        <Icon name="folder" size={12} /> Artifacts <span className="muted">{files ? files.length : ''}</span>
+        <Icon name="folder" size={12} />
+        {dir ? (
+          <>
+            <IconButton icon="back" title="Back: the folder above" onClick={() => setDir(dir.includes('/') ? dir.slice(0, dir.lastIndexOf('/')) : '')} />
+            <button className="art-crumb" onClick={() => setDir('')}>
+              Artifacts
+            </button>
+            {dir.split('/').map((name, k, all) => (
+              <span key={k} className="art-crumbs">
+                <span className="muted">/</span>
+                <button className="art-crumb" disabled={k === all.length - 1} onClick={() => setDir(all.slice(0, k + 1).join('/'))}>
+                  {name}
+                </button>
+              </span>
+            ))}
+          </>
+        ) : (
+          'Artifacts'
+        )}{' '}
+        <span className="muted">{files ? files.filter(under).length : ''}</span>
         <span className="grow" />
         {(a.reveal || a.files) && (
           <IconButton
@@ -1294,7 +1334,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
             title="Open in Finder or Files"
             onClick={e =>
               openMenu(e, [
-                ...(a.reveal ? [{ label: 'Show in Finder', icon: 'folder', run: () => a.reveal!('') } as MenuItem] : []),
+                ...(a.reveal ? [{ label: 'Show in Finder', icon: 'folder', run: () => a.reveal!(dir && `${dir}/`) } as MenuItem] : []),
                 ...(a.files ? [{ label: 'Open in Files', icon: 'panel', sub: "The side panel's Files, on its Artifacts", run: a.files } as MenuItem] : []),
               ], 'right')
             }
@@ -1305,12 +1345,31 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
       <div className="art-strip">
         {err && <span className="warn small">{err}</span>}
         {files && !files.length && <span className="muted small">Nothing kept yet</span>}
-        {files?.map(f => (
+        {folders.map(([name, x]) => (
+          <button
+            key={`dir:${name}`}
+            className="art-card dir"
+            data-tip={`${dir ? `${dir}/` : ''}${name} · ${x.n} ${x.n === 1 ? 'file' : 'files'} · ${new Date(x.at).toLocaleString()}`}
+            onClick={() => into(name)}
+            onContextMenu={e => a.reveal && (e.preventDefault(), openMenu(e, [{ label: 'Open', icon: 'folder', run: () => into(name) }, { label: 'Show in Finder', icon: 'folder', run: () => a.reveal!(`${dir ? `${dir}/` : ''}${name}/`) }]))}
+          >
+            <span className="art-thumb">
+              <span className="art-link">
+                <Icon name="folder" size={22} />
+                <span className="art-host">
+                  {x.n} {x.n === 1 ? 'file' : 'files'}
+                </span>
+              </span>
+            </span>
+            <span className="art-name">{name}</span>
+          </button>
+        ))}
+        {here?.map(f => (
           <button
             key={f.path}
             className={`art-card ${linkOf(f.path) ? 'link' : ''}`}
             data-tip={linkOf(f.path) ? `${linkOf(f.path)!.url} · open in the browser` : `${f.path} · ${sizeOf(f.size)} · ${new Date(f.at).toLocaleString()}`}
-            onClick={() => (linkOf(f.path) ? openExternal(linkOf(f.path)!.url) : setBig(f.path))}
+            onClick={() => (linkOf(f.path) ? go(linkOf(f.path)!.url) : setBig(f.path))}
             onContextMenu={e => rightClick(e, f)}
           >
             <span className="art-thumb">{look(f)}</span>
@@ -1318,8 +1377,8 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
           </button>
         ))}
       </div>
-      {at && files && (
-        <Modal title={`${at.path} · ${i + 1} of ${files.length}`} onClose={() => setBig(null)} wide loose>
+      {at && here && (
+        <Modal title={`${at.path} · ${i + 1} of ${here.length}`} onClose={() => setBig(null)} wide loose>
           <div className="art-big" onContextMenu={e => rightClick(e, at)}>
             {look(at, true)}
           </div>
@@ -1327,10 +1386,10 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
             <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
             {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
             {a.files && <button onClick={() => (setBig(null), a.files!())}>Open in Files</button>}
-            <button aria-label="Previous" disabled={files.length < 2} onClick={() => step(-1)}>
+            <button aria-label="Previous" disabled={here.length < 2} onClick={() => step(-1)}>
               <Icon name="back" />
             </button>
-            <button aria-label="Next" disabled={files.length < 2} onClick={() => step(1)}>
+            <button aria-label="Next" disabled={here.length < 2} onClick={() => step(1)}>
               <Icon name="forward" />
             </button>
           </div>

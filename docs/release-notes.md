@@ -2,6 +2,96 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## 0.16.0 · Oct 15, 2026
+
+- **Workflows: a way out per answer**: an AI decision's *Ways out* › *A line per answer of* a question: yes and no, each
+  option of a choice or each level of a score goes to its own block (three options, three arrows), plus *error*.
+- **Workflows: question kinds as cards**: + *Question* shows Jev's three, *How true* (`noul`), *Choice* and *Score*,
+  with what each does and an example.
+- **Workflows: block IDs and a variables list**: change a block's *ID* and every arrow and `{{steps.<id>.…}}` follows;
+  *{{ }} Variables* lists all a workflow has, the run's and each block's, a click copies one. New blocks use the block
+  before's answer (`{{steps.<id>.answer}}`), not a made-up name.
+- **Workflows: clearer Notify me**: it says what it sends and when; an End's *What it says* is the notification's words
+  (with variables), and *And on my phone* sends it to your phone pushes too.
+- **Workflows: JSON mode** on an AI call (its answer one JSON object; on by itself when it names outputs) and on an
+  agent block (told to end with one JSON object or list; its answer is that JSON, for a decision's state or a Case's JS).
+- **Workflows: a block's right click** on the canvas: *Add a block after it*, *Duplicate*, *Delete*. Deletes are red,
+  and the trash in a block's panel outlines that block in red while the pointer is on it.
+- **Laki AI on the Workflows page**: ✦ in a workflow (or the chat button) opens its chat with the workflow, your unsaved
+  changes too, to change it; *Make it with Laki AI* on the list makes one, after asking you a few questions.
+- The workflow canvas lays blocks out by their steps, branches side by side, and its list follows files Laki AI or an
+  agent writes.
+- A block's limit reads *at most [∞] times, then…* (∞: no limit), no longer “at most ∞ then times”.
+- **Reset the interface resets everything it can**: Settings › General › Development › *Reset the interface* puts every
+  setting back to its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features),
+  turns every extension off and shows Get started again, as well as the window's layout. What you set up stays:
+  projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates.
+- Extensions start off, yours too: turn one on in Settings › Extensions.
+- **Laki AI's glow** (experimental, Settings › General › *Experimental*, off by default): as Laki AI reads a tab's
+  screen or uses the agent browser, a rainbow edge turns once around that tab with a soft light inside, then fades (the
+  whole window when the tab isn't shown).
+- Settings › Appearance › *Your picture on your PRs* (under *Pull requests in the sidebar*, on by default): off, your own
+  PRs show GitHub's mark alone.
+
+## 0.15.0 · Oct 14, 2026
+
+- Your own PRs show your GitHub picture in the sidebar, the hover card and the info panel, as others' show theirs.
+- A new workspace (yours, an agent's, a scheduled one) no longer takes the place of the one you're looking at, even
+  after the one you had picked was archived.
+- The status bar PR's right click: *Copy PR link* and *Copy #n*.
+- ⌘K and the sidebar's filter find a workspace by its PR's number.
+- **Artifacts in folders**: the Artifacts strip shows the storage folder's folders first; click one to go in, its path
+  to go back. Agents are told to group related files in subfolders.
+- A `.url` artifact with a `file:///` link (a page an agent made elsewhere on this Mac) opens that page in the browser.
+- The status bar leaves out what an agent listens on itself (its browser bridge, an MCP server) and browsers it tests
+  in; dev servers it starts still show.
+- Agents are told to attach a PR they open on another branch (`laki pr . <url>`) so it shows on the workspace.
+- **Remote access with a PIN**: Settings › Remote access › *Sign in with* › *PIN (Laki)*: no Cloudflare email; the
+  page asks for a PIN Laki shows next to the QR code, a new one each start. A wrong PIN twice (or as many as you pick)
+  stops remote access. Cloudflare's email stays the default.
+  ⌘K's *Start remote access* uses the way you picked.
+- **Specs & Brainstorms in one list**: newest first, each row says its kind; *All* / *Specs* / *Brainstorms* filter it,
+  and one *New* ▾ starts either kind, empty or from a template (*Edit templates…* at its foot).
+- **Extensions as buttons, on the rail and in the sidebar's foot**: two more places (*Rail*, *Sidebar foot*), and
+  `widget.json`'s `icon`, `label`, `badge`, `tip` and `click`: a button whose label and count its fetch keeps up to date
+  in the background, and a click that runs one of its actions (or opens its full view). One without a preview is a
+  button wherever it sits. The Extension creator skill knows it all.
+- A brainstorm's or spec's chat with Laki AI has its brief in every ask, as it is then (your edits too), and its files
+  by name; it reads one (ideas.md, a prototype) when it needs to, on any backend.
+- Idle agents now sleep after 8 hours by default (Settings › Resources; *Never* is still there). Asleep, an agent
+  frees its memory and resumes its chat as you look at it.
+- **Settings › Terminal, redone**: the preview on top (with *Reset to defaults*), then Text, Cursor, Panes and tabs, and
+  Keyboard, mouse and clipboard, each setting with what it does; the cursor and padding as buttons.
+- **Make an extension with Laki AI**: Settings › Extensions › *Make one with AI* › type what you want › *Make it with
+  Laki AI*: its chat opens, asks you at least two questions about it, then writes it (saved off until you turn it on).
+  Laki AI asks first for any new extension.
+- **Workflows: AI call and Webhook blocks, and outputs**: an *AI call* sends one prompt to a model on OpenRouter (Laki
+  AI's key); a *Webhook* sends a request to another system (method, headers with `{{env.NAME}}` secrets that never
+  reach the log, a body from your text, a file, or the run's variables). Any agent, AI call, command or webhook can name
+  its outputs (`out: title, files`), each a `{{steps.<block>.<name>}}` for the blocks after it.
+- A workflow run started after you turned Workflows on no longer starts its step over 8 seconds in.
+- **Share a tab**: a tab's right click › *Share read-only link* copies a link to a page anyone can read: an agent's
+  chat (Claude Code, Codex: prompts, answers, tool calls) or the terminal's text, kept up to date as you go on, with
+  *Copy as Markdown* and *Download .md*. A globe marks a shared tab; its right click copies, opens or stops it. Needs
+  cloudflared, like Expose to the world. *Share read-only link…* asks for how long (1, 8 or 24 hours, or until you stop
+  it) and shows a QR code with the link; past its hours the link is dead. The page's *Tool calls* switch hides them.
+- **Workflows: AI decision block**: asks a decision model on OpenRouter (Jev, GPT-6 Luna Decisions,
+  Microsoft-Decision-1, Perplexity Decider, Cloudflare Clef, or any model id) yes/no, choice or score questions about a
+  JSON state built from the run's variables. Each answer is a variable (`{{steps.triage.urgent}}`, its `.p`); when the
+  model isn't sure enough (*Sure from*, 70% by default) the run asks you. Questions as cards or as the API's JSON.
+- **Workflows: Show you block**: a window over Laki with what the run made (HTML or Markdown, scrollable; links open in
+  your browser), and a notification if you like. The run keeps what it showed: reopen it from the run.
+- **Workflows: Case branches on numbers and JS**: `>=`, `<=`, `>`, `<` (a decision's `.p` ≥ 0.8), or a JS expression
+  over the run's variables.
+- **Workflows: a Test button** on AI call, AI decision and Webhook blocks: one call with sample values, its outputs and
+  log, without a run.
+- Workflows: an AI call takes a system prompt and a temperature, and answers in JSON when it names outputs; a webhook
+  tries again on 429 and 5xx (twice, after its Retry-After).
+- **Scheduled workflows**: a scheduled task can start a workflow (its prompt is the run's task); one still running
+  skips the next time.
+- Workflows' notifications and asks reach the app again (they were dropped on the way).
+- Help (⌘/) has a *Specs & Brainstorms* section, and says what's new above; so do the README and the guide.
+
 ## 0.14.0 · Oct 14, 2026
 
 - **Voice in the cloud, hold Fn to talk** (experimental: Settings › General › *Experimental*): Settings › Voice picks

@@ -484,6 +484,39 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   await rig.rpc('remoteStop')
   await until(() => stops() === 5, 'cloudflared stopped')
 
+  // Laki's PIN (no email, the saved one kept; pin wins over an email): the link's key alone only asks for it, the PIN
+  // gives the page its token; a wrong one counts down (settings' remoteTries), the last stops remote access
+  await rig.rpc('settingsSet', { remoteTries: 3 })
+  const pinned = await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev', pin: true })
+  assert.deepEqual([pinned.mail, pinned.open, pinned.tries], ['', undefined, 3])
+  assert.match(pinned.pin, /^\d{6}$/)
+  assert.equal(log().split(`cloudflared tunnel --url http://127.0.0.1:${port}\n`).length - 1, 2) // open's, and this one: no --allowed-mail
+  const link = pinned.link.split('?token=')[1]
+  const pinAt = (body: object, origin = url) => fetch(`${at}/pin`, { method: 'POST', headers: { origin }, body: JSON.stringify(body) }).then(r => r.json())
+  assert.equal(await ping(link, url), 401) // the link's key alone isn't in
+  assert.deepEqual(await pinAt({ token: link }), { need: true, left: 3 })
+  assert.deepEqual(await pinAt({ token: 'nope', pin: pinned.pin }), { need: false })
+  assert.equal((await fetch(`${at}/pin`, { method: 'POST', headers: { origin: 'https://evil.example' }, body: '{}' })).status, 403)
+  assert.equal((await fetch(`${at}/pin`, { method: 'POST', body: JSON.stringify({ token: link, pin: pinned.pin }) })).status, 403) // not from its page
+  const wrong = pinned.pin === '000000' ? '111111' : '000000'
+  assert.deepEqual(await pinAt({ token: link, pin: wrong }), { error: 'Wrong PIN: 2 more tries, then remote access stops' })
+  assert.equal((await rig.rpc('state')).remote.tries, 2)
+  assert.deepEqual(await pinAt({ token: '\u00e9'.repeat(64), pin: pinned.pin }), { need: false }) // as long as the key in characters, not in bytes
+  const wide = [...pinned.pin].map(d => String.fromCharCode(0xff10 + Number(d))).join('') // a phone keyboard's fullwidth digits
+  const got = await pinAt({ token: link, pin: ` ${wide.slice(0, 3)} ${wide.slice(3)} ` })
+  assert.match(got.token, /^[0-9a-f]{64}$/)
+  assert.equal(await ping(got.token, url), 200)
+  assert.deepEqual(await pinAt({ token: got.token }), { need: false }) // in already
+  const app = await connect(rig)
+  assert.deepEqual(await pinAt({ token: link, pin: wrong }), { error: 'Wrong PIN: 1 more try, then remote access stops' })
+  assert.deepEqual(await pinAt({ token: link, pin: wrong }), { error: 'Wrong PIN: remote access stopped. Start it again on your Mac for a new link and PIN.' })
+  assert.match((await until(async () => app.events.find(m => m.ev === 'remote'), 'the app told')).text, /Remote access stopped: a wrong PIN/)
+  app.close()
+  assert.equal((await rig.rpc('state')).remote, undefined)
+  await until(() => stops() === 6, 'cloudflared stopped')
+  assert.equal(await ping(got.token, url), 403)
+  assert.equal((await rig.rpc('state')).settings.remoteMail, 'me@x.dev')
+
   // cloudflared failing; stopped while starting
   writeFileSync(join(rig.home, 'cf-fail'), '429 Too Many Requests')
   await assert.rejects(rig.rpc('remoteStart', { hours: 1 }), /cloudflared ended \(exit 1\)[^]*429 Too Many Requests/)
@@ -795,6 +828,14 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   const links = await until(async () => (await ws()).links, 'its link')
   assert.deepEqual(links.map((l: any) => [l.title, l.url]), [['Project page', 'https://claude.ai/artifact/SyQ5']])
   assert.deepEqual((await rig.rpc('artifactList', { ws: w.id })).slice(0, 2).map((f: any) => f.path).sort(), ['Project page.url', 'bad.url']) // .url files first
+  // a local page's (file:///, as codex keeps its own artifacts; a space in its path too): a link too; a file:// with a host isn't
+  mkdirSync(join(dir, 'reviews'))
+  writeFileSync(join(dir, 'reviews', 'Review 14438.url'), '[InternetShortcut]\nURL=file:///Users/me/Library/Application Support/codex/14438/review.html\n')
+  writeFileSync(join(dir, 'host.url'), '[InternetShortcut]\nURL=file://evil/share/x.html\n')
+  await until(async () => (await ws()).links?.length === 2, 'the local link')
+  assert.deepEqual((await ws()).links.map((l: any) => [l.path, l.url]).sort(), [['Project page.url', 'https://claude.ai/artifact/SyQ5'], ['reviews/Review 14438.url', 'file:///Users/me/Library/Application Support/codex/14438/review.html']])
+  rmSync(join(dir, 'reviews'), { recursive: true })
+  rmSync(join(dir, 'host.url'))
   rmSync(join(dir, 'bad.url'))
   rmSync(join(dir, 'shots'), { recursive: true })
   rmSync(join(dir, 'report.md'))

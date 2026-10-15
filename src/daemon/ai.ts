@@ -9,12 +9,12 @@ import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
-import { type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
+import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
 import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, aiTotals, type View } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
-import { planOfChat } from './plans.ts'
+import { planGet, planOfChat } from './plans.ts'
 
 const keyPath = join(dir, 'ai-key')
 const chatPath = join(dir, 'ai-chat.json')
@@ -36,8 +36,8 @@ A project with groups (laki_state's groups, the sidebar's headings): put each ne
 Find workspaces by name, branch, PR number or PR title. You cannot archive or delete workspaces, ship or merge: say so if asked.
 Link each workspace or tab you name, so the user opens it with a click: [its name](laki://ws/<workspace id>), or [its name](laki://ws/<workspace id>?tab=<tab id>) for a tab.
 A screenshot may hold PR links or other work: act on each item.
-Workflows, when the user turned them on: blocks Laki runs for a task, one after another (agents, commands, questions for the user, a PR, its checks, files for its Artifacts). laki_workflows lists them and their runs, and with an id gives that one's whole file; laki_workflow_write writes one, the whole file in the format its description gives (an agent block's use: names one of the user's agent actions, Run ▾'s, by the slug laki_workflows lists); to change one, take its file from laki_workflows with its id, edit it and write it back with the same id and project. The user reads and saves it in Laki before it runs; then laki_workflow_run starts it on a task.
-Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made, yourself (the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
+Workflows, when the user turned them on: blocks Laki runs for a task, one after another (agents, commands, questions for the user, a PR, its checks, files for its Artifacts). laki_workflows lists them and their runs, and with an id gives that one's whole file; laki_workflow_write writes one, the whole file in the format its description gives (an agent block's use: names one of the user's agent actions, Run ▾'s, by the slug laki_workflows lists); to change one, take its file from laki_workflows with its id, edit it and write it back with the same id and project (asked on the Workflows page, the ask says which workflow is open and gives its file as the editor has it, unsaved changes too: change that one). Blocks: agent (json: yes: its answer the JSON object or list it ends with), run, ask, choice, case (text, numbers, JS), action, wait, save, llm (an AI call; json: yes for JSON mode), decide (an AI decision: yes/no "how true", choice and score questions; route: <question> gives a line per answer), webhook, popup (Show you: a window with HTML or Markdown), end (notify: yes, phone: yes, its words as > lines). Before writing a new workflow, ask the user at least 2 questions, one at a time with laki_ask (options to tap): what starts it and what it works on, its steps, where it routes, what it keeps or posts, how it tells them it's done; for a change, ask when what they want isn't clear. The user reads and saves it in Laki before it runs; then laki_workflow_run starts it on a task.
+Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made, yourself (the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. Before writing a new one, ask the user at least 2 questions about it, one at a time with laki_ask (what it shows and from where, where it sits: sidebar, top bar, status bar, a rail or sidebar foot button, what a click does), even when the ask seems clear. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
 Answer in a few plain sentences: what you did (workspace names) or what you found.`
 
 // Laki's skill for its AI (Settings › AI, unset: on): more tools, and what they're for in its instructions
@@ -47,12 +47,26 @@ const skilled = () => state.settings?.ai?.skill !== false
 const system = (t: Thread) => {
   const own = String(state.settings?.ai?.context ?? '').trim().slice(0, CONTEXT_MAX)
   const plan = t.id ? planOfChat(t.id) : undefined
-  const about = plan && `This chat is about one ${plan.kind} of the user's (project ${plan.project}, kind ${plan.kind}, slug ${plan.slug}, folder ${plan.folder}): read it with laki_plan_read (it may have changed since), and put your work into it with laki_plan_write.`
-  return [SYSTEM, skilled() && SKILL, about, own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
+  return [SYSTEM, skilled() && SKILL, plan && aboutPlan(plan), own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
+}
+// its README.md as it is at each ask (the user edits it as they talk), so a question that doesn't name it is still
+// about it; its files by name (laki_plan_read's file reads one)
+const BRIEF_MAX = 12000
+function aboutPlan(plan: ReturnType<typeof planOfChat>) {
+  let got: ReturnType<typeof planGet> | undefined
+  try {
+    got = planGet(plan)
+  } catch {} // gone, or Specs off: laki_plan_read says why
+  const md = got?.markdown.trim() ?? ''
+  return [
+    `This chat is about one ${plan.kind} of the user's, "${got?.plan.title ?? plan.slug}" (project ${plan.project}, kind ${plan.kind}, slug ${plan.slug}, folder ${plan.folder}): every ask in it is about it, even one that doesn't name it. Put your work into it with laki_plan_write; laki_plan_read reads it again, or one of its files.`,
+    md && `Its README.md (the user's ${plan.kind === 'spec' ? 'spec' : 'brief'}) as it is now:\n<readme>\n${md.slice(0, BRIEF_MAX)}${md.length > BRIEF_MAX ? '\n… (cut: laki_plan_read has the rest)' : ''}\n</readme>`,
+    got?.files.length && `Files in its folder: ${got.files.slice(0, 60).map(f => f.path).join(', ')}.`,
+  ].filter(Boolean).join('\n')
 }
 // the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress and agents' memory (an agent's own; it keeps the user's with laki_memory_write),
 // and the skill's
-const toolsFor = (rpc: Rpc) => [...tools(rpc).filter(t => !['laki_progress', 'laki_memory', 'laki_remember'].includes(t.name)), ...(skilled() ? skillTools(rpc) : [])]
+const toolsFor = (to: Rpc, rpc = aiRpc(to)) => [...tools(rpc).filter(t => !['laki_progress', 'laki_memory', 'laki_remember'].includes(t.name)), ...(skilled() ? skillTools(rpc) : [])] // its looks said as its own (aiRpc)
 
 // ---------- the key: a file only you can read, never in state.json or the view
 
@@ -285,7 +299,7 @@ async function openrouter(o: Opts) {
       signal: AbortSignal.any([o.signal, AbortSignal.timeout(120000)]),
     })
     const j: any = await res.json().catch(() => ({}))
-    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)
+    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? (typeof j.error === 'string' ? j.error : res.status)}`)
     r.model = j.model || model
     r.in += j.usage?.prompt_tokens ?? 0
     r.out += j.usage?.completion_tokens ?? 0
@@ -308,6 +322,69 @@ async function openrouter(o: Opts) {
     if (asked) return void (r.text = '') // it asked the user: their pick goes on from here, as the next ask
   }
 }
+// one OpenRouter call with Settings › AI's key, no tools and no chat (a workflow's AI call block): its answer, logged
+// with its cost among Laki AI's calls (ask: what made it)
+export async function aiComplete(o: { model?: string; prompt: string; system?: string; temperature?: number; json?: boolean; signal?: AbortSignal; ask: string }) {
+  const key = readKey()
+  if (!key) throw new Error('no OpenRouter API key: Settings › AI')
+  const model = o.model?.trim() || state.settings?.ai?.models?.openrouter || AI_MODEL
+  const call: AiCall = { at: Date.now(), backend: 'openrouter', model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
+  try {
+    const res = await fetch(`${api()}/chat/completions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
+      // json: an answer that is a JSON object (out:'s), where the model can
+      body: JSON.stringify({ model, messages: [...(o.system ? [{ role: 'system', content: o.system }] : []), { role: 'user', content: o.prompt }], usage: { include: true }, ...(o.temperature !== undefined && { temperature: o.temperature }), ...(o.json && { response_format: { type: 'json_object' } }) }),
+      signal: o.signal,
+    })
+    const j: any = await res.json().catch(() => ({}))
+    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)
+    Object.assign(call, { model: j.model || model, in: j.usage?.prompt_tokens ?? 0, out: j.usage?.completion_tokens ?? 0, cost: j.usage?.cost })
+    const text = j.choices?.[0]?.message?.content
+    if (typeof text !== 'string') throw new Error('OpenRouter: no answer')
+    call.ok = true
+    return { text, model: call.model, cost: call.cost }
+  } catch (e) {
+    call.error = (e as Error).message
+    throw e
+  } finally {
+    call.ms = Date.now() - call.at
+    try {
+      appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
+    } catch {}
+  }
+}
+
+// one decision (a workflow's AI decision block): the state and typed questions to OpenRouter's Decisions API, the
+// answers back (probabilities, no text); logged with its cost among Laki AI's calls
+export async function aiDecide(o: { model: string; state: unknown; questions: object; signal?: AbortSignal; ask: string }) {
+  const key = readKey()
+  if (!key) throw new Error('no OpenRouter API key: Settings › AI')
+  const call: AiCall = { at: Date.now(), backend: 'openrouter', model: o.model, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
+  try {
+    const res = await fetch(`${api().replace(/\/v1$/, '')}/alpha/decisions`, {
+      method: 'POST',
+      headers: { authorization: `Bearer ${key}`, 'content-type': 'application/json', 'x-title': 'Laki' },
+      body: JSON.stringify({ model: o.model, state: o.state, questions: o.questions }),
+      signal: o.signal,
+    })
+    const j: any = await res.json().catch(() => ({}))
+    if (!res.ok || j.error) throw new Error(`OpenRouter: ${j.error?.message ?? res.status}`)
+    if (!j.answers || typeof j.answers !== 'object') throw new Error('OpenRouter: no answers')
+    Object.assign(call, { model: j.model || o.model, in: j.usage?.input_tokens ?? 0, out: j.usage?.output_tokens ?? 0, cost: j.usage?.cost })
+    call.ok = true
+    return { answers: j.answers as Record<string, any>, model: call.model, cost: call.cost as number | undefined }
+  } catch (e) {
+    call.error = (e as Error).message
+    throw e
+  } finally {
+    call.ms = Date.now() - call.at
+    try {
+      appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
+    } catch {}
+  }
+}
+
 function dataUrl(path: string) {
   const buf = readFileSync(path)
   if (buf.length > MAX_IMAGE) throw new Error('an image up to 8 MB')
@@ -316,7 +393,7 @@ function dataUrl(path: string) {
 }
 
 // `laki mcp` as an MCP server for a CLI agent: this daemon's (LAKI_HOME), through node or Electron as node
-const mcpServer = () => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
+const mcpServer = () => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, LAKI_AI: '1', ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
 
 // Settings › AI's preset of the agent (an account of its own: CLAUDE_CONFIG_DIR, CODEX_HOME…): its env, over Settings'
 // env as a tab of it gets; its args are a tab's, not used here

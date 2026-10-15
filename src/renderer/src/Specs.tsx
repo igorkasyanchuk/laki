@@ -43,14 +43,14 @@ const KIND_SAYS: Record<PlanKind, string> = {
   brainstorm: 'An idea to explore: Laki AI writes options, diagrams, a mind map and clickable prototypes beside it.',
 }
 const kindIcon = (k: PlanKind) => (k === 'spec' ? 'spec' : 'bulb')
-const ON_INDEX = 6 // each kind's newest on the index; the rest on its own page
 
-// three levels, as breadcrumbs in the page's header: the index (both kinds: filter, project, New), a kind's whole list,
-// and one spec or brainstorm alone, the page's whole width (and the window's, with the app's full screen)
+// two levels, as breadcrumbs in the page's header: the list (both kinds in one, newest first: a filter, a kind, a
+// project, New ▾) and one spec or brainstorm alone, the page's whole width (and the window's, with the app's full
+// screen); Templates is the New menu's
 export function SpecsPage({ projects, at, api, onClose }: { projects: Project[]; at?: { project?: string; kind?: PlanKind; slug?: string }; api: SpecsApi; onClose: () => void }) {
   const [list, setList] = useState<Plan[] | null>(null)
-  const [level, setLevel] = useState<PlanKind | 'templates' | null>(at?.kind ?? null) // null: the index
-  const kind = level === 'templates' ? null : level
+  const [level, setLevel] = useState<'templates' | null>(null) // null: the list
+  const [only, setOnly] = useState<PlanKind | ''>(at?.kind && !at.slug ? at.kind : '') // the list's kind, '' both
   const [menu, openMenu] = useMenu()
   const [project, setProject] = useState(at?.project && projects.some(p => p.id === at.project) ? at.project : '')
   const [q, setQ] = useState('')
@@ -67,35 +67,26 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
   }, [!!sel])
   const name = (id: string) => projects.find(p => p.id === id)?.name ?? id
   const words = q.toLowerCase().split(/\s+/).filter(Boolean)
-  const shown = (k: PlanKind) => (list ?? []).filter(p => p.kind === k && (!project || p.project === project) && words.every(w => `${p.title} ${name(p.project)}`.toLowerCase().includes(w)))
-  const open = (p: Ref & { title?: string }) => (setSelTitle(p.title ?? ''), setLevel(p.kind), setSel({ project: p.project, kind: p.kind, slug: p.slug }))
-  const up = (l: PlanKind | 'templates' | null) => (setSel(null), setLevel(l))
+  const matching = (list ?? []).filter(p => (!project || p.project === project) && words.every(w => `${p.title} ${name(p.project)}`.toLowerCase().includes(w)))
+  const shown = matching.filter(p => !only || p.kind === only) // newest first (planList's order)
+  const open = (p: Ref & { title?: string }) => (setSelTitle(p.title ?? ''), setSel({ project: p.project, kind: p.kind, slug: p.slug }))
+  const up = (l: 'templates' | null) => (setSel(null), setLevel(l))
   // empty, or a template's text under its title
   const create = (k: PlanKind, t?: PlanTemplate) => {
     const into = project || projects[0]?.id
     if (!into) return
     api.call<Plan>('planNew', { project: into, kind: k, text: t?.text }).then(open, () => {})
   }
-  const fromTemplate = (e: MouseEvent, k: PlanKind) => {
-    const tpls = api.templates.filter(t => t.kind === k)
+  const where = project ? name(project) : projects[0] ? `${name(projects[0].id)} (pick a project to choose)` : 'a project'
+  // New ▾: an empty spec or brainstorm, or one from a template; the templates themselves at the foot
+  const newMenu = (e: MouseEvent) =>
     openMenu(e, [
-      { head: tpls.length ? `A new ${KIND_WORDS[k][1]} from a template` : `No ${KIND_WORDS[k][1]} templates yet` },
-      ...tpls.map((t): MenuItem => ({ label: t.name.trim() || 'Untitled template', icon: 'file', sub: t.text.match(/^#+\s+(.+)$/gm)?.slice(0, 3).map(h => h.replace(/^#+\s+/, '')).join(' · '), run: () => create(k, t) })),
+      { head: `New, in ${where}` },
+      ...PLAN_KINDS.map((k): MenuItem => ({ label: `New ${KIND_WORDS[k][1]}`, icon: kindIcon(k), key: k[0], sub: KIND_SAYS[k].split(':')[0], run: () => create(k) })) /* its first words */,
+      ...(api.templates.length ? [null, { head: 'From a template' } as MenuItem] : []),
+      ...api.templates.map((t): MenuItem => ({ label: t.name.trim() || 'Untitled template', icon: kindIcon(t.kind), sub: [`A ${KIND_WORDS[t.kind][1]}`, ...(t.text.match(/^#+\s+(.+)$/gm)?.slice(0, 3).map(h => h.replace(/^#+\s+/, '')) ?? [])].join(' · '), run: () => create(t.kind, t) })),
       { label: 'Edit templates…', icon: 'settings', foot: true, run: () => up('templates') },
     ], 'right')
-  }
-  const newTip = (k: PlanKind) => (project ? `A new ${KIND_WORDS[k][1]} in ${name(project)}` : `A new ${KIND_WORDS[k][1]} in ${projects[0] ? name(projects[0].id) : 'a project'} (pick a project to choose)`)
-  // New: an empty one; its ▾, from a template
-  const newButton = (k: PlanKind, primary: boolean) => (
-    <span key={k} className={`split plans-new ${primary ? 'primary' : ''}`}>
-      <button className={primary ? 'primary' : ''} disabled={!projects.length} data-tip={`${newTip(k)}, empty`} onClick={() => create(k)}>
-        <Icon name="plus" /> New {KIND_WORDS[k][1]}
-      </button>
-      <button className={`caret ${primary ? 'primary' : ''}`} disabled={!projects.length} aria-label={`A new ${KIND_WORDS[k][1]} from a template`} data-tip="From a template" onClick={e => fromTemplate(e, k)}>
-        <Icon name="chevron" size={11} />
-      </button>
-    </span>
-  )
   const crumbs = (
     <nav className="crumbs" aria-label="Where you are">
       {level || sel ? (
@@ -105,15 +96,6 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
       ) : (
         <b className="crumb here">Specs & Brainstorms</b>
       )}
-      {kind && <span className="crumb-sep">›</span>}
-      {kind &&
-        (sel ? (
-          <button className="crumb" onClick={() => up(kind)}>
-            {KIND_WORDS[kind][0]}
-          </button>
-        ) : (
-          <b className="crumb here">{KIND_WORDS[kind][0]}</b>
-        ))}
       {level === 'templates' && <span className="crumb-sep">›</span>}
       {level === 'templates' && <b className="crumb here">Templates</b>}
       {sel && <span className="crumb-sep">›</span>}
@@ -125,6 +107,7 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
     <button key={`${p.project}/${p.kind}/${p.slug}`} className="plans-row" onClick={() => open(p)} onContextMenu={e => api.pin && (e.preventDefault(), openMenu(e, pinItem(p)))}>
       <Icon name={kindIcon(p.kind)} />
       <span className="plans-title">{p.title}</span>
+      <span className={`plans-kind ${p.kind}`}>{KIND_WORDS[p.kind][1]}</span>
       <span className="plans-meta muted small">
         {!project && `${name(p.project)} · `}
         {ago(p.at)}
@@ -132,29 +115,7 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
       </span>
     </button>
   )
-  const block = (k: PlanKind) => {
-    const all = shown(k)
-    const some = kind || words.length ? all : all.slice(0, ON_INDEX)
-    return (
-      <section key={k} className="plans-block">
-        {!kind && (
-          <div className="plans-block-head">
-            <button className="link" onClick={() => up(k)}>
-              <Icon name={kindIcon(k)} /> <b>{KIND_WORDS[k][0]}</b>
-            </button>
-            {all.length > 0 && <span className="muted small">{all.length}</span>}
-            <span className="grow" />
-            {all.length > some.length && (
-              <button className="link small" onClick={() => up(k)}>
-                All {all.length} ›
-              </button>
-            )}
-          </div>
-        )}
-        {list === null ? <p className="muted small">Loading…</p> : some.length ? <div className="plans-rows">{some.map(row)}</div> : <div className="plans-empty muted small">{words.length || project ? `No ${KIND_WORDS[k][0].toLowerCase()} here.` : KIND_SAYS[k]}</div>}
-      </section>
-    )
-  }
+  const count = (k: PlanKind | '') => matching.filter(p => !k || p.kind === k).length
   return (
     <Page
       title="Specs & Brainstorms"
@@ -172,10 +133,9 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
       {level === 'templates' && !sel ? (
         <Templates templates={api.templates} save={api.saveTemplates} />
       ) : sel ? (
-        <PlanView key={`${sel.project}/${sel.kind}/${sel.slug}`} at={sel} api={api} projectName={name(sel.project)} onTitle={setSelTitle} onSaved={refresh} onGone={() => up(sel.kind)} />
+        <PlanView key={`${sel.project}/${sel.kind}/${sel.slug}`} at={sel} api={api} projectName={name(sel.project)} onTitle={setSelTitle} onSaved={refresh} onGone={() => up(null)} />
       ) : (
         <div className="plans-index">
-          {kind && <p className="muted small plans-says">{KIND_SAYS[kind]} Each is a folder outside your repo with a README.md agents can read; nothing goes in a worktree.</p>}
           <div className="plans-bar">
             <input className="grow" type="search" value={q} placeholder="Filter by title or project" aria-label="Filter" onChange={e => setQ(e.target.value)} />
             <select value={project} aria-label="Project" onChange={e => setProject(e.target.value)}>
@@ -186,14 +146,32 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
                 </option>
               ))}
             </select>
-            {kind ? newButton(kind, true) : PLAN_KINDS.map((k, i) => newButton(k, i === 0))}
-            {!kind && (
-              <button data-tip="What a new spec or brainstorm can start from: its headings, the steps you want" onClick={() => up('templates')}>
-                <Icon name="file" /> Templates
-              </button>
-            )}
+            <button className="primary" disabled={!projects.length} data-tip={`A new spec or brainstorm in ${where}, empty or from a template`} onClick={newMenu}>
+              <Icon name="plus" /> New <Icon name="chevron" size={11} />
+            </button>
           </div>
-          {(kind ? [kind] : PLAN_KINDS).map(block)}
+          <div className="plans-kinds">
+            <div className="seg" role="radiogroup" aria-label="Kind">
+              {(['', ...PLAN_KINDS] as const).map(k => (
+                <button key={k || 'all'} type="button" role="radio" aria-checked={only === k} className={only === k ? 'on' : ''} onClick={() => setOnly(k)}>
+                  {k ? <Icon name={kindIcon(k)} size={12} /> : null}
+                  {k ? KIND_WORDS[k][0] : 'All'} <span className="muted">{list ? count(k) : ''}</span>
+                </button>
+              ))}
+            </div>
+            {only && <span className="muted small plans-says">{KIND_SAYS[only]}</span>}
+          </div>
+          {list === null ? (
+            <p className="muted small">Loading…</p>
+          ) : shown.length ? (
+            <div className="plans-rows">{shown.map(row)}</div>
+          ) : (
+            <div className="plans-empty muted small">
+              {words.length || project || matching.length
+                ? `No ${only ? KIND_WORDS[only][0].toLowerCase() : 'specs or brainstorms'} here.`
+                : `${KIND_SAYS.spec} ${KIND_SAYS.brainstorm} Each is a folder outside your repo with a README.md agents can read; nothing goes in a worktree.`}
+            </div>
+          )}
         </div>
       )}
     </Page>

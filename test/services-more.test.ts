@@ -320,7 +320,8 @@ test('widgets: fetched on schedule only within the working hours; a line that do
   const rig = await fresh(t)
   widget(join(rig.data, 'widgets', 'hrs'), { every: 1, fetch: `echo '{"n":1}'` })
   await rig.rpc('settingsSet', { devMode: true, widgetHours: '9am-10am' })
-  await rig.rpc('widgetReload') // a reload fetches whatever the hours
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'hrs', on: true }) // turned on, it fetches whatever the hours
   const at = () => rig.rpc('state').then(v => v.widgets.find((w: any) => w.id === 'hrs'))
   let last = (await until(() => at().then(w => !w.running && w.at && w), 'the first fetch')).at
   const app = await rig.connect()

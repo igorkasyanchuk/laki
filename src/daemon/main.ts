@@ -2,7 +2,7 @@
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
 import { execFileSync } from 'node:child_process'
-import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { randomBytes } from 'node:crypto'
 import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { dirname, extname, join, normalize, sep } from 'node:path'
@@ -16,7 +16,7 @@ import { refreshSkills, skills, skillSet } from './skill.ts'
 import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './accounts.ts'
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
-import { flowAnswer, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
+import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
 import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 
 const { dir } = core
@@ -86,7 +86,7 @@ const token = randomBytes(32).toString('hex')
 const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN ? process.env.LAKI_DEV_ORIGIN.split(',') : [])])
 // remote access (core.ts) adds its page's origin and its own token while it runs
 const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === core.remoteOrigin())
-const same = (t: string, want: string | undefined) => !!want && t.length === want.length && timingSafeEqual(Buffer.from(t), Buffer.from(want))
+const { same } = core
 // remote access's token only from its page: a client with no Origin (curl past Cloudflare's sign-in) needs ours
 const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (same(t, token) || (!!o && o === core.remoteOrigin() && same(t, core.remoteToken())))
 
@@ -166,6 +166,7 @@ const api: Record<string, Handler> = {
   prList: p => core.prList(p), // Laki AI's laki_prs: a project's open PRs
   prRefresh: () => core.scanPRs(), // every PR again now (the status bar's Refresh): one scan at a time, so autoPR never sends twice
   webhookTest: p => core.webhookTest(p),
+  uiReset: () => core.uiReset(),
   portKill: p => core.portKill(p),
   meme: () => meme(),
   aiAsk: p => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here
@@ -205,12 +206,15 @@ const api: Record<string, Handler> = {
   accountLogin: p => core.accountLogin(p),
   tabAccount: p => core.tabAccount(p),
   resources: () => core.resources(),
+  shareStart: p => core.shareStart(p), // a tab's read-only page, for anyone with its link
+  shareStop: p => core.stopShares({ tab: core.resolveTarget(String(p.tab ?? '')).id }),
   // Resources' Stop for what the daemon runs (resources' others): Laki AI's ask, a tunnel, remote access
   resourceStop: p => {
     const k = String(p.key ?? '')
     const t = k.match(/^tunnel:(.+):(\d+)$/)
     if (k === 'ai') return aiStop()
     if (k === 'remote') return core.remoteStop()
+    if (k === 'share') return core.stopShares()
     if (t) return core.tunnelStop({ ws: t[1], port: Number(t[2]) })
     throw new Error(`nothing to stop called ${k}`)
   },
@@ -220,7 +224,7 @@ const api: Record<string, Handler> = {
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message),
-  screen: p => core.screen(p.target, p.lines),
+  screen: p => core.screen(p.target, p.lines, p.by),
   input: (p, c) => core.input(p.tab, p.data, c),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
   view: (p, c) => c && core.setView(c, p),
@@ -233,6 +237,7 @@ const api: Record<string, Handler> = {
   remoteStart: p => core.remoteStart(p),
   remoteStop: () => core.remoteStop(),
   remoteTick: p => core.remoteTick(p.now), // tests move the clock
+  shareTick: p => core.shareTick(p.now),
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetRun: p => widgetRun(p),
@@ -260,6 +265,7 @@ const api: Record<string, Handler> = {
   flowStart: p => flowStart(p),
   flowStop: p => flowStop(p),
   flowAnswer: p => flowAnswer(p),
+  flowTest: p => flowTest(p), // the inspector's Test: one AI call, decision or webhook, alone
   flowGet: p => flowGet(p),
   flowForget: p => flowForget(p),
   flowTick: p => flowTick(p.now), // tests move the clock
@@ -288,6 +294,20 @@ const server = createServer(async (req, res) => {
     return res.end(r.body)
   }
   if (!originOk(req.headers.origin)) return reply(403, { error: 'origin not allowed' })
+  // remote access's PIN (core.remotePin): from its page only, with the link's key in the body
+  if (req.method === 'POST' && req.url === '/pin') {
+    if (!req.headers.origin || req.headers.origin !== core.remoteOrigin()) return reply(403, { error: 'origin not allowed' })
+    let body = ''
+    for await (const chunk of req) {
+      body += chunk
+      if (body.length > 4096) return reply(413, { error: 'too big' })
+    }
+    try {
+      return reply(200, core.remotePin(JSON.parse(body) ?? {}))
+    } catch (e) {
+      return reply(200, { error: (e as Error).message })
+    }
+  }
   if (req.method !== 'POST' || req.url !== '/rpc') return reply(404, { error: 'not found' })
   if (!tokenOk(req.headers.authorization?.replace(/^Bearer /, ''), req.headers.origin)) return reply(401, { error: 'bad token' })
   let body = ''
@@ -378,7 +398,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(60000, () => core.sleepTick())
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
   every(30000, () => core.watchLimits())
-  every(15000, () => core.remoteTick())
+  every(15000, () => (core.remoteTick(), core.shareTick()))
   every(30000, () => core.scheduleTick())
   every(30000, () => widgetTick())
   every(5000, () => flowTick())
@@ -390,6 +410,7 @@ function shutdown() {
   log('shutting down')
   timers.forEach(clearInterval)
   core.stopTunnels()
+  core.stopShares()
   core.remoteStop()
   flowStopAll() // a run block's command
   aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again

@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { skillTools, tools } from '../src/cli/mcp.ts'
+import { aiRpc, type Rpc, skillTools, tools } from '../src/cli/mcp.ts'
 import { aiTotals } from '../src/shared/types.ts'
 import { connect, fresh, until } from './helpers.ts'
 
@@ -368,4 +368,23 @@ test("ai: the skill's tools: templates and actions start workspaces, a shell get
   const ws = (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id)
   assert.deepEqual([ws.name, ws.pinned], ['review auth', true])
   await assert.rejects(tool('laki_memory_write')({ project: p.id, text: 'x', id: 'nope' }), /no memory item nope/)
+})
+
+test("Laki AI's looks: its screen and browser calls said as its own (aiRpc), the app told which tab (peek); others' not", async t => {
+  const sent: [string, any][] = []
+  const fake = aiRpc((async (m: string, p?: any) => void sent.push([m, p])) as Rpc)
+  await fake('screen', { target: 'w' })
+  await fake('browse', { ws: 'w', op: 'text' })
+  await fake('state')
+  assert.deepEqual(sent, [['screen', { target: 'w', by: 'ai' }], ['browse', { ws: 'w', op: 'text', by: 'ai' }], ['state', undefined]])
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'shell', name: 'looked' })
+  const sh = await rig.tab(ws.id, 'shell')
+  const c = await rig.connect()
+  await rig.rpc('screen', { target: sh.id, lines: 5 })
+  await rig.rpc('screen', { target: sh.id, lines: 5, by: 'ai' })
+  await until(() => c.events.some(e => e.ev === 'peek'), 'a peek')
+  assert.deepEqual(c.events.filter(e => e.ev === 'peek').map(e => [e.ws, e.tab]), [[ws.id, sh.id]], 'only its own look')
+  c.close()
 })

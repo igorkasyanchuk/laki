@@ -40,14 +40,17 @@ export type Msg = { ev: string; [k: string]: any }
 // remote access's token, taken out of the address bar (and this page's history entry: Cloudflare's sign-in page, an
 // entry before it, keeps the link) once read; the tab keeps it for its reconnects and reloads
 let kept = ''
+const keep = (t: string) => {
+  kept = t
+  try {
+    sessionStorage.setItem('laki.token', t)
+  } catch {}
+}
 function pageToken() {
   const q = new URLSearchParams(location.search)
   const t = q.get('token')
   if (t) {
-    kept = t
-    try {
-      sessionStorage.setItem('laki.token', t)
-    } catch {}
+    keep(t)
     q.delete('token')
     const rest = q.toString()
     history.replaceState(history.state, '', `${location.pathname}${rest ? `?${rest}` : ''}${location.hash}`)
@@ -90,6 +93,12 @@ async function whyNot(token: string): Promise<string | undefined> {
     return 'This link has ended: remote access was stopped or started again. Open the newest link from Laki on your Mac (Settings › Remote access).'
 }
 
+// remote access with Laki's PIN (core.remotePin): does the link's key need one? null: no answer (asked again next time)
+async function pinNeed(token: string): Promise<{ need: boolean; left?: number } | null> {
+  const r = await fetch('/pin', { method: 'POST', body: JSON.stringify({ token }) }).catch(() => null)
+  return r?.ok ? r.json().catch(() => null) : null
+}
+
 class Api {
   private ws: WebSocket | null = null
   private seq = 0
@@ -98,10 +107,16 @@ class Api {
   connected = false
 
   private fails = 0 // connects in a row that never opened
+  private pinned = false // the remote page: no PIN asked for (or given)
 
   async connect() {
     try {
       const to = await wsURL()
+      if (to.remote && !this.pinned) {
+        const p = await pinNeed(to.token)
+        if (p?.need) return this.emit({ ev: 'pin', left: p.left }) // the splash asks; pin() connects
+        this.pinned = !!p
+      }
       const ws = new WebSocket(to.url)
       this.ws = ws
       ws.onopen = () => {
@@ -111,7 +126,7 @@ class Api {
       }
       ws.onmessage = e => {
         const m = JSON.parse(e.data)
-        if (m.id !== undefined) {
+        if (m.ev === undefined && m.id !== undefined) { // a reply; an event may carry an id of its own (a workflow run's)
           const w = this.waiting.get(m.id)
           this.waiting.delete(m.id)
           // unknown method: a daemon older than the app, still running (it outlives updates)
@@ -134,6 +149,15 @@ class Api {
     } catch {
       setTimeout(() => this.connect(), 1000)
     }
+  }
+
+  // the PIN shown in Laki on the Mac, for remote access's page: its token in place of the link's key, then connect
+  async pin(code: string) {
+    const r = await fetch('/pin', { method: 'POST', body: JSON.stringify({ token: pageToken(), pin: code }) }).then(r => r.json(), () => null).catch(() => null)
+    if (!r?.token) throw new Error(r?.error ?? 'Laki on your Mac is out of reach. Try again.')
+    keep(r.token)
+    this.pinned = true
+    void this.connect()
   }
 
   call<T = any>(method: string, params: object = {}): Promise<T> {
@@ -166,7 +190,31 @@ export const api = new Api()
 // (the AI window) hands it to main, which shows the app window and routes it there
 let lakiLink: ((url: string) => void) | undefined
 export const onLakiLink = (f: (url: string) => void) => void (lakiLink = f)
-export const openExternal = (url: string) => (url.startsWith('laki:') && lakiLink ? lakiLink(url) : bridge ? bridge.openExternal(url) : window.open(url, '_blank', 'noopener'))
+// a file:/// link's path (a .url file's: a page an agent made on this Mac); '' for anything else
+// what the page on screen tells Laki AI's floating chat as you ask (App's whereNow): the open workflow, its file
+export const pageNow: { workflow?: () => string } = {}
+export const fileOf = (url: string) => {
+  try {
+    const u = new URL(url)
+    return u.protocol === 'file:' && !u.host ? decodeURIComponent(u.pathname) : ''
+  } catch {
+    return ''
+  }
+}
+export const openExternal = (url: string) => {
+  if (url.startsWith('laki:') && lakiLink) return lakiLink(url)
+  return bridge ? bridge.openExternal(url) : window.open(url, '_blank', 'noopener')
+}
+// a storage folder's link (a .url file's, Artifacts' and the info panel's): a file:/// one through main's open-path (a
+// document in its app, a web page in the browser; anything that could run only shown in Finder), as no other link does
+// (a widget's, a web page's); a browser elsewhere can't reach this Mac's files. Rejects when it can't open it
+export const openKeptLink = async (url: string) => {
+  const path = fileOf(url)
+  if (!url.startsWith('file:')) return void openExternal(url)
+  if (!path) throw new Error(`Not a file on this Mac: ${url}`) // a host's, or a broken %
+  if (!bridge?.openPath) throw new Error('A file on the Mac: open it in Laki there')
+  if ((await bridge.openPath(path)) === 'missing') throw new Error(`Not on this Mac any more: ${path}`)
+}
 
 export function notify(title: string, body: string, tab: string, onClick: () => void, sound?: string, actions?: NotifyAction[]) {
   if (bridge) return bridge.notify(title, body, tab, sound, actions)

@@ -1,7 +1,7 @@
 // The file preview's Markdown (src/renderer/src/markdown.ts): blocks and inline marks as a tree
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { inline, markdown } from '../src/renderer/src/markdown.ts'
+import { inline, markdown } from '../src/shared/markdown.ts'
 
 test('markdown blocks', () => {
   const md = markdown(

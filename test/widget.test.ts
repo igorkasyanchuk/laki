@@ -94,8 +94,10 @@ test('widgets: found in folders, fetched on schedule into storage, rendered, set
   )
   assert.equal(await find(rig, 'hello'), undefined, 'not before a reload')
   await rig.rpc('widgetReload')
+  assert.equal((await find(rig, 'hello')).on, false, 'every extension starts off')
+  await rig.rpc('widgetSet', { id: 'hello', on: true })
   let w = await until(() => find(rig, 'hello').then(w => w?.at && w), 'the first fetch')
-  assert.equal(w.on, true, "a user's widget is on")
+  assert.equal(w.on, true)
   assert.deepEqual(w.size, [3, 1], 'clamped to the grid')
   assert.equal(w.error, undefined)
   assert.equal(await rig.rpc('widgetRender', { id: 'hello' }), '<style>.x{}</style>hi world')
@@ -186,6 +188,7 @@ test('widgets: typed settings, the size of the full view', async t => {
     '{{#if config.flag}}on{{/if}} {{config.tags.length}} {{config.n}} {{#unless config.loose}}tight{{/unless}} [{{data.env}}]',
   )
   await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'typed', on: true })
   let w = await until(() => find(rig, 'typed').then(w => w?.at && !w.running && w), 'fetched')
   assert.deepEqual(w.config, { repo: '', flag: '1', n: '3', tags: 'a,b', pick: 'y', loose: '' })
   assert.deepEqual(
@@ -228,6 +231,7 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
     { 'fetch.mjs': 'export default ({ config, last }) => ({ n: (last?.n ?? 0) + Number(config.step), end: "</script>" })' },
   )
   await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'js', on: true })
   await until(() => find(rig, 'js').then(w => w?.at), 'the first run')
   await rig.rpc('widgetRun', { id: 'js' })
   const w = await find(rig, 'js')
@@ -459,4 +463,38 @@ test('extensions: a place (sidebar, top bar, status bar), network access for a J
   assert.ok(!existsSync(dir) && !existsSync(join(rig.data, 'widget-data', 'net.json')))
   assert.equal(await find(rig, 'net'), undefined)
   await assert.rejects(rig.rpc('widgetRm', { id: 'net' }), /no widget net/)
+})
+
+test('extensions as buttons: the rail and the foot, an icon, a label, a badge and a tip from the data, a click', async t => {
+  const rig = await fresh(t)
+  const btn = { name: 'My PRs', place: 'rail', icon: 'pr', label: '{{open}} open', badge: '{{#if open}}{{open}}{{/if}}', tip: 'yours: <b>{{open}}</b> & more', fetch: 'echo "{\\"open\\": $(cat n)}"', click: 'bump', actions: { bump: 'echo $(( $(cat n) + 1 )) > n' } }
+  widget(rig, 'prs', btn, '', { n: '3' }) // no preview: a button wherever it is
+  widget(rig, 'page', { name: 'Page', place: 'foot', icon: '👨‍👩‍👧', click: 'nope' }, '<template preview>hi</template>')
+  widget(rig, 'cell', { name: 'cell', icon: 'not-an-icon!' }, '<template preview>hi</template>')
+  await rig.rpc('widgetReload')
+  for (const id of ['prs', 'page', 'cell']) await rig.rpc('widgetSet', { id, on: true })
+  const prs = await until(async () => (w => w?.at && w)(await find(rig, 'prs')), 'fetched')
+  assert.deepEqual([prs.place, prs.button, prs.icon, prs.label, prs.badge, prs.tip, prs.click], ['rail', true, 'pr', '3 open', '3', 'yours: 3 & more', 'bump'])
+  const page = await find(rig, 'page')
+  assert.deepEqual([page.place, page.button, page.icon, page.click, page.label], ['foot', true, '👨‍👩‍👧', undefined, undefined]) // an emoji of a few, one character; a click that isn't one of its actions: none
+  const cell = await find(rig, 'cell')
+  assert.deepEqual([cell.place, cell.button, cell.icon], ['side', undefined, undefined]) // a preview in the grid; an icon that's neither: none
+  // the click's action, then a fetch: the label follows the data
+  assert.equal((await rig.rpc('widgetAction', { id: 'prs', action: 'bump' })).ok, true)
+  await until(async () => (await find(rig, 'prs')).label === '4 open', 'its label after the click')
+  await rig.rpc('widgetSet', { id: 'cell', place: 'foot' })
+  assert.equal((await find(rig, 'cell')).button, true, 'in the foot: a button')
+})
+
+test('Reset the interface: every setting at its default but what you set up, the experimental ones too; every extension off', async t => {
+  const rig = await fresh(t)
+  widget(rig, 'mine', { name: 'Mine', fetch: 'echo "{}"' }, '<template preview>hi</template>')
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'mine', on: true, place: 'top' })
+  await rig.rpc('settingsSet', { theme: 'dawn', railLabels: false, workflows: true, specs: true, birdView: true, aiGlow: true, ownAvatar: false, editor: 'zed', env: { A: '1' }, webhook: { url: 'https://ntfy.sh/x' }, branchPrefix: 'me/', voice: { on: true, model: 'm' } })
+  const s = await rig.rpc('uiReset')
+  assert.deepEqual(s, { editor: 'zed', env: { A: '1' }, webhook: { url: 'https://ntfy.sh/x' }, voice: { model: 'm' } }, "voice's setup kept, its experimental switch off")
+  assert.deepEqual((await rig.rpc('state')).settings, s, 'kept, and the view says so')
+  const w = await find(rig, 'mine')
+  assert.deepEqual([w.on, w.place], [false, 'top'], 'off, its other choices kept')
 })

@@ -8,8 +8,11 @@
 import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, BAD_EXITS, BLOCK_NAMES, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { ACTIONS, apiQuestions, flowVars, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { pageNow } from './api'
 import { Markdown } from './MarkdownView'
+import { Modal } from './panels'
+import { ShownDialog } from './Shown'
 import { ask, Icon, IconButton, type MenuItem, Page, Switch, useMenu } from './ui'
 import './workflows.css'
 
@@ -18,13 +21,16 @@ export type WorkflowsApi = {
   openWs: (id: string) => void
   openTab?: (ws: string, tab: string) => void // a block's session, in its workspace
   toast: (text: string) => void
+  phone?: boolean // Settings › Phone pushes is set up: a notify can go to the phone too
+  settings?: (section: string) => void // Settings at that section
+  ai?: (ask?: string) => void // the floating Laki AI chat over the page; with an ask, that sent to it
 }
 type Sel = { id: string; source: WorkflowSource; project?: string }
 type At = { kind: 'index' } | { kind: 'wf'; sel: Sel } | { kind: 'run'; id: string }
 const W = 180
 const H = 58
 const RUNS_SHOWN = 12
-const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', end: 'gray' }
+const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', llm: 'red', decide: 'yellow', popup: 'teal', webhook: 'brown', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', end: 'gray' }
 const STATUS_WORDS: Record<string, string> = { running: 'running', waiting: 'asks you', paused: 'paused', done: 'done', stopped: 'stopped', failed: 'failed' }
 const same = (a: Sel | null | undefined, w: { id: string; source: WorkflowSource; project?: string }) => !!a && a.id === w.id && a.source === w.source && (a.project ?? '') === (w.project ?? '')
 const ended = (r: { status: FlowRun['status'] }) => FLOW_ENDED.includes(r.status)
@@ -40,14 +46,15 @@ function agentActions(global: RunAction[] | undefined, projects: Project[], item
 }
 const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daemon's actions have no slug)
 
-export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; workspaces: WorkspaceView[]; tabs: { id: string }[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string }; api: WorkflowsApi; onClose: () => void }) {
+export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string }; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
   const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : { kind: 'index' })
   const [starting, setStarting] = useState<WorkflowItem | null>(null)
   const [allRuns, setAllRuns] = useState(false)
   const [menu, openMenu] = useMenu()
   const refresh = () => api.call<WorkflowItem[]>('flowList', {}).then(setList, () => setList([]))
-  useEffect(() => void refresh(), [])
+  useEffect(() => void refresh(), [view.flowFiles]) // and as a file changes (Laki AI's, an agent's)
+  const [want, setWant] = useState('') // Make it with Laki AI's
   const flows = [...(view.flows ?? [])].sort((a, b) => Number(ended(a)) - Number(ended(b)) || b.started - a.started)
   const pname = (id?: string) => projects.find(p => p.id === id)?.name ?? id ?? ''
   const cur = at.kind === 'wf' ? list?.find(w => same(at.sel, w)) : undefined
@@ -121,6 +128,15 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
               </button>
             </span>
           </header>
+          {api.ai && (
+            <form className="wf-make" onSubmit={e => (e.preventDefault(), want.trim() && (api.ai!(workflowAsk(want)), setWant('')))}>
+              <Icon name="ai" />
+              <input value={want} placeholder="Or say what it should do: every morning, read my unread Slack, and if anything is urgent, start an agent on it" aria-label="What the workflow should do" onChange={e => setWant(e.target.value)} />
+              <button type="submit" className="btn" disabled={!want.trim()} data-tip="Laki AI asks you a few questions, then writes it; you read it and save it">
+                Make it with Laki AI
+              </button>
+            </form>
+          )}
           {(list?.length || flows.length) > 0 && (
             <div className="sched-stats">
               <div>
@@ -175,7 +191,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                       <span className="sched-acts">
                         <IconButton icon="run" title={w.problems.length ? `Can't run: ${w.problems[0]}` : 'Run it'} onClick={() => (w.problems.length ? setAt({ kind: 'wf', sel: w }) : setStarting(w))} />
                         <IconButton icon="copy" title="Make a copy" onClick={() => create(intoOf(w), w)} />
-                        <IconButton icon="trash" title="Delete" onClick={() => void removeWf(w)} />
+                        <IconButton icon="trash" title="Delete" className="danger" onClick={() => void removeWf(w)} />
                       </span>
                     </div>
                   )
@@ -216,7 +232,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                     </span>
                     <span className="sched-run-at">{ago(r.ended ?? r.started)}</span>
                     <span className="sched-acts" onClick={e => e.stopPropagation()}>
-                      <IconButton icon="trash" title="Delete this run" onClick={() => void removeRun(r)} />
+                      <IconButton icon="trash" title="Delete this run" className="danger" onClick={() => void removeRun(r)} />
                     </span>
                   </div>
                 ))}
@@ -280,9 +296,34 @@ const BLANK = toFile({ id: 'workflow', name: 'New workflow', desc: 'What it does
 
 // ---------- the canvas: blocks where they are (at), else a column in their order
 
+// where each block is drawn: its at:, else in rows by its longest way from the start (a loop's way back left out), a
+// decision's or a case's ways side by side; what the start never reaches below
 function placed(blocks: Block[]): Map<string, [number, number]> {
+  const by = new Map(blocks.map(b => [b.id, b]))
+  const next = (id: string) => exitsOf(by.get(id)!).flatMap(e => (e.to && by.has(e.to) ? [e.to] : []))
+  const order: string[] = []
+  const seen = new Set<string>()
+  const visit = (id: string) => {
+    seen.add(id)
+    for (const n of next(id)) if (!seen.has(n)) visit(n)
+    order.push(id)
+  }
+  const start = blocks.find(b => b.kind === 'start')
+  if (start) visit(start.id)
+  order.reverse() // each block before the ones it leads to (a way back aside)
+  const at = new Map(order.map((id, i) => [id, i]))
+  const row = new Map<string, number>(order.map(id => [id, 0]))
+  for (const id of order) for (const n of next(id)) if (at.get(n)! > at.get(id)!) row.set(n, Math.max(row.get(n)!, row.get(id)! + 1))
+  let last = Math.max(-1, ...row.values())
+  for (const b of blocks) if (!row.has(b.id)) row.set(b.id, ++last)
+  const cols = new Map<number, number>()
   const m = new Map<string, [number, number]>()
-  blocks.forEach((b, i) => m.set(b.id, b.at ?? [70, 20 + i * 90]))
+  for (const id of [...order, ...blocks.filter(b => !at.has(b.id)).map(b => b.id)]) {
+    const r = row.get(id)!
+    const c = cols.get(r) ?? 0
+    cols.set(r, c + 1)
+    m.set(id, by.get(id)!.at ?? [70 + c * (W + 40), 20 + r * 90])
+  }
   return m
 }
 
@@ -307,24 +348,41 @@ function geo(a: [number, number], b: [number, number], i: number, k: number) {
   return [sx, sy, sx + side * d, sy, tx + side * d, ty, tx, ty]
 }
 
+// what a block's prompt or body can use: the run's own, and what each other block gives
+function varsHint(wf: Workflow, b: Block) {
+  const gives = wf.blocks.filter(x => x.id !== b.id).flatMap(x => [...(x.kind === 'agent' || x.kind === 'llm' ? [`steps.${x.id}.answer`] : x.kind === 'run' || x.kind === 'webhook' ? [`steps.${x.id}.output`] : []), ...(x.out ?? []).map(n => `steps.${x.id}.${n}`), ...(x.qs ?? []).map(q => `steps.${x.id}.${q.name}`)])
+  return ['task', 'answer', ...gives.slice(0, 12)].map(v => `{{${v}}}`).join(', ')
+}
+// an outputs field's words: what the block does to give them, and a bad name
+function outHint(b: Block) {
+  const bad = (b.out ?? []).filter(n => !OUT_NAME.test(n) || OUT_TAKEN.includes(n))
+  if (bad.length) return `${bad.join(', ')}? letters, digits, - _; not ${OUT_TAKEN.join(', ')}`
+  const how = b.kind === 'run' ? 'its output is a JSON object with them' : b.kind === 'webhook' ? 'its response is a JSON object with them' : 'it’s told to end its answer with a JSON object of them'
+  return `Names the blocks after it use as {{steps.${b.id}.<name>}}: ${how}`
+}
+
 function subOf(b: Block) {
   switch (b.kind) {
     case 'start': return b.input === 'task' ? 'a task' : ''
     case 'agent': return [b.agent || 'claude', b.use, b.model, b.effort].filter(Boolean).join(' · ')
     case 'run': return b.cmd ?? ''
+    case 'llm': return [b.model || 'Settings › AI’s model', b.out?.length && `→ ${b.out.join(', ')}`].filter(Boolean).join(' · ')
+    case 'webhook': return `${b.method ?? 'POST'} ${(b.url ?? '').replace(/^https?:\/\//, '')}`
+    case 'decide': return [DECIDE_MODELS.find(m => m.id === (b.model || DECIDE_MODELS[0].id))?.name.replace(/ \(.*\)$/, '') ?? b.model, (b.qs ?? []).map(q => `${q.name}?`).join(' '), b.route && `routes on ${b.route}`].filter(Boolean).join(' · ')
+    case 'popup': return `${b.title || 'a window'}${b.notify ? ` · notify${b.phone ? ' + phone' : ''}` : ''}`
     case 'ask': return b.question ?? ''
-    case 'choice': return `${b.of ?? ''} ${b.test ?? 'contains'} "${b.value ?? ''}"`
+    case 'choice': return branchLabel({ of: b.of ?? '', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })
     case 'case': return [b.of, `${b.options?.length ?? 0} ways`].filter(Boolean).join(' · ')
     case 'action': return (ACTIONS[b.action ?? ''] ?? b.action ?? '') + (b.confirm === false ? '' : ['ship', 'approve', 'merge', 'archive'].includes(b.action ?? '') ? ' · asks first' : '')
     case 'wait': return WAITS[b.for ?? ''] ?? b.for ?? ''
     case 'save': return b.link !== undefined ? `link: ${b.link}` : b.from !== undefined ? `${b.from} → ${b.file ?? ''}` : b.file ?? ''
-    case 'end': return `${b.result ?? 'success'}${b.notify ? ' · notify' : ''}`
+    case 'end': return `${b.result ?? 'success'}${b.notify ? ` · notify${b.phone ? ' + phone' : ''}` : ''}`
   }
 }
 
 type Lit = { state: Record<string, 'running' | 'waiting' | 'done' | 'failed'>; taken: Set<string>; visits: Record<string, number>; live?: string } // live: the arrow it just took, while it runs
 
-function Canvas({ wf, sel, onPick, onMove, lit }: { wf: Workflow; sel?: string | null; onPick?: (id: string | null) => void; onMove?: (id: string, at: [number, number]) => void; lit?: Lit }) {
+function Canvas({ wf, sel, onPick, onMove, onMenu, doomed, lit }: { wf: Workflow; sel?: string | null; onPick?: (id: string | null) => void; onMove?: (id: string, at: [number, number]) => void; onMenu?: (e: React.MouseEvent, id: string) => void; doomed?: string | null; lit?: Lit }) {
   const pos = placed(wf.blocks)
   const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; moved: boolean } | null>(null)
   if (drag) pos.set(drag.id, [drag.x, drag.y])
@@ -360,10 +418,10 @@ function Canvas({ wf, sel, onPick, onMove, lit }: { wf: Workflow; sel?: string |
             <animateMotion dur="1.3s" repeatCount="indefinite" path={d} />
           </circle>,
         )
-      if (e.name !== 'next' && (ex.length > 1 || e.max || optioned(a.kind)))
+      if (e.name !== 'next' && (ex.length > 1 || e.max || optioned(a.kind) || !!a.route))
         labels.push(
           <div key={`${a.id}-${e.name}`} className={`wf-el ${cls}`} style={{ left: (x0 + 3 * x1 + 3 * x2 + x3) / 8, top: (y0 + 3 * y1 + 3 * y2 + y3) / 8 }}>
-            {e.name.length > 28 ? `${e.name.slice(0, 27)}…` : e.name}
+            {(l => (l.length > 28 ? `${l.slice(0, 27)}…` : l))(e.label ?? e.name)}
           </div>,
         )
     })
@@ -389,7 +447,7 @@ function Canvas({ wf, sel, onPick, onMove, lit }: { wf: Workflow; sel?: string |
           return (
             <div
               key={b.id}
-              className={`wf-node ${b.kind === 'start' || b.kind === 'end' ? 'pill' : ''} ${sel === b.id ? 'sel' : ''} ${drag?.id === b.id ? 'dragging' : ''}`}
+              className={`wf-node ${b.kind === 'start' || b.kind === 'end' ? 'pill' : ''} ${sel === b.id ? 'sel' : ''} ${drag?.id === b.id ? 'dragging' : ''} ${doomed === b.id ? 'doomed' : ''}`}
               style={{ left: x, top: y, ['--kc' as string]: `var(--tc-${KIND_COLOR[b.kind]})` }}
               data-kind={b.kind}
               data-state={st}
@@ -397,10 +455,12 @@ function Canvas({ wf, sel, onPick, onMove, lit }: { wf: Workflow; sel?: string |
               onPointerMove={move}
               onPointerUp={up}
               onPointerCancel={() => setDrag(null)}
+              onContextMenu={onMenu && (e => (onPick?.(b.id), onMenu(e, b.id)))}
             >
               <div className="k">
                 <i />
                 {BLOCK_NAMES[b.kind]}
+                {b.kind !== 'start' && b.name && b.name !== b.id && <code className="wf-id">{b.id}</code>}
               </div>
               <div className="t">{blockName(b)}</div>
               <div className="s">{subOf(b)}</div>
@@ -425,6 +485,24 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
   const wf = parsed.workflow
   const problems = [...parsed.problems, ...check(wf)]
   const dirty = text !== item.text
+  const [vars, setVars] = useState(false) // the Variables list
+  const [doomed, setDoomed] = useState<string | null>(null) // the block its trash is under the pointer: red on the canvas
+  useEffect(() => setDoomed(null), [pick]) // another block's panel: not that one
+  // the file changed under it (Laki AI, an agent, the CLI): taken when it wasn't changed here, or when Laki AI wrote it
+  // (it was shown this draft as it was asked)
+  const seen = useRef(item.text)
+  useEffect(() => {
+    if (item.text === seen.current) return
+    const was = seen.current
+    seen.current = item.text
+    if (text === was || item.byAgent) setText(item.text)
+  }, [item.text])
+  // what Laki AI's chat is told as you ask: this workflow, as the editor has it
+  useEffect(() => {
+    pageNow.workflow = () =>
+      `the workflow "${wf.name}" open in its editor (id ${item.id}, source ${item.source}${item.project ? `, project ${item.project}` : ''}${dirty ? ', with changes not saved yet' : ''}). To change it, write the whole file back with laki_workflow_write, the same id and project. Its file as the editor shows it now:\n<workflow>\n${text.slice(0, 6000)}${text.length > 6000 ? '\n… (cut: laki_workflows with its id has all of it)' : ''}\n</workflow>`
+    return () => void (pageNow.workflow = undefined)
+  })
   useEffect(() => void (dirty ? drafts.set(keyOf(item), text) : drafts.delete(keyOf(item))), [text, item.text])
   const edit = (f: (w: Workflow) => void) => {
     const w: Workflow = JSON.parse(JSON.stringify(wf))
@@ -440,17 +518,19 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
-  const addBlock = (kind: BlockKind, more: Partial<Block> = {}) =>
+  const addBlock = (kind: BlockKind, more: Partial<Block> = {}, after = pick) =>
     edit(w => {
-      const ids = new Set(w.blocks.map(b => b.id))
-      let id: string = kind
-      for (let n = 2; ids.has(id); n++) id = `${kind}${n}`
-      const from = w.blocks.find(b => b.id === pick) ?? w.blocks.at(-1)
+      const id = freeId(w, kind)
+      const from = w.blocks.find(b => b.id === after) ?? w.blocks.at(-1)
       const pos = placed(w.blocks)
       const [fx, fy] = from ? pos.get(from.id)! : [70, 20]
-      const b: Block = { id, kind, ...NEW_BLOCK[kind], ...more, at: [fx, fy + 90] }
-      // between the picked block and where its first good exit went
-      if (from && !optioned(from.kind) && from.kind !== 'end') {
+      const b: Block = { id, kind, ...JSON.parse(JSON.stringify(NEW_BLOCK[kind])), ...more, at: [fx, fy + 90] }
+      // {{prev}} in its defaults: what the block before gives (an agent's or AI call's answer, a command's output), else the task
+      const give = from?.kind === 'agent' || from?.kind === 'llm' ? 'answer' : from?.kind === 'run' || from?.kind === 'webhook' || from?.kind === 'wait' ? 'output' : ''
+      const prev = give ? `{{steps.${from!.id}.${give}}}` : '{{task}}'
+      for (const k of ['text', 'title'] as const) if (b[k]) b[k] = b[k]!.split('{{prev}}').join(prev)
+      // between the picked block and where its first good exit went (one with options or routes: you link it)
+      if (from && !optioned(from.kind) && !routesOf(from) && from.kind !== 'end') {
         const e = EXITS[from.kind].find(x => !BAD_EXITS.includes(x)) ?? EXITS[from.kind][0]
         const was = from.to?.[e]
         from.to = { ...from.to, [e]: id }
@@ -460,6 +540,33 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
       w.blocks.push(b)
       setPick(id)
     })
+  // a block's right click on the canvas: a block after it, a copy of it, out with it
+  const blockActions = (id: string): MenuItem[] => {
+    const b = wf.blocks.find(x => x.id === id)
+    if (!b) return []
+    const full = wf.blocks.length >= MAX_BLOCKS
+    return [
+      { head: blockName(b) },
+      b.kind !== 'end' && !full ? { label: 'Add a block after it', icon: 'plus', items: blockMenu(`After ${blockName(b)}`, actions, presets, (k, more) => addBlock(k, more, id)) } : null,
+      b.kind !== 'start' && !full
+        ? {
+            label: 'Duplicate',
+            icon: 'copy',
+            run: () =>
+              edit(w => {
+                const x: Block = JSON.parse(JSON.stringify(w.blocks.find(y => y.id === id)!))
+                const pos = placed(w.blocks)
+                const [bx, by] = pos.get(id)!
+                let ax = bx + W + 40 // beside it, past any block there
+                while ([...pos.values()].some(([px, py]) => Math.abs(px - ax) < W && Math.abs(py - by) < H)) ax += W + 40
+                w.blocks.push({ ...x, id: freeId(w, id.replace(/\d+$/, '') || x.kind), name: x.name && `${x.name} (copy)`, at: [ax, by] })
+                setPick(w.blocks.at(-1)!.id)
+              }),
+          }
+        : null,
+      b.kind !== 'start' ? { label: 'Delete', icon: 'trash', danger: true, run: () => (edit(w => dropBlock(w, id)), setPick(null)) } : null,
+    ]
+  }
   const where = (
     <span className="wf-facts">
       <select value={wf.where} onChange={e => edit(w => void (w.where = e.target.value as Workflow['where']))} data-tip="Where each run works">
@@ -476,6 +583,7 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
   )
   return (
     <div className="wf-editor">
+      {vars && <VarsList wf={wf} onClose={() => setVars(false)} toast={api.toast} />}
       <div className="wf-head">
         <div className="wf-title">
           <b>{wf.name}</b>
@@ -499,8 +607,9 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
             <span className="wf-dot" /> {runs.length} running
           </button>
         )}
+        {api.ai && <IconButton icon="ai" title="Change it with Laki AI: its chat knows this workflow" onClick={() => api.ai!()} />}
         <IconButton icon="copy" title="Make a copy" onClick={onCopy} />
-        <IconButton icon="trash" title="Delete this workflow" onClick={onRemove} />
+        <IconButton icon="trash" title="Delete this workflow" className="danger" onClick={onRemove} />
         <button className="btn primary" disabled={problems.length > 0 || dirty} onClick={onRun} data-tip={problems[0] ?? (dirty ? 'Save it first' : 'Start a run')}>
           <Icon name="run" size={12} /> Run
         </button>
@@ -512,6 +621,9 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
             <Icon name="plus" size={12} /> Block
           </button>
         )}
+        <button className="btn small" onClick={() => setVars(true)} data-tip="Every variable this workflow has, and the block that sets it">
+          {'{{ }}'} Variables
+        </button>
         {problems.length > 0 && (
           <span className="wf-problems" data-tip={problems.join('\n')}>
             {problems.length === 1 ? problems[0] : `${problems[0]} · ${problems.length - 1} more`}
@@ -520,8 +632,8 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
       </div>
       {mode === 'canvas' ? (
         <div className="wf-split">
-          <Canvas wf={wf} sel={pick} onPick={setPick} onMove={(id, at) => edit(w => void (w.blocks.find(b => b.id === id)!.at = at))} />
-          <Inspector wf={wf} id={pick} presets={presets} actions={actions} edit={edit} onPick={setPick} />
+          <Canvas wf={wf} sel={pick} onPick={setPick} onMove={(id, at) => edit(w => void (w.blocks.find(b => b.id === id)!.at = at))} onMenu={(e, id) => openMenu(e, blockActions(id))} doomed={doomed} />
+          <Inspector wf={wf} id={pick} presets={presets} actions={actions} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} />
         </div>
       ) : (
         <div className="wf-file">
@@ -541,6 +653,10 @@ const KIND_SAYS: Record<BlockKind, string> = {
   start: 'Where it begins',
   agent: 'A prompt to an agent; waits for its turn to end',
   run: 'A shell command: ok or fail by its exit code',
+  llm: 'One call to a model on OpenRouter: a prompt in, an answer out',
+  webhook: 'An HTTP request to another system: its response back',
+  decide: 'Typed questions to a decision model: probabilities, not text',
+  popup: 'A window in Laki with a result: HTML or Markdown',
   choice: 'Yes or no, by what a block said (if / else)',
   case: 'Many ways: the first branch that holds (if / elsif / else)',
   ask: 'A question with buttons, for you',
@@ -549,16 +665,42 @@ const KIND_SAYS: Record<BlockKind, string> = {
   save: 'Text, a file or a link, into the workspace’s Artifacts',
   end: 'Done, stopped or failed',
 }
+// an id no block has: the kind's name, else with a number (agent2)
+function freeId(w: Workflow, base: string) {
+  const ids = new Set(w.blocks.map(b => b.id))
+  let id = base
+  for (let n = 2; ids.has(id); n++) id = `${base.slice(0, 38)}${n}` // ID's 41 at most
+  return id
+}
+// a block out, and every way to it (exits, options, a max's) with it: they go nowhere now; a session on it: the run's
+function dropBlock(w: Workflow, id: string) {
+  w.blocks = w.blocks.filter(x => x.id !== id)
+  for (const o of w.blocks) {
+    for (const [k, v] of Object.entries(o.to ?? {})) if (v === id) delete o.to![k]
+    for (const opt of o.options ?? []) if (opt.to === id) delete opt.to
+    if (o.max?.to === id) delete o.max.to
+    if (o.session === id) delete o.session // its tab: the run's again
+  }
+}
 const NEW_BLOCK: Record<BlockKind, Partial<Block>> = {
   start: { input: 'task' },
   agent: { name: 'Agent', agent: 'claude', text: '{{task}}' },
   run: { name: 'Tests', cmd: 'npm test' },
+  llm: { name: 'Sum it up', text: 'Sum up this work in three lines, and give it a title:\n\n{{prev}}', out: ['title', 'summary'] },
+  decide: {
+    name: 'Triage',
+    model: DECIDE_MODELS[0].id,
+    text: '{"input": {{prev}}}',
+    qs: [{ name: 'urgent', type: 'yes/no', ask: 'Does any of these messages need me today?', opts: [{ label: 'yes', text: 'someone is blocked, a deadline today, an outage' }, { label: 'no', text: 'FYI, chatter, newsletters' }] }],
+  },
+  popup: { name: 'Show the result', title: 'Done: {{task}}', text: '{{prev}}' },
+  webhook: { name: 'Post it', url: 'https://example.com/hook', text: '{"task": "{{task}}", "text": "{{prev}}"}' },
   choice: { name: 'If', of: 'answer', test: 'contains', value: 'yes', options: [{ label: 'Yes' }, { label: 'No' }] },
   case: { name: 'Case', of: 'answer', options: [{ label: 'equals "only_specs"' }, { label: 'contains "fix"' }, { label: 'else' }] },
   ask: { name: 'Ask you', question: 'Go on?', options: [{ label: 'Yes' }, { label: 'Stop' }] },
   action: { name: 'Open a PR', action: 'ship', text: '{{task}}' },
   wait: { name: 'CI checks', for: 'checks' },
-  save: { name: 'Save', file: 'notes.md', text: '{{steps.work.answer}}' },
+  save: { name: 'Save', file: 'notes.md', text: '{{prev}}' },
   end: { name: 'Done', result: 'success' },
 }
 // + Block's menu: each kind, an agent action (Run ▾'s) as an agent block, and the three ways to keep something
@@ -571,7 +713,11 @@ function blockMenu(head: string, actions: RunAction[], presets: Preset[], add: (
     actions.length
       ? { label: 'Agent action', sub: 'One of Run ▾’s, as an agent block', items: actions.map((a): MenuItem => ({ label: a.name, sub: a.slug, pill: a.target === 'any' ? undefined : a.target, run: () => add('agent', { name: a.name, use: ref(a), text: undefined, ...(presetOf(a) && { agent: presetOf(a) }) }) })) }
       : { label: 'Agent action', sub: 'None yet: Settings › Actions', run: () => add('agent') },
-    ...(['run', 'choice', 'case', 'ask', 'action', 'wait'] as const).map(one),
+    ...(['run', 'choice', 'case', 'ask', 'popup', 'action', 'wait'] as const).map(one),
+    { head: 'Outside Laki' },
+    one('llm'),
+    one('decide'),
+    one('webhook'),
     { head: 'Into its Artifacts' },
     { label: 'Save text', sub: 'An answer, notes: a file in the storage folder', run: () => add('save') },
     { label: 'Save a file', sub: 'A file or folder of the workspace, copied there', run: () => add('save', { name: 'Keep a file', file: 'report.html', from: 'report.html', text: undefined }) },
@@ -582,13 +728,13 @@ function blockMenu(head: string, actions: RunAction[], presets: Preset[], add: (
 }
 const FORMAT_HELP = `\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30\`.
 
-A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · session: run|new|<block>\`, \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`end: success|stopped|failed · notify: yes\`. An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
+A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · session: run|new|<block> · json: yes\` (JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown), \`end: success|stopped|failed · notify: yes · phone: yes\` (its \`>\` lines: the notification's words; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
 
 \`> lines\` are its prompt (or text). Exits: \`next: id\`, \`ok:\`, \`fail:\`, \`error:\`, \`pass:\`; a choice's and an ask's options: \`- Label → id\`. \`max: 3 → id\` limits a block (every loop needs one, or an ask). \`at: x,y\`: where it's drawn.
 
-Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
+Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
 
-function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void }) {
+function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoom }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void }) {
   const b = wf.blocks.find(x => x.id === id)
   const used = b?.use ? findAction(actions, [], b.use) : undefined
   if (!b)
@@ -642,24 +788,13 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
         <code>{b.id}</code>
         <span className="grow" />
         {b.kind !== 'start' && (
-          <IconButton
-            icon="trash"
-            title="Remove this block"
-            onClick={() => {
-              edit(w => {
-                w.blocks = w.blocks.filter(x => x.id !== b.id)
-                for (const o of w.blocks) {
-                  for (const [k, v] of Object.entries(o.to ?? {})) if (v === b.id) delete o.to![k]
-                  for (const opt of o.options ?? []) if (opt.to === b.id) delete opt.to
-                  if (o.max?.to === b.id) delete o.max.to
-                }
-              })
-              onPick(null)
-            }}
-          />
+          <span className="wf-doom" onPointerEnter={() => onDoom?.(b.id)} onPointerLeave={() => onDoom?.(null)}>
+            <IconButton icon="trash" title="Remove this block" className="danger" onClick={() => (onDoom?.(null), edit(w => dropBlock(w, b.id)), onPick(null))} />
+          </span>
         )}
       </div>
       {b.kind !== 'start' && field('Name', text(b.name, (x, v) => (x.name = v || undefined), false, b.id))}
+      {b.kind !== 'start' && <IdField key={b.id} id={b.id} rename={to => (edit(w => void renameBlock(w, b.id, to)), onPick(to))} check={to => renameBlock(JSON.parse(JSON.stringify(wf)), b.id, to)} />}
       {b.kind === 'agent' && (
         <>
           <div className="wf-row2">
@@ -707,6 +842,10 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
             b.use ? (used?.text.split('\n')[0].slice(0, 140) ?? 'No such action here: Settings › Actions, or the project’s') : actions.length ? 'One of Run ▾’s, by its slug: its prompt goes first' : 'Run ▾’s agent actions show here: Settings › Actions',
           )}
           {field(b.use ? 'More for it (after the action’s prompt)' : 'Prompt', text(b.text, (x, v) => (x.text = v || undefined), true), '{{task}}, {{answer}}, {{steps.<id>.answer}}, {{steps.<id>.output}}, {{pr.url}}')}
+          <Switch className="switch-row" on={!!b.json} onChange={v => set(x => void (x.json = v || undefined))}>
+            JSON mode
+          </Switch>
+          <span className="wf-hint">{b.json ? `It’s told to end with one JSON object or list (a \`\`\`json block); {{steps.${b.id}.answer}} is that JSON: bare in an AI decision’s state, json('steps.${b.id}.answer') in a Case’s JS. No JSON in it: its words, said in the log.` : 'Its answer is its last message. On: one JSON object or list, for the blocks after it to read.'}</span>
         </>
       )}
       {b.kind === 'run' && (
@@ -715,6 +854,62 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
           {field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 10} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />)}
         </>
       )}
+      {b.kind === 'llm' && (
+        <>
+          {field('Model', text(b.model, (x, v) => (x.model = v.trim() || undefined), false, 'Settings › AI’s'), 'An OpenRouter model, e.g. anthropic/claude-sonnet-4.5. Its key: Settings › AI')}
+          {field('Prompt', text(b.text, (x, v) => (x.text = v || undefined), true), `One call, no tools: ${varsHint(wf, b)}`)}
+          {field('System prompt', <Typed area rows={2} value={b.system ?? ''} placeholder="Optional: who it is, how it answers" onText={v => set(x => void (x.system = v.trim() ? v.replace(/\s*\n\s*/g, ' ') : undefined))} />)}
+          <Switch className="switch-row" on={b.json ?? !!b.out?.length} onChange={v => set(x => void (x.json = v === !!x.out?.length ? undefined : v))}>
+            JSON mode
+          </Switch>
+          <span className="wf-hint">{b.json ?? !!b.out?.length ? `Its answer is one JSON object (OpenRouter’s response_format). Outputs below take its keys; a Case’s JS reads it with json('steps.${b.id}.answer').` : 'Its answer is text. On: one JSON object (on by itself with Outputs).'}</span>
+          <div className="wf-row2">
+            {field('Temperature', <Typed type="number" min={0} max={2} value={b.temperature ?? ''} placeholder="its default" onText={v => set(x => void (x.temperature = v === '' || Number.isNaN(Number(v)) ? undefined : Math.min(2, Math.max(0, Number(v)))))} />)}
+            {field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 2} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />)}
+          </div>
+        </>
+      )}
+      {b.kind === 'decide' && <DecideFields key={`q:${b.id}`} wf={wf} b={b} set={set} />}
+      {b.kind === 'popup' && (
+        <>
+          {field('Title', text(b.title, (x, v) => (x.title = v.trim() || undefined), false, 'Done: {{task}}'))}
+          {field('Shows', text(b.text, (x, v) => (x.text = v || undefined), true), `HTML when it starts with <, else Markdown; scrollable, with Close. ${varsHint(wf, b)}`)}
+          <NotifyFields b={b} set={set} api={api} what="as it shows the window" />
+        </>
+      )}
+      {b.kind === 'webhook' && (
+        <>
+          <div className="wf-row2">
+            {field(
+              'Method',
+              <select value={b.method ?? 'POST'} onChange={e => set(x => void (x.method = e.target.value === 'POST' ? undefined : (e.target.value as Block['method'])))}>
+                {METHODS.map(m => (
+                  <option key={m}>{m}</option>
+                ))}
+              </select>,
+            )}
+            {field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? 2} onText={v => set(x => void (x.timeout = Number(v) || undefined))} />)}
+          </div>
+          {field('URL', text(b.url, (x, v) => (x.url = v.trim()), false, 'https://example.com/hook'), '{{vars}} too; ok on a 2xx answer')}
+          {field('Headers', <Typed area rows={2} value={(b.headers ?? []).join('\n')} placeholder="Authorization: Bearer {{env.API_TOKEN}}" onText={v => set(x => void (x.headers = (l => (l.length ? l : undefined))(v.split('\n').map(h => h.trim()).filter(Boolean))))} />, 'One per line. {{env.NAME}}: Settings’ or the project’s env, for a secret (never in the log)')}
+          {(b.method ?? 'POST') !== 'GET' && (
+            <>
+              {field(
+                'Body',
+                <select value={b.from !== undefined ? 'file' : b.text !== undefined ? 'text' : 'vars'} onChange={e => set(x => void ((x.from = e.target.value === 'file' ? x.from || 'report.html' : undefined), (x.text = e.target.value === 'text' ? x.text || '{"text": "{{steps.work.answer}}"}' : undefined)))}>
+                  <option value="vars">The run’s variables, as JSON</option>
+                  <option value="text">Text or JSON</option>
+                  <option value="file">A file of the workspace</option>
+                </select>,
+              )}
+              {b.text !== undefined && field('Text', text(b.text, (x, v) => (x.text = v), true), `JSON when it starts with { or [: values go in escaped. ${varsHint(wf, b)}`)}
+              {b.from !== undefined && field('File', text(b.from, (x, v) => (x.from = v), false, 'report.pdf'), 'A path in the workspace ({{steps.<id>.<name>}} too), sent as it is')}
+            </>
+          )}
+        </>
+      )}
+      {(b.kind === 'llm' || b.kind === 'decide' || b.kind === 'webhook') && <TestBlock key={`t:${b.id}`} b={b} api={api} project={project} />}
+      {OUT_KINDS.includes(b.kind) && field('Outputs', <Typed value={(b.out ?? []).join(', ')} placeholder="title, summary, files" onText={v => set(x => void (x.out = (n => (n.length ? n : undefined))(v.split(/[\s,]+/).filter(Boolean))))} />, outHint(b))}
       {b.kind === 'ask' && (
         <>
           {field('Question', text(b.question, (x, v) => (x.question = v)))}
@@ -728,7 +923,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
             {field(
               'Test',
               <select value={b.test ?? 'contains'} onChange={e => set(x => void (x.test = e.target.value as Block['test']))}>
-                {TESTS.map(t => (
+                {TESTS.filter(t => t !== 'js').map(t => (
                   <option key={t}>{t}</option>
                 ))}
               </select>,
@@ -737,7 +932,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
           </div>
         </>
       )}
-      {b.kind === 'case' && field('Of', text(b.of, (x, v) => (x.of = v.trim() || undefined), false, 'steps.classify.answer'), 'What its branches test (a branch may name its own); the first that holds wins, else the last')}
+      {b.kind === 'case' && field('Of', text(b.of, (x, v) => (x.of = v.trim() || undefined), false, 'steps.classify.answer'), 'What its branches test (a branch may name its own); the first that holds wins, else the last. Numbers: >= 0.8 (a decision’s .p); JS: anything')}
       {b.kind === 'action' && (
         <>
           {field(
@@ -795,12 +990,22 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
               ))}
             </select>,
           )}
-          <Switch className="switch-row" on={!!b.notify} onChange={v => set(x => void (x.notify = v || undefined))}>
-            Notify me
-          </Switch>
+          <NotifyFields b={b} set={set} api={api} what="as the run ends here" />
+          {b.notify && field('What it says', text(b.text, (x, v) => (x.text = v || undefined), false, blockName(b)), `{{vars}} too, e.g. {{pr.url}}; empty: “${blockName(b)}”. ${varsHint(wf, b)}`)}
         </>
       )}
       {b.kind !== 'end' && <div className="wf-sub">Where it goes</div>}
+      {b.kind === 'decide' &&
+        field(
+          'Ways out',
+          <select value={b.route ?? ''} onChange={e => set(x => void ((x.route = e.target.value || undefined), x.route || (x.options = undefined)))}>
+            <option value="">One: ok (then a Case routes)</option>
+            {(b.qs ?? []).map(q => (
+              <option key={q.name} value={q.name}>{`A line per answer of ${q.name}`}</option>
+            ))}
+          </select>,
+          b.route ? `Its answer to ${b.route} picks the line; not sure, it asks you first, then goes your way.` : 'Or a line for each answer of one question.',
+        )}
       {b.kind === 'case' ? (
         <>
           {(b.options ?? []).map((o, i) => {
@@ -820,16 +1025,16 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
               <div key={i} className="wf-branch">
                 <div className="wf-exit">
                   <span className="wf-exit-name">{i ? 'elsif' : 'if'}</span>
-                  <Typed value={cur.of ?? ''} placeholder={b.of || 'a variable'} aria-label="Its variable" onText={v => put({ of: v.trim() || undefined })} />
+                  {cur.test === 'js' ? <span className="wf-hint grow">a JS expression: vars, num(name), json(name)</span> : <Typed value={cur.of ?? ''} placeholder={b.of || 'a variable'} aria-label="Its variable" onText={v => put({ of: v.trim() || undefined })} />}
                   {(b.options?.length ?? 0) > 2 && <IconButton icon="x" title="Remove this branch" onClick={() => set(x => void x.options!.splice(i, 1))} />}
                 </div>
                 <div className="wf-exit">
-                  <select className="wf-test" value={cur.test} aria-label="Its test" onChange={e => put({ test: e.target.value as typeof cur.test })}>
+                  <select className="wf-test" value={cur.test} aria-label="Its test" onChange={e => put({ test: e.target.value as typeof cur.test, ...(e.target.value === 'js' && { of: undefined, value: cur.test === 'js' ? cur.value : `vars['${cur.of || b.of || 'answer'}'] === 'yes'` }), ...(NUM_TESTS.includes(e.target.value) && !NUM_TESTS.includes(cur.test) && { value: '0.5' }) })}>
                     {TESTS.map(t => (
-                      <option key={t}>{t}</option>
+                      <option key={t} value={t}>{t === 'js' ? 'JS' : t}</option>
                     ))}
                   </select>
-                  <Typed value={cur.value} placeholder="text" aria-label="Its text" onText={v => put({ value: v })} />
+                  <Typed value={cur.value} placeholder={cur.test === 'js' ? "num('steps.triage.urgent.p') > 0.8" : NUM_TESTS.includes(cur.test) ? '0.8' : 'text'} aria-label="Its text" className={cur.test === 'js' ? 'wf-mono' : undefined} onText={v => put({ value: v })} />
                 </div>
                 <div className="wf-exit">
                   <span>→</span>
@@ -876,23 +1081,330 @@ function Inspector({ wf, id, presets, actions, edit, onPick }: { wf: Workflow; i
           {b.kind === 'choice' && <span className="wf-hint">The first when it holds, the second when not.</span>}
         </>
       ) : (
-        EXITS[b.kind].map(e => (
-          <div key={e} className={`wf-exit ${BAD_EXITS.includes(e) ? 'bad' : ''}`}>
-            <span className="wf-exit-name">{e}</span>
-            <span>→</span>
-            {target(b.to?.[e], v => set(x => (v ? (x.to = { ...x.to, [e]: v }) : delete x.to?.[e])))}
-          </div>
-        ))
+        exitsOf(b)
+          .filter(e => !e.max)
+          .map(e => {
+            const routed = !!routesOf(b) && e.name !== 'error' // a routed decision's answer: kept as an option
+            return (
+              <div key={e.name} className={`wf-exit ${e.bad ? 'bad' : ''}`}>
+                <span className="wf-exit-name" data-tip={e.label !== e.name ? e.label : undefined}>{e.label ?? e.name}</span>
+                <span>→</span>
+                {target(e.to, v =>
+                  set(x => {
+                    if (!routed) return void (v ? (x.to = { ...x.to, [e.name]: v }) : delete x.to?.[e.name])
+                    const l = (x.options ??= []).filter(o => o.label !== e.name)
+                    x.options = v ? [...l, { label: e.name, to: v }] : l
+                  }),
+                )}
+              </div>
+            )
+          })
       )}
       {b.kind !== 'start' && b.kind !== 'end' && (
         <div className="wf-exit">
           <span className="wf-exit-name">at most</span>
           <Typed type="number" min={0} className="wf-num" value={b.max?.n ?? ''} placeholder="∞" onText={v => set(x => void (x.max = Number(v) > 0 ? { n: Number(v), to: x.max?.to } : undefined))} />
-          <span>then</span>
-          {b.max ? target(b.max.to, v => set(x => void (x.max = { n: x.max!.n, to: v }))) : <span className="wf-hint">times</span>}
+          <span>times</span>
+          {b.max ? (
+            <>
+              <span>, then</span>
+              {target(b.max.to, v => set(x => void (x.max = { n: x.max!.n, to: v })))}
+            </>
+          ) : (
+            <span className="wf-hint">(∞: no limit)</span>
+          )}
         </div>
       )}
     </div>
+  )
+}
+
+// every variable a workflow has (flowVars): the run's, then each block's; a click copies it as {{name}}
+function VarsList({ wf, onClose, toast }: { wf: Workflow; onClose: () => void; toast: (t: string) => void }) {
+  const all = flowVars(wf)
+  const groups = [{ id: '', title: 'The run’s', vars: all.filter(v => !v.from) }, ...wf.blocks.flatMap(b => (x => (x.length ? [{ id: b.id, title: `${blockName(b)} · ${BLOCK_NAMES[b.kind]}`, vars: x }] : []))(all.filter(v => v.from === b.id)))]
+  const copy = (n: string) => void navigator.clipboard.writeText(`{{${n}}}`).then(() => toast(`Copied {{${n}}}`), () => {})
+  return (
+    <Modal title={`Variables · ${wf.name}`} onClose={onClose} wide>
+      <p className="wf-hint">{'What {{…}} fills in prompts, commands, URLs, bodies and titles; a Case or If tests them. A block’s are there once it ran. A click copies one. A webhook also has {{env.NAME}}: Settings’ or the project’s env, never logged.'}</p>
+      <div className="wf-vars">
+        {groups.map(g => (
+          <section key={g.id || 'run'}>
+            <h4>{g.title}{g.id && <code className="wf-id">{g.id}</code>}</h4>
+            {g.vars.map(v => (
+              <button key={v.name} className="wf-var" onClick={() => copy(v.name)} data-tip="Copy">
+                <code>{`{{${v.name}}}`}</code>
+                <span>{v.what}</span>
+              </button>
+            ))}
+          </section>
+        ))}
+      </div>
+    </Modal>
+  )
+}
+
+// a block's id: what {{steps.<id>.…}} names; a new one renames every way to it (exits, sessions, variables in text)
+function IdField({ id, rename, check }: { id: string; rename: (to: string) => void; check: (to: string) => void }) {
+  const [v, setV] = useState(id)
+  const [err, setErr] = useState('')
+  const go = () => {
+    const to = v.trim()
+    if (to === id) return setErr('')
+    try {
+      check(to)
+      setErr('')
+      rename(to)
+    } catch (e) {
+      setErr((e as Error).message)
+    }
+  }
+  return (
+    <div className="wf-field">
+      <label>ID</label>
+      <input className="wf-mono" value={v} spellCheck={false} aria-label="Its ID" onChange={e => setV(e.target.value)} onBlur={go} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), go())} />
+      {err ? <span className="wf-err">{err}</span> : <span className="wf-hint">{`Its variables: {{steps.${id}.…}}. A new ID changes every arrow and {{steps.${id}.…}} to it (⏎).`}</span>}
+    </div>
+  )
+}
+
+// a Show you's or an end's notification: what it is, where it goes (the Mac; the phone with phone pushes set up)
+function NotifyFields({ b, set, api, what }: { b: Block; set: (f: (x: Block) => void) => void; api: WorkflowsApi; what: string }) {
+  return (
+    <>
+      <Switch className="switch-row" on={!!b.notify} onChange={v => set(x => void ((x.notify = v || undefined), v || (x.phone = undefined)))}>
+        Notify me {what}
+      </Switch>
+      <span className="wf-hint">
+        {b.kind === 'end' ? 'A notification on this Mac with the workflow’s name, how the run ended and what it says (below); a click opens the run. A failed run always notifies. ' : 'A notification on this Mac with its title; a click opens the run. '}
+        Settings › General › macOS notifications turns them all off.
+      </span>
+      {b.notify && (
+        <>
+          <Switch className="switch-row" on={!!b.phone} disabled={!api.phone && !b.phone} onChange={v => set(x => void (x.phone = v || undefined))}>
+            And on my phone
+          </Switch>
+          <span className="wf-hint">
+            {api.phone ? 'A push to your phone too, the way Settings › Phone pushes sends an agent’s.' : 'Needs phone pushes (ntfy, Telegram, Slack, a webhook): '}
+            {!api.phone && api.settings && (
+              <button className="link" onClick={() => api.settings!('webhook')}>
+                Settings › Phone pushes
+              </button>
+            )}
+          </span>
+        </>
+      )}
+    </>
+  )
+}
+
+// an AI decision's inspector: its model (the list's, or any id), how sure, the state it judges, and its questions as
+// cards or as the Decisions API's JSON (the same questions: either edits them)
+const QTYPE_NAMES = Object.fromEntries(QTYPES.map(t => [t, `${QTYPE_INFO[t].name} (${QTYPE_INFO[t].api})`])) as Record<DecideQ['type'], string>
+// a new question's start: yes/no's meanings, a choice's two options, a score's three levels
+const newQ = (type: DecideQ['type'], n: number): DecideQ => ({ name: `q${n}`, type, ask: '', opts: type === 'yes/no' ? [] : type === 'choice' ? [{ label: 'a', text: '' }, { label: 'b', text: '' }] : ['low', 'medium', 'high'].map((t, k) => ({ label: String(k), text: t })) })
+function DecideFields({ wf, b, set }: { wf: Workflow; b: Block; set: (f: (x: Block) => void) => void }) {
+  const [tab, setTab] = useState<'form' | 'json'>('form')
+  const [json, setJson] = useState<string | null>(null) // the JSON as typed, until it reads
+  const [err, setErr] = useState('')
+  const [picked, setOther] = useState(false) // Another model… picked, its id still to type
+  const [adding, setAdding] = useState(false) // + Question's kinds, as cards
+  const other = picked || (!!b.model && !DECIDE_MODELS.some(m => m.id === b.model))
+  const qs = b.qs ?? []
+  const q = (i: number, f: (q: DecideQ) => void) => set(x => f(x.qs![i]))
+  // the routed question's answers moved (renamed, removed, renumbered): its ways out follow; undefined drops one
+  const reroute = (y: Block, i: number, f: (label: string) => string | undefined) =>
+    void (y.route === y.qs![i].name && y.options && (y.options = y.options.flatMap(o => (l => (l === undefined ? [] : [{ ...o, label: l }]))(f(o.label)))))
+  const field = (label: string, el: React.ReactNode, hint?: string) => (
+    <div className="wf-field">
+      <label>{label}</label>
+      {el}
+      {hint && <span className="wf-hint">{hint}</span>}
+    </div>
+  )
+  return (
+    <>
+      {field(
+        'Decision model',
+        <select value={other ? '' : b.model || DECIDE_MODELS[0].id} onChange={e => (setOther(!e.target.value), set(x => void (x.model = e.target.value && e.target.value !== DECIDE_MODELS[0].id ? e.target.value : undefined)))}>
+          {DECIDE_MODELS.map(m => (
+            <option key={m.id} value={m.id}>{m.name}</option>
+          ))}
+          <option value="">Another model…</option>
+        </select>,
+        'OpenRouter’s Decisions API: probabilities, not text. Its key: Settings › AI',
+      )}
+      {other && field('Model id', <Typed value={b.model ?? ''} placeholder="nace-ai/drex-v2.0" onText={v => set(x => void (x.model = v.trim() || undefined))} />, 'Any model of openrouter.ai/models?output_modalities=decisions')}
+      {field('State', <Typed area rows={4} value={b.text ?? ''} placeholder={'{"messages": {{steps.<step>.answer}}}'} onText={v => set(x => void (x.text = v || undefined))} />, `What it judges: JSON ({{var}} bare: as JSON when it is; in quotes: escaped) or words. Empty: the block before’s answer or output. ${varsHint(wf, b)}`)}
+      {field(
+        'Sure from',
+        <Typed type="number" min={0.5} max={0.99} value={b.sure ?? SURE} onText={v => set(x => void (x.sure = Number(v) >= 0.5 && Number(v) < 1 && Number(v) !== SURE ? Number(v) : undefined))} />,
+        `Yes at ${Math.round((b.sure ?? SURE) * 100)}% or more, no at ${Math.round((1 - (b.sure ?? SURE)) * 100)}% or less; a choice or a score that sure. In between it asks you.`,
+      )}
+      <div className="wf-sub wf-qhead">
+        Questions
+        <span className="grow" />
+        <div className="seg small">
+          <button className={tab === 'form' ? 'on' : ''} onClick={() => (setTab('form'), setJson(null), setErr(''))}>Cards</button>
+          <button className={tab === 'json' ? 'on' : ''} onClick={() => setTab('json')}>JSON</button>
+        </div>
+      </div>
+      {tab === 'json' ? (
+        <>
+          <Typed
+            area
+            rows={14}
+            className="wf-mono"
+            value={json ?? JSON.stringify(apiQuestions(qs), null, 2)}
+            onText={v => {
+              setJson(v)
+              try {
+                const got = fromApi(JSON.parse(v))
+                setErr('')
+                set(x => void (x.qs = got))
+              } catch (e) {
+                setErr((e as Error).message)
+              }
+            }}
+          />
+          {err ? <span className="wf-err">{err}</span> : <span className="wf-hint">The Decisions API’s questions: noul (yes/no), choice and score, each with instructions and criteria.</span>}
+        </>
+      ) : (
+        <>
+          {qs.map((x, i) => (
+            <div key={i} className="wf-branch">
+              <div className="wf-exit">
+                <Typed value={x.name} aria-label="Its name" placeholder="urgent" onText={v => set(y => void ((y.route === y.qs![i].name && (y.route = v.trim())), (y.qs![i].name = v.trim())))} />
+                <select className="wf-test" value={x.type} aria-label="Its kind" data-tip={QTYPE_INFO[x.type].says} onChange={e => set(y => void (reroute(y, i, () => undefined), (y.qs![i].type = e.target.value as DecideQ['type']), (y.qs![i].opts = newQ(y.qs![i].type, 0).opts)))}>
+                  {QTYPES.map(t => (
+                    <option key={t} value={t}>{QTYPE_NAMES[t]}</option>
+                  ))}
+                </select>
+                <IconButton icon="x" title="Remove this question" onClick={() => set(y => void ((y.route === y.qs![i].name && ((y.route = undefined), (y.options = undefined))), y.qs!.splice(i, 1)))} />
+              </div>
+              <Typed area rows={2} value={x.ask} placeholder="What it asks" aria-label="What it asks" onText={v => q(i, y => void (y.ask = v.replace(/\s*\n\s*/g, ' ')))} />
+              {x.type === 'yes/no'
+                ? (['yes', 'no'] as const).map(l => (
+                    <div key={l} className="wf-exit">
+                      <span className="wf-exit-name">{l}</span>
+                      <Typed value={x.opts.find(o => o.label === l)?.text ?? ''} placeholder={`what ${l} means (optional)`} onText={v => q(i, y => void (y.opts = (['yes', 'no'] as const).map(k => ({ label: k, text: k === l ? v : (y.opts.find(o => o.label === k)?.text ?? '') })).filter(o => o.text.trim())))} />
+                    </div>
+                  ))
+                : x.opts.map((o, n) => (
+                    <div key={n} className="wf-exit">
+                      {x.type === 'choice' ? <Typed className="wf-num wf-opt" value={o.label} aria-label="Option" onText={v => set(y => void ((w => (reroute(y, i, l => (l === y.qs![i].opts[n].label ? w : l)), (y.qs![i].opts[n].label = w)))(v.replace(/:/g, '').trim())))} /> : <span className="wf-exit-name">{n}</span>}
+                      <Typed value={o.text} placeholder={x.type === 'choice' ? 'what it means' : 'this level'} onText={v => q(i, y => void (y.opts[n].text = v))} />
+                      {x.opts.length > 2 && <IconButton icon="x" title="Remove" onClick={() => set(y => void (reroute(y, i, l => (y.qs![i].type === 'score' ? (Number(l) === n ? undefined : Number(l) > n ? String(Number(l) - 1) : l) : l === y.qs![i].opts[n].label ? undefined : l)), y.qs![i].opts.splice(n, 1), y.qs![i].type === 'score' && y.qs![i].opts.forEach((z, k) => (z.label = String(k)))))} />}
+                    </div>
+                  ))}
+              {x.type !== 'yes/no' && (
+                <button className="btn small" onClick={() => q(i, y => void y.opts.push({ label: y.type === 'score' ? String(y.opts.length) : `option${y.opts.length + 1}`, text: '' }))}>
+                  <Icon name="plus" size={11} /> {x.type === 'score' ? 'Level' : 'Option'}
+                </button>
+              )}
+              <span className="wf-hint">
+                {`{{steps.${b.id}.${x.name || '<name>'}}}`}: {x.type === 'yes/no' ? 'yes or no' : x.type === 'choice' ? 'the option' : 'the level’s number'}; .p, .confidence{x.type === 'score' ? ', .score, .level' : ''}
+              </span>
+            </div>
+          ))}
+          {adding ? (
+            <div className="wf-qkinds" role="group" aria-label="What kind of question">
+              <span className="wf-hint">What kind of question?</span>
+              {QTYPES.map(t => (
+                <button
+                  key={t}
+                  className="wf-qkind"
+                  onClick={() => {
+                    setAdding(false)
+                    set(y => {
+                      const taken = new Set((y.qs ?? []).map(z => z.name))
+                      let n = (y.qs?.length ?? 0) + 1
+                      while (taken.has(`q${n}`)) n++
+                      ;(y.qs ??= []).push(newQ(t, n))
+                    })
+                  }}
+                >
+                  <code>{QTYPE_INFO[t].api}</code>
+                  <b>{QTYPE_INFO[t].says}</b>
+                  <i>{QTYPE_INFO[t].e}</i>
+                </button>
+              ))}
+              <button className="btn small" onClick={() => setAdding(false)}>Cancel</button>
+            </div>
+          ) : (
+            <button className="btn small" onClick={() => setAdding(true)}>
+              <Icon name="plus" size={11} /> Question
+            </button>
+          )}
+          <span className="wf-hint">Its ways out: Where it goes below can give each answer of a question its own line; or one line (ok) and a Case after it (equals "yes", a number’s {'>='} 0.8, JS).</span>
+        </>
+      )}
+    </>
+  )
+}
+
+// the variables a block uses ({{…}}: env.* aside), for its Test's fields
+function varsIn(b: Block) {
+  const t = [b.text, b.url, b.system, b.from, ...(b.headers ?? [])].join('\n')
+  return [...new Set([...t.matchAll(/\{\{\s*([\w.?-]+)\s*\}\}/g)].map(m => m[1]).filter(n => !n.startsWith('env.')))]
+}
+type Tested = { exit: string; why: string; vars: Record<string, string>; missing: string[]; unsure: string[]; log: string[]; ms: number }
+// an AI call, a decision or a webhook sent once with values you type: what it says and gives (a webhook's really sent)
+function TestBlock({ b, api, project }: { b: Block; api: WorkflowsApi; project?: string }) {
+  const names = varsIn(b)
+  const [vals, setVals] = useState<Record<string, string>>({})
+  const [res, setRes] = useState<Tested | null>(null)
+  const [busy, setBusy] = useState(false)
+  const send = () => {
+    setBusy(true)
+    setRes(null)
+    api
+      .call<Tested>('flowTest', { block: b, vars: vals, project })
+      .then(setRes, e => setRes({ exit: 'error', why: (e as Error).message, vars: {}, missing: [], unsure: [], log: [], ms: 0 }))
+      .finally(() => setBusy(false))
+  }
+  return (
+    <details className="wf-testbox">
+      <summary>Test it</summary>
+      {names.map(n => (
+        <div key={n} className="wf-field">
+          <label>{`{{${n}}}`}</label>
+          <Typed area={n.endsWith('answer') || n.endsWith('output')} rows={2} value={vals[n] ?? ''} placeholder={n === 'task' ? 'a test task' : 'a sample value'} onText={v => setVals(x => ({ ...x, [n]: v }))} />
+        </div>
+      ))}
+      <div className="wf-exit">
+        <button className="btn small primary" disabled={busy} onClick={send}>
+          {busy ? 'Sending…' : b.kind === 'webhook' ? 'Send it' : 'Ask it once'}
+        </button>
+        <span className="wf-hint">{b.kind === 'webhook' ? 'Really sends it, with the project’s env' : 'One call on your OpenRouter key'}</span>
+      </div>
+      {res && (
+        <div className={`wf-dec ${res.exit === 'ok' ? '' : 'bad'}`}>
+          <div className="wf-dec-head">
+            <span className="wf-exit-name">{res.exit}</span>
+            <span className="grow" />
+            {res.ms > 0 && <span className="wf-hint">{dur(res.ms)}</span>}
+          </div>
+          <div className="wf-dec-why">{res.why}</div>
+          {Object.entries(res.vars)
+            .filter(([k]) => !k.endsWith('.answers'))
+            .map(([k, v]) => (
+              <div key={k} className="wf-kv">
+                <span>{k.replace(`steps.${b.id}.`, '')}</span>
+                <b>{v.length > 80 ? `${v.slice(0, 79)}…` : v || '(empty)'}</b>
+              </div>
+            ))}
+          {res.unsure.length > 0 && <span className="wf-hint">Not sure of {res.unsure.join(', ')}: a run would ask you.</span>}
+          {res.missing.length > 0 && <span className="wf-hint">No {res.missing.join(', ')} in what it gave.</span>}
+          {res.log.length > 0 && (
+            <details>
+              <summary className="wf-hint">What it sent and got</summary>
+              <pre className="wf-testlog">{res.log.join('\n\n')}</pre>
+            </details>
+          )}
+        </div>
+      )}
+    </details>
   )
 }
 
@@ -949,6 +1461,7 @@ function RunView({ id, entry, api, pname, ws, tabs, onGone, onDelete }: { id: st
   const [mode, setMode] = useState<'blocks' | 'log'>('blocks')
   const [typed, setTyped] = useState('')
   const [pick, setPick] = useState<string | null>(null)
+  const [win, setWin] = useState<Shown | null>(null) // what a Show you showed, again
   // again as the view says it moved (status, block, a decision)
   useEffect(() => void api.call<FlowRun>('flowGet', { id }).then(setR, onGone), [id, entry?.status, entry?.cur, entry?.decisions, entry?.at, entry?.wait?.kind, entry?.turns])
   // the log while it goes: every few seconds (an agent's turn adds lines without moving the view)
@@ -1002,14 +1515,14 @@ function RunView({ id, entry, api, pname, ws, tabs, onGone, onDelete }: { id: st
           <button className={mode === 'log' ? 'on' : ''} onClick={() => setMode('log')}>Log {r.log.length}</button>
         </div>
         {!over && <button className="btn" onClick={stop}><Icon name="stop" size={11} /> Stop</button>}
-        <IconButton icon="trash" title="Delete this run" onClick={() => onDelete(entry ?? flowView(r))} />
+        <IconButton icon="trash" title="Delete this run" className="danger" onClick={() => onDelete(entry ?? flowView(r))} />
       </div>
       {r.status === 'waiting' && r.wait && 'options' in r.wait && (
         <div className="wf-ask">
           <div className="wf-ask-q">
             <Icon name="help" size={14} />
             <b>{r.wait.question}</b>
-            <span className="wf-hint">{r.wait.kind === 'confirm' ? 'before it does something others see' : r.wait.kind === 'stuck' ? 'it can’t go on by itself' : ''}</span>
+            <span className="wf-hint">{r.wait.kind === 'confirm' ? 'before it does something others see' : r.wait.kind === 'stuck' ? 'it can’t go on by itself' : r.wait.kind === 'decide' ? 'the model isn’t sure' : ''}</span>
           </div>
           {r.wait.show && (
             <div className="wf-ask-show">
@@ -1024,6 +1537,17 @@ function RunView({ id, entry, api, pname, ws, tabs, onGone, onDelete }: { id: st
           </div>
         </div>
       )}
+      {(r.shown?.length ?? 0) > 0 && (
+        <div className="wf-shown">
+          <span className="wf-hint">It showed you</span>
+          {[...r.shown!].reverse().map((x, i) => (
+            <button key={i} className="btn small" onClick={() => setWin(x)}>
+              {x.title}
+            </button>
+          ))}
+        </div>
+      )}
+      {win && <ShownDialog s={{ run: r.id, name: r.flow.name, title: win.title, body: win.body }} onClose={() => setWin(null)} />}
       {r.status === 'paused' && r.wait?.kind === 'limit' && <div className="wf-note">Paused at a usage limit: it goes on when the limit resets{r.wait.until ? `, at ${new Date(r.wait.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.</div>}
       {mode === 'log' ? (
         <RunLog log={r.log} />

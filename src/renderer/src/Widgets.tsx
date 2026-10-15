@@ -1,15 +1,16 @@
 // Widgets (daemon/widgets.ts): the sidebar's grid of previews, above its foot (or a line of them in the top bar or the
-// status bar: WidgetStrip, each widget's place), and a widget's full view in a dialog.
+// status bar: WidgetStrip, each widget's place), buttons on the rail and the sidebar's foot (WidgetButtons), and a
+// widget's full view in a dialog.
 // The daemon fills each template. A widget without scripts is shown in a shadow root (the app's CSS variables reach
 // it, its styles stay in it) once `clean` has taken out what could run or navigate; one with scripts is a frame of
 // the daemon's page for it, sandboxed, that talks to the app only in messages: open a link, refresh, the full view,
 // run one of its actions.
 // Only what's on screen is rendered: a folded grid, or a closed dialog, holds nothing.
 import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
-import type { WidgetView } from '../../shared/types'
+import type { WidgetPlace, WidgetView } from '../../shared/types'
 import { ago, sayOf, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
 import { daemonBase } from './api'
-import { Icon, IconButton } from './ui'
+import { Icon, IconButton, isIconName } from './ui'
 
 export type WidgetApi = {
   render: (id: string, full: boolean) => Promise<string | null>
@@ -150,11 +151,58 @@ function useParked() {
   return [[...parked], (id: string) => (parked.delete(id), parkSay())] as const
 }
 
+// a widget as a button (its view's button: a rail or foot place, or no preview of its own): a click runs its click
+// action, else opens its full view, else fetches it now (else its settings)
+const click = (w: WidgetView, api: WidgetApi) =>
+  w.click ? void api.action(w.id, w.click, '', w.name).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id).catch(() => {}) : api.settings()
+const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${status(w) ? ` · ${status(w)}` : ''}`
+// its icon: one of the app's by name, an emoji as it is, else its name's first letter
+function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
+  if (isIconName(w.icon)) return <Icon name={w.icon} size={size} />
+  return <span className="widget-glyph" style={{ fontSize: size - 1 }}>{w.icon && !/^[a-z]/i.test(w.icon) ? w.icon : ([...w.name.trim()][0] ?? '?').toUpperCase()}</span>
+}
+// a button widget in a cell (the sidebar's grid, a bar): its icon, label and badge across the cell
+function CellButton({ w, api }: { w: WidgetView; api: WidgetApi }) {
+  return (
+    <button className="widget-button" onClick={() => click(w, api)}>
+      <Glyph w={w} />
+      <span className="widget-button-label">{w.label ?? w.name}</span>
+      {w.badge && <span className="widget-badge">{w.badge}</span>}
+    </button>
+  )
+}
+
+// the rail's or the sidebar's foot's widgets: buttons like theirs (look), the rail's with its words under (words), the
+// foot's beside (words: the foot's labels). places: those shown here (the foot takes the rail's when there's no rail)
+export function WidgetButtons({ widgets, api, places, look, words }: { widgets: WidgetView[]; api: WidgetApi; places: WidgetPlace[]; look: 'rail' | 'foot'; words: boolean }) {
+  const on = widgets.filter(w => w.on && places.includes(w.place ?? 'side'))
+  return on.map(w => {
+    const dot = w.running ? 'rail-dot' : w.error ? 'rail-dot bad' : ''
+    return look === 'rail' ? (
+      <button key={`widget:${w.id}`} type="button" className="rail-kind nodrag" aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+        <span className="rail-icon">
+          <Glyph w={w} size={18} />
+          {w.badge ? <span className="rail-count">{w.badge}</span> : dot && <span className={dot} />}
+        </span>
+        {words && <span className="rail-label">{w.label ?? w.name}</span>}
+      </button>
+    ) : (
+      <button key={`widget:${w.id}`} type="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+        <Glyph w={w} />
+        {words && <span className="ib-label">{w.label ?? w.name}</span>}
+        {w.badge && <span className="widget-badge">{w.badge}</span>}
+      </button>
+    )
+  })
+}
+
 // a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
 function Cell({ w, api, parked, load, style }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties }) {
   return (
-    <div className={`widget ${w.full ? 'opens' : ''}`} style={style} data-tip={`${w.name}${status(w) ? ` · ${status(w)}` : ''}`}>
-      {w.js && parked ? (
+    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''}`} style={style} data-tip={tipOf(w)}>
+      {w.button ? (
+        <CellButton w={w} api={api} />
+      ) : w.js && parked ? (
         <button className="widget-parked muted small" onClick={load}>
           Stopped · load
         </button>

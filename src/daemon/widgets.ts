@@ -8,7 +8,7 @@ import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync,
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
+import { BUTTON_PLACES, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
 import { hasFull, hasScript, pageOf, render, sayOf, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
@@ -17,13 +17,17 @@ import { changed, cliArgv, cliEnv, clients, devLog, dir, own, plainEnv, q, state
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
 // (its default export, or what it prints); actions: commands its buttons run by name (data-run="name", data-arg:
-// $WIDGET_ARG); view: the full view's size; place: where it shows at first (side, top, status: the user's choice wins)
+// $WIDGET_ARG); view: the full view's size; place: where it shows at first (side, top, status, rail, foot: the user's
+// choice wins). As a button (a rail or foot place, or no preview in widget.html): icon (an icon of the app's, or a
+// character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions)
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string> }
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
 type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai' } // by: Laki AI wrote it (widgetWrite)
-type Entry = { id: string; dir: string; builtin: boolean; m: Manifest; full: boolean; js: boolean; s: Omit<Store, 'data'> }
+// preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
+type Face = { label?: string; badge?: string; tip?: string }
+type Entry = { id: string; dir: string; builtin: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'> }
 
 const here = dirname(fileURLToPath(import.meta.url))
 // the app's own (the repo's widgets/, next to out/ when built), off until turned on
@@ -90,11 +94,41 @@ export function scanWidgets() {
       try {
         html = readFileSync(join(d, 'widget.html'), 'utf8')
       } catch {}
-      const { data: _, ...s } = readStore(id)
-      widgets.set(id, { id, dir: d, builtin: !!BUILTIN && (d === BUILTIN || d.startsWith(BUILTIN + '/')), m, full: hasFull(html), js: hasScript(html), s })
+      const { data, ...s } = readStore(id)
+      const e: Entry = { id, dir: d, builtin: !!BUILTIN && (d === BUILTIN || d.startsWith(BUILTIN + '/')), m, full: hasFull(html), js: hasScript(html), preview: !!viewOf(html, false)?.trim(), face: {}, s }
+      e.face = faceOf(e, data)
+      widgets.set(id, e)
     }
   changed()
 }
+
+// a button's words: widget.json's label, badge and tip filled from its data (as a preview is), plain text on a line
+const ENT: Record<string, string> = { amp: '&', lt: '<', gt: '>', quot: '"', '#39': "'" }
+const plain = (html: string) =>
+  html
+    .replace(/<[^>]*>/g, '')
+    .replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ENT[e])
+    .replace(/\s+/g, ' ')
+    .trim()
+function faceOf(w: Entry, data: unknown): Face {
+  const ctx = { ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}), data, config: typedOf(w), at: w.s.at, error: w.s.error } // {{open}} as {{data.open}}
+  const fill = (t: unknown, n: number) => {
+    if (typeof t !== 'string' || !t.trim()) return undefined
+    try {
+      return plain(render(t, ctx)).slice(0, n) || undefined
+    } catch {
+      return undefined
+    }
+  }
+  return { label: fill(w.m.label, 40), badge: fill(w.m.badge, 6), tip: fill(w.m.tip, 300) }
+}
+// an icon: a name of the app's (the renderer knows which), or a character or two (an emoji, 👨‍👩‍👧 one too)
+const graphemes = new Intl.Segmenter()
+const iconOf = (w: Entry) => {
+  const s = typeof w.m.icon === 'string' ? w.m.icon.trim() : ''
+  return /^[a-zA-Z][\w-]{0,30}$/.test(s) || (!!s && !/\s/.test(s) && [...graphemes.segment(s)].length <= 2) ? s : undefined
+}
+const clickOf = (w: Entry) => (typeof w.m.click === 'string' && w.m.actions && Object.hasOwn(w.m.actions, w.m.click) ? w.m.click : undefined)
 
 const clamp = (n: unknown, lo: number, hi: number, def: number) => (Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Math.round(Number(n)))) : def)
 const down = (n: unknown) => (Number(n) === 0.5 ? 0.5 : clamp(n, 1, 4, 1)) // cells down: half a cell too (a line of links)
@@ -103,7 +137,7 @@ const sizeOf = (w: Entry): [number, number] => {
   return [clamp(a, 1, 3, 1), down(b)]
 }
 const everyOf = (w: Entry) => clamp(w.s.every ?? w.m.every, 1, 1440, WIDGET_EVERY)
-const onOf = (w: Entry) => w.s.on ?? !w.builtin
+const onOf = (w: Entry) => !!w.s.on // every extension starts off: Settings › Extensions turns it on
 const SIZES: WidgetSize[] = ['s', 'm', 'l']
 const isSize = (v: unknown): v is WidgetSize => SIZES.includes(v as WidgetSize)
 const viewSize = (w: Entry): WidgetSize => [w.s.view, w.m.view].find(isSize) ?? 'm'
@@ -162,6 +196,10 @@ export const widgetsView = (): WidgetView[] =>
     running: running.has(w.id) || undefined,
     byAi: w.s.by === 'ai' || undefined,
     rev,
+    ...((BUTTON_PLACES.includes(placeOf(w)) || !w.preview) && { button: true }),
+    icon: iconOf(w),
+    ...w.face,
+    click: clickOf(w),
   }))
 
 function find(id: string) {
@@ -215,6 +253,16 @@ export function widgetPage(id: string, query: URLSearchParams): { code: number; 
   }
 }
 
+// Reset the interface: every extension off (its other choices kept)
+export function widgetsOff() {
+  for (const w of widgets.values()) {
+    if (!w.s.on) continue
+    writeStore(w.id, { ...readStore(w.id), on: false })
+    w.s = { ...w.s, on: false }
+  }
+  changed()
+}
+
 // the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
 // (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
 export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace; net?: boolean; config?: Record<string, string> }) {
@@ -233,8 +281,9 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
   }
   writeStore(w.id, s)
   wLog(w, `settings changed: ${[...Object.keys(o).filter(k => k !== 'id' && k !== 'config'), ...Object.keys(o.config ?? {})].join(', ')}`) // names only: a setting may be a key
-  const { data: _, ...meta } = s
+  const { data, ...meta } = s
   w.s = meta
+  w.face = faceOf(w, data) // its config, in its words
   changed()
   if (onOf(w) && (o.on || o.config)) void widgetRun({ id: w.id }) // its data for the new settings
   return widgetsView().find(x => x.id === w.id)
@@ -341,7 +390,7 @@ export async function widgetRun(o: { id: string }): Promise<{ ok: boolean; error
   s.error = error
   writeStore(w.id, s)
   const cur = widgets.get(w.id)
-  if (cur) cur.s = { ...cur.s, at: s.at, error }
+  if (cur) (cur.s = { ...cur.s, at: s.at, error }), (cur.face = faceOf(cur, s.data))
   changed()
   if (again.delete(w.id) && cur && onOf(cur)) void widgetRun({ id: w.id }) // with the settings as they are now
   return error ? { ok: false, error } : { ok: true }

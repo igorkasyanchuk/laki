@@ -298,6 +298,7 @@ export type Settings = {
   editKeys?: boolean // the terminal's ⌘← ⌘→ ⌘⌫ ⌥← ⌥→ as macOS editors have them (unset: on)
   notify?: boolean
   prIcon?: boolean // the sidebar marks a workspace with a PR (unset: on)
+  ownAvatar?: boolean // that mark on your own PR has your GitHub picture (unset: on; off: GitHub's mark alone)
   prMarks?: PRMarks // the sidebar's ✓ (approved), ✓✓ (by you too) and 👀 (you commented) on an open PR
   notifyOn?: Partial<Record<NotifyKind, boolean>> // which turns notify (unset: all)
   notifySound?: string // a macOS sound's name (Glass, Ping…), 'none', or unset: the default
@@ -324,8 +325,11 @@ export type Settings = {
   specs?: boolean // experimental (Settings › General): Specs & Brainstorms, off unless true
   workflows?: boolean // experimental (Settings › General): Workflows, off unless true
   birdView?: boolean // experimental (Settings › General): the eye beside Help, every live session's screen at once, off unless true
+  aiGlow?: boolean // experimental (Settings › General): a glow over what Laki AI looks at (a tab's pane, else the window), off unless true
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
+  remoteAuth?: 'email' | 'pin' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email)
+  remoteTries?: number // pin: wrong PINs that stop remote access (unset: REMOTE_TRIES)
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
   sideLook?: SideLook // the sidebar's lines, rows and button labels, over the theme's
@@ -344,7 +348,7 @@ export type Settings = {
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
-  sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset or 0: always)
+  sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER; 0: always)
   webhook?: Webhook // pushes to your phone
   archiveMerged?: boolean // a workspace whose PR merged is archived when clean, with Undo (unset: off)
   menuBar?: boolean // the menu bar's item: the needs-you count and those tabs (unset: on)
@@ -429,7 +433,11 @@ export type Todo = { id: string; project: string; text: string; at: number }
 
 // remote access (core.ts): who may open it, until when (ms; none: until stopped), and once cloudflared has one, its URL and the link
 // with the token
-export type Remote = { mail: string; open?: boolean; until?: number; url?: string; link?: string } // open: no email (mail ''), anyone with the link
+// open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
+// tries: wrong ones left before it stops
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string }
+export const REMOTE_TRIES = 2
+export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 
 // a plan's limit (daemon/usage.ts): used %, when it resets (ms); note: what the % is of, for an amount (extra usage)
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
@@ -441,7 +449,7 @@ export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[];
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
 // no worktree, one session; 'local-new': a new session, a sidebar row, each run), or in that workspace (its running agent of the preset, queued while it works; else a new tab). next:
 // when it runs (none: off, or a once that ran)
-export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number }
+export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number; workflow?: string; source?: 'yours' | 'project' } // workflow: a run of that workflow (Workflows on) instead of a prompt, prompt its task
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
@@ -460,7 +468,7 @@ export type PR = {
   list?: Check[]
   title?: string
   author?: string
-  mine?: boolean // its author is you (gh api user): no avatar, no Approve
+  mine?: boolean // its author is you (gh api user): no Approve
   draft?: boolean
   head?: string
   review?: string // APPROVED, CHANGES_REQUESTED, REVIEW_REQUIRED
@@ -482,7 +490,7 @@ export type PR = {
 export type Ask = { options: { n: number; label: string }[]; at: number }
 // asleep: an idle agent whose process Laki ended to free memory (settings.sleepAfter); a look, a key or a message resumes it
 // progress: the agent's estimate of its task (laki progress), until its turn ends
-export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string }; runs?: Agent } // runs: an agent typed in a shell tab
+export type TabView = Tab & { status: Status; code?: number; done: boolean; limit?: number; last?: string; runAt?: number; ask?: Ask; asleep?: boolean; progress?: { pct: number; note?: string }; runs?: Agent; share?: { url: string; until?: number } } // runs: an agent typed in a shell tab; share: its read-only page's link (shareStart), until when
 
 // Resources (Settings): memory (RSS, KB) and CPU (%) by process, from one ps. app: Laki's own (main, renderers, GPU…);
 // daemon: this one, heap: its JS heap (KB); tabs: each running tab's process tree, the program first
@@ -502,7 +510,7 @@ export type Stat = { add: number; del: number; files: number; dirty: number }
 export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; artifacts?: number; links?: Link[] }
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
-export type Proc = { pid: number; cmd: string }
+export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; agents: { id: Agent; found: boolean }[] }
 
@@ -514,16 +522,22 @@ export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?:
 // or names, kept joined by commas), what Settings calls it and says under it
 export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'choice' | 'list'; label?: string; hint?: string; choices?: string[] }
 // view: the full view's dialog, small, medium or large; config: each setting as text (a bool's '1' or '')
-export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; rev: number }
+// button: it shows as a button (a rail or foot place, or no preview of its own): icon (one of the app's icons, or a
+// character or two), label, badge (a count on it) and tip, filled from its data; click: the action a click runs (none:
+// its full view, else a fetch)
+export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
 export type WidgetSize = 's' | 'm' | 'l'
-// where an extension shows: the sidebar's grid (the default), the top bar or the status bar (a line high, by the bar's right end)
-export const WIDGET_PLACES = ['side', 'top', 'status'] as const
+// where an extension shows: the sidebar's grid (the default), the top bar or the status bar (a line high, by the bar's
+// right end), the rail (a button among its icons; without the rail, the sidebar's foot) or the sidebar's foot (a button
+// beside Video, Meme and Timer)
+export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot'] as const
+export const BUTTON_PLACES: readonly WidgetPlace[] = ['rail', 'foot']
 export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; flows?: FlowView[]; api?: number; built?: string } // built: its build's time (none from source)
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string } // built: its build's time (none from source); flowFiles: when a workflow file last changed
 
 // specs and brainstorms (experimental, settings.specs; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
@@ -540,4 +554,4 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 60
+export const API = 65

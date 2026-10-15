@@ -31,9 +31,12 @@ export const widgetFormat = () => `## widget.json
 - \`size\`: cells [across 1–3, down 0.5 or 1–4] in the sidebar's grid; one cell is about 70×64 px, 0.5 a line 29 px tall. The user can change it.
 - \`every\`: minutes between fetches (default ${WIDGET_EVERY}); the user can change it. A fetch also runs when the widget is
   turned on, when its settings change, on Reload and from \`laki widget run <id>\`.
-- \`place\`: where it shows at first: \`side\` (the sidebar's grid, the default), \`top\` (the top bar) or \`status\` (the
-  status bar's right end). The bars are a line high (about 26 px), and it's as wide as its cells across: design it as a
-  ½-high one (a number and a word, a few links). The user can move it.
+- \`place\`: where it shows at first. The user can move it.
+  - \`side\`: the sidebar's grid, above its buttons (the default).
+  - \`top\` (the top bar) or \`status\` (the status bar's right end): a line high (about 26 px), as wide as its cells
+    across: design it as a ½-high one (a number and a word, a few links).
+  - \`rail\` (a button among the rail's icons on the left; without the rail, in the sidebar's foot) or \`foot\` (a button
+    in the sidebar's foot, beside Video, Meme and Timer): a button, never a page (below).
 - \`view\`: the full view's dialog, \`s\` (small), \`m\` (medium, the default) or \`l\` (large: for wide tables). The user
   can change it.
 - \`config\`: the settings the user fills in (Settings › Extensions). Each is a default (a string: text; \`true\`/\`false\`:
@@ -47,6 +50,35 @@ export const widgetFormat = () => `## widget.json
   error's message is what the user sees.
 - Prefer what every Mac has, so there's nothing to install: \`sh\` with \`curl\`/\`gh\`/\`jq\`, \`python3\` with its
   standard library only, or a JS \`script\`. A Python fetch:
+
+- A **button** (any widget in \`rail\` or \`foot\`, and one whose widget.html has no preview, or that has no
+  widget.html at all, wherever it is): its icon, its label and a badge, which its fetch keeps up to date in the
+  background, and a click that does something.
+  - \`icon\`: an icon of Laki's by name (\`board\`, \`bell\`, \`clock\`, \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`,
+    \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`, \`smile\`…), or an emoji. None: its
+    name's first letter.
+  - \`label\`, \`badge\` (a short count on the icon; empty or missing: none) and \`tip\` (the tooltip): templates over
+    its data, like widget.html's, with its fields by name too (\`"label": "{{open}} open"\`, as \`{{data.open}}\`; \`"badge": "{{#if failing}}{{failing}}{{/if}}"\`), as
+    plain text. They change with each fetch. No label: its name.
+  - \`click\`: one of its \`actions\`, run on a click (its toast and modal as below), then it fetches again. None: a click
+    opens its full view (a \`<template full>\`), else fetches now.
+  - A button that only does something: \`click\` and \`actions\`, no fetch. One that only watches: a fetch, a label or
+    a badge, and a full view to open.
+
+\`\`\`json
+{
+  "name": "My PRs",
+  "place": "rail",
+  "icon": "pr",
+  "label": "PRs",
+  "badge": "{{#if open}}{{open}}{{/if}}",
+  "tip": "{{open}} open PRs of yours · click: GitHub",
+  "every": 5,
+  "fetch": "gh search prs --author @me --state open --json number --jq '{open: length}'",
+  "click": "github",
+  "actions": { "github": "open https://github.com/pulls" }
+}
+\`\`\`
 
 \`\`\`python
 import json, os, sys, urllib.request
@@ -119,6 +151,11 @@ print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
   canvas charts, sorting, filtering; build HTML with your own escaping. Draw a canvas at a fixed size (its \`width\` and
   \`height\` attributes, CSS stretching it): the frame's size may not be known yet while the page runs.
 `
+
+// Settings › Extensions' Make it with Laki AI: the ask its chat gets (its rule, ai.ts' SYSTEM: questions first)
+export const widgetAsk = (want: string) => `Make me a Laki extension: ${want.trim()}
+
+Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from, where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write.`
 
 // the prompt to paste into any AI chat: what's wanted, then all of the format, then how to answer; home: where the
 // files go

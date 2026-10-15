@@ -218,3 +218,85 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
     </div>
   )
 }
+
+// Share a tab (a tab's right click): for how long, then its link with a QR code for a phone, Copy, Open and Stop
+export type ShareApi = { start: (hours: number) => Promise<unknown>; stop: () => Promise<unknown>; open: (url: string) => void; copy: (text: string) => void }
+const SHARE_FOR: [number, string][] = [[1, '1 hour'], [8, '8 hours'], [24, '24 hours'], [0, 'Until I stop it']]
+export const timeLeft = (until: number, now = Date.now()) => {
+  const m = Math.max(1, Math.round((until - now) / 60000))
+  return m < 60 ? `${m} min` : `${Math.floor(m / 60)} h${m % 60 ? ` ${m % 60} min` : ''}`
+}
+export function SharePop({ name, share, api, onClose }: { name: string; share?: { url: string; until?: number }; api: ShareApi; onClose: () => void }) {
+  const [hours, setHours] = useState(8)
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+  useEffect(() => {
+    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.preventDefault(), e.stopPropagation(), onClose())
+    window.addEventListener('keydown', f, true) // before the terminal under it
+    return () => window.removeEventListener('keydown', f, true)
+  }, [onClose])
+  const fail = (e: unknown) => setErr(String((e as Error).message ?? e))
+  const start = async () => {
+    if (busy) return
+    setBusy(true)
+    setErr('')
+    await api.start(hours).catch(fail)
+    setBusy(false)
+  }
+  let body
+  if (share)
+    body = (
+      <>
+        <QR text={share.url} />
+        <div className="tunnel-code">
+          <code>{share.url}</code>
+          <IconButton icon="copy" title="Copy the link" onClick={() => api.copy(share.url)} />
+          <IconButton icon="link" title="Open" onClick={() => api.open(share.url)} />
+        </div>
+        <p className="muted small">
+          Anyone with the link reads {name} as it goes on (its chat, or its terminal&rsquo;s text), and can copy or download it as Markdown. Nobody can type in it.{' '}
+          {share.until ? `It ends in ${timeLeft(share.until)}.` : 'It runs until you stop it, close the tab or stop Laki.'}
+        </p>
+        <div className="buttons">
+          <span className="grow" />
+          <button className="danger" onClick={() => void api.stop().then(onClose, fail)}>
+            Stop sharing
+          </button>
+        </div>
+      </>
+    )
+  else
+    body = (
+      <form className="form" onSubmit={e => (e.preventDefault(), void start())}>
+        <div className="tunnel-radios" role="radiogroup" aria-label="For how long">
+          <span className="muted">For how long</span>
+          {SHARE_FOR.map(([h, label]) => (
+            <label key={h} className="check">
+              <input type="radio" name="for" checked={hours === h} onChange={() => setHours(h)} /> {label}
+            </label>
+          ))}
+        </div>
+        <p className="muted small">A read-only page of {name} at a random trycloudflare.com link: anyone who gets it can read it, live. Needs cloudflared (brew install cloudflared).</p>
+        <div className="buttons">
+          <span className="grow" />
+          <button type="submit" className="primary" disabled={busy}>
+            {busy ? 'Starting…' : 'Share'}
+          </button>
+        </div>
+      </form>
+    )
+  return (
+    <div className="menu-backdrop" onPointerDown={e => e.target === e.currentTarget && onClose()}>
+      <div className="tunnel-pop share-pop" role="dialog" aria-label={`Share ${name}`}>
+        <div className="tunnel-head">
+          <Icon name="globe" />
+          <b>Share {name} read-only</b>
+          <span className="grow" />
+          <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
+        </div>
+        {body}
+        {err && <div className="tunnel-err">{err}</div>}
+      </div>
+    </div>
+  )
+}

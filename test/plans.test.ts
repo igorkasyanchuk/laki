@@ -105,6 +105,8 @@ test('specs over MCP: list, read, new and write; the prompts name the folder', a
     call(3, 'laki_plans', {}),
     call(4, 'laki_plan_read', { project: p.id, kind: 'brainstorm', slug: 'dark-mode' }),
     call(5, 'laki_plan_write', { project: p.id, kind: 'brainstorm', slug: 'dark-mode', path: 'README.md', text: 'x' }),
+    call(6, 'laki_plan_read', { project: p.id, kind: 'brainstorm', slug: 'dark-mode', file: 'ideas.md' }),
+    call(7, 'laki_plan_read', { project: p.id, kind: 'brainstorm', slug: 'dark-mode', file: '../../x' }),
   ]
   const r = await rig.cliIn(msgs.map(m => JSON.stringify(m)).join('\n') + '\n', 'mcp')
   const got = Object.fromEntries(r.out.trim().split('\n').map(l => JSON.parse(l)).map(m => [m.id, m]))
@@ -115,6 +117,8 @@ test('specs over MCP: list, read, new and write; the prompts name the folder', a
   assert.match(read.readme, /Should it follow the OS\?/)
   assert.deepEqual(read.files, ['ideas.md (10 bytes)'])
   assert.equal(got[5].result.isError, true)
+  assert.equal(text(6), '# Two ways') // one of its files, read
+  assert.equal(got[7].result.isError, true, 'nothing outside its folder')
   const plan = JSON.parse(text(3))[0]
   assert.match(specPrompt(plan), new RegExp(`${plan.path}/README\\.md`))
   assert.match(brainstormPrompt(plan), /laki_plan_read \(project \S+, kind brainstorm, slug dark-mode\)/)
@@ -157,7 +161,7 @@ test('Brainstorm with Laki AI: a chat of its own, in its folder; its ideas land 
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { specs: true, ai: { on: true, backend: 'claude' } })
-  const b = await rig.rpc('planNew', { project: p.id, kind: 'brainstorm', title: 'Dark mode' })
+  const b = await rig.rpc('planNew', { project: p.id, kind: 'brainstorm', title: 'Dark mode', text: 'Should it follow the OS?' })
   const chat = planChat(b)
   const r = await rig.rpc('aiAsk', { text: brainstormPrompt(b), chat })
   assert.match(JSON.stringify(r), /wrote ideas\.md/)
@@ -173,6 +177,11 @@ test('Brainstorm with Laki AI: a chat of its own, in its folder; its ideas land 
   const log = () => readFileSync(join(rig.home, 'fake.log'), 'utf8').trim().split('\n').map(l => JSON.parse(l)).filter((l: any) => l.bin === 'claude' && l.args[0] === '-p')
   assert.ok(log().at(-1).args.includes('--resume'))
   assert.ok(log().at(-1).args.some((a: string) => a.includes(`slug ${b.slug}`)), 'its instructions name the brainstorm')
+  // and hold its brief as it is now, and its files: an ask that doesn't name it is about it
+  writeFileSync(join(b.path, 'README.md'), '# Dark mode\n\nShould it follow the OS? Only on macOS.\n')
+  await rig.rpc('aiAsk', { text: 'what do you think?', chat })
+  const told = log().at(-1).args.find((a: string) => a.includes('This chat is about'))
+  assert.match(told, /"Dark mode"[^]*<readme>\n# Dark mode\n\nShould it follow the OS\? Only on macOS\.\n<\/readme>\nFiles in its folder: ideas\.md\./)
   // 12 hours unused: it ends, kept as ended; Continue takes it up again; else the next ask starts a new chat
   await rig.rpc('aiTick', { now: Date.now() + PLAN_CHAT_IDLE + 60000 })
   st = await rig.rpc('aiState', { chat })

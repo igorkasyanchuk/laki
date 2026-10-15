@@ -67,12 +67,14 @@ exec /usr/sbin/lsof "$@"
   assert.ok(none.daemon.rss > 0 && none.daemon.heap > 0)
   rmSync(join(d, 'ps-none'))
 
-  // a port of the agent itself, and a ghost: a pid in the tree that's no process (Linux's and macOS's pids stay below it)
+  // a port of the agent itself and a browser's (theirs, not in ports), and a ghost its shell tool started: a pid in the
+  // tree that's no process (Linux's and macOS's pids stay below it)
   const ghost = 4194304
-  writeFileSync(join(d, 'ps-kids'), `${ghost} ${pty}\n`)
-  writeFileSync(join(d, 'lsof-scan'), `p${pty}\ncclaude\nn*:5555\np${ghost}\ncghost\nn127.0.0.1:4567\n`)
-  await until(async () => JSON.stringify((await wsOf(rig, ws.id)).ports) === '[4567,5555]', 'ports scanned')
-  assert.deepEqual((await wsOf(rig, ws.id)).procs, { 4567: { pid: ghost, cmd: 'ghost' }, 5555: { pid: pty, cmd: 'claude' } })
+  writeFileSync(join(d, 'ps-kids'), `${ghost} ${pty} -zsh\n${ghost + 1} ${ghost} node\n`)
+  writeFileSync(join(d, 'lsof-scan'), `p${pty}\ncclaude\nn*:5555\np${ghost}\ncghost\nn127.0.0.1:4567\np${ghost + 1}\ncGoogle Chrome\nn127.0.0.1:9222\n`)
+  await until(async () => (await wsOf(rig, ws.id)).procs?.[9222], 'ports scanned')
+  assert.deepEqual((await wsOf(rig, ws.id)).ports, [4567])
+  assert.deepEqual((await wsOf(rig, ws.id)).procs, { 4567: { pid: ghost, cmd: 'ghost' }, 5555: { pid: pty, cmd: 'claude', own: true }, 9222: { pid: ghost + 1, cmd: 'Google Chrome', own: true } })
   await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 1234 }), new RegExp(`nothing of ${ws.id}'s listens on :1234`))
   writeFileSync(join(d, 'gone'), '')
   await assert.rejects(rig.rpc('portKill', { ws: ws.id, port: 4567 }), new RegExp(`ghost \\(pid ${ghost}\\) no longer listens on :4567`))

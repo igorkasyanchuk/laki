@@ -3,6 +3,7 @@
 // the tasks and the runs' log (all, or one project's), the form. App.tsx passes a SchedulesApi over the daemon.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Schedule, ScheduleRun, View } from '../../shared/types'
+import type { WorkflowItem, WorkflowSource } from '../../shared/workflow'
 import { ago } from '../../shared/widget'
 import { describe, nextRun, parseWhen, stamp, wsTitle } from '../../shared/when'
 import { ask, Icon, IconButton, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
@@ -13,6 +14,7 @@ export type SchedulesApi = {
   run(id: string): Promise<ScheduleRun>
   open(ws: string, tab?: string): void
   pick(): Promise<{ id: string } | null> // another folder: the folder picker, then it's a project
+  flows?: () => Promise<WorkflowItem[]> // Workflows on: a task may run one instead of a prompt
 }
 
 const EXAMPLES = ['every day at 2am except weekends', 'weekdays at 9:00', 'mon, wed and fri at 18:30', 'every 2 hours from 9am to 6pm', 'tomorrow at 7am']
@@ -27,7 +29,7 @@ export const soon = (t: number, now = Date.now()) => {
   const d = Math.round(m / 60 / 24)
   return m < 1 ? 'now' : m < 60 ? `in ${m} min` : h < 24 ? `in ${h} h` : d === 1 ? 'in a day' : `in ${d} days`
 }
-type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string }
+type Form = { id?: string; name: string; project: string; preset: string; ws: string; prompt: string; when: string; workflow?: string; source?: WorkflowSource } // workflow: a run of it, prompt its task
 // a changed form as the page closed (Esc, ✕, a click elsewhere), and what it was as it opened: back as the page opens
 // again, until it's saved or discarded
 const DRAFT = 'laki.scheduleDraft'
@@ -55,6 +57,9 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     return f && view.projects.some(p => p.id === f.project) && (!f.id || view.schedules?.some(s => s.id === f.id)) ? d : null // its project or task gone: none
   }, [])
   const [form, setForm] = useState<Form | null>(draft?.form ?? null)
+  const [flows, setFlows] = useState<WorkflowItem[]>([])
+  useEffect(() => void api.flows?.().then(setFlows, () => {}), [])
+  const flowName = (id?: string) => flows.find(w => w.id === id)?.name ?? id
   const orig = useRef<string | null>(draft?.orig ?? null) // the form as it opened: Cancel asks, and a close keeps it, only when it changed
   const changed = !!form && JSON.stringify(form) !== orig.current
   useEffect(() => keep(DRAFT, changed ? ({ form, orig: orig.current } satisfies Draft) : undefined), [form])
@@ -80,14 +85,14 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const rule = form?.when.trim() ? parseWhen(form.when) : null
   const fail = (e: unknown) => setErr((e as Error).message)
   const first = rule && !('error' in rule) ? nextRun(rule, Date.now()) : undefined // the next run: what the names preview
-  const makes = form?.ws === 'new' || form?.ws === 'local-new' // a row of its own each run, named
+  const makes = !form?.workflow && (form?.ws === 'new' || form?.ws === 'local-new') // a row of its own each run, named (a workflow's runs: as it names them)
 
   const ready = !!form && !saving && !!form.prompt.trim() && !!rule && !('error' in rule) && !!form.ws
   const save = async () => {
     if (!form || !ready) return
     setSaving(true)
     setErr('')
-    await api.set({ ...form, name: form.name.trim() || undefined }).then(() => setForm(null), fail)
+    await api.set({ ...form, name: form.name.trim() || undefined, workflow: form.workflow ?? '' }).then(() => setForm(null), fail) // '': a prompt again
     setSaving(false)
   }
   const run = async (s: Schedule) => {
@@ -100,7 +105,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
     // the project's local workspace is its folder; one that's gone: what Where's menu offers, not an id it lacks
     const w = view.workspaces.find(x => x.id === s.ws && x.project === s.project && !x.archived)
     const ws = ['new', 'local', 'local-new'].includes(s.ws) ? s.ws : w ? (w.kind === 'local' ? 'local' : w.id) : where0(s.project)
-    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when })
+    if (form?.id !== s.id) open({ id: s.id, name: s.name ?? '', project: s.project, preset: s.preset, ws, prompt: s.prompt, when: s.when, ...(s.workflow && { workflow: s.workflow, source: s.source }) })
   }
   const rm = (s: Schedule) => ask(`Delete the scheduled task ${s.name || s.prompt.slice(0, 40)}?`, { ok: 'Delete', danger: true }).then(y => y && api.rm(s.id).catch(fail))
   const where = (ws: string) => WHERE.find(x => x[0] === ws)?.[1] ?? `in ${view.workspaces.find(w => w.id === ws)?.name || ws}`
@@ -135,11 +140,16 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
       ...WHERE.filter(([k]) => k !== 'new' || project?.git !== false).map(([k, label, icon]) => ({ label: label[0].toUpperCase() + label.slice(1), icon, hint: form.ws === k ? ON : undefined, run: () => set({ ws: k }) }) as MenuItem),
       ...(wsOf(form.project).length ? [null, { head: 'In one of its workspaces' }, ...wsOf(form.project).map(w => ({ label: w.name || w.id, icon: 'terminal', hint: form.ws === w.id ? ON : undefined, run: () => set({ ws: w.id }) }) as MenuItem)] : []),
     ])
+  const runnable = flows.filter(w => !w.problems.length && (w.source === 'yours' || w.project === form?.project)) // a project's: in that project only
   const agentMenu = (e: React.MouseEvent) =>
     form &&
     openMenu(
       e,
-      [{ head: 'Agent' }, ...(agents.includes(form.preset) ? agents : [...agents, form.preset]).map(a => ({ label: a, icon: 'agent', hint: form.preset === a ? ON : undefined, run: () => set({ preset: a }) }) as MenuItem)], // its own, if switched off since
+      [
+        { head: 'Agent' },
+        ...(agents.includes(form.preset) ? agents : [...agents, form.preset]).map(a => ({ label: a, icon: 'agent', hint: !form.workflow && form.preset === a ? ON : undefined, run: () => set({ preset: a, workflow: undefined, source: undefined }) }) as MenuItem), // its own, if switched off since
+        ...(runnable.length ? [null, { head: 'Workflow' }, ...runnable.map(w => ({ label: w.name, sub: w.source === 'project' ? 'the project’s' : 'yours', icon: 'flow', hint: form.workflow === w.id ? ON : undefined, run: () => set({ workflow: w.id, source: w.source }) }) as MenuItem)] : []),
+      ],
       'right',
     )
   const failed = runs.filter(r => !r.ok).length
@@ -196,12 +206,12 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
           // Enter in a field never saves it (a time typed, a name): ⌘⏎ or the button does
           <form className="form sched-form" onSubmit={e => e.preventDefault()} onKeyDown={e => e.key === 'Enter' && (e.metaKey || e.ctrlKey) && (e.preventDefault(), save())}>
             <div className="nw-card nw-composer">
-              <textarea rows={3} value={form.prompt} aria-label="Prompt" placeholder="What the agent should do: update the dependencies, run the tests, open a PR if they pass" onChange={e => set({ prompt: e.target.value })} autoFocus />
+              <textarea rows={3} value={form.prompt} aria-label={form.workflow ? 'Its task' : 'Prompt'} placeholder={form.workflow ? `What ${flowName(form.workflow)} works on: its {{task}}` : 'What the agent should do: update the dependencies, run the tests, open a PR if they pass'} onChange={e => set({ prompt: e.target.value })} autoFocus />
               <div className="prompt-tools">
                 <span className="prompt-tools-end">
-                  <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="The agent that gets it" onClick={agentMenu}>
-                    <Icon name="agent" />
-                    <span>{form.preset}</span>
+                  <button type="button" className="nw-pick" aria-haspopup="menu" data-tip={flows.length ? 'The agent that gets it, or a workflow that runs it' : 'The agent that gets it'} onClick={agentMenu}>
+                    <Icon name={form.workflow ? 'flow' : 'agent'} />
+                    <span>{form.workflow ? flowName(form.workflow) : form.preset}</span>
                     <Icon name="chevron" size={11} />
                   </button>
                 </span>
@@ -231,11 +241,13 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                 <span className="nw-chip-text">{project?.name}</span>
                 <Icon name="chevron" size={11} />
               </button>
-              <button type="button" className="nw-chip" aria-haspopup="menu" data-tip={form.ws.startsWith('local') && project ? `Where each run goes: ${project.path}` : 'Where each run goes'} onClick={whereMenu}>
-                <Icon name={WHERE.find(x => x[0] === form.ws)?.[2] ?? 'terminal'} />
-                <span className="nw-chip-text">{where(form.ws)}</span>
-                <Icon name="chevron" size={11} />
-              </button>
+              {!form.workflow && (
+                <button type="button" className="nw-chip" aria-haspopup="menu" data-tip={form.ws.startsWith('local') && project ? `Where each run goes: ${project.path}` : 'Where each run goes'} onClick={whereMenu}>
+                  <Icon name={WHERE.find(x => x[0] === form.ws)?.[2] ?? 'terminal'} />
+                  <span className="nw-chip-text">{where(form.ws)}</span>
+                  <Icon name="chevron" size={11} />
+                </button>
+              )}
               <label className="nw-chip" data-tip={`Optional; a new workspace or session is named after it. {{DD-MM-YY}}, {{YYYY-MM-DD}}, {{HH:mm}} or {{ddd D MMM}} in the name or the prompt become the run's date and time`}>
                 <Icon name="pencil" />
                 <input className="nw-chip-input" value={form.name} aria-label="Name" placeholder={makes ? 'name: from the prompt, dated' : 'name: from the prompt'} spellCheck={false} onChange={e => set({ name: e.target.value })} />
@@ -280,7 +292,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
               {schedules.map(s => (
                 <div key={s.id} className={`sched-row ${s.on ? '' : 'off'} ${form?.id === s.id ? 'editing' : ''}`}>
                   <span className="sched-icon">
-                    <Icon name={s.ws === 'new' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal'} />
+                    <Icon name={s.workflow ? 'flow' : s.ws === 'new' ? 'fork' : s.ws.startsWith('local') ? 'folder' : 'terminal'} />
                   </span>
                   <button type="button" className="sched-main" data-tip="Edit" onClick={() => edit(s)}>
                     <span className="sched-name">{s.name || s.prompt}</span>
@@ -296,8 +308,14 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                     </span>
                     <span className="sched-tags">
                       <span className="tag">{nameOf(s.project)}</span>
-                      <span className="tag">{s.preset}</span>
-                      <span className="tag">{where(s.ws)}</span>
+                      {s.workflow ? (
+                        <span className="tag">workflow: {flowName(s.workflow)}</span>
+                      ) : (
+                        <>
+                          <span className="tag">{s.preset}</span>
+                          <span className="tag">{where(s.ws)}</span>
+                        </>
+                      )}
                     </span>
                   </button>
                   <span className="sched-acts">
