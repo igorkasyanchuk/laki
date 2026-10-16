@@ -24,15 +24,28 @@ export const widgetFormat = () => `## widget.json
     "project": { "label": "Laki project", "hint": "the project a review opens in" }
   },
   "fetch": "sh fetch.sh",
-  "actions": { "review": "\\"$LAKI_CLI\\" new \\"$WIDGET_PROJECT\\" --pr \\"$WIDGET_ARG\\" --prompt 'Review it'" }
+  "actions": { "review": "\\"$LAKI_CLI\\" new \\"$WIDGET_PROJECT\\" --pr \\"$WIDGET_ARG\\" --prompt 'Review it'" },
+  "sample": [
+    { "number": 412, "title": "Move billing to the new API", "url": "https://github.com/acme/web/pull/412", "createdAt": "2026-10-02T10:00:00Z" },
+    { "number": 418, "title": "Faster search on the orders page", "url": "https://github.com/acme/web/pull/418", "createdAt": "2026-10-05T09:30:00Z" }
+  ],
+  "sampleConfig": { "repo": "acme/web" }
 }
 \`\`\`
+
+- \`sample\` (**required** with a \`fetch\` or \`script\`): made-up data in exactly the shape the fetch prints, realistic and
+  varied (a few items, one of each state the page shows: a failing one, an approved one…), so the user sees how it looks
+  before it ever runs (Settings › Extensions' and the extension's page's Preview, a tile not turned on yet).
+  \`sampleConfig\`: settings for that preview (a repo name, a few links) over the defaults. In a preview its buttons and
+  links do nothing, and \`window.laki.sample\` is true. No fetch: \`sampleConfig\` alone shows it filled in.
 
 - \`size\`: cells [across 1–3, down 0.5 or 1–4] in the sidebar's grid; one cell is about 70×64 px, 0.5 a line 29 px tall. The user can change it.
 - \`every\`: minutes between fetches (default ${WIDGET_EVERY}); the user can change it. A fetch also runs when the widget is
   turned on, when its settings change, on Reload and from \`laki widget run <id>\`.
-- \`place\`: where it shows at first. The user can move it.
+- \`place\`: where it shows at first, one place or a list of them (\`["side", "desk"]\`). The user can move it.
   - \`side\`: the sidebar's grid, above its buttons (the default).
+  - \`desk\`: a tile on the Desk page (experimental), as big as the user drags it: its full view when it has one, else
+    its preview.
   - \`top\` (the top bar) or \`status\` (the status bar's right end): a line high (about 26 px), as wide as its cells
     across: design it as a ½-high one (a number and a word, a few links).
   - \`rail\` (a button among the rail's icons on the left; without the rail, in the sidebar's foot) or \`foot\` (a button
@@ -130,7 +143,7 @@ print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
   \`{{this}}\`, \`{{@index}}\`, and the outer names), \`{{#if x}}…{{else}}…{{/if}}\`, \`{{#unless x}}…{{/unless}}\` (an empty list
   is false), \`{{date x}}\` (Sep 2, 2026), \`{{ago x}}\` (3 hours ago), \`{{spark list}}\` (a line chart of numbers, SVG).
   Names: \`data\` (the fetch's JSON), \`config\` (the settings, as in \`$LAKI_WIDGET_CONFIG\`), \`at\` (the last fetch, ms),
-  \`error\`, \`full\`.
+  \`error\`, \`full\`, \`sample\` (a preview with widget.json's \`sample\`).
 - Ready-made classes (use them before your own CSS: they follow the app's theme):
   - a number: \`tile\` (centered), \`num\`, \`label\`; text: \`muted\`, \`small\`, \`nowrap\`, \`ellipsis\`, \`title\`, \`sub\`,
     \`bad\`, \`good\`, \`warn\`; \`tag\` (a pill, for labels), \`badge\` (a count), \`dot\` (a status dot in the current color), \`spark\`;
@@ -152,15 +165,25 @@ print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
   \`height\` attributes, CSS stretching it): the frame's size may not be known yet while the page runs.
 `
 
-// Settings › Extensions' Make it with Laki AI: the ask its chat gets (its rule, ai.ts' SYSTEM: questions first)
-export const widgetAsk = (want: string) => `Make me a Laki extension: ${want.trim()}
+// how Laki AI makes one (ai.ts' SYSTEM: questions first); desk: the Desk's Build with Laki AI, so not where it sits
+const howMake = (desk?: boolean) =>
+  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from, ${desk ? '' : "where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), "}what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (with a sample in widget.json: its preview).${desk ? ' It goes on my Desk: "place": "desk" in widget.json, a tile there.' : ''} It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
 
-Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from, where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write.`
+// the Desk's Build with Laki AI: the ask the floating chat gets
+export const widgetAsk = (want: string, desk?: boolean) => `Make me a Laki extension: ${want.trim()}
 
-// Settings › Extensions' Edit with Laki AI: one of the user's, which they let it rewrite (widgetSet ai)
-export const widgetEditAsk = (id: string, name: string, want: string) => `Change my Laki extension "${name}" (id ${id}): ${want.trim()}
+${howMake(desk)}`
 
-I let you rewrite this one. Read it first with laki_extension_read (laki_extension_guide for the format), then write the files you change with laki_extension_write under the same id. Keep what I didn't ask to change. Tell me in a line what changed; it's saved off, and I turn it on again in Settings › Extensions.`
+// the Extension page's Laki AI (its chat beside the preview and settings): where the user is, with each ask, for the
+// model. w: the one open there (mine: in Laki's folder, so it may rewrite it: widgetSet ai); none: New extension
+export const widgetHere = (w?: { id: string; name: string; mine: boolean }) =>
+  w
+    ? `On the page of my Laki extension "${w.name}" (id ${w.id}): its preview (live, and with its sample data) and its settings are beside this chat. "It" and "this" mean this extension. ${
+        w.mine
+          ? `To change it: laki_extension_read first (laki_extension_guide for the format), then laki_extension_write the files you change under the same id, its sample in widget.json kept in step with what the fetch prints. Keep what I didn't ask to change; tell me in a line what changed. It's saved off: I look at the preview, then turn it on.`
+          : "You can't rewrite this one (it comes with Laki, or it's in a folder of my own): to change it, make a copy under a new id."
+      }`
+    : `On the New extension page: I describe a Laki extension for you to make; it shows on this page, with its sample data, once written. ${howMake()}`
 
 // the prompt to paste into any AI chat: what's wanted, then all of the format, then how to answer; home: where the
 // files go

@@ -308,9 +308,13 @@ test('widgets: folders from ~/, a widget as a folder, the first of an id, bad on
 
   // a script outside its folder doesn't run (a sibling folder whose name starts the same included)
   widget(join(own, 'outside-x'), {}, null, { 'fetch.mjs': 'export default () => ({ ran: true })' })
+  assert.deepEqual(await rig.rpc('widgetRun', { id: 'outside' }), { ok: false, error: 'outside is off: turn it on first' }, 'an off one runs nothing')
+  await rig.rpc('widgetSet', { id: 'outside', on: true })
   assert.deepEqual(await rig.rpc('widgetRun', { id: 'outside' }), { ok: false, error: "../outside-x/fetch.mjs isn't in the widget's folder" })
 
-  // actions: nothing printed, JSON that says nothing to show, a toast over several lines
+  // actions: nothing printed, JSON that says nothing to show, a toast over several lines; none while it's off
+  assert.match((await rig.rpc('widgetAction', { id: 'acts', action: 'quiet' })).error, /is off: turn it on first/)
+  await rig.rpc('widgetSet', { id: 'acts', on: true })
   assert.deepEqual(await rig.rpc('widgetAction', { id: 'acts', action: 'quiet' }), { ok: true })
   assert.deepEqual(await rig.rpc('widgetAction', { id: 'acts', action: 'plain' }), { ok: true, out: '{"x":1}' })
   assert.deepEqual(await rig.rpc('widgetAction', { id: 'acts', action: 'multi' }), { ok: true, toast: 'multi' })

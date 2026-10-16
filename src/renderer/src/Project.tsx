@@ -3,7 +3,7 @@
 // (experimental: settings.specs; the Specs page opens one) and its Settings (Settings' own project section). Notes are
 // the user's alone: kept with the project in the daemon. App.tsx passes a ProjectApi.
 import { useEffect, useState } from 'react'
-import { type Memory, MEMORY_MAX, type Plan, type PlanKind, type Project, type ProjectConfig, type RunAction, type Schedule, type Template } from '../../shared/types'
+import { type CompactLogLine, type Memory, MEMORY_MAX, type Plan, type PlanKind, type Project, type ProjectConfig, type RunAction, type Schedule, type Template } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { describe } from '../../shared/when'
 import { Markdown } from './MarkdownView'
@@ -29,7 +29,9 @@ export type ProjectApi = {
   schedules(): void // the Scheduled tasks page, at this project: making and changing them is there
   setSchedule(id: string, on: boolean): Promise<unknown>
   specs?: { list(): Promise<Plan[]>; open(at?: { kind: PlanKind; slug?: string }): void } // experimental: on, the Specs tab
+  compact?: CompactApi // Laki AI on: the learned memories' Compact now and its log
 }
+export type CompactApi = { run(): Promise<unknown>; log(): Promise<CompactLogLine[]> }
 
 const TAB = 'laki.projectTab' // the last tab shown, for the next project opened
 // tab: the one shown, App's (the project's ⋯ › Settings sets it, a click here through onTab), else the last one shown
@@ -54,7 +56,7 @@ export function ProjectPage({ project: p, schedules, tab: at, onTab, api, onClos
         </div>
         {tab === 'notes' && <NotesView key={p.id} notes={p.notes ?? ''} onSave={notes => api.save({ notes })} />}
         {tab === 'tasks' && <Tasks schedules={schedules} api={api} />}
-        {tab === 'memory' && <MemoryList key={p.id} memory={p.memory ?? []} save={memory => api.save({ memory })} />}
+        {tab === 'memory' && <MemoryList key={p.id} memory={p.memory ?? []} save={memory => api.save({ memory })} compact={api.compact} last={p.compacted} />}
         {tab === 'specs' && api.specs && <Specs key={p.id} specs={api.specs} />}
         {tab === 'settings' && (
           <div className="settings-main form pp-settings">
@@ -169,8 +171,17 @@ function Specs({ specs }: { specs: NonNullable<ProjectApi['specs']> }) {
 // (auto-memory: laki memory add, MCP's laki_remember); the whole list is saved each time. global: Settings › Global
 // memory, the user's rules for every project (no learned ones)
 const newId = () => `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-export function MemoryList({ memory, save, global }: { memory: Memory[]; save: (m: Memory[]) => Promise<unknown>; global?: boolean }) {
+export function MemoryList({ memory, save, global, compact, last }: { memory: Memory[]; save: (m: Memory[]) => Promise<unknown>; global?: boolean; compact?: CompactApi; last?: Project['compacted'] }) {
   const [draft, setDraft] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [log, setLog] = useState<CompactLogLine[] | null>(null)
+  const [err, setErr] = useState('')
+  const compactNow = () => {
+    setBusy(true)
+    setErr('')
+    compact!.run().then(() => log && compact!.log().then(setLog), e => setErr((e as Error).message)).finally(() => setBusy(false))
+  }
+  const toggleLog = () => (log ? setLog(null) : void compact!.log().then(setLog, e => setErr((e as Error).message)))
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   const mine = memory.filter(m => !m.auto)
   const learned = memory.filter(m => m.auto)
@@ -216,7 +227,46 @@ export function MemoryList({ memory, save, global }: { memory: Memory[]; save: (
         <span className="muted small" data-tip={`Agents add what they learn about the project (laki memory add); past ${MEMORY_MAX}, the oldest goes`}>
           {learned.length}/{MEMORY_MAX} · auto-memory
         </span>
+        {compact && (
+          <span className="mem-compact">
+            <button type="button" disabled={busy || learned.length < 2} data-tip="Laki AI merges duplicates, joins what overlaps and drops what's stale: a shorter list replaces these (never yours)" onClick={compactNow}>
+              <Icon name={busy ? 'refresh' : 'collapse'} size={12} /> {busy ? 'Compacting…' : 'Compact now'}
+            </button>
+            <button type="button" className={log ? 'on' : ''} onClick={toggleLog}>
+              Log
+            </button>
+          </span>
+        )}
       </div>
+      {compact && (last || err) && (
+        <p className={`small ${err || (last && !last.ok) ? 'field-err' : 'muted'}`}>
+          {err || (last!.ok ? `Compacted ${ago(last!.at)}: ${last!.before} → ${last!.after}${last!.why === 'you' ? '' : last!.why === 'full' ? ' (it was full)' : ' (every few days)'}` : `Compacting failed ${ago(last!.at)}: ${last!.error}`)}
+        </p>
+      )}
+      {log && (
+        <div className="mem-log">
+          {!log.length && <p className="muted small">No compaction yet.</p>}
+          {log.map(l => (
+            <details key={l.at}>
+              <summary>
+                <span className={l.ok ? '' : 'field-err'}>{new Date(l.at).toLocaleString()}</span> · {l.ok ? `${l.before} → ${l.after}` : `failed: ${l.error}`} · {l.why === 'you' ? 'by you' : l.why === 'full' ? 'it was full' : 'every few days'}
+              </summary>
+              <div className="mem-log-cols">
+                <div>
+                  <b className="small">Before</b>
+                  <ul>{(l.was ?? []).map((t, i) => <li key={i}>{t}</li>)}</ul>
+                </div>
+                {l.now && (
+                  <div>
+                    <b className="small">After</b>
+                    <ul>{l.now.map((t, i) => <li key={i}>{t}</li>)}</ul>
+                  </div>
+                )}
+              </div>
+            </details>
+          ))}
+        </div>
+      )}
       {!learned.length && <p className="muted small">Nothing yet: agents add what they learn as they work here.</p>}
       {[...learned].reverse().map(m => item(m))}
         </>

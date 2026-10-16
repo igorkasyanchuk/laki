@@ -23,6 +23,18 @@
       @keyframes fl-wobble { 0%, 100% { border-radius: 19px 0 0 19px / 22px 0 0 22px; } 33% { border-radius: 16px 0 0 21px / 19px 0 0 27px; } 66% { border-radius: 21px 0 0 17px / 26px 0 0 20px; } }
       @keyframes fl-in { from { transform: translateX(40px); } }
       @keyframes fl-in-left { from { transform: translateX(-40px); } }
+      /* on the top or bottom edge: a row 44px high (main's BAR), as wide as what's in it; the shape's round side and its
+         flares turned, flipped for the bottom */
+      body:is([data-side='top'], [data-side='bottom']) #bar { width: max-content; height: 44px; flex-direction: row; padding: 0 20px 6px; animation-name: fl-in-top; }
+      body[data-side='bottom'] #bar { padding: 6px 20px 0; animation-name: fl-in-bottom; }
+      body:is([data-side='top'], [data-side='bottom']) .shape { top: 0; bottom: auto; left: 14px; right: 14px; width: auto; height: 38px; border-radius: 0 0 22px 22px / 0 0 19px 19px; animation-name: fl-wobble-h; }
+      body[data-side='bottom'] .shape { top: auto; bottom: 0; transform: scaleY(-1); }
+      body:is([data-side='top'], [data-side='bottom']) .shape::before { top: 0; right: auto; left: -12px; background: radial-gradient(circle at 0 100%, transparent 11.5px, var(--bg) 12px); }
+      body:is([data-side='top'], [data-side='bottom']) .shape::after { top: 0; bottom: auto; right: -12px; background: radial-gradient(circle at 100% 100%, transparent 11.5px, var(--bg) 12px); }
+      body:is([data-side='top'], [data-side='bottom']).dragging .shape { animation: none; border-radius: 19px; } /* over the row's wobble */
+      @keyframes fl-wobble-h { 0%, 100% { border-radius: 0 0 22px 22px / 0 0 19px 19px; } 33% { border-radius: 0 0 27px 19px / 0 0 21px 16px; } 66% { border-radius: 0 0 20px 26px / 0 0 17px 21px; } }
+      @keyframes fl-in-top { from { transform: translateY(-40px); } }
+      @keyframes fl-in-bottom { from { transform: translateY(40px); } }
       .fl-dot, .fl-btn { cursor: pointer; transition: transform 0.12s; }
       body.dragging :is(.fl-dot, .fl-btn) { cursor: grabbing; }
       /* hovered (.hot, floater.ts: :hover comes back as the bar does, after a click brought Laki in front): brighter and a
@@ -43,6 +55,12 @@
       .fl-acts.pop .fl-btn { animation: fl-pop 0.2s cubic-bezier(0.3, 1.4, 0.5, 1) backwards; }
       .fl-acts.pop .fl-btn:nth-child(3) { animation-delay: 30ms; } .fl-acts.pop .fl-btn:nth-child(2) { animation-delay: 60ms; } .fl-acts.pop .fl-btn:nth-child(1) { animation-delay: 90ms; }
       @keyframes fl-pop { from { opacity: 0; transform: translateY(8px) scale(0.6); } }
+      /* a row: the + and its stack after the circles, the stack to the +'s left */
+      body:is([data-side='top'], [data-side='bottom']) :is(.fl-btns, .fl-acts) { flex-direction: row; }
+      body:is([data-side='top'], [data-side='bottom']) .fl-dot + .fl-btns { margin: 0 0 0 2px; padding: 0 0 0 8px; border-top: none; border-left: 1px solid var(--line); }
+      body:is([data-side='top'], [data-side='bottom']) .fl-acts { margin: 0 2px 0 0; padding: 0 8px 0 0; border-bottom: none; border-right: 1px solid var(--line); }
+      body:is([data-side='top'], [data-side='bottom']) .fl-acts.pop .fl-btn { animation-name: fl-pop-x; }
+      @keyframes fl-pop-x { from { opacity: 0; transform: translateX(8px) scale(0.6); } }
       /* the + menu beside the drop (main's MENU: 236 by 196; the rows share its height) */
       #menu { box-sizing: border-box; height: 100vh; padding: 6px; display: flex; flex-direction: column; gap: 2px; background: var(--bg); border: 1px solid var(--line); border-radius: 12px; }
       .m-row { flex: 1; display: flex; align-items: center; gap: 10px; width: 100%; padding: 0 8px; border: none; border-radius: 8px; background: transparent; color: var(--fg); text-align: left; cursor: pointer; font: inherit; outline: none; }

@@ -4,15 +4,15 @@ import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_pro
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 import { readdir, readFile, rm, stat } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
-import { chmodSync, closeSync, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, userInfo } from 'node:os'
 import { basename, dirname, extname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
-import { nextRun, parseWhen, stamp, wsTitle } from '../shared/when.ts'
+import { actionSlug, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, homeDir, loginCmd } from './accounts.ts'
@@ -116,6 +116,7 @@ export function load() {
   state.schedules ??= []
   state.runs ??= []
   state.todos ??= []
+  state.reminders ??= []
   state.flows ??= []
   for (const p of state.projects) if (p.kind === 'shells' && p.name === 'Shells') p.name = 'Terminals' // its first name (0.7)
   slugActions() // actions from before slugs
@@ -174,6 +175,59 @@ function hookFiles(h: Hooks): Record<string, string> {
     'gemini-settings.json': JSON.stringify(gemini, null, 2),
     'opencode/plugin/laki.js': OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(h.argv)),
   }
+}
+
+// ---------- the laki command in any shell (Settings › General › Command line): a launcher like the skills' in a folder on
+// PATH: Homebrew's or /usr/local/bin when it can write there, else ~/.local/bin (made; PATH then says whether it's on it)
+const CLI_MARK = '# the laki CLI (written by Laki: Settings › General › Command line)'
+const cliText = () => `#!/bin/sh\n${CLI_MARK}\nexec ${LAKI_CLI} "$@"\n`
+const cliSpots = () => process.env.LAKI_CLI_DIRS?.split(':') ?? ['/opt/homebrew/bin', '/usr/local/bin', join(homedir(), '.local/bin')] // LAKI_CLI_DIRS: tests' own folders
+const there = (f: string) => {
+  try {
+    return !!lstatSync(f) // a link that goes nowhere too: writing would make its target
+  } catch {
+    return false
+  }
+}
+const writable = (d: string) => {
+  try {
+    return statSync(d).isDirectory() && (accessSync(d, fsConstants.W_OK), true)
+  } catch {
+    return false
+  }
+}
+export function cliState() {
+  const onPath = (d: string) => (process.env.PATH ?? '').split(':').includes(d)
+  const ours = (f: string) => {
+    try {
+      return lstatSync(f).isFile() && readFileSync(f, 'utf8').includes(CLI_MARK) // a symlink (npm link) or a folder: not ours
+    } catch {
+      return false
+    }
+  }
+  const mine = cliSpots().map(d => join(d, 'laki')).find(ours)
+  const found = (process.env.PATH ?? '').split(':').filter(Boolean).map(d => join(d, 'laki')).find(f => existsSync(f)) // the one a shell runs
+  return {
+    path: mine, // Laki's launcher, wherever it went
+    current: !!mine && readFileSync(mine, 'utf8') === cliText(), // its paths are this install's (an app moved or updated: not)
+    onPath: !!mine && onPath(dirname(mine)),
+    other: found && found !== mine ? found : undefined, // another laki first on PATH (npm link)
+    // where Install writes: a spot with no laki of another's there (never through an npm link's symlink); none: the last, made
+    to: mine ?? join(cliSpots().find(d => writable(d) && !there(join(d, 'laki'))) ?? cliSpots().at(-1)!, 'laki'),
+  }
+}
+export function cliInstall() {
+  const { to: at, path } = cliState()
+  if (at !== path && there(at)) throw new Error(`${at} is another laki: remove it first, or put that folder later on your PATH`)
+  mkdirSync(dirname(at), { recursive: true })
+  writeFileSync(at, cliText(), { mode: 0o755 })
+  chmodSync(at, 0o755)
+  return cliState()
+}
+export function cliRemove() {
+  const at = cliState().path
+  if (at) rmSync(at) // only Laki's own (CLI_MARK): never an npm link's
+  return cliState()
 }
 
 // /laki:new in claude tabs: a plugin Laki loads with --plugin-dir (agentCmd; this Mac's only: a host has no laki CLI),
@@ -260,15 +314,19 @@ export function memoryNote(p?: Project) {
 
 // an agent's memory (laki memory add, MCP's laki_remember): one more, the oldest learned one past MEMORY_MAX going; the
 // same text again dates it anew. The user's (auto false: the CLI's --mine) is refused past MEMORY_MAX
+// who did it, by the tab it came from ($LAKI_TAB): its agent (or a shell) and workspace
+const byTab = (id?: string) => {
+  const t = state.tabs.find(x => x.id === id)
+  const w = t && state.workspaces.find(x => x.id === t.workspace)
+  return t && w ? `${t.preset ?? t.name} in ${w.name ?? w.id}` : undefined
+}
 export function memoryAdd(o: { project: string; text: string; auto?: boolean; tab?: string }) {
   const p = findProject(o.project)
   const text = String(o.text ?? '').trim()
   if (!text) throw new Error('what to remember?')
   const auto = o.auto !== false
   if (text.length > (auto ? MEMORY_AUTO_LEN : 20000)) throw new Error(auto ? `a memory is ${MEMORY_AUTO_LEN} characters at most: the gist, in a line or two` : 'a memory is 20,000 characters at most')
-  const t = state.tabs.find(x => x.id === o.tab)
-  const w = t && state.workspaces.find(x => x.id === t.workspace)
-  const by = t && w ? `${t.preset ?? t.name} in ${w.name ?? w.id}` : undefined
+  const by = byTab(o.tab)
   const list = p.memory ?? []
   let m = list.find(x => !!x.auto === auto && x.text.trim().toLowerCase() === text.toLowerCase())
   if (m) (m.at = Date.now()), list.splice(list.indexOf(m), 1), list.push(m)
@@ -427,6 +485,7 @@ export function view(): View {
     schedules: state.schedules,
     runs: state.runs?.slice(0, RUNS_SHOWN),
     todos: state.todos,
+    ...(state.settings?.calendar === true && { reminders: state.reminders!.filter(r => !r.done || r.at > Date.now() - REMINDERS_DONE) }), // done ones: the last few months'
     layouts: state.layouts,
     widgets: widgetsView(),
     widgetKey,
@@ -1382,7 +1441,8 @@ export function imagesTidy() {
   try {
     files = readdirSync(images)
   } catch {}
-  for (const f of files) if (Number(f.split('-')[0]) < Date.now() - days * 86400e3) rmSync(join(images, f), { force: true })
+  const held = new Set(state.todos?.flatMap(t => t.images ?? []).map(p => basename(p))) // a to-do's: kept until it starts
+  for (const f of files) if (Number(f.split('-')[0]) < Date.now() - days * 86400e3 && !held.has(f)) rmSync(join(images, f), { force: true })
 }
 export function imageSave(o: { data: string; ext?: string }) {
   const ext = ['png', 'jpg', 'jpeg', 'gif', 'webp'].includes(o.ext ?? '') ? o.ext : 'png'
@@ -1445,7 +1505,7 @@ export function settingsSet(o: Settings) {
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays']
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'memoryCompact', 'flowVars']
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings
@@ -1896,11 +1956,14 @@ export async function wsRestore(ref: string) {
 
 // ---------- the board's to-dos (Board.tsx): prompts waiting for a workspace; starting one is wsNew, then todoRm
 
-export function todoAdd(o: { project: string; text: string }) {
+// images: pasted ones, imageSave's paths (only those: their paths go into the prompt), kept by imagesTidy while it waits
+export function todoAdd(o: { project: string; text: string; images?: string[] }) {
   const p = findProject(o.project)
-  const text = o.text?.trim()
-  if (!text) throw new Error('a to-do needs its text')
-  const t: Todo = { id: randomUUID().slice(0, 8), project: p.id, text, at: Date.now() }
+  const text = String(o.text ?? '').trim()
+  const kept = join(dir, 'images') + sep
+  const images = (Array.isArray(o.images) ? o.images : []).filter((x): x is string => typeof x === 'string' && resolve(x).startsWith(kept) && existsSync(x)).slice(0, 10)
+  if (!text && !images.length) throw new Error('a to-do needs its text')
+  const t: Todo = { id: randomUUID().slice(0, 8), project: p.id, text, at: Date.now(), ...(images.length && { images }) }
   state.todos!.push(t)
   save()
   changed()
@@ -1911,6 +1974,88 @@ export function todoRm(o: { id: string }) {
   state.todos = state.todos!.filter(t => t.id !== o.id)
   save()
   changed()
+}
+
+// ---------- the calendar's reminders (Calendar.tsx, experimental): a note for a moment, from the app, Laki AI, an agent or
+// the CLI; reminderTick rings each once as it's due, while a client is on (one due while the app was closed rings as it opens)
+
+const REMINDERS_DONE = 92 * 86400000 // a done one is in the view (the Calendar) this long after its time
+const reminderOf = (id: string) => {
+  const r = state.reminders!.find(x => x.id === id)
+  if (!r) throw new Error(`no reminder ${id}`)
+  return r
+}
+const calendarOn = () => {
+  if (state.settings?.calendar !== true) throw new Error('turn Calendar on first: Settings › General › Experimental')
+}
+const reminderText = (t: unknown) => {
+  const text = typeof t === 'string' ? t.trim() : ''
+  if (!text) throw new Error('a reminder needs its text')
+  return text.slice(0, 2000)
+}
+const reminderAt = (at: unknown) => {
+  const r = parseAt(at as string | number)
+  if (typeof r !== 'number') throw new Error(r.error)
+  return r
+}
+
+export function reminderAdd(o: { at: number | string; text: string; ws?: string; project?: string; by?: string; tab?: string }) {
+  calendarOn()
+  const text = reminderText(o.text)
+  const at = reminderAt(o.at)
+  const ws = o.ws ? findWs(o.ws) : undefined
+  const project = ws?.project ?? (o.project ? findProject(o.project).id : undefined)
+  const by = (typeof o.by === 'string' && o.by.trim().slice(0, 80)) || byTab(o.tab) // said, else the tab it came from
+  const r: Reminder = { id: randomUUID().slice(0, 8), at, text, made: Date.now(), ...(ws && { ws: ws.id }), ...(project && { project }), ...(by && { by }) }
+  const all = [...state.reminders!, r]
+  // ponytail: past REMINDERS_MAX the oldest rung ones go, then the oldest; a list, not a database
+  while (all.length > REMINDERS_MAX) all.splice(all.findIndex(x => x.fired) >= 0 ? all.findIndex(x => x.fired) : 0, 1)
+  state.reminders = all.sort((a, b) => a.at - b.at)
+  save()
+  changed()
+  return r
+}
+
+// text, at (moved: it rings again), done, ws ('' none)
+export function reminderSet(o: { id: string; text?: string; at?: number | string; done?: boolean; ws?: string }) {
+  calendarOn()
+  const r = reminderOf(o.id)
+  if (o.text !== undefined) r.text = reminderText(o.text)
+  if (o.at !== undefined) {
+    r.at = reminderAt(o.at)
+    if (r.at > Date.now()) delete r.fired
+  }
+  if (o.done !== undefined) r.done = !!o.done || undefined
+  if (o.ws !== undefined) {
+    const ws = o.ws ? findWs(o.ws) : undefined
+    r.ws = ws?.id
+    r.project = ws?.project
+  }
+  state.reminders!.sort((a, b) => a.at - b.at)
+  save()
+  changed()
+  return r
+}
+
+export function reminderRm(o: { id: string }) {
+  calendarOn()
+  reminderOf(o.id)
+  state.reminders = state.reminders!.filter(x => x.id !== o.id)
+  save()
+  changed()
+}
+
+// every 30 s (now: tests move the clock): the due ones not rung yet, rung once as a `reminder` event (App: a notification
+// and a toast); with nobody to hear it, it waits
+export function reminderTick(now = Date.now()) {
+  if (state.settings?.calendar !== true || !clients.size) return []
+  const due = state.reminders!.filter(r => !r.fired && !r.done && r.at <= now)
+  for (const r of due) {
+    r.fired = true
+    broadcast({ ev: 'reminder', reminder: r.id, text: r.text, at: r.at, ws: r.ws }) // not id: that would make it a reply
+  }
+  if (due.length) save(), changed()
+  return due
 }
 
 // wsFork: a new workspace from this one's branch, its Claude chat forked (--fork-session).

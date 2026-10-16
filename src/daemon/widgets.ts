@@ -21,10 +21,11 @@ import { changed, cliArgv, cliEnv, clients, devLog, dir, own, plainEnv, q, state
 // choice wins). As a button (a rail or foot place, or no preview in widget.html): icon (an icon of the app's, or a
 // character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions)
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown> }
+// sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY)
+type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY)
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; builtin: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'> }
@@ -138,11 +139,17 @@ const sizeOf = (w: Entry): [number, number] => {
 }
 const everyOf = (w: Entry) => clamp(w.s.every ?? w.m.every, 1, 1440, WIDGET_EVERY)
 const onOf = (w: Entry) => !!w.s.on // every extension starts off: Settings › Extensions turns it on
+// an off one runs nothing, its fetch nor its actions (its page's clicks and scripts, a preview's too): one Laki AI wrote
+// is off until you've looked at it
+const OFF = (w: Entry) => `${w.m.name || w.id} is off: turn it on first`
 const SIZES: WidgetSize[] = ['s', 'm', 'l']
 const isSize = (v: unknown): v is WidgetSize => SIZES.includes(v as WidgetSize)
 const viewSize = (w: Entry): WidgetSize => [w.s.view, w.m.view].find(isSize) ?? 'm'
 const isPlace = (v: unknown): v is WidgetPlace => WIDGET_PLACES.includes(v as WidgetPlace)
-const placeOf = (w: Entry): WidgetPlace => [w.s.place, w.m.place].find(isPlace) ?? 'side'
+// its places: the user's (one, or a list), else widget.json's, else the sidebar; the first is its place
+const placeList = (v: unknown) => [...new Set((Array.isArray(v) ? v : [v]).filter(isPlace))]
+const placesOf = (w: Entry): WidgetPlace[] => [w.s.place, w.m.place].map(placeList).find(l => l.length) ?? ['side']
+const placeOf = (w: Entry): WidgetPlace => placesOf(w)[0]
 
 const TYPES: WidgetOption['type'][] = ['text', 'number', 'bool', 'choice', 'list']
 const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
@@ -187,6 +194,7 @@ export const widgetsView = (): WidgetView[] =>
     full: w.full,
     view: viewSize(w),
     place: placeOf(w),
+    places: placesOf(w),
     net: (w.js && w.s.net) || undefined,
     js: w.js || undefined,
     config: configOf(w),
@@ -195,8 +203,9 @@ export const widgetsView = (): WidgetView[] =>
     error: w.s.error,
     running: running.has(w.id) || undefined,
     byAi: w.s.by === 'ai' || undefined,
+    sample: w.m.sample !== undefined || (!fetches(w) && w.m.sampleConfig !== undefined) || undefined, // a preview with made-up data
     rev,
-    ...((BUTTON_PLACES.includes(placeOf(w)) || !w.preview) && { button: true }),
+    ...((placesOf(w).every(p => BUTTON_PLACES.includes(p)) || !w.preview) && { button: true }), // a tile elsewhere: its preview
     icon: iconOf(w),
     ...w.face,
     click: clickOf(w),
@@ -210,13 +219,17 @@ function find(id: string) {
 
 // the widget's preview or full view as HTML, filled from its storage; null: it has no such view. A JS widget's is a
 // whole page (pageOf), for a frame
-export function widgetRender(o: { id: string; full?: boolean; vars?: Record<string, string> }) {
+// sample: with widget.json's made-up data (and sampleConfig over its settings), as it would look; sample in the context
+export function widgetRender(o: { id: string; full?: boolean; vars?: Record<string, string>; sample?: boolean }) {
   const w = find(o.id)
   const file = readFileSync(join(w.dir, 'widget.html'), 'utf8')
   const html = viewOf(file, !!o.full)
   if (html === undefined) return null
   const s = readStore(w.id)
-  const ctx = { data: s.data, config: typedOf(w), at: s.at, error: s.error, full: !!o.full }
+  const sc = w.m.sampleConfig && typeof w.m.sampleConfig === 'object' && !Array.isArray(w.m.sampleConfig) ? w.m.sampleConfig : {}
+  const ctx = o.sample
+    ? { data: w.m.sample, config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true }
+    : { data: s.data, config: typedOf(w), at: s.at, error: s.error, full: !!o.full }
   const body = render(html, ctx)
   return hasScript(file) ? pageOf(body, ctx, o.vars) : body // as the app shows it (js): a script in either view makes both pages
 }
@@ -235,7 +248,7 @@ export function widgetPage(id: string, query: URLSearchParams): { code: number; 
     try {
       vars = JSON.parse(query.get('theme') || '{}')
     } catch {}
-    html = widgetRender({ id, full: query.get('full') === '1', vars: vars && typeof vars === 'object' ? vars : {} })
+    html = widgetRender({ id, full: query.get('full') === '1', sample: query.get('sample') === '1', vars: vars && typeof vars === 'object' ? vars : {} })
   } catch (e) {
     html = `<!doctype html><p style="color:#f7768e;font:12px system-ui">${String((e as Error).message).replace(/[&<>]/g, '')}</p>`
   }
@@ -266,7 +279,7 @@ export function widgetsOff() {
 // the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
 // (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
 const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
-export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace; net?: boolean; config?: Record<string, string>; ai?: boolean }) {
+export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean }) {
   const w = find(o.id)
   const s = readStore(w.id)
   if (o.ai) {
@@ -278,7 +291,7 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
-  if (o.place !== undefined) s.place = isPlace(o.place) ? o.place : undefined
+  if (o.place !== undefined) s.place = (l => (l.length > 1 ? l : l[0]))(placeList(o.place)) // none: widget.json's again
   if (o.net !== undefined) s.net = !!o.net || undefined
   if (o.config) {
     const opts = new Map(optionsOf(w).map(x => [x.key, x]))
@@ -366,6 +379,7 @@ try {
 // run the widget's fetch now (exec); what it prints must be JSON. A failure keeps the last data and says why.
 export async function widgetRun(o: { id: string }): Promise<{ ok: boolean; error?: string }> {
   const w = find(o.id)
+  if (!onOf(w)) return { ok: false, error: OFF(w) }
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script` }
   if (running.has(w.id)) return again.add(w.id), { ok: false, error: 'already fetching: it fetches again after this one' }
   const script = w.m.script ? resolve(w.dir, w.m.script) : undefined
@@ -406,6 +420,7 @@ export async function widgetRun(o: { id: string }): Promise<{ ok: boolean; error
 // fetches again, to show what it changed. What it prints as JSON with toast or modal (sayOf) is what the app shows
 export async function widgetAction(o: { id: string; action: string; arg?: string }): Promise<{ ok: boolean; out?: string; error?: string } & WidgetSay> {
   const w = find(o.id)
+  if (!onOf(w)) return { ok: false, error: OFF(w) }
   const cmd = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
   if (typeof cmd !== 'string') return { ok: false, error: `${w.m.name || w.id} has no action ${o.action}` }
   wLog(w, `action ${o.action}${o.arg ? ` (${String(o.arg).slice(0, 200)})` : ''}`)
@@ -488,6 +503,8 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
       throw new Error(`widget.json: ${(e as Error).message}`)
     }
     if (!m || typeof m !== 'object' || Array.isArray(m)) throw new Error('widget.json: an object')
+    const j = m as Manifest
+    if ((j.fetch || j.script) && j.sample === undefined) throw new Error('widget.json: a sample too, made-up data in the shape its fetch prints, for its preview (laki_extension_guide)') // every extension shows how it looks before it runs
   }
   mkdirSync(widgetHome(), { recursive: true })
   const at = statOf(d)
@@ -503,7 +520,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
   writeStore(o.id, { ...readStore(o.id), on: false, net: undefined, by: theirs ? was.by : 'ai', aiMay: undefined }) // net too: the user allows the network for the page they looked at, not a rewrite
   scanWidgets()
   wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; off until it's turned on`)
-  return { ...widgetsView().find(w => w.id === o.id), note: 'Saved turned off: the user turns it on in Settings › Extensions' }
+  return { ...widgetsView().find(w => w.id === o.id), note: 'Saved turned off: the user looks at it on its page (Settings › Extensions, with its sample) and turns it on' }
 }
 
 // Settings › Extensions' Delete (after the app's confirm): its folder and its storage, for good. Not one that comes with

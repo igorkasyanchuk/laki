@@ -14,7 +14,7 @@ import { describe } from '../shared/when.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -177,6 +177,26 @@ async function main() {
       const mem = p.memory ?? []
       const line = (m: Memory) => `${m.id}  ${new Date(m.at).toISOString().slice(0, 10)}  ${m.text.replace(/\s*\n\s*/g, ' ')}`
       return out(mem, [`${p.name}: yours`, ...mem.filter(m => !m.auto).map(line), '', 'learned by agents', ...mem.filter(m => m.auto).map(line)].join('\n'))
+    }
+    case 'remind':
+    case 'reminders': {
+      // the calendar's follow-ups: laki remind <when> <text…> [--ws <id>|.] | laki reminders [rm|done <id>]
+      if (cmd === 'reminders') {
+        const [sub, id] = rest
+        if (sub === 'rm' || sub === 'done') {
+          if (!id) throw new Error(`usage: laki reminders ${sub} <id>`)
+          return out(sub === 'rm' ? await rpc('reminderRm', { id }) : await rpc('reminderSet', { id, done: true }), sub === 'rm' ? `removed ${id}` : `done ${id}`)
+        }
+        const v: View = await rpc('state')
+        if (!v.reminders) throw new Error('Calendar is off: Settings › General › Experimental')
+        return out(v.reminders, v.reminders.map(r => `${r.id}  ${new Date(r.at).toLocaleString()}  ${r.done ? '✓ ' : ''}${r.text.replace(/\s*\n\s*/g, ' ')}`).join('\n') || 'no reminders')
+      }
+      const [when, ...words] = rest
+      if (!when || !words.length) throw new Error('usage: laki remind "<when: in 2h, tomorrow at 9am, 2026-10-20 14:30>" <text…> [--ws <id>|.]')
+      if (flags.ws === '.' && !process.env.LAKI_WORKSPACE) throw new Error('--ws .: only in a workspace\'s tab (or give its id)')
+      const ws = flags.ws === '.' ? process.env.LAKI_WORKSPACE : (flags.ws as string | undefined)
+      const r = await rpc('reminderAdd', { at: when, text: words.join(' '), ws, tab: process.env.LAKI_TAB, ...(!process.env.LAKI_TAB && { by: 'the CLI' }) })
+      return out(r, `reminder ${r.id} at ${new Date(r.at).toLocaleString()}`)
     }
     case 'rename':
     case 'pr': {

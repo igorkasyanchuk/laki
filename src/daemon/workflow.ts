@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, apiQuestions, jsonFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, isLive, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 
@@ -180,7 +180,7 @@ function varsOf(r: FlowRun): Record<string, string> {
   const pr = ws && prOf(ws.id)
   // the agent variables ({{branch}}, {{path}}…: what actions and templates take) under the run's own
   const agent = ws ? Object.fromEntries(Object.entries(agentVars(ws, { project: state.projects.find(p => p.id === ws.project)?.name, pr: pr?.url })).filter((e): e is [string, string] => e[1] !== undefined)) : {}
-  return { ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
+  return { ...varsFill(r.flow.vars, state.settings?.flowVars), ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
 }
 
 export async function flowStart(o: { workflow: string; source?: WorkflowSource; project: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent' }) {
@@ -687,12 +687,12 @@ const before = (r: FlowRun, vars: Record<string, string>) => (id => (id ? valueO
 
 // the inspector's Test: an AI call, an AI decision or a webhook sent once, alone, with the variables given (a project's
 // env and folder, when it names one); what it says and gives back, never a run
-export async function flowTest(o: { block: Block; vars?: Record<string, string>; project?: string }) {
+export async function flowTest(o: { block: Block; vars?: Record<string, string>; project?: string; own?: Record<string, string> }) { // own: the workflow's variables
   on()
   const b = o.block
   if (!b || !['llm', 'decide', 'webhook'].includes(b.kind)) throw new Error('Test sends an AI call, an AI decision or a webhook')
   const proj = o.project ? findProject(o.project) : undefined
-  const vars: Record<string, string> = { task: 'a test task', ...Object.fromEntries(Object.entries(o.vars ?? {}).map(([k, v]) => [k, String(v)])) }
+  const vars: Record<string, string> = { task: 'a test task', ...varsFill(o.own, state.settings?.flowVars), ...Object.fromEntries(Object.entries(o.vars ?? {}).map(([k, v]) => [k, String(v)])) }
   const ask = `Test · ${blockName(b)}`
   const log: string[] = []
   const t0 = Date.now()

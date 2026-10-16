@@ -92,11 +92,15 @@ export type Block = {
   notify?: boolean // end, popup: a notification too
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
 }
-export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main'; session: 'new' | 'shared'; runs?: number; turns?: number; blocks: Block[] }
+export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main'; session: 'new' | 'shared'; runs?: number; turns?: number; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars
 export type WorkflowSource = 'yours' | 'project'
 export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean } // the list's; byAgent: an agent wrote it (MCP), not saved by the user since
 
 export const ID = /^[a-z0-9][a-z0-9_?-]{0,40}$/i
+export const VAR_NAME = /^[A-Za-z_][\w-]{0,40}$/ // a variable's: {{vars.NAME}}
+const VAR_LINE = /^var\s+([A-Za-z_][\w-]{0,40})\s*:\s?(.*)$/
+// {{vars.NAME}}: Settings' (every workflow's), then the workflow's own over them
+export const varsFill = (own?: Record<string, string>, global?: Record<string, string>) => Object.fromEntries(Object.entries({ ...global, ...own }).filter(([k]) => VAR_NAME.test(k)).map(([k, v]) => [`vars.${k}`, String(v ?? '')]))
 const clip = (s: string, n = 120) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 export const blockName = (b: Block) => b.name || (b.kind === 'start' ? 'Start' : b.id)
 
@@ -168,6 +172,8 @@ export function parse(text: string, id = ''): { workflow: Workflow; problems: st
       return
     }
     if (head) {
+      const v = VAR_LINE.exec(line) // var NAME: value
+      if (v) return void ((wf.vars ??= {})[v[1]] = v[2].trim())
       const kv = pairs(line)
       if (kv.length && kv.every(([k]) => ['runs in', 'session', 'at once', 'turns'].includes(k))) {
         for (const [k, v] of kv) {
@@ -309,6 +315,7 @@ export function toFile(wf: Workflow): string {
   const L = [`# ${one(wf.name)}`]
   if (wf.desc) L.push(one(wf.desc))
   L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`].filter(Boolean).join(' · '))
+  for (const [k, v] of Object.entries(wf.vars ?? {})) if (VAR_NAME.test(k)) L.push(`var ${k}: ${one(v)}`)
   for (const b of wf.blocks) {
     L.push('', `## ${b.id}`)
     if (b.name && b.name !== b.id) L.push(`name: ${one(b.name)}`)
@@ -482,7 +489,7 @@ Before you write it, ask me at least 2 questions, one at a time with laki_ask (e
 // ---------- what a workflow's variables are: the run's, each block's ({{steps.<id>.…}}), for the inspector's list
 
 export type FlowVar = { name: string; what: string; from?: string } // from: the block that sets it
-export function flowVars(wf: Workflow): FlowVar[] {
+export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, aren't here: the editor lists them apart
   const out: FlowVar[] = [
     { name: 'task', what: 'what the run works on (Run’s task, a schedule’s prompt)' },
     { name: 'project', what: 'the project’s name' },
@@ -681,6 +688,7 @@ export const WORKFLOW_FORMAT = `A Laki workflow is one Markdown file: a graph of
 <one line: what it does>
 
 runs in: worktree|main · session: new|shared · at once: 3 · turns: 30
+var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:
 - ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked.

@@ -17,6 +17,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki memory [<project>|.]                   a project's memory: the user's, and what agents learned
   laki memory add <project>|. <text> [--mine] remember something lasting about it (an agent's; --mine: yours)
   laki memory rm <project>|. <id>             forget one agents learned
+  laki remind <when> <text> [--ws <id>|.]    a reminder on the calendar (Calendar, experimental): in 2h, tomorrow at 9am
+  laki reminders [rm|done <id>]              the calendar's reminders
   laki tab <ws> [--preset p] [--cmd c]        a new tab
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab

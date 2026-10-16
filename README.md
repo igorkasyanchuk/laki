@@ -18,8 +18,9 @@ worktree. Agents keep running when the window is closed.
 - **Workflows** (experimental): blocks Laki runs for a task, drawn on a canvas or written as Markdown (say, a plan you
   approve, the build, tests until they pass, a PR, CI until green). Blocks can call a model on OpenRouter or a webhook,
   ask a decision model yes/no, choice or score questions (a way out per answer, or asking you when it isn't sure),
-show you a window with what a run made, and name outputs (`{{steps.sum.title}}`) the next blocks use. A schedule can
-start one, and Laki AI makes or changes one with you. Each run keeps its decisions and log.
+show you a window with what a run made, and name outputs (`{{steps.sum.title}}`) the next blocks use; your own
+variables (`{{vars.REPO}}`), a workflow's or global. A schedule can start one, and Laki AI makes or changes one with
+you. Each run keeps its decisions and log.
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.
@@ -60,8 +61,8 @@ start one, and Laki AI makes or changes one with you. Each run keeps its decisio
 - **Looks**: six Dock icons to pick from; 98 themes, 80 of which change shapes and type too (some after films' and games' screens); glass; your
   accent, corners (every theme's), sidebar lines and rows (compact to cards); tabs on top, bottom, left or right.
 - **Extensions** (widgets or plugins, the same thing): live tiles in the sidebar, the top bar or the status bar (your
-  PRs counted and grouped, your team's PRs, links you open often, or any you make with an agent's laki-widget skill,
-  Laki AI, or any AI chat: Settings has the prompt), or buttons on the rail and in the sidebar's foot (an icon, a label,
+  PRs counted and grouped, links you open often, or any you make with Laki AI on the extension's own page, an agent's
+  laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and in the sidebar's foot (an icon, a label,
   a count, a click that runs something), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.
   The SDK: [docs/extensions.md](docs/extensions.md).
@@ -83,7 +84,7 @@ macOS (Apple silicon or Intel), Node 22.6+, git. Optional: your agents on PATH, 
 git clone https://github.com/igorkasyanchuk/laki && cd laki
 npm install && npm run pack
 open dist/mac-arm64/Laki.app      # Intel: dist/mac; or copy it to /Applications
-npm link                          # optional: the laki CLI
+npm link                          # optional: the laki CLI (or Settings › General › Command line)
 ```
 
 Linux and Windows (WSL 2), a preview: `npm run pack:linux` builds `dist/linux/Laki-<version>-<arch>.AppImage` in Docker

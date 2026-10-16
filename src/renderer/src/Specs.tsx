@@ -6,7 +6,7 @@
 // (daemon/ai.ts: it ends after 12 hours unused). New ones start empty or from a template (Templates, settings.planTemplates).
 // Loaded as the page opens (App's lazy import).
 import { type MouseEvent, useEffect, useMemo, useRef, useState } from 'react'
-import { BRAINSTORM_OUTPUT, brainstormPrompt, PLAN_CHAT_IDLE, PLAN_TEMPLATES, planChat } from '../../shared/plans'
+import { BRAINSTORM_OUTPUT, brainstormPrompt, PLAN_CHAT_IDLE, PLAN_TEMPLATES, planChat, planRef } from '../../shared/plans'
 import { type AiMsg, PLAN_KINDS, type Plan, type PlanFile, type PlanKind, type PlanTemplate, type Project } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { Message, Tools, turns } from './Ai'
@@ -42,6 +42,7 @@ const KIND_SAYS: Record<PlanKind, string> = {
   spec: 'Requirements for a task, written like a Notion page: text, checklists, images, diagrams. Start a workspace from one, or point any agent at it.',
   brainstorm: 'An idea to explore: Laki AI writes options, diagrams, a mind map and clickable prototypes beside it.',
 }
+const ALL_SAYS = 'Specs and brainstorms, newest first. Each is a folder outside your repo with a README.md agents can read.'
 const kindIcon = (k: PlanKind) => (k === 'spec' ? 'spec' : 'bulb')
 
 // two levels, as breadcrumbs in the page's header: the list (both kinds in one, newest first: a filter, a kind, a
@@ -159,7 +160,7 @@ export function SpecsPage({ projects, at, api, onClose }: { projects: Project[];
                 </button>
               ))}
             </div>
-            {only && <span className="muted small plans-says">{KIND_SAYS[only]}</span>}
+            <p className="muted small plans-says">{only ? KIND_SAYS[only] : ALL_SAYS}</p>
           </div>
           {list === null ? (
             <p className="muted small">Loading…</p>
@@ -330,7 +331,9 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
             </button>
           )}
           {brainstorm && <IconButton icon="ai" title={chatOn ? 'Hide the chat' : 'Chat with Laki AI about it'} on={chatOn} onClick={() => showChat(!chatOn)} />}
-          <IconButton icon="copy" title={`Copy the path of its README.md, for a prompt: ${shortPath(p.path)}/README.md`} onClick={() => api.copy(`${p.path}/README.md`)} />
+          <button data-tip={`A line for any agent's prompt, its README.md's path in it: ${shortPath(p.path)}/README.md`} onClick={() => (void flush(), api.copy(planRef(p)))}>
+            <Icon name="copy" /> Copy for a prompt
+          </button>
           <IconButton icon="folder" title="Show in Finder" onClick={() => api.reveal(p.path)} />
           <IconButton icon="trash" title={`Delete this ${p.kind}`} onClick={remove} />
         </div>

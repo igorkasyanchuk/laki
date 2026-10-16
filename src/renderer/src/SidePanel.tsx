@@ -412,10 +412,16 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
             </button>
           </span>
         )}
-        <span className="muted small grow">{d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : ` changed vs ${d.base}`}${files.length ? ' · click a line to comment' : ''}` : err ? '' : 'Loading…'}</span>
+        {(sum => (
+          <span className="sp-sum muted small grow" data-tip={sum && files.length ? `${sum} · click a line to comment` : undefined}>
+            {sum || (err ? '' : 'Loading…')}
+            {sum && files.length > 0 && <span className="sp-sum-more"> · click a line to comment</span>}
+          </span>
+        ))(d && !err ? `${files.length} file${files.length === 1 ? '' : 's'}${all ? '' : ` changed vs ${d.base}`}` : '')}
         {inPR.length > 0 && (
           <span className={`sp-viewed-n ${viewed === inPR.length ? 'all' : ''}`} data-tip={`Files you've marked viewed on GitHub, of the ${inPR.length} here in PR #${pr!.number}`}>
-            {viewed}/{inPR.length} viewed
+            {viewed}/{inPR.length}
+            <span className="sp-viewed-w"> viewed</span>
           </span>
         )}
         <IconButton icon={split ? 'unsplit' : 'splitRight'} title={split ? 'One column: the changes in one' : 'Two columns: before and after side by side'} on={split} onClick={() => pickSplit(!split)} />

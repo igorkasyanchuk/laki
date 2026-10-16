@@ -41,7 +41,7 @@ test('accounts: shared folder, a tab keeps its account, restart on another, prof
   const plain = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
   await rig.rpc('settingsSet', { accountUse: { claude: a.id } })
   const later = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
-  await until(() => rig.fakeLog().some(l => l.tab === later.id), 'later started')
+  await until(() => [plain.id, later.id].every(id => rig.fakeLog().some(l => l.tab === id)), 'both started') // under load either may come first
   assert.equal(rig.fakeLog().find(l => l.tab === plain.id).env.CLAUDE_CONFIG_DIR, undefined)
   assert.equal(rig.fakeLog().find(l => l.tab === later.id).env.CLAUDE_CONFIG_DIR, a.dir)
   await rig.rpc('settingsSet', { accountUse: {} })

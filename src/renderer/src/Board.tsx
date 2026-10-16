@@ -1,17 +1,21 @@
 // The board (the sidebar's ▥, ⌘K, laki://board): every workspace as a card in a column by where it is (its agents
 // at work, waiting for you, done, a PR open, merged), and To do: prompts waiting for a workspace. Start, or a drag
 // onto another column, makes one with the default agent; a click on a card opens its workspace, a right click (or ⋯)
-// is its menu: open, archive, delete; Merged's ⋯ archives them all.
+// is its menu: open, archive, delete; Merged's ⋯ archives them all. A to-do takes screenshots pasted or dropped in: their
+// paths go after its text as it starts.
 import { type DragEvent, type FormEvent, type MouseEvent, useState } from 'react'
 import type { TabView, Todo, View, WorkspaceView } from '../../shared/types'
+import { Thumbs } from './Ai'
 import { Glyph, rollup } from './Glyph'
 import { CiMark, prState } from './Info'
+import { type Img, PromptInput } from './PromptInput'
 import { Icon, IconButton, Page, TurnTime } from './ui'
 
 export type BoardApi = {
   open: (ws: string) => void
   start: (t: Todo) => Promise<unknown>
-  add: (project: string, text: string) => Promise<unknown>
+  add: (project: string, text: string, images: string[]) => Promise<unknown>
+  saveImage: (base64: string, ext: string) => Promise<string> // imageSave: the saved file's path
   rm: (id: string) => Promise<unknown>
   menu: (e: MouseEvent, w: WorkspaceView) => void // a card's: open, archive, delete
   archiveAll: (e: MouseEvent, ws: WorkspaceView[]) => void // Merged's ⋯
@@ -41,6 +45,8 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
   const projects = view.projects.filter(p => !p.kind) // Terminals and Browsers: no tasks
   const project = projects.some(p => p.id === pick) ? pick : (projects[0]?.id ?? '') // one picked, else the first (projects come and go)
   const [text, setText] = useState('')
+  const [images, setImages] = useState<Img[]>([])
+  const [saving, setSaving] = useState(false) // images still on their way
   const [starting, setStarting] = useState<string[]>([]) // to-dos whose workspace is on its way
   const [over, setOver] = useState('') // the column a to-do is dragged over
   const name = (id: string) => view.projects.find(p => p.id === id)?.name ?? id
@@ -58,8 +64,8 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
   }
   const add = (e?: FormEvent) => {
     e?.preventDefault()
-    if (!text.trim() || !project) return
-    api.add(project, text).then(() => setText(''), () => {})
+    if ((!text.trim() && !images.length) || !project || saving) return
+    api.add(project, text, images.map(i => i.path)).then(() => (setText(''), setImages([])), () => {})
   }
   // a to-do dropped on a column of workspaces starts one
   const drop = (col: string) => ({
@@ -80,7 +86,8 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
           </h3>
           {todos.map(t => (
             <div key={t.id} className={`board-card todo ${starting.includes(t.id) ? 'busy' : ''}`} draggable onDragStart={e => e.dataTransfer.setData(TODO, t.id)}>
-              <div className="board-text">{t.text}</div>
+              {t.text && <div className="board-text">{t.text}</div>}
+              {!!t.images?.length && <Thumbs paths={t.images} />}
               <div className="board-foot">
                 <span className="muted small">{name(t.project)}</span>
                 <span className="spacer" />
@@ -97,7 +104,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
           ))}
           {projects.length > 0 && (
             <form className="board-add" onSubmit={add}>
-              <textarea value={text} rows={3} placeholder="What should an agent do? (⌘⏎ adds it)" onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && add()} />
+              <PromptInput value={text} onChange={setText} images={images} onImages={setImages} save={api.saveImage} onSubmit={add} onBusy={setSaving} rows={3} focus={false} placeholder="What should an agent do? Paste or drop screenshots. (⌘⏎ adds it)" />
               <div className="board-foot">
                 {projects.length > 1 && (
                   <select value={project} onChange={e => setPick(e.target.value)} title="Project">
@@ -109,7 +116,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                   </select>
                 )}
                 <span className="spacer" />
-                <button type="submit" disabled={!text.trim()}>
+                <button type="submit" disabled={(!text.trim() && !images.length) || saving}>
                   Add
                 </button>
               </div>
@@ -151,7 +158,7 @@ export function BoardPage({ view, timers, going = {}, api, onClose }: { view: Vi
                     </div>
                     {last && <div className="board-last">{last}</div>}
                     {w.pr && (
-                      <div className={`ws-pr board-pr ${prState(w.pr)} ${w.pr.checks === 'fail' && w.pr.state === 'OPEN' ? 'fail' : ''}`}>
+                      <div className={`ws-pr board-pr ${prState(w.pr)}`}>
                         <Icon name="github" size={11} /> #{w.pr.number}
                         {w.pr.checks ? <> · <CiMark pr={w.pr} /></> : ''}
                         {w.pr.conflict && w.pr.state === 'OPEN' ? ' · conflicts' : ''}

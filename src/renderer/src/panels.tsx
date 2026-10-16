@@ -1,10 +1,11 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { AGENT_NAMES, type Doctor, HOME_ACCOUNT, EFFORTS, isAgent, type LogLine, MODELS, type Plan, prIn, type View } from '../../shared/types'
+import { AGENT_NAMES, type Doctor, HOME_ACCOUNT, EFFORTS, isAgent, type LogLine, MODELS, prIn, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
 import { Markdown } from './MarkdownView'
+import { THEMES } from './themes'
 import { type Img, PromptInput, withImages } from './PromptInput'
 import { clock, laterText, nameOf, parseDuration, parseLater, prRef, templated, templatesFor } from './text'
 import { escapes, Icon, IconButton, type IconName, keep, load, type MenuItem, ON, Page, Switch, useMenu } from './ui'
@@ -19,11 +20,25 @@ export function Modal({ title, onClose, children, wide, loose }: { title: string
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [onClose])
+  // the keyboard comes to it (a terminal that kept it would take Esc to its agent, and the dialog would stay), and goes
+  // back where it was as it closes; a field that took it first (autoFocus) keeps it
+  const [was] = useState(() => document.activeElement as HTMLElement | null) // before its fields' autoFocus
+  useEffect(() => {
+    const el = box.current
+    if (!el?.contains(document.activeElement)) el?.focus({ preventScroll: true })
+    return () => {
+      const now = document.activeElement
+      if (was?.isConnected && (!now || now === document.body || el?.contains(now))) was.focus() // not over what took it since
+    }
+  }, [])
   const outside = () => (typed.current && !loose ? box.current?.animate([{ scale: 1 }, { scale: 1.02 }, { scale: 1 }], { duration: 200, easing: 'ease-out' }) : onClose())
   return (
     <div className="overlay" onMouseDown={e => e.target === e.currentTarget && outside()}>
-      <div ref={box} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title} onInput={() => (typed.current = true)}>
-        <div className="modal-title">{title}</div>
+      <div ref={box} tabIndex={-1} className={`modal ${wide ? 'wide' : ''}`} role="dialog" aria-label={title} onInput={() => (typed.current = true)}>
+        <div className="modal-title">
+          <span className="grow">{title}</span>
+          <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
+        </div>
         {children}
       </div>
     </div>
@@ -187,7 +202,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },
 ]
 
-export function Onboarding({ done, onGo, onTick, onSkip, onOff }: { done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void }) {
+export function Onboarding({ done, onGo, onTick, onSkip, onOff, theme, onTheme }: { done: Set<string>; onGo: (id: string) => void; onTick: (id: string) => void; onSkip: () => void; onOff: () => void; theme: string; onTheme: (id: string) => void }) {
   const n = STEPS.filter(x => done.has(x.id)).length
   const next = STEPS.find(x => !done.has(x.id))?.id // the one step in the accent: the rest wait their turn
   return (
@@ -195,6 +210,20 @@ export function Onboarding({ done, onGo, onTick, onSkip, onOff }: { done: Set<st
       <div className="onboard">
         <div className="ob-bar" style={{ '--p': `${(n / STEPS.length) * 100}%` } as CSSProperties} />
         <p className="muted small">{n === STEPS.length ? 'All done. Enjoy Laki!' : `${n} of ${STEPS.length} done. A step ticks itself as you do it; click its circle to tick it yourself.`}</p>
+        <label className="ob-step ob-theme">
+          <Icon name="palette" />
+          <div className="ob-what">
+            <b>Pick a theme</b>
+            <span className="muted small">Painted as you pick; Settings › Appearance has them all with a preview</span>
+          </div>
+          <select value={theme} onChange={e => onTheme(e.target.value)} aria-label="Theme">
+            {([['Dark', false], ['Light', true]] as const).map(([g, light]) => (
+              <optgroup key={g} label={g}>
+                {THEMES.filter(t => !!t.light === light).map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </optgroup>
+            ))}
+          </select>
+        </label>
         <div className="ob-steps">
         {STEPS.map(x => (
           <div key={x.id} className={`ob-step ${done.has(x.id) ? 'done' : ''}`}>
@@ -522,13 +551,6 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       if (mine && !localStorage.getItem(DRAFT)) keep(DRAFT, mine)
     }
   }
-  // specs and brainstorms (experimental): one's README.md path goes into the prompt, for the agent to read. Above the
-  // return below: the first project, opened from Welcome, renders this page again with it (more hooks: React's #310)
-  const [plans, setPlans] = useState<Plan[]>([])
-  useEffect(() => {
-    if (view.settings.specs && p.project) api.call<Plan[]>('planList', { project: p.project }).then(setPlans, () => setPlans([]))
-    else setPlans([])
-  }, [p.project, view.settings.specs])
   if (!view.projects.length)
     return (
       <Page title="New workspace" onClose={onClose}>
@@ -611,25 +633,9 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
       ],
       'right',
     )
-  const specMenu = (e: MouseEvent) =>
-    openMenu(
-      e,
-      [
-        { head: 'A spec or brainstorm: its path goes in the prompt' },
-        ...plans.map(x => ({ label: x.title, icon: x.kind === 'spec' ? 'spec' : 'bulb', sub: x.kind, run: () => set({ prompt: `${(p.prompt ?? '').trimEnd()}${p.prompt?.trim() ? '\n\n' : ''}${x.kind === 'spec' ? 'Spec' : 'Brainstorm'}: ${x.path}/README.md (read it, and the files beside it)` }) }) as MenuItem),
-      ],
-      'right',
-    )
   const other = OTHER_AGENTS.find(o => o[0] === p.preset)
   const pickers = (
     <>
-      {prompting && plans.length > 0 && (
-        <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="Point the agent at a spec or brainstorm: its README.md's path goes in the prompt" onClick={specMenu}>
-          <Icon name="spec" />
-          <span>Spec</span>
-          <Icon name="chevron" size={11} />
-        </button>
-      )}
       {prompting && templates.length > 0 && (
         <button type="button" className="nw-pick" aria-haspopup="menu" data-tip="A prompt template: your words go into it" onClick={tplMenu}>
           <Icon name="file" />
@@ -1125,35 +1131,64 @@ export const StarLaki = () => (
   </button>
 )
 
-const TIPS: [string, string, string][] = [
-  ['⌘N', 'A workspace per task', 'Its own branch, worktree and $PORT: agents never trip over each other'],
-  ['⌘J', 'Jump to who needs you', 'The next agent waiting for an answer, or done'],
-  ['Race', 'One prompt, many agents', 'Compare their work side by side and keep the best'],
-  ['⌘K', 'Everything by name', 'Workspaces, tabs, actions and settings'],
+const TIPS: [IconName, string, string, string][] = [
+  ['plus', '⌘N', 'A workspace per task', 'Its own branch, worktree and $PORT: agents never trip over each other'],
+  ['unread', '⌘J', 'Jump to who needs you', 'The next agent waiting for an answer, or done'],
+  ['race', 'Race', 'One prompt, many agents', 'Compare their work side by side and keep the best'],
+  ['search', '⌘K', 'Everything by name', 'Workspaces, tabs, actions and settings'],
 ]
 
-// a workspace without tabs: start something (agents first), what Laki is good at, and the star
-export function Ready({ name, branch, actions }: { name: string; branch?: string; actions: { label: string; icon?: IconName; hint?: string; run: () => void }[] }) {
+// a workspace without tabs: start something (agents first, as cards), what Laki is good at, and the star
+export function Ready({ name, branch, project, actions }: { name: string; branch?: string; project?: string; actions: { label: string; icon?: IconName; hint?: string; sub?: string; run: () => void }[] }) {
   const agents = actions.filter(a => a.icon === 'agent')
+  const starts = [...agents, ...actions.filter(a => !agents.includes(a))]
   return (
     <div className="ready">
-      <img src={icon} alt="" />
-      <h1>{name} is ready</h1>
-      <p className="muted">{branch ? <>A worktree of its own on <code>{branch}</code>. Start an agent on the task, or a shell to look around.</> : 'Start an agent on the task, or a shell to look around.'}</p>
+      <div className="ready-hero">
+        <span className="ready-mark">
+          <img src={icon} alt="" />
+        </span>
+        <span className="ready-chip">
+          <i /> Ready{project && <span className="muted"> · {project}</span>}
+        </span>
+        <h1>{name}</h1>
+        <p className="muted">
+          {branch ? (
+            <>
+              A worktree of its own on <span className="ready-branch"><Icon name="fork" size={11} /> {branch}</span>
+            </>
+          ) : (
+            'Its own folder'
+          )}
+          . Start an agent on the task, or a shell to look around.
+        </p>
+      </div>
       <div className="ready-starts">
-        {[...agents, ...actions.filter(a => !agents.includes(a))].map((a, i) => (
-          <button key={a.label} className={i === 0 && agents.length ? 'primary' : ''} onClick={a.run}>
-            <Icon name={a.icon ?? 'terminal'} size={14} /> {a.label}
-            {a.hint && <kbd>{a.hint}</kbd>}
+        {starts.map((a, i) => (
+          <button key={a.label} type="button" className={`ready-start ${i === 0 && agents.length ? 'first' : ''}`} onClick={a.run}>
+            <span className="ready-start-icon">
+              <Icon name={a.icon ?? 'terminal'} size={16} />
+            </span>
+            <span className="ready-start-text">
+              <b>{a.label}</b>
+              <small>{a.sub || (a.icon === 'agent' ? 'Agent' : 'A terminal here')}</small>
+            </span>
+            {a.hint ? <kbd>{a.hint}</kbd> : i === 0 && agents.length ? <Icon name="arrowRight" size={14} /> : null}
           </button>
         ))}
       </div>
       <div className="ready-tips">
-        {TIPS.map(([k, title, text]) => (
+        {TIPS.map(([ic, k, title, text]) => (
           <div key={title} className="ready-tip">
-            <kbd>{k}</kbd>
-            <b>{title}</b>
-            <span className="muted">{text}</span>
+            <span className="ready-tip-icon">
+              <Icon name={ic} size={15} />
+            </span>
+            <span className="ready-tip-text">
+              <b>
+                {title} <kbd>{k}</kbd>
+              </b>
+              <span className="muted">{text}</span>
+            </span>
           </div>
         ))}
       </div>

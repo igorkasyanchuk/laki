@@ -5,12 +5,12 @@
 // has a chat of its own (the Specs page's side panel), kept in its folder (.chat.json), which ends after PLAN_CHAT_IDLE
 // unused: the next ask starts a new one, unless aiContinue takes it up again. One ask at a time, in any chat. Its `ai`
 // event says which chat as `of` ('' the AI page's): an `id` would make it a reply.
-import { type ChildProcess, spawn } from 'node:child_process'
+import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
-import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View } from '../shared/types.ts'
+import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View, EFFORTS } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -69,7 +69,7 @@ function aboutPlan(plan: ReturnType<typeof planOfChat>) {
 }
 // the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress and agents' memory (an agent's own; it keeps the user's with laki_memory_write),
 // and the skill's
-const toolsFor = (to: Rpc, rpc = aiRpc(to)) => [...tools(rpc).filter(t => !['laki_progress', 'laki_memory', 'laki_remember'].includes(t.name)), ...(skilled() ? skillTools(rpc) : [])] // its looks said as its own (aiRpc)
+const toolsFor = (to: Rpc, rpc = aiRpc(to)) => [...tools(rpc, undefined, 'Laki AI').filter(t => !['laki_progress', 'laki_memory', 'laki_remember'].includes(t.name)), ...(skilled() ? skillTools(rpc) : [])] // its looks said as its own (aiRpc)
 
 // ---------- the key: a file only you can read, never in state.json or the view
 
@@ -427,6 +427,58 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
   }
 }
 
+// one question, one answer, outside any chat and with no tools (memory's compaction): Settings › AI's backend, OpenRouter
+// through aiComplete, or claude -p / codex exec with nothing but the prompt (their preset's account and env, as the
+// chat's); logged among Laki AI's calls
+export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean }): Promise<string> {
+  const s = state.settings?.ai ?? {}
+  const backend: AiBackend = s.backend ?? 'openrouter'
+  if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text
+  const model = s.models?.[backend]
+  const call: AiCall = { at: Date.now(), backend, model: model || backend, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
+  const args =
+    backend === 'claude'
+      ? ['-p', '--output-format', 'json', '--tools', '', '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effortArgs('claude'), '--', o.prompt]
+      : ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effortArgs('codex'), '--', o.prompt]
+  mkdirSync(home, { recursive: true })
+  const env = { ...process.env, ...state.settings?.env, ...presetOf(backend)?.env, ...accountEnv(presetOf(backend)?.account ?? accountUsed(backend)) }
+  try {
+    const out = await new Promise<string>((ok, no) => {
+      const c = execFile(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: 300000 }, (e, so, se) => (e ? no(new Error(`${backend}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed (not on PATH)' : String(se).trim().split('\n').pop() || e.message}`)) : ok(so)))
+      own(c, `Laki AI · ${backend}`, 'ai')
+    })
+    let text = ''
+    for (const l of backend === 'claude' ? [out] : out.split('\n')) { // claude: one JSON document; codex: a line each
+      let j: any
+      try {
+        j = JSON.parse(l)
+      } catch {
+        continue
+      }
+      if (backend === 'claude' && j.type === 'result') {
+        if (j.is_error) throw new Error(j.result || j.subtype)
+        text = j.result ?? ''
+        call.cost = j.total_cost_usd
+        call.in = (j.usage?.input_tokens ?? 0) + (j.usage?.cache_read_input_tokens ?? 0) + (j.usage?.cache_creation_input_tokens ?? 0)
+        call.out = j.usage?.output_tokens ?? 0
+      }
+      if (j.type === 'item.completed' && j.item?.type === 'agent_message') text = j.item.text ?? ''
+      if (j.type === 'turn.completed') (call.in += j.usage?.input_tokens ?? 0), (call.out += j.usage?.output_tokens ?? 0)
+    }
+    if (!text) throw new Error(`${backend}: no answer`)
+    call.ok = true
+    return text
+  } catch (e) {
+    call.error = (e as Error).message
+    throw e
+  } finally {
+    call.ms = Date.now() - call.at
+    try {
+      appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
+    } catch {}
+  }
+}
+
 // one decision (a workflow's AI decision block): the state and typed questions to OpenRouter's Decisions API, the
 // answers back (probabilities, no text); logged with its cost among Laki AI's calls
 export async function aiDecide(o: { model: string; state: unknown; questions: object; signal?: AbortSignal; ask: string }) {
@@ -507,13 +559,20 @@ function cli(o: Opts, cmd: AiBackend, args: string[], line: (j: any) => void) {
   })
 }
 
+// Settings › AI's effort for claude -p or codex exec, as a tab's (agentCmd): one of EFFORTS, else theirs
+const effortArgs = (backend: 'claude' | 'codex') => {
+  const e = state.settings?.ai?.efforts?.[backend]
+  if (!e || !EFFORTS[backend]?.includes(e)) return []
+  return backend === 'claude' ? ['--effort', e] : ['-c', `model_reasoning_effort="${e}"`]
+}
+
 // claude -p: only Read (a screenshot: its folder added when there is one, it runs elsewhere) and the laki tools; stream-json shows each tool call as it happens
 async function claude(o: Opts) {
   const model = state.settings?.ai?.models?.claude
   const sk = sessionKey('claude')
   const resume = o.t.resume
   const prompt = o.images.length ? `${o.ask}\n\nImages (read them): ${o.images.join(' ')}` : o.ask
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...effortArgs('claude'), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
   const r = o.r
   let failed = ''
   await cli(o, 'claude', args, j => {
@@ -559,6 +618,7 @@ async function codex(o: Opts) {
     '-c', `mcp_servers.laki.env=${env}`,
     '-c', 'mcp_servers.laki.tool_timeout_sec=300',
     ...(model ? ['-m', model] : []),
+    ...effortArgs('codex'),
     ...o.images.flatMap(i => ['-i', i]),
     '--',
     o.ask || 'See the image.',

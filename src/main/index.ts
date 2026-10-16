@@ -399,7 +399,7 @@ ipcMain.on('badge', (_e, n: number, items: { tab: string; label: string }[] = []
 // Say it's window (#voice) takes a prompt by dictation, for an agent of the list or a new session. The card, the menu and
 // the voice window are the bar's window.open: the four share one renderer process. Dragged anywhere (floater-drag: the
 // page sends how far the pointer went, so its cursors work; macOS's drag regions take them away), it snaps to the
-// nearer edge as it's let go, and stays there
+// edge nearest where it's let go (left, right, top or bottom: a row there, its windows below or above it), and stays there
 type Float = { tab: string; status?: string }
 type FloatOpts = { style: string; cards: boolean; add: boolean; menu: 'stack' | 'card'; voiceTo: 'pick' | 'new'; doneAlert: boolean; ai: boolean }
 const BAR = 44 // the drop's window width; floater.html's too
@@ -414,18 +414,26 @@ let voice: BrowserWindow | null = null
 let menu: BrowserWindow | null = null
 let menuTop = 0 // the +'s top in the bar, as its menu opens
 let voiceTabs = new Set<string>() // the agents the voice window offered (one may finish, and leave the list, meanwhile)
-let hover: { tab: string; top: number } | null = null // the circle under the mouse: its tab, its top in the bar
+let hover: { tab: string; top: number } | null = null // the circle under the mouse: its tab, how far down (or across) the bar it is
 let front = false // Laki is the front app (a launch makes it so; one in the background doesn't)
 const floaterFile = () => join(app.getPath('userData'), 'floater.json') // where the bar was left: its top left corner
-let home: { x: number; y: number } | null = null // where it was left (floater.json); barAt: where it is (a screen gone: the main one's default)
+type Side = 'left' | 'right' | 'top' | 'bottom' // the screen edge it's on; top and bottom: a row
+type Spot = { x: number; y: number; side?: Side }
+let home: Spot | null = null // where it was left (floater.json); barAt: where it is (a screen gone: the main one's default)
 let barAt: { x: number; y: number } | null = null
+let side: Side = 'right'
 let dragFrom: { x: number; y: number } | null = null // the window's spot as a drag started
-let stackFrom: { x: number; y: number } | null = null // where the drop was as its stack opened: back there as it closes
+let stackFrom: Spot | null = null // where the drop was as its stack opened: back there as it closes
 let shooting = false // a screenshot under way: the drop and its card stay out of it
-const barSide = () => { // where the card goes: toward the middle of the bar's screen
-  if (!barAt) return 'left'
-  const d = screen.getDisplayNearestPoint(barAt).workArea
-  return barAt.x + BAR / 2 > d.x + d.width / 2 ? 'left' : 'right'
+const across = () => side === 'top' || side === 'bottom' // a row along the top or bottom edge
+const barLen = () => (floater ? floater.getSize()[across() ? 0 : 1] : 0) // its length along the edge
+const clamp = (v: number, lo: number, hi: number) => Math.round(Math.max(lo, Math.min(v, hi)))
+const sized = (len: number) => (across() ? { width: Math.round(len), height: BAR } : { width: BAR, height: Math.round(len) })
+// a window of w by h beside the drop, toward the screen's middle: at along px down (or across) the bar, kept on screen
+const beside = (w: number, h: number, along: number) => {
+  const d = screen.getDisplayNearestPoint(barAt!).workArea
+  if (across()) return { x: clamp(barAt!.x + along, d.x, d.x + d.width - w), y: side === 'bottom' ? barAt!.y - 6 - h : barAt!.y + BAR + 6 }
+  return { x: side === 'right' ? barAt!.x - 6 - w : barAt!.x + BAR + 6, y: clamp(barAt!.y + along, d.y, d.y + d.height - h) }
 }
 const floatOpts = (width: number, height: number, focusable = true): BrowserWindowConstructorOptions => ({
   ...barAt,
@@ -480,11 +488,7 @@ function barWin() {
       w.on('blur', () => w.close()) // a click anywhere else; the + again closes it too (floater.ts: open as the press began)
       w.on('closed', () => menu === w && ((menu = null), floater?.webContents.send('floater-menu', false)))
       w.webContents.on('did-finish-load', () => {
-        if (barAt) {
-          const d = screen.getDisplayNearestPoint(barAt).workArea
-          const y = Math.max(d.y, Math.min(barAt.y + menuTop + 40 - menuH(), d.y + d.height - menuH())) // its foot by the +'s
-          w.setPosition(barSide() === 'left' ? barAt.x - 6 - MENU.width : barAt.x + BAR + 6, Math.round(y))
-        }
+        if (barAt) (p => w.setPosition(p.x, p.y))(beside(MENU.width, menuH(), menuTop + 40 - (across() ? MENU.width : menuH()))) // its end by the +'s
         w.webContents.send('floats', floats) // the theme's colors
         w.show()
         w.focus() // its keys: 1-4, arrows, Esc
@@ -497,12 +501,7 @@ function barWin() {
     w.webContents.on('did-finish-load', () => {
       voiceTabs = new Set(floats.voiceTo === 'new' ? [] : floats.items.map(x => x.tab))
       w.webContents.send('voice', floats.voiceTo === 'new' ? [] : floats.items, floats.colors, floats.voiceTo) // always a new session: no agents to pick
-      if (barAt) {
-        const d = screen.getDisplayNearestPoint(barAt).workArea
-        const [, h] = f.getSize()
-        const y = Math.max(d.y, Math.min(barAt.y + h - VOICE.height, d.y + d.height - VOICE.height))
-        w.setPosition(barSide() === 'left' ? barAt.x - 6 - VOICE.width : barAt.x + BAR + 6, Math.round(y))
-      }
+      if (barAt) (p => w.setPosition(p.x, p.y))(beside(VOICE.width, VOICE.height, barLen() - (across() ? VOICE.width : VOICE.height))) // by the bar's end
       w.show()
       w.focus() // the key window without bringing Laki's own forward (a panel): dictation and the keys go to it
     })
@@ -511,18 +510,29 @@ function barWin() {
   else f.loadFile(fileURLToPath(new URL('../renderer/floater.html', import.meta.url)), { hash: 'bar' })
   return f
 }
-// the drop against the nearer edge (left or right) of the screen it's on (its spot's, or the main one's when that's on
-// no screen: a laptop undocked, home kept for its return), inside it top to bottom; the page told which side, for its
-// shape. animate: let go after a drag
-function snap(animate = false, h = floater?.getSize()[1] ?? 0) {
+// the drop against an edge of the screen it's on (its spot's, or the main one's when that's on no screen: a laptop
+// undocked, home kept for its return): home's side, or, let go after a drag (to: the pointer), the edge nearest the
+// pointer; inside the screen along it. The page is told the side, for its shape (a row on top or bottom); a new
+// orientation keeps the length, centered where it was, until the page says its own. animate: after a drag
+function snap(animate = false, len = barLen(), to?: { x: number; y: number }) {
   if (!floater) return
   const at = home ?? { x: Infinity, y: 0 }
-  const on = screen.getAllDisplays().find(({ bounds: b }) => at.x + BAR / 2 >= b.x && at.x + BAR / 2 < b.x + b.width && at.y >= b.y && at.y < b.y + b.height)
+  const [w0, h0] = floater.getSize()
+  const c = to ?? { x: at.x + w0 / 2, y: at.y + h0 / 2 } // what decides the screen (and, after a drag, the edge)
+  const on = screen.getAllDisplays().find(({ bounds: b }) => c.x >= b.x && c.x < b.x + b.width && c.y >= b.y && c.y < b.y + b.height)
   const d = (on ?? screen.getPrimaryDisplay()).workArea
-  const right = on ? at.x + BAR / 2 > d.x + d.width / 2 : true
-  barAt = { x: right ? d.x + d.width - BAR : d.x, y: on ? Math.max(d.y, Math.min(at.y, d.y + d.height - h)) : d.y + Math.round(d.height * 0.6) }
-  floater.setBounds({ ...barAt, width: BAR, height: h }, animate)
-  floater.webContents.send('floater-side', right ? 'right' : 'left')
+  const was = across()
+  if (!on) side = 'right'
+  else if (to) {
+    const far: [Side, number][] = [['left', c.x - d.x], ['right', d.x + d.width - c.x], ['top', c.y - d.y], ['bottom', d.y + d.height - c.y]]
+    side = far.reduce((a, b) => (b[1] < a[1] ? b : a))[0]
+  } else side = home?.side ?? (c.x > d.x + d.width / 2 ? 'right' : 'left') // an older floater.json's: the nearer side
+  const turned = !!to && across() !== was // dragged to an edge the other way: centered where it was let go
+  if (!on) barAt = { x: d.x + d.width - BAR, y: d.y + Math.round(d.height * 0.6) }
+  else if (across()) barAt = { x: clamp(turned ? at.x + w0 / 2 - len / 2 : at.x, d.x, d.x + d.width - len), y: side === 'bottom' ? d.y + d.height - BAR : d.y }
+  else barAt = { x: side === 'right' ? d.x + d.width - BAR : d.x, y: clamp(turned ? at.y + h0 / 2 - len / 2 : at.y, d.y, d.y + d.height - len) }
+  floater.setBounds({ ...barAt, ...sized(len) }, animate)
+  floater.webContents.send('floater-side', side)
 }
 app.whenReady().then(() => screen.on('display-removed', () => snap()))
 function placeFloater() {
@@ -531,6 +541,7 @@ function placeFloater() {
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
+      if (home && !['left', 'right', 'top', 'bottom'].includes(home.side as string)) delete home.side // an older file's: left or right, by where it is
     } catch {}
     const f = (floater = barWin())
     f.webContents.on('did-finish-load', () => (snap(), sendFloats()))
@@ -607,16 +618,18 @@ ipcMain.on('proc-stop', (e, what: unknown) => {
     if (!a.w.isDestroyed()) a.w.destroy()
   }
 })
-// where it is, kept on screen (a drag may be under way); the same height: nothing, a snap's animation goes on. up: the
-// stack opened or closed, the drop grows or shrinks upward, so the + stays under the mouse
-ipcMain.on('floater-size', (e, h: number, up?: boolean) => {
-  if (!floater || e.sender !== floater.webContents || !(h > 0 && h < 1200)) return
-  const [was, now] = [floater.getSize()[1], Math.round(h)]
+// its length along the edge (a height; on top or bottom, a width), kept on screen (a drag may be under way); the same:
+// nothing, a snap's animation goes on. up: the stack opened or closed, the drop grows or shrinks upward (leftward in a
+// row), so the + stays under the mouse
+ipcMain.on('floater-size', (e, len: number, up?: boolean) => {
+  if (!floater || e.sender !== floater.webContents || !(len > 0 && len < 2400)) return
+  const [was, now] = [barLen(), Math.round(len)]
   if (now === was) return
-  if (dragFrom) return floater.setSize(BAR, now)
+  if (dragFrom) return (s => floater!.setSize(s.width, s.height))(sized(now))
   if (up && barAt && now > was) {
-    stackFrom ??= home ?? barAt
-    home = { x: barAt.x, y: Math.max(screen.getDisplayNearestPoint(barAt).workArea.y, barAt.y + was - now) } // on its screen: snap finds it
+    stackFrom ??= home ?? { ...barAt, side }
+    const d = screen.getDisplayNearestPoint(barAt).workArea // on its screen: snap finds it
+    home = across() ? { x: Math.max(d.x, barAt.x + was - now), y: barAt.y, side } : { x: barAt.x, y: Math.max(d.y, barAt.y + was - now), side }
   } else if (up && stackFrom) (home = stackFrom), (stackFrom = null) // not saved: a drag saves where it is
   snap(false, now)
 })
@@ -722,8 +735,8 @@ ipcMain.on('floater-drag', (e, phase: string, dx: number, dy: number) => {
     stackFrom = null // where it's let go is its place now
     const [x, y] = floater.getPosition()
     home = { x, y }
-    snap(true)
-    home = barAt
+    snap(true, barLen(), screen.getCursorScreenPoint()) // the edge nearest where it's let go
+    home = { ...barAt!, side }
     try {
       writeFileSync(floaterFile(), JSON.stringify(home))
     } catch {} // ponytail: not kept, it comes back at the default spot
@@ -756,9 +769,7 @@ ipcMain.on('floater-hover', (e, tab: string, top: number) => {
 ipcMain.on('floater-card', (e, tab: string, w: number, h: number) => {
   if (!card || !barAt || e.sender !== card.webContents || hover?.tab !== tab || !(w > 0 && w < 800 && h > 0 && h < 800)) return
   if (front || !overBar()) return void ((hover = null), card.hide()) // gone meanwhile (a click that brought Laki forward)
-  const d = screen.getDisplayNearestPoint(barAt).workArea
-  const y = Math.max(d.y, Math.min(barAt.y + hover.top - 6, d.y + d.height - h))
-  card.setBounds({ x: barSide() === 'left' ? barAt.x - 6 - Math.round(w) : barAt.x + BAR + 6, y: Math.round(y), width: Math.round(w), height: Math.round(h) })
+  card.setBounds({ ...beside(Math.round(w), Math.round(h), hover.top - 6), width: Math.round(w), height: Math.round(h) })
   card.showInactive()
 })
 // in front: one of Laki's own windows has the focus. A press on the drop makes Laki the active app too (its panel
@@ -882,6 +893,13 @@ ipcMain.handle('capture', async (e, id: number) => {
   const img = await wc.capturePage()
   if (img.isEmpty()) throw new Error('nothing on screen to capture yet')
   return img.toPNG().toString('base64')
+})
+// development mode's element picker: the app window's own pixels in a box (CSS pixels), a PNG in base64
+ipcMain.handle('capture-rect', async (e, r: { x: unknown; y: unknown; width: unknown; height: unknown }) => {
+  if (!win || e.sender !== win.webContents) throw new Error('not the app window')
+  const [x, y, width, height] = [r?.x, r?.y, r?.width, r?.height].map(n => (typeof n === 'number' && Number.isFinite(n) ? Math.max(0, Math.round(n)) : 0))
+  if (!width || !height) throw new Error('nothing to capture')
+  return (await win.webContents.capturePage({ x, y, width, height })).toPNG().toString('base64')
 })
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url)

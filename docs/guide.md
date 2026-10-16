@@ -81,8 +81,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
 - **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar, in a grid 3 cells across: a count, a chart, a table,
-  each fed by a command or a script on a schedule, with a full view a click away (below: Extensions). Three come with
-  Laki: *Links*, *My PRs* and *Team PRs*; the *Extension creator* agent skill or Laki AI makes more.
+  each fed by a command or a script on a schedule, with a full view a click away (below: Extensions). Two come with
+  Laki: *Links* and *My PRs*; Laki AI (Settings › Extensions › *New extension*, or the Desk's *Build with AI*) or the
+  *Extension creator* agent skill makes more.
 - **A video while you work**: the play button at the bottom of the sidebar asks for a YouTube link (a video, a
   short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
@@ -140,7 +141,9 @@ Not like the Mac: shortcuts written ⌘ are the Super key, and paste in a termin
 to the terminal); the window has the system's title bar (Alt shows the menu) and closing it quits Laki (the daemon and
 its agents keep running); no menu bar screenshots, timer sounds, *Open in* other apps, `laki open` or laki:// links.
 
-To put the CLI on your PATH as `laki`:
+To put the CLI on your PATH as `laki`: Settings › General › *Command line* › *Install the laki command* (a small
+launcher in Homebrew's bin, /usr/local/bin or ~/.local/bin; it says when that folder isn't on your PATH), or from the
+repo:
 
 ```bash
 npm link
@@ -153,7 +156,8 @@ npm link
    git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
    links and remote access) and which agents are on your PATH.
 2. *Get started* opens once (everyone sees it once, after an update too): the first steps (add a project, start a
-   workspace, Settings, an extension, actions, a prompt template, a terminal or a browser), each with a button that does it.
+   workspace, Settings, an extension, actions, a prompt template, a terminal or a browser), each with a button that does it,
+   and a theme to pick from a dropdown (painted as you pick).
    A step ticks itself as you do it, or click its circle to tick it yourself. *Skip for now* closes it: what's left
    stays as a bar at the sidebar's bottom (a click opens it again, ✕ hides it; *Get started* in ⌘K or the Help menu's *Get Started Again…* brings it back);
    *Don't show again* hides both.
@@ -173,8 +177,8 @@ npm link
 ## Using it
 
 **Sidebar:** projects (a branch icon for a repo, a folder for a plain folder) and their workspaces, one line each
-(status, name; GitHub's mark when it has a PR: green open, gray draft, purple merged, red closed
-or an open one's failing checks; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › Appearance). The
+(status, name; GitHub's mark when it has a PR: green open, gray draft, purple merged, red closed; a red ⊗ beside it:
+an open PR's checks failing; a yellow ⚠ beside it: merge conflicts with its base; off in Settings › Appearance). The
 selected workspace's PR is in the status bar.
 - An open PR's marks, with GitHub's mark at the row's end: ✓ approved, ✓✓ approved and by you too, 👀 you commented on someone
   else's PR. Settings › Appearance › *Pull request marks* turns each off and puts them by the status circle or after the name instead.
@@ -184,14 +188,16 @@ selected workspace's PR is in the status bar.
   | <img src="icons/pr-open.svg" width="14" alt="green GitHub mark"> | an open PR |
   | <img src="icons/pr-draft.svg" width="14" alt="gray GitHub mark"> | a draft PR |
   | <img src="icons/pr-merged.svg" width="14" alt="purple GitHub mark"> | merged |
-  | <img src="icons/pr-closed.svg" width="14" alt="red GitHub mark"> | closed, or an open PR's checks failing |
+  | <img src="icons/pr-closed.svg" width="14" alt="red GitHub mark"> | closed |
+  | <img src="icons/ci-fail.svg" width="14" alt="red crossed circle"> | an open PR's checks failing |
   | <img src="icons/conflict.svg" width="14" alt="yellow warning sign"> | merge conflicts with its base |
   | the author's picture | its PR's author (yours too) |
   | <img src="icons/approved.svg" width="14" alt="check"> | approved |
   | <img src="icons/approved-you.svg" width="14" alt="double check"> | approved, and by you too |
   | 👀 | you commented on, or reviewed with comments, someone else's PR |
-- A line divides the projects; each one's workspaces hang under it, indented on a guide line.
-- *Diff size in the sidebar* (Settings › Git & worktrees, off by default) puts each workspace's diff size on its row
+- A line divides the projects; each one's workspaces hang under it, indented (Settings › Appearance › *The sidebar* adds
+  a guide line beside them; none by default).
+- *Diff size in the sidebar* (Settings › Appearance › Sidebar, off by default) puts each workspace's diff size on its row
   (`+120 −8`: lines added and removed against its base, new files too; checked every 10 seconds). On hover ⋯, its
   menu, slides in at the row's end and its marks move left to make room.
 - Rest the mouse on a row for its card beside the sidebar: its branch and `$PORT`, what its agents are doing, the
@@ -210,7 +216,10 @@ selected workspace's PR is in the status bar.
   (auto-memory): what agents found worth keeping as they worked there (an approach that works, a gotcha, a
   convention), each with when and who added it; past 50 the oldest goes, and the pin keeps one as yours. Claude and
   Codex get both lists at every start in the project (after Settings › *Global memory*), with how to add to them (unless the preset's *Tell it about
-  Laki* is off); other agents read them with `laki memory`. Edits reach a session at its next start.
+  Laki* is off); other agents read them with `laki memory`. Edits reach a session at its next start. With Laki AI on,
+  its model compacts the learned list (never yours) every 7 days and as it fills up: duplicates merged, overlaps
+  joined, stale ones dropped. *Compact now* does it at once, *Log* shows each run's list before and after; Settings ›
+  *Global memory* sets how often (or only when full) or turns it off.
   ```bash
   laki memory [.]                         # this project's memory (in a tab, . is its project)
   laki memory add . "tests need Postgres up: docker compose up db"   # an agent's; --mine: yours
@@ -306,7 +315,7 @@ selected workspace's PR is in the status bar.
   busiest one's mark stays on it), until another click. Drop a workspace on a group's head to put it first in
   that group (a folded one opens). Drag the head like a workspace; double click to rename; its + (on hover, beside ⋯) is *New workspace here…*; right click (or its ⋯)
   for a color (its name in a box of that color, after a dot), *New workspace here…* (the new-workspace page, set to
-  put it first in this group), *Rename or set its template…* (a default prompt template: *New workspace here…* starts
+  put it first in this group), *Edit…* (its name and a default prompt template: *New workspace here…* starts
   with it; a group without one starts with no template, never the last one used) and *Remove group* (its workspaces stay).
 - A workspace with a PR shows its author's GitHub picture before the PR mark (yours on your own).
 
@@ -436,7 +445,7 @@ email address only, unless you leave the email out on purpose (below).
 the column of where it is: *Running* (a usage limit too: it resumes by itself), *Needs you*, *Done*, *PR open*,
 *Merged*; with its last answer, its PR and checks, and its turn's time when timers are on (Terminals and Browsers
 aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on hover) to open, archive or delete it;
-*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it) for a project, then ▷ (or drag it onto another
+*Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it; paste or drop screenshots in, they go with it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
 **AI** (Settings › *AI*, or the same switch in General › *Experimental*, turns it on; then *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
@@ -466,8 +475,8 @@ workspaces. When it isn't sure, it asks with a few options as buttons: a click a
 something else: then that question is closed). It removes a memory item, a scheduled task, a tab or a to-do only
 through such a question: *Yes, remove…* is yours to press, and Laki does it. Ask it for an extension
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
-so you look and turn it on in Settings › Extensions (*by Laki AI* on its row); *Edit with Laki AI* there has it rewrite
-one of yours the same way. It never archives or deletes
+so you look and turn it on in Settings › Extensions (*by Laki AI* on its row); the chat on an extension's page has it
+rewrite one of yours the same way. It never archives or deletes
 workspaces, ships or merges, and it does nothing until you ask. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
 into one line you can open, a pasted image is a thumbnail (a click shows it big), *Stop* ends an ask, *New chat* starts
 over. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
@@ -483,7 +492,8 @@ for, what it spent today and this month (also in Settings › AI), and what it c
   the same session ask after ask (one conversation, it remembers; *New chat* starts a new session). claude's
   cost is Claude Code's own estimate; codex's is your plan's. *Your profiles* in the Backend list run it as one of
   yours: a claude or codex profile with its env and account (none: the agent's default account), each with a session
-  of its own.
+  of its own. *Effort* (beside the model) sets how hard it thinks: low to max for claude, minimal to xhigh for codex
+  (unset: the agent's default); memory compaction uses it too.
 
 *Steps* (unset: 20) caps the rounds of tool calls one ask may make. *Keep pasted images* (Settings › AI › *Pasted
 images*: 30 days unless changed) is how long Laki keeps what you paste into its chats and new workspaces' prompts. *Show costs ($)* (Settings › AI › Spending, on by
@@ -773,29 +783,29 @@ typed as chips, Enter or a comma after each).
 weekdays`, `8:00 to 18:30 except fri`, `9am-6pm, no weekends`, `noon-6`, `10pm-6am` (overnight). Outside them nothing fetches until they start again;
 *Fetch now* and a change of settings still do. Empty: any time the app is open.
 
-Every extension, yours too, starts off: turn it on in Settings › Extensions. Three come with Laki:
+Every extension, yours too, starts off: turn it on in Settings › Extensions. Two come with Laki:
 - *My PRs*: your open PRs in a repo (*Repo*: `owner/name` or its GitHub link; *Author*: `@me`, or someone's login;
   blank: you) counted: open, drafts, with conflicts, and with each of up to 3 labels (*Count label 1–3*); the full
   view (large) has the counts and the PRs grouped by what they need: conflicts, failing CI, changes asked, approved,
   in review, drafts, each with its labels, CI, review and date.
-- *Team PRs*: the open PRs of your team (*GitHub logins*, a chip each; one query per login, so a busy repo doesn't
-  time out) in a repo: how many; the full view (large) lists them with labels, CI, review and conflicts, a filter by
-  author (a click on a name too) and by words, sorting, *Open PR* and *Review in Laki* (a new workspace on the PR with the *Review prompt*; set *Laki project* to the project's name; a toast while it's made, then *Review started* with *Open it*).
-  *Review command* runs a shell command of yours instead (`$PR` is the PR's URL, `$PR_NUMBER` its number, `$LAKI_CLI`
-  the laki command: `"$LAKI_CLI" new myapp --pr "$PR" --preset codex --prompt 'Review it'`), and *Button* renames the
-  button.
 - *Links*: sites you open often, a click away in your default browser (Linear, New Relic, lunch): each chip of
   *Links* is `Label: https://…` (a bare URL: its host as the label; `mailto:` links open your mail).
 
-My PRs and Team PRs take *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
+My PRs takes *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
 
-To make one, install the *Extension creator* skill (Settings › Agent skill) and ask your agent ("an extension with my
-open issues"), or Laki AI: Settings › Extensions › *Make one with AI*, type what you want and press *Make it with Laki
-AI* (with Laki AI on): its chat opens, it asks you at least two questions about it (what it shows, where it sits, what
-a click does), then writes it, saved off until you turn it on. Or any AI chat: type what you want, *Copy the prompt* (the
-whole format as a prompt; *Show the prompt* unfolds it), paste it in the chat, then save the files it gives you in `<data>/widgets/<id>/` and press
-*Reload extensions*. One of yours in Laki's folder has *Edit with Laki AI* in its dialog: say what to change, and Laki AI
-rewrites it in its chat, saved off again until you turn it on. An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
+Each extension has a **page of its own**: a click on its row in Settings › Extensions (or ⚙ in its full view, *Its
+page* on a Desk tile). It shows how it looks where it sits, and its full view, either live or with **made-up data**
+(*Sample*: what its `widget.json` gives as `sample`, so you see it before it ever runs; every one with a fetch has
+one), its settings under them, and Laki AI's chat beside them: say what to change and it rewrites the extension (one
+of yours, in Laki's folder), saved off until you turn it on, the preview showing each version. The crumb at the top,
+or Esc, goes back where you came from (Settings, the Desk).
+
+To make one: Settings › Extensions › *Yours* › **New extension** opens a new extension's page. Describe it in the chat
+there (with Laki AI on): it asks you at least two questions (what it shows, where it sits, what a click does), then
+writes it, and the page turns into its page, the preview with its sample data; ask for changes until you like it,
+then turn it on. Without Laki AI, *Copy the prompt* there gives any AI chat the whole format with what you typed;
+save the files it gives you in `<data>/widgets/<id>/` and press *Reload extensions*. Or install the *Extension
+creator* skill (Settings › Agent skill) and ask your agent ("an extension with my open issues"). An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
 sandboxed frame that can't reach the app, nor the network unless you turn on its *Network access* (then its page may
 fetch from and show images of https sites; its data otherwise comes from its fetch, which always has the network).
 `laki widget` lists, reloads, fetches and renders them.
@@ -838,8 +848,8 @@ written on each save: what agents read; a diagram is its nodes and edges, with i
 beside them. A README.md changed by someone else (an agent) since: the spec asks *Load it* or *Keep mine*.
 
 To hand one to an agent: a spec's *Start* opens the new-workspace page with a prompt naming its README.md (pick the
-agent, change the words, create); the new-workspace page's *Spec* picker adds any spec's or brainstorm's path to the
-prompt; the copy button copies the path. Agents with Laki's MCP server list, read and write them too
+agent, change the words, create); *Copy for a prompt* copies a line naming its README.md, to paste into any agent's
+prompt. Agents with Laki's MCP server list, read and write them too
 (`laki_plans`, `laki_plan_read`, `laki_plan_new`, `laki_plan_write`: never README.md or spec.json, your words).
 A prototype runs in a sandboxed frame: no requests out, never the app or your files.
 
@@ -890,18 +900,25 @@ your phone pushes too (Settings › Phone pushes: ntfy, Telegram, Slack or a web
 
 Each block has an **ID**, its `## id` in the file (on the canvas when it has its own name): change it in the block and
 every arrow and `{{steps.<id>.…}}` follows. The sidebar's *{{ }} Variables* lists every variable a workflow has, the run's
-and each block's, with what it holds; a click copies one, a drag drops it into a field. Laki AI works on the Workflows page too: in a workflow, ✦ (or the
+and each block's, with what it holds; a click copies one, a drag drops it into a field. Your own variables are on top
+of it: *This workflow's* (kept in its file, `var REPO: acme/web` lines) and *Every workflow's* (global, kept in Laki's
+settings: a team name, a channel, a URL), each `{{vars.NAME}}` in any block; a workflow's own wins over a global one of
+the same name. Laki AI works on the Workflows page too: in a workflow, ✦ (or the
 chat button) opens its chat with the workflow in every ask (the file, your unsaved changes): ask it to add or change a
-step, it writes the workflow, you read it and *Save*. On the list, *Make it with Laki AI*: say what it should do; it
-asks you a few questions first (what starts it, its steps, where it routes, how it tells you), then writes it.
+step, it writes the workflow, you read it and *Save*.
 
-None come with Laki: *New workflow* makes one, yours (any project) or a project's (in its repo,
-`.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most); a row's copy button copies it.
+None come with Laki: *New workflow* ▾ makes one. *From scratch*: yours (any project) or a project's (in its repo,
+`.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most). *With
+Laki AI…*: say what it should do; its chat asks you a few questions first (what starts it, its steps, where it routes,
+how it tells you), then writes it, and the workflow opens as it's written. A row's ⋯ copies or deletes it (deleting
+asks first); so does the ⋯ in a workflow's head.
 Laki AI and your agents (the laki skill) write them too: ask for one, read it, then *Save* it before it runs. For example: a plan
 you approve, the build, tests until they pass (at most 3 fixes), a PR, CI until green. A workflow opens on a canvas: drag blocks, pick one to change it
 on the right (its prompt, model, where each exit goes). The sidebar on the left has *Blocks* (a click adds one after the
 picked block, else at the end; a drag onto the canvas drops it where you let go) and *Variables*. A block's right
-click: *Add a block after it*, *Duplicate* or *Delete*. *File* shows the
+click: *Add a block after it*, *Duplicate* or *Delete*. ⇧-click (or ⌘-click) picks several, and so does a box dragged
+on the empty canvas; drag one of them to move them all. With the canvas clicked, Delete or ⌫ deletes what's picked,
+⌘A picks every block and Esc none; ⌘Z undoes a change (a deletion too) while you aren't typing in a box. *File* shows the
 same workflow as Markdown, the way agents write one (`laki_workflow_write`).
 
 *Run* asks for a project and a task. Each run works in a new worktree (a sidebar row, with a workflow mark) or the
@@ -935,6 +952,29 @@ Turn it on in Settings › General › *Experimental*; the eye beside Help (⌘K
 and terminals, as a card under its workspace with its screen as it is now (read every few seconds while it's open);
 *All*, *Working* or *Needs you* (a red dot on those). A click opens that session. The cards stand in columns, each as
 tall as its screen, and each workspace is tinted with its color (its group's, else one of its own).
+
+### Calendar (experimental)
+
+Turn it on in Settings › General › *Experimental*; the rail's Calendar (⌘K too) opens it, a page to stay on (Esc
+doesn't close it). A week (Monday first) or a month, switched at the top of the page, with ‹ *Today* › to move: your
+scheduled tasks at the times they'll run, the runs that happened, and your reminders. Click a day for its overview on
+the right (every task, run and reminder that day), *Remind me this day* or *+ Reminder* to add one: what, when, and a
+workspace it's about if any. Laki AI and agents add them too, when you ask
+(*remind me to check the release tomorrow at 10*; `laki remind "tomorrow at 10am" Check the release`, MCP's
+`laki_reminder`). As one is due Laki notifies you (a toast too, *Open* goes to its workspace); one due while Laki was
+closed rings as it opens. Tick it off when it's done; the rail's count is the ones that rang and aren't.
+
+### Desk (experimental)
+
+Turn it on in Settings › General › *Experimental*; the rail's Desk (⌘K too) opens it: your extensions as tiles, an
+overview of what's going on. *Add* puts one there (it can stay in the sidebar too: Settings › Extensions' place menu
+ticks every place it shows in). Drag a tile's head onto another to move it, its corner to resize it; Laki keeps the
+layout. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to stay on.
+
+**Build with AI** (with Laki AI on) asks what it should show, then hands it to Laki AI's floating chat: it asks a few
+questions and writes the extension for the Desk. It shows as a tile right away, dashed, with its made-up data and
+*By Laki AI · off*: *Look* opens its page (what it runs, its settings), *Turn on* runs it. Ask the chat for changes
+and the tile follows; *Take it off the Desk* in a tile's ⋯ removes it.
 
 ### Laki AI's glow (experimental)
 
@@ -1016,7 +1056,10 @@ lit for a moment.
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
-  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
+  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Pick an
+  element*: the rail's *Pick* (without the rail, the crosshair beside Help) or its hotkey, ⇧⌘C unless you record
+  another, works on every page and over dialogs: point at anything in Laki's window, click, and it tells what it is
+  (selector, React components, classes, styles, a screenshot) to copy into a prompt; Esc or a right click stops; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
   long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), *Close tabs without asking* (off by default: closing a tab whose agent or server still runs asks first), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
@@ -1025,8 +1068,8 @@ lit for a moment.
 - *Git & worktrees*: the branch prefix for new worktrees (default `laki/`), *Sync the base branch* (off; *Origin's*,
   recommended: git fetch, then the worktree starts off `origin/<base>`; *Fast-forward mine*: your base branch moves up to
   origin's first, when it can; a failed fetch never stops a workspace), *Folder for worktrees* (a folder per project
-  inside it; empty: `~/.laki/worktrees`; a project's settings can pick its own; ones made already stay), *Diff size in
-  the sidebar* (off) and *Archive workspace when its PR merges* (off).
+  inside it; empty: `~/.laki/worktrees`; a project's settings can pick its own; ones made already stay) and *Archive
+  workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
   ✓, ✓✓ and 👀, each on by default, and where they go; *Menu bar item*: the count and its menu, on by default; *Fun
@@ -1036,8 +1079,8 @@ lit for a moment.
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
   over the theme's: every corner it draws, its selected row, buttons and dialogs too; pills and circles stay round), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
   keeps them on top), *Project names in the sidebar* (font,
-  case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line: thin,
-  thick, dashed, dotted, big dots, accent, accent dots or none; the line between projects: a line, dashed, dotted,
+  case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line: none by
+  default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,
   double or nothing; the indent, row height, text size and icon size, each the theme's unless you pick one; the style:
   Compact, Default, Extended, Cards or Status (the row's edge in the color of what its agent is doing, and a line under
   it that fills as the agent reports its progress, or sweeps while it works without reporting), above; *Button labels*: words
@@ -1046,7 +1089,7 @@ lit for a moment.
   Space, with a circle per agent working or waiting for you (a pulse), two letters from its workspace's name inside (none the same; pr-, issue- and numbers skipped): hover one for
   its card, as the sidebar's: its name, project, branch and `$PORT`, its agents, what it asked or last said, its PR
   (state, checks, review, conflicts), diff size and ports; click to open it in Laki; drag it from anywhere on it (a circle too)
-  up and down or to the other side, and it sticks to the nearer edge as you let go, where it stays; hidden while Laki is
+  anywhere, and it sticks to the screen's edge nearest where you let go (left, right, or a row along the top or bottom), where it stays; hidden while Laki is
   in front; on by default. *While working* picks how a working agent's circle looks, each shown live: *Glow* (a soft
   halo), *Gradient* (its color turning slowly inside, the default), *Arc* (an arc going round), *Bricks* (pixel bars rising and falling inside it), *Comet* (a bright head going round, its tail fading behind), *Wave* (filled with its color, a slow tide rolling over) or *Still*; *Recent
   sessions too*: the last 1 to 5 agents you used (3 by default), idle or finished, as dimmer circles after the ones at work (finished
@@ -1132,8 +1175,8 @@ lit for a moment.
   is 1×; with ⌥ three times that), copy selected text to the clipboard (on by default), *Mac editing keys* (⌘← and
   ⌘→ go to the line's start and end, ⌥← and ⌥→ a word back and on, ⌘⌫ deletes the line, as iTerm's Natural Text
   Editing has them; on by default) and
-  *Dim other panes* (in a split, the panes without the keyboard fade back; off by default) and *Focus the pane under
-  the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; off by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
+  *Dim other panes* (in a split, the panes without the keyboard fade back; on by default) and *Focus the pane under
+  the mouse* (in a split, moving the mouse onto a pane gives it the keyboard, no click needed; on by default), with a live preview. Ligatures aren't drawn: xterm.js needs an add-on for them that isn't bundled.
 - *Open in*: the default app for ⌘E, or a custom command that gets the folder as `$1` (e.g. `idea "$1"`).
 - *Agents & profiles*: an agent is a CLI Laki starts (Claude Code, Codex, Gemini, Grok, OpenCode, or any command); a
   profile is how it starts, grouped under its agent: a model and an effort (a workspace that picks its own wins),
@@ -1238,12 +1281,13 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   the agent's own settings, which Laki never writes); OpenCode's `mcp add` only asks questions, so it gets the
   lines to merge into `~/.config/opencode/opencode.json`.
 - *Remote access*: the email it lets in, how long, start and stop, the QR code and link (above).
-- *Extensions*: *Make one with AI* (the prompt, above), the folders they're found in (Laki's own, and more of yours,
-  one per line), *Reload extensions*, *Working hours*, and the extensions in two lists, *Yours* and *Built in*, a row each (its name, what it shows, its
-  size, how often it fetches, the last fetch; *Fetch now* on hover) with its switch: on or off. A click on one sets it
-  up in a dialog: its size (cells across × down, ½ a thin line), how often it fetches (minutes), its full view's size,
-  *Fetch now*, *Open*, its folder (in Finder, your editor or a terminal, or *Copy path*) and, in development mode,
-  its *Logs*; its settings under them, saved as they change; one of yours in Laki's folder has *Edit with Laki AI* (above).
+- *Extensions*: the extensions in two lists, *Yours* (with *New extension*, above) and *Built in*, a row each (its name,
+  what it shows, its size, how often it fetches, the last fetch; *Fetch now* on hover) with its switch: on or off; the
+  folders they're found in (Laki's own, and more of yours, one per line), *Reload extensions* and *Working hours*. A
+  click on one opens its page (above): the preview, live or with its sample, and its settings: its size (cells across
+  × down, ½ a thin line), how often it fetches (minutes), its full view's size, *Fetch now*, its folder (in Finder, your
+  editor or a terminal, or *Copy path*) and, in development mode, its *Logs*; its settings under them, saved as they
+  change; Laki AI's chat beside them.
 - *Release notes* (with *Development mode* on; also ⌘K *Release notes*): what's new in Laki, newest first; *Next* is what the coming version adds.
 - *Resources* (also ⌘K *Resources*): memory and CPU now, refreshed every 3 seconds while it's open. macOS counts every
   process Laki starts as Laki's (the Force Quit window's number): each agent, its MCP servers, the dev servers in

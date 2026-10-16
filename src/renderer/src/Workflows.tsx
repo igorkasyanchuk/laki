@@ -8,7 +8,7 @@
 import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, apiQuestions, flowVars, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { ACTIONS, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
@@ -23,6 +23,8 @@ export type WorkflowsApi = {
   phone?: boolean // Settings › Phone pushes is set up: a notify can go to the phone too
   settings?: (section: string) => void // Settings at that section
   ai?: (ask?: string) => void // the floating Laki AI chat over the page; with an ask, that sent to it
+  globals?: Record<string, string> // Settings' flowVars: {{vars.NAME}} in every workflow
+  setGlobals?: (v: Record<string, string>) => Promise<unknown>
 }
 type Sel = { id: string; source: WorkflowSource; project?: string }
 type At = { kind: 'index' } | { kind: 'wf'; sel: Sel } | { kind: 'run'; id: string }
@@ -53,7 +55,21 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
   const [menu, openMenu] = useMenu()
   const refresh = () => api.call<WorkflowItem[]>('flowList', {}).then(setList, () => setList([]))
   useEffect(() => void refresh(), [view.flowFiles]) // and as a file changes (Laki AI's, an agent's)
-  const [want, setWant] = useState('') // Make it with Laki AI's
+  const [want, setWant] = useState('') // With Laki AI's
+  const [making, setMaking] = useState(false) // its box, open
+  // asked Laki AI for one: the workflows there were then; the first new one opens as it's written
+  const [awaiting, setAwaiting] = useState<Set<string> | null>(null)
+  useEffect(() => {
+    const made = awaiting && at.kind === 'index' && list?.find(w => !awaiting.has(keyOf(w)))
+    if (made) setAwaiting(null), setAt({ kind: 'wf', sel: made })
+  }, [list])
+  const make = () => {
+    if (!want.trim() || !api.ai) return
+    setAwaiting(new Set((list ?? []).map(keyOf)))
+    api.ai(workflowAsk(want))
+    setWant('')
+    setMaking(false)
+  }
   const flows = [...(view.flows ?? [])].sort((a, b) => Number(ended(a)) - Number(ended(b)) || b.started - a.started)
   const pname = (id?: string) => projects.find(p => p.id === id)?.name ?? id ?? ''
   const cur = at.kind === 'wf' ? list?.find(w => same(at.sel, w)) : undefined
@@ -71,14 +87,29 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
     let id = base
     for (let n = 2; taken.has(id); n++) id = `${base}-${n}`
     const text = from ? toFile({ ...from, name: `${from.name} (copy)` }) : BLANK
-    api.call<WorkflowItem>('flowSave', { id, text, ...into }).then(w => (refresh(), setAt({ kind: 'wf', sel: w })), e => api.toast((e as Error).message))
+    api.call<WorkflowItem>('flowSave', { id, text, ...into }).then(w => (setAwaiting(a => a && new Set([...a, keyOf(w)])), refresh(), setAt({ kind: 'wf', sel: w })), e => api.toast((e as Error).message)) // made here: not the one Laki AI is making
   }
   const intoOf = (w: WorkflowItem) => (w.source === 'project' ? { source: 'project' as const, project: w.project! } : { source: 'yours' as const })
   const newMenu = (e: React.MouseEvent) =>
     openMenu(e, [
       { head: 'A new workflow' },
-      { label: 'Yours', sub: 'In Laki, for any project', icon: 'plus', run: () => create({ source: 'yours' }) },
-      ...projects.filter(p => !p.host).map((p): MenuItem => ({ label: p.name, sub: 'In its repo: .laki/workflows', icon: 'fork', run: () => create({ source: 'project', project: p.id }) })),
+      {
+        label: 'From scratch',
+        sub: 'A start, an agent and an end, to build on',
+        icon: 'plus',
+        items: [
+          { head: 'Where it lives' },
+          { label: 'Yours', sub: 'In Laki, for any project', icon: 'plus', run: () => create({ source: 'yours' }) },
+          ...projects.filter(p => !p.host).map((p): MenuItem => ({ label: p.name, sub: 'In its repo: .laki/workflows', icon: 'fork', run: () => create({ source: 'project', project: p.id }) })),
+        ],
+      },
+      ...(api.ai ? [{ label: 'With Laki AI…', sub: 'Say what it should do: it asks a few questions, then writes it', icon: 'ai', run: () => setMaking(true) } as MenuItem] : []),
+    ])
+  const wfMenu = (e: React.MouseEvent, w: WorkflowItem) =>
+    openMenu(e, [
+      { label: 'Make a copy', icon: 'copy', run: () => create(intoOf(w), w) },
+      null,
+      { label: 'Delete…', icon: 'trash', danger: true, run: () => void removeWf(w) },
     ])
   const removeWf = async (w: WorkflowItem) => {
     if (!(await ask(`Delete ${w.name}?`, { text: `${w.path ?? ''}\nIts runs stay on the list.`, ok: 'Delete', danger: true }))) return false
@@ -123,18 +154,33 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
             <p className="muted">Blocks Laki runs for a task, one after another: agents, commands, questions for you, a PR, its checks, files for its Artifacts. Each run gets a workspace of its own and keeps what it decided.</p>
             <span className="sched-hero-acts">
               <button type="button" className="primary" disabled={list === null} onClick={newMenu}>
-                <Icon name="plus" /> New workflow
+                <Icon name="plus" /> New workflow <Icon name="chevron" size={10} />
               </button>
             </span>
           </header>
-          {api.ai && (
-            <form className="wf-make" onSubmit={e => (e.preventDefault(), want.trim() && (api.ai!(workflowAsk(want)), setWant('')))}>
+          {api.ai && making && (
+            <form className="wf-make" onSubmit={e => (e.preventDefault(), make())}>
               <Icon name="ai" />
-              <input value={want} placeholder="Or say what it should do: every morning, read my unread Slack, and if anything is urgent, start an agent on it" aria-label="What the workflow should do" onChange={e => setWant(e.target.value)} />
-              <button type="submit" className="btn" disabled={!want.trim()} data-tip="Laki AI asks you a few questions, then writes it; you read it and save it">
-                Make it with Laki AI
+              <input autoFocus value={want} placeholder="What should it do? e.g. every morning, read my unread Slack, and if anything is urgent, start an agent on it" aria-label="What the workflow should do" onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Escape' && (e.preventDefault(), setMaking(false))} />
+              <button type="submit" className="btn primary" disabled={!want.trim()} data-tip="Laki AI asks you a few questions, then writes it; it opens here, you read it and save it">
+                Make it
               </button>
+              <IconButton icon="x" title="Close" onClick={() => setMaking(false)} />
             </form>
+          )}
+          {awaiting && !making && (
+            <div className="wf-make wf-awaiting">
+              <span className="ai-dots">
+                <i />
+                <i />
+                <i />
+              </span>
+              <span className="grow">Laki AI is on it, in its chat: answer its questions there. The workflow opens here once it's written.</span>
+              <button className="btn" onClick={() => api.ai!()}>
+                Its chat
+              </button>
+              <IconButton icon="x" title="Don't open it" onClick={() => setAwaiting(null)} />
+            </div>
           )}
           {(list?.length || flows.length) > 0 && (
             <div className="sched-stats">
@@ -189,8 +235,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                       </button>
                       <span className="sched-acts">
                         <IconButton icon="run" title={w.problems.length ? `Can't run: ${w.problems[0]}` : 'Run it'} onClick={() => (w.problems.length ? setAt({ kind: 'wf', sel: w }) : setStarting(w))} />
-                        <IconButton icon="copy" title="Make a copy" onClick={() => create(intoOf(w), w)} />
-                        <IconButton icon="trash" title="Delete" className="danger" onClick={() => void removeWf(w)} />
+                        <IconButton icon="more" title="More: copy, delete" onClick={e => wfMenu(e, w)} />
                       </span>
                     </div>
                   )
@@ -381,24 +426,63 @@ function subOf(b: Block) {
 
 type Lit = { state: Record<string, 'running' | 'waiting' | 'done' | 'failed'>; taken: Set<string>; visits: Record<string, number>; live?: string } // live: the arrow it just took, while it runs
 
-function Canvas({ wf, sel, onPick, onMove, onMenu, onDrop, doomed, lit }: { wf: Workflow; sel?: string | null; onPick?: (id: string | null) => void; onMove?: (id: string, at: [number, number]) => void; onMenu?: (e: React.MouseEvent, id: string) => void; onDrop?: (kind: BlockKind, more: Partial<Block> | undefined, at: [number, number]) => void; doomed?: string | null; lit?: Lit }) {
+// many (the editor's): the blocks picked together (⇧ or ⌘-click, a box dragged on the canvas), moved and deleted as one;
+// onKey: a key while the canvas has the keyboard (Delete, ⌘A, Esc)
+function Canvas({ wf, sel, many = [], onPick, onMany, onMove, onMenu, onDrop, onKey, doomed, lit }: { wf: Workflow; sel?: string | null; many?: string[]; onPick?: (id: string | null) => void; onMany?: (ids: string[]) => void; onMove?: (moves: [string, [number, number]][]) => void; onMenu?: (e: React.MouseEvent, id: string) => void; onDrop?: (kind: BlockKind, more: Partial<Block> | undefined, at: [number, number]) => void; onKey?: (e: React.KeyboardEvent) => void; doomed?: string | null; lit?: Lit }) {
   const pos = placed(wf.blocks)
-  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; moved: boolean } | null>(null)
-  if (drag) pos.set(drag.id, [drag.x, drag.y])
+  // from: where each block it moves was (the picked ones, when it's one of them)
+  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; moved: boolean; from: [string, [number, number]][] } | null>(null)
+  const [band, setBand] = useState<{ x0: number; y0: number; x1: number; y1: number; add: boolean } | null>(null)
+  const shift = (d: NonNullable<typeof drag>) => {
+    const [x0, y0] = d.from.find(([id]) => id === d.id)![1]
+    return d.from.map(([id, [x, y]]): [string, [number, number]] => [id, [Math.max(0, x + d.x - x0), Math.max(0, y + d.y - y0)]])
+  }
+  if (drag) for (const [id, at] of shift(drag)) pos.set(id, at)
   const maxX = Math.max(0, ...[...pos.values()].map(p => p[0])) + W + 140
   const maxY = Math.max(0, ...[...pos.values()].map(p => p[1])) + H + 80
   const by = new Map(wf.blocks.map(b => [b.id, b]))
   const down = (e: PE, b: Block) => {
     if (e.button !== 0) return
+    if (onMany && (e.shiftKey || e.metaKey)) {
+      // in or out of the picked ones
+      const now = new Set(many.length ? many : sel ? [sel] : [])
+      if (now.has(b.id)) now.delete(b.id)
+      else now.add(b.id)
+      onMany([...now])
+      return void onPick?.(now.has(b.id) ? b.id : null)
+    }
     const [x, y] = pos.get(b.id)!
+    const group = many.length > 1 && many.includes(b.id) ? many : [b.id]
     ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
-    setDrag({ id: b.id, dx: e.clientX - x, dy: e.clientY - y, x, y, moved: false })
+    setDrag({ id: b.id, dx: e.clientX - x, dy: e.clientY - y, x, y, moved: false, from: group.flatMap(id => (pos.has(id) ? [[id, pos.get(id)!] as [string, [number, number]]] : [])) })
+    if (group.length === 1) onMany?.([])
     onPick?.(b.id)
   }
   const move = (e: PE) => drag && onMove && setDrag({ ...drag, x: Math.max(0, Math.round((e.clientX - drag.dx) / 10) * 10), y: Math.max(0, Math.round((e.clientY - drag.dy) / 10) * 10), moved: true })
   const up = () => {
-    if (drag?.moved) onMove?.(drag.id, [drag.x, drag.y])
+    if (drag?.moved) onMove?.(shift(drag))
+    else if (drag && drag.from.length > 1) onMany?.([]) // a click on one of the picked ones: just it
     setDrag(null)
+  }
+  // a box dragged on the empty canvas picks what it touches (⇧: as well); a click there, nothing
+  const at = (e: PE) => (r => [e.clientX - r.left, e.clientY - r.top])((e.currentTarget as HTMLElement).getBoundingClientRect())
+  const bandDown = (e: PE) => {
+    if (e.target !== e.currentTarget || e.button !== 0) return
+    if (!onMany) return onPick?.(null)
+    const [x, y] = at(e)
+    ;(e.currentTarget as HTMLElement).setPointerCapture(e.pointerId)
+    setBand({ x0: x, y0: y, x1: x, y1: y, add: e.shiftKey || e.metaKey })
+  }
+  const bandMove = (e: PE) => band && (([x, y]) => setBand({ ...band, x1: x, y1: y }))(at(e))
+  const box = band && { l: Math.min(band.x0, band.x1), t: Math.min(band.y0, band.y1), r: Math.max(band.x0, band.x1), b: Math.max(band.y0, band.y1) }
+  const bandUp = () => {
+    if (!band || !box) return
+    setBand(null)
+    if (box.r - box.l < 4 && box.b - box.t < 4) return void (band.add || (onPick?.(null), onMany?.([])))
+    const hit = wf.blocks.filter(b => (([x, y]) => x < box.r && x + W > box.l && y < box.b && y + H > box.t)(pos.get(b.id)!)).map(b => b.id)
+    const ids = band.add ? [...new Set([...(many.length ? many : sel ? [sel] : []), ...hit])] : hit
+    onMany!(ids)
+    onPick?.(ids.length === 1 ? ids[0] : null)
   }
   const paths: React.ReactNode[] = []
   const labels: React.ReactNode[] = []
@@ -428,7 +512,10 @@ function Canvas({ wf, sel, onPick, onMove, onMenu, onDrop, doomed, lit }: { wf: 
   return (
     <div
       className="wf-scroll"
-      onPointerDown={e => e.target === e.currentTarget && onPick?.(null)}
+      tabIndex={onKey ? 0 : undefined}
+      onPointerDownCapture={e => onKey && (e.currentTarget as HTMLElement).focus({ preventScroll: true }) /* the keyboard: Delete, ⌘A */}
+      onKeyDown={onKey}
+      onPointerDown={e => e.target === e.currentTarget && (onPick?.(null), onMany?.([]))}
       onDragOver={e => onDrop && e.dataTransfer.types.includes(DRAG) && (e.preventDefault(), (e.dataTransfer.dropEffect = 'copy'))}
       onDrop={e => {
         const raw = onDrop && e.dataTransfer.getData(DRAG)
@@ -440,7 +527,7 @@ function Canvas({ wf, sel, onPick, onMove, onMenu, onDrop, doomed, lit }: { wf: 
         onDrop!(kind, more, [snap(e.clientX - r.left - W / 2), snap(e.clientY - r.top - H / 2)])
       }}
     >
-      <div className="wf-canvas" style={{ width: maxX, height: maxY }} onPointerDown={e => e.target === e.currentTarget && onPick?.(null)}>
+      <div className="wf-canvas" style={{ width: maxX, height: maxY }} onPointerDown={bandDown} onPointerMove={bandMove} onPointerUp={bandUp} onPointerCancel={() => setBand(null)}>
         <svg width={maxX} height={maxY}>
           <defs>
             {['', '-bad', '-taken', '-live'].map(s => (
@@ -452,6 +539,7 @@ function Canvas({ wf, sel, onPick, onMove, onMenu, onDrop, doomed, lit }: { wf: 
           {paths}
         </svg>
         {labels}
+        {box && <div className="wf-band" style={{ left: box.l, top: box.t, width: box.r - box.l, height: box.b - box.t }} />}
         {wf.blocks.map(b => {
           const [x, y] = pos.get(b.id)!
           const st = lit?.state[b.id]
@@ -459,7 +547,7 @@ function Canvas({ wf, sel, onPick, onMove, onMenu, onDrop, doomed, lit }: { wf: 
           return (
             <div
               key={b.id}
-              className={`wf-node ${b.kind === 'start' || b.kind === 'end' ? 'pill' : ''} ${sel === b.id ? 'sel' : ''} ${drag?.id === b.id ? 'dragging' : ''} ${doomed === b.id ? 'doomed' : ''}`}
+              className={`wf-node ${b.kind === 'start' || b.kind === 'end' ? 'pill' : ''} ${sel === b.id || many.includes(b.id) ? 'sel' : ''} ${drag?.from.some(([id]) => id === b.id) ? 'dragging' : ''} ${doomed === b.id ? 'doomed' : ''}`}
               style={{ left: x, top: y, ['--kc' as string]: `var(--tc-${KIND_COLOR[b.kind]})` }}
               data-kind={b.kind}
               data-state={st}
@@ -467,7 +555,7 @@ function Canvas({ wf, sel, onPick, onMove, onMenu, onDrop, doomed, lit }: { wf: 
               onPointerMove={move}
               onPointerUp={up}
               onPointerCancel={() => setDrag(null)}
-              onContextMenu={onMenu && (e => (onPick?.(b.id), onMenu(e, b.id)))}
+              onContextMenu={onMenu && (e => (many.includes(b.id) || (onPick?.(b.id), onMany?.([])), onMenu(e, b.id)))}
             >
               <div className="k">
                 <i />
@@ -492,6 +580,7 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
   const [text, setText] = useState(drafts.get(keyOf(item)) ?? item.text)
   const [mode, setMode] = useState<'canvas' | 'file'>('canvas')
   const [pick, setPick] = useState<string | null>(null)
+  const [many, setMany] = useState<string[]>([]) // blocks picked together (Canvas)
   const [menu, openMenu] = useMenu()
   const parsed = useMemo(() => parse(text, item.id), [text])
   const wf = parsed.workflow
@@ -502,11 +591,14 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
   // the file changed under it (Laki AI, an agent, the CLI): taken when it wasn't changed here, or when Laki AI wrote it
   // (it was shown this draft as it was asked)
   const seen = useRef(item.text)
+  // ⌘Z: the file before each change on the canvas or in the inspector, a Discard or a file taken from disk (the last 50)
+  const past = useRef<string[]>([])
+  const replace = (next: string) => next !== text && ((past.current = [...past.current.slice(-49), text]), setText(next))
   useEffect(() => {
     if (item.text === seen.current) return
     const was = seen.current
     seen.current = item.text
-    if (text === was || item.byAgent) setText(item.text)
+    if (text === was || item.byAgent) replace(item.text)
   }, [item.text])
   // what Laki AI's chat is told as you ask: this workflow, as the editor has it
   useEffect(() => {
@@ -518,14 +610,41 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
   const edit = (f: (w: Workflow) => void) => {
     const w: Workflow = JSON.parse(JSON.stringify(wf))
     f(w)
-    setText(toFile(w))
+    replace(toFile(w))
+  }
+  // blocks out (never the start): the picked one, or the ones picked together
+  const remove = (ids: string[]) => {
+    const out = ids.filter(id => wf.blocks.some(b => b.id === id && b.kind !== 'start'))
+    if (!out.length) return
+    edit(w => out.forEach(id => dropBlock(w, id)))
+    setPick(null)
+    setMany([])
+    api.toast(`${out.length === 1 ? 'Deleted a block' : `Deleted ${out.length} blocks`} · ⌘Z brings ${out.length === 1 ? 'it' : 'them'} back`)
+  }
+  const picked = many.length > 1 ? many : pick ? [pick] : []
+  // the canvas's keys: Delete or ⌫ deletes what's picked, ⌘A picks every block, Esc none
+  const onKey = (e: React.KeyboardEvent) => {
+    if (e.target !== e.currentTarget) return
+    if ((e.key === 'Delete' || e.key === 'Backspace') && picked.length) e.preventDefault(), remove(picked)
+    else if (e.metaKey && e.key === 'a') e.preventDefault(), setMany(wf.blocks.map(b => b.id)), setPick(null)
+    else if (e.key === 'Escape' && picked.length) e.preventDefault(), setMany([]), setPick(null)
   }
   const save = () => api.call<WorkflowItem>('flowSave', { id: item.id, source: item.source, project: item.project, text }).then(onSaved, e => api.toast((e as Error).message))
   // ⌘S saves
   const saveRef = useRef(save)
   saveRef.current = save
+  // ⌘Z, outside a box being typed in (its own undo): the change before
+  const undoRef = useRef(() => {})
+  undoRef.current = () => {
+    const was = past.current.pop()
+    if (was !== undefined) setText(was), setPick(null), setMany([])
+  }
   useEffect(() => {
-    const f = (e: KeyboardEvent) => e.metaKey && e.key === 's' && (e.preventDefault(), saveRef.current())
+    const f = (e: KeyboardEvent) => {
+      if (e.metaKey && e.key === 's') return void (e.preventDefault(), saveRef.current())
+      const field = (document.activeElement as HTMLElement | null)?.closest('input, textarea, select, [contenteditable]')
+      if (e.metaKey && !e.shiftKey && e.key === 'z' && !field) e.preventDefault(), undoRef.current()
+    }
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
@@ -577,7 +696,7 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
               }),
           }
         : null,
-      b.kind !== 'start' ? { label: 'Delete', icon: 'trash', danger: true, run: () => (edit(w => dropBlock(w, id)), setPick(null)) } : null,
+      b.kind !== 'start' ? (many.length > 1 && many.includes(id) ? { label: `Delete these ${many.length}`, icon: 'trash', danger: true, run: () => remove(many) } : { label: 'Delete', icon: 'trash', danger: true, run: () => remove([id]) }) : null,
     ]
   }
   const where = (
@@ -609,7 +728,7 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
           <button className={mode === 'file' ? 'on' : ''} onClick={() => setMode('file')}>File</button>
         </div>
         {dirty && (
-          <button className="btn" onClick={() => setText(item.text)} data-tip="Back to the saved file">
+          <button className="btn" onClick={() => replace(item.text)} data-tip="Back to the saved file (⌘Z: your changes again)">
             Discard
           </button>
         )}
@@ -620,8 +739,17 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
           </button>
         )}
         {api.ai && <IconButton icon="ai" title="Change it with Laki AI: its chat knows this workflow" onClick={() => api.ai!()} />}
-        <IconButton icon="copy" title="Make a copy" onClick={onCopy} />
-        <IconButton icon="trash" title="Delete this workflow" className="danger" onClick={onRemove} />
+        <IconButton
+          icon="more"
+          title="More: copy, delete"
+          onClick={e =>
+            openMenu(e, [
+              { label: 'Make a copy', icon: 'copy', run: onCopy },
+              null,
+              { label: 'Delete this workflow…', icon: 'trash', danger: true, run: onRemove },
+            ])
+          }
+        />
         <button className="btn primary" disabled={problems.length > 0 || dirty} onClick={onRun} data-tip={problems[0] ?? (dirty ? 'Save it first' : 'Start a run')}>
           <Icon name="run" size={12} /> Run
         </button>
@@ -636,9 +764,24 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
       </div>
       {mode === 'canvas' ? (
         <div className="wf-split">
-          <Palette wf={wf} actions={actions} presets={presets} full={wf.blocks.length >= MAX_BLOCKS} pick={pick} onAdd={(k, more) => addBlock(k, more)} toast={api.toast} />
-          <Canvas wf={wf} sel={pick} onPick={setPick} onMove={(id, at) => edit(w => void (w.blocks.find(b => b.id === id)!.at = at))} onMenu={(e, id) => openMenu(e, blockActions(id))} onDrop={(k, more, at) => addBlock(k, more, pick, at)} doomed={doomed} />
-          <Inspector wf={wf} id={pick} presets={presets} actions={actions} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} />
+          <Palette wf={wf} actions={actions} presets={presets} full={wf.blocks.length >= MAX_BLOCKS} pick={pick} onAdd={(k, more) => addBlock(k, more)} toast={api.toast} edit={edit} api={api} />
+          <Canvas wf={wf} sel={pick} many={many} onPick={setPick} onMany={setMany} onKey={onKey} onMove={moves => edit(w => moves.forEach(([id, at]) => (b => b && (b.at = at))(w.blocks.find(b => b.id === id))))} onMenu={(e, id) => openMenu(e, blockActions(id))} onDrop={(k, more, at) => addBlock(k, more, pick, at)} doomed={doomed} />
+          {many.length > 1 ? (
+            <div className="wf-insp">
+              <div className="wf-insp-head">
+                <b>{many.length} blocks picked</b>
+              </div>
+              <p className="wf-hint">Drag one to move them all. ⇧-click adds or takes out one; a box dragged on the canvas picks what it touches.</p>
+              {many.some(id => wf.blocks.some(b => b.id === id && b.kind !== 'start')) && (
+                <button className="btn danger" onClick={() => remove(many)}>
+                  <Icon name="trash" size={12} /> Delete them <kbd>⌫</kbd>
+                </button>
+              )}
+              <p className="wf-hint">⌘Z brings back what you deleted; Discard goes back to the saved file.</p>
+            </div>
+          ) : (
+            <Inspector wf={wf} id={pick} presets={presets} actions={actions} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} />
+          )}
         </div>
       ) : (
         <div className="wf-file">
@@ -745,7 +888,7 @@ function blockMenu(head: string, actions: RunAction[], presets: Preset[], add: (
 // the editor's left sidebar: Blocks (a click adds one after the picked block, a drag drops it where you let go) and
 // Variables (a click copies one, a drag drops it into a field)
 const DRAG = 'application/x-laki-block'
-function Palette({ wf, actions, presets, full, pick, onAdd, toast }: { wf: Workflow; actions: RunAction[]; presets: Preset[]; full: boolean; pick: string | null; onAdd: (k: BlockKind, more?: Partial<Block>) => void; toast: (t: string) => void }) {
+function Palette({ wf, actions, presets, full, pick, onAdd, toast, edit, api }: { wf: Workflow; actions: RunAction[]; presets: Preset[]; full: boolean; pick: string | null; onAdd: (k: BlockKind, more?: Partial<Block>) => void; toast: (t: string) => void; edit: (f: (w: Workflow) => void) => void; api: WorkflowsApi }) {
   const [tab, setTab] = useState<'blocks' | 'vars'>('blocks')
   const after = wf.blocks.find(b => b.id === pick)
   return (
@@ -786,6 +929,8 @@ function Palette({ wf, actions, presets, full, pick, onAdd, toast }: { wf: Workf
       ) : (
         <>
           <p className="wf-hint">{'A click copies one; drag it into a field. A block’s are there once it ran'}</p>
+          <VarList title="This workflow’s" hint="In its file: saved with it" vars={wf.vars ?? {}} onSet={v => edit(w => void (w.vars = Object.keys(v).length ? v : undefined))} toast={toast} />
+          {api.setGlobals && <VarList title="Every workflow’s" hint="Global: kept in Laki’s settings; a workflow’s own of the same name wins" vars={api.globals ?? {}} onSet={v => void api.setGlobals!(v)} toast={toast} />}
           <VarsBody wf={wf} toast={toast} />
         </>
       )}
@@ -806,7 +951,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoo
   if (!b)
     return (
       <div className="wf-insp">
-        <p className="wf-hint">Pick a block to change it. Drag blocks to move them; the sidebar's blocks go after the picked one (a click) or where you drop them.</p>
+        <p className="wf-hint">Pick a block to change it. Drag blocks to move them; ⇧-click or a box dragged on the canvas picks several; Delete or ⌫ deletes what's picked (⌘Z brings it back). The sidebar's blocks go after the picked one (a click) or where you drop them.</p>
         <div className="wf-field">
           <label>Name</label>
           <Typed value={wf.name} onText={v => edit(w => void (w.name = v))} />
@@ -974,7 +1119,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoo
           )}
         </>
       )}
-      {(b.kind === 'llm' || b.kind === 'decide' || b.kind === 'webhook') && <TestBlock key={`t:${b.id}`} b={b} api={api} project={project} />}
+      {(b.kind === 'llm' || b.kind === 'decide' || b.kind === 'webhook') && <TestBlock key={`t:${b.id}`} b={b} api={api} project={project} own={wf.vars} />}
       {OUT_KINDS.includes(b.kind) && field('Outputs', <Typed value={(b.out ?? []).join(', ')} placeholder="title, summary, files" onText={v => set(x => void (x.out = (n => (n.length ? n : undefined))(v.split(/[\s,]+/).filter(Boolean))))} />, outHint(b))}
       {b.kind === 'ask' && (
         <>
@@ -1188,6 +1333,37 @@ function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoo
 // every variable a workflow has (flowVars): the run's, then each block's; a click copies it as {{name}}
 // what {{…}} fills in prompts, commands, URLs, bodies and titles (a Case or If tests them), the run's then each block's.
 // A webhook also has {{env.NAME}}: Settings' or the project's env, never logged
+// your own variables, {{vars.NAME}}: a workflow's (var lines in its file) or every workflow's (Settings' flowVars); a
+// name copies it, its value is saved as it's typed
+function VarList({ title, hint, vars, onSet, toast }: { title: string; hint: string; vars: Record<string, string>; onSet: (v: Record<string, string>) => void; toast: (t: string) => void }) {
+  const [name, setName] = useState('')
+  const [value, setValue] = useState('')
+  const bad = !!name && !VAR_NAME.test(name)
+  const add = () => name && !bad && (onSet({ ...vars, [name]: value }), setName(''), setValue(''))
+  const copy = (n: string) => void navigator.clipboard.writeText(`{{vars.${n}}}`).then(() => toast(`Copied {{vars.${n}}}`), () => {})
+  return (
+    <section className="wf-own">
+      <h4 data-tip={hint}>{title}</h4>
+      {Object.entries(vars).map(([k, v]) => (
+        <div key={k} className="wf-own-row">
+          <button className="wf-own-name" draggable onDragStart={e => e.dataTransfer.setData('text/plain', `{{vars.${k}}}`)} onClick={() => copy(k)} data-tip={`{{vars.${k}}}: a click copies it, or drag it into a field`}>
+            {k}
+          </button>
+          <Typed value={v} aria-label={`${k}'s value`} onText={t => onSet({ ...vars, [k]: t })} />
+          <IconButton icon="x" title={`Remove ${k}`} onClick={() => onSet(Object.fromEntries(Object.entries(vars).filter(([x]) => x !== k)))} />
+        </div>
+      ))}
+      <form className="wf-own-row add" onSubmit={e => (e.preventDefault(), add())}>
+        <input value={name} placeholder="NAME" aria-label="A new variable's name" className={bad ? 'bad' : ''} data-tip={bad ? 'Letters, digits, _ and -, a letter or _ first' : undefined} onChange={e => setName(e.target.value.trim())} />
+        <input value={value} placeholder="value" aria-label="Its value" onChange={e => setValue(e.target.value)} />
+        <button type="submit" className="ib" aria-label="Add it" data-tip="Add it" disabled={!name || bad}>
+          <Icon name="plus" />
+        </button>
+      </form>
+    </section>
+  )
+}
+
 function VarsBody({ wf, toast }: { wf: Workflow; toast: (t: string) => void }) {
   const all = flowVars(wf)
   const groups = [{ id: '', title: 'The run’s', vars: all.filter(v => !v.from) }, ...wf.blocks.flatMap(b => (x => (x.length ? [{ id: b.id, title: blockName(b), vars: x }] : []))(all.filter(v => v.from === b.id)))]
@@ -1411,11 +1587,11 @@ function DecideFields({ wf, b, set }: { wf: Workflow; b: Block; set: (f: (x: Blo
 // the variables a block uses ({{…}}: env.* aside), for its Test's fields
 function varsIn(b: Block) {
   const t = [b.text, b.url, b.system, b.from, ...(b.headers ?? [])].join('\n')
-  return [...new Set([...t.matchAll(/\{\{\s*([\w.?-]+)\s*\}\}/g)].map(m => m[1]).filter(n => !n.startsWith('env.')))]
+  return [...new Set([...t.matchAll(/\{\{\s*([\w.?-]+)\s*\}\}/g)].map(m => m[1]).filter(n => !n.startsWith('env.') && !n.startsWith('vars.')))] // those two filled by Laki
 }
 type Tested = { exit: string; why: string; vars: Record<string, string>; missing: string[]; unsure: string[]; log: string[]; ms: number }
 // an AI call, a decision or a webhook sent once with values you type: what it says and gives (a webhook's really sent)
-function TestBlock({ b, api, project }: { b: Block; api: WorkflowsApi; project?: string }) {
+function TestBlock({ b, api, project, own }: { b: Block; api: WorkflowsApi; project?: string; own?: Record<string, string> }) {
   const names = varsIn(b)
   const [vals, setVals] = useState<Record<string, string>>({})
   const [res, setRes] = useState<Tested | null>(null)
@@ -1424,7 +1600,7 @@ function TestBlock({ b, api, project }: { b: Block; api: WorkflowsApi; project?:
     setBusy(true)
     setRes(null)
     api
-      .call<Tested>('flowTest', { block: b, vars: vals, project })
+      .call<Tested>('flowTest', { block: b, vars: vals, project, own })
       .then(setRes, e => setRes({ exit: 'error', why: (e as Error).message, vars: {}, missing: [], unsure: [], log: [], ms: 0 }))
       .finally(() => setBusy(false))
   }

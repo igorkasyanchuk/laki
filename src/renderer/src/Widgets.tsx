@@ -7,20 +7,20 @@
 // run one of its actions.
 // Only what's on screen is rendered: a folded grid, or a closed dialog, holds nothing.
 import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
-import type { WidgetPlace, WidgetView } from '../../shared/types'
+import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { ago, sayOf, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
 import { daemonBase } from './api'
 import { Icon, IconButton, isIconName } from './ui'
 
 export type WidgetApi = {
-  render: (id: string, full: boolean) => Promise<string | null>
+  render: (id: string, full: boolean, sample?: boolean) => Promise<string | null> // sample: widget.json's made-up data
   run: (id: string) => Promise<unknown>
   open: (url: string) => void
   full: (id: string) => void
   close: () => void // the full view's dialog (Esc in a JS widget's frame)
   action: (id: string, action: string, arg: string, label?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
   say: (id: string, s: WidgetSay) => void // a toast, a dialog with buttons
-  settings: () => void
+  settings: (id?: string) => void // its page (Extension.tsx); none: Settings › Extensions
   key?: string // the daemon's key for JS widgets' pages
 }
 
@@ -58,8 +58,9 @@ const themeVars = () => {
   return { ...Object.fromEntries(VARS.map(v => [v, cs.getPropertyValue(v).trim()]).filter(([, x]) => x)), 'color-scheme': cs.colorScheme }
 }
 
-// one widget's preview or full view; a click on a preview (not a link or button) opens the full view
-function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: WidgetApi }) {
+// one widget's preview or full view; a click on a preview (not a link or button) opens the full view. sample: with its
+// made-up data, as it would look (nothing it shows does anything)
+export function WidgetBody({ w, full, api, sample }: { w: WidgetView; full: boolean; api: WidgetApi; sample?: boolean }) {
   const host = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [err, setErr] = useState('')
@@ -71,12 +72,12 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
     let live = true
     setErr('')
     if (w.js) {
-      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
+      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? '&sample=1' : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
       return () => void (live = false)
     }
     const el = host.current!
     const root = el.shadowRoot ?? el.attachShadow({ mode: 'open' })
-    api.render(w.id, full).then(
+    api.render(w.id, full, sample).then(
       html => {
         if (!live) return
         const style = document.createElement('style')
@@ -86,7 +87,7 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, w.net, full, config, api.key, theme]) // net: Network access's CSP needs the page loaded again
+  }, [w.id, w.js, w.at, w.rev, w.net, full, config, api.key, theme, sample]) // net: Network access's CSP needs the page loaded again
   // a JS widget's messages: only from its own frame, and only right after a click in it (the frame has the focus,
   // the page a user activation), never on its script's own say (a refresh on load would loop: each fetch reloads it);
   // Esc in it closes the full view
@@ -96,6 +97,7 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
       if (e.source !== frame.current?.contentWindow || !e.data || typeof e.data !== 'object') return
       const { laki, url, action, arg, label } = e.data as { laki?: string; url?: string; action?: string; arg?: string; label?: string }
       if (laki === 'close' && full) return api.close()
+      if (sample) return // made-up data: its buttons and links do nothing
       if (document.activeElement !== frame.current || navigator.userActivation?.isActive === false) return
       if (laki === 'open' && typeof url === 'string' && LINK.test(url)) api.open(url)
       else if (laki === 'run' && typeof action === 'string')
@@ -106,8 +108,9 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
     }
     window.addEventListener('message', f)
     return () => window.removeEventListener('message', f)
-  }, [w.js, w.id, w.full, full])
+  }, [w.js, w.id, w.full, full, sample])
   const click = (e: MouseEvent) => {
+    if (sample) return e.preventDefault() // made-up data: nothing it shows does anything
     const path = e.nativeEvent.composedPath().filter((n): n is Element => n instanceof Element)
     const a = path.find(n => n.matches('a[href]'))
     const b = path.find(n => n.matches('[data-laki]'))
@@ -132,7 +135,7 @@ function WidgetBody({ w, full, api }: { w: WidgetView; full: boolean; api: Widge
   )
 }
 
-const status = (w: WidgetView) => (w.running ? 'fetching…' : w.error ? `failed: ${w.error}` : w.at ? `fetched ${ago(w.at)}` : w.every ? 'not fetched yet' : '')
+export const status = (w: WidgetView) => (w.running ? 'fetching…' : w.error ? `failed: ${w.error}` : w.at ? `fetched ${ago(w.at)}` : w.every ? 'not fetched yet' : '')
 
 // JS widgets stopped in Settings › Resources (laki-stop): unloaded until a click, wherever they show. Kept here, not in
 // a strip's state: the status bar's goes away on a Browsers page, and a stop meanwhile would be lost
@@ -154,7 +157,7 @@ function useParked() {
 // a widget as a button (its view's button: a rail or foot place, or no preview of its own): a click runs its click
 // action, else opens its full view, else fetches it now (else its settings)
 const click = (w: WidgetView, api: WidgetApi) =>
-  w.click ? void api.action(w.id, w.click, '', w.name).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id).catch(() => {}) : api.settings()
+  w.click ? void api.action(w.id, w.click, '', w.name).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id).catch(() => {}) : api.settings(w.id)
 const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${status(w) ? ` · ${status(w)}` : ''}`
 // its icon: one of the app's by name, an emoji as it is, else its name's first letter
 function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
@@ -162,7 +165,7 @@ function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
   return <span className="widget-glyph" style={{ fontSize: size - 1 }}>{w.icon && !/^[a-z]/i.test(w.icon) ? w.icon : ([...w.name.trim()][0] ?? '?').toUpperCase()}</span>
 }
 // a button widget in a cell (the sidebar's grid, a bar): its icon, label and badge across the cell
-function CellButton({ w, api }: { w: WidgetView; api: WidgetApi }) {
+export function CellButton({ w, api }: { w: WidgetView; api: WidgetApi }) {
   return (
     <button className="widget-button" onClick={() => click(w, api)}>
       <Glyph w={w} />
@@ -175,7 +178,7 @@ function CellButton({ w, api }: { w: WidgetView; api: WidgetApi }) {
 // the rail's or the sidebar's foot's widgets: buttons like theirs (look), the rail's with its words under (words), the
 // foot's beside (words: the foot's labels). places: those shown here (the foot takes the rail's when there's no rail)
 export function WidgetButtons({ widgets, api, places, look, words }: { widgets: WidgetView[]; api: WidgetApi; places: WidgetPlace[]; look: 'rail' | 'foot'; words: boolean }) {
-  const on = widgets.filter(w => w.on && places.includes(w.place ?? 'side'))
+  const on = widgets.filter(w => w.on && placesOf(w).some(p => places.includes(p)))
   return on.map(w => {
     const dot = w.running ? 'rail-dot' : w.error ? 'rail-dot bad' : ''
     return look === 'rail' ? (
@@ -214,10 +217,11 @@ function Cell({ w, api, parked, load, style }: { w: WidgetView; api: WidgetApi; 
   )
 }
 
-// the sidebar's widgets: a grid 3 cells across, each widget its size in cells, plain (no tiles, no head)
-export function WidgetGrid({ widgets, api }: { widgets: WidgetView[]; api: WidgetApi }) {
+// the sidebar's widgets: a grid 3 cells across, each widget its size in cells, plain (no tiles, no head); with the Desk off
+// (experimental), one placed only there too: else it would show nowhere
+export function WidgetGrid({ widgets, api, desk }: { widgets: WidgetView[]; api: WidgetApi; desk?: boolean }) {
   const [parked, load] = useParked()
-  const on = widgets.filter(w => w.on && (w.place ?? 'side') === 'side')
+  const on = widgets.filter(w => w.on && (l => l.includes('side') || (!desk && l.every(p => p === 'desk')))(placesOf(w)))
   if (!on.length) return null
   return (
     <div className="widgets widget-grid">
@@ -231,7 +235,7 @@ export function WidgetGrid({ widgets, api }: { widgets: WidgetView[]; api: Widge
 // the top bar's or the status bar's widgets: a line high, each as wide as its cells across (a ½-high one fits best)
 export function WidgetStrip({ widgets, api, place }: { widgets: WidgetView[]; api: WidgetApi; place: 'top' | 'status' }) {
   const [parked, load] = useParked()
-  const on = widgets.filter(w => w.on && w.place === place)
+  const on = widgets.filter(w => w.on && placesOf(w).includes(place))
   if (!on.length) return null
   return (
     <div className={`widget-strip ${place} nodrag`}>
@@ -257,7 +261,7 @@ export function WidgetDialog({ w, api, onClose }: { w: WidgetView; api: WidgetAp
           <span className={`small ${w.error && !w.running ? 'warn' : 'muted'}`}>{status(w)}</span>
           <span className="spacer" />
           {w.every !== undefined && <IconButton icon="refresh" title="Fetch now" onClick={() => void api.run(w.id).catch(() => {})} />}
-          <IconButton icon="settings" title="Its settings" onClick={api.settings} />
+          <IconButton icon="settings" title="Its page: settings, preview, Laki AI" onClick={() => api.settings(w.id)} />
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
         </div>
         <div className="widget-full">

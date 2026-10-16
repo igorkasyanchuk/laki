@@ -4,11 +4,11 @@ An extension (also called a widget or a plugin: one and the same) is a small liv
 table or a row of links, with a full view a click away. It is a folder with two files, and Laki does the rest: runs
 its fetch on a schedule, keeps what it printed, fills the page and shows it where you put it.
 
-This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *Make one with
-AI* (the prompt), in the *Extension creator* agent skill (Settings › Agent skill), and in
-[`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which both are made from. Three examples come with Laki,
-in [`widgets/`](../widgets): `links` (a JS page, no fetch), `my-prs` (a shell fetch with gh and jq, a template) and
-`team-prs` (a JS fetch script and a JS page).
+This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *New
+extension* (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), and in
+[`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which both are made from. Two examples come with Laki,
+in [`widgets/`](../widgets): `links` (a JS page, no fetch) and `my-prs` (a shell fetch with gh and jq, a template, its
+sample).
 
 ## How it works
 
@@ -31,7 +31,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 
 | file | what |
 |---|---|
-| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `actions` (commands its buttons run); as a button: `icon`, `label`, `badge`, `tip`, `click` |
+| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run); as a button: `icon`, `label`, `badge`, `tip`, `click` |
 | `widget.html` | `<template preview>` (where it sits), `<template full>` (the dialog a click opens, optional), shared `<style>` outside both; none for a button that has no full view |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
 
@@ -94,9 +94,23 @@ the daemon either way.
 | `status` | the status bar's right end (a Browsers page has none) | a line high, its cells across wide |
 | `rail` | a button among the rail's icons (no rail: the sidebar's foot) | a button |
 | `foot` | a button in the sidebar's foot, beside Video, Meme and Timer | a button |
+| `desk` | a tile on the Desk page (experimental), sized there | its full view, else its preview |
 
 `widget.json`'s `place` is where it starts; the user moves it in its settings (Settings › Extensions › the extension ›
-*Sidebar / Top bar / Status bar / Rail / Sidebar foot*). For the bars, design it ½ high: a number and a word, a few links.
+*Sidebar / Top bar / Status bar / Rail / Sidebar foot / Desk*, one or several). For the bars, design it ½ high: a number and a word, a few links.
+
+## Its preview with made-up data (`sample`)
+
+Every extension shows how it looks before it ever runs: its page (Settings › Extensions › the extension) has *Live* and
+*Sample*, and a Desk tile Laki AI just made shows its sample until it's turned on. `sample` is what its fetch would
+print (the same shape, realistic values), `sampleConfig` the settings to show it with; templates get `sample: true`
+meanwhile, and its links and buttons do nothing. Laki AI's `laki_extension_write` refuses a fetch without a sample.
+
+```json
+{ "name": "Open issues", "fetch": "sh fetch.sh", "every": 10,
+  "sample": { "open": 12, "issues": [{ "title": "Login fails on Safari", "age": "2d" }] },
+  "sampleConfig": { "repo": "acme/web" } }
+```
 
 ## Buttons
 
@@ -128,9 +142,13 @@ click that does something.
 
 ## Managing them
 
-- Settings › Extensions: each one's switch, place, size, how often it fetches, its full view's size, its settings,
-  *Network access* for a JS page, its folder, *Delete* (its folder and settings, for good, after a confirm; the ones
-  that come with Laki only turn off). Search for *plugin* finds it too.
+- Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
+  size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, its folder, *Delete*
+  (its folder and settings, for good, after a confirm; the ones that come with Laki only turn off), and Laki AI's chat
+  to change it. *New extension* (in *Yours*) makes one with Laki AI, or gives you the prompt for any AI chat. Search
+  for *plugin* finds it too.
+- The Desk's *Build with AI*: Laki AI makes one for the Desk in its floating chat; it shows as a tile at once, with its
+  sample, off until you turn it on.
 - The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget render <id> [--full]`,
   `laki widget action <id> <action> [arg]`.
 - Laki AI and `laki mcp` (`laki_extensions`, `laki_extension_guide`, `laki_extension_read`, `laki_extension_write`):

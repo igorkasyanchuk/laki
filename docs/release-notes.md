@@ -2,6 +2,49 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- **Calendar** (experimental: Settings › General › Experimental): a week or a month of scheduled tasks at their times,
+  their runs and your reminders. Click a day to add one; Laki AI and agents add them too (`laki remind "tomorrow at
+  9am" …`, MCP's `laki_reminder`). A reminder notifies you as it's due.
+- **Desk** (experimental): your extensions as tiles on a page of their own, dragged to move and resized by the corner.
+  *Build with AI* has Laki AI make one for it in the floating chat: a tile at once, with made-up data, off until you
+  turn it on.
+- **An extension's own page**: its preview where it sits and its full view, live or with made-up data, its settings,
+  and Laki AI's chat beside them to change it until you like it; back goes where you came from (closing an
+  extension's view no longer closes Settings). *New extension* in *Yours* makes one with Laki AI there.
+- **Every extension previews with made-up data** (`sample` in widget.json) before it ever runs. Team PRs is gone.
+- **Calendar**: ‹ *Today* › and Week / Month on the page; a day's click shows its overview on the right. Calendar and
+  Desk stay open on Esc.
+- **Workflows**: *New workflow* ▾ makes one from scratch or with Laki AI (it opens as it's written); several blocks
+  picked (⇧-click, a box on the canvas) move and delete together; Delete or ⌫ deletes, ⌘Z undoes; your own variables,
+  a workflow's or global, as `{{vars.NAME}}`; deleting a workflow is in its ⋯ menu.
+- **Laki AI's effort** for claude -p and codex exec (Settings › AI).
+- **A workspace with no tabs** shows its starts as cards, with tips.
+- **Defaults**: *Dim other panes* and *Focus the pane under the mouse* are on; the sidebar's guide line is off;
+  *Diff size in the sidebar* moved to Settings › Appearance.
+- **Extensions in several places at once**: the sidebar and the Desk, the rail and the top bar… (Settings › Extensions'
+  place menu ticks each).
+- **Memory compaction**: Laki AI merges each project's learned memories (never yours) into a shorter list every 7 days
+  and as they fill up; a project's Memory tab has *Compact now* and a log of what changed. Settings › Global memory sets
+  how often.
+- **The laki command in any terminal**: Settings › General › Command line installs it (Homebrew's bin, /usr/local/bin or
+  ~/.local/bin).
+- **Changes**: a file's header stays at the top while you scroll through its diff, as on GitHub; its head stays one
+  line in a narrow panel.
+- **Board**: a to-do takes screenshots pasted or dropped in; they go to the agent with it.
+- **Floating bubbles** stick to the top or bottom of the screen too, as a row: drop them near that edge.
+- **A PR's failing CI has its own mark**: a red ⊗ beside the GitHub mark, which keeps the PR's color (red: closed).
+- **Get started** picks a theme from a dropdown. Dialogs have a ✕ and take the keyboard as they open, so Esc closes
+  them (About Laki sent Esc to the agent). The AI page stays open on Esc. A group's menu says *Edit…*.
+- **Development mode's element picker**: the rail's *Pick* (or the crosshair beside Help) points at anything in Laki's
+  window, on any page and over dialogs, and tells what it is (selector, React components, classes, styles, a
+  screenshot), to copy into a prompt. ⇧⌘C starts it; Settings › General › Development records another key.
+- **Remote access's PIN page** is new: the PIN in six boxes (sent as you type the last), over a moving gradient.
+- **Specs**: *Copy for a prompt* on a spec or brainstorm copies a line naming its README.md for any agent's prompt; the
+  new-workspace page's *Spec* picker is gone. The list's hint is a line of its own under All / Specs / Brainstorms,
+  whole, for each of them.
+
 ## 0.17.0 · Oct 16, 2026
 
 - **Laki AI: past chats in a sidebar**: New chat keeps the one it ends; a click on an earlier chat takes it up again

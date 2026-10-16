@@ -3,16 +3,16 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, IMAGE_DAYS, type Memory, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { type Account, COMPACT_DAYS, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
-import { ask, Icon, IconButton, type IconName, keep, load, Switch } from './ui'
+import { ask, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ON, Switch, useMenu } from './ui'
+import { PICKER_KEY } from './Picker'
 import { QR } from './Tunnel'
 import { mostRoom, USAGE_AGENTS } from './Usage'
 import { BACKENDS, money, tokens } from './Ai'
@@ -31,11 +31,12 @@ const Says = ({ title, hint }: { title: ReactNode; hint?: ReactNode }) => (
 )
 
 // a block of settings that belong together, set apart from the next: a title, what it's for, then them
-const Group = ({ title, hint, children }: { title: string; hint?: ReactNode; children: ReactNode }) => (
+const Group = ({ title, hint, act, children }: { title: string; hint?: ReactNode; act?: ReactNode; children: ReactNode }) => (
   <section className="set-group">
-    <div className="set-head">
+    <div className={`set-head ${act ? 'with-act' : ''}`}>
       <h3>{title}</h3>
       {hint && <p className="muted small">{hint}</p>}
+      {act && <span className="set-act">{act}</span>}
     </div>
     {children}
   </section>
@@ -121,8 +122,8 @@ export type AppSettings = Paint & {
   prMarks?: PRMarks // the sidebar's ✓, ✓✓ and 👀 on an open PR
   timers?: boolean // a turn's time on its tab and row (unset: off)
   diffStat?: boolean // each workspace's +/- in the sidebar (unset: off)
-  dimPanes?: boolean // a split's other panes faded (unset: off)
-  hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: off)
+  dimPanes?: boolean // a split's other panes faded (unset: on)
+  hoverFocus?: boolean // the pane under the mouse gets the keyboard (unset: on)
   splitNew?: boolean // a new tab opens beside the pane you're on (the daemon's layoutPlace)
   closeNoAsk?: boolean // closing a tab whose process still runs doesn't ask first (unset: it asks)
   pageZoom?: number // Settings and Help's size, one of PAGE_ZOOMS (unset: 1)
@@ -167,9 +168,12 @@ export type AppSettings = Paint & {
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
+  pickerKey?: string // the element picker's hotkey (unset: PICKER_KEY; '': none)
   specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
   workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
   birdView?: boolean // experimental: Bird view (Bird.tsx), every live session's screen at once, off unless true
+  calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
+  desk?: boolean // experimental: Desk (Desk.tsx), extensions on a page of their own, resized there, off unless true
   aiGlow?: boolean // experimental: Laki AI's glow (App's PeekGlow) over what it looks at, off unless true
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
@@ -179,6 +183,7 @@ export type AppSettings = Paint & {
   railBrowsers?: boolean // the rail's Browser (unset: on)
   sideStyle?: SideStyle // the sidebar's rows
   memory?: Memory[] // Global memory: the user's rules for every project's agents
+  memoryCompact?: { off?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own (daemon/memory.ts)
   imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // HTML and Markdown artifacts: the app's viewer, or the default browser (unset: app)
 }
@@ -507,6 +512,19 @@ function AiSection({ api, ai, presets, onChange, imageDays, onImageDays }: { api
             onChange={e => onChange({ ...ai, models: { ...ai.models, [backend]: e.target.value.trim() || undefined } })}
           />
         </label>
+        {(backend === 'claude' || backend === 'codex') && (
+          <label>
+            Effort
+            <select value={ai.efforts?.[backend] ?? ''} onChange={e => onChange({ ...ai, efforts: { ...ai.efforts, [backend]: e.target.value || undefined } })}>
+              <option value="">Its default</option>
+              {(EFFORTS[backend] ?? []).map(x => (
+                <option key={x} value={x}>
+                  {x}
+                </option>
+              ))}
+            </select>
+          </label>
+        )}
         {backend === 'openrouter' && (
           <p className="muted small">
             A model id from openrouter.ai/models, one that can call tools (and read images, for screenshots).
@@ -1031,7 +1049,7 @@ export function ProjectSection(p: {
 }
 
 const WEIGHTS: Record<string, string> = { 300: 'light', 400: 'regular', 500: 'medium', 600: 'semibold', 700: 'bold' }
-const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', dimPanes: false, hoverFocus: false, splitNew: false, scrollSpeed: SCROLL, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
+const TERM_DEFAULTS = { fontFamily: '', fontSize: FONT_SIZE, fontWeight: '400', lineHeight: 1.15, letterSpacing: 0, minContrast: 1, cursorStyle: 'block', cursorBlink: true, termPad: 'normal', dimPanes: true, hoverFocus: true, splitNew: false, scrollSpeed: SCROLL, copyOnSelect: true, editKeys: true } satisfies Partial<AppSettings>
 const CONTRAST: Record<number, string> = { 1: "the theme's colors", 3: 'low (3:1)', 4.5: 'medium (4.5:1)', 7: 'high (7:1)' }
 
 // Find a setting (the nav's search box): each setting's title as the page writes it, its section, words it goes by.
@@ -1060,7 +1078,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Your picture on your PRs', 'avatar picture photo own mine pr github sidebar'],
   ['appearance', 'Pull request marks', 'approved approval check double eyes commented review me sidebar'],
   ['appearance', 'Turn timers', 'elapsed time'],
-  ['git', 'Diff size in the sidebar', 'lines added removed changes stat'],
+  ['appearance', 'Diff size in the sidebar', 'lines added removed changes stat'],
   ['appearance', 'Claude Code plan limits', 'usage ring 5-hour weekly'],
   ['appearance', 'Codex plan limits', 'usage ring 5-hour weekly'],
   ['general', 'Environment', 'env variables'],
@@ -1130,7 +1148,10 @@ const FIND: [string, string, string?][] = [
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
+  ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
   ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
+  ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
+  ['general', 'Desk', 'experimental dashboard overview widgets extensions tiles resize build'],
   ['general', "Laki AI's glow", 'experimental ai glow animation computer use screen reading looking peek effect gradient'],
   ['general', 'Laki AI', 'experimental ai assistant chat turn on enable openrouter'],
   ['general', 'Voice', 'experimental voice dictation dictate speech to text cloud hold fn mic talk whisper'],
@@ -1717,15 +1738,14 @@ function SkillSection({ api }: { api: SkillApi }) {
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace; net?: boolean; config?: Record<string, string> }) => Promise<unknown>
+  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour)
+  desk?: boolean // Desk is on (experimental): a place too
   run: (id: string) => Promise<unknown>
   rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, for good (asked first here)
   reload: () => Promise<unknown>
-  open: (id: string) => void // its full view
+  page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
   logs?: (id: string) => void // development mode's: its fetches and actions
-  ai?: (want: string) => void // Make it with Laki AI: its chat, asked to make one (unset: Laki AI is off)
-  edit?: (w: WidgetView, want: string) => void // Edit with Laki AI: one of yours in Laki's folder, changed in its chat (unset: Laki AI is off)
 }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
@@ -1735,6 +1755,7 @@ const PLACES: [WidgetPlace, string, string][] = [
   ['status', 'Status bar', "At the status bar's right end: a line high"],
   ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
   ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside Video, Meme and Timer'],
+  ['desk', 'Desk', 'A tile on the Desk page (experimental), sized there'],
 ]
 const VIEWS: [WidgetSize, string][] = [
   ['s', 'Small'],
@@ -1816,23 +1837,25 @@ function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string
   )
 }
 
-function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
+export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const options = w.options ?? Object.keys(w.config).map(key => ({ key, type: 'text' as const })) // an older daemon's: text only
+  const [menu, openMenu] = useMenu() // where it shows: a place each pick turns on or off
   return (
     <div className={`preset widget-card ${w.on ? '' : 'off'}`}>
+      {menu}
       <div className="row wc-head">
         <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? `${w.name}: on` : `${w.name}: off`} />
         <b>{w.name}</b>
         {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
         <span className="grow" />
-        <select className="wc-place" value={w.place ?? 'side'} data-tip={PLACES.find(x => x[0] === (w.place ?? 'side'))?.[2]} aria-label="Where it shows" onChange={e => void api.set(w.id, { place: e.target.value as WidgetPlace })}>
-          {PLACES.map(([v, n]) => (
-            <option key={v} value={v}>
-              {n}
-            </option>
-          ))}
-        </select>
-        {!['rail', 'foot'].includes(w.place ?? 'side') && <select className="wc-size" value={w.size.join('x')} data-tip={(w.place ?? 'side') === 'side' ? 'Size in the sidebar: cells across × down' : 'Its width: cells across (a bar is a line high)'} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
+        <button type="button" className="wc-place" data-tip="Where it shows: one place or several" aria-label="Where it shows" onClick={e => openMenu(e, PLACES.filter(([v]) => v !== 'desk' || api.desk || placesOf(w).includes('desk')).map(([v, n, tip]) => ({ label: n, tip, hint: placesOf(w).includes(v) ? ON : undefined, run: () => {
+          const now = placesOf(w)
+          const next = now.includes(v) ? now.filter(x => x !== v) : [...now, v]
+          if (next.length) void api.set(w.id, { place: next })
+        } })))}>
+          {placesOf(w).map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' + ')} <Icon name="chevron" size={10} />
+        </button>
+        {placesOf(w).some(p => ['side', 'top', 'status'].includes(p)) && <select className="wc-size" value={w.size.join('x')} data-tip={placesOf(w).includes('side') ? 'Size in the sidebar: cells across × down (a bar: its cells across)' : 'Its width: cells across (a bar is a line high)'} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
           {SIZES.map(([a, d]) => (
             <option key={`${a}x${d}`} value={`${a}x${d}`}>
               {a}×{d === 0.5 ? '½' : d}
@@ -1866,8 +1889,7 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             ))}
           </select>
         )}
-        {w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
-        {w.full && <button onClick={() => api.open(w.id)}>Open</button>}
+        {w.on && w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
         {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
         {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
         {api.rm && !w.builtin && (
@@ -1881,7 +1903,6 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         )}
       </div>
       {w.description && <div className="muted small">{w.description}</div>}
-      {api.edit && !w.builtin && api.home && w.dir === `${api.home}/${w.id}` && <WidgetEdit w={w} edit={api.edit} />}
       {w.js && (
         <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
           <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its fetch gave it. Its fetch command always has the network" />
@@ -1899,32 +1920,24 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   )
 }
 
-// the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its card in a dialog.
-// Closing blurs the field first: a number or text saves as it's left
+// the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its page
 function WidgetList({ api }: { api: WidgetsApi }) {
-  const [open, setOpen] = useState<string | null>(null)
-  const w = api.list.find(x => x.id === open)
-  const close = () => ((document.activeElement as HTMLElement | null)?.blur(), setOpen(null))
-  if (!api.list.length) return null
   const mine = api.list.filter(w => !w.builtin)
   const theirs = api.list.filter(w => w.builtin)
   return (
     <>
-      <Group title="Yours" hint="Ones you or an AI made: in Laki's folder or the folders below">
-        {mine.length ? list(mine) : <p className="muted small">None yet: make one with AI below.</p>}
+      <Group
+        title="Yours"
+        hint="Ones you or Laki AI made: in Laki's folder or the folders below"
+        act={
+          <button type="button" className="primary" onClick={() => api.page('')}>
+            <Icon name="plus" size={12} /> New extension
+          </button>
+        }
+      >
+        {mine.length ? list(mine) : <p className="muted small">None yet: New extension describes one to Laki AI (or gives you the prompt for any AI chat).</p>}
       </Group>
       {!!theirs.length && <Group title="Built in" hint="Ones that come with Laki: turn on the ones you like">{list(theirs)}</Group>}
-      {w && (
-        <Modal title={w.name} onClose={close} wide loose>
-          <WidgetCard w={w} api={api} />
-          <div className="buttons">
-            <span className="muted small grow">Saved as you change it</span>
-            <button className="primary" onClick={close}>
-              Done
-            </button>
-          </div>
-        </Modal>
-      )}
     </>
   )
   function list(ws: WidgetView[]) {
@@ -1935,7 +1948,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
             <span className="sched-icon">
               <Icon name={w.js ? 'code' : 'panel'} />
             </span>
-            <button type="button" className="sched-main" data-tip="Configure" onClick={() => setOpen(w.id)}>
+            <button type="button" className="sched-main" data-tip="Open: preview, settings, Laki AI" onClick={() => api.page(w.id)}>
               <span className="sched-name">{w.name}</span>
               {w.description && (
                 <span className="sched-meta">
@@ -1955,7 +1968,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               </span>
             </button>
             <span className="sched-acts">
-              {w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
+              {w.on && w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
             </span>
             <Switch on={w.on} tip={w.on ? `${w.name}: on` : `${w.name}: off`} onChange={on => void api.set(w.id, { on })} />
           </div>
@@ -1963,69 +1976,6 @@ function WidgetList({ api }: { api: WidgetsApi }) {
       </div>
     )
   }
-}
-
-// Edit with Laki AI: what to change, sent to its chat with the extension's id; Laki AI rewrites it (saved off, as a new
-// one is, until you turn it on again)
-function WidgetEdit({ w, edit }: { w: WidgetView; edit: NonNullable<WidgetsApi['edit']> }) {
-  const [want, setWant] = useState('')
-  const go = () => want.trim() && (edit(w, want.trim()), setWant(''))
-  return (
-    <label>
-      Change it with Laki AI
-      <span className="widget-make">
-        <input value={want} onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), go())} placeholder="e.g. show the count in red over 10; add a refresh button" />
-        <button type="button" className="primary" disabled={!want.trim()} onClick={go}>
-          <Icon name="ai" /> Edit with Laki AI
-        </button>
-      </span>
-      <span className="muted small">Its chat opens and it rewrites the files. It's turned off once changed: look, then turn it on again</span>
-    </label>
-  )
-}
-
-// the prompt that makes a widget in any AI chat: what's wanted, then the whole format
-// ai: Laki AI makes it in its chat, asking first
-function WidgetPrompt({ home, ai }: { home: string; ai?: (want: string) => void }) {
-  const [want, setWant] = useState('')
-  const [copied, setCopied] = useState(false)
-  const text = widgetPrompt(want, home.replace(/^\/Users\/[^/]+(?=\/|$)/, '~')) // ~, not your account's name, to a chat elsewhere
-  const copy = () => navigator.clipboard.writeText(text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 2000)))
-  const make = () => ai && want.trim() && (ai(want), setWant(''))
-  return (
-    <Group
-      title="Make one with AI"
-      hint={
-        ai
-          ? 'Describe it and press Make it with Laki AI: its chat opens, asks you a few questions about it, then writes it (saved off until you turn it on). Or copy the prompt into any AI chat.'
-          : "Describe it, copy the prompt, paste it into any AI chat, then save the files it gives you in Laki's folder and press Reload. With Laki AI on (Settings › AI), it makes one right here."
-      }
-    >
-      <label>
-        What should it show?
-        <span className="widget-make">
-          <input value={want} onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), make())} placeholder="e.g. open Sentry issues of my project, by count; a table in the full view" />
-          {ai && (
-            <button type="button" className="primary" disabled={!want.trim()} onClick={make}>
-              <Icon name="ai" /> Make it with Laki AI
-            </button>
-          )}
-        </span>
-      </label>
-      <div className="row">
-        <button type="button" onClick={() => void copy()}>
-          <Icon name={copied ? 'check' : 'copy'} /> {copied ? 'Copied' : 'Copy the prompt'}
-        </button>
-        <span className="muted small grow">For any other AI chat: what you typed, then how a Laki extension is made</span>
-      </div>
-      <details className="prompt-peek">
-        <summary className="muted small">Show the prompt</summary>
-        <div className="prompt-box">
-          <textarea className="mono" readOnly rows={8} value={text} onFocus={e => e.currentTarget.select()} />
-        </div>
-      </details>
-    </Group>
-  )
 }
 
 function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void; hours: string; onHours: (h: string) => void }) {
@@ -2036,11 +1986,9 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
       <h2>Extensions</h2>
       <p className="muted">
         Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 3 cells across, a line high in the top bar or the status bar, or buttons on the rail and in the sidebar's foot (an icon, a label, a count, a click that runs something): each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
-        schedule) and widget.html (what it shows, and its full view, a click away). A click on one below sets it up. Ask an agent with the Extension creator skill (Agent skill) to make one, or any AI with the prompt below.
+        schedule) and widget.html (what it shows, and its full view, a click away). A click on one opens its page: a preview (with made-up data too), its settings and Laki AI to change it. New extension makes one with Laki AI, or gives you the prompt for any AI chat; an agent with the Extension creator skill (Agent skill) makes them too.
       </p>
       <WidgetList api={api} />
-      {!api.list.length && <p className="muted">No extensions in these folders yet.</p>}
-      {api.home && <WidgetPrompt home={api.home} ai={api.ai} />}
       <Group title="Folders">
         <div className="muted small">
           Laki's own: <span className="mono">{api.home}</span>
@@ -2071,6 +2019,73 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
   )
 }
 
+// a hotkey: Record, then the keys (⌘, ⌃ or ⌥ with a key); Esc cancels, ⌫ alone leaves none
+function KeyField({ value, def, onSet }: { value: string; def: string; onSet: (v: string) => void }) {
+  const [rec, setRec] = useState(false)
+  useEffect(() => {
+    if (!rec) return
+    const f = (e: KeyboardEvent) => {
+      if (['Meta', 'Control', 'Alt', 'Shift'].includes(e.key)) return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+      const bare = !e.metaKey && !e.ctrlKey && !e.altKey
+      if (bare && e.key === 'Escape') return setRec(false)
+      if (bare && e.key === 'Backspace') return (onSet(''), setRec(false))
+      if (bare) return // a key alone would be typed everywhere
+      onSet(keyLabel(e))
+      setRec(false)
+    }
+    keyRec.on = true
+    window.addEventListener('keydown', f, true)
+    return () => ((keyRec.on = false), window.removeEventListener('keydown', f, true))
+  }, [rec])
+  return (
+    <span className="key-field">
+      <button type="button" className={rec ? 'on' : ''} onClick={() => setRec(r => !r)} data-tip={rec ? 'Press the keys: ⌘, ⌃ or ⌥ with a key. Esc cancels, ⌫ leaves none' : 'Click, then press the keys'}>
+        {rec ? 'Press the keys…' : value ? <kbd>{value}</kbd> : 'None'}
+      </button>
+      {value !== def && !rec && <IconButton icon="restore" title={`Back to ${def}`} onClick={() => onSet(def)} />}
+    </span>
+  )
+}
+
+// the laki command for any shell (core.ts cliInstall): a launcher in Homebrew's bin, /usr/local/bin or ~/.local/bin
+export type CliState = { path?: string; current: boolean; onPath: boolean; other?: string; to: string }
+export type CliApi = { state(): Promise<CliState>; install(): Promise<CliState>; remove(): Promise<CliState> }
+function CliField({ api }: { api: CliApi }) {
+  const [st, setSt] = useState<CliState | null>(null)
+  const [err, setErr] = useState('')
+  useEffect(() => void api.state().then(setSt, e => setErr((e as Error).message)), [])
+  const run = (f: () => Promise<CliState>) => f().then(x => (setSt(x), setErr('')), e => setErr((e as Error).message))
+  if (!st) return <p className="muted small">{err || 'Looking…'}</p>
+  const dir = st.to.replace(/\/laki$/, '')
+  return (
+    <div className="setting-box">
+      <div className="row">
+        <Says title={st.path ? (st.current ? 'Installed' : 'Installed, from another copy of Laki') : 'Not installed'} hint={st.path ? `${st.path}${st.current ? '' : ': install again to point it at this one'}` : `Puts a small launcher at ${st.to}`} />
+        <span className="grow" />
+        {(!st.path || !st.current) && (
+          <button type="button" className="primary" onClick={() => run(api.install)}>
+            {st.path ? 'Install again' : 'Install the laki command'}
+          </button>
+        )}
+        {st.path && (
+          <button type="button" onClick={() => run(api.remove)}>
+            Remove
+          </button>
+        )}
+      </div>
+      {st.path && !st.onPath && (
+        <p className="muted small">
+          {dir} isn't on your PATH: add <code>export PATH="{dir}:$PATH"</code> to your shell's profile (~/.zshrc), then open a new terminal.
+        </p>
+      )}
+      {st.other && <p className="muted small">Another laki comes first on your PATH: {st.other} (npm link?). Your shell runs that one.</p>}
+      {err && <p className="field-err">{err}</p>}
+    </div>
+  )
+}
+
 export function SettingsPage(p: {
   settings: AppSettings
   apps: AppInfo[]
@@ -2089,6 +2104,7 @@ export function SettingsPage(p: {
   widgets?: WidgetsApi
   resources?: ResourcesApi
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
+  cli?: CliApi // General › Command line: the laki command in any shell
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   presets: Preset[] // the daemon's: the settings', or its defaults
@@ -2394,13 +2410,6 @@ export function SettingsPage(p: {
                 <FolderField value={s.worktrees} label="Folder for worktrees" placeholder="Laki's data folder: ~/.laki/worktrees" onChange={v => set({ worktrees: v })} />
               </div>
               </Group>
-              <Group title="In the sidebar">
-              <div className="setting-box">
-                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
-                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
-                </Switch>
-              </div>
-              </Group>
               <Group title="When a PR merges">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.archiveMerged} onChange={v => set({ archiveMerged: v })}>
@@ -2521,6 +2530,13 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={!!s.devMode} onChange={v => set({ devMode: v })}>
                   <Says title="Development mode" hint="Keeps what happens to each workspace (PR checks, what the PR switches sent and why not, its agents' turns and commands) and extension (fetches, actions): ⋯ › Logs, and Logs on an extension in Settings › Extensions" />
                 </Switch>
+                {s.devMode && (
+                  <div className="row">
+                    <Says title="Pick an element" hint="Its hotkey, over any page or dialog: what's under the pointer, to copy into a prompt (also the rail's Pick)" />
+                    <span className="grow" />
+                    <KeyField value={s.pickerKey ?? PICKER_KEY} def={PICKER_KEY} onSet={pickerKey => set({ pickerKey })} />
+                  </div>
+                )}
                 {s.devMode && p.logs && (
                   <div className="row">
                     <span className="muted small grow">Creation log: what making a workspace ran (what was asked, git, the setup, the agent) or why it failed</span>
@@ -2537,6 +2553,11 @@ export function SettingsPage(p: {
                 </div>
               </div>
               </Group>
+              {p.cli && (
+                <Group title="Command line" hint="The laki command in any terminal, not only in Laki's tabs: laki ls, laki new, laki remind…">
+                  <CliField api={p.cli} />
+                </Group>
+              )}
               <Group title="Experimental" hint="New things to try: they may change, or go">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.specs === true} onChange={v => set({ specs: v })}>
@@ -2544,6 +2565,12 @@ export function SettingsPage(p: {
                 </Switch>
                 <Switch className="switch-row" on={s.workflows === true} onChange={v => set({ workflows: v })}>
                   <Says title="Workflows" hint="Blocks Laki runs for a task: agents, commands, choices, questions for you, a PR, CI. Each run keeps its decisions and log, and resumes after a restart. Shows the rail's Flows" />
+                </Switch>
+                <Switch className="switch-row" on={s.calendar === true} onChange={v => set({ calendar: v })}>
+                  <Says title="Calendar" hint="A week or a month of scheduled tasks at their times, their runs, and reminders you, Laki AI or an agent add (laki remind). A reminder notifies as it's due. Shows the rail's Calendar and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.desk === true} onChange={v => set({ desk: v })}>
+                  <Says title="Desk" hint="A page of your extensions as tiles you drag and resize: an overview of what's going on (your PRs, links, ones you build there with Laki AI). An extension can be on the Desk and in the sidebar at once. Shows the rail's Desk and ⌘K" />
                 </Switch>
                 <Switch className="switch-row" on={s.birdView === true} onChange={v => set({ birdView: v })}>
                   <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
@@ -2655,6 +2682,11 @@ export function SettingsPage(p: {
                 </Switch>
               </Group>
               <Group title="Sidebar" hint="How a workspace's row looks; each choice is over the theme's">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.diffStat === true} onChange={v => set({ diffStat: v })}>
+                  <Says title="Diff size in the sidebar" hint="Lines each workspace added and removed against its base, new files too; checked every 10 seconds" />
+                </Switch>
+              </div>
               <div className="field">
                 <div className="seg side-styles" role="radiogroup" aria-label="Sidebar style">
                   {SIDE_STYLES.map(([k, name, what]) => (
@@ -3018,10 +3050,10 @@ export function SettingsPage(p: {
               <Group title="Panes and tabs">
                 <div className="setting-box">
                   {seg('Padding', 'Room between the text and the pane\'s edges', 'termPad', 'normal', [['tiny', 'Tiny'], ['normal', 'Normal'], ['roomy', 'Roomy']])}
-                  <Switch className="switch-row" on={!!s.dimPanes} onChange={v => set({ dimPanes: v })}>
+                  <Switch className="switch-row" on={s.dimPanes !== false} onChange={v => set({ dimPanes: v })}>
                     <Says title="Dim other panes" hint="In a split, the panes you're not typing in fade back" />
                   </Switch>
-                  <Switch className="switch-row" on={!!s.hoverFocus} onChange={v => set({ hoverFocus: v })}>
+                  <Switch className="switch-row" on={s.hoverFocus !== false} onChange={v => set({ hoverFocus: v })}>
                     <Says title="Focus the pane under the mouse" hint="Type into a split without clicking it first" />
                   </Switch>
                   <Switch className="switch-row" on={!!s.splitNew} onChange={v => set({ splitNew: v })}>
@@ -3090,6 +3122,18 @@ export function SettingsPage(p: {
                 with each project. A profile with <b>Tell it about Laki</b> off gets none.
               </p>
               <MemoryList global memory={s.memory ?? []} save={memory => (set({ memory }), Promise.resolve())} />
+              <Group title="Compact agents' memories" hint="Each project's learned memories, sent to Laki AI's model: duplicates merged, overlaps joined, stale ones dropped, a shorter list in their place. Never yours. A project's Memory tab has Compact now and the log">
+                <div className="setting-box">
+                  <Switch className="switch-row" on={!s.memoryCompact?.off} onChange={on => set({ memoryCompact: { ...s.memoryCompact, off: !on || undefined } })}>
+                    <Says title="On its own" hint={s.ai?.on ? `Every few days, and as a project's learned memories reach ${MEMORY_MAX}` : 'Laki AI does it: turn it on in Settings › AI'} />
+                  </Switch>
+                  <label className="row">
+                    <Says title="Every" hint="days since the last one (0: only when full)" />
+                    <span className="grow" />
+                    <input type="number" min={0} max={365} style={{ width: 80 }} value={s.memoryCompact?.days ?? COMPACT_DAYS} onChange={e => e.target.value !== '' && set({ memoryCompact: { ...s.memoryCompact, days: Math.max(0, Math.min(365, Math.round(Number(e.target.value) || 0))) } })} />
+                  </label>
+                </div>
+              </Group>
             </>
           )}
           {sec === 'notes' && (

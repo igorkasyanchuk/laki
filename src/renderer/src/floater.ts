@@ -2,7 +2,7 @@
 // on the screen's edge with a circle per workspace whose agent works (floater.css: a glow, a gradient, an arc,
 // bricks, a comet, a wave or still, Settings' pick), waits for you (a pulse), or was used last (dimmer), its initials inside; a click opens its tab
 // in Laki, a hover asks main for its card, a drag (from anywhere on it, past 4px) moves it and main sticks it to the
-// nearer edge as it's let go. Under the circles, a + (Settings' switch) whose click shows ACTS: stacked in the drop
+// edge nearest where it's let go (top or bottom: a row, body[data-side]). Under the circles, a + (Settings' switch) whose click shows ACTS: stacked in the drop
 // over it (floaterMenu stack, a hover's name in the card's window) or #menu, a window beside it (card). #card: that card
 // (name, project, what the agent asked or last said) in a window of its own beside the drop, so the drop never moves
 // under the mouse. #voice: Say it's prompt, dictated (macOS's), sent to an agent of the list or a new session.
@@ -29,9 +29,9 @@ type Bridge = {
   dictate?: () => void
   floater?: {
     onFloats: (cb: (f: Floats) => void) => void
-    onSide: (cb: (side: 'left' | 'right') => void) => void
+    onSide: (cb: (side: 'left' | 'right' | 'top' | 'bottom') => void) => void
     drag: (phase: 'start' | 'move' | 'end', dx?: number, dy?: number) => void
-    size: (h: number, up?: boolean) => void
+    size: (len: number, up?: boolean) => void
     hover: (tab: string, top: number) => void
     open: (tab: string) => void
     act: (what: Act) => void
@@ -54,6 +54,9 @@ const bar = document.getElementById('bar')!
 const card = document.getElementById('card')!
 const mode = /^#(card|voice|menu)$/.exec(location.hash)?.[1] ?? 'bar'
 const page = (hash: string) => window.open(`${location.href.split('#')[0]}#${hash}`) // main allows #card, #menu and #voice
+// on the top or bottom edge the drop is a row: a circle's place and its length are across it, not down
+const across = () => document.body.dataset.side === 'top' || document.body.dataset.side === 'bottom'
+const along = (e: Element) => (r => (across() ? r.left : r.top))(e.getBoundingClientRect())
 
 const paint = (colors: Colors) => {
   for (const [k, v] of Object.entries(colors)) if (/^[a-z]+$/.test(k) && typeof v === 'string') document.documentElement.style.setProperty(`--${k}`, v)
@@ -152,7 +155,7 @@ else {
       else bridge?.act(d.act as Act)
     }
   }
-  const plusAt = () => bar.querySelector<HTMLElement>('[data-act="plus"]')?.getBoundingClientRect().top ?? 0
+  const plusAt = () => (p => (p ? along(p) : 0))(bar.querySelector('[data-act="plus"]'))
   const plus = (wasOpen: boolean) => {
     hover('')
     if (cur?.menu !== 'card') return void ((stack = !stack), (quiet = Date.now() + 400), render(true, stack))
@@ -172,14 +175,19 @@ else {
   bar.onpointercancel = () => done(false)
   // hidden (Laki in front): the circle under the mouse then isn't under it as it comes back
   document.addEventListener('visibilitychange', () => document.hidden && (hovered = ''))
-  bridge?.onSide(side => (document.body.dataset.side = side))
+  const length = () => (across() ? bar.offsetWidth : bar.offsetHeight)
+  bridge?.onSide(side => {
+    const turned = across() !== (side === 'top' || side === 'bottom')
+    document.body.dataset.side = side
+    if (turned && cur) bridge.size(length()) // a row now (or a column again): its own length
+  })
   bridge?.onFloats(f => {
     cur = f
     const shut = stack && (!f.add || f.menu === 'card') // closed by Settings: shrinks upward, as the + would
     if (shut) stack = false
     render(shut)
   })
-  // up: the + opened or closed, the drop grows or shrinks upward (main); pop: its actions come in
+  // up: the + opened or closed, the drop grows or shrinks upward, leftward in a row (main); pop: its actions come in
   function render(up = false, pop = false) {
     if (!cur) return
     tipped = '' // its buttons are made anew: a move names one again
@@ -196,7 +204,7 @@ else {
       d.textContent = labels[i]
       d.dataset.tab = f.tab
       if (f.color && /^[a-z]+$/.test(f.color)) d.style.setProperty('--ink', `var(--tc${f.color})`)
-      d.onmouseenter = () => !drag?.moved && hover(f.tab, d.getBoundingClientRect().top)
+      d.onmouseenter = () => !drag?.moved && hover(f.tab, along(d))
       d.onmouseleave = () => !drag?.moved && hover('')
       bar.append(d)
     }
@@ -205,7 +213,7 @@ else {
       // a stacked action's name beside it, once the pointer really moves over it (not mouseenter: the drop growing
       // under a still pointer puts the top one there)
       const tip = (b: HTMLElement, name: string, hint: string) => {
-        b.onpointermove = () => drag || tipped === name || Date.now() < quiet || ((tipped = name), (hovered = ''), bridge?.tip(name, hint, b.getBoundingClientRect().top))
+        b.onpointermove = () => drag || tipped === name || Date.now() < quiet || ((tipped = name), (hovered = ''), bridge?.tip(name, hint, along(b)))
         b.onmouseleave = () => !drag?.moved && ((tipped = ''), hover(''))
       }
       if (stack) {
@@ -225,9 +233,9 @@ else {
     hot(was && [...bar.querySelectorAll<HTMLElement>('.fl-dot, .fl-btn')].find(x => (was.tab ?? was.act) === (x.dataset.tab ?? x.dataset.act)))
     // a card open across an update: its new text, beside where its circle is now (gone: it shuts)
     const still = hovered && [...bar.querySelectorAll<HTMLElement>('.fl-dot')].find(d => d.dataset.tab === hovered)
-    if (still) hover(hovered, still.getBoundingClientRect().top)
+    if (still) hover(hovered, along(still))
     else if (hovered) hover('')
-    bridge?.size(bar.offsetHeight, up)
+    bridge?.size(length(), up)
   }
 }
 

@@ -109,6 +109,26 @@ export function nextRun(r: Rule, after: number): number | undefined {
   }
 }
 
+// a reminder's moment (Calendar): ms, a date (2026-10-20: 9am that day; 2026-10-20 14:30; an ISO time), a length from now
+// (in 30m, in 2 hours, in 3 days, in 1w) or a day and time parseWhen reads (tomorrow at 9am, fri at 5pm, at 18:30): its
+// next time after now
+export function parseAt(text: string | number, now = Date.now()): number | { error: string } {
+  const say = { error: 'When? (tomorrow at 9am, in 2h, fri at 5pm, 2026-10-20 14:30)' }
+  if (typeof text === 'number') return Number.isFinite(text) ? text : say
+  const s = String(text ?? '').trim().toLowerCase()
+  const rel = /^in (\d+(?:\.\d+)?) ?(m|mins?|minutes?|h|hrs?|hours?|d|days?|w|weeks?)$/.exec(s)
+  if (rel) return now + Number(rel[1]) * { m: 60000, h: 3600000, d: 86400000, w: 604800000 }[rel[2][0] as 'm' | 'h' | 'd' | 'w']
+  const day = /^(\d{4})-(\d{2})-(\d{2})(?:[ t](\d{1,2}):(\d{2}))?$/.exec(s)
+  if (day) {
+    const at = new Date(+day[1], +day[2] - 1, +day[3], day[4] ? +day[4] : 9, day[5] ? +day[5] : 0)
+    return at.getMonth() === +day[2] - 1 && at.getDate() === +day[3] && (!day[4] || (+day[4] < 24 && +day[5] < 60)) ? at.getTime() : say // no 2026-02-31
+  }
+  if (/^\d{4}-\d{2}-\d{2}t/.test(s) && !Number.isNaN(Date.parse(text))) return Date.parse(text)
+  const r = parseWhen(s, now)
+  if ('error' in r) return { error: `${r.error.replace(/\(.*\)/, '').trim()} (tomorrow at 9am, in 2h, 2026-10-20 14:30)` }
+  return nextRun(r, now) ?? say
+}
+
 // widgets' working hours (Settings › Widgets): 9am-9pm · weekdays 8:00 to 18:30 · 22:00-6:00 except weekends. to before
 // from: across midnight (the night belongs to the day it starts on). Empty: always
 export type Hours = { days: number[]; from: number; to: number }

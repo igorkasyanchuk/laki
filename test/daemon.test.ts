@@ -907,6 +907,21 @@ test('a model and effort go into the agent\'s flags (a wrong one makes nothing);
   assert.deepEqual((await rig.rpc('state')).todos, [{ ...todo, text: 'fix the footer' }])
   await rig.rpc('todoRm', { id: todo.id })
   assert.deepEqual((await rig.rpc('state')).todos, [])
+  // a to-do's pasted images: imageSave's only, the image alone is enough
+  const img = await rig.rpc('imageSave', { data: Buffer.from('png').toString('base64'), ext: 'png' })
+  const shot = await rig.rpc('todoAdd', { project: p.id, text: '', images: [img, '/etc/passwd', `${img}/../../state.json`, 7] })
+  assert.deepEqual(shot.images, [img])
+  // a waiting to-do's image outlives imageDays (the tidy at each imageSave); one no to-do holds goes
+  const then = Date.now() - 400 * 86400e3
+  const old = (n: string) => join(rig.data, 'images', `${then}-${n}.png`)
+  writeFileSync(old('held'), 'png')
+  writeFileSync(old('loose'), 'png')
+  const held = await rig.rpc('todoAdd', { project: p.id, text: 'look', images: [old('held')] })
+  await rig.rpc('imageSave', { data: Buffer.from('png').toString('base64'), ext: 'png' })
+  assert.equal(existsSync(old('held')), true)
+  assert.equal(existsSync(old('loose')), false)
+  await rig.rpc('todoRm', { id: held.id })
+  await rig.rpc('todoRm', { id: shot.id })
 
   // a model isn't a flag; one picked comes after a preset's own args, so it wins
   await assert.rejects(rig.rpc('tabNew', { ws: ws.id, preset: 'claude', model: '-p' }), /model -p\?/)

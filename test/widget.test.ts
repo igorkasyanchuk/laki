@@ -83,7 +83,6 @@ test('widgets: found in folders, fetched on schedule into storage, rendered, set
   )
   assert.deepEqual(builtin.size, [3, 1])
   assert.equal(builtin.view, 'l')
-  assert.equal(v.widgets.find((w: any) => w.id === 'team-prs').view, 'l', "widget.json's")
   assert.equal(v.widgetHome, join(rig.data, 'widgets'))
 
   widget(
@@ -275,7 +274,7 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   assert.match((await rig.rpc('widgetRun', { id: 'js' })).error, /^Cannot read properties of null/)
 })
 
-test('widgets that come with Laki: My PRs, Team PRs, Links', async t => {
+test('widgets that come with Laki: My PRs, Links', async t => {
   const rig = await fresh(t)
   mkdirSync(rig.env.FAKE_GH, { recursive: true })
   const pr = (number: number, login: string, mergeable: string, o: object = {}) => ({
@@ -342,52 +341,7 @@ test('widgets that come with Laki: My PRs, Team PRs, Links', async t => {
   assert.match(await rig.rpc('widgetRender', { id: 'my-prs', full: true }), /No open PRs/)
   await mine({ hide: '' })
 
-  // Team PRs: the team's logins
-  await rig.rpc('widgetSet', { id: 'team-prs', on: true, config: { repo: 'o/r' } })
-  assert.match((await until(() => find(rig, 'team-prs').then(w => !w.running && w.error && w), 'no logins')).error, /^Set GitHub logins/)
-  await rig.rpc('widgetSet', { id: 'team-prs', config: { repo: 'github.com/o/r/pulls', logins: '@Alice, bob' } })
-  const team = async () => {
-    await until(() => find(rig, 'team-prs').then(w => !w.running && w.at), 'team fetched')
-    const w = await find(rig, 'team-prs')
-    assert.equal(w.error, undefined)
-    return JSON.parse(readFileSync(join(rig.data, 'widget-data', 'team-prs.json'), 'utf8')).data
-  }
-  let d = await team()
-  assert.deepEqual(
-    d.prs.map((p: any) => [p.number, p.ci, p.review, p.conflict, p.draft]),
-    [
-      [2, 'pending', 'waiting', false, false],
-      [1, 'failing', 'approved', true, false],
-    ],
-  )
-  assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /pr list --repo o\/r --state open --author alice /, 'one list per login')
-  await rig.rpc('widgetSet', { id: 'team-prs', config: { logins: 'carol' } })
-  await until(async () => (await team()).prs[0]?.number === 3, 'another team')
-  d = await team()
-  assert.deepEqual(d.team, ['carol'])
-  await rig.rpc('widgetSet', { id: 'team-prs', config: { logins: 'alice,bob,carol', hide: 'bug' } })
-  await until(async () => (await team()).prs.length === 0, 'all hidden by label')
-  await rig.rpc('widgetSet', { id: 'team-prs', config: { hide: '', only: 'Bug' } })
-  await until(async () => (await team()).prs.length === 3, 'only with the label')
   const { port } = rig.info()
-  const page = await (await fetch(`http://127.0.0.1:${port}/widget/team-prs?key=${(await rig.rpc('state')).widgetKey}&full=1`)).text()
-  assert.match(page, /data-run="review"/)
-  assert.match(page, />Open PR</)
-  assert.match(page, /<select id="who" aria-label="Author">/, 'a filter by author')
-  // its action needs a project
-  assert.match((await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' })).error, /Set Laki project/)
-  // with one: a workspace from the PR, then a modal that opens it
-  const proj = await rig.rpc('projectAdd', { path: rig.repo })
-  writeFileSync(join(rig.env.FAKE_GH, 'prhead.json'), JSON.stringify({ number: 3, title: 'Fix it', url: 'https://github.com/o/r/pull/3', headRefName: 'fix-it', baseRefName: 'main', isCrossRepository: false }))
-  writeFileSync(join(rig.env.FAKE_GH, 'checkout'), 'fix-it')
-  await rig.rpc('widgetSet', { id: 'team-prs', config: { project: proj.id, prompt: 'review it' } })
-  const started = await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' })
-  assert.equal(started.modal?.title, 'Review started', JSON.stringify(started))
-  assert.deepEqual(started.modal.buttons[1], { label: 'Open it', open: 'laki://ws/pr-3-fix-it', primary: true })
-  // or a command of your own, with the PR's URL and number; the button says what it does
-  await rig.rpc('widgetSet', { id: 'team-prs', config: { command: 'echo "asked for $PR ($PR_NUMBER)"', button: 'Codex review' } })
-  assert.deepEqual(await rig.rpc('widgetAction', { id: 'team-prs', action: 'review', arg: 'https://github.com/o/r/pull/3' }), { ok: true, out: 'asked for https://github.com/o/r/pull/3 (3)' })
-  assert.match(await (await fetch(`http://127.0.0.1:${port}/widget/team-prs?key=${(await rig.rpc('state')).widgetKey}&full=1`)).text(), /"button":"Codex review"/)
   // Links: no fetch, its chips from the settings
   const links = (await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links')
   assert.equal(links.every, undefined)
@@ -409,7 +363,8 @@ test('widget sizes: half a cell down is kept (a thin line), other fractions roun
 
 test('extensions Laki AI writes: in its own folder only, saved off, read back; never over another folder’s', async t => {
   const rig = await fresh(t)
-  const json = JSON.stringify({ name: 'NY clock', fetch: 'echo "{\\"t\\": 1}"', every: 1 })
+  const json = JSON.stringify({ name: 'NY clock', fetch: 'echo "{\\"t\\": 1}"', every: 1, sample: { t: 7 } })
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': JSON.stringify({ name: 'NY clock', fetch: 'date' }) } }), /a sample too/, 'a fetch without made-up data for its preview')
   await assert.rejects(rig.rpc('widgetWrite', { id: 'My Clock', files: { 'widget.json': json } }), /an id/)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { '../x.sh': 'x' } }), /no folders/)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.html': 'x' } }), /needs widget.json/)
@@ -417,6 +372,9 @@ test('extensions Laki AI writes: in its own folder only, saved off, read back; n
   await assert.rejects(rig.rpc('widgetWrite', { id: 'my-prs', files: { 'widget.json': json } }), /comes with Laki/)
   const w = await rig.rpc('widgetWrite', { id: 'ny', files: { 'widget.json': json, 'widget.html': '<template preview>{{data.t}}</template>', 'fetch.sh': '#!/bin/sh\necho "{}"' } })
   assert.deepEqual([w.id, w.on, w.byAi, w.every], ['ny', false, true, 1], 'saved off')
+  assert.equal(w.sample, true)
+  assert.equal(await rig.rpc('widgetRender', { id: 'ny', sample: true }), '7', 'its preview: the sample, never fetched')
+  assert.equal(await rig.rpc('widgetRender', { id: 'ny' }), '', 'live: nothing yet')
   const dir = join(rig.data, 'widgets', 'ny')
   assert.equal(readFileSync(join(dir, 'widget.html'), 'utf8'), '<template preview>{{data.t}}</template>')
   assert.ok(statSync(join(dir, 'fetch.sh')).mode & 0o100, 'a script with #! runs')

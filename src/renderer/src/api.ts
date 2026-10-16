@@ -29,6 +29,7 @@ type Bridge = {
   procStop?(what: string): void
   onDeepLink?(cb: (url: string) => void): void
   capture?(webContentsId: number): Promise<string>
+  captureRect?(r: { x: number; y: number; width: number; height: number }): Promise<string> // the app window's pixels there, a PNG in base64 (the element picker's)
   onShot?(cb: (png: string, note?: string) => void): void
   onNewPrompt?(cb: (prompt: string) => void): void // the new-workspace window's: a voice prompt while it's open
   fitNew?(height: number): void // the new-workspace window's: its height, as tall as the page

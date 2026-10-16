@@ -7,7 +7,8 @@ import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
 import { actionsFor, importable, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
-import { fillTemplate, isAgent, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
+import { fillTemplate, isAgent, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
+import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
 import { ago, render, spark } from '../src/shared/widget.ts'
 
@@ -226,4 +227,12 @@ test("splitRows: a diff side by side, removed lines beside the added ones after 
     { left: undefined, right: a2 },
     { full: end },
   ])
+})
+
+test("placesOf: an extension's places, else its one place, else the sidebar; planRef: a line naming a plan's README.md", () => {
+  assert.deepEqual(placesOf({ places: ['desk', 'side'], place: 'desk' }), ['desk', 'side'])
+  assert.deepEqual(placesOf({ places: [], place: 'top' }), ['top'], 'an empty list: its place (an older daemon)')
+  assert.deepEqual(placesOf({}), ['side'])
+  assert.equal(planRef({ kind: 'spec', path: '/p/specs/login' }), 'Spec: /p/specs/login/README.md (read it, and the files beside it: attachments, diagrams)')
+  assert.match(planRef({ kind: 'brainstorm', path: '/p/b/x' }), /^Brainstorm: \/p\/b\/x\/README\.md /)
 })

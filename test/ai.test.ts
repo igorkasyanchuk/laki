@@ -200,6 +200,15 @@ test('ai: claude -p and codex exec reach Laki through `laki mcp`, and go on with
   assert.deepEqual(w.env, { TEST_GLOBAL: 'g', TEST_ACCOUNT: 'work' })
   assert.ok(!w.args.includes('--resume'), "the plain claude's session isn't the preset's")
 
+  // an effort (Settings › AI): claude's --effort; one it doesn't take, none
+  await rig.rpc('settingsSet', { ai: { on: true, backend: 'claude', efforts: { claude: 'high' } } })
+  await rig.rpc('aiAsk', { text: 'think hard' })
+  let e: string[] = rig.fakeLog().filter(l => l.bin === 'claude' && l.args[0] === '-p').at(-1).args
+  assert.equal(e[e.indexOf('--effort') + 1], 'high')
+  await rig.rpc('settingsSet', { ai: { on: true, backend: 'claude', efforts: { claude: 'minimal' } } })
+  await rig.rpc('aiAsk', { text: 'think less' })
+  assert.ok(!rig.fakeLog().filter(l => l.bin === 'claude' && l.args[0] === '-p').at(-1).args.includes('--effort'), "codex's word, not claude's")
+
   await rig.rpc('aiNew')
   await rig.rpc('settingsSet', { ai: { on: true, backend: 'codex' } })
   assert.deepEqual(await rig.rpc('aiAsk', { text: 'projects?' }), { text: '1 projects, asked: projects?' })
@@ -208,13 +217,17 @@ test('ai: claude -p and codex exec reach Laki through `laki mcp`, and go on with
   assert.ok(cx[0].args.includes('sandbox_mode="read-only"') && cx[0].args[1] === '--json')
   assert.ok(cx[0].args.includes('--ignore-user-config'), "not the user's MCP servers")
   assert.deepEqual(cx[1].args.slice(0, 3), ['exec', 'resume', 'thread-x1'])
+  assert.ok(!cx[0].args.some((x: string) => x.startsWith('model_reasoning_effort')), 'unset: its own')
   a = await rig.rpc('aiState')
   assert.deepEqual({ ...a.calls[0], at: 0, ms: 0 }, { at: 0, ms: 0, backend: 'codex', model: 'codex', in: 300, out: 30, tools: 1, ok: true, ask: 'more' })
   await assert.rejects(rig.rpc('aiAsk', { text: 'fail' }), /it broke/)
+  await rig.rpc('settingsSet', { ai: { on: true, backend: 'codex', efforts: { codex: 'xhigh' } } })
+  await rig.rpc('aiAsk', { text: 'and harder' })
+  assert.ok(rig.fakeLog().filter(l => l.bin === 'codex' && l.args[0] === 'exec').at(-1).args.includes('model_reasoning_effort="xhigh"'))
   // the conversation is kept across a restart
   await rig.stop()
   await rig.start()
-  assert.equal((await rig.rpc('aiState')).chat.length, 8) // 2 asks of 3, the failed one's ask and error
+  assert.equal((await rig.rpc('aiState')).chat.length, 11) // 3 asks of 3, the failed one's ask and error
   assert.ok(readFileSync(join(rig.data, 'ai-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length >= 6)
 })
 

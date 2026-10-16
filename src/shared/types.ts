@@ -47,6 +47,7 @@ export type Project = {
   kind?: 'shells' | 'browsers' // the sidebar's Terminals (shells) or Browsers (quickNew): your home folder, a workspace per terminal or page
   sort?: WsSort // its workspaces' order in the sidebar (unset: manual, as dragged); a group's own wins
   memory?: Memory[] // the project page's Memory, newest last: the user's (MEMORY_MAX) and what agents learned (auto, MEMORY_MAX); claude and codex get both at every start
+  compacted?: CompactRun // its learned memories' last compaction (daemon/memory.ts): when, how many before and after, why, or what failed
   plans?: string // its specs' and brainstorms' folder (daemon/plans.ts), made with the first one
 }
 // each mark unset: on; at: where a row shows them (unset: start, by the status circle)
@@ -54,6 +55,11 @@ export type PRMarks = { approved?: boolean; mine?: boolean; commented?: boolean;
 export type Memory = { id: string; text: string; at: number; edited?: number; auto?: boolean; by?: string } // at: when it was added; auto: an agent's (auto-memory), else the user's; by: who (an agent, its workspace)
 export const MEMORY_MAX = 50 // each kind's: the user's (refused past it), agents' (the oldest goes)
 export const MEMORY_AUTO_LEN = 600 // an agent's memory: the gist, in a line or two
+// a compaction of a project's learned memories (daemon/memory.ts): why (you: Compact now; days: its every N days; full:
+// MEMORY_MAX reached), how many before and after; the log (memoryCompactLog) keeps each one's texts too
+export type CompactRun = { at: number; why: 'you' | 'days' | 'full'; ok: boolean; before: number; after: number; ms?: number; error?: string }
+export type CompactLogLine = CompactRun & { project: string; was?: string[]; now?: string[] }
+export const COMPACT_DAYS = 7 // settings.memoryCompact.days unset
 export type Sep = { id: string; name: string; color?: string; template?: string; sort?: WsSort } // color: TAB_COLORS' name, its label's tint; template: a prompt template's name, the one a new workspace under it starts with; sort: its workspaces' (unset: the project's)
 // the sidebar's order of a project's workspaces, or a group's: as dragged, newest first, last active first, by name
 export const WS_SORTS = ['manual', 'created', 'activity', 'name'] as const
@@ -325,6 +331,9 @@ export type Settings = {
   specs?: boolean // experimental (Settings › General): Specs & Brainstorms, off unless true
   workflows?: boolean // experimental (Settings › General): Workflows, off unless true
   birdView?: boolean // experimental (Settings › General): the eye beside Help, every live session's screen at once, off unless true
+  calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
+  desk?: boolean // experimental (Settings › General): the rail's Desk, extensions placed there as tiles, off unless true
+  deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size (an extension placed there without one: last, DESK_TILE)
   aiGlow?: boolean // experimental (Settings › General): a glow over what Laki AI looks at (a tab's pane, else the window), off unless true
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
@@ -371,11 +380,14 @@ export type Settings = {
   imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // an HTML or Markdown artifact opens in the app's viewer or the default browser (unset: app)
   memory?: Memory[] // Settings › Global memory: the user's own rules (MEMORY_MAX, never auto) for claude and codex in every project, with its memory
+  memoryCompact?: { off?: boolean; days?: number } // agents' learned memories compacted by Laki AI every days (unset: COMPACT_DAYS) and as they reach MEMORY_MAX; off: only Compact now
+  flowVars?: Record<string, string> // workflows' global variables, {{vars.NAME}} in every one (a workflow's own var lines win)
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
   progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
   railPlans?: PlanPin[] // specs and brainstorms pinned to the rail (RAIL_PINS at most), oldest first
+  pickerKey?: string // development mode's element picker: its hotkey as ui.tsx' keyLabel writes it (unset: PICKER_KEY; '': none)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
@@ -396,7 +408,7 @@ export type AiBackend = 'openrouter' | 'claude' | 'codex'
 // preset: an agent preset of the backend's agent (claude, codex), its env for an account of its own
 // skill: Laki's skill for it (unset: on): more tools (PRs, projects' notes and memory, tabs and shells, actions, templates) and
 // asking you with options; hideCost: no $ on the AI page
-export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean } // context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
+export type AiSettings = { on?: boolean; backend?: AiBackend; preset?: string; models?: Partial<Record<AiBackend, string>>; efforts?: Partial<Record<'claude' | 'codex', string>>; steps?: number; skill?: boolean; hideCost?: boolean; context?: string; float?: boolean } // efforts: claude -p's --effort, codex's model_reasoning_effort (EFFORTS; unset: theirs); context: the user's own instructions, after the system prompt; float: the chat button in the corner (unset: on)
 export const AI_MODEL = 'anthropic/claude-sonnet-5.5'
 export const AI_STEPS = 20
 export const AI_CONTEXT_MAX = 8000 // Your instructions' characters
@@ -434,7 +446,16 @@ export type LogLine = { at: number; text: string; n?: number }
 export type SideLook = { guide?: string; divider?: string; indent?: string; rows?: string; text?: string; icons?: string; labels?: boolean }
 
 // a task waiting on the board (Board.tsx) for a workspace: a prompt for a project
-export type Todo = { id: string; project: string; text: string; at: number }
+export type Todo = { id: string; project: string; text: string; at: number; images?: string[] } // images: pasted ones (<data>/images), their paths after the text as it starts
+// a follow-up on the calendar (Calendar, experimental): a note for a moment, from you, Laki AI or an agent (by), maybe about a
+// workspace or a project; it rings once as it's due (fired) while the app is open, done: ticked off
+export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean }
+export const REMINDERS_MAX = 500 // past it the oldest rung ones go
+// a tile on the Desk (experimental): an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
+export type DeskTile = { id: string; w: number; h: number }
+export const DESK_COLS = 12
+export const DESK_ROW = 40
+export const DESK_TILE: Omit<DeskTile, 'id'> = { w: 4, h: 6 }
 
 // remote access (core.ts): who may open it, until when (ms; none: until stopped), and once cloudflared has one, its URL and the link
 // with the token
@@ -461,7 +482,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; flows?: FlowRun[]; flowsByAgent?: string[] }
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[] }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -533,19 +554,21 @@ export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'ch
 // button: it shows as a button (a rail or foot place, or no preview of its own): icon (one of the app's icons, or a
 // character or two), label, badge (a count on it) and tip, filled from its data; click: the action a click runs (none:
 // its full view, else a fetch)
-export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
+export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; sample?: boolean; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
 export type WidgetSize = 's' | 'm' | 'l'
 // where an extension shows: the sidebar's grid (the default), the top bar or the status bar (a line high, by the bar's
-// right end), the rail (a button among its icons; without the rail, the sidebar's foot) or the sidebar's foot (a button
-// beside Video, Meme and Timer)
-export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot'] as const
+// right end), the rail (a button among its icons; without the rail, the sidebar's foot), the sidebar's foot (a button
+// beside Video, Meme and Timer) or the Desk (experimental: a page of tiles, each resized there). Any of them at once:
+// places (place is the first of them, for an older app)
+export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot', 'desk'] as const
+export const placesOf = (w: { place?: WidgetPlace; places?: WidgetPlace[] }): WidgetPlace[] => (w.places?.length ? w.places : [w.place ?? 'side'])
 export const BUTTON_PLACES: readonly WidgetPlace[] = ['rail', 'foot']
 export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string } // built: its build's time (none from source); flowFiles: when a workflow file last changed
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetKey?: string; widgetHome?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string } // built: its build's time (none from source); flowFiles: when a workflow file last changed
 
 // specs and brainstorms (experimental, settings.specs; daemon/plans.ts): a folder each, outside the repo. files: how
 // many beside the editor's own (attachments, a brainstorm's output)
@@ -562,4 +585,4 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 66
+export const API = 69

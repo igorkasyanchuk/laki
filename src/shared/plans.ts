@@ -12,9 +12,11 @@ export const BRAINSTORM_OUTPUT = `Explore the idea, don't build it. Write what y
 - <name>.diagram.json for an architecture or a flow worth editing by hand. ${DIAGRAM_FORMAT}
 Ask the user when the direction depends on them.`
 
-const where = (p: Plan) => `${p.path}/README.md`
+const where = (p: Pick<Plan, 'path'>) => `${p.path}/README.md`
 
 // the spec's Start: the new-workspace page's prompt (the user picks the agent and can change it)
+// the spec page's Copy for a prompt: a line naming its README.md, to paste into any agent's prompt
+export const planRef = (p: Pick<Plan, 'kind' | 'path'>) => `${p.kind === 'spec' ? 'Spec' : 'Brainstorm'}: ${where(p)} (read it, and the files beside it: attachments, diagrams)`
 export const specPrompt = (p: Plan) => `Implement the spec "${p.title}": ${where(p)}. Read it first, and the files beside it (attachments, diagrams), then do what it says; ask me when it is unclear.`
 
 // the brainstorm's button: the first ask in its own chat with Laki AI (the chat's instructions name the brainstorm too)

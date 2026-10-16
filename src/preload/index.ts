@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('laki', {
   onNewPrompt: (cb: (prompt: string) => void) => ipcRenderer.on('new-prompt', (_e, p: string) => cb(p)), // the new-workspace window's
   fitNew: (height: number) => ipcRenderer.send('new-fit', height), // its height: what the page needs
   capture: (webContentsId: number): Promise<string> => ipcRenderer.invoke('capture', webContentsId), // the preview's PNG, base64
+  captureRect: (r: { x: number; y: number; width: number; height: number }): Promise<string> => ipcRenderer.invoke('capture-rect', r), // the app window's own, a PNG in base64: the element picker's
   // the menu bar's screenshot (a PNG, base64, drawn on) and its note: to a new workspace's prompt
   onShot: (cb: (png: string, note?: string) => void) => {
     ipcRenderer.on('shot', (_e, png: string, note?: string) => cb(png, note))
@@ -42,9 +43,9 @@ contextBridge.exposeInMainWorld('laki', {
   // the bubbles' own windows (floater.html): the bar (the list in; its height, a hover and a click out) and the card
   floater: {
     onFloats: (cb: (f: { items: object[]; colors: Record<string, string>; style: string; add: boolean; menu: string }) => void) => ipcRenderer.on('floats', (_e, f) => cb(f)),
-    onSide: (cb: (side: 'left' | 'right') => void) => ipcRenderer.on('floater-side', (_e, side) => cb(side)),
+    onSide: (cb: (side: 'left' | 'right' | 'top' | 'bottom') => void) => ipcRenderer.on('floater-side', (_e, side) => cb(side)),
     drag: (phase: 'start' | 'move' | 'end', dx = 0, dy = 0) => ipcRenderer.send('floater-drag', phase, dx, dy),
-    size: (h: number, up?: boolean) => ipcRenderer.send('floater-size', h, up), // up: the stack opened or closed, the + stays put
+    size: (len: number, up?: boolean) => ipcRenderer.send('floater-size', len, up), // its length along the edge; up: the stack opened or closed, the + stays put
     hover: (tab: string, top: number) => ipcRenderer.send('floater-hover', tab, top),
     open: (tab: string) => ipcRenderer.send('floater-open', tab),
     act: (what: 'new' | 'mic' | 'area' | 'screen' | 'ai') => ipcRenderer.send('floater-act', what), // the +'s actions (the bar's stack or the menu)

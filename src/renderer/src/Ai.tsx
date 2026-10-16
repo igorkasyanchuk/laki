@@ -55,6 +55,8 @@ export function AiPage({
   onLater,
   compact,
   context,
+  embed,
+  hello,
 }: {
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
@@ -63,6 +65,8 @@ export function AiPage({
   onLater?: (text: string) => void // Send later's dialog for Laki AI, with what's typed (the app's; not the AI window's)
   compact?: boolean // the bubbles' AI window: the chat alone under a head of its own (no Calls, Info or cost)
   context?: () => Promise<string> // where the user is as they ask (the floating chat's): for the model, not the conversation
+  embed?: boolean // compact, in a page of its own (the Extension page's): no close, Esc is the page's
+  hello?: { title: string; text: string; examples: string[]; placeholder: string } // what an empty chat says, its examples and the box's hint
 }) {
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
@@ -92,7 +96,11 @@ export function AiPage({
       if (!m.busy) load() // the call just logged
     })
   }, [])
-  useEffect(() => void end.current?.scrollIntoView({ block: 'end' }), [d?.chat.length, d?.busy, tab]) // void: Chromium's returns a promise
+  // its thread to the end, not the page around it (scrollIntoView would move that too: the Extension page's)
+  useEffect(() => {
+    const el = end.current?.closest('.ai-thread')
+    if (el) el.scrollTop = el.scrollHeight
+  }, [d?.chat.length, d?.busy, tab])
   const backend = settings.backend ?? 'openrouter'
   const ready = !!settings.on && (backend !== 'openrouter' || !!d?.key)
   const can = ready && !d?.busy && !saving && (!!text.trim() || !!images.length)
@@ -162,10 +170,10 @@ export function AiPage({
                     <span className="ai-mark">
                       <Icon name="ai" size={22} />
                     </span>
-                    <h2>What should Laki do?</h2>
-                    <p className="muted">It looks at your workspaces and agents, starts new ones, sends them prompts and attaches PRs.</p>
+                    <h2>{hello?.title ?? 'What should Laki do?'}</h2>
+                    <p className="muted">{hello?.text ?? 'It looks at your workspaces and agents, starts new ones, sends them prompts and attaches PRs.'}</p>
                     <div className="ai-examples">
-                      {EXAMPLES.map(x => (
+                      {(hello?.examples ?? EXAMPLES).map(x => (
                         <button key={x} onClick={() => (setText(x), document.querySelector<HTMLTextAreaElement>('.ai-composer textarea')?.focus())}>
                           {x}
                           <Icon name="arrowRight" size={12} />
@@ -204,10 +212,11 @@ export function AiPage({
                   dictate={bridge?.dictate}
                   dictationSettings={bridge?.dictationSettings}
                   onSubmit={ask}
+                  focus={!embed}
                   enter
                   onBusy={setSaving}
                   rows={2}
-                  placeholder="Ask Laki… or paste a screenshot of PR links"
+                  placeholder={hello?.placeholder ?? 'Ask Laki… or paste a screenshot of PR links'}
                   tools={
                     <>
                       {onLater && (
@@ -232,8 +241,10 @@ export function AiPage({
             </div>
           </>
   )
+  // in a page: its box takes the keyboard without scrolling the page to it
+  useEffect(() => void (embed && box.current?.querySelector('textarea')?.focus({ preventScroll: true })), [])
   useEffect(() => {
-    if (!compact) return
+    if (!compact || embed) return
     // Esc in it, or with nothing focused and no page or dialog to close: the main window's floating chat stays while
     // Esc goes to a terminal, a page or a dialog
     const f = (e: KeyboardEvent) => escapes(e) && (!box.current || box.current.contains(document.activeElement) || (document.activeElement === document.body && !document.querySelector('.settings-page, .overlay'))) && closeRef.current()
@@ -242,7 +253,7 @@ export function AiPage({
   }, [compact])
   if (compact)
     return (
-      <div className={`ai-window ${d?.busy ? 'busy' : ''}`} role="dialog" aria-label="Laki AI" ref={box}>
+      <div className={`ai-window ${embed ? 'ai-embed' : ''} ${d?.busy ? 'busy' : ''}`} role={embed ? 'region' : 'dialog'} aria-label="Laki AI" ref={box}>
         <div className="ai-win-head drag">
           <span className="ai-mark">
             <Icon name="ai" size={14} />
@@ -255,13 +266,13 @@ export function AiPage({
           <button className="ai-new nodrag" disabled={!d?.chat.length || d.busy} data-tip="Start a new conversation" onClick={newChat}>
             <Icon name="plus" size={12} /> New chat
           </button>
-          <IconButton icon="x" title="Close (Esc)" className="nodrag" onClick={onClose} />
+          {!embed && <IconButton icon="x" title="Close (Esc)" className="nodrag" onClick={onClose} />}
         </div>
         <div className="ai-page">{chat}</div>
       </div>
     )
   return (
-    <Page title="Laki AI" onClose={onClose} wide>
+    <Page title="Laki AI" onClose={onClose} wide esc={false} /* a page to stay on: Esc is the prompt's, never a close */>
       <div className="ai-page ai-split">
         <aside className="ai-chats" aria-label="Chats">
           <button className="ai-new primary" disabled={!d?.chat.length || d.busy} data-tip={d?.busy ? 'It works on this one: stop it first' : 'Start a new conversation: this one stays below'} onClick={newChat}>
@@ -455,7 +466,7 @@ const imageOf = (path: string) => {
   for (const k of shown.keys()) if (shown.size > SHOWN_MAX) shown.delete(k)
   return p
 }
-function Thumbs({ paths }: { paths: string[] }) {
+export function Thumbs({ paths }: { paths: string[] }) {
   const [urls, setUrls] = useState<(string | null)[]>([])
   const [big, setBig] = useState<string | null>(null)
   useEffect(() => {

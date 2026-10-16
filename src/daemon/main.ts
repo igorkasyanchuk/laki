@@ -18,6 +18,7 @@ import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
 import { scanWidgets, widgetAction, widgetFiles, widgetKey, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
+import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 
 const { dir } = core
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
@@ -179,6 +180,16 @@ const api: Record<string, Handler> = {
   tabFocus: p => core.tabFocus(p),
   todoAdd: p => core.todoAdd(p),
   todoRm: p => core.todoRm(p),
+  memoryCompact: p => memoryCompact(p),
+  memoryCompactLog: p => memoryCompactLog(p),
+  memoryTick: p => memoryTick(p.now), // tests move the clock
+  cliState: () => core.cliState(),
+  cliInstall: () => core.cliInstall(),
+  cliRemove: () => core.cliRemove(),
+  reminderAdd: p => core.reminderAdd(p),
+  reminderSet: p => core.reminderSet(p),
+  reminderRm: p => core.reminderRm(p),
+  reminderTick: p => core.reminderTick(p.now), // tests move the clock
   tabClose: p => core.closeTab(p.id),
   tabSet: p => core.tabSet(p),
   settingsSet: p => core.settingsSet(p),
@@ -380,7 +391,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     }
     core.clients.add(c)
     core.hello(c)
-    if (core.clients.size === 1) widgetTick() // the app is back: what fell due meanwhile
+    if (core.clients.size === 1) widgetTick(), core.reminderTick() // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }
       try {
@@ -435,6 +446,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => core.watchLimits())
   every(15000, () => (core.remoteTick(), core.shareTick()))
   every(30000, () => core.scheduleTick())
+  every(30000, () => core.reminderTick())
+  every(1800000, () => memoryTick())
   every(30000, () => widgetTick())
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends

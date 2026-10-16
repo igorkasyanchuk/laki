@@ -478,7 +478,7 @@ html:has(dialog.sd-modal[open]) { overflow: hidden; }
 .plans-row .icon-svg { flex: none; color: var(--muted); }
 .plans-title { flex: 1; min-width: 0; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .plans-meta { flex: none; }
-.plans-kinds { display: flex; align-items: center; flex-wrap: wrap; gap: 6px 12px; }
+.plans-kinds { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; }
 .plans-kinds .seg button { display: inline-flex; align-items: center; gap: 5px; }
 .plans-kind { flex: none; padding: 1px 7px; border-radius: 999px; font-size: 11px; color: var(--muted); border: 1px solid var(--line); }
 .plans-kind.brainstorm { color: var(--waiting); border-color: color-mix(in srgb, var(--waiting) 40%, transparent); }

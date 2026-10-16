@@ -182,6 +182,9 @@ more than 30 minutes late is skipped and logged as missed).
   become the run's workspace's and tab's.
 - \`laki schedule\` lists them (id, next run), \`laki schedule log\` the last runs; \`on\`, \`off\`, \`run\` (now)
   and \`rm\` take an id.
+- A reminder for the user (Calendar, when it's on: Settings › General › Experimental), only when they ask for one:
+  \`laki remind "<when: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30>" <text> --ws .\` (\`--ws .\`: about your
+  workspace); it notifies them then. \`laki reminders\` lists them; \`done\` and \`rm\` take an id. MCP: \`laki_reminder\`.
 
 ## Recipes
 
@@ -219,7 +222,7 @@ Extension and widget are two names for one thing: the app says extension (Settin
     ${join(dir, 'widgets')}/<id>/
 
 (the user can add more folders in Settings › Extensions). Two complete examples come with Laki, read them first:
-${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq, counts and groups, a template) and \`${join(BUILTIN, 'team-prs')}\` (a JS fetch script, a JS page with a filter, sorting and an action)` : 'my-prs and team-prs in the app'}.
+${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq, counts and groups, a template, its sample) and \`${join(BUILTIN, 'links')}\` (a JS page, no fetch, a list setting)` : 'my-prs and links in the app'}.
 Don't edit those: copy one to a new id.
 
 ${widgetFormat()}

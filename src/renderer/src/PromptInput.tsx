@@ -10,7 +10,7 @@ import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 export type Img = { path: string; url: string } // saved file, and a data: URL for its thumbnail
 
 // the prompt the agent gets
-export const withImages = (text: string, imgs: Img[]) => [text.trim(), imgs.map(i => i.path).join('\n')].filter(Boolean).join('\n\n')
+export const withImages = (text: string, imgs: { path: string }[]) => [text.trim(), imgs.map(i => i.path).join('\n')].filter(Boolean).join('\n\n')
 
 // what agents read (claude, codex): other images (HEIC, SVG, …) are refused
 const EXT: Record<string, string> = { 'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif', 'image/webp': 'webp' }
@@ -37,6 +37,7 @@ export function PromptInput(p: {
   placeholder?: string
   rows?: number
   tools?: ReactNode // the toolbar's right end
+  focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const [err, setErr] = useState('')
@@ -91,7 +92,7 @@ export function PromptInput(p: {
         ref={box}
         rows={p.rows ?? 4}
         value={p.value}
-        autoFocus
+        autoFocus={p.focus !== false}
         placeholder={p.placeholder ?? 'What should the agent do? Paste or drop screenshots here.'}
         onChange={e => p.onChange(e.target.value)}
         onPaste={paste}

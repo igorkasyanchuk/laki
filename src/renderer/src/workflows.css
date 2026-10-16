@@ -195,3 +195,18 @@
 .wf-palette .wf-var { grid-template-columns: 1fr; gap: 1px; cursor: grab; }
 .wf-palette .wf-var span { font-size: 11px; }
 .narrow .wf-palette { display: none; }
+
+/* blocks picked together: a box dragged on the canvas */
+.wf-band { position: absolute; z-index: 4; border: 1px solid var(--accent); border-radius: 3px; background: color-mix(in srgb, var(--accent) 12%, transparent); pointer-events: none; }
+.wf-scroll:focus { outline: none; }
+.wf-insp kbd { margin-left: 4px; font: 11px var(--mono); opacity: 0.7; }
+/* your own variables, {{vars.NAME}}: the workflow's and every workflow's */
+.wf-own { display: grid; gap: 4px; margin-bottom: 12px; }
+.wf-own h4 { margin: 0 0 2px; font-size: 12px; color: var(--muted); }
+.wf-own-row { display: grid; grid-template-columns: minmax(70px, 0.8fr) minmax(0, 1.2fr) auto; gap: 4px; align-items: center; }
+.wf-own-row input { min-width: 0; height: 26px; padding: 0 7px; font: 12px var(--mono); }
+.wf-own-row input.bad { border-color: var(--error); }
+.wf-own-name { min-width: 0; height: 26px; padding: 0 7px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: left; border: none; border-radius: 5px; background: none; color: var(--accent-ink); font: 12px var(--mono); cursor: grab; }
+.wf-own-name:hover { background: var(--hover); }
+.wf-awaiting { color: var(--muted); }
+.wf-awaiting > .grow { flex: 1; font-size: 12.5px; }

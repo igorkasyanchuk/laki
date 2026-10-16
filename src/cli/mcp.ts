@@ -34,7 +34,7 @@ export async function state(rpc: Rpc = conn) {
   return {
     projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind, groups: p.seps?.length ? p.seps.map(s => s.name || 'Unnamed group') : undefined, groupTemplates: (t => (Object.keys(t).length ? t : undefined))(Object.fromEntries((p.seps ?? []).filter(s => s.template).map(s => [s.name || 'Unnamed group', s.template!]))) })), // kind: shells (the Terminals project) or browsers, the user's own; groups: the sidebar's, laki_new_workspace's group; groupTemplates: a group's prompt template, which a new workspace in it starts with
     workspaces: live
-      .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review }, related: w.related, from: live.some(x => x.id === w.from) ? w.from : undefined, tabs: layoutOf(w.id) })), // related: other PRs and issues it's about; from: the workspace that started it; tabs: its tabs with splits, as the app shows them
+      .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review, updated: w.pr.updated }, related: w.related, from: live.some(x => x.id === w.from) ? w.from : undefined, tabs: layoutOf(w.id) })), // related: other PRs and issues it's about; from: the workspace that started it; tabs: its tabs with splits, as the app shows them
     tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
 }
@@ -53,7 +53,7 @@ async function groupOf(rpc: Rpc, project: string, group: string) {
 const PLACE = { beside: str("a tab id: the new one opens beside it, in its tab (a split; default: a tab of its own, or beside the user's pane when their setting says so)"), edge: { type: 'string', enum: ['right', 'left', 'bottom', 'top'], description: 'which side of it (default right)' } }
 
 // from: the workspace whose agent runs this laki mcp ($LAKI_WORKSPACE): what it starts came from there
-export const tools = (rpc: Rpc, from?: string): Tool[] => [
+export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who: the caller, as a reminder's by
   {
     name: 'laki_state',
     description: "Laki's projects, workspaces (a git worktree per task, or a folder) and tabs, with each tab's status: running (an agent's turn, or a shell's command), waiting (for a permission), idle or exited; done: finished while nobody looked; last: the agent's last answer. Terminals and Browsers (a project's kind shells or browsers) are the user's own terminals and web pages.",
@@ -208,11 +208,11 @@ export const tools = (rpc: Rpc, from?: string): Tool[] => [
     description: 'How a Laki extension (a widget) is made (widget.json, widget.html, its fetch command or JS script, the template language, JS pages). Read it before laki_extension_write.',
     inputSchema: obj({}),
     max: 12000,
-    run: async () => `Examples that come with Laki (laki_extension_read): links (a JS page, no fetch), my-prs (a shell fetch with gh and jq, a template), team-prs (a JS fetch script, a JS page). Write a new one under a new id with laki_extension_write; change one you made by its id (files you leave out stay; never the user's own nor one that comes with Laki). A fetch runs in the extension's folder; for a JS script, "script": "fetch.mjs". It is saved turned off: the user turns it on in Settings › Extensions (laki://settings/widgets).\n\n${widgetFormat()}`,
+    run: async () => `Examples that come with Laki (laki_extension_read): links (a JS page, no fetch), my-prs (a shell fetch with gh and jq, a template, its sample). Write a new one under a new id with laki_extension_write; change one you made by its id (files you leave out stay; never the user's own nor one that comes with Laki). A fetch runs in the extension's folder; for a JS script, "script": "fetch.mjs". It is saved turned off: the user looks at it (its page shows it with its sample) and turns it on in Settings › Extensions (laki://settings/widgets).\n\n${widgetFormat()}`,
   },
   {
     name: 'laki_extension_read',
-    description: "An extension's files as text: an example to copy (links, my-prs, team-prs) or one to change.",
+    description: "An extension's files as text: an example to copy (links, my-prs) or one to change.",
     inputSchema: obj({ id: str('its id, from laki_extensions') }, ['id']),
     max: 24000,
     run: a => rpc('widgetFiles', { id: a.id }),
@@ -297,6 +297,22 @@ export const tools = (rpc: Rpc, from?: string): Tool[] => [
     run: async a => {
       const r = await rpc('flowStart', { workflow: a.workflow, project: a.project, task: a.task, dry: !!a.dry, by: 'agent', trigger: 'an agent' }, 180000)
       return { id: r.id, status: r.status, workspace: r.ws }
+    },
+  },
+  {
+    name: 'laki_reminder',
+    description: "Laki's calendar (Calendar, experimental): follow-ups the user is reminded of at a moment, with a notification. act add (text, at: in 2h, tomorrow at 9am, fri at 5pm, 2026-10-20 14:30; ws: a workspace it's about, default yours), list (what's coming and recent, with ids), done or rm (by id). Only when the user asks for a reminder or a follow-up.",
+    inputSchema: obj({ act: { type: 'string', enum: ['add', 'list', 'done', 'rm'] }, text: str('add: what to remind of'), at: str('add: when'), ws: str("add: a workspace's id"), id: str('done, rm: its id, from list') }, ['act']),
+    run: async a => {
+      if (a.act === 'add') {
+        const r = await rpc('reminderAdd', { text: a.text, at: a.at, ws: a.ws ?? from, tab: process.env.LAKI_TAB, by: who ?? (process.env.LAKI_TAB ? undefined : 'MCP') })
+        return { id: r.id, at: new Date(r.at).toString() }
+      }
+      if (a.act === 'done' || a.act === 'rm') return a.act === 'rm' ? (await rpc('reminderRm', { id: a.id }), { ok: true }) : rpc('reminderSet', { id: a.id, done: true })
+      const v: View = await rpc('state')
+      if (!v.reminders) throw new Error('Calendar is off: Settings › General › Experimental')
+      const day = Date.now() - 86400000
+      return v.reminders.filter(r => r.at > day || !r.done).map(r => ({ id: r.id, at: new Date(r.at).toString(), text: r.text, ws: r.ws, done: !!r.done }))
     },
   },
 ]
@@ -518,7 +534,7 @@ export const aiRpc = (rpc: Rpc): Rpc => (method, params, ms) => rpc(method, AI_L
 
 let daemon: Promise<unknown> | undefined
 const own = process.env.LAKI_AI === '1' ? aiRpc(conn) : conn // Laki AI's claude or codex runs this laki mcp
-const TOOLS = [...tools(own, process.env.LAKI_WORKSPACE || undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : [])]
+const TOOLS = [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : [])]
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool) throw new Error(`no tool ${name}`)

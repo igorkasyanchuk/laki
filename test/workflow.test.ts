@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { apiQuestions, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile } from '../src/shared/workflow.ts'
+import { apiQuestions, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
 import { fresh, until } from './helpers.ts'
 
 // every kind of block, loops limited by a max and an ask
@@ -699,4 +699,42 @@ end: failed · notify: yes · phone: yes
   assert.deepEqual(chats.at(-1).response_format, { type: 'json_object' })
   await rig.rpc('flowTest', { block: parse('## j\nllm: x/fast\njson: no\nout: title\n> hi\n', 'x').workflow.blocks[0] })
   assert.equal(chats.at(-1).response_format, undefined)
+})
+
+// your own variables: a workflow's (var lines) over Settings' global ones, {{vars.NAME}} in any block
+const VARS = `# Vars
+Its own and global variables.
+
+runs in: main · session: new
+var REPO: acme/web
+var TEAM: mine
+
+## start
+input: task
+next: say
+
+## say
+run: echo {{vars.REPO}} {{vars.TEAM}} {{vars.CHANNEL}}
+ok: done
+fail: done
+
+## done
+end: success
+`
+test('workflow variables: var lines read back, the workflow’s own over the global ones, filled in a run', async t => {
+  const { workflow, problems } = parse(VARS, 'vars')
+  assert.deepEqual(problems, [])
+  assert.deepEqual(workflow.vars, { REPO: 'acme/web', TEAM: 'mine' })
+  assert.equal(toFile(workflow), VARS, 'round trip')
+  assert.deepEqual(varsFill(workflow.vars, { TEAM: 'payments', CHANNEL: '#ops', 'bad name': 'x' }), { 'vars.TEAM': 'mine', 'vars.CHANNEL': '#ops', 'vars.REPO': 'acme/web' })
+  assert.equal(flowVars(workflow).some(v => v.name.startsWith('vars.')), false, 'yours are listed apart')
+  assert.equal(toFile({ ...workflow, vars: { REPO: 'x', '../bad': 'y' } }).includes('var ../bad'), false, 'a bad name is never written')
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true, flowVars: { TEAM: 'payments', CHANNEL: '#ops' } })
+  await rig.rpc('flowSave', { id: 'vars', text: VARS })
+  const run = await rig.rpc('flowStart', { workflow: 'vars', source: 'yours', project: p.id, task: 'say it' })
+  const r = await until(async () => (x => x.status === 'done' && x)(await rig.rpc('flowGet', { id: run.id })), 'the end', 15000)
+  assert.equal(r.vars['steps.say.output'].trim(), 'acme/web mine #ops')
 })

@@ -75,6 +75,9 @@ const paths = {
   panel: 'M2.5 3h11v10h-11zM9.5 3v10',
   chevron: 'M4.5 6.5L8 10l3.5-3.5',
   chevronRight: 'M6.5 4.5L10 8l-3.5 3.5',
+  chevronLeft: 'M9.5 4.5L6 8l3.5 3.5',
+  calendar: 'M2.5 4h11v9.5h-11zM2.5 7h11M5.5 2.5v3M10.5 2.5v3', // Calendar (experimental)
+  desk: 'M2.5 2.5h5v5h-5zM9.5 2.5h4v3h-4zM9.5 7.5h4v6h-4zM2.5 9.5h5v4h-5z', // Desk (experimental): tiles
   stop: 'M4.5 4.5h7v7h-7z',
   globe: 'M8 14a6 6 0 100-12 6 6 0 000 12zM2 8h12M8 2c1.6 1.7 2.4 3.7 2.4 6S9.6 12.3 8 14M8 2C6.4 3.7 5.6 5.7 5.6 8s.8 4.3 2.4 6',
   copy: 'M5.5 5.5h8v8h-8zM10.5 5.5v-3h-8v8h3',
@@ -92,11 +95,14 @@ const paths = {
   smile: 'M8 14a6 6 0 100-12 6 6 0 000 12zM5.6 9.4c.6.9 1.4 1.3 2.4 1.3s1.8-.4 2.4-1.3M6.2 6.4v.01M9.8 6.4v.01',
   race: 'M3.5 14V2.5M3.5 3h8.5l-2 2.75 2 2.75H3.5',
   conflict: 'M8 2.2l6.2 11H1.8zM8 6.6v3.2M8 11.6v.01',
+  ciFail: 'M8 2.2a5.8 5.8 0 110 11.6A5.8 5.8 0 018 2.2zM6 6l4 4M10 6l-4 4', // a PR's failing checks
+  lock: 'M4 7.5h8a.5.5 0 01.5.5v5a.5.5 0 01-.5.5H4a.5.5 0 01-.5-.5V8a.5.5 0 01.5-.5zM5.5 7.5V5.5a2.5 2.5 0 015 0v2M8 10v1.2', // the remote page's PIN
   check: 'M3.5 8.5l3 3 6-7',
   checks: 'M1.5 8.6l2.8 2.8 5.7-6.9M7.4 11.2l.2.2 5.7-6.9',
   minus: 'M4 8h8',
   memory: 'M4 4h8v8H4zM6.5 6.5h3v3h-3zM6 1.5V4M10 1.5V4M6 12v2.5M10 12v2.5M1.5 6H4M1.5 10H4M12 6h2.5M12 10h2.5',
   eye: 'M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8zM10 8a2 2 0 11-4 0 2 2 0 014 0z',
+  target: 'M8 3a5 5 0 110 10A5 5 0 018 3zM8 1v3.2M8 11.8V15M1 8h3.2M11.8 8H15M8 8h.01', // development mode's element picker
   help: 'M8 14a6 6 0 100-12 6 6 0 000 12zM6.2 6.3a1.9 1.9 0 113 1.5c-.7.5-1.2.9-1.2 1.7M8 11.2v.01',
   // GitHub's mark (Octicons, MIT), filled
   github:
@@ -239,6 +245,14 @@ export function AskHost() {
 // a page over the main area, as Settings is (the new-workspace form): its title, ✕ and Esc close it
 // head: what the header shows in place of the title (the Specs page's breadcrumbs); tools: buttons before its ✕
 // esc false: Esc doesn't close it (Workflows: a page you keep open while runs go)
+// a key with its modifiers as macOS writes it (⌃⌥⇧⌘ then the key: ⇧⌘C), by the physical key (⌥C would be ç); a settable
+// hotkey is kept as this text
+export const keyRec = { on: false } // Settings' KeyField is recording: App's keys stand aside (they'd run the combo)
+export const keyLabel = (e: { key: string; code: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }) => {
+  const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key
+  return `${e.ctrlKey ? '⌃' : ''}${e.altKey ? '⌥' : ''}${e.shiftKey ? '⇧' : ''}${e.metaKey ? '⌘' : ''}${k}`
+}
+
 export function Page({ title, head, tools, onClose, children, wide, esc = true }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean }) {
   useEffect(() => {
     if (!esc) return
