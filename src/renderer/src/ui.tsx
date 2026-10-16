@@ -351,7 +351,7 @@ export const moveId = (ids: string[], d: RowDrop, n = 1) => {
 // yellow); mono: its label in the terminal's font; foot: in the menu's foot, under a line.
 // { filter } puts a box on top (its placeholder): what's typed keeps the items it matches, and keys are for the box
 export const ON = '✓' // a menu item's hint: the one picked (its label in the accent, a check after it)
-type ItemBase = { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean }
+type ItemBase = { label: string; icon?: IconName; hint?: string; key?: string; danger?: boolean; indent?: boolean; sub?: string; pill?: string; tone?: 'good' | 'warn'; mono?: boolean; foot?: boolean; tip?: string }
 export type MenuItem =
   | (ItemBase & { run: () => void; items?: never })
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
@@ -504,6 +504,7 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
         aria-haspopup={it.items ? 'menu' : undefined}
         aria-expanded={it.items ? subOf?.it === it : undefined}
         className={`menu-item ${it.danger ? 'danger' : ''} ${it.indent ? 'indent' : ''} ${it.foot ? 'foot' : ''} ${on ? 'on' : ''} ${it.sub ? 'two' : ''} ${acts[sel] === it || subOf?.it === it ? 'sel' : ''}`}
+        data-tip={it.tip}
         onClick={e => pick(it, e.currentTarget, e.detail === 0)}
         onPointerEnter={e => hover(it, e.currentTarget)}
         onPointerMove={() => setSel(acts.indexOf(it))} // the one under the mouse is ⏎'s, as in a native menu

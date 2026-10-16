@@ -142,6 +142,36 @@ test('ai: a pasted image goes to OpenRouter as a data URL; one from elsewhere ne
   assert.deepEqual(await rig.rpc('aiStop'), { stopped: true })
   await assert.rejects(asking, /stopped/)
   assert.equal((await rig.rpc('aiState')).busy, false)
+
+  // the page's thumbnails: a kept image as a data URL, nothing from elsewhere
+  assert.equal(await rig.rpc('aiImage', { path }), `data:image/png;base64,${png}`)
+  await assert.rejects(rig.rpc('aiImage', { path: join(rig.home, 'repo', 'README.md') }), /isn't kept/)
+
+  // New chat keeps the one it ends among the earlier chats; one taken up again swaps with the one there
+  await rig.rpc('aiNew')
+  assert.deepEqual((await rig.rpc('aiState')).chat, [])
+  const [old] = await rig.rpc('aiChats')
+  assert.equal(old.title, 'review these')
+  await rig.rpc('aiNew') // an empty chat isn't kept
+  assert.equal((await rig.rpc('aiChats')).length, 1)
+  await rig.rpc('aiOpen', { id: old.id })
+  assert.equal((await rig.rpc('aiState')).chat[0].text, 'review these')
+  assert.deepEqual(await rig.rpc('aiChats'), [])
+  await assert.rejects(rig.rpc('aiOpen', { id: old.id }), /gone/)
+  await assert.rejects(rig.rpc('aiOpen', { id: '../ai-key' }), /gone/)
+  await rig.rpc('aiNew')
+  await rig.rpc('aiChatRm', { id: (await rig.rpc('aiChats'))[0].id })
+  assert.deepEqual(await rig.rpc('aiChats'), [])
+
+  // pasted images past Settings › AI's days go as another is saved
+  const stale = join(rig.data, 'images', `${Date.now() - 3 * 86400e3}-abc123.png`)
+  writeFileSync(stale, 'old')
+  await rig.rpc('imageSave', { data: png })
+  assert.ok(statSync(stale)) // 30 days by default
+  await rig.rpc('settingsSet', { imageDays: 2 })
+  await rig.rpc('imageSave', { data: png })
+  assert.throws(() => statSync(stale))
+  assert.ok(statSync(path)) // today's stays
 })
 
 test('ai: claude -p and codex exec reach Laki through `laki mcp`, and go on with their session', async t => {
@@ -318,6 +348,13 @@ test("ai: the skill's tools: templates and actions start workspaces, a shell get
   assert.deepEqual(st.projects.find((x: any) => x.id === p.id).groups, ['Reviews', 'Features'])
   assert.equal(st.workspaces.find((x: any) => x.id === g.id).group, 'Reviews')
   assert.equal(st.workspaces.find((x: any) => x.id === w.id).group, undefined)
+  // a group with a prompt template: a new workspace in it starts with it, unless one is given; laki_state names it
+  await rig.rpc('projectSet', { id: p.id, seps: [{ id: 'sep-rv', name: 'Reviews', template: 'careful' }, { id: 'sep-ft', name: 'Features', template: 'gone' }] })
+  assert.deepEqual((await tool('laki_state')({})).projects.find((x: any) => x.id === p.id).groupTemplates, { Reviews: 'careful', Features: 'gone' })
+  await tool('laki_new_workspace')({ project: p.id, prompt: 'look at PR 8', name: 'rv8', group: 'Reviews' })
+  await until(() => rig.fakeLog().some((l: any) => l.bin === 'claude' && l.args.includes('Project care: look at PR 8')), "the group's template")
+  await tool('laki_new_workspace')({ project: p.id, prompt: 'add a flag', name: 'ft1', group: 'Features' }) // its template gone: the prompt as it is
+  await until(() => rig.fakeLog().some((l: any) => l.bin === 'claude' && l.args.includes('add a flag')), 'no template')
   // an agent's laki mcp (its $LAKI_WORKSPACE): what it starts came from there, the prompt's PRs only related
   const spun: any = await tools(rig.rpc, g.id).find(x => x.name === 'laki_new_workspace')!.run({ project: p.id, prompt: 'fix what https://github.com/o/r/pull/7 broke', name: 'fx' })
   assert.deepEqual([spun.from, spun.prUrl, spun.related], [g.id, undefined, ['https://github.com/o/r/pull/7']])

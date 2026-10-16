@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { type Account, IMAGE_DAYS, type Memory, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetPrompt } from '../../shared/widgetGuide'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
@@ -18,6 +18,7 @@ import { mostRoom, USAGE_AGENTS } from './Usage'
 import { BACKENDS, money, tokens } from './Ai'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
+import { MemoryList } from './Project'
 import notes from '../../../docs/release-notes.md?raw'
 import { version } from '../../../package.json'
 
@@ -174,7 +175,12 @@ export type AppSettings = Paint & {
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
   railLabels?: boolean // the rail's words under its icons (unset: on)
+  railShells?: boolean // the rail's Terminal (unset: on)
+  railBrowsers?: boolean // the rail's Browser (unset: on)
   sideStyle?: SideStyle // the sidebar's rows
+  memory?: Memory[] // Global memory: the user's rules for every project's agents
+  imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
+  artifactsIn?: 'app' | 'browser' // HTML and Markdown artifacts: the app's viewer, or the default browser (unset: app)
 }
 
 export type AppInfo = { id: string; name: string; browser?: boolean } // somewhere a folder can open; a browser: only a file
@@ -420,7 +426,7 @@ function VoiceSection({ v, keyApi, onChange }: { v: VoiceSettings; keyApi: AiApi
 }
 
 // presets: Agent presets of claude or codex, each a backend of its own (its env: an account of its own)
-function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings; presets: Preset[]; onChange: (ai: AiSettings) => void }) {
+function AiSection({ api, ai, presets, onChange, imageDays, onImageDays }: { api: AiApi; ai: AiSettings; presets: Preset[]; onChange: (ai: AiSettings) => void; imageDays?: number; onImageDays: (d: number | undefined) => void }) {
   const [st, setSt] = useState<{ key: boolean; totals: AiTotals }>()
   useEffect(() => void api.state().then(setSt, () => {}), [])
   const backend = ai.backend ?? 'openrouter'
@@ -518,6 +524,12 @@ function AiSection({ api, ai, presets, onChange }: { api: AiApi; ai: AiSettings;
             <Says title="Chat button in the corner" hint="Everywhere but the AI page, Settings, Help, and where a chat is on screen already: Specs & Brainstorms, Workflows" />
           </Switch>
         </div>
+      </Group>
+      <Group title="Pasted images" hint="Screenshots you paste into Laki AI's chats and into new workspaces' prompts, kept in Laki's images folder: the chat shows them as thumbnails, a click shows one big. Older ones go">
+        <label>
+          Keep pasted images (days)
+          <input type="number" min={1} max={3650} placeholder={String(IMAGE_DAYS)} value={imageDays || ''} onChange={e => onImageDays(e.target.value ? Math.max(1, Math.min(3650, Math.round(Number(e.target.value)) || 1)) : 0)} />
+        </label>
       </Group>
       <Group title="Steps" hint="OpenRouter: how many rounds of tool calls one ask may take before it stops, a guard against a model that loops (claude -p and codex exec keep their own)">
         <label>
@@ -727,10 +739,10 @@ function FolderField({ value, placeholder, label, onChange }: { value?: string; 
     </span>
   )
 }
-export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string }
+export type ProjectInfo = { id: string; name: string; path: string; git: boolean; host?: string; config?: ProjectConfig; notes?: string; memory?: Memory[] }
 
 // a project's page: name, scripts, env; saved as you type, like the rest
-const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Terminal']]
+const TARGETS: [RunAction['target'], string][] = [['any', 'Any agent'], ...AGENTS.map(a => [a, AGENT_NAMES[a]] as [Agent, string]), ['shell', 'Shell (a command)']]
 const ACTION_EG: Record<RunAction['target'], string> = {
   any: 'Review the changes and fix what you find',
   claude: 'Run a code review twice and fix what it finds',
@@ -907,6 +919,7 @@ export function ProjectSection(p: {
   global?: { actions?: RunAction[]; templates?: Template[] } // Settings' own, which go with this project's
   taken?: (string | undefined)[] // the other projects' action slugs (an action's slug is unique everywhere)
   onGlobal?: (sec: 'actions' | 'templates') => void
+  onMemory?: () => void // Settings' Memory row: the project page's Memory
   onSave: (o: { name?: string; config: ProjectConfig; notes?: string }) => unknown
 }) {
   const [name, setName] = useState(p.project.name)
@@ -952,6 +965,18 @@ export function ProjectSection(p: {
       {p.rename && (
         <Group title="Name" hint="As the sidebar shows it">
           <input value={name} aria-label="Name" onChange={e => setName(e.target.value)} />
+        </Group>
+      )}
+      {p.onMemory && (
+        <Group title="Memory" hint="What Claude and Codex get at every start in this project: yours, and what agents learned. Settings › Global memory goes with it">
+          <div className="button-row">
+            <span className="grow">
+              {(m => `${m.filter(x => !x.auto).length} yours · ${m.filter(x => x.auto).length} learned by agents`)(p.project.memory ?? [])}
+            </span>
+            <button type="button" onClick={p.onMemory}>
+              <Icon name="bulb" /> Manage
+            </button>
+          </div>
         </Group>
       )}
       {!p.noNotes && (
@@ -1026,6 +1051,7 @@ const FIND: [string, string, string?][] = [
   ['ai', "Laki's skill", 'tools prs notes memory shells actions templates ask options remove'],
   ['ai', 'Show costs ($)', 'hide cost money dollars price spend'],
   ['ai', 'Your instructions', 'custom context system prompt my own rules'],
+  ['ai', 'Keep pasted images (days)', 'images screenshots storage retention delete older clean thumbnails 30'],
   ['webhook', 'Send test', 'webhook phone push'],
   ['webhook', 'Answer from the phone', 'buttons reply tap telegram ntfy choices menu permission allow'],
   ['appearance', 'Menu bar item', 'tray status count waiting needs you'],
@@ -1046,6 +1072,8 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
   ['appearance', 'Project names', 'sidebar font case letter spacing size weight'],
   ['appearance', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
+  ['appearance', 'Terminals', 'rail terminal shells button show hide list'],
+  ['appearance', 'Browsers', 'rail browser web button show hide list'],
   ['appearance', 'Sidebar', 'status guide line divider indent row height dotted dashed text size icon size avatar github style compact extended cards'],
   ['appearance', 'Button labels', 'sidebar schedule scheduled board settings video timer words'],
   ['appearance', 'Glass', 'transparent see-through blur vibrancy'],
@@ -1054,6 +1082,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Terminals use', 'theme themes colors palette dark light'],
   ['appearance', 'Favorites', 'theme star starred favorite'],
   ['general', 'Storage', 'storage folder files artifacts LAKI_STORAGE_FOLDER keep deleted'],
+  ['general', 'Open HTML and Markdown artifacts', 'artifacts viewer html markdown md browser embed inline modal open in laki default browser'],
   ['appearance', 'Finished ones stand out', 'floating bubbles done finished green pulse attention'],
   ['presets', 'Tell it about Laki', 'note system prompt skill rename pr storage'],
   ['terminal', 'Font', 'monospace family'],
@@ -1082,6 +1111,7 @@ const FIND: [string, string, string?][] = [
   ['pr', 'Review', 'pr prompt comments auto'],
   ['pr', 'Fix conflicts', 'pr prompt merge auto'],
   ['templates', 'Prompt templates', 'prompt'],
+  ['memory', 'Global memory', 'rules instructions every project all projects claude md agents memory custom remember always'],
   ['actions', 'Actions', 'run menu prompt command'],
   ['skill', 'Agent skill', 'mcp server laki cli'],
   ['skill', 'Extension creator', 'agent skill widgets laki-widget make extension ai'],
@@ -1102,6 +1132,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
   ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
   ['general', "Laki AI's glow", 'experimental ai glow animation computer use screen reading looking peek effect gradient'],
+  ['general', 'Laki AI', 'experimental ai assistant chat turn on enable openrouter'],
   ['general', 'Voice', 'experimental voice dictation dictate speech to text cloud hold fn mic talk whisper'],
   ['appearance', 'Dock icon', 'app icon dock logo picture dawn terminal glacier bubbles neon'],
   ['appearance', 'Floating bubbles', 'floater drop bubble overlay glow gradient arc still style while working recent sessions idle how many icons card hover new session plus menu stack actions microphone voice say it dictation record screenshot area screen'],
@@ -1122,6 +1153,7 @@ const SECTIONS: { id: string; label: string; icon: IconName; group: string }[] =
   { id: 'resources', label: 'Resources', icon: 'memory', group: 'Laki' },
   { id: 'notes', label: 'Release notes', icon: 'file', group: 'Laki' },
   { id: 'presets', label: 'Agents & profiles', icon: 'agent', group: 'Agents' },
+  { id: 'memory', label: 'Global memory', icon: 'bulb', group: 'Agents' },
   { id: 'templates', label: 'Prompt templates', icon: 'pencil', group: 'Agents' },
   { id: 'actions', label: 'Actions', icon: 'run', group: 'Agents' },
   { id: 'pr', label: 'Pull requests', icon: 'pr', group: 'Agents' },
@@ -1693,6 +1725,7 @@ export type WidgetsApi = {
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
   logs?: (id: string) => void // development mode's: its fetches and actions
   ai?: (want: string) => void // Make it with Laki AI: its chat, asked to make one (unset: Laki AI is off)
+  edit?: (w: WidgetView, want: string) => void // Edit with Laki AI: one of yours in Laki's folder, changed in its chat (unset: Laki AI is off)
 }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
@@ -1848,6 +1881,7 @@ function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         )}
       </div>
       {w.description && <div className="muted small">{w.description}</div>}
+      {api.edit && !w.builtin && api.home && w.dir === `${api.home}/${w.id}` && <WidgetEdit w={w} edit={api.edit} />}
       {w.js && (
         <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
           <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its fetch gave it. Its fetch command always has the network" />
@@ -1872,10 +1906,31 @@ function WidgetList({ api }: { api: WidgetsApi }) {
   const w = api.list.find(x => x.id === open)
   const close = () => ((document.activeElement as HTMLElement | null)?.blur(), setOpen(null))
   if (!api.list.length) return null
+  const mine = api.list.filter(w => !w.builtin)
+  const theirs = api.list.filter(w => w.builtin)
   return (
     <>
+      <Group title="Yours" hint="Ones you or an AI made: in Laki's folder or the folders below">
+        {mine.length ? list(mine) : <p className="muted small">None yet: make one with AI below.</p>}
+      </Group>
+      {!!theirs.length && <Group title="Built in" hint="Ones that come with Laki: turn on the ones you like">{list(theirs)}</Group>}
+      {w && (
+        <Modal title={w.name} onClose={close} wide loose>
+          <WidgetCard w={w} api={api} />
+          <div className="buttons">
+            <span className="muted small grow">Saved as you change it</span>
+            <button className="primary" onClick={close}>
+              Done
+            </button>
+          </div>
+        </Modal>
+      )}
+    </>
+  )
+  function list(ws: WidgetView[]) {
+    return (
       <div className="sched-list">
-        {api.list.map(w => (
+        {ws.map(w => (
           <div key={w.id} className={`sched-row ${w.on ? '' : 'off'}`}>
             <span className="sched-icon">
               <Icon name={w.js ? 'code' : 'panel'} />
@@ -1906,18 +1961,26 @@ function WidgetList({ api }: { api: WidgetsApi }) {
           </div>
         ))}
       </div>
-      {w && (
-        <Modal title={w.name} onClose={close} wide loose>
-          <WidgetCard w={w} api={api} />
-          <div className="buttons">
-            <span className="muted small grow">Saved as you change it</span>
-            <button className="primary" onClick={close}>
-              Done
-            </button>
-          </div>
-        </Modal>
-      )}
-    </>
+    )
+  }
+}
+
+// Edit with Laki AI: what to change, sent to its chat with the extension's id; Laki AI rewrites it (saved off, as a new
+// one is, until you turn it on again)
+function WidgetEdit({ w, edit }: { w: WidgetView; edit: NonNullable<WidgetsApi['edit']> }) {
+  const [want, setWant] = useState('')
+  const go = () => want.trim() && (edit(w, want.trim()), setWant(''))
+  return (
+    <label>
+      Change it with Laki AI
+      <span className="widget-make">
+        <input value={want} onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), go())} placeholder="e.g. show the count in red over 10; add a refresh button" />
+        <button type="button" className="primary" disabled={!want.trim()} onClick={go}>
+          <Icon name="ai" /> Edit with Laki AI
+        </button>
+      </span>
+      <span className="muted small">Its chat opens and it rewrites the files. It's turned off once changed: look, then turn it on again</span>
+    </label>
   )
 }
 
@@ -1934,7 +1997,7 @@ function WidgetPrompt({ home, ai }: { home: string; ai?: (want: string) => void 
       title="Make one with AI"
       hint={
         ai
-          ? 'Describe it and press Make it with Laki AI: its chat opens, asks you a few questions about it, then writes it (saved off until you turn it on). Or copy the prompt below into any AI chat.'
+          ? 'Describe it and press Make it with Laki AI: its chat opens, asks you a few questions about it, then writes it (saved off until you turn it on). Or copy the prompt into any AI chat.'
           : "Describe it, copy the prompt, paste it into any AI chat, then save the files it gives you in Laki's folder and press Reload. With Laki AI on (Settings › AI), it makes one right here."
       }
     >
@@ -1949,10 +2012,18 @@ function WidgetPrompt({ home, ai }: { home: string; ai?: (want: string) => void 
           )}
         </span>
       </label>
-      <div className="prompt-box">
-        <textarea className="mono" readOnly rows={6} value={text} onFocus={e => e.currentTarget.select()} />
-        <IconButton icon={copied ? 'check' : 'copy'} title={copied ? 'Copied' : 'Copy the prompt'} className="prompt-copy" onClick={() => void copy()} />
+      <div className="row">
+        <button type="button" onClick={() => void copy()}>
+          <Icon name={copied ? 'check' : 'copy'} /> {copied ? 'Copied' : 'Copy the prompt'}
+        </button>
+        <span className="muted small grow">For any other AI chat: what you typed, then how a Laki extension is made</span>
       </div>
+      <details className="prompt-peek">
+        <summary className="muted small">Show the prompt</summary>
+        <div className="prompt-box">
+          <textarea className="mono" readOnly rows={8} value={text} onFocus={e => e.currentTarget.select()} />
+        </div>
+      </details>
     </Group>
   )
 }
@@ -2023,11 +2094,12 @@ export function SettingsPage(p: {
   presets: Preset[] // the daemon's: the settings', or its defaults
   accounts?: AccountsApi // claude's and codex's sign-ins (an older daemon: none)
   onSection?: (id: string) => void // each section it shows (Get started's steps)
+  onMemory?: (project: string) => void // a project's Memory row: its page's Memory tab
 }) {
   const { settings, apps, onSave, onClose } = p
   const [s, setS] = useState<AppSettings>(settings)
   // the section it was on last (closing it, a click in the sidebar, doesn't lose your place), unless it's gone
-  const sections = SECTIONS.filter(x => (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || (p.ai && s.voice?.on === true)) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
+  const sections = SECTIONS.filter(x => (x.id !== 'notes' || s.devMode === true) && (x.id !== 'skill' || p.skill) && (x.id !== 'ai' || p.ai) && (x.id !== 'voice' || (p.ai && s.voice?.on === true)) && (x.id !== 'remote' || p.remote) && (x.id !== 'widgets' || p.widgets) && (x.id !== 'resources' || p.resources))
   const [sec, setSec] = useState(() => (x => (sections.some(y => y.id === x) || p.projects?.some(y => `project:${y.id}` === x) ? x : 'general'))(p.section ?? load('laki.settingsSec', 'general')))
   useEffect(() => {
     keep('laki.settingsSec', sec)
@@ -2272,7 +2344,7 @@ export function SettingsPage(p: {
               </button>
             </Fragment>
           ))}
-          {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Projects</div>}
+          {!findQ.trim() && !!p.projects?.length && <div className="settings-nav-head">Project settings</div>}
           {!findQ.trim() && p.projects?.map(x => (
             <button key={x.id} className={sec === `project:${x.id}` ? 'on' : ''} onClick={() => openSec(`project:${x.id}`)} data-tip={x.path}>
               <Icon name={x.host ? 'server' : x.git === false ? 'folder' : 'fork'} /> <span>{x.name}</span>
@@ -2290,6 +2362,7 @@ export function SettingsPage(p: {
               global={{ actions: s.actions, templates: s.templates }}
               taken={p.projects?.filter(x => x.id !== project.id).flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])}
               onGlobal={openSec}
+              onMemory={p.onMemory && (() => p.onMemory!(project.id))}
               onSave={o => p.onSaveProject?.(project.id, o)}
             />
           )}
@@ -2404,6 +2477,13 @@ export function SettingsPage(p: {
                   <Switch className="switch-row" on={!!s.keepStorage} onChange={v => set({ keepStorage: v })}>
                     <Says title="Keep a deleted workspace's storage" hint="Off: deleting a workspace deletes its storage folder too (archiving keeps it)" />
                   </Switch>
+                  <label className="switch-row">
+                    <select value={s.artifactsIn ?? 'app'} onChange={e => set({ artifactsIn: e.target.value === 'browser' ? 'browser' : 'app' })}>
+                      <option value="app">In Laki</option>
+                      <option value="browser">In the browser</option>
+                    </select>
+                    <Says title="Open HTML and Markdown artifacts" hint="In Laki: a viewer over the app (HTML sandboxed: its scripts run, it can't read Laki or your files; Markdown rendered), with Open in the browser. In the browser: your default browser, as Finder opens them" />
+                  </label>
                 </div>
               </Group>
               <Group title="Tabs">
@@ -2471,6 +2551,11 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.aiGlow === true} onChange={v => set({ aiGlow: v })}>
                   <Says title="Laki AI's glow" hint="As Laki AI reads a tab's screen or uses the agent browser, a moving glow around that tab (else the window): it was looking. Off by default" />
                 </Switch>
+                {p.ai && (
+                  <Switch className="switch-row" on={!!s.ai?.on} onChange={on => set({ ai: { ...s.ai, on } })}>
+                    <Says title="Laki AI" hint="Laki's own assistant: ask it in words to start workspaces, send prompts to your agents or tell you what they're doing. Shows the rail's AI and ⌘K; the same switch as Settings › AI" />
+                  </Switch>
+                )}
                 {p.ai && (
                   <Switch className="switch-row" on={s.voice?.on === true} onChange={on => set({ voice: { ...s.voice, on } })}>
                     <Says title="Voice" hint="Talk instead of typing: speech to text in the cloud (OpenRouter, a model you pick) and hold Fn to talk, typed where the cursor is. Shows Settings › Voice; off, the mic is macOS dictation" />
@@ -2559,6 +2644,12 @@ export function SettingsPage(p: {
               </div>
               </Group>
               <Group title="Rail" hint="Projects, Board, Schedule, Terminal and Browser on the left, with what needs you on each; the list beside it shows the one you pick">
+                <Switch className="switch-row" on={s.railShells !== false} onChange={v => set({ railShells: v })}>
+                  <Says title="Terminals" hint="The rail's Terminal: your terminals in a list of their own. Off: Terminals is a project in Projects' list" />
+                </Switch>
+                <Switch className="switch-row" on={s.railBrowsers !== false} onChange={v => set({ railBrowsers: v })}>
+                  <Says title="Browsers" hint="The rail's Browser: your browsers in a list of their own. Off: Browsers is a project in Projects' list" />
+                </Switch>
                 <Switch className="switch-row" on={s.railLabels !== false} onChange={v => set({ railLabels: v })}>
                   <Says title="Labels" hint="Words under the rail's icons: Projects, Board, Schedule, Terminal, Browser, Settings; off: icons only, and a narrower rail" />
                 </Switch>
@@ -2990,6 +3081,17 @@ export function SettingsPage(p: {
             />
           )}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
+          {sec === 'memory' && (
+            <>
+              <h2>Global memory</h2>
+              <p className="muted small">
+                Your own rules for every project: Claude and Codex get them at every start, in any project, just before that project's own memory (a project's
+                page › Memory). Good for how you like to work: commit messages, tests to run, what never to do. Only you add here: agents' auto-memory stays
+                with each project. A profile with <b>Tell it about Laki</b> off gets none.
+              </p>
+              <MemoryList global memory={s.memory ?? []} save={memory => (set({ memory }), Promise.resolve())} />
+            </>
+          )}
           {sec === 'notes' && (
             <>
               <h2>Release notes</h2>
@@ -2999,7 +3101,7 @@ export function SettingsPage(p: {
               </div>
             </>
           )}
-          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} presets={presets} onChange={ai => set({ ai })} />}
+          {sec === 'ai' && p.ai && <AiSection api={p.ai} ai={s.ai ?? {}} presets={presets} onChange={ai => set({ ai })} imageDays={s.imageDays} onImageDays={imageDays => set({ imageDays })} />}
           {sec === 'voice' && p.ai && s.voice?.on === true && <VoiceSection v={s.voice ?? {}} keyApi={p.ai} onChange={voice => set({ voice })} />}
           {sec === 'webhook' && <WebhookSection w={s.webhook ?? {}} onChange={webhook => set({ webhook })} test={p.webhookTest} />}
           {sec === 'pr' && (
@@ -3060,8 +3162,9 @@ export function SettingsPage(p: {
                 project › Actions) come after them, and one with the same name and kind replaces a global one.
               </Scope>
               <p className="muted small">
-                A prompt goes to its agent's tab (the focused one first), queued while the agent works; it's listed only while that agent runs there. A
-                command goes to a terminal: the focused one, any other, or a new one. The copy button makes the same for another agent.
+                Agent actions: a prompt goes to its agent's tab (the focused one first), queued while the agent works; it's listed only while that agent runs
+                there. Shell actions (target Shell): a command you run often, run in the focused shell at its prompt, any other at its prompt, or a new one.
+                Resting on one in Run ▾ shows what it sends. The copy button makes the same for another agent.
               </p>
               <ActionsField value={s.actions} taken={p.projects?.flatMap(x => x.config?.actions?.map(a => a.slug) ?? [])} onChange={actions => set({ actions })} />
             </>

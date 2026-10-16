@@ -11,7 +11,6 @@ import { ago } from '../../shared/widget'
 import { ACTIONS, apiQuestions, flowVars, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
 import { Markdown } from './MarkdownView'
-import { Modal } from './panels'
 import { ShownDialog } from './Shown'
 import { ask, Icon, IconButton, type MenuItem, Page, Switch, useMenu } from './ui'
 import './workflows.css'
@@ -382,7 +381,7 @@ function subOf(b: Block) {
 
 type Lit = { state: Record<string, 'running' | 'waiting' | 'done' | 'failed'>; taken: Set<string>; visits: Record<string, number>; live?: string } // live: the arrow it just took, while it runs
 
-function Canvas({ wf, sel, onPick, onMove, onMenu, doomed, lit }: { wf: Workflow; sel?: string | null; onPick?: (id: string | null) => void; onMove?: (id: string, at: [number, number]) => void; onMenu?: (e: React.MouseEvent, id: string) => void; doomed?: string | null; lit?: Lit }) {
+function Canvas({ wf, sel, onPick, onMove, onMenu, onDrop, doomed, lit }: { wf: Workflow; sel?: string | null; onPick?: (id: string | null) => void; onMove?: (id: string, at: [number, number]) => void; onMenu?: (e: React.MouseEvent, id: string) => void; onDrop?: (kind: BlockKind, more: Partial<Block> | undefined, at: [number, number]) => void; doomed?: string | null; lit?: Lit }) {
   const pos = placed(wf.blocks)
   const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number; moved: boolean } | null>(null)
   if (drag) pos.set(drag.id, [drag.x, drag.y])
@@ -427,7 +426,20 @@ function Canvas({ wf, sel, onPick, onMove, onMenu, doomed, lit }: { wf: Workflow
     })
   }
   return (
-    <div className="wf-scroll" onPointerDown={e => e.target === e.currentTarget && onPick?.(null)}>
+    <div
+      className="wf-scroll"
+      onPointerDown={e => e.target === e.currentTarget && onPick?.(null)}
+      onDragOver={e => onDrop && e.dataTransfer.types.includes(DRAG) && (e.preventDefault(), (e.dataTransfer.dropEffect = 'copy'))}
+      onDrop={e => {
+        const raw = onDrop && e.dataTransfer.getData(DRAG)
+        if (!raw) return
+        e.preventDefault()
+        const { kind, more } = JSON.parse(raw) as { kind: BlockKind; more?: Partial<Block> }
+        const r = e.currentTarget.querySelector('.wf-canvas')!.getBoundingClientRect() // scrolled with it: canvas coordinates
+        const snap = (v: number) => Math.max(0, Math.round(v / 10) * 10)
+        onDrop!(kind, more, [snap(e.clientX - r.left - W / 2), snap(e.clientY - r.top - H / 2)])
+      }}
+    >
       <div className="wf-canvas" style={{ width: maxX, height: maxY }} onPointerDown={e => e.target === e.currentTarget && onPick?.(null)}>
         <svg width={maxX} height={maxY}>
           <defs>
@@ -485,7 +497,6 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
   const wf = parsed.workflow
   const problems = [...parsed.problems, ...check(wf)]
   const dirty = text !== item.text
-  const [vars, setVars] = useState(false) // the Variables list
   const [doomed, setDoomed] = useState<string | null>(null) // the block its trash is under the pointer: red on the canvas
   useEffect(() => setDoomed(null), [pick]) // another block's panel: not that one
   // the file changed under it (Laki AI, an agent, the CLI): taken when it wasn't changed here, or when Laki AI wrote it
@@ -518,13 +529,15 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
-  const addBlock = (kind: BlockKind, more: Partial<Block> = {}, after = pick) =>
+  // at: where it was dropped on the canvas (none: below the block it comes after, the blocks under it moved down)
+  const addBlock = (kind: BlockKind, more: Partial<Block> = {}, after = pick, at?: [number, number]) =>
     edit(w => {
+      if (w.blocks.length >= MAX_BLOCKS) return
       const id = freeId(w, kind)
       const from = w.blocks.find(b => b.id === after) ?? w.blocks.at(-1)
       const pos = placed(w.blocks)
       const [fx, fy] = from ? pos.get(from.id)! : [70, 20]
-      const b: Block = { id, kind, ...JSON.parse(JSON.stringify(NEW_BLOCK[kind])), ...more, at: [fx, fy + 90] }
+      const b: Block = { id, kind, ...JSON.parse(JSON.stringify(NEW_BLOCK[kind])), ...more, at: at ?? [fx, fy + 90] }
       // {{prev}} in its defaults: what the block before gives (an agent's or AI call's answer, a command's output), else the task
       const give = from?.kind === 'agent' || from?.kind === 'llm' ? 'answer' : from?.kind === 'run' || from?.kind === 'webhook' || from?.kind === 'wait' ? 'output' : ''
       const prev = give ? `{{steps.${from!.id}.${give}}}` : '{{task}}'
@@ -535,7 +548,7 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
         const was = from.to?.[e]
         from.to = { ...from.to, [e]: id }
         if (was && !optioned(kind) && kind !== 'end') b.to = { [EXITS[kind][0]]: was }
-        for (const o of w.blocks) if (o !== from && o.at && o.at[1] > fy && Math.abs(o.at[0] - fx) < W) o.at = [o.at[0], o.at[1] + 90] // room below
+        if (!at) for (const o of w.blocks) if (o !== from && o.at && o.at[1] > fy && Math.abs(o.at[0] - fx) < W) o.at = [o.at[0], o.at[1] + 90] // room below
       }
       w.blocks.push(b)
       setPick(id)
@@ -583,7 +596,6 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
   )
   return (
     <div className="wf-editor">
-      {vars && <VarsList wf={wf} onClose={() => setVars(false)} toast={api.toast} />}
       <div className="wf-head">
         <div className="wf-title">
           <b>{wf.name}</b>
@@ -616,14 +628,6 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
       </div>
       <div className="wf-bar">
         {where}
-        {mode === 'canvas' && (
-          <button className="btn small" disabled={wf.blocks.length >= MAX_BLOCKS} data-tip={wf.blocks.length >= MAX_BLOCKS ? `${MAX_BLOCKS} blocks at most` : undefined} onClick={e => openMenu(e, blockMenu(pick ? `After ${blockName(wf.blocks.find(b => b.id === pick) ?? { id: pick, kind: 'agent' })}` : 'A new block', actions, presets, addBlock))}>
-            <Icon name="plus" size={12} /> Block
-          </button>
-        )}
-        <button className="btn small" onClick={() => setVars(true)} data-tip="Every variable this workflow has, and the block that sets it">
-          {'{{ }}'} Variables
-        </button>
         {problems.length > 0 && (
           <span className="wf-problems" data-tip={problems.join('\n')}>
             {problems.length === 1 ? problems[0] : `${problems[0]} · ${problems.length - 1} more`}
@@ -632,7 +636,8 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
       </div>
       {mode === 'canvas' ? (
         <div className="wf-split">
-          <Canvas wf={wf} sel={pick} onPick={setPick} onMove={(id, at) => edit(w => void (w.blocks.find(b => b.id === id)!.at = at))} onMenu={(e, id) => openMenu(e, blockActions(id))} doomed={doomed} />
+          <Palette wf={wf} actions={actions} presets={presets} full={wf.blocks.length >= MAX_BLOCKS} pick={pick} onAdd={(k, more) => addBlock(k, more)} toast={api.toast} />
+          <Canvas wf={wf} sel={pick} onPick={setPick} onMove={(id, at) => edit(w => void (w.blocks.find(b => b.id === id)!.at = at))} onMenu={(e, id) => openMenu(e, blockActions(id))} onDrop={(k, more, at) => addBlock(k, more, pick, at)} doomed={doomed} />
           <Inspector wf={wf} id={pick} presets={presets} actions={actions} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} />
         </div>
       ) : (
@@ -703,28 +708,89 @@ const NEW_BLOCK: Record<BlockKind, Partial<Block>> = {
   save: { name: 'Save', file: 'notes.md', text: '{{prev}}' },
   end: { name: 'Done', result: 'success' },
 }
-// + Block's menu: each kind, an agent action (Run ▾'s) as an agent block, and the three ways to keep something
-function blockMenu(head: string, actions: RunAction[], presets: Preset[], add: (k: BlockKind, more?: Partial<Block>) => void): MenuItem[] {
-  const one = (k: BlockKind): MenuItem => ({ label: BLOCK_NAMES[k], sub: KIND_SAYS[k], run: () => add(k) })
+// what a workflow can add, in groups: each kind, an agent action (Run ▾'s) as an agent block, and the three ways to keep
+// something (the sidebar's tiles and a block's Add a block after it)
+type Pick = { label: string; sub?: string; pill?: string; kind: BlockKind; more?: Partial<Block> }
+function picks(actions: RunAction[], presets: Preset[]): { head: string; items: Pick[] }[] {
+  const one = (k: BlockKind): Pick => ({ label: BLOCK_NAMES[k], sub: KIND_SAYS[k], kind: k })
   const presetOf = (a: RunAction) => (a.target !== 'any' && presets.some(p => p.name === a.target) ? a.target : undefined)
   return [
-    { head },
-    one('agent'),
-    actions.length
-      ? { label: 'Agent action', sub: 'One of Run ▾’s, as an agent block', items: actions.map((a): MenuItem => ({ label: a.name, sub: a.slug, pill: a.target === 'any' ? undefined : a.target, run: () => add('agent', { name: a.name, use: ref(a), text: undefined, ...(presetOf(a) && { agent: presetOf(a) }) }) })) }
-      : { label: 'Agent action', sub: 'None yet: Settings › Actions', run: () => add('agent') },
-    ...(['run', 'choice', 'case', 'ask', 'popup', 'action', 'wait'] as const).map(one),
-    { head: 'Outside Laki' },
-    one('llm'),
-    one('decide'),
-    one('webhook'),
-    { head: 'Into its Artifacts' },
-    { label: 'Save text', sub: 'An answer, notes: a file in the storage folder', run: () => add('save') },
-    { label: 'Save a file', sub: 'A file or folder of the workspace, copied there', run: () => add('save', { name: 'Keep a file', file: 'report.html', from: 'report.html', text: undefined }) },
-    { label: 'Save a link', sub: 'A URL (its PR, a deploy), listed first', run: () => add('save', { name: 'Keep the PR', file: 'Pull request', link: '{{pr.url}}', text: undefined }) },
-    { head: 'The end' },
-    one('end'),
+    { head: 'Blocks', items: [one('agent'), ...(['run', 'choice', 'case', 'ask', 'popup', 'action', 'wait'] as const).map(one)] },
+    { head: 'Agent actions', items: actions.map(a => ({ label: a.name, sub: a.slug, pill: a.target === 'any' ? undefined : a.target, kind: 'agent', more: { name: a.name, use: ref(a), text: undefined, ...(presetOf(a) && { agent: presetOf(a) }) } })) },
+    { head: 'Outside Laki', items: [one('llm'), one('decide'), one('webhook')] },
+    {
+      head: 'Into its Artifacts',
+      items: [
+        { label: 'Save text', sub: 'An answer, notes: a file in the storage folder', kind: 'save' },
+        { label: 'Save a file', sub: 'A file or folder of the workspace, copied there', kind: 'save', more: { name: 'Keep a file', file: 'report.html', from: 'report.html', text: undefined } },
+        { label: 'Save a link', sub: 'A URL (its PR, a deploy), listed first', kind: 'save', more: { name: 'Keep the PR', file: 'Pull request', link: '{{pr.url}}', text: undefined } },
+      ],
+    },
+    { head: 'The end', items: [one('end')] },
   ]
+}
+// a block's Add a block after it: picks as a menu, the agent actions in a submenu
+function blockMenu(head: string, actions: RunAction[], presets: Preset[], add: (k: BlockKind, more?: Partial<Block>) => void): MenuItem[] {
+  const [main, acts, ...rest] = picks(actions, presets)
+  const item = (p: Pick): MenuItem => ({ label: p.label, sub: p.sub, pill: p.pill, run: () => add(p.kind, p.more) })
+  return [
+    { head },
+    item(main.items[0]),
+    acts.items.length ? { label: 'Agent action', sub: 'One of Run ▾’s, as an agent block', items: acts.items.map(item) } : { label: 'Agent action', sub: 'None yet: Settings › Actions', run: () => add('agent') },
+    ...main.items.slice(1).map(item),
+    ...rest.flatMap((g): MenuItem[] => [{ head: g.head }, ...g.items.map(item)]),
+  ]
+}
+
+// the editor's left sidebar: Blocks (a click adds one after the picked block, a drag drops it where you let go) and
+// Variables (a click copies one, a drag drops it into a field)
+const DRAG = 'application/x-laki-block'
+function Palette({ wf, actions, presets, full, pick, onAdd, toast }: { wf: Workflow; actions: RunAction[]; presets: Preset[]; full: boolean; pick: string | null; onAdd: (k: BlockKind, more?: Partial<Block>) => void; toast: (t: string) => void }) {
+  const [tab, setTab] = useState<'blocks' | 'vars'>('blocks')
+  const after = wf.blocks.find(b => b.id === pick)
+  return (
+    <aside className="wf-palette" aria-label="Blocks and variables">
+      <div className="seg">
+        <button className={tab === 'blocks' ? 'on' : ''} onClick={() => setTab('blocks')}>Blocks</button>
+        <button className={tab === 'vars' ? 'on' : ''} onClick={() => setTab('vars')}>{'{{ }}'} Variables</button>
+      </div>
+      {tab === 'blocks' ? (
+        <>
+          <p className="wf-hint">{full ? `${MAX_BLOCKS} blocks at most` : `A click adds it ${after ? `after ${blockName(after)}` : 'at the end'}; or drag it onto the canvas`}</p>
+          {picks(actions, presets).map(g => (
+            <section key={g.head}>
+              <h4>{g.head}</h4>
+              {!g.items.length && <p className="wf-hint">None yet: Settings › Actions</p>}
+              {g.items.map(p => (
+                <div
+                  key={`${p.kind}:${p.label}`}
+                  role="button"
+                  tabIndex={0}
+                  aria-disabled={full}
+                  draggable={!full}
+                  className="wf-tile"
+                  style={{ ['--kc' as string]: `var(--tc-${KIND_COLOR[p.kind]})` }}
+                  data-tip={p.sub}
+                  onDragStart={e => (e.dataTransfer.setData(DRAG, JSON.stringify({ kind: p.kind, more: p.more })), (e.dataTransfer.effectAllowed = 'copy'))}
+                  onClick={() => !full && onAdd(p.kind, p.more)}
+                  onKeyDown={e => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), !full && onAdd(p.kind, p.more))}
+                >
+                  <i />
+                  <b>{p.label}</b>
+                  {p.pill && <span className="wf-tile-pill">{p.pill}</span>}
+                </div>
+              ))}
+            </section>
+          ))}
+        </>
+      ) : (
+        <>
+          <p className="wf-hint">{'A click copies one; drag it into a field. A block’s are there once it ran'}</p>
+          <VarsBody wf={wf} toast={toast} />
+        </>
+      )}
+    </aside>
+  )
 }
 const FORMAT_HELP = `\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30\`.
 
@@ -740,7 +806,7 @@ function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoo
   if (!b)
     return (
       <div className="wf-insp">
-        <p className="wf-hint">Pick a block to change it. Drag blocks to move them; + Block adds one after the picked block.</p>
+        <p className="wf-hint">Pick a block to change it. Drag blocks to move them; the sidebar's blocks go after the picked one (a click) or where you drop them.</p>
         <div className="wf-field">
           <label>Name</label>
           <Typed value={wf.name} onText={v => edit(w => void (w.name = v))} />
@@ -1120,27 +1186,26 @@ function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoo
 }
 
 // every variable a workflow has (flowVars): the run's, then each block's; a click copies it as {{name}}
-function VarsList({ wf, onClose, toast }: { wf: Workflow; onClose: () => void; toast: (t: string) => void }) {
+// what {{…}} fills in prompts, commands, URLs, bodies and titles (a Case or If tests them), the run's then each block's.
+// A webhook also has {{env.NAME}}: Settings' or the project's env, never logged
+function VarsBody({ wf, toast }: { wf: Workflow; toast: (t: string) => void }) {
   const all = flowVars(wf)
-  const groups = [{ id: '', title: 'The run’s', vars: all.filter(v => !v.from) }, ...wf.blocks.flatMap(b => (x => (x.length ? [{ id: b.id, title: `${blockName(b)} · ${BLOCK_NAMES[b.kind]}`, vars: x }] : []))(all.filter(v => v.from === b.id)))]
+  const groups = [{ id: '', title: 'The run’s', vars: all.filter(v => !v.from) }, ...wf.blocks.flatMap(b => (x => (x.length ? [{ id: b.id, title: blockName(b), vars: x }] : []))(all.filter(v => v.from === b.id)))]
   const copy = (n: string) => void navigator.clipboard.writeText(`{{${n}}}`).then(() => toast(`Copied {{${n}}}`), () => {})
   return (
-    <Modal title={`Variables · ${wf.name}`} onClose={onClose} wide>
-      <p className="wf-hint">{'What {{…}} fills in prompts, commands, URLs, bodies and titles; a Case or If tests them. A block’s are there once it ran. A click copies one. A webhook also has {{env.NAME}}: Settings’ or the project’s env, never logged.'}</p>
-      <div className="wf-vars">
-        {groups.map(g => (
-          <section key={g.id || 'run'}>
-            <h4>{g.title}{g.id && <code className="wf-id">{g.id}</code>}</h4>
-            {g.vars.map(v => (
-              <button key={v.name} className="wf-var" onClick={() => copy(v.name)} data-tip="Copy">
-                <code>{`{{${v.name}}}`}</code>
-                <span>{v.what}</span>
-              </button>
-            ))}
-          </section>
-        ))}
-      </div>
-    </Modal>
+    <div className="wf-vars">
+      {groups.map(g => (
+        <section key={g.id || 'run'}>
+          <h4>{g.title}{g.id && <code className="wf-id">{g.id}</code>}</h4>
+          {g.vars.map(v => (
+            <button key={v.name} className="wf-var" draggable onDragStart={e => e.dataTransfer.setData('text/plain', `{{${v.name}}}`)} onClick={() => copy(v.name)} data-tip={v.what}>
+              <code>{`{{${v.name}}}`}</code>
+              <span>{v.what}</span>
+            </button>
+          ))}
+        </section>
+      ))}
+    </div>
   )
 }
 

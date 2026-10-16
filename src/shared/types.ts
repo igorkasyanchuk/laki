@@ -366,6 +366,11 @@ export type Settings = {
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
   railLabels?: boolean // the rail layout's words under its icons; off: icons only, a narrower rail (unset: on)
+  railShells?: boolean // the rail's Terminal button; off: Terminals is a project in Projects' list (unset: on)
+  railBrowsers?: boolean // the rail's Browser button; off: Browsers is a project in Projects' list (unset: on)
+  imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
+  artifactsIn?: 'app' | 'browser' // an HTML or Markdown artifact opens in the app's viewer or the default browser (unset: app)
+  memory?: Memory[] // Settings › Global memory: the user's own rules (MEMORY_MAX, never auto) for claude and codex in every project, with its memory
   sideStyle?: SideStyle // the sidebar's rows: a line, the marks, a second line, cards with the agent's last answer (unset: default)
   progress?: boolean // LAKI_PROGRESS=1 in agents' env: with the laki skill, they report how far along their task is (unset: off)
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
@@ -438,6 +443,9 @@ export type Todo = { id: string; project: string; text: string; at: number }
 export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string }
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
+export const IMAGE_DAYS = 30 // days a pasted image is kept (<data>/images: Laki AI's chats, prompts) unless Settings › AI says otherwise
+// an earlier chat of the AI page's (New chat keeps the one it ends): its file's name, its first ask, its last message, its messages
+export type AiPast = { id: string; title: string; at: number; n: number }
 
 // a plan's limit (daemon/usage.ts): used %, when it resets (ms); note: what the % is of, for an amount (extra usage)
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
@@ -554,4 +562,4 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 65
+export const API = 66

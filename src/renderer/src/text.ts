@@ -1,6 +1,6 @@
 // Small text helpers, kept apart from React so tests can load them.
 
-import { fillTemplate, mergeActions, prRef, type RunAction, type Template, templated, templatesFor } from '../../shared/types.ts'
+import { fillTemplate, mergeActions, prRef, type RunAction, type TabView, type Template, templated, templatesFor } from '../../shared/types.ts'
 export type { Template }
 // a prompt template (Settings → Prompt templates, and a project's own): {{prompt}} is what you type, {{project}} and
 // {{base}} the new workspace's, {{pr}} its PR (prRef); an unknown {{name}} stays as it is
@@ -24,17 +24,17 @@ export const parseMails = (s: string) =>
 
 // an action (Settings › Actions, or a project's): a prompt for an agent, or a command for a terminal
 export type { RunAction }
-export type ActionTab = { id: string; agent?: string; shell?: boolean } // a workspace's live tab: its agent, or a shell
+export type ActionTab = { id: string; agent?: string; shell?: boolean; busy?: boolean } // a workspace's live tab: its agent, or a shell (busy: a command in front, vim, a server)
 
 // Run ▾'s actions, worked out as it opens: the global ones, then the project's (one with a global one's name and
-// target replaces it). An agent's only while the workspace runs that agent (its focused tab first; any: any agent); a terminal's
-// always (the focused shell, else any; none: a new one)
+// target replaces it). An agent's only while the workspace runs that agent (its focused tab first; any: any agent); a shell's
+// always (the focused shell at its prompt, else any at its prompt; none: a new one)
 export function actionsFor(global: RunAction[] = [], project: RunAction[] = [], tabs: ActionTab[] = [], focused?: string) {
   const pick = (ok: (t: ActionTab) => boolean) => tabs.find(t => t.id === focused && ok(t)) ?? tabs.find(ok)
   const agent: { action: RunAction; tab: string }[] = []
   const terminal: { action: RunAction; tab?: string }[] = []
   for (const a of mergeActions(global, project)) {
-    if (a.target === 'shell') terminal.push({ action: a, tab: pick(t => !!t.shell)?.id })
+    if (a.target === 'shell') terminal.push({ action: a, tab: pick(t => !!t.shell && !t.busy)?.id })
     else {
       const t = pick(t => (a.target === 'any' ? !!t.agent : t.agent === a.target))
       if (t) agent.push({ action: a, tab: t.id })
@@ -157,7 +157,7 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 }
 
 // what an imported field must be where a page would break on anything else (a list it maps, a number it adds to)
-const KINDS: Record<string, string> = { presets: 'array null', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
+const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
 export function importable(v: Record<string, unknown>) {
@@ -267,4 +267,17 @@ export function wavOf(samples: Float32Array, rate: number) {
   b.setUint32(40, samples.length * 2, true)
   samples.forEach((v, i) => b.setInt16(44 + i * 2, Math.max(-1, Math.min(1, v)) * 0x7fff, true))
   return new Uint8Array(b.buffer)
+}
+
+// a shell's command (vim, a server, a REPL) spins its first SHELL_SPIN ms only, then shows as idle: it may run for
+// good. An agent, and one typed in a shell (runs), spins its whole turn. App re-renders as one crosses it (spinsUntil)
+export const SHELL_SPIN = 5000
+const shellish = (t: TabView) => (t.kind === 'shell' || t.kind === 'dev') && !t.runs // a terminal or the run tab; not one running an agent
+const quiet = (t: TabView, now: number) => t.status === 'running' && shellish(t) && !!t.runAt && now - t.runAt >= SHELL_SPIN
+export const shownStatus = (t: TabView, now = Date.now()) => (quiet(t, now) ? 'idle' : t.status)
+export const spins = (t: TabView, now = Date.now()) => shownStatus(t, now) === 'running'
+// when the next shell stops spinning (ms from now), or undefined: none will
+export function spinsUntil(tabs: TabView[], now = Date.now()) {
+  const left = tabs.filter(t => t.status === 'running' && shellish(t) && t.runAt && !quiet(t, now)).map(t => t.runAt! + SHELL_SPIN - now)
+  return left.length ? Math.max(0, Math.min(...left)) : undefined
 }

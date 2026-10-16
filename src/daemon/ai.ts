@@ -7,10 +7,10 @@
 // event says which chat as `of` ('' the AI page's): an `id` would make it a reply.
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
-import { appendFileSync, mkdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
-import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, aiTotals, type View } from '../shared/types.ts'
+import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -18,6 +18,9 @@ import { planGet, planOfChat } from './plans.ts'
 
 const keyPath = join(dir, 'ai-key')
 const chatPath = join(dir, 'ai-chat.json')
+const pastDir = join(dir, 'ai-chats') // the AI page's earlier chats: <at>-<hex>.json each, as ai-chat.json
+const PAST_MAX = 100 // ponytail: the newest kept; older ones go as a new one is kept
+const PAST_ID = /^\d+-[0-9a-f]{6}$/
 const callsPath = join(dir, 'ai-calls.jsonl')
 const home = join(dir, 'ai') // the CLI agents' folder: no repo, no project's CLAUDE.md or AGENTS.md
 const KEEP = 200 // the conversation's messages kept
@@ -32,12 +35,12 @@ const api = () => {
 
 const SYSTEM = `You are Laki's assistant. Laki is a Mac app that runs coding agents (Claude Code, Codex, Gemini, Grok, OpenCode) side by side, each task in a workspace: a git worktree on its own branch, with tabs (agent sessions, shells).
 Do what the user asks with the laki tools, at once, without asking first: look things up with laki_state (workspaces, their PRs with titles, each tab's status and last answer), laki_screen and laki_diff; start work with laki_new_workspace (a PR to review: its pr field and a prompt saying what to do), laki_new_tab (another agent in a workspace that exists), laki_send (a message to a running agent), laki_attach_pr; laki_schedules and laki_schedule_add when asked to schedule work.
-A project with groups (laki_state's groups, the sidebar's headings): put each new workspace in the one whose name fits it best (laki_new_workspace's group: a PR review in a group like Reviews); none fits, no group.
+A project with groups (laki_state's groups, the sidebar's headings): put each new workspace in the one whose name fits it best (laki_new_workspace's group: a PR review in a group like Reviews); none fits, no group. A group with a prompt template (laki_state's groupTemplates) starts its workspaces with it on its own; otherwise, when one of the user's prompt templates (laki_templates) plainly fits the task, give it as laki_new_workspace's template; none fits, none.
 Find workspaces by name, branch, PR number or PR title. You cannot archive or delete workspaces, ship or merge: say so if asked.
 Link each workspace or tab you name, so the user opens it with a click: [its name](laki://ws/<workspace id>), or [its name](laki://ws/<workspace id>?tab=<tab id>) for a tab.
 A screenshot may hold PR links or other work: act on each item.
 Workflows, when the user turned them on: blocks Laki runs for a task, one after another (agents, commands, questions for the user, a PR, its checks, files for its Artifacts). laki_workflows lists them and their runs, and with an id gives that one's whole file; laki_workflow_write writes one, the whole file in the format its description gives (an agent block's use: names one of the user's agent actions, Run ▾'s, by the slug laki_workflows lists); to change one, take its file from laki_workflows with its id, edit it and write it back with the same id and project (asked on the Workflows page, the ask says which workflow is open and gives its file as the editor has it, unsaved changes too: change that one). Blocks: agent (json: yes: its answer the JSON object or list it ends with), run, ask, choice, case (text, numbers, JS), action, wait, save, llm (an AI call; json: yes for JSON mode), decide (an AI decision: yes/no "how true", choice and score questions; route: <question> gives a line per answer), webhook, popup (Show you: a window with HTML or Markdown), end (notify: yes, phone: yes, its words as > lines). Before writing a new workflow, ask the user at least 2 questions, one at a time with laki_ask (options to tap): what starts it and what it works on, its steps, where it routes, what it keeps or posts, how it tells them it's done; for a change, ask when what they want isn't clear. The user reads and saves it in Laki before it runs; then laki_workflow_run starts it on a task.
-Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made, yourself (the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. Before writing a new one, ask the user at least 2 questions about it, one at a time with laki_ask (what it shows and from where, where it sits: sidebar, top bar, status bar, a rail or sidebar foot button, what a click does), even when the ask seems clear. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
+Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made or the user let you edit (Edit with Laki AI), yourself (the rest of the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. Before writing a new one, ask the user at least 2 questions about it, one at a time with laki_ask (what it shows and from where, where it sits: sidebar, top bar, status bar, a rail or sidebar foot button, what a click does), even when the ask seems clear. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
 Answer in a few plain sentences: what you did (workspace names) or what you found.`
 
 // Laki's skill for its AI (Settings › AI, unset: on): more tools, and what they're for in its instructions
@@ -159,8 +162,77 @@ const fresh = (t: Thread) => ((t.chat = []), (t.resume = {}), (t.ended = undefin
 export function aiNew(p: { chat?: string } = {}) {
   const t = thread(p.chat)
   if (busy?.id === t.id) throw new Error('the AI is at work: stop it first')
+  if (!t.id) shelve(t)
   fresh(t)
   changed(t)
+}
+
+// ---------- the AI page's earlier chats (its sidebar): New chat keeps the one it ends; a click takes one up again
+
+// the AI page's chat kept among the earlier ones, once something was asked in it
+function shelve(t: Thread) {
+  if (!t.chat.some(m => m.role === 'user')) return
+  mkdirSync(pastDir, { recursive: true })
+  writeFileSync(join(pastDir, `${t.at}-${randomBytes(3).toString('hex')}.json`), JSON.stringify({ chat: t.chat, resume: t.resume, at: t.at }), { mode: 0o600 })
+  const all = pastFiles().sort((a, b) => parseInt(a) - parseInt(b))
+  for (const f of all.slice(0, Math.max(0, all.length - PAST_MAX))) rmSync(join(pastDir, f), { force: true })
+}
+const pastFiles = () => {
+  try {
+    return readdirSync(pastDir).filter(f => PAST_ID.test(f.slice(0, -5)) && f.endsWith('.json'))
+  } catch {
+    return []
+  }
+}
+const readPast = (id: string): { chat: AiMsg[]; resume: Record<string, string | undefined>; at: number } | null => {
+  if (!PAST_ID.test(String(id))) return null
+  try {
+    const j = JSON.parse(readFileSync(join(pastDir, `${id}.json`), 'utf8'))
+    return { chat: Array.isArray(j.chat) ? j.chat : [], resume: j.resume && typeof j.resume === 'object' ? j.resume : {}, at: Number(j.at) || 0 }
+  } catch {
+    return null
+  }
+}
+// the list, newest first: each one's first ask as its title
+// ponytail: each file read once (they don't change once kept), its row kept here; a gone one drops out
+const pastRows = new Map<string, AiPast>()
+export function aiChats(): AiPast[] {
+  const files = pastFiles()
+  for (const id of pastRows.keys()) if (!files.includes(`${id}.json`)) pastRows.delete(id)
+  return files
+    .map(f => {
+      const id = f.slice(0, -5)
+      let row = pastRows.get(id)
+      if (!row) {
+        const j = readPast(id)
+        const first = j?.chat.find(m => m.role === 'user')
+        pastRows.set(id, (row = { id, title: first?.text.trim().split('\n')[0].slice(0, 100) || (first?.images?.length ? 'An image' : 'A chat'), at: j?.at || parseInt(id), n: j?.chat.length ?? 0 }))
+      }
+      return row
+    })
+    .sort((a, b) => b.at - a.at)
+}
+// one taken up again: it's the AI page's chat (its sessions go on), the one there kept among the earlier ones
+export function aiOpen(p: { id: string }) {
+  const t = thread('')
+  if (busy?.id === t.id) throw new Error('the AI is at work: stop it first')
+  const j = readPast(p.id)
+  if (!j) throw new Error('that chat is gone')
+  shelve(t)
+  rmSync(join(pastDir, `${p.id}.json`), { force: true })
+  Object.assign(t, { chat: j.chat, resume: j.resume, at: j.at || Date.now(), ended: undefined })
+  changed(t)
+  return { ok: true }
+}
+export function aiChatRm(p: { id: string }) {
+  if (!PAST_ID.test(String(p.id))) throw new Error('no such chat')
+  rmSync(join(pastDir, `${p.id}.json`), { force: true })
+  return { ok: true }
+}
+// a pasted image of a message, to show (the page's thumbnails): only the daemon's own (imageOk)
+export function aiImage(p: { path: string }) {
+  if (!imageOk(p.path)) throw new Error("that image isn't kept any more")
+  return dataUrl(p.path)
 }
 // chat: only that chat's ask (none: any, as shutdown and Settings › Resources' Stop)
 export function aiStop(p: { chat?: string } = {}) {

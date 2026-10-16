@@ -3,7 +3,6 @@
 // workspace to WsInfo.
 import { type MouseEvent, type ReactNode } from 'react'
 import { MERGE_METHODS, type MergeMethod, type PRPerm } from '../../shared/types'
-import { PanelHandle } from './Panes'
 import { Folded } from './MarkdownView'
 import { shortPath } from './text'
 import { type Tunnel } from './Tunnel'
@@ -392,12 +391,9 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
   )
 }
 
-export const INFO_WIDTH = 340 // the info panel's first width, and a double-click on its edge's
-export function InfoPanel(p: {
+// the right panel's Info tab (⌘I): the workspace's facts and its PR
+export function InfoTab(p: {
   w: WsInfo
-  width: number
-  onWidth: (w: number) => void
-  onClose: () => void
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: FixWhat) => void
@@ -413,15 +409,11 @@ export function InfoPanel(p: {
 }) {
   const { w } = p
   return (
-    <div className="info" style={{ width: p.width }}>
-      <PanelHandle onWidth={p.onWidth} init={INFO_WIDTH} />
-      <div className="diff-head">
-        <b>{w.name || w.id}</b>
-        <IconButton icon="pencil" title="Rename" onClick={p.onRename} />
-        <span className="spacer" />
-        <IconButton icon="x" title="Close (⌘I)" onClick={p.onClose} />
-      </div>
-      <div className="info-body">
+      <div className="sp-body info-body">
+        <div className="info-name">
+          <b>{w.name || w.id}</b>
+          <IconButton icon="pencil" title="Rename" onClick={p.onRename} />
+        </div>
         <section className="info-facts">
           {w.name && (
             <Row k="id" copy={() => p.onCopy(w.id)}>
@@ -509,6 +501,5 @@ export function InfoPanel(p: {
 
         <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onAttach={p.onAttach} onDetach={p.onDetach} />
       </div>
-    </div>
   )
 }

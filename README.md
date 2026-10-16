@@ -47,7 +47,7 @@ start one, and Laki AI makes or changes one with you. Each run keeps its decisio
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,
   opened in the browser) a click away, each big in a click, copied with a right click (the file itself, a picture as a picture), in Finder or the side panel's Files too, the links in the info panel.
 - **Board, schedules**: every workspace by where it is, to-dos, and prompts that run at times written in English.
-- **Share a tab**: right click › *Share read-only link*: an agent's chat (or a terminal's text) as a live page anyone
+- **Share a tab**: right click › *Share live view*: an agent's chat (or a terminal's text) as a live page anyone
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only; or with Laki's own
   PIN instead (shown on your Mac, a new one each time; a wrong one, twice unless you pick otherwise, stops it); or for

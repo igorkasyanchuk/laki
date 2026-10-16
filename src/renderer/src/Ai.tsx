@@ -3,13 +3,14 @@
 // folded into one line, the composer at the bottom; Calls: each ask with its tokens, cost and time; Info: how it runs
 // and pays, what it spent, what it can do. Off, or OpenRouter without a key: a note.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AI_MODEL, type AiCall, type AiMsg, type AiSettings, type AiTotals } from '../../shared/types'
+import { AI_MODEL, type AiCall, type AiMsg, type AiPast, type AiSettings, type AiTotals } from '../../shared/types'
 import { api, bridge, openExternal } from './api'
 import { ago } from './Info'
 import { linkWorkspaces, wsLink } from './links'
 import { Markdown } from './MarkdownView'
+import { Modal } from './panels'
 import { type Img, PromptInput } from './PromptInput'
-import { escapes, Icon, IconButton, Page } from './ui'
+import { ask as confirm, escapes, Icon, IconButton, Page } from './ui'
 
 type AiData = { chat: AiMsg[]; busy: boolean; key: boolean; calls: AiCall[]; totals: AiTotals }
 
@@ -77,12 +78,17 @@ export function AiPage({
   const names = workspaces.map(w => `${w.id}\n${w.name}`).join('\n')
   const link = useMemo(() => linkWorkspaces(workspaces), [names])
   const load = () => api.call<AiData>('aiState').then(setD, e => setErr(e.message))
+  // the earlier chats (the page's sidebar; an older daemon: none)
+  const [past, setPast] = useState<AiPast[]>([])
+  const loadPast = () => !compact && void api.call<AiPast[]>('aiChats').then(setPast, () => {})
   useEffect(() => {
     load()
+    loadPast()
     return api.on(m => {
-      if (m.ev === 'open') return void load() // a daemon started again: its conversation, not the busy one we had
+      if (m.ev === 'open') return void (load(), loadPast()) // a daemon started again: its conversation, not the busy one we had
       if (m.ev !== 'ai' || m.of) return // a spec's or brainstorm's chat (the Specs page's)
       setD(x => x && { ...x, chat: m.chat, busy: m.busy })
+      if (!m.chat.length) loadPast() // New chat (here, the AI window, laki ai new): the one it ended is in the list
       if (!m.busy) load() // the call just logged
     })
   }, [])
@@ -140,7 +146,11 @@ export function AiPage({
     </>
   ) : null
 
-  const newChat = () => api.call('aiNew').then(load, e => setErr(e.message))
+  const newChat = () => api.call('aiNew').then(() => (load(), loadPast()), e => setErr(e.message))
+  // an earlier chat taken up again: the one here goes in the list
+  const openPast = (id: string) => (setErr(''), setTab('chat'), api.call('aiOpen', { id }).then(() => (load(), loadPast()), e => setErr(e.message)))
+  const rmPast = (c: AiPast) => void confirm('Delete this chat?', { text: c.title, ok: 'Delete', danger: true }).then(y => y && api.call('aiChatRm', { id: c.id }).then(loadPast, e => setErr(e.message)))
+  const firstAsk = d?.chat.find(m => m.role === 'user')
   const groups = d ? turns(d.chat) : []
   const chat = (
           <>
@@ -252,7 +262,28 @@ export function AiPage({
     )
   return (
     <Page title="Laki AI" onClose={onClose} wide>
-      <div className="ai-page">
+      <div className="ai-page ai-split">
+        <aside className="ai-chats" aria-label="Chats">
+          <button className="ai-new primary" disabled={!d?.chat.length || d.busy} data-tip={d?.busy ? 'It works on this one: stop it first' : 'Start a new conversation: this one stays below'} onClick={newChat}>
+            <Icon name="plus" size={12} /> New chat
+          </button>
+          <div className="ai-chats-head">Chats</div>
+          <button className="ai-chat on" aria-current="true" onClick={() => setTab('chat')}>
+            <span className="ai-chat-title">{firstAsk ? firstAsk.text.trim().split('\n')[0] || 'An image' : 'New chat'}</span>
+            <span className="ai-chat-at">{d?.busy ? 'working…' : 'now'}</span>
+          </button>
+          {past.map(c => (
+            <div key={c.id} className="ai-chat-row">
+              <button className="ai-chat" disabled={d?.busy} data-tip={d?.busy ? 'It works on this chat: stop it first' : c.title} onClick={() => openPast(c.id)}>
+                <span className="ai-chat-title">{c.title}</span>
+                <span className="ai-chat-at">{ago(c.at)}</span>
+              </button>
+              <IconButton icon="trash" title="Delete this chat" className="ai-chat-rm" onClick={() => rmPast(c)} />
+            </div>
+          ))}
+          {!past.length && <p className="muted small ai-chats-none">Chats you end with New chat stay here: a click takes one up again.</p>}
+        </aside>
+        <div className="ai-main">
         <div className="ai-bar">
           <div className="seg" role="tablist">
             {(['chat', 'calls', 'info'] as const).map(k => (
@@ -268,9 +299,6 @@ export function AiPage({
               today {money(t.today.cost)}
             </span>
           )}
-          <button className="ai-new" disabled={!d?.chat.length || d.busy} onClick={newChat}>
-            <Icon name="plus" size={12} /> New chat
-          </button>
         </div>
 
         {tab === 'chat' ? (
@@ -352,6 +380,7 @@ export function AiPage({
             </div>
           </div>
         )}
+        </div>
       </div>
     </Page>
   )
@@ -413,6 +442,58 @@ function target(args: string): [string, string?] | undefined {
   } catch {}
 }
 
+// a message's pasted images: thumbnails, a click shows one big; one no longer kept (Settings › AI › Keep pasted images): a
+// chip. ponytail: the SHOWN_MAX last read kept as data URLs in memory (the oldest goes); a failed read is asked again
+const shown = new Map<string, Promise<string>>()
+const SHOWN_MAX = 40
+const imageOf = (path: string) => {
+  let p = shown.get(path)
+  if (p) shown.delete(path) // to the newest end
+  else p = api.call<string>('aiImage', { path })
+  shown.set(path, p)
+  p.catch(() => shown.get(path) === p && shown.delete(path))
+  for (const k of shown.keys()) if (shown.size > SHOWN_MAX) shown.delete(k)
+  return p
+}
+function Thumbs({ paths }: { paths: string[] }) {
+  const [urls, setUrls] = useState<(string | null)[]>([])
+  const [big, setBig] = useState<string | null>(null)
+  useEffect(() => {
+    let on = true
+    void Promise.all(paths.map(p => imageOf(p).catch(() => null))).then(u => on && setUrls(u))
+    return () => void (on = false)
+  }, [paths.join('\n')])
+  const gone = urls.filter(u => u === null).length
+  return (
+    <span className="ai-thumbs">
+      {urls.map((u, i) =>
+        u ? (
+          <button key={i} type="button" className="ai-thumb" data-tip="Show it big" onClick={() => setBig(u)}>
+            <img src={u} alt={`Image ${i + 1}`} />
+          </button>
+        ) : null,
+      )}
+      {(!urls.length || gone > 0) && (
+        <span className="tag" data-tip={urls.length ? 'Not kept any more: Settings › AI › Keep pasted images' : undefined}>
+          <Icon name="image" size={11} /> {urls.length ? gone : paths.length} image{(urls.length ? gone : paths.length) > 1 ? 's' : ''}
+        </span>
+      )}
+      {big && (
+        <Modal title="Image" onClose={() => setBig(null)} wide loose>
+          <div className="art-big">
+            <img src={big} alt="" />
+          </div>
+          <div className="buttons">
+            <button className="primary" onClick={() => setBig(null)}>
+              Close
+            </button>
+          </div>
+        </Modal>
+      )}
+    </span>
+  )
+}
+
 export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: string) => string; busy: boolean; onPick: (id: string, n: number) => void }) {
   const src = useMemo(() => link(m.text), [m.text, link])
   if (m.role === 'error') return <div className="ai-msg ai-error">{m.text}</div>
@@ -420,12 +501,7 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
     return (
       <div className="ai-msg ai-user">
         {m.text}
-        {!!m.images?.length && (
-          <span className="tag">
-            <Icon name="image" size={11} /> {m.images.length} image
-            {m.images.length > 1 ? 's' : ''}
-          </span>
-        )}
+        {!!m.images?.length && <Thumbs paths={m.images} />}
       </div>
     )
   return (

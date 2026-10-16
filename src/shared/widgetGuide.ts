@@ -157,6 +157,11 @@ export const widgetAsk = (want: string) => `Make me a Laki extension: ${want.tri
 
 Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from, where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write.`
 
+// Settings › Extensions' Edit with Laki AI: one of the user's, which they let it rewrite (widgetSet ai)
+export const widgetEditAsk = (id: string, name: string, want: string) => `Change my Laki extension "${name}" (id ${id}): ${want.trim()}
+
+I let you rewrite this one. Read it first with laki_extension_read (laki_extension_guide for the format), then write the files you change with laki_extension_write under the same id. Keep what I didn't ask to change. Tell me in a line what changed; it's saved off, and I turn it on again in Settings › Extensions.`
+
 // the prompt to paste into any AI chat: what's wanted, then all of the format, then how to answer; home: where the
 // files go
 export const widgetPrompt = (want: string, home: string) => `Make me a widget for Laki, a Mac app for running coding agents: a small live page in its sidebar, with a full view a click away, fed by a shell command or a JS script on a schedule.

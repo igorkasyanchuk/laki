@@ -1,7 +1,7 @@
 // The right panel (⌥⌘B): the workspace's files, its changes against the base branch, and its PR's
 // checks and review comments; a file's preview, the file finder (⌘P) and the header's Run button. App.tsx
 // passes in how the daemon lists, reads and makes files, opens one in the editor, diffs and reads reviews.
-import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode } from 'react'
 import { bridge, openExternal } from './api'
 import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
@@ -11,7 +11,7 @@ import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type Ws
 import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, splitRows, toCsv } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
 
-export type PanelTab = 'files' | 'changes' | 'review' | 'preview'
+export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview'
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
 export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] } // at: an older daemon gives none
@@ -48,6 +48,7 @@ export type PRFiles = { id: string; files: Record<string, string> }
 
 export const PANEL_WIDTH = 340
 const TABS: { id: PanelTab; label: string; icon: IconName }[] = [
+  { id: 'info', label: 'Info', icon: 'info' },
   { id: 'files', label: 'Files', icon: 'file' },
   { id: 'changes', label: 'Changes', icon: 'changes' },
   { id: 'review', label: 'Review', icon: 'review' },
@@ -580,8 +581,9 @@ export function SidePanel(p: {
   onAct: (act: PRAct, method?: MergeMethod) => void
   root: FilesRoot // Files': the worktree, or the Artifacts
   onRoot: (r: FilesRoot) => void
+  info: ReactNode // the Info tab (Info.tsx InfoTab): the workspace's facts and PR
 }) {
-  const tabs = TABS.filter(t => p.git || t.id === 'files' || t.id === 'preview')
+  const tabs = TABS.filter(t => p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview')
   const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
     <div className="side-panel" style={{ width: p.width }}>
@@ -595,6 +597,7 @@ export function SidePanel(p: {
         <span className="grow" />
         <IconButton icon="x" title="Close (⌥⌘B)" onClick={p.onClose} />
       </div>
+      {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
       {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />}
@@ -973,12 +976,15 @@ export function RunButton({ running, onRun, onStop, onMenu }: { running: boolean
   )
 }
 
+const ACTION_TIP = 600 // ponytail: a tip's characters; the rest is in Settings › Actions
 // Run ▾'s two groups of actions (actionsFor's); tabName: a tab's name, for the hint; run: the app sends it
 export function actionMenu({ agent, terminal }: ReturnType<typeof actionsFor>, tabName: (id: string) => string | undefined, run: (a: RunAction, tab?: string) => void): MenuItem[] {
-  const item = (a: RunAction, tab: string | undefined, hint: string): MenuItem => ({ label: a.name, icon: a.target === 'shell' ? 'terminal' : 'agent', hint, run: () => run(a, tab) })
+  // its tip: what it sends (a prompt) or runs (a command), cut long
+  const tip = (a: RunAction) => (a.text.length > ACTION_TIP ? `${a.text.slice(0, ACTION_TIP)}…` : a.text)
+  const item = (a: RunAction, tab: string | undefined, hint: string): MenuItem => ({ label: a.name, icon: a.target === 'shell' ? 'terminal' : 'agent', hint, tip: tip(a), run: () => run(a, tab) })
   return [
     ...(agent.length ? [null, { head: 'Agent actions' }, ...agent.map(x => item(x.action, x.tab, tabName(x.tab) ?? x.action.target))] : []),
-    ...(terminal.length ? [null, { head: 'Terminal actions' }, ...terminal.map(x => item(x.action, x.tab, (x.tab && tabName(x.tab)) || (x.tab ? 'shell' : 'new shell')))] : []),
+    ...(terminal.length ? [null, { head: 'Shell actions' }, ...terminal.map(x => item(x.action, x.tab, (x.tab && tabName(x.tab)) || 'new shell'))] : []),
   ]
 }
 

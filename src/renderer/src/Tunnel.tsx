@@ -276,7 +276,7 @@ export function SharePop({ name, share, api, onClose }: { name: string; share?: 
             </label>
           ))}
         </div>
-        <p className="muted small">A read-only page of {name} at a random trycloudflare.com link: anyone who gets it can read it, live. Needs cloudflared (brew install cloudflared).</p>
+        <p className="muted small">A view-only page of {name} at a random trycloudflare.com link: anyone who gets it watches it live, and can't type into it. Needs cloudflared (brew install cloudflared).</p>
         <div className="buttons">
           <span className="grow" />
           <button type="submit" className="primary" disabled={busy}>
@@ -290,7 +290,7 @@ export function SharePop({ name, share, api, onClose }: { name: string; share?: 
       <div className="tunnel-pop share-pop" role="dialog" aria-label={`Share ${name}`}>
         <div className="tunnel-head">
           <Icon name="globe" />
-          <b>Share {name} read-only</b>
+          <b>Share a live view of {name}</b>
           <span className="grow" />
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
         </div>

@@ -166,9 +166,10 @@ function Specs({ specs }: { specs: NonNullable<ProjectApi['specs']> }) {
 }
 
 // Memory: what to keep about the project, one item each (Markdown), newest first: yours, then what agents learned
-// (auto-memory: laki memory add, MCP's laki_remember); the whole list is saved each time
+// (auto-memory: laki memory add, MCP's laki_remember); the whole list is saved each time. global: Settings › Global
+// memory, the user's rules for every project (no learned ones)
 const newId = () => `m-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`
-function MemoryList({ memory, save }: { memory: Memory[]; save: (m: Memory[]) => Promise<unknown> }) {
+export function MemoryList({ memory, save, global }: { memory: Memory[]; save: (m: Memory[]) => Promise<unknown>; global?: boolean }) {
   const [draft, setDraft] = useState('')
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null)
   const mine = memory.filter(m => !m.auto)
@@ -185,9 +186,16 @@ function MemoryList({ memory, save }: { memory: Memory[]; save: (m: Memory[]) =>
   return (
     <>
       <div className="mem-new">
-        <textarea rows={3} value={draft} aria-label="A new memory" placeholder="Something to keep about this project: a decision, a gotcha, who to ask… (Markdown)" onChange={e => setDraft(e.target.value)} onKeyDown={keys(add)} />
+        <textarea
+          rows={3}
+          value={draft}
+          aria-label="A new memory"
+          placeholder={global ? 'A rule for every project: how you like commits, tests to run, words to avoid… (Markdown)' : 'Something to keep about this project: a decision, a gotcha, who to ask… (Markdown)'}
+          onChange={e => setDraft(e.target.value)}
+          onKeyDown={keys(add)}
+        />
         <div className="row">
-          <span className="muted small grow">{full ? `${MEMORY_MAX} of yours at most: delete one to add another` : 'Claude and Codex get these at every start in this project · ⌘⏎ adds it'}</span>
+          <span className="muted small grow">{full ? `${MEMORY_MAX} of yours at most: delete one to add another` : `Claude and Codex get these at every start${global ? ', in every project' : ' in this project'} · ⌘⏎ adds it`}</span>
           <button className="primary" disabled={!draft.trim() || full} onClick={add}>
             Add
           </button>
@@ -201,6 +209,8 @@ function MemoryList({ memory, save }: { memory: Memory[]; save: (m: Memory[]) =>
       </div>
       {!mine.length && <p className="muted small">Nothing yet.</p>}
       {[...mine].reverse().map(m => item(m))}
+      {!global && (
+        <>
       <div className="mem-head">
         <b>Learned by agents</b>
         <span className="muted small" data-tip={`Agents add what they learn about the project (laki memory add); past ${MEMORY_MAX}, the oldest goes`}>
@@ -209,6 +219,8 @@ function MemoryList({ memory, save }: { memory: Memory[]; save: (m: Memory[]) =>
       </div>
       {!learned.length && <p className="muted small">Nothing yet: agents add what they learn as they work here.</p>}
       {[...learned].reverse().map(m => item(m))}
+        </>
+      )}
     </>
   )
   function item(m: Memory) {

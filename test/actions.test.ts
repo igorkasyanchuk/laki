@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { actionsFor, type RunAction } from '../src/renderer/src/text.ts'
+import type { TabView } from '../src/shared/types.ts'
+import { actionsFor, type RunAction, SHELL_SPIN, shownStatus, spins, spinsUntil } from '../src/renderer/src/text.ts'
 
 test("Run ▾ actions: the project's replace global ones by name; agents only when running, focused first; terminals always", () => {
   const review: RunAction = { name: 'review', target: 'claude', text: 'review it twice' }
@@ -34,4 +35,20 @@ test("Run ▾ actions: the project's replace global ones by name; agents only wh
   assert.deepEqual(actionsFor([any], [], [{ id: 's', shell: true }]).agent, [])
   // a hand-edited state.json's action without a name is skipped, not a crash
   assert.deepEqual(actionsFor([{ target: 'shell', text: 'ls' } as RunAction], [{ name: 'x', target: 'shell', text: 'pwd' }], []).terminal.length, 1)
+  // a shell action skips a shell busy with a command (vim, a server): another at its prompt, else a new one
+  const sh: RunAction = { name: 'migrate', target: 'shell', text: 'rails db:migrate' }
+  assert.equal(actionsFor([sh], [], [{ id: 's1', shell: true, busy: true }, { id: 's2', shell: true }], 's1').terminal[0].tab, 's2')
+  assert.equal(actionsFor([sh], [], [{ id: 's1', shell: true, busy: true }], 's1').terminal[0].tab, undefined)
+})
+
+test("a shell's and the run tab's spinner stops after SHELL_SPIN; an agent's, and one typed in a shell, spins its turn", () => {
+  const t0 = 1_000_000
+  const tab = (o: Partial<TabView>) => ({ id: 'x', workspace: 'w', name: 'x', kind: 'shell', status: 'running', done: false, runAt: t0, ...o }) as TabView
+  assert.equal(shownStatus(tab({}), t0 + 1000), 'running')
+  assert.equal(shownStatus(tab({}), t0 + SHELL_SPIN), 'idle')
+  assert.equal(spins(tab({ kind: 'dev' }), t0 + 60000), false)
+  assert.equal(spins(tab({ kind: 'agent' }), t0 + 60000), true)
+  assert.equal(spins(tab({ runs: 'claude' }), t0 + 60000), true)
+  assert.equal(spinsUntil([tab({}), tab({ id: 'y', runAt: t0 + 2000 })], t0 + 1000), SHELL_SPIN - 1000)
+  assert.equal(spinsUntil([tab({ kind: 'agent' })], t0), undefined)
 })

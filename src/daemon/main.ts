@@ -2,13 +2,13 @@
 // POST /rpc (Authorization: Bearer <token>) and a WebSocket at /ws?token=<token>. The token lives in
 // <data>/daemon.json (0600); a browser page can't read it, and an Origin that isn't ours is refused anyway.
 import { execFileSync } from 'node:child_process'
-import { randomBytes } from 'node:crypto'
-import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, unlinkSync, writeFileSync } from 'node:fs'
+import { randomBytes, timingSafeEqual } from 'node:crypto'
+import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
-import { aiAnswer, aiAsk, aiContinue, aiForget, aiKey, aiNew, aiQuestion, aiState, aiStop, aiTick, voiceText } from './ai.ts'
+import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiQuestion, aiState, aiStop, aiTick, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, widgetAction, widgetFiles, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, widgetAction, widgetFiles, widgetKey, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 
 const { dir } = core
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
@@ -113,6 +113,36 @@ function page(path: string, res: ServerResponse) {
   res.end(body)
 }
 
+// GET /artifact/<key>/<ws>/<path>: a file of a workspace's Artifacts for the app's viewer (an HTML report, its CSS,
+// scripts and pictures beside it: the key is in the path, so its relative links carry it). Sandboxed, an origin of its
+// own: it reads nothing of the daemon's or other files; https: for a CDN's script, style, font or picture (no fetch or
+// XHR: connect-src; a picture's URL can still carry words out, as any page's can). ponytail: 50 MB a file
+const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.woff': 'font/woff', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf' }
+function artifactPage(path: string, res: ServerResponse) {
+  const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
+  const m = /^\/artifact\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
+  const key = Buffer.from(m?.[1] ?? '')
+  if (!m || key.length !== widgetKey.length || !timingSafeEqual(key, Buffer.from(widgetKey))) return no(401, 'bad key')
+  let body: Buffer
+  let file: string
+  try {
+    file = core.artifactFile(m[2], decodeURIComponent(m[3]))
+    if (statSync(file).size > 50 << 20) return no(413, 'over 50 MB')
+    body = readFileSync(file)
+  } catch {
+    return no(404, 'not there')
+  }
+  res.writeHead(200, {
+    'content-type': ART_TYPES[extname(file).toLowerCase()] ?? 'application/octet-stream',
+    'content-security-policy': "sandbox allow-scripts; default-src 'none'; script-src 'self' 'unsafe-inline' https:; style-src 'self' 'unsafe-inline' https:; img-src 'self' data: https:; font-src 'self' data: https:; media-src 'self' data: https:",
+    'cache-control': 'no-store',
+    'referrer-policy': 'no-referrer',
+    'x-content-type-options': 'nosniff',
+    ...(!/^text\/html/.test(ART_TYPES[extname(file).toLowerCase()] ?? '') && { 'access-control-allow-origin': '*' }), // its page's module scripts and fonts: CORS loads, from its opaque origin
+  })
+  res.end(body)
+}
+
 // ---------- the API: same methods over HTTP and WebSocket
 
 type Handler = (p: any, c?: core.Conn) => unknown
@@ -173,7 +203,11 @@ const api: Record<string, Handler> = {
   aiState: p => aiState(p), // chat: a spec's or brainstorm's (planChat), else the AI page's
   aiQuestion: p => aiQuestion(p), // the skill's laki_ask and laki_remove: a question with buttons, only while an ask works
   aiAnswer: p => aiAnswer(p, (method, params) => call(method, params) as Promise<any>), // the AI page's buttons: a removal is done here, on Yes
-  aiNew: p => aiNew(p),
+  aiNew: p => aiNew(p), // the AI page's: the chat it ends kept among the earlier ones (aiChats)
+  aiChats: () => aiChats(),
+  aiOpen: p => aiOpen(p),
+  aiChatRm: p => aiChatRm(p),
+  aiImage: p => aiImage(p), // a message's pasted image as a data URL
   aiStop: p => aiStop(p),
   aiContinue: p => aiContinue(p), // an ended chat (a spec's, unused 12 hours) taken up again
   aiTick: p => aiTick(p.now), // tests move the clock
@@ -288,6 +322,7 @@ const server = createServer(async (req, res) => {
     const u = new URL(req.url ?? '/', 'http://x')
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
     const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
+    if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, res) // an artifact in the app's viewer: the key in its path
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin
     const r = w ? widgetPage(w[1], u.searchParams) : planPage(u.pathname, u.searchParams)
     res.writeHead(r.code, r.headers)
@@ -403,6 +438,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => widgetTick())
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
+  every(3600000, () => core.imagesTidy()) // pasted images past settings.imageDays
   setTimeout(() => core.scanPRs().catch(() => {}), 2000)
 })
 

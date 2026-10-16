@@ -178,3 +178,20 @@
 /* Workflows: Make it with Laki AI */
 .wf-make { display: flex; gap: 8px; align-items: center; margin: 0 0 14px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); color: var(--muted); }
 .wf-make input { flex: 1; min-width: 0; border: none; background: none; color: var(--fg); font: inherit; outline: none; }
+/* the editor's left sidebar: blocks to add (a click, or a drag onto the canvas) and the variables */
+.wf-palette { width: 228px; flex: none; overflow-y: auto; border-right: 1px solid var(--line); padding: 10px 10px 24px; display: flex; flex-direction: column; gap: 8px; }
+.wf-palette > .seg { align-self: stretch; display: flex; }
+.wf-palette > .seg button { flex: 1; font-size: 11.5px; padding: 3px 6px; }
+.wf-palette .wf-hint { margin: 0; font-size: 11.5px; }
+.wf-palette section { display: flex; flex-direction: column; gap: 4px; }
+.wf-palette h4 { margin: 4px 0 2px; color: var(--muted); font-size: 10.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+.wf-tile { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border: 1px solid var(--line); border-radius: var(--rs, 7px); background: var(--panel); font-size: 12.5px; cursor: grab; user-select: none; }
+.wf-tile:hover, .wf-tile:focus-visible { border-color: var(--kc); background: color-mix(in srgb, var(--kc) 8%, var(--panel)); }
+.wf-tile[aria-disabled='true'] { opacity: 0.5; cursor: default; }
+.wf-tile i { width: 8px; height: 8px; flex: none; border-radius: 2px; background: var(--kc); }
+.wf-tile b { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wf-tile-pill { margin-left: auto; color: var(--muted); font-size: 10.5px; }
+.wf-palette .wf-vars { max-height: none; overflow: visible; gap: 10px; }
+.wf-palette .wf-var { grid-template-columns: 1fr; gap: 1px; cursor: grab; }
+.wf-palette .wf-var span { font-size: 11px; }
+.narrow .wf-palette { display: none; }

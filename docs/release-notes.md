@@ -2,6 +2,34 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## 0.17.0 · Oct 16, 2026
+
+- **Laki AI: past chats in a sidebar**: New chat keeps the one it ends; a click on an earlier chat takes it up again
+  (its claude or codex session goes on), the trash deletes one.
+- **Laki AI: images as thumbnails**: a pasted screenshot shows in the chat, a click shows it big. Settings › AI ›
+  *Keep pasted images* (30 days by default).
+- **Laki AI in Settings › General › Experimental**: the same switch as Settings › AI; off, its ⌘K entry goes too.
+- **Laki AI picks a group's template**: a new workspace in a group with a prompt template starts with it; with none,
+  a template that plainly fits the task.
+- **Global memory** (Settings › Global memory): your own rules for Claude and Codex in every project, given with each
+  project's memory. Settings › a project shows its memory's count and *Manage*. The section head is *Project settings*.
+- **Info in the right panel**: the workspace's info is the panel's first tab (⌘I), beside Files, Changes, Review and Preview.
+- **Files open as tabs**: the file preview keeps several files open, each with its unsaved edit; drag its left edge to resize it.
+- **Artifacts in the app**: an HTML or Markdown artifact opens in a viewer over the app (HTML sandboxed, its own CSS and
+  pictures load); Settings › General › Storage can send them to the browser instead.
+- **Workflows: a sidebar of blocks and variables**: click a block to add it after the picked one, or drag it onto the
+  canvas; Variables copies one on a click, or drag it into a field.
+- **Run ▾: what an action sends**: rest on one to see its prompt or command. Terminal actions are now *Shell actions*,
+  run in a shell at its prompt (a busy one, vim or a server, is skipped).
+- **Shell spinners stop after 5 seconds**: a command that runs on (vim, a server, a REPL) no longer spins forever.
+- **Rail: Terminal and Browser switches** (Settings › Appearance › Rail): off, Terminals or Browsers is a project in Projects' list.
+- **Extensions: Yours and Built in**, two lists; *Edit with Laki AI* on one of yours; the AI prompt folded away (*Copy the prompt*).
+- **Share live view** (was *Share read-only link*), and a new look for its page: chat bubbles, a LIVE badge, *New below*,
+  light or dark as the reader's system is.
+- **Release notes only in development mode** (Settings › General › Development).
+- **Codex and Claude chats come back more often**: a resume drops its chat id only when it fails as it starts, not
+  because the chat's own text says "session not found"; development mode logs why an agent ended.
+
 ## 0.16.0 · Oct 15, 2026
 
 - **Workflows: a way out per answer**: an AI decision's *Ways out* › *A line per answer of* a question: yes and no, each

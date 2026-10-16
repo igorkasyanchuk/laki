@@ -1217,10 +1217,45 @@ export function Welcome({ onOpen, onSsh, check }: { onOpen: () => void; onSsh: (
 export type Artifact = { path: string; size: number; at: number }
 // reveal: its folder in Finder ('' the whole storage folder); files: the side panel's Files, on the Artifacts
 // menu: a file's right click (Open, Finder, Copy…); copy: text to the clipboard (a link's URL)
-export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void }
+export type ArtifactsApi = { list: () => Promise<Artifact[]>; read: (path: string) => Promise<{ size: number; text?: string; image?: string }>; reveal?: (path: string) => void; files?: () => void; menu?: (path: string) => MenuItem[]; copy?: (text: string) => void; page?: (path: string) => string | undefined; external?: (path: string) => void } // page: an HTML one's address for the app's viewer (Settings: in Laki); external: in the default browser
 const host = (url: string) => (fileOf(url) ? fileOf(url).split('/').pop()! : url.replace(/^https?:\/\/(www\.)?/, '').split(/[/?#]/)[0]) // a file:/// link: its file's name
 const sizeOf = (n: number) => (n < 1024 ? `${n} B` : n < 1 << 20 ? `${Math.round(n / 1024)} KB` : `${(n / (1 << 20)).toFixed(1)} MB`)
 type Seen = { size: number; text?: string; image?: string } | { error: string }
+const HTML = /\.html?$/i
+export const VIEWED = /\.(html?|md|markdown)$/i // the app's viewer shows these (Settings › General › Artifacts open)
+
+// an HTML or Markdown artifact in the app (Settings › General › Storage: Open artifacts in Laki): HTML in a sandboxed
+// frame (the daemon's /artifact/…: its CSS, scripts and pictures beside it load), Markdown rendered
+export function ArtifactView({ path, page, read, onExternal, onReveal, onClose }: { path: string; page?: string; read: () => Promise<{ text?: string }>; onExternal?: () => void; onReveal?: () => void; onClose: () => void }) {
+  const [md, setMd] = useState<string | { error: string } | null>(null)
+  const html = HTML.test(path)
+  useEffect(() => void (!html && read().then(c => setMd(c.text ?? { error: "It isn't text" }), e => setMd({ error: String(e?.message ?? e) }))), [path])
+  return (
+    <Modal title={path} onClose={onClose} wide loose>
+      <div className="art-big">
+        {html ? (
+          page ? <iframe className="art-frame" title={path} sandbox="allow-scripts" src={page} /> : <span className="muted small">Loading…</span>
+        ) : md === null ? (
+          <span className="muted small">Loading…</span>
+        ) : typeof md === 'string' ? (
+          <div className="art-md">
+            <Markdown src={md} />
+          </div>
+        ) : (
+          <span className="warn small">{md.error}</span>
+        )}
+      </div>
+      <div className="buttons">
+        <span className="muted small grow">{html ? 'Sandboxed: its scripts run; it can’t read Laki or your files' : ''}</span>
+        {onReveal && <button onClick={onReveal}>Show in Finder</button>}
+        {onExternal && <button onClick={onExternal}>Open in the browser</button>}
+        <button className="primary" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Modal>
+  )
+}
 // links: its .url files (what its agents published): first, a click opens them in the browser
 export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: string; n: number; links?: { path: string; url: string; title: string }[]; api: ArtifactsApi; onClose: () => void }) {
   const linkOf = (path: string) => links.find(l => l.path === path)
@@ -1301,6 +1336,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
     if (!c) return full || f.size <= 2 << 20 ? <span className="muted small">Loading…</span> : <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
     if ('error' in c) return <span className="warn small">{c.error}</span>
     if (c.image) return <img src={c.image} alt={f.path} />
+    if (full && HTML.test(f.path) && a.page?.(f.path)) return <iframe className="art-frame" title={f.path} sandbox="allow-scripts" src={a.page(f.path)} />
     if (c.text !== undefined) return full && /\.(md|markdown)$/i.test(f.path) ? <div className="art-md"><Markdown src={c.text} /></div> : <pre>{full ? c.text : c.text.split('\n').slice(0, 12).join('\n')}</pre>
     return <span className="art-ext">{f.path.includes('.') ? f.path.split('.').pop() : 'file'}</span>
   }
@@ -1384,6 +1420,7 @@ export function ArtifactsBar({ ws, n, links = [], api: a, onClose }: { ws: strin
           </div>
           <div className="buttons">
             <span className="muted small grow">{sizeOf(at.size)} · {new Date(at.at).toLocaleString()}</span>
+            {a.external && VIEWED.test(at.path) && <button onClick={() => a.external!(at.path)}>Open in the browser</button>}
             {a.reveal && <button onClick={() => a.reveal!(at.path)}>Show in Finder</button>}
             {a.files && <button onClick={() => (setBig(null), a.files!())}>Open in Files</button>}
             <button aria-label="Previous" disabled={here.length < 2} onClick={() => step(-1)}>

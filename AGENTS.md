@@ -43,7 +43,7 @@ npm run dev                       # Electron + renderer dev server on :5199
   Laki Electron; `dataDir` in `src/shared/conn.ts` keeps an existing one). Never stop it and never point tests
   at it.
 - Releasing: `docs/release.md` (checks, both builds, `scripts/pack-smoke.sh` once before each release).
-- Release notes: `docs/release-notes.md`, Settings › Release notes (`?raw`, comments stripped). Each user-visible
+- Release notes: `docs/release-notes.md`, Settings › Release notes (with `devMode` only, its ⌘K item too; `?raw`, comments stripped). Each user-visible
   addition gets a line under `## Next` (add that heading above the newest version when it isn't there); `npm run dmg`
   stamps it as the version it builds and the date (`scripts/notes.ts`).
 - Signing: the app is ad-hoc signed (`build.mac.identity: "-"`, `hardenedRuntime: false`), not notarized. Keep it:
@@ -97,7 +97,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event. A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -119,7 +119,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   false, refused past it), `memoryRm` (a learned one only); the CLI's `laki memory`, MCP's `laki_memory` and
   `laki_remember` (not Laki AI's: its `laki_memory_write` keeps the user's). `memoryNote` gives both lists to claude and
   codex at every start with Laki's note (the preset's `laki`), each item cut at 2,000 characters, the newest within
-  40,000, and how to add to it (claude's settings allow `laki memory add .` and `rm .`);
+  40,000, and how to add to it (claude's settings allow `laki memory add .` and `rm .`); before them *Global memory*
+  (`settings.memory`, Settings › Global memory: the user's own items only, the newest within `MEMORY_GLOBAL`, 20,000);
 - `quickNew` (`kind` shells or browsers, a browser's `url`; the sidebar's + › Terminal and Browser): the `Terminals` (`load` renames a `Shells` from 0.7) or
   `Browsers` project (`kind`, your home folder, `git: false`; made by the first one; never the home folder's own
   project: `projectAdd` and `findProject`'s path match skip it), then `wsNew` `local` `another` named `terminal <n>` (a
@@ -177,8 +178,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   approve, close, merge on unless false, `land` off unless true; the daemon refuses, the app hides); merge: `method`
   squash/merge/rebase, saved as the project's `mergeMethod`, `deleteBranch`: `merge()`, `gh pr merge --<method>
   [--delete-branch] -R <host/owner/repo> -- <url>`: `-R` keeps gh off the worktree's git (no checkout, no local branch
-  deleted), then a scan a second later), `prAttach` (`ws`, `pr`: a URL or number; the app's *Attach a PR…*, the status bar's *+ PR*, the info
-  panel: a git workspace on a branch, no PR found, and related's *Make it this workspace's PR*): `prHead`, then `prUrl`,
+  deleted), then a scan a second later), `prAttach` (`ws`, `pr`: a URL or number; the app's *Attach a PR…*, the status bar's *+ PR*, the right
+  panel's Info: a git workspace on a branch, no PR found, and related's *Make it this workspace's PR*): `prHead`, then `prUrl`,
   and `prLinked` when its head isn't the workspace's branch, the one before (`prUrl`, else the branch's) to `related`; a scan follows), `prDetach`
   (`ws`: a linked `prUrl` to `related`, the PR ⋯'s *Not this workspace's PR*; its branch's own is refused: the scan
   would find it again), `prDiff` (`gh pr diff` by the PR's URL, in `diff`'s shape: `diffFiles` reads each file's status and
@@ -188,9 +189,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   app's confirm; an open PR only), `imageSave` (the preview's screenshots too), `openIn` with a `file` (paths must stay inside the
   workspace: `inside`, links followed, by `realpath`);
 - widgets (below): `widgetRender` (`id`, `full`: the filled HTML, a JS widget's as a whole page; null: no such
-  view), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes),
-  `widgetRun` (fetch now), `widgetRm` (Settings' trash can, after `ask`: the folder, `rmSync` (a link: only it), and its
-  store; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'`) nor through a link, files left out kept; saved off with the store's `by: 'ai'`, the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
+  view), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes;
+  `ai`: Settings' *Edit with Laki AI*, one of the user's in `widgetHome()` (else refused) gets the store's `aiMay`,
+  which lets `widgetWrite` rewrite it), `widgetRun` (fetch now), `widgetRm` (Settings' trash can, after `ask`: the folder, `rmSync` (a link: only it), and its
+  store; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; saved off with the store's `by: 'ai'` (`aiMay` dropped), the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
@@ -227,7 +229,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   conversation, `busy`, `elsewhere`: an ask at work in another chat, `ended`, `key`: one is saved, the last 100 calls,
   `totals`), `aiNew`, `aiStop` (none: any chat's ask), `aiKey` (`key`; empty removes it); each takes `chat` (a spec's or
   brainstorm's, `planChat`; none: the AI page's), and `aiContinue` (an ended chat taken up again), `aiTick` (`now`: tests
-  move the clock; every 10 minutes);
+  move the clock; every 10 minutes); the AI page's earlier chats: `aiChats`, `aiOpen` (`id`), `aiChatRm` (`id`); `aiImage`
+  (`path`: a message's pasted image, `imageOk`'s only, as a data URL);
 - Laki AI's skill: `prList` (`project`, `who` mine/others/all: `gh pr list --state open` in the project, `ghLogin`
   for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
   `AI_ACTS` memory/schedule/tab/todo with `id`, `project`, `label`: Yes / No; only while `busy`; a chat message with
@@ -371,7 +374,7 @@ Commands run as `$SHELL -lic '<cmd>'`. The environment adds:
   or <data>/storage>/<name>-<id>`, named and made at its first tab, kept as `ws.storage` (a rename doesn't move it); none
   for Terminals, Browsers and hosts. `wsRm` and `projectRm` delete it (`rmStorage`: only a `…<id>` folder) unless `settings.keepStorage`; archive keeps it.
 
-Claude and Codex are told about Laki at every start (`LAKI_NOTE` and the project's memory, `memoryNote`, unless the preset's `laki` is false; then
+Claude and Codex are told about Laki at every start (`LAKI_NOTE` and Settings' global memory, then the project's, `memoryNote`, unless the preset's `laki` is false; then
 `PROGRESS_NOTE` with `settings.progress`; one text through `--append-system-prompt` / `-c developer_instructions`, not when
 the preset's args set their own, nor for codex when its `config.toml` has `developer_instructions` (`codexOwn`: `-c` would
 replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki new .`, `laki browser`,
@@ -490,19 +493,25 @@ gets `again` `{ run: true }`, and `restoreAll` keeps it. `restoreAll` starts the
 types it once the prompt is up (it printed, then 500 ms quiet; 10 s at most) under a dim note. A crash keeps nothing,
 and neither does a host.
 
+A resume of a chat claude or codex don't have (`CHAT_GONE`, their words on the screen as it exits) drops the tab's
+`resumeId` (Enter starts a new chat) only when it exits within `RESUME_FAIL` (30 s) of starting: later, a chat's own
+words ("session not found") don't. In development mode `spawnTab`'s exit logs each agent's end to its workspace's log:
+the code, the seconds it ran, its last lines.
+
 ### Scans
 
 - Shells (`shellTick`, every 2 s): a local shell tab whose terminal's foreground process group (`ps -o pid=,tpgid=`,
-  one call for all) isn't the shell's own is `running` in `view` (`busyShells`): the spinner while a command runs, not
+  one call for all) isn't the shell's own is `running` in `view` (`busyShells`): the spinner while a command runs (its first
+  `SHELL_SPIN`, 5 s, only, a Run tab's too: the renderer's `text.ts` `shownStatus`; vim or a server would spin for good), not
   `worked()` (an agent's turn, for review comments) nor notifications. One whose foreground program is an agent
   (`agentRuns`: `ps -o args=`, claude or `node …/codex`) is `shellAgents`: its status off its screen (`askOf`: waiting;
-  `BUSY`: running; else idle, `done` if no one looked), the view's `runs`; no notifications.
+  `BUSY`: running; else idle, `done` if no one looked), the view's `runs` (it spins its whole turn); no notifications.
 - Artifacts (`scanArtifacts`, with the port scan): the files in each live workspace's storage folder, hidden files and folders not
   counted, one scan at a time, as `WorkspaceView.artifacts`: the status bar's *Artifacts: n* (a menu: Finder, or *Show here*: panels.tsx
   `ArtifactsBar`, a strip of previews over the status bar from `artifactList` (newest first, 500 at most) and `fileRead`
   `storage` (the folder as the root, `inside`'s checks), a click shows one big, ← → the others; the folder's folders first,
   a click goes in (`dir`), the head's path or ← back out), none at 0. Its `.url` files
-  (`urlOf`: http(s), or `file:///`) are `WorkspaceView.links` (newest first): the info panel's *links* rows, and first in the gallery,
+  (`urlOf`: http(s), or `file:///`) are `WorkspaceView.links` (newest first): Info's *links* rows, and first in the gallery,
   where a click opens them in the browser (the renderer's `openKeptLink`: a `file:///` one through main's `open-path`; `openExternal`, every other link's, never opens files). `keepPublished`, at each turn's end (`turn`'s idle/done/failed), writes
   `<title>.url` for each link the agent published and the folder hasn't (`sameUrl`): its publish tools' (`publishedBy`, from
   claude's PostToolUse payload, buffered as `Runtime.published`: the Artifact tool's publish, not its read/list/asset, or an
@@ -556,8 +565,10 @@ and neither does a host.
   What was sent is `workspace.fix`.
   Messages go to the first live claude/codex tab with `send({ whenIdle })`. Each starts with `prPrompt`: the
   `settings.prPrompts` text for ci, review or conflict, else `PR_PROMPTS` (`shared/types.ts`), `{{pr}}`, `{{url}}`,
-  `{{base}}` filled in; the checks' logs or the threads follow. The info panel's send buttons use the same.
-- Images pasted into a prompt: `imageSave` writes them to `<data>/images/`; the prompt gets their paths.
+  `{{base}}` filled in; the checks' logs or the threads follow. Info's send buttons use the same.
+- Images pasted into a prompt: `imageSave` writes them to `<data>/images/`; the prompt gets their paths. `imagesTidy`
+  (at each save and hourly) deletes the ones older than `settings.imageDays` (Settings › AI › *Pasted images*; unset:
+  `IMAGE_DAYS`, 30), Laki AI's chats' too.
 
 ### Tunnels
 
@@ -567,7 +578,7 @@ output that isn't `login.`. No emails: public, anyone with the link (the popup's
 cloudflared 2026.9.3+ (`MAIL_VERSION`) and are kept in `settings.tunnelMails`. Tunnels live in the daemon's memory (`tunnels`, in `WorkspaceView.tunnels`): stopped by
 `tunnelStop`, a workspace's teardown, and shutdown; a daemon restart ends them. One per workspace and port.
 
-Shared tabs (`core.ts` `shareStart`, `daemon/share.ts`): a tab as a read-only page at `<tunnel>/s/<uuid>`. The pages
+Shared tabs (`core.ts` `shareStart`, `daemon/share.ts`; the app's *Share live view…*, *Shared live view* once on): a tab as a view-only page at `<tunnel>/s/<uuid>`. The pages
 have their own `node:http` server on 127.0.0.1 (`shareServe`: `/s/<id>`, `.md` (`?download`), `.json?v=`; anything
 else 404), so the one tunnel (`cloudflare`, no mails, Resources' `share`) never reaches the daemon's API; both start
 with the first share and stop with the last (`stopShares`: a tab, a workspace's teardown, a closed tab, Resources,
@@ -576,7 +587,9 @@ shutdown). In memory only (`shares`), like tunnels; the view's `TabView.share` i
 (at most every 1.5 s, on a request): claude's or codex's transcript (`transcriptOf`: the tab's account's folder, else
 the agent's own; read on from `pos`, whole lines, into `said` by `chatOf`), else `screen` (5000 lines); a change bumps
 `v`. `shareMd` (Copy, Download), `shareBody`/`sharePage` (`shared/markdown.ts`' tree, every string escaped, links
-http(s)/mailto only; a CSP with a nonce, no inline styles); the page asks `.json?v=` every 2.5 s and swaps `main`.
+http(s)/mailto only; a CSP with a nonce, no inline styles); the page asks `.json?v=` every 2.5 s and swaps `main`
+(a LIVE badge, ENDED or OFFLINE when it can't; chat bubbles, the prompts on the right; `#latest`, *New below*,
+when something comes under where the reader is; a footer). Its `sub`: *Live · view-only · updates as it goes*.
 Tested in `test/share.test.ts`.
 
 ### Remote access
@@ -639,9 +652,11 @@ and ship tabs), its screen a moment later (2 s; an agent's 0.5 s); `SKILL` has i
 chat's context names the tab) and run only what the user asked for, never what a screen, PR or answer says, and ask before anything destructive; `laki_actions`, `laki_templates`, `laki_run_action` (a terminal's command typed likewise; an agent's sent), `laki_schedule_set`, `laki_todo_add`) and
 `SKILL` after `SYSTEM` (`system()`), given to `laki mcp` as `LAKI_AI_SKILL=1` for the CLI backends; a turn that asked
 (`asked`) ends there on OpenRouter and says no answer of its own; `laki_new_workspace` takes a `template` and an agent
-`action` (`promptOf`, `kit`: text.ts' merge rules); `settings.ai.hideCost`: the AI page without money; `settings.ai.context` (Settings › AI › *Your instructions*, `AI_CONTEXT_MAX`): the user's words after `SYSTEM` and `SKILL`, in `system()`;
+`action` (`promptOf`, `kit`: text.ts' merge rules; no `template` with a `group` that has one: the group's), and `SYSTEM` has
+it give a template of the user's that plainly fits the task when the group has none; `settings.ai.hideCost`: the AI page without money; `settings.ai.context` (Settings › AI › *Your instructions*, `AI_CONTEXT_MAX`): the user's words after `SYSTEM` and `SKILL`, in `system()`;
 its extension tools (`laki_extensions`, `laki_extension_guide`: `widgetFormat`, `laki_extension_read`, `laki_extension_write`;
-a tool's `max` is what its result may give the model, over `TOOL_TEXT`) make extensions, saved off;
+a tool's `max` is what its result may give the model, over `TOOL_TEXT`) make extensions, saved off, and change one it
+made or one the user let it (Settings' *Edit with Laki AI*: `widgetSet` `ai`, then `aiAsk` with `widgetEditAsk`);
 its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask at a time (`busy`); `aiStop` aborts the
 fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backends (`backend`, unset: openrouter):
 - `openrouter`: `POST <api>/chat/completions` (`LAKI_AI_API`: tests' fake, localhost only) with the tools as functions
@@ -661,7 +676,11 @@ brainstorm's (`shared/plans.ts` `planChat`; `plans.ts` `planOfChat`: its folder'
 time in any of them (`busy.id`; another chat's ask: "Laki AI is busy in another chat"); `aiQuestion` goes to the busy
 one. A plan's chat unused `PLAN_CHAT_IDLE` (12 hours) is `ended` (`aiTick`, or as it's read again): its ask stopped,
 what was said kept; the next ask starts it again empty (`fresh`), `aiContinue` keeps its session. `planRm` drops it
-(`aiForget`). The `ai` event carries `of`, the chat's id: an `id` would make it a reply.
+(`aiForget`). The `ai` event carries `of`, the chat's id: an `id` would make it a reply. The AI page's earlier chats:
+`aiNew` on its chat keeps it first (`shelve`, once something was asked) as `<data>/ai-chats/<at>-<hex>.json` (its
+messages, `resume`, `at`; `PAST_MAX`, 100: the oldest go); `aiChats` lists them newest first (`AiPast`: its first ask as
+the title), `aiOpen` makes one the page's chat again (the one there shelved first; its `resume` too, so its claude or
+codex session goes on), `aiChatRm` deletes one.
 Both run in `<data>/ai` with `MCP_TOOL_TIMEOUT` 5 minutes (a `wsNew` takes a while), with Settings' env and, with
 `ai.preset` (Settings › AI's *Your agent presets*: a claude or codex preset), that preset's env over it (an account of
 its own; its args are a tab's, not used); `resume` is kept per `sessionKey` (the agent and the preset). Each tool call is a `tool`
@@ -672,11 +691,13 @@ would start a daemon again), `aiTotals` (shared/types.ts) today's and this month
 workspace or tab it names (`laki://ws/<id>?tab=<tab>`), and the page links the bold names it didn't (`links.ts`
 `linkWorkspaces`); a laki:// link in any Markdown goes to App's router (`api.ts` `onLakiLink`), or, in a window
 without one (the AI window), to main's `open-external`, which shows the app window and routes it (`openLink`). The renderer's `Ai.tsx` (`AiPage`: the rail's AI
-when on, ⌘K, `laki://ai`; Chat, Calls and Info tabs; the chat Claude's way: examples, the thread in a column, a turn's tool
-calls folded into one `.ai-tools` pill (each line's *Open*: its `ws` or `target`), `PromptInput` `enter` (⏎ asks) with images and dictation, Stop, New chat; Info
+and ⌘K's (both only while `ai.on`; Settings › General › *Experimental* has the same switch), `laki://ai`; `.ai-chats`, its
+sidebar: New chat, the chat there, the earlier ones (a click `aiOpen`, the trash `aiChatRm` after `ask`; not `compact`); Chat, Calls and Info tabs; the chat Claude's way: examples, the thread in a column, a turn's tool
+calls folded into one `.ai-tools` pill (each line's *Open*: its `ws` or `target`), a message's images as `Thumbs`
+(`aiImage`, once a session each; a click shows one big in a `Modal`; one no longer kept: a chip), `PromptInput` `enter` (⏎ asks) with images and dictation, Stop; Info
 `.ai-info`: how it runs and pays (`PAYS`, `SESSION`), spending, what it can do; the bubbles' *Ask
 Laki AI*: main's `aiWin`, `?window=ai`, `NewWindow.tsx` `AiWindow`: `AiPage` `compact`, `.ai-window`: its own head
-(`.ai-win-head`, the drag region: New chat, ✕; Esc closes) over the chat alone, no Calls, Info, cost or foot) and Settings › AI (`AiSection`: on, backend, model, the key, steps, spending). The CLI's `laki ai`. Tested in
+(`.ai-win-head`, the drag region: New chat, ✕; Esc closes) over the chat alone, no Calls, Info, cost or foot) and Settings › AI (`AiSection`: on, backend, model, the key, *Pasted images*: `imageDays`, steps, spending). The CLI's `laki ai`. Tested in
 `test/ai.test.ts` (a fake OpenRouter; the fake claude's `-p` and codex's `exec`, which call `laki mcp` through
 `test/fakes/mcp.cjs`).
 
@@ -767,7 +788,7 @@ you settle one), each answer's block an option `- <answer> → id` (only those w
 `json` (unset: `!!out`) is `response_format`; an agent's `json` adds `jsonAsk` (unless `out:` asks already) and its
 answer becomes `lastJson` of it (none: its words, said). An end's text is its notification (`fill`, else the block's name);
 `phone` on an end or popup with `notify` also `flowPhone` (core: `pushTo` Settings' phone webhook, event `done`).
-`flowVars` lists a workflow's variables (the run's, each block's) for the Variables list; `renameBlock` changes an id
+`flowVars` lists a workflow's variables (the run's, each block's) for the editor sidebar's Variables; `renameBlock` changes an id
 and every exit, route, session, `of` and `{{steps.<id>.…}}` (the inspector's ID field). `flowSave`/`flowRm` bump
 core's `flowFiles.at` (the view's `flowFiles`): the list refreshes, an open workflow not edited (or written by an agent)
 takes the file. `workflowAsk` is *Make it with Laki AI*'s ask (laki_ask questions first); the Editor sets api.ts'
@@ -785,7 +806,10 @@ message with `ev` as an event, though it has an `id`: the run's). A tab an agent
 prompt gets `flow` (the run; `flowForget` clears it), and the status bar's `.sb-flow` shows the run of the focused tab, else of the
 workspace (`ws.flow`), a click opens it; the run's `openTab` (WorkflowsApi) opens an agent block's tab (`r.tabs[block]`). The renderer's
 `Workflows.tsx` (lazy, `workflows.css`; `Page` `esc={false}`: Esc doesn't close it): the index (Scheduled tasks' `.sched-*`:
-hero, stats, the workflows' rows, the runs'), then one workflow or run, breadcrumbs back (styles.css' `.crumbs`), `Editor` (`Canvas`: `geo`'s bezier arrows, drag snaps to 10;
+hero, stats, the workflows' rows, the runs'), then one workflow or run, breadcrumbs back (styles.css' `.crumbs`), `Editor` (`Palette`, its left sidebar: *Blocks*, `picks`' groups as tiles (a click is `addBlock` after the picked block,
+else the last; an HTML5 drag, `DRAG`, onto the canvas drops one there, snapped, `Canvas` `onDrop`), and *{{ }} Variables*
+(`VarsBody`: a click copies `{{name}}`, a drag carries it as text into a field); a block's *Add a block after it* is
+`blockMenu` over the same `picks`; `Canvas`: `geo`'s bezier arrows, drag snaps to 10;
 `Inspector`, a case's branches as `.wf-branch` cards; File: the Markdown), `StartRun`, `RunView` (the canvas' `Lit`: `taken` arrows, `live`
 the one into the working block while it runs (`.wf-e.live` flowing, an `animateMotion` dot), the working block's gear badge
 (`.wf-gear`) and shimmer; reduced motion: none; the ask, decisions, state; `RunLog`: the whole log, details folded, a filter; `flowGet` again as the view's
@@ -799,9 +823,11 @@ after a restart.
 protocol version; `tools/list`, `tools/call`, `ping`; notifications get no answer, other methods -32601). Each tool is
 one or two `rpc` calls (`tools(rpc)`: Laki AI passes the daemon's own); none deletes, archives or ships. Its `state` (also `laki ls --json`, which the skill has agents
 run) leaves out settings, projects' config, queued prompts and remote access's link: an agent's transcript keeps them. stdout is the protocol's, so the daemon starts at the first
-tool call (`ensureDaemon`), never before. `state` gives each project's `groups` (its seps' names) and each workspace's
-`group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupId`, refused
-when there's none of it) is `wsNew` `place`, and Laki AI's `SYSTEM` has it pick the group that fits. Each workspace's
+tool call (`ensureDaemon`), never before. `state` gives each project's `groups` (its seps' names) and `groupTemplates`
+(a group's prompt template by the group's name), and each workspace's
+`group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupOf`, refused
+when there's none of it) is `wsNew` `place`, its template the one used when none is given (one still in `kit`'s
+templates), and Laki AI's `SYSTEM` has it pick the group that fits. Each workspace's
 `related` and `from` too; `laki_new_workspace` `link` is `wsNew`'s, and `tools(rpc, from)`'s `from` (the CLI's
 `$LAKI_WORKSPACE`; the daemon drops its own at start, so Laki AI's have none) its `from`. Tested in `test/cli.test.ts`.
 
@@ -892,9 +918,10 @@ action, else the full view, else a fetch), `WidgetGrid` (the sidebar's, `place` 
 (a template widget in a shadow root after `clean`, the sanitizer: no scripts, frames, forms, `on…` attributes or
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
-Scheduled tasks' `.sched-row`s, each with its switch, a click opens its `WidgetCard` in panels.tsx' `Modal`, whose
+two `Group`s, *Yours* and *Built in*, of Scheduled tasks' `.sched-row`s, each with its switch, a click opens its `WidgetCard` in panels.tsx' `Modal`, whose
 close blurs the field first (text and numbers save on blur), and Settings' Esc leaves it to an open `.overlay`; `WidgetPrompt`: `shared/widgetGuide.ts` `widgetPrompt`, the format as a prompt for any AI
-chat, which the laki-widget skill's SKILL.md shares as `widgetFormat`; `WidgetCard`: a head row, then
+chat (*Copy the prompt*; the text folded in *Show the prompt*), which the laki-widget skill's SKILL.md shares as `widgetFormat`; `WidgetCard`: a head row,
+`WidgetEdit` for one of yours in `widgetHome()` with Laki AI on (*Edit with Laki AI*: `WidgetsApi.edit`), then
 `WidgetOptionField` per setting, a list's `ChipsInput`; its folder button is App's Open in menu with `widget`). The
 ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: url`, plain words with a rule between them, opened in the
 browser; no fetch; 3×½),
@@ -962,11 +989,12 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     - `laki.tabs`: the selected tab per workspace;
     - `laki.groups`: each workspace's tabs, each a split tree of sessions (the daemon's `layouts`, kept here for the first paint);
     - `laki.sideW`: the sidebar's width per `RailKind` (`sideKind`: the rail's kind, projects without the rail; `laki.side`, the
-      one width before, seeds each); `laki.sideOpen`: whether it's shown; `laki.info`: the workspaces whose info panel is open (⌘I, per workspace);
+      one width before, seeds each); `laki.sideOpen`: whether it's shown;
     - `laki.rail`: the rail layout's kind (`RailKind`: projects, shells, browsers);
     - `laki.folded`: the projects whose workspaces the sidebar hides (a click on the project's head; `rows.dragged`
       keeps a drag's click from folding it), and the seps whose workspaces up to the next sep it hides (`shownRows`);
-    - `laki.panel`, `laki.panelTab`, `laki.panelW`: the right panel; `laki.infoW`: the info panel's width (both
+    - `laki.panel`, `laki.panelTab` (`info`: ⌘I's), `laki.panelW`: the right panel; `laki.previewW`: the file preview's
+      width (null: it shares the room with the terminals; a double-click on its edge goes back to that) (both
       `Panes.tsx` `PanelHandle`: no cap but the terminals' 280px, also `max-width` in styles.css);
     - `laki.theme`: the last `Paint` (theme, glass, font), painted before the daemon's settings arrive.
     - `laki.active`: when each agent tab last worked or waited (ms), for the bubbles' recent ones; closed tabs drop out.
@@ -1071,13 +1099,14 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - The project and workspace order is the daemon's (`reorder`).
   - The rail (`rail`: always, but on a phone, whose sidebar is a drawer; Settings › Appearance › Rail) puts `railBar`
     (`.rail`, `railW` as `--rail-w` on `.app`, `.rail-on`) left of the sidebar: a `railButton` per `RAIL` kind (a project's
-    `kind`, none: projects) with `railSays` (`needsYou`'s count, a dot while a tab runs), Board and Schedule (`runFailed`: a
+    `kind`, none: projects) with `railSays` (`needsYou`'s count, a dot while a tab `spins`), Board and Schedule (`runFailed`: a
     red dot) right after Projects, and AI (when on) over Settings at its bottom, which leave the list's `.side-foot` (Video, Meme, Timer stay); Schedule's and Board's pages hide the list (`listOff`: the aside `hidden`, `.list-off`); the list is `listed`, that kind's projects, and `inList` its pinned (a filter: all). An
     effect on the selected workspace sets the kind (`lastIn`: each kind's last, where `railTo` goes back); below `.rail-sep`,
     `railPins` (`pinButton`: `initials` in the workspace's color, a terminal's or browser's icon, `needsYou`'s count; never lit, its kind's button is; a
     right click is `wsMenu`); `moveWs`
-    keeps to the list; `SideHandle` `at`. Its one setting, `railLabels` (off:
-    `data-bare`, icons only, `railW` 52).
+    keeps to the list; `SideHandle` `at`. Its settings: `railLabels` (off:
+    `data-bare`, icons only, `railW` 52), `railShells` and `railBrowsers` (off: `railOf` makes that kind `projects`, no
+    button, its project in Projects' list; `rawKind` still gives a pin its icon and leaves out *Run ›*).
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses
@@ -1197,12 +1226,23 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   line opens Raw). Tested in `test/markdown.test.ts`.
 - **Artifacts in Files** (`SidePanel.tsx` `Files` `root`, App's `filesRoot`): with a storage folder, Files has
   *Workspace* / *Artifacts* (`PanelApi.artifacts`: `artifactList` as the tree, the preview's `storage` (read-only,
-  `openLabel` Open: main's `open-path`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's
+  `openLabel` Open: App's `openArt`), a right click: Open, Show in Finder, Copy path; no new files). The status bar's
   *Artifacts: n* toggles `ArtifactsBar`; its ⋯ (`ArtifactsApi` `reveal('')`, `files`: `artifactsInFiles`) and the big
-  view's buttons go to Finder or there.
+  view's buttons go to Finder or there. An HTML or Markdown one (`VIEWED`) opens in `ArtifactView` (panels.tsx, a
+  `Modal`; App's `artView`) unless `settings.artifactsIn` is `browser` (Settings › General › Storage; then main's
+  `open-path`, as any other): HTML in an iframe `sandbox="allow-scripts"` from the daemon's `GET
+  /artifact/<widgetKey>/<ws>/<path>` (main.ts `artifactPage`: core's `artifactFile`, the storage folder through
+  `inside`, never a host's; a CSP `sandbox allow-scripts`, its own files and https: scripts, styles, fonts and pictures,
+  no `connect-src`; 50 MB a file), so the CSS, scripts and pictures beside it load; Markdown through `fileRead`;
+  *Open in the browser*, *Show in Finder*. The gallery's big view frames HTML the same way (`ArtifactsApi.page`), and
+  its right click has *Open* (the viewer) and *Open in the browser*.
 - **`text.ts`**: `actionsFor` (Run ▾'s actions as it opens: `settings.actions`, then the project's `config.actions`,
   which replace a global one of the same name and target; an agent's only with a live tab of it (`any`: any
-  agent's), the focused one first; a shell's to the focused shell, any, or none: each app's `runAction` opens one), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and
+  agent's), the focused one first; a shell's to the focused shell at its prompt (`ActionTab` `busy`: a command in
+  front, vim, a server, an agent it runs), any other at its prompt, or none: each app's `runAction` opens one),
+  `SHELL_SPIN`, `shownStatus`, `spins` and `spinsUntil` (a shell's or Run tab's command spins its first 5 s only, then
+  shows idle; an agent, and one a shell `runs`, its whole turn; App draws again as one crosses it, and `tabGlyph`,
+  Glyph's `rollup`, the rail's dots and the filter's *Working* go by it), `parseMails` (a tunnel's who-gets-in: `@team.com` and `team.com` become `*@team.com`) and
   `MAIL_OK` (what the daemons take: kept in step with their `MAIL`/`mailRe`); prompt templates (`templated`, `fillTemplate`, from `shared/types.ts`: the daemon's `prPrompt` uses it too; `{{prompt}}`, `{{project}}`, `{{base}}`;
   `settings.templates` and a project's `config.templates`, merged by `templatesFor`: the project's first, replacing a
   global one of the same name; filled in by the new-workspace page; `nameOf`: a templated workspace's name from the typed
@@ -1211,23 +1251,24 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   macOS picks the microphone and languages, `dictationSettings`); `tools`: the page's pickers at the toolbar's end;
   `withImages` appends their paths. The mic keeps the text box focused and starts dictation 150 ms later: macOS
   learns the web view's text field a moment after focus, and dictation started before that stops at once.
-- **`Info.tsx`**: the workspace info panel (`.info-facts`: a card of one-line `Row`s, the whole value in `data-tip`, a
+- **`Info.tsx`**: the right panel's Info tab (`InfoTab`, App's `SidePanel` `info`; ⌘I and ⓘ open the panel on it): the
+  workspace's name with a rename pencil (`.info-name`), then `.info-facts`: a card of one-line `Row`s, the whole value in `data-tip`, a
   copy button on hover, a row's `acts` beside it; the path and storage `shortPath`'d, `$PORT` opens `localhost`, each
   public link: `WsInfo.tunnels`, `onCopy`; *from* and *started*, the workspaces `from` ties (`onWs`: it selected), and
   *related* (`refLabel`: PR #n · repo; a PR's *Make it this workspace's PR*, `onPrimary`: `prAttach`; ✕, `onUnrelate`:
   `wsSet` `unrelate`; the PR shown below left out); the PR ⋯'s *Not this workspace's PR* for a linked one, `onDetach`: `prDetach`) and the status bar's PR (`PRStatus`, `AutoToggles`, `ciText`);
-  each app maps its workspace to `WsInfo`. `PRSection` (the info panel's and Review's): title, a muted meta line, one row
+  each app maps its workspace to `WsInfo`. `PRSection` (Info's and Review's): title, a muted meta line, one row
   of Merge ▾ (`.split.green` when nothing `blocked` it: conflicts, failing or running checks, changes requested, `ready`
 false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) square at the end (neither Merge nor Approve:
   *Open on GitHub* and ⋯ first in the row), the
   body as `Folded` Markdown (MarkdownView.tsx's: 6 lines, Show more), `Checks` (failing, running, passing, skipped, each
   with `took`, the daemon's seconds, and its URL; a summary line), *Let the agent fix*: `AutoToggles` with `row`, a
   switch per row and *Send now* (`send`) only when there's something to send (failing checks, `threads` open, an
-  older daemon's or the info panel's unknown, or conflicts).
+  older daemon's or Info's unknown, or conflicts).
 - **`ui.tsx`**: line icons (`Icon`, `IconButton`), `Switch` (every on/off: the auto toggles, Settings' rows as
   `switch-row`), popup and right-click menus (`useMenu`, color swatches;
   each item has a key: its own `key` or a free initial, `menuKeys`; `sub`: a line under the label, `pill`/`tone`: a tag at
-  its end, `mono`, `foot`: under a line at the bottom, its icon at the end; `items`: a submenu beside it (a hover, a click, → or ⏎; ← or Esc back), as the ⋯ menus' *Open in*; a picked item (`hint` `ON`) is in the accent
+  its end, `mono`, `foot`: under a line at the bottom, its icon at the end; `tip`: its tooltip (Run ▾'s actions: their text); `items`: a submenu beside it (a hover, a click, → or ⏎; ← or Esc back), as the ⋯ menus' *Open in*; a picked item (`hint` `ON`) is in the accent
   with a check; `{ filter }`: a box on top, letters go to it, ⏎ runs the first label match (else the picked one), Esc
   clears it first; such menus are `.menu.rich`; one flipped above its button is held by its bottom),
   tooltips (`Tips`: any element with `data-tip`; a pressed one shows none until the pointer leaves it, a menu it opens stays clear; `IconButton` `tip={false}`: an `aria-label` only), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
@@ -1238,7 +1279,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   `{ project, tab? }`: its ⋯ › Settings opens that tab, else the last one, `laki.projectTab`): Notes (panels.tsx' `NotesView`, also the ⋯ › Notes dialog's:
   an edit saved as it unmounts), Scheduled tasks (Schedules.tsx' rows, a switch each; changes on that page), Memory
   (`Project.memory`, `{ id, text, at, edited, auto, by }`, the whole list through `projectSet`: *Yours* and *Learned by
-  agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`) and Settings (Settings.tsx' `ProjectSection`, `noNotes`). The sidebar's
+  agents*, `MEMORY_MAX` each, a learned one's pin keeps it as yours; never in MCP's state or `ls --json`; `MemoryList`, also Settings' Global memory with `global`: yours only) and Settings (Settings.tsx' `ProjectSection`, `noNotes`). The sidebar's
   arrow folds; Terminals and Browsers have no page.
 - **`Settings.tsx`**: the settings page (⌘,), autosaved, zoomed by the terminal font size times `settings.pageZoom`
   (`PAGE_ZOOMS`, Appearance's *Settings & Help size*; ⌘± while it or Help is open; Help takes the same zoom; its
@@ -1269,15 +1310,21 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   the title. Settings' `spot` (App's dialog `{ settings, spot }`: Run ▾'s *Edit the run script…* → Scripts, *Edit actions…* → Actions)
   opens at that `Group`'s card, lit the same way (a ring, a halo and a tint, 2.6 s). Hovering a theme paints it (`applyTheme`), the chosen one again as the mouse leaves `.themes` or the page closes. A
   setting back at its default is saved as that value: an unset key wouldn't replace the saved one. Projects
-  are sections of it (`ProjectSection`: name, scripts, env; saved 400 ms after typing and on leaving).
-- **`SidePanel.tsx`**: the right panel (⌥⌘B): Files (tree from the daemon's file list, search, new
+  are sections of it, under the nav's *Project settings* head (`ProjectSection`: name, a Memory row (its counts;
+  *Manage*: `onMemory`, App's `{ project, tab: 'memory' }`), scripts, env; saved 400 ms after typing and on leaving).
+  Global memory (`memory`: `settings.memory` through Project.tsx' `MemoryList` `global`); Release notes only with
+  `devMode`; General's Storage has `artifactsIn`, its Experimental the same `ai.on` switch as Settings › AI; Appearance's
+  Rail `railShells` and `railBrowsers`.
+- **`SidePanel.tsx`**: the right panel (⌥⌘B): Info (`PanelTab` `info`, first, any project: App passes `InfoTab` as
+  `info`), Files (tree from the daemon's file list, search, new
   file/folder, changed files marked), Changes (the diff by file, Expand all / Collapse all (one button: collapse while any is open), each line with its old and new numbers from the
   hunks; a click opens `CommentBox`: the PR, or the agent; an image, `IMAGE`, is `ImageDiff`: `PanelApi.read` with `base`
   for before, as `<img>`, SVG too, a click for full size), Review (`PRSection` from `Info.tsx` with the open
   threads' count; `ThreadCard`s: file:line, a click previews it there, each comment's author, `ago` of its `at` and its
-  body as `Folded` Markdown; resolved ones in a `<details>`), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line), `FileFinder` (⌘P, `findFiles`: a
-  basename match first); a right click in Files is App's `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Terminal actions; App's `runMenu(w)`, the toolbar's and a sidebar row's *Run ›*). App.tsx passes a `PanelApi` over the daemon. One right panel at a time: it or
-  the info panel.
+  body as `Folded` Markdown; resolved ones in a `<details>`), Preview (above; a narrow panel shows the other tabs as icons, a container query); `FilePreview` (a click in Files, or a thread's line; App keeps several, `openFiles`, a tab each over it, `.pv-tabs`,
+  by `fileKey`, each with its own `edit`; `shownFile`: each workspace's in front; ⌘W or a middle click closes one, an
+  edit asked first; its left edge is a `PanelHandle`, `previewW`), `FileFinder` (⌘P, `findFiles`: a
+  basename match first); a right click in Files is App's `fileMenu` (`PanelApi.menu`: default app, browsers for `WEB` files, Open in, Copy path); `RunButton` and `actionMenu` (Run ▾'s Agent and Shell actions, each item's `tip` its text, cut at `ACTION_TIP`; App's `runMenu(w)`, the toolbar's and a sidebar row's *Run ›*). App.tsx passes a `PanelApi` over the daemon.
 - **`Tunnel.tsx`**: Expose to the world: the status bar's globe next to each port (`TunnelButton`) and its
   popup: install instructions when cloudflared is missing, who can open it (anyone with the link, the default,
   or only some emails and `*@domain`s), then a QR code and the link; with emails, chips of who gets in, the bad ones flagged. `portsOf`: listening ports plus tunneled ones. App.tsx passes a `TunnelApi`. `QR`: a code
@@ -1353,20 +1400,20 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 |---|---|
 | `src/main/index.ts` | Electron main: single instance, starts the daemon, window (where it was left: `window.json` in userData, `winAt`, bounds, maximized, full screen; else maximized; hiddenInset title bar; traffic lights centered in the 38px header; `glass` IPC: vibrancy and a clear background), menu (with *Quit Laki Completely*: `shutdown`, asking first when an agent is running; File, Edit, View and Go list the renderer's ⌘ keys: `key()`, `registerAccelerator: false`, a click sends `browser-key`), notifications (with their sound; Allow/Deny actions call `answer`), the agent browser (`browse` IPC: a hidden window per workspace), the Dock badge and menu bar item (`badge` IPC: `Tray`; its *Screenshot … to an agent*: `screenshot`, macOS's `screencapture` `-i` or `-m` (the bubbles hidden meanwhile: `shooting`), then `annotate`'s editor window, sent as `shot` (png, note) once the renderer says `shot-ready`), the floating bubbles (`floats` IPC: `placeFloater`, floater.html's bar and the card, menu and voice windows it opens; `floater-act`, `voice-send`), `pick-folder` IPC, `open-external` (http(s) and mailto only), laki:// links, the preview's webview guard and `capture` |
 | `src/preload/index.ts` | `bridge`: conn info, notify, glass, badge, pickFolder, pathOf (a dropped folder's path), openExternal, onFocusTab, onBrowserTab, onBrowserKey (⌘W/⌘T from a Browsers page), dictate (`startDictation:` to the first responder), dictationSettings, onDeepLink, onShot (the menu bar's screenshot, drawn on, and its note), annotate (the editor window's), floats and floater (the floating bubbles' list and options; their windows': the bar, the card, the + menu, the voice prompt), onNewPrompt and fitNew (the new-workspace window's), capture, browse |
-| `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, shutdown |
+| `src/daemon/main.ts` | HTTP + WebSocket server, auth (token, Origin), the `api` table, `GET /artifact/…` (the artifacts viewer), shutdown |
 | `src/daemon/core.ts` | the model: projects, workspaces, tabs, hooks, queue, limits, scans, diff, run, ship, archive/fork, view |
 | `src/daemon/accounts.ts` | claude's and codex's accounts: folders with the agent's own linked in, a tab's account, who signs in |
 | `src/daemon/skill.ts` | the agent skills: SKILL.md and a CLI launcher in each agent's `skills/laki` and `skills/laki-widget` (`~/.claude`, `~/.codex`, `~/.gemini`, `~/.grok`, `~/.config/opencode`; `skills`, `skillSet`); `src/shared/usage.ts` is the CLI help it quotes |
 | `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page |
-| `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the read-only page |
+| `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the view-only page |
 | `src/daemon/plans.ts` | specs and brainstorms (experimental): their folders, the editor's save, files, agents' output, a prototype's page |
 | `src/renderer/src/Specs.tsx` | the Specs & Brainstorms page; `SpecEditor.tsx` (BlockNote), `diagram.tsx` (React Flow), `specmd.ts` (blocks → Markdown), `plans.css`: ported from specdrop |
 | `src/shared/plans.ts` | specs' and brainstorms' words for agents: the prompts, what a brainstorm writes, the diagram format |
 | `src/daemon/workflow.ts` | workflows (experimental): the sources, the engine (runs, decisions, asks, agents' turns, commands, PR waits), resume |
 | `src/shared/workflow.ts` | workflows' model and Markdown file, `check`, the format in words (MCP's and Laki AI's) |
-| `src/renderer/src/Workflows.tsx` | the Workflows page: list, canvas, inspector, file, runs |
+| `src/renderer/src/Workflows.tsx` | the Workflows page: list, canvas with its blocks and variables sidebar, inspector, file, runs |
 | `src/daemon/ai.ts` | Laki AI: OpenRouter's tool loop, claude -p and codex exec with `laki mcp`, the conversation, the key, the call log |
-| `src/renderer/src/Ai.tsx` | the AI page: Chat (a thread, the composer) and Calls tabs, the info panel |
+| `src/renderer/src/Ai.tsx` | the AI page: its earlier chats' sidebar, Chat (a thread, the composer, images as thumbnails), Calls and Info tabs |
 | `src/renderer/src/voice.ts` | Settings › Voice's cloud: recording, hold Fn, the text typed where the cursor was |
 | `src/shared/widget.ts` | widgets' template language, views, base CSS, a JS widget's page |
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |

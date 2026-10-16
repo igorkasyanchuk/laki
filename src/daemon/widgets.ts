@@ -24,7 +24,7 @@ type Spec = { type?: string; label?: string; hint?: string; default?: unknown; c
 type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai' } // by: Laki AI wrote it (widgetWrite)
+type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY)
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; builtin: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'> }
@@ -265,9 +265,15 @@ export function widgetsOff() {
 
 // the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
 // (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
-export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace; net?: boolean; config?: Record<string, string> }) {
+const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
+export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace; net?: boolean; config?: Record<string, string>; ai?: boolean }) {
   const w = find(o.id)
   const s = readStore(w.id)
+  if (o.ai) {
+    // Edit with Laki AI (Settings › Extensions): one of the user's in Laki's folder, which widgetWrite may then rewrite
+    if (w.builtin || w.dir !== join(widgetHome(), w.id)) throw new Error(`${w.m.name ?? w.id} isn't in Laki's folder: Laki AI can't change it`)
+    s.aiMay = Date.now()
+  }
   if (o.on !== undefined) s.on = !!o.on
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
@@ -469,7 +475,9 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
   const d = join(widgetHome(), o.id)
   const had = widgets.get(o.id)
   if (had && had.dir !== d) throw new Error(`${o.id} is ${had.builtin ? 'one that comes with Laki' : `in ${had.dir}`}: write a new one under another id`)
-  if (statOf(d) && readStore(o.id).by !== 'ai') throw new Error(`${o.id} is the user's own (Laki AI didn't make it): write a new one under another id`) // theirs isn't overwritten
+  const was = readStore(o.id)
+  const theirs = !!statOf(d) && was.by !== 'ai' // the user's own: only with a fresh Edit with Laki AI, and it stays theirs
+  if (theirs && !(was.aiMay && Date.now() - was.aiMay < AI_MAY)) throw new Error(`${o.id} is the user's own (Laki AI didn't make it): write a new one under another id`) // theirs isn't overwritten
   const json = files.find(([n]) => n === 'widget.json')?.[1] as string | undefined
   if (json === undefined && !statOf(join(d, 'widget.json'))) throw new Error('a new extension needs widget.json')
   if (json !== undefined) {
@@ -492,7 +500,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
     writeFileSync(p, t as string)
     chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
   }
-  writeStore(o.id, { ...readStore(o.id), on: false, net: undefined, by: 'ai' }) // net too: the user allows the network for the page they looked at, not a rewrite
+  writeStore(o.id, { ...readStore(o.id), on: false, net: undefined, by: theirs ? was.by : 'ai', aiMay: undefined }) // net too: the user allows the network for the page they looked at, not a rewrite
   scanWidgets()
   wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; off until it's turned on`)
   return { ...widgetsView().find(w => w.id === o.id), note: 'Saved turned off: the user turns it on in Settings › Extensions' }

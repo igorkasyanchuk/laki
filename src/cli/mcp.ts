@@ -32,21 +32,21 @@ export async function state(rpc: Rpc = conn) {
     return gs.some(g => !('tab' in g)) ? gs.map(g => describe(g, id => ts.find(t => t.id === id)?.name ?? id)) : undefined // all plain tabs: nothing to say
   }
   return {
-    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind, groups: p.seps?.length ? p.seps.map(s => s.name || 'Unnamed group') : undefined })), // kind: shells (the Terminals project) or browsers, the user's own; groups: the sidebar's, laki_new_workspace's group
+    projects: v.projects.map(p => ({ id: p.id, name: p.name, path: p.path, host: p.host, git: p.git !== false, kind: p.kind, groups: p.seps?.length ? p.seps.map(s => s.name || 'Unnamed group') : undefined, groupTemplates: (t => (Object.keys(t).length ? t : undefined))(Object.fromEntries((p.seps ?? []).filter(s => s.template).map(s => [s.name || 'Unnamed group', s.template!]))) })), // kind: shells (the Terminals project) or browsers, the user's own; groups: the sidebar's, laki_new_workspace's group; groupTemplates: a group's prompt template, which a new workspace in it starts with
     workspaces: live
       .map(w => ({ id: w.id, name: w.name, project: w.project, group: groupOf.get(w.id), kind: w.kind, branch: w.branch, path: w.path, host: w.host, port: w.port, ports: w.ports, pr: w.pr && { number: w.pr.number, state: w.pr.state, url: w.pr.url, title: w.pr.title, author: w.pr.author, mine: w.pr.mine, draft: w.pr.draft, checks: w.pr.checks || undefined, review: w.pr.review }, related: w.related, from: live.some(x => x.id === w.from) ? w.from : undefined, tabs: layoutOf(w.id) })), // related: other PRs and issues it's about; from: the workspace that started it; tabs: its tabs with splits, as the app shows them
     tabs: v.tabs.map(t => ({ id: t.id, workspace: t.workspace, name: t.name, kind: t.kind, agent: t.kind === 'agent' ? t.preset : undefined, status: t.status, code: t.code, done: t.done, queued: t.queue?.length || undefined, last: t.last?.slice(0, 500) })),
   }
 }
 
-// a group of a project by its name (any case) or id, as wsNew's place
-async function groupId(rpc: Rpc, project: string, group: string) {
+// a group of a project by its name (any case) or id: its id (wsNew's place) and its prompt template, if any
+async function groupOf(rpc: Rpc, project: string, group: string) {
   const v: View = await rpc('state')
   const p = v.projects.find(x => x.id === project || x.name === project || x.path === project || `${x.host}:${x.path}` === project) // as findProject takes it
   const want = String(group).trim().toLowerCase()
   const s = p?.seps?.find(x => x.id === group || (x.name || 'Unnamed group').toLowerCase() === want)
   if (!s) throw new Error(`no group ${group} in ${project}${p?.seps?.length ? `: its groups are ${p.seps.map(x => x.name || 'Unnamed group').join(', ')}` : ': it has none (leave group out)'}`)
-  return s.id
+  return { id: s.id, template: s.template, project: p!.id }
 }
 
 // where a new tab goes: beside a pane (a split in its tab), else as the user's setting says
@@ -77,16 +77,19 @@ export const tools = (rpc: Rpc, from?: string): Tool[] => [
         pr: str("a GitHub PR (its URL or number) to work on: the workspace is a worktree on its branch (forks too), named after it"),
         link: str("a GitHub PR (its URL or number) the workspace is about without checking it out (a review): its primary PR, whose status Laki shows. From an agent's tab (this server under $LAKI_WORKSPACE), PRs the prompt only names are related, not its PR; the workspace's own PR, once it opens one, is"),
         presets: { type: 'array', items: { type: 'string' }, description: 'a race: 2–6 presets (claude, codex…) that each get a worktree on the same prompt, for the user to compare and keep one' },
-        template: str("a prompt template's name (laki_templates): the prompt goes into it"),
+        template: str("a prompt template's name (laki_templates): the prompt goes into it. Left out with a group that has one (laki_state's groupTemplates): the group's"),
         action: str("an agent action's name (Run ▾'s, laki_actions): its prompt is what the agent does, the prompt above added after it"),
         group: str("one of the project's groups (laki_state's groups), the sidebar's heading it goes under: the one whose name fits the task best (a PR review under Reviews); leave it out when none fits"),
       },
       ['project'],
     ),
     run: async a => {
-      const place = a.group ? await groupId(rpc, a.project, a.group) : undefined // before the prompt: a wrong group makes nothing
-      const prompt = a.template || a.action ? await promptOf(rpc, a.project, a.prompt ?? '', a.template, a.action, a.pr, a.base) : a.prompt
-      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, from, place, ...((a.template || a.action) && { vars: true }) } // a template's or an action's {{branch}}…: the daemon's
+      const sep = a.group ? await groupOf(rpc, a.project, a.group) : undefined // before the prompt: a wrong group makes nothing
+      const place = sep?.id
+      // no template given: the group's, as the new-workspace page opened from the group starts with it (one gone since: none)
+      const template = a.template || (sep?.template && (await kit(rpc, sep.project)).templates.some(t => t.name.trim().toLowerCase() === sep.template!.trim().toLowerCase()) ? sep.template : undefined)
+      const prompt = template || a.action ? await promptOf(rpc, sep?.project ?? a.project, a.prompt ?? '', template, a.action, a.pr, a.base) : a.prompt
+      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, from, place, ...((template || a.action) && { vars: true }) } // a template's or an action's {{branch}}…: the daemon's
       if (!prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },
@@ -216,7 +219,7 @@ export const tools = (rpc: Rpc, from?: string): Tool[] => [
   },
   {
     name: 'laki_extension_write',
-    description: "Make an extension, or change one Laki AI made: its files in Laki's extensions folder (never the user's own). Files left out stay as they are. Saved turned off: tell the user to turn it on in [Settings › Extensions](laki://settings/widgets), and what its fetch runs.",
+    description: "Make an extension, or change one Laki AI made or the user let it edit (Edit with Laki AI): its files in Laki's extensions folder (never the user's other ones). Files left out stay as they are. Saved turned off: tell the user to turn it on in [Settings › Extensions](laki://settings/widgets), and what its fetch runs.",
     inputSchema: obj(
       {
         id: str('a new id for a new one: lowercase letters, digits and dashes (e.g. ny-clock)'),

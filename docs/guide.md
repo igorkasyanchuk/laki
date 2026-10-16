@@ -45,9 +45,9 @@ changing it: [AGENTS.md](../AGENTS.md).
   access and SSH connections, in Settings or ⌘K; idle
   agents can sleep to give their memory back, and resume their chat when you look.
 - **PRs**: the workspace's PR and its CI in the status bar; switches that send failing CI, new review
-  comments or merge conflicts to the agent on their own; an info panel with the PR and its checks;
+  comments or merge conflicts to the agent on their own; the side panel's *Info* (⌘I) with the PR and its checks;
   a workspace archived once its PR merges (off by default).
-- **Side panel** (⌥⌘B): the workspace's files (search, preview, new file or folder, changed files marked),
+- **Side panel** (⌥⌘B): the workspace's info (⌘I), its files (search, preview, several open as tabs, new file or folder, changed files marked),
   its changes against the base branch (click a line to comment on the PR or tell the agent), its PR's checks
   and review comments, and a browser preview of its dev server (a screenshot, or a picked element's selector,
   HTML, CSS and screenshot, goes to the agent). Markdown files preview rendered or raw; changed images show
@@ -209,7 +209,7 @@ selected workspace's PR is in the status bar.
 - **Project memory** has two lists of 50 each. *Yours*: add with ⌘⏎, edit, delete. *Learned by agents*
   (auto-memory): what agents found worth keeping as they worked there (an approach that works, a gotcha, a
   convention), each with when and who added it; past 50 the oldest goes, and the pin keeps one as yours. Claude and
-  Codex get both lists at every start in the project, with how to add to them (unless the preset's *Tell it about
+  Codex get both lists at every start in the project (after Settings › *Global memory*), with how to add to them (unless the preset's *Tell it about
   Laki* is off); other agents read them with `laki memory`. Edits reach a session at its next start.
   ```bash
   laki memory [.]                         # this project's memory (in a tab, . is its project)
@@ -235,9 +235,10 @@ selected workspace's PR is in the status bar.
     terminal* and *New browser*. (A *Shells* project from before is renamed *Terminals*.) Their status bar: a terminal's
     shows only the ports something in it listens on (no `$PORT`, no folder); a browser has none. Their top bar has only
     ⋯ (no Open in, info, preview, side panel or Run), and Settings and the Board leave them out.
-- A shell tab running a command (a `git push`, `npm install`, a dev server) has the spinner, on its tab and its row,
-  until its prompt is back. An agent you start there (`claude`, `codex`…) shows as an agent tab does instead: idle,
-  working, asking (◆) or done (●), read off its screen (no notifications: start it in its own tab for those).
+- A shell tab (or the Run tab) running a command (a `git push`, `npm install`, a dev server) has the spinner, on its tab
+  and its row, until its prompt is back or for 5 seconds at most: a server, vim or a REPL runs on, and shows idle after. An
+  agent you start there (`claude`, `codex`…) shows as an agent tab does instead: idle, working (the spinner, its whole
+  turn), asking (◆) or done (●), read off its screen (no notifications: start it in its own tab for those).
 - *Meme* (the smiley) at its bottom, beside *Video*: a random meme from r/memes, r/ProgrammerHumor or
   r/wholesomememes, pictures only, for a break (*Next*, → or N; a right click: copy, download, open on
   Reddit; Esc closes it); one you've seen comes again only when nothing new is left. Fetched only when you click:
@@ -286,10 +287,10 @@ selected workspace's PR is in the status bar.
 - Right click a workspace for a color, *Rename…* (the name it shows; its folder and branch keep the id),
   *Info*, *Mute notifications*, *Remind me…*, *Pin to top* (it moves under *Pinned*, above the projects, until *Unpin*),
   *Pin to the rail* (a button on the rail, below a line, a click away from anywhere; 5 at most: terminals and browsers
-  too), *Run ›* (the toolbar's Run ▾ for that workspace: its run script, localhost, your agent and terminal actions),
+  too), *Run ›* (the toolbar's Run ▾ for that workspace: its run script, localhost, your agent and shell actions),
   *Mark as unread*, *Copy branch name*, *Refresh PR status* (asks GitHub now, not at the next check), *Attach a PR…* (a
   git workspace on a branch with no PR found: one opened another way, by its URL or number; also the status bar's
-  *+ PR* and the info panel's PR section; a PR whose branch is another one is only linked: its status, no PR switches;
+  *+ PR* and *Info*'s PR section; a PR whose branch is another one is only linked: its status, no PR switches;
   one with no PR on its branch gets the PR its agent names in its last answer by itself, as a scheduled run's that
   pushed under another branch name: one link of the repo's own remotes),
   *Approve PR #n…* (someone else's open PR), *Compare the race* (a race's
@@ -347,7 +348,7 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 
 - *Aa* matches case and *.\** turns on regex. Esc closes the search.
 
 **Tab bar icons** (right side; hover for a tooltip):
-- info (⌘I): the workspace info panel (below);
+- info (⌘I): the side panel on *Info* (below);
 - editor: opens the workspace in Cursor, Zed, VS Code, Windsurf, Antigravity, Sublime Text, JetBrains IDEs, Xcode, Finder,
   Terminal, iTerm, Warp or Ghostty (the ones installed). ⌘E opens the default, which is the last editor picked;
 - panel (⌥⌘B): the side panel (below); ⌘D opens it on *Changes*;
@@ -359,7 +360,9 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 
   ▾ also lists your actions (Settings → *Actions*, and the project's), worked out as it opens:
   - *Agent actions*: a prompt for an agent (Claude Code, Codex, Gemini, Grok, OpenCode, or *Any agent*), listed while the workspace runs that agent. It goes to
     the focused tab if it's that agent, else its first tab, now or (while it works) when its turn ends.
-  - *Terminal actions*: a command, typed into the focused shell, else the workspace's first, else a new one.
+  - *Shell actions*: a command (an action whose target is *Shell*), run in the focused shell if it's at its prompt,
+    else the workspace's first shell at its prompt, else a new one.
+  - Resting on an action shows what it sends or runs.
 
 **Status bar** (bottom): the branch (short, without the branch prefix; hover for all of it and its base, click to
 show it whole: Laki remembers), `$PORT` (green while something listens on it) and the other
@@ -382,18 +385,18 @@ the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a 
   addresses get in (cloudflared 2026.9.3 or newer: `--allowed-mail`). The list is kept for next time; with
   none yet, it's git's `user.email`.
 - Once it's up: a QR code to open it on your phone, the link (copy, open), and *Stop*. The globe lights up,
-  and the info panel (⌘I) shows the public link too.
+  and *Info* (⌘I) shows the public link too.
 - It runs in the daemon until you stop it, delete or archive the workspace, or stop the daemon; closing the
   app leaves it on. A port with a tunnel stays in the status bar after its server stops.
 
-**Share a tab** (a tab's right click › *Share read-only link…*: for 1, 8 or 24 hours, or until you stop it): a page
+**Share a tab** (a tab's right click › *Share live view…*: for 1, 8 or 24 hours, or until you stop it): a page
 anyone with the link can read, at a random `https://….trycloudflare.com/s/<id>` (the same Quick Tunnels, so it needs
 `cloudflared` too), copied as it starts and shown with a QR code. Past its hours the link is dead. An
 agent's tab shows its chat (Claude Code's and Codex's: your prompts, its answers, its tool calls folded a line each);
-any other tab (a shell, a server, another agent) its terminal's text. It updates as you go on (every few seconds),
-follows the end while the reader is there, and has *Copy as Markdown*, *Download .md* and a *Tool calls* switch. Nobody can type into it,
+any other tab (a shell, a server, another agent) its terminal's text, in chat bubbles under a *LIVE* badge. It updates as
+you go on (every few seconds), follows the end while the reader is there (further up, *New below* takes them down), and has *Copy as Markdown*, *Download .md* and a *Tool calls* switch. Nobody can type into it,
 and the tunnel reaches these pages only, never the rest of Laki. A shared tab has a globe; its right click ›
-*Shared read-only* copies or opens the link, or stops sharing. Closing the tab, archiving its workspace or stopping
+*Shared live view* copies or opens the link, or stops sharing. Closing the tab, archiving its workspace or stopping
 the daemon stops it too, and the link is dead after (a new share is a new link). Resources lists its cloudflared as
 *Shared tabs*.
 
@@ -436,14 +439,15 @@ aren't on it). Click a card to open the workspace; right-click it (or its ⋯ on
 *Merged*'s ⋯ archives them all (one with uncommitted changes asks first). *To do* holds prompts for later: write one (⌘⏎ adds it) for a project, then ▷ (or drag it onto another
 column) starts a workspace on it with the default agent, and the to-do goes.
 
-**AI** (Settings › *AI* turns it on; then *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
+**AI** (Settings › *AI*, or the same switch in General › *Experimental*, turns it on; then *AI* at the rail's bottom, over Settings, *AI* in ⌘K,
 `laki://ai`, `laki ai` in a terminal, or *Ask Laki AI* in the floating bubbles' +: a small window of its own over the app
 you're in): Laki's own assistant, one conversation that works Laki with the same tools as
 `laki mcp`. Ask *what are my agents doing?*, *start a code review of the PR with the login form*, *take the PR from
 workspace ABC and start a new codex session to review it*, or paste a screenshot with three PR links and ask to review
 each in its own workspace: it reads the workspaces, their PRs and agents' last answers, then starts workspaces (a PR's
 on its branch), opens tabs, sends prompts, attaches PRs and schedules tasks, at once, without asking. A project with
-groups gets each new workspace in the group whose name fits it (a review in *Reviews*), or none. The bubbles' window is
+groups gets each new workspace in the group whose name fits it (a review in *Reviews*), or none; a group with a prompt
+template starts it with that template, else it picks one of yours that plainly fits the task. The bubbles' window is
 the chat alone: no Calls, Info or cost (the app's AI page has them). The chat button at the window's bottom right (every
 page but AI, Settings, Help and Specs; Settings › AI › *Chat button* hides it) opens the same chat over what
 you're doing, and each ask tells it where you are: the page, the workspace, the tab, its status, progress and last
@@ -462,9 +466,12 @@ workspaces. When it isn't sure, it asks with a few options as buttons: a click a
 something else: then that question is closed). It removes a memory item, a scheduled task, a tab or a to-do only
 through such a question: *Yes, remove…* is yours to press, and Laki does it. Ask it for an extension
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
-so you look and turn it on in Settings › Extensions (*by Laki AI* on its row). It never archives or deletes
+so you look and turn it on in Settings › Extensions (*by Laki AI* on its row); *Edit with Laki AI* there has it rewrite
+one of yours the same way. It never archives or deletes
 workspaces, ships or merges, and it does nothing until you ask. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
-into one line you can open, *Stop* ends an ask, *New chat* starts over. A workspace or tab it names is a link: a click
+into one line you can open, a pasted image is a thumbnail (a click shows it big), *Stop* ends an ask, *New chat* starts
+over. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
+goes on), the trash deletes it. A workspace or tab it names is a link: a click
 opens it in Laki (from the bubbles' window too); a tool line's *Open* goes to the workspace it worked on. The *Calls* tab
 lists every ask with its backend and model, tokens in and out, cost and time; *Info* says how it runs and how it's paid
 for, what it spent today and this month (also in Settings › AI), and what it can do. It runs with:
@@ -478,7 +485,8 @@ for, what it spent today and this month (also in Settings › AI), and what it c
   yours: a claude or codex profile with its env and account (none: the agent's default account), each with a session
   of its own.
 
-*Steps* (unset: 20) caps the rounds of tool calls one ask may make. *Show costs ($)* (Settings › AI › Spending, on by
+*Steps* (unset: 20) caps the rounds of tool calls one ask may make. *Keep pasted images* (Settings › AI › *Pasted
+images*: 30 days unless changed) is how long Laki keeps what you paste into its chats and new workspaces' prompts. *Show costs ($)* (Settings › AI › Spending, on by
 default) turned off hides the money on the AI page: asks and tokens only.
 *Your instructions* (Settings › AI) is your own context for it, added after Laki's instructions at every ask: who you
 are, how you name things, what it should know. It can't lift what Laki AI may not do.
@@ -515,14 +523,16 @@ Code's Keychain item or `~/.claude/.credentials.json`; Codex's `~/.codex/auth.js
 agent's own `/usage` screen asks, at most every 5 minutes. It never refreshes a token: an expired one says so
 until the agent's next run renews it. Settings › Appearance turns each agent off (then nothing is read).
 
-**Side panel** (⌥⌘B, the panel icon; drag its edge to resize; one panel at a time with the info panel):
+**Side panel** (⌥⌘B, the panel icon; drag its edge to resize; ⌘I or ⓘ opens it on *Info*, below):
 - *Files*: the workspace's files (git's, ignored ones left out; a plain folder's, without `node_modules` and
   the like). Search filters by path. New file and new folder go in the selected folder; a new file opens in
   your editor. A click on a file previews it next to the terminal (text with line numbers, code in color up
   to 50 KB, or an image),
   with *Open in editor*; a double-click opens it in the editor. The pencil edits a text file right there, for small
   changes (no completion): ⌘S or *Save* writes it, Esc or *Cancel* drops the edit (asked first when you changed
-  something; closing the preview, ⌘W, or opening another file asks too). If the file changed since you started (an
+  something; closing its tab, ⌘W, asks too). Each file you open is a tab over the preview, with its own unsaved edit (a
+  dot): a click goes to one, ✕ or a middle click closes it, ⌘W the one in front. Drag the preview's left edge to make it
+  wider; a double-click on it shares the room with the terminals again. If the file changed since you started (an
   agent at work), saving asks before writing yours over it. Line ends (CRLF) stay as they were; files over 512 KB or
   not UTF-8 open in your editor instead. A right click opens it elsewhere: its default
   app, a browser (HTML, SVG, PDF, images, JSON, XML), any editor, Finder (shows it), a terminal (in its folder);
@@ -569,7 +579,7 @@ its quotes and line ends stay as they were. The first 2,000 rows show; Raw has t
 **Find files** (*Find files…*, first in ⌘K; or ⌘P): type parts of a path (`crt` finds `src/cart.ts`); names match
 before folders. ↑↓ and Enter preview the file; ⌘W closes the preview.
 
-**Info panel** (ⓘ or ⌘I, open or closed per workspace; drag its left edge to make it wider, double-click it for the default): a card of the workspace's
+**Info** (the side panel's first tab; ⓘ or ⌘I): its name (the pencil renames it), then a card of the workspace's
 facts, a line each (rest on one for all of it; a copy button on hover): its id, branch, path, storage folder, `$PORT`
 (a click opens `localhost:<port>`), each public link (*public*: anyone with the link, *shared*: only some emails), when it was made,
 *from* (the workspace whose agent started it) and *started* (the ones its agents started), a click opens one, and
@@ -585,7 +595,7 @@ moves to *related*, and the branch's own PR, once there is one, shows instead.
 opened shows up at once. If an agent switches the workspace to another branch, Laki follows it (the status bar and the
 PR are that branch's). Hover a switch for what it does, how often it checks and how many tries it gets.
 
-The three switches in the status bar (and the info panel), each on or off per workspace, act on an open PR after each
+The three switches in the status bar (and *Info*), each on or off per workspace, act on an open PR after each
 check. Each sends its prompt to the workspace's first running agent (Claude Code, Codex…), queued until its turn ends;
 with no agent running nothing is sent, and the next check tries again.
 - *fix CI*: when CI fails on a new commit, the failing checks and the end of their GitHub Actions logs (the last 80
@@ -607,7 +617,7 @@ the status bar PR's tooltip and the row's hover card say the same.
 
 *Merge* ▾ (green once it could go in: checks passing, no conflicts, no changes requested; plain otherwise, its
 tooltip says why), *Approve*, GitHub, and ⋯ (its checks, its files, *Close pull request…*), under the PR's title (the
-side panel's *Review*, the info panel), in the status bar PR's right click and (approve) a workspace's right click,
+side panel's *Review* and *Info*), in the status bar PR's right click and (approve) a workspace's right click,
 merge, approve or close the open PR with `gh`, as you, after you confirm (each question names the PR; Approve's its
 author and checks). Your own PR has no *Approve* (GitHub refuses it). *Merge* uses the way you
 merged last in this project (*Squash and merge* at first); ▾ picks *Create a merge commit* or *Rebase and merge*,
@@ -630,7 +640,7 @@ PR: *Undo* in the message brings it back for good. One that can't go says *merge
 
 What each sends is a prompt in Settings › *Pull requests*, which you can change: `{{pr}}` is the PR's number, `{{url}}`
 its link, `{{base}}` its base branch; the failing checks or the review threads go after it. *Reset* puts the default
-back. *Send now* beside each switch (*Review*, the info panel) sends the same prompt once, switch or not; it shows
+back. *Send now* beside each switch (*Review*, *Info*) sends the same prompt once, switch or not; it shows
 only when there's something to send: failing checks, open review threads, merge conflicts.
 
 **New workspace** (a page, like Settings; Esc closes it): write the prompt; the agent and its model are picked
@@ -707,7 +717,8 @@ and report through the laki skill (Settings › Agent skill) or MCP's `laki_prog
 
 **The rail**, like Slack's: a narrow rail on the left with *Projects*, *Board*, *Schedule* (a red dot: a run failed),
 *Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
-*AI* (when it's on) over *Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail). Board and Schedule are pages
+*AI* (when it's on) over *Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail;
+*Terminals* or *Browsers* off: no button, and that project is in Projects' list). Board and Schedule are pages
 over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
 list shows the kind you pick, and its rail button goes back to the last workspace you had there.
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the
@@ -781,9 +792,10 @@ My PRs and Team PRs take *Only with labels* (any of them; empty: all) and *Hide 
 To make one, install the *Extension creator* skill (Settings › Agent skill) and ask your agent ("an extension with my
 open issues"), or Laki AI: Settings › Extensions › *Make one with AI*, type what you want and press *Make it with Laki
 AI* (with Laki AI on): its chat opens, it asks you at least two questions about it (what it shows, where it sits, what
-a click does), then writes it, saved off until you turn it on. Or any AI chat: the same box has the whole format as a
-prompt (type what you want, copy it, paste it in the chat), then save the files it gives you in `<data>/widgets/<id>/` and press
-*Reload extensions*. An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
+a click does), then writes it, saved off until you turn it on. Or any AI chat: type what you want, *Copy the prompt* (the
+whole format as a prompt; *Show the prompt* unfolds it), paste it in the chat, then save the files it gives you in `<data>/widgets/<id>/` and press
+*Reload extensions*. One of yours in Laki's folder has *Edit with Laki AI* in its dialog: say what to change, and Laki AI
+rewrites it in its chat, saved off again until you turn it on. An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
 sandboxed frame that can't reach the app, nor the network unless you turn on its *Network access* (then its page may
 fetch from and show images of https sites; its data otherwise comes from its fetch, which always has the network).
 `laki widget` lists, reloads, fetches and renders them.
@@ -839,7 +851,7 @@ it stays open while runs go (✕ does).
 
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
 happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,
-picked from + *Block* › *Agent action* or in the block, `use: <its slug>` in the file; it waits for the turn to end),
+picked from the sidebar's *Agent actions* or in the block, `use: <its slug>` in the file; it waits for the turn to end),
 *Run command* (`npm test`: ok or fail by its exit code), *If / else* (two ways, by what a block said: contains, matches,
 equals), *Case* (if / elsif / else: its branches in order, the first that holds wins, *else* last; each tests the case's
 variable or one of its own, so *if the change is only specs → approve, else → a full review* is a Case on what an agent
@@ -877,8 +889,8 @@ run notifies anyway, and Settings › General › *macOS notifications* turns th
 your phone pushes too (Settings › Phone pushes: ntfy, Telegram, Slack or a webhook).
 
 Each block has an **ID**, its `## id` in the file (on the canvas when it has its own name): change it in the block and
-every arrow and `{{steps.<id>.…}}` follows. *{{ }} Variables* lists every variable a workflow has, the run's and each
-block's, with what it holds; a click copies one. Laki AI works on the Workflows page too: in a workflow, ✦ (or the
+every arrow and `{{steps.<id>.…}}` follows. The sidebar's *{{ }} Variables* lists every variable a workflow has, the run's
+and each block's, with what it holds; a click copies one, a drag drops it into a field. Laki AI works on the Workflows page too: in a workflow, ✦ (or the
 chat button) opens its chat with the workflow in every ask (the file, your unsaved changes): ask it to add or change a
 step, it writes the workflow, you read it and *Save*. On the list, *Make it with Laki AI*: say what it should do; it
 asks you a few questions first (what starts it, its steps, where it routes, how it tells you), then writes it.
@@ -887,7 +899,8 @@ None come with Laki: *New workflow* makes one, yours (any project) or a project'
 `.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most); a row's copy button copies it.
 Laki AI and your agents (the laki skill) write them too: ask for one, read it, then *Save* it before it runs. For example: a plan
 you approve, the build, tests until they pass (at most 3 fixes), a PR, CI until green. A workflow opens on a canvas: drag blocks, pick one to change it
-on the right (its prompt, model, where each exit goes), + *Block* adds one after the picked block. A block's right
+on the right (its prompt, model, where each exit goes). The sidebar on the left has *Blocks* (a click adds one after the
+picked block, else at the end; a drag onto the canvas drops it where you let go) and *Variables*. A block's right
 click: *Add a block after it*, *Duplicate* or *Delete*. *File* shows the
 same workflow as Markdown, the way agents write one (`laki_workflow_write`).
 
@@ -963,7 +976,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 |---|---|
 | ⌘O | open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it |
 | ⌘N | new workspace |
-| ⌘T / ⌘W | new shell tab / close tab (or the file preview, when one is open); in a browser: a new page / close it |
+| ⌘T / ⌘W | new shell tab / close tab (or the file in front in the preview, when one is open); in a browser: a new page / close it |
 | ⌘⇧N | the tab bar's ＋ menu: shell, an agent preset or a command, picked with ↑↓ and ⏎ (or the item's letter) |
 | ⌘1…⌘9 | tabs |
 | Esc | close a dialog or menu |
@@ -975,8 +988,8 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | ⌘K | palette |
 | ⌘P | find a file in the workspace |
 | ⌘D | changes (the side panel) |
-| ⌥⌘B | side panel: files, changes, review, preview |
-| ⌘I | workspace info |
+| ⌥⌘B | side panel: info, files, changes, review, preview |
+| ⌘I | workspace info (the side panel on *Info*) |
 | ⌘F | find in the terminal |
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
@@ -1003,7 +1016,7 @@ lit for a moment.
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
   waited in its queue and went in, its tabs' turns and the command each tab started with; *Creation log* under it: what
-  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
+  making each workspace ran, step by step (what was asked, git, the setup, the agent) or why it failed; *Reset the interface*: Laki as it starts: every setting at its default (the theme, the rail and sidebar, the terminal, notifications, the experimental features), every extension off, Get started again, the window's layout (widths, open panels, folded projects, the selected workspace and tabs, text sizes); projects, workspaces, sessions, profiles and accounts, Laki AI, phone pushes, remote access, env, actions, templates, global memory, how long pasted images are kept, your editor, folders, timers and drafts stay; and per extension, *Logs* in Settings › Extensions: each fetch, how
   long it took or why it failed, its actions; the last 500 lines each, in the daemon's memory; off by default), *Close tabs without asking* (off by default: closing a tab whose agent or server still runs asks first), and environment
   variables for every session (a project's or preset's env wins over them). *Move to another Mac*: Export saves
   every setting of these pages to `laki-settings.json` (your env too: keep it private); Import on the other Mac
@@ -1147,12 +1160,15 @@ lit for a moment.
   prompt (`--append-system-prompt`, Codex's `developer_instructions`; a preset whose arguments set their own keeps
   those, and so does Codex with `developer_instructions` in its `config.toml`: no note then): it runs in Laki, and how to name its workspace (`laki rename . "…"`), attach a PR (`laki pr . <n>`), hand a
   task to a new workspace, look at the app in the agent browser, and where to keep files for you, and a link to whatever it publishes (the storage folder, below).
+- *Global memory*: your own rules for every project (how you like commits, tests to run, what never to do), 50 at most,
+  added and edited like a project's memory: Claude and Codex get them at every start, in any project, just before that
+  project's own (none with *Tell it about Laki* off). Only you add here: agents' auto-memory stays with each project.
 - *Storage* (General): every workspace gets a folder of its own outside the repo, `$LAKI_STORAGE_FOLDER` in each of its
   tabs (agents and shells alike): `<data>/storage/<name>-<id>`, or under the folder you set. It's made with the
   workspace's first tab and keeps its path when the workspace is renamed. Ask an agent to put screenshots, reports
-  or exports there; the info panel's *Storage* opens it, and the status bar's *Artifacts: n* (the files in it, hidden
+  or exports there; *Info*'s *Storage* opens it, and the status bar's *Artifacts: n* (the files in it, hidden
   ones not counted; none at 0) shows them here (⌘⇧A shows or hides them): a strip of previews over the status bar, newest
-  first; click one for a big view (images, text, Markdown rendered), ← and → for the others. Its folders come first:
+  first; click one for a big view (images, text, Markdown rendered, an HTML page in a frame), ← and → for the others. Its folders come first:
   click one to go in, the path at the top (or ←) to go back out. A right click on one (in the strip,
 the big view or Files) copies the file itself (a picture as a picture, to paste into a chat or a document), its text
 or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
@@ -1165,8 +1181,11 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   surge.sh, web.app or workers.dev; agents are told to save anything else themselves, and to group related files in
   a subfolder. A `.url` file with a `file:///` link (a page an agent made elsewhere on this Mac) opens that page in
   the browser too. Each link once. Links come first in the strip and open in the browser on a click,
-  and the info panel lists them under *links*. Archiving keeps it; deleting the workspace (or removing its
+  and *Info* lists them under *links*. Archiving keeps it; deleting the workspace (or removing its
   project) deletes it too, unless *Keep a deleted workspace's storage* is on. None for Terminals, Browsers and SSH hosts.
+  An HTML or Markdown file opens in a viewer over the app (*Open HTML and Markdown artifacts*: *In Laki*, the default, or
+  *In the browser*): HTML sandboxed, its scripts run and the CSS and pictures beside it load, it can’t read Laki or your files; Markdown
+  rendered; with *Open in the browser* and *Show in Finder*.
 - *Phone pushes*: a webhook that gets a push when an agent waits for you (on) or finishes (off), with what it asks.
   *Format*: ntfy (a topic's URL, e.g. `https://ntfy.sh/<a topic only you know>`, which the ntfy app subscribes to),
   Slack (an incoming webhook), Telegram (your bot's whole `sendMessage?chat_id=…` URL) or generic JSON (`{event,
@@ -1194,9 +1213,9 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   become the workspace's and the tab's as an action, a template, a scheduled prompt or a workflow reaches it: *Run the
   tests on {{branch}}, then comment on {{pr}}*. One with nothing to give (no PR yet) stays as it is, and a message you
   type is left alone.
-- *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent, *Any agent*: whichever runs, or a terminal) and the prompt
+- *Actions*: Run ▾'s shortcuts, each a name, who it's for (an agent, *Any agent*: whichever runs, or *Shell*: a command) and the prompt
   or command, e.g. `execute code review 2 times with --fix` for Claude, `execute $code-review and fix
-  findings` for Codex, `bundle exec rails db:migrate` for a terminal. The copy button duplicates one (to make the
+  findings` for Codex, `bundle exec rails db:migrate` for a shell. The copy button duplicates one (to make the
   same for another agent); *Show* lists one agent's. Each has a slug beside its name (`xhigh-code-review`), set from
   the name as you type it and kept when you rename it, unique across your actions and every project's (type your own;
   one taken gets a `-2`): a workflow's agent block names the action by it (`use: xhigh-code-review`).
@@ -1220,12 +1239,12 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   lines to merge into `~/.config/opencode/opencode.json`.
 - *Remote access*: the email it lets in, how long, start and stop, the QR code and link (above).
 - *Extensions*: *Make one with AI* (the prompt, above), the folders they're found in (Laki's own, and more of yours,
-  one per line), *Reload extensions*, *Working hours*, and the extensions, a row each (its name, what it shows, its
+  one per line), *Reload extensions*, *Working hours*, and the extensions in two lists, *Yours* and *Built in*, a row each (its name, what it shows, its
   size, how often it fetches, the last fetch; *Fetch now* on hover) with its switch: on or off. A click on one sets it
   up in a dialog: its size (cells across × down, ½ a thin line), how often it fetches (minutes), its full view's size,
   *Fetch now*, *Open*, its folder (in Finder, your editor or a terminal, or *Copy path*) and, in development mode,
-  its *Logs*; its settings under them, saved as they change.
-- *Release notes* (also ⌘K *Release notes*): what's new in Laki, newest first; *Next* is what the coming version adds.
+  its *Logs*; its settings under them, saved as they change; one of yours in Laki's folder has *Edit with Laki AI* (above).
+- *Release notes* (with *Development mode* on; also ⌘K *Release notes*): what's new in Laki, newest first; *Next* is what the coming version adds.
 - *Resources* (also ⌘K *Resources*): memory and CPU now, refreshed every 3 seconds while it's open. macOS counts every
   process Laki starts as Laki's (the Force Quit window's number): each agent, its MCP servers, the dev servers in
   its tabs. *Laki itself* is the app's own processes and the daemon; the video, JS extensions (all in one process: one
@@ -1245,16 +1264,17 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   message (`laki send`, a scheduled task, the PR buttons) resumes the chat (`--resume`), and a message waits until
   it's up. Never one with a dev server listening under it, getting PR feedback (the PR switches), or on an SSH
   host. An agent grows the longer it runs; a resumed one starts small.
-- *Projects*: each project's settings (below).
+- *Project settings*: each project's settings (below).
 
 Selecting text in a terminal copies it. A tab whose agent you stop with Esc goes back to idle, and so does one
 whose turn ends without a word (a resumed chat's recap): quiet for a few seconds, no "esc to interrupt".
 
 ## Project settings
 
-Settings → *Projects*, or ⋯ on a project then *Settings* (its page's Settings tab; Run ▾ → *Edit the run script…* opens its Run
+Settings → *Project settings*, or ⋯ on a project then *Settings* (its page's Settings tab; Run ▾ → *Edit the run script…* opens its Run
 tab). Saved as you type:
 - Name.
+- *Memory*: how many items are yours and how many agents learned; *Manage* opens the project page's *Memory* tab.
 - *Notes*: yours, in Markdown (links, how to run it, who to ask). ⋯ on the project › *Notes* shows them rendered, with
   *Edit*; agents never see them (not in `laki ls --json` or MCP).
 - *Scripts*, one tab each, any number of lines; *Import* fills one from a script file:
