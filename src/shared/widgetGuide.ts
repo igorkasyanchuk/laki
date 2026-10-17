@@ -3,12 +3,14 @@
 
 import { WIDGET_EVENTS } from './types.ts'
 import { WIDGET_SCHEMA_URL } from './widgetSchema.ts'
-import { UI, UI_SAMPLES } from './widgetUi.ts'
+import { CHARTS, COLORS, DO, TONES, UI, UI_EXAMPLES, UI_SAMPLES } from './widgetUi.ts'
 
 export const WIDGET_EVERY = 5 // minutes between fetches when widget.json doesn't say
 
 // the UI kit's catalog, from its table: each element's props in a line, then its sample
 const catalog = () => UI_SAMPLES.map(s => `- \`${s.type}\` (${Object.keys(UI[s.type].props).join(', ') || 'no props'}): ${s.blurb}\n  \`${JSON.stringify(s.spec)}\``).join('\n')
+// a few of the kit's examples: every chart kind, Laki's commands, a layout of a few elements
+const examples = () => UI_EXAMPLES.filter(x => x.title !== 'Colors').map(x => `- ${x.title}: \`${JSON.stringify(x.spec)}\``).join('\n')
 
 // widget.json, its ui and widget.html: all a widget is
 export const widgetFormat = () => `## widget.json
@@ -33,7 +35,12 @@ export const widgetFormat = () => `## widget.json
 }
 \`\`\`
 
-- \`sample\` (**required** with a \`fetch\` or \`script\`): made-up data in exactly the shape the fetch prints, realistic and
+- \`source\`: where its data comes from at first; the user picks another on its card: \`{ "kind": "fetch" }\` (its fetch or
+  script, the default), \`{ "kind": "static", "text": "…" }\` (JSON, or words: \`{ text }\`, a Markdown note: \`ui\`
+  \`{ "type": "markdown", "value": "{{text}}" }\`, no fetch at all), \`{ "kind": "file", "path": "~/notes/today.md" }\` or
+  \`{ "kind": "url", "url": "https://…" }\` (read each \`every\` minutes: JSON is the data, anything else \`{ text }\`; a path
+  or URL may say \`{{config.repo}}\`, \`{{workspace.path}}\`). A public JSON API needs no fetch: a URL source.
+- \`sample\` (**required** with a \`fetch\`, a \`script\`, a file or a URL): made-up data in exactly the shape the data takes, realistic and
   varied (one of each state it shows: a failing one, an approved one…): the user sees it before it ever runs
   (\`window.laki.sample\` is true then, and its buttons do nothing). \`sampleConfig\`: settings for that preview.
 - \`size\`: cells [across 1–3, down 0.5 or 1–4]; a cell is about 70×64 px, 0.5 a line 29 px tall. \`every\`: minutes
@@ -98,7 +105,26 @@ an empty list is false), \`each\` (a path: it repeats per item; a list, table, c
 values) are looked up as they are. It fits every size, bar and theme, a failed fetch shows its error and Retry, and
 its links, buttons and filters work. Use widget.html only for a look the kit can't make.
 
+- **Colors**: a \`color\` prop (text, heading, icon, badge, spark, progress, gauge, heatmap, header's icon, stat's and tags' dot)
+  takes a tone (${TONES.join(', ')}), one of Laki's palette (${COLORS.join(', ')}: each theme's own) or a hex
+  (\`d73a4a\`: a GitHub label's), or a template giving one (\`"{{#if red}}bad{{else}}good{{/if}}"\`). Prefer tones for
+  meaning (bad: failing) and the palette for kinds; a hex only for a color that comes with the data.
+- **Charts**: \`kind\` ${CHARTS.join(', ')}. One number per row (\`y\`), or \`series\` (\`[{ "label", "y", "color" }]\`: lines,
+  bars, stacked); pie, donut and hbars a slice or bar per row, its label \`x\`; scatter \`x\` and \`y\` numbers. \`colors\`: the
+  order of colors; a row's \`color\` template or a \`tone\` map over \`x\` colors each; \`legend\`, \`unit\`, \`min\`, \`max\`.
+- **Buttons** (\`button\`, \`actions\`, a list's \`actions\`, \`header\` and \`footer\` \`actions\`, \`toolbar\` \`items\`): \`run\`
+  (one of its actions), \`open\` (a link), \`refresh\`, \`full\`, \`copy\`, or \`do\`, a Laki command, asked first: ${DO.map(d => `\`${d}\``).join(', ')}
+  (\`new\`: a workspace whose agent starts on \`prompt\`, in \`project\` (a name; none: the selected one's) with \`agent\`
+  (none: the default); \`send\`: \`prompt\` to the selected workspace's agent; \`ai\`: \`prompt\` to Laki AI; \`terminal\`:
+  \`command\` in a new terminal; \`browse\`: \`url\` in a Laki browser tab). A JS page: \`laki.do({ do, prompt… })\`.
+- **Layouts**: a \`header\` (icon, title, buttons), the body, a \`footer\` (muted words, buttons) in a \`stack\`; a
+  \`toolbar\` of icon buttons; a \`spacer\` pushes what follows it in a \`row\` to the end.
+
 ${catalog()}
+
+Examples:
+
+${examples()}
 
 ## widget.html (a custom look)
 
@@ -114,14 +140,14 @@ ${catalog()}
 - Links open in the browser; \`data-laki="refresh"\` fetches; \`data-run="review" data-arg="{{url}}"\` runs an action.
   Without a script it's drawn in the app: scripts, frames, forms and \`on…\` attributes are removed.
 - With a \`<script>\`: a page in a sandboxed frame with no network (unless the user turns on its Network access) and
-  \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`, \`open(url)\`, \`expand()\`, \`run(action, arg)\`,
+  \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`, \`open(url)\`, \`expand()\`, \`run(action, arg)\`, \`do(cmd)\`,
   \`toast(text)\`, \`modal({…})\` (these right after a click), \`ui(spec, data)\` and \`mount(el, spec, data)\` (the kit's
   HTML). Inline everything; draw a canvas at a fixed size.
 `
 
 // how Laki AI makes one (ai.ts' SYSTEM: questions first); desk: the Desk's Build with Laki AI, so not where it sits
 const howMake = (desk?: boolean) =>
-  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from, ${desk ? '' : "where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), "}what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (its ui from the UI kit, with a sample in widget.json: its preview).${desk ? ' It goes on my Desk: "place": "desk" in widget.json, a tile there.' : ''} It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
+  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from (a command, a file, a URL, or text I type), ${desk ? '' : "where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), "}what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (its ui from the UI kit, with a sample in widget.json: its preview).${desk ? ' It goes on my Desk: "place": "desk" in widget.json, a tile there.' : ''} It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
 
 // the Desk's Build with Laki AI: the ask the floating chat gets
 export const widgetAsk = (want: string, desk?: boolean) => `Make me a Laki extension: ${want.trim()}

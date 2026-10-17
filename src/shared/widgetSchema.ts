@@ -85,7 +85,14 @@ export const MANIFEST: Record<string, J> = {
   badge: str('As a button: a short count, a template ("{{#if n}}{{n}}{{/if}}")'),
   tip: str('Its tooltip, a template'),
   click: str('One of its actions, run on a click on its button'),
-  sample: { description: 'Made-up data in the shape its fetch prints, for its preview before it runs (needed with a fetch)' },
+  source: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['kind'],
+    properties: { kind: { enum: ['fetch', 'static', 'file', 'url'], description: 'fetch: its own fetch or script; static: the text below; file: a file read each time (JSON, else { "text" }); url: an http(s) page read each time' }, text: str('With static: JSON, or words (its data: { "text" })'), path: str('With file: its path (~ is home; relative: the extension’s folder; {{config.x}}, {{workspace.path}})'), url: str('With url: the address ({{config.x}} too)') },
+    description: 'Where its data comes from at first: the user picks another on its card (Its fetch, Static, File, URL)',
+  },
+  sample: { description: 'Made-up data in the shape its data takes, for its preview before it runs (needed with a fetch, a script, a file or a URL)' },
   sampleConfig: { type: 'object', description: 'Settings to show the sample with' },
   ui: { description: 'What it draws with the UI kit (Settings › Extensions › UI kit, laki widget kit): one element, or { "preview", "full" }', allOf: [{ $ref: '#/definitions/ui' }] },
 }
@@ -123,6 +130,8 @@ export const WIDGET_SCHEMA = {
   },
 }
 
+// what has data to show before it runs: a fetch, a script, a file or a URL (a text typed in is its own)
+export const needsSample = (m: Record<string, unknown>) => !!(m.fetch || m.script) || ['file', 'url'].includes(String((m.source as { kind?: unknown } | undefined)?.kind))
 // laki.d.ts: window.laki for a JS page (widget.html with a <script>), and the UI kit's elements as types
 const tsOf = (k: Kind): string =>
   Array.isArray(k) ? k.map(w => JSON.stringify(w)).join(' | ') : ({ text: 'Text', icon: 'string', number: 'number | string', bool: 'boolean', path: 'string | unknown[]', children: 'UiElement[]', button: 'UiButton', buttons: 'UiButton[]', tone: 'Tone | string | Record<string, Tone>', items: 'any[]', object: 'Record<string, unknown>' } as Record<string, string>)[k as string]
@@ -160,6 +169,8 @@ interface Laki {
   expand(): void
   /** one of widget.json's actions, its arg as $WIDGET_ARG */
   run(action: string, arg?: string): void
+  /** a Laki command (the app shows what and asks first): a new workspace whose agent starts on prompt, a prompt to the workspace's agent or to Laki AI, a command in a new terminal, a page in a Laki browser tab */
+  do(cmd: { do: 'new' | 'send' | 'ai' | 'terminal' | 'browse'; prompt?: string; command?: string; url?: string; agent?: string; project?: string }, label?: string): void
   toast(text: string): void
   modal(m: LakiModal): void
   /** the UI kit's HTML for an element, filled from data (else the page's) */
@@ -195,7 +206,13 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     if (!(WIDGET_PLACES as readonly string[]).includes(p as string)) say('error', 'widget.json place', `${JSON.stringify(p)} isn't a place: ${WIDGET_PLACES.join(', ')}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(p), WIDGET_PLACES))}`)
   if (m.fetch && m.script) say('error', 'widget.json', 'fetch or script, not both')
   if (m.scope !== undefined && m.scope !== 'global' && m.scope !== 'workspace') say('error', 'widget.json scope', `global or workspace, not ${JSON.stringify(m.scope)}`)
-  if ((m.fetch || m.script) && m.sample === undefined) say('warn', 'widget.json', 'no sample: its preview has nothing to show before it runs')
+  if (needsSample(m) && m.sample === undefined) say('warn', 'widget.json', 'no sample: its preview has nothing to show before it runs')
+  if (m.source !== undefined) {
+    const src = m.source as Record<string, unknown> | null
+    if (!src || typeof src !== 'object' || !['fetch', 'static', 'file', 'url'].includes(String(src.kind))) say('error', 'widget.json source', '{ "kind": "fetch" | "static" | "file" | "url", "text" | "path" | "url" }')
+    else if (src.kind === 'fetch' && !m.fetch && !m.script) say('error', 'widget.json source', 'fetch: but no fetch nor script')
+    else if (src.kind === 'url' && typeof src.url === 'string' && !/^https?:\/\//i.test(src.url) && !src.url.includes('{{')) say('error', 'widget.json source', 'url: http or https')
+  }
   if (m.stream !== undefined && typeof m.stream !== 'boolean') say('error', 'widget.json stream', `true or false, not ${kindOf(m.stream)}`)
   if (m.stream === true && m.scope === 'workspace') say('error', 'widget.json stream', 'a stream is global only: not with "scope": "workspace"') // ponytail: one process per workspace
   if (m.stream === true && !(m.fetch || m.script)) say('error', 'widget.json stream', 'a stream needs a fetch or a script that runs all along')

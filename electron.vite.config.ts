@@ -28,7 +28,7 @@ export default defineConfig({
         name: 'csp', // only in the build: the dev server injects inline scripts
         apply: 'build',
         transformIndexHtml: html =>
-          html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://avatars.githubusercontent.com; frame-src 'self' http://localhost:* http://127.0.0.1:* https://www.youtube-nocookie.com" />`),
+          html.replace('<head>', `<head>\n    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; connect-src 'self' ws://127.0.0.1:*; style-src 'self' 'unsafe-inline'; img-src 'self' data: https:; frame-src 'self' http://localhost:* http://127.0.0.1:* https://www.youtube-nocookie.com" />`),
       },
     ],
     define: { __BUILT__: BUILT }, // About's build time (the dev server's: its start), and the stale daemon's check

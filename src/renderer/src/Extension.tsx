@@ -3,12 +3,14 @@
 // place and as its full view, its settings, and Laki AI's chat beside them to make or change it; the inspector's tabs
 // (Data, Runs, Env, Files, Check) beside Overview; closing goes back where it was opened from. id '': a new one, which the
 // page follows once Laki AI writes it. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { type AiSettings, placesOf, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetHere, widgetPrompt } from '../../shared/widgetGuide'
 import type { UiProblem } from '../../shared/widgetUi'
 import { AiPage } from './Ai'
+import { highlight } from './highlight'
+import { Markdown } from './MarkdownView'
 import { WidgetCard, type WidgetsApi } from './Settings'
 import { escapes, Icon, IconButton, Page } from './ui'
 import { CellButton, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
@@ -181,7 +183,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
               <CellButton w={w} api={api} />
             </div>
           ) : (
-            <div className={`widget ext-tile ${bar ? 'bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : desk ? { width: 400, height: 260 } : { width: w.size[0] * 92, height: w.size[1] * 64 }}>
+            <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : desk ? { width: 400, height: 260 } : { width: w.size[0] * 92, height: w.size[1] * 64 }}>
               <WidgetBody key={`${sample}`} w={w} full={desk && !!w.full} api={api} sample={sample} cells={bar ? [w.size[0], 0.5] : desk ? [3, 4] : w.size} />
             </div>
           )}
@@ -220,7 +222,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
           {(['Top bar', 'Status bar'] as const).map(where => (
             <div key={where}>
               <span className="muted small">{where}</span>
-              <div className="widget ext-tile bar" style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }}>
+              <div className="widget ext-tile in-bar" style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }}>
                 {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${sample}`} w={w} full={false} api={api} sample={sample} cells={[w.size[0], 0.5]} />}
               </div>
             </div>
@@ -304,7 +306,8 @@ const bytes = (b: number) => (b < 1024 ? `${b} B` : b < 1 << 20 ? `${(b / 1024).
 // data or files change, and every 2 s while Runs shows
 export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check'> }) {
   const [x, setX] = useState<WidgetRuns | null>(null)
-  const [files, setFiles] = useState<string[] | null>(null)
+  const [files, setFiles] = useState<Record<string, string> | null>(null)
+  const [sel, setSel] = useState('')
   const [text, setText] = useState<string | null>(null) // Data's box as typed; null: as fetched
   const [err, setErr] = useState('')
   const [open, setOpen] = useState<number | null>(null)
@@ -323,7 +326,7 @@ export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab
   useEffect(() => {
     if (tab !== 'files') return
     let live = true
-    cfg.files?.(w.id).then(f => live && setFiles(f), () => live && setFiles([]))
+    cfg.files?.(w.id).then(f => live && setFiles(f), () => live && setFiles({}))
     return () => void (live = false)
   }, [w.id, w.rev, tab])
   const apply = () => {
@@ -433,9 +436,46 @@ export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab
           </button>
         )}
       </div>
-      <ul className="ext-files mono">{files === null ? <li className="muted">Reading…</li> : files.map(f => <li key={f}>{f}</li>)}</ul>
+      {files === null ? (
+        <p className="muted small">Reading…</p>
+      ) : (
+        <FileView files={files} sel={sel && Object.hasOwn(files, sel) ? sel : (Object.keys(files).find(f => f === 'widget.json') ?? Object.keys(files)[0] ?? '')} onSel={setSel} />
+      )}
       {!!x.fixtures.length && <p className="muted small">fixtures/: {x.fixtures.map(f => `${f}.json`).join(', ')}</p>}
     </section>
+  )
+}
+
+// its files: the list, and the picked one's text (colored; Markdown rendered), read-only: an editor or the studio changes them
+function FileView({ files, sel, onSel }: { files: Record<string, string>; sel: string; onSel: (f: string) => void }) {
+  const text = files[sel] ?? ''
+  const md = /\.md$/i.test(sel)
+  const lines = useMemo(() => (md ? [] : highlight(sel, text)), [sel, text, md])
+  if (!Object.keys(files).length) return <p className="muted small">No files to show</p>
+  return (
+    <div className="ext-fv">
+      <ul className="ext-files mono" role="listbox" aria-label="Its files">
+        {Object.keys(files).map(f => (
+          <li key={f} role="option" aria-selected={f === sel} className={f === sel ? 'on' : ''} onClick={() => onSel(f)}>
+            {f}
+          </li>
+        ))}
+      </ul>
+      <div className="ext-fv-body">
+        {md ? (
+          <Markdown src={text} />
+        ) : (
+          <pre className="mono">
+            {lines.map((l, i) => (
+              <div key={i} className="pv-line">
+                <span className="pv-n">{i + 1}</span>
+                {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
+              </div>
+            ))}
+          </pre>
+        )}
+      </div>
+    </div>
   )
 }
 

@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type Account, type WidgetRuns, againOnEnter, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { type Account, type WidgetRuns, againOnEnter, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -19,7 +19,7 @@ import { BoardPage } from './Board'
 import { UiKitPage } from './UiKit'
 import { inWs, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
-import type { UiProblem } from '../../shared/widgetUi'
+import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { widgetAsk } from '../../shared/widgetGuide'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
@@ -1223,6 +1223,7 @@ export function App() {
           else if (b?.open) openExternal(b.open)
         })
     },
+    do: (w, c, label) => widgetDo(w, c, label),
     settings: id => setDialog(id ? { extension: id, back: dialog } : { section: 'widgets' }),
     menu: (w, e) =>
       openMenu(e, [
@@ -1234,6 +1235,52 @@ export function App() {
     key: view?.widgetKey,
   }
   widgetSay.current = widgetApi.say
+  // a widget button's Laki command (the UI kit's do, a JS page's laki.do): said and asked first (a page in a browser
+  // tab only opens, like a link), then done. Its workspace: a per-workspace one's, else the selected one
+  const widgetDo = async (w: WidgetView, c: UiDo, label?: string) => {
+    const by = `${w.name}${label ? ` › ${label}` : ''} asks`
+    const shown = (t: string) => `“${t.length > 600 ? `${t.slice(0, 600)}…` : t}”`
+    const here = w.here ? view?.workspaces.find(x => x.id === w.here) : ws
+    const prompt = String(c.prompt ?? '').trim()
+    if (c.do === 'browse') {
+      const url = String(c.url ?? '').trim()
+      return /^https?:\/\/\S+$/i.test(url) ? quickNew('browsers', url) : toast(`${w.name}: no http(s) page to open`)
+    }
+    if (c.do === 'terminal') {
+      const cmd = String(c.command ?? '').trim()
+      if (!cmd || /[\r\n]/.test(cmd)) return toast(`${w.name}: no command (one line) to run`)
+      if (!(await ask('Run this in a new terminal?', { text: `${by}: ${shown(cmd)}`, ok: 'Run', danger: true }))) return
+      const t = await call<WorkspaceView>('quickNew', { kind: 'shells' }).catch(() => null)
+      if (!t) return
+      showNew(t.id)
+      setDialog(null)
+      // ponytail: laki_shell's 1.5 s for the shell's prompt to come up
+      return void setTimeout(() => void call('send', { target: `${t.id}/1`, text: cmd }).catch(() => {}), 1500)
+    }
+    if (!prompt) return toast(`${w.name}: no prompt to send`)
+    if (c.do === 'ai') {
+      if (!settings.ai?.on) return toast('Laki AI is off: Settings › AI')
+      if (!(await ask('Ask Laki AI this?', { text: `${by}: ${shown(prompt)}`, ok: 'Ask' }))) return
+      if (settings.ai?.float === false) setDialog('ai')
+      else setAiFloat(true)
+      return void api.call('aiAsk', { text: prompt }).catch(fail)
+    }
+    if (c.do === 'send') {
+      if (!here || view?.projects.find(x => x.id === here.project)?.kind) return toast(`${w.name}: select a workspace with an agent to send it to`)
+      if (!(await ask(`Send this to ${here.name}’s agent?`, { text: `${by}: ${shown(prompt)}`, ok: 'Send' }))) return
+      const r = await call<{ queued?: number }>('send', { target: here.id, text: prompt, whenIdle: true, agent: true }).catch(() => null)
+      return void (r && done(r.queued ? `Queued for ${here.name}’s agent` : `Sent to ${here.name}’s agent`))
+    }
+    if (c.do === 'new') {
+      const want = String(c.project ?? '').trim().toLowerCase()
+      const p = want ? view?.projects.find(x => x.id === want || x.name.toLowerCase() === want) : view?.projects.find(x => x.id === here?.project)
+      if (!p || p.kind) return toast(want ? `${w.name}: no project ${c.project}` : `${w.name}: select a workspace of the project to start it in`)
+      const agent = String(c.agent ?? '').trim()
+      if (!(await ask(`Start a new workspace in ${p.name}?`, { text: `${by}${agent ? `, with ${agent}` : ''}: ${shown(prompt)}`, ok: 'Start' }))) return
+      const made = await call<WorkspaceView>('wsNew', { project: p.id, prompt, place: 'top', ...(agent && { preset: agent }), ...(p.git === false && { local: true, another: true, name: nameOf(prompt) }) }).catch(() => null)
+      if (made) (showNew(made.id), setDialog(null))
+    }
+  }
   // an extension's tool an agent calls (widgetToolCall): what would run, asked here and as a notification; the first
   // answer counts (widgetToolAnswer), Esc denies. Always: in this workspace from now on, for a tool that asks first
   toolAsk.current = m => {
@@ -1272,7 +1319,7 @@ export function App() {
     kit: () => setDialog({ uikit: true, back: dialog }),
     runs: (id, ws) => api.call<WidgetRuns>('widgetRuns', { id, data: true, ws }),
     mock: (id, o) => call('widgetMock', { id, ...o }),
-    files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => Object.keys(r.files)),
+    files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => r.files),
     make: kind => api.call<{ id: string }>('widgetNew', { kind, name: `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog, tab: 'data' }), e => toast(String(e?.message ?? e))),
     check: (id, run, ws) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run, ws }),
     revoke: (id, action, ws) => api.call('widgetGrantRm', { id, action, ws }),

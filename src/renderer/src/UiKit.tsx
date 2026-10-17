@@ -3,7 +3,7 @@
 // a click from the clipboard. Its samples are the AI guide's, the starters' and the tests'.
 import { useEffect, useRef, useState } from 'react'
 import { uiBehave, WIDGET_CSS } from '../../shared/widget'
-import { uiHtml, UI_SAMPLES, type UiSpec } from '../../shared/widgetUi'
+import { CHARTS, COLORS, DO, TONES, UI_EXAMPLES, uiHtml, UI_SAMPLES, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
 import { clean } from './Widgets'
 
@@ -27,6 +27,49 @@ function KitBody({ spec, data, cells }: { spec: UiSpec; data: unknown; cells: [n
   return <div ref={host} className="widget-body" />
 }
 
+type Item = { key: string; title: string; tag: string; blurb: string; spec: UiSpec; data?: unknown; full?: boolean }
+const ITEMS: Item[] = UI_SAMPLES.map(s => ({ key: s.type, title: s.type, tag: s.group, blurb: s.blurb, spec: s.spec, data: s.data }))
+const EXAMPLES: Item[] = UI_EXAMPLES.map((x, i) => ({ key: `example-${i}`, title: x.title, tag: 'Example', blurb: x.blurb, spec: x.spec, data: x.data, full: x.full }))
+
+// one element or example: at a size, as a status bar item, its JSON
+function KitCard({ it, pick, onPick, copy }: { it: Item; pick: string; onPick: (n: string) => void; copy: (text: string) => void }) {
+  const cells = SIZES.find(x => x[0] === pick)?.[1] ?? null
+  const json = JSON.stringify({ ui: it.spec, ...(it.data !== undefined && { sample: it.data }) }, null, 2)
+  return (
+    <section className="ext-card kit-card" id={`kit-${it.key}`}>
+      <div className="ext-card-head kit-card-head">
+        <b className={it.tag === 'Example' ? '' : 'mono'}>{it.title}</b>
+        <span className="tag">{it.tag}</span>
+        <div className="seg" role="tablist" aria-label="Size">
+          {SIZES.map(([n]) => (
+            <button key={n} role="tab" aria-selected={pick === n} className={pick === n ? 'on' : ''} onClick={() => onPick(n)}>
+              {n}
+            </button>
+          ))}
+        </div>
+        <span className="muted small kit-blurb">{it.blurb}</span>
+      </div>
+      <div className="ext-stage kit-stage">
+        <div className="widget ext-tile" style={cells ? { width: cells[0] * 92, height: cells[1] * 64 } : { width: '100%', maxHeight: 360, overflow: 'auto' }}>
+          <KitBody spec={it.spec} data={it.data} cells={cells} />
+        </div>
+        <div className="kit-status">
+          <span className="muted small">status bar</span>
+          <div className="widget ext-tile in-bar" style={{ width: 2 * 92 }}>
+            <KitBody spec={it.spec} data={it.data} cells={[2, 0.5]} />
+          </div>
+        </div>
+      </div>
+      <div className="kit-json">
+        <pre className="mono">{json}</pre>
+        <button type="button" className="sm" onClick={() => copy(json)}>
+          <Icon name="copy" size={12} /> Copy
+        </button>
+      </div>
+    </section>
+  )
+}
+
 export function UiKitPage({ back, onClose, copy }: { back: string; onClose: () => void; copy: (text: string) => void }) {
   const [q, setQ] = useState('')
   const [size, setSize] = useState<Record<string, string>>({})
@@ -39,7 +82,11 @@ export function UiKitPage({ back, onClose, copy }: { back: string; onClose: () =
     return () => window.removeEventListener('keydown', f)
   }, [])
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
-  const shown = UI_SAMPLES.filter(s => words.every(w => `${s.type} ${s.group} ${s.blurb}`.toLowerCase().includes(w)))
+  const match = (it: Item) => words.every(w => `${it.title} ${it.tag} ${it.blurb} ${JSON.stringify(it.spec)}`.toLowerCase().includes(w))
+  const shown = ITEMS.filter(match)
+  const examples = EXAMPLES.filter(match)
+  const card = (it: Item) => <KitCard key={it.key} it={it} pick={size[it.key] ?? (it.full ? 'Full' : '3×2')} onPick={n => setSize(x => ({ ...x, [it.key]: n }))} copy={copy} />
+  const m = (t: string) => <span className="mono">{t}</span>
   return (
     <Page
       title="UI kit"
@@ -59,51 +106,26 @@ export function UiKitPage({ back, onClose, copy }: { back: string; onClose: () =
       <div className="kit">
         <div className="kit-head">
           <p className="muted">
-            An extension's UI as JSON elements: widget.json's <span className="mono">"ui"</span>, one element or <span className="mono">{'{ "preview", "full" }'}</span>. Each element takes <span className="mono">if</span>, <span className="mono">unless</span>, <span className="mono">each</span>, <span className="mono">tip</span> and <span className="mono">tone</span> too; its words are templates over the data (<span className="mono">{'{{field}}'}</span>, <span className="mono">{'{{ago at}}'}</span>, <span className="mono">{'{{num n}}'}</span>). <span className="mono">laki widget kit</span> prints the same.
+            An extension's UI as JSON elements: widget.json's {m('"ui"')}, one element or {m('{ "preview", "full" }')}. Each element takes {m('if')}, {m('unless')}, {m('each')}, {m('tip')} and {m('tone')} too; its words are templates over the data ({m('{{field}}')}, {m('{{ago at}}')}, {m('{{num n}}')}). {m('laki widget kit')} prints the same.
           </p>
-          <input className="kit-find" value={q} onChange={e => setQ(e.target.value)} placeholder="Find an element: list, chart, form…" spellCheck={false} autoFocus />
+          <ul className="muted small kit-notes">
+            <li>
+              <b>Colors</b>: a {m('color')} takes a tone ({TONES.join(', ')}), one of Laki's palette ({COLORS.join(', ')}: each theme's own) or a hex ({m('d73a4a')}). A chart takes {m('colors')} in order, a series its {m('color')}, a row its {m('color')} template.
+            </li>
+            <li>
+              <b>Charts</b>: {m('kind')} {CHARTS.join(', ')}.
+            </li>
+            <li>
+              <b>Buttons</b>: {m('run')} (an action), {m('open')} (a link), {m('do')} (a Laki command: {DO.join(', ')}; the app asks first), {m('refresh')}, {m('full')}, {m('copy')}.
+            </li>
+          </ul>
+          <input className="kit-find" value={q} onChange={e => setQ(e.target.value)} placeholder="Find an element or example: chart, pie, button…" spellCheck={false} autoFocus />
         </div>
-        {!shown.length && <p className="muted">No element matches.</p>}
-        <div className="kit-grid">
-          {shown.map(s => {
-            const pick = size[s.type] ?? '3×2'
-            const cells = SIZES.find(x => x[0] === pick)?.[1] ?? null
-            const json = JSON.stringify({ ui: s.spec, ...(s.data !== undefined && { sample: s.data }) }, null, 2)
-            return (
-              <section key={s.type} className="ext-card kit-card" id={`kit-${s.type}`}>
-                <div className="ext-card-head">
-                  <b className="mono">{s.type}</b>
-                  <span className="tag">{s.group}</span>
-                  <span className="muted small grow">{s.blurb}</span>
-                  <div className="seg" role="tablist" aria-label="Size">
-                    {SIZES.map(([n]) => (
-                      <button key={n} role="tab" aria-selected={pick === n} className={pick === n ? 'on' : ''} onClick={() => setSize(x => ({ ...x, [s.type]: n }))}>
-                        {n}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="ext-stage kit-stage">
-                  <div className="widget ext-tile" style={cells ? { width: cells[0] * 92, height: cells[1] * 64 } : { width: '100%', maxHeight: 360, overflow: 'auto' }}>
-                    <KitBody spec={s.spec} data={s.data} cells={cells} />
-                  </div>
-                  <div className="kit-status">
-                    <span className="muted small">status bar</span>
-                    <div className="widget ext-tile bar" style={{ width: 2 * 92 }}>
-                      <KitBody spec={s.spec} data={s.data} cells={[2, 0.5]} />
-                    </div>
-                  </div>
-                </div>
-                <div className="kit-json">
-                  <pre className="mono">{json}</pre>
-                  <button type="button" className="sm" onClick={() => copy(json)}>
-                    <Icon name="copy" size={12} /> Copy
-                  </button>
-                </div>
-              </section>
-            )
-          })}
-        </div>
+        {!shown.length && !examples.length && <p className="muted">Nothing matches.</p>}
+        {!!shown.length && <h3 className="kit-h">Elements · {shown.length}</h3>}
+        <div className="kit-grid">{shown.map(card)}</div>
+        {!!examples.length && <h3 className="kit-h">Examples · {examples.length}</h3>}
+        <div className="kit-grid">{examples.map(card)}</div>
       </div>
     </Page>
   )

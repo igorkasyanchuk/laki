@@ -250,6 +250,7 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .wc-every input { width: 52px; padding: 4px 6px; }
 .ib.spin svg { animation: spin 0.8s linear infinite; } /* fetching */
 .tag-soft { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 400; }
+.wc-src { display: flex; flex-direction: column; gap: 6px; } .wc-src > .row { align-items: center; justify-content: flex-start; gap: 10px; } .wc-src :is(textarea, input) { width: 100%; font-size: 11.5px; } .wc-src textarea { resize: vertical; }
 .wc-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 12px; }
 .wo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .wo > span:first-child { align-self: flex-start; white-space: nowrap; }
@@ -1964,7 +1965,7 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-stage { position: relative; display: grid; place-items: center; min-height: 180px; padding: 36px 16px 20px; border-radius: var(--rs, 8px); background: radial-gradient(color-mix(in srgb, var(--fg) 9%, transparent) 1px, transparent 1px) 0 0 / 14px 14px, var(--bg); }
 .ext-where { position: absolute; top: 10px; left: 12px; }
 .ext-tile { max-width: 100%; margin: 0; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--side); box-shadow: 0 8px 24px -12px rgba(0, 0, 0, 0.4); }
-.ext-tile.bar { height: 30px; padding: 0 8px; display: flex; align-items: center; }
+.ext-tile.in-bar { height: 30px; padding: 0 8px; display: flex; align-items: center; }
 .ext-button { width: 200px; height: 34px; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--side); overflow: hidden; }
 .ext-full { position: relative; height: 420px; overflow: auto; padding: 12px 14px; border: 1px solid var(--line); border-radius: var(--rs, 8px); background: var(--bg); }
 .ext-full.s { height: 320px; }
@@ -1991,6 +1992,9 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-env > div { display: contents; }
 .ext-env dt { color: var(--muted); } .ext-env dd { margin: 0; overflow-wrap: anywhere; }
 .ext-files > li { padding: 5px 4px; font-size: 12px; }
+.ext-fv { display: grid; grid-template-columns: minmax(120px, 200px) minmax(0, 1fr); gap: 10px; min-height: 0; } .ext-fv .ext-files > li { overflow: hidden; border-radius: 5px; text-overflow: ellipsis; white-space: nowrap; cursor: pointer; } .ext-fv .ext-files > li:hover { background: var(--hover); } .ext-fv .ext-files > li.on { background: var(--sel); }
+.ext-fv-body { min-width: 0; max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: var(--rs, 8px); padding: 6px 8px; font-size: 12px; } .ext-fv-body pre { margin: 0; font-size: 11.5px; line-height: 1.5; } .ext-fv-body .pv-n { display: inline-block; width: 3ch; margin-right: 10px; color: var(--muted); text-align: right; user-select: none; }
+@media (max-width: 640px) { .ext-fv { grid-template-columns: minmax(0, 1fr); } }
 .ext-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
 .ext-check > li { display: grid; grid-template-columns: 16px minmax(90px, max-content) 1fr; gap: 8px; align-items: baseline; padding: 5px 4px; font-size: 12px; }
 .ext-check > li + li { border-top: 1px solid var(--line); }
@@ -2008,7 +2012,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .kit-head { display: flex; flex-direction: column; gap: 10px; }
 .kit-find { max-width: 420px; }
 .kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 14px; }
-.kit-card .ext-card-head { flex-wrap: wrap; }
+.kit-card .ext-card-head { flex-wrap: wrap; } .kit-card-head .seg { margin-left: auto; } .kit-blurb { flex-basis: 100%; min-width: 0; }
+.kit-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; line-height: 1.5; } .kit-h { margin: 18px 0 8px; font-size: 13px; }
 .kit-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 0; padding: 20px 16px; }
 .kit-status { display: flex; align-items: center; gap: 8px; max-width: 100%; }
 .kit-json { position: relative; min-width: 0; }

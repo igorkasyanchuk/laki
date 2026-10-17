@@ -9,10 +9,10 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { BUTTON_PLACES, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
-import { hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
+import { BUTTON_PLACES, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
+import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
-import { actionCmd, manifestCheck, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
+import { actionCmd, manifestCheck, needsSample, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
@@ -27,11 +27,11 @@ import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
 type ActionDef = string | { run?: string; tool?: unknown } // a command, or one an agent may call too (widgetSchema.ts' toolOf)
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown }
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta> } // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
@@ -53,10 +53,21 @@ const again = new Set<string>() // asked to fetch while fetching (settings chang
 let rev = 0 // each reload: the app renders its widgets again
 // what a JS widget's page asks for (GET /widget/<id>?key=…): its data is the user's, so not for any page on this Mac
 export const widgetKey = randomBytes(16).toString('hex')
-const fetches = (w: Entry) => !!(w.m.fetch || w.m.script)
+// its data's source (the user's pick, else widget.json's, else its fetch); fetches: something to run or read
+export function sourceOk(v: unknown): WidgetSource | undefined {
+  if (!v || typeof v !== 'object') return undefined
+  const o = v as Record<string, unknown>
+  const kind = WIDGET_SOURCES.find(k => k === o.kind)
+  if (!kind) return undefined
+  const str = (x: unknown, max: number) => (typeof x === 'string' && x.length <= max ? x : undefined)
+  return { kind, ...(kind === 'static' && { text: str(o.text, 64 << 10) ?? '' }), ...(kind === 'file' && { path: str(o.path, 1024)?.trim() ?? '' }), ...(kind === 'url' && { url: str(o.url, 2048)?.trim() ?? '' }) }
+}
+const sourceOf = (w: Entry): WidgetSource => w.s.source ?? sourceOk(w.m.source) ?? { kind: 'fetch' }
+const ownFetch = (w: Entry) => !!(w.m.fetch || w.m.script)
+const fetches = (w: Entry) => (k => (k === 'fetch' ? ownFetch(w) : true))(sourceOf(w).kind)
 const wLog = (w: { id: string }, text: string | (() => string)) => devLog(`widget:${w.id}`, text) // a function: only in dev mode
 const fetchable = (w: Entry, ws?: string) => onOf(w) && fetches(w) && !running.has(keyOf(w.id, ws)) && !metaOf(w, ws).mock // on, with a fetch, not fetching now, not showing data put there by hand
-const due = (w: Entry, now: number, ws?: string) => !streaming(w) && fetchable(w, ws) && now - (metaOf(w, ws).at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
+const due = (w: Entry, now: number, ws?: string) => !streaming(w) && sourceOf(w).kind !== 'static' && fetchable(w, ws) && now - (metaOf(w, ws).at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
 
 const storePath = (id: string) => join(dir, 'widget-data', `${id}.json`)
 const home = (p: string) => (p.startsWith('~/') ? join(homedir(), p.slice(2)) : p)
@@ -426,7 +437,9 @@ export const widgetsView = (): WidgetView[] =>
     builtin: w.builtin || undefined,
     on: onOf(w),
     size: sizeOf(w),
-    every: fetches(w) ? everyOf(w) : undefined,
+    every: fetches(w) && sourceOf(w).kind !== 'static' ? everyOf(w) : undefined,
+    source: sourceOf(w),
+    ownFetch: ownFetch(w) || undefined,
     full: w.full,
     view: viewSize(w),
     place: placeOf(w),
@@ -541,7 +554,7 @@ export function widgetsOff() {
 // the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
 // (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
 const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
-export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean }) {
+export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean }) {
   const w = find(o.id)
   const s = readStore(w.id)
   if (o.ai) {
@@ -557,6 +570,15 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
   if (o.place !== undefined) s.place = (l => (l.length > 1 ? l : l[0]))(placeList(o.place)) // none: widget.json's again
   if (o.net !== undefined) s.net = !!o.net || undefined
+  if (o.source !== undefined) {
+    // null: widget.json's again; a fetch of its own only when it has one
+    const src = o.source === null ? undefined : sourceOk(o.source)
+    if (o.source !== null && !src) throw new Error(`a source: { kind: ${WIDGET_SOURCES.join(' | ')}, text | path | url }`)
+    if (src?.kind === 'fetch' && !ownFetch(w)) throw new Error(`${w.m.name || w.id} has no fetch of its own: pick static, file or url`)
+    if (src?.kind === 'url' && src.url && !/^https?:\/\//i.test(src.url) && !src.url.includes('{{')) throw new Error('a URL: http or https')
+    s.source = src
+    if (src) s.mock = undefined // its own data from now on, not sample data
+  }
   if (o.config) {
     const opts = new Map(optionsOf(w).map(x => [x.key, x]))
     const given = Object.entries(o.config).filter(([k]) => opts.has(k)).map(([k, v]) => [k, textOf(opts.get(k)!, v)])
@@ -568,7 +590,15 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
   w.s = meta
   w.face = faceOf(w, data) // its config, in its words
   changed()
-  if (onOf(w) && (o.on || o.config)) refetch(w, 'settings', undefined, () => true) // its data for the new settings (fetching: once more after; a stream starts again)
+  if (sourceOf(w).kind === 'static' && o.source !== undefined && !scoped(w))
+    keep(w, undefined, st => {
+      // typed in: shown at once, on or off (a per-workspace one's instances: as each fetches)
+      const p = parsed(sourceOf(w).text ?? '', 'static')
+      if (!p.error) (st.data = p.data), (st.mock = undefined)
+      st.error = p.error
+      st.at = Date.now()
+    })
+  if (onOf(w) && (o.on || o.config || o.source !== undefined)) refetch(w, 'settings', undefined, () => true) // its data for the new settings (fetching: once more after; a stream starts again)
   streamSync() // off: a stream ends
   return widgetsView().find(x => x.id === w.id)
 }
@@ -680,7 +710,8 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^(action|event):[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
   const once = o.once === true && !onOf(w)
   if (!onOf(w) && !once && !(force && w.s.by !== 'ai')) return { ok: false, error: OFF(w) }
-  if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script` }
+  if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script: give it a source (static, file or url)` }
+  const src = sourceOf(w)
   if (once && streaming(w)) return { ok: false, error: 'a stream runs only while it is on' }
   if (streaming(w)) {
     // a stream: started again (a Stop in Resources ends there)
@@ -696,18 +727,26 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   running.add(k)
   changed()
   const t0 = Date.now()
-  wLog(w, `fetch (${reason}${once ? ', once while off' : ''}${x ? `, ${x.id}` : ''}): ${script ? `node ${w.m.script}` : w.m.fetch}`)
+  wLog(w, `fetch (${reason}${once ? ', once while off' : ''}${x ? `, ${x.id}` : ''}): ${src.kind !== 'fetch' ? `${src.kind} ${src.path ?? src.url ?? ''}`.trim() : script ? `node ${w.m.script}` : w.m.fetch}`)
   let data: unknown
   let error: string | undefined
   let r: Ran | undefined
   let fail: Failed | undefined
   try {
-    // a script on Laki's own node (Electron's, as node, in the app)
-    r = await exec(w, script ? process.execPath : '/bin/sh', script ? ['--input-type=module', '-e', RUN_JS, script] : ['-c', w.m.fetch!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env, ...(script && process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) }, ev?.stdin)
-    try {
-      data = JSON.parse(r.out)
-    } catch {
-      throw new Error(`fetch printed no JSON: ${lastLine(r.out) ?? 'nothing'}`)
+    if (src.kind !== 'fetch') {
+      // a text, a file or a URL: JSON, else { text }
+      r = { out: await sourceText(w, src, x), err: '' }
+      const p = parsed(r.out, src.kind)
+      if (p.error) throw new Error(p.error)
+      data = p.data
+    } else {
+      // a script on Laki's own node (Electron's, as node, in the app)
+      r = await exec(w, script ? process.execPath : '/bin/sh', script ? ['--input-type=module', '-e', RUN_JS, script] : ['-c', w.m.fetch!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env, ...(script && process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) }, ev?.stdin)
+      try {
+        data = JSON.parse(r.out)
+      } catch {
+        throw new Error(`fetch printed no JSON: ${lastLine(r.out) ?? 'nothing'}`)
+      }
     }
   } catch (e) {
     fail = e as Failed
@@ -728,6 +767,43 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   const cur = widgets.get(w.id)
   if (again.delete(k) && cur && onOf(cur) && !gone) soon({ id: w.id, reason, ws: x?.id }) // with the settings as they are now
   return error ? { ok: false, error } : { ok: true }
+}
+
+// a source's text: typed in, a file (~ is home, relative: the widget's folder) or a URL (30 s), each 16 MB at most;
+// a path or URL may name settings and the workspace: {{config.repo}}, {{workspace.path}}
+const SOURCE_WAIT = 30_000
+async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
+  const at = (t: string) => fill(t, [{ config: typedOf(w), workspace: x ? wsInfo(x) : undefined }]).trim()
+  if (src.kind === 'static') return src.text ?? ''
+  if (src.kind === 'file') {
+    const f = at(src.path ?? '')
+    if (!f) throw new Error('no file: give its path')
+    const p = resolve(w.dir, home(f))
+    const st = statSync(p, { throwIfNoEntry: false })
+    if (!st) throw new Error(`no file ${f}`)
+    if (!st.isFile()) throw new Error(`${f} isn't a file`)
+    if (st.size > MAX_OUT) throw new Error(`${f} is over 16 MB`)
+    return readFileSync(p, 'utf8')
+  }
+  const url = at(src.url ?? '')
+  if (!/^https?:\/\/\S+$/i.test(url)) throw new Error(url ? `${url} isn't an http(s) URL` : 'no URL')
+  const res = await fetch(url, { signal: AbortSignal.timeout(SOURCE_WAIT), headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.5' } })
+  if (!res.ok) throw new Error(`${url.replace(/[?#].*$/, '')}: HTTP ${res.status}`) // its query may hold a key
+  if (Number(res.headers.get('content-length') ?? 0) > MAX_OUT) throw new Error('over 16 MB')
+  const t = await res.text()
+  if (t.length > MAX_OUT) throw new Error('over 16 MB')
+  return t
+}
+// what a source gave as data: JSON (an object or a list), else the words as { text }
+function parsed(out: string, kind: WidgetSource['kind']): { data?: unknown; error?: string } {
+  const t = out.trim()
+  if (/^[[{]/.test(t))
+    try {
+      return { data: JSON.parse(t) }
+    } catch (e) {
+      if (kind === 'static') return { error: `not JSON: ${(e as Error).message}` } // typed as JSON: say so
+    }
+  return { data: { text: out } }
 }
 
 // a button's command (widget.json's actions), its data-arg as $WIDGET_ARG (never in the command line); then the widget
@@ -878,7 +954,7 @@ type Stream = { p?: ChildProcess; since?: number; restarts: number; last?: strin
 const streams = new Map<string, Stream>()
 const STREAM_IDLE = 10 * 60_000
 let shownAt = 0 // the last time a window was shown
-const streaming = (w: Entry) => w.m.stream === true && !scoped(w) && fetches(w)
+const streaming = (w: Entry) => w.m.stream === true && !scoped(w) && sourceOf(w).kind === 'fetch' && ownFetch(w)
 function streamSync(now = Date.now()) {
   if ([...clients].some(c => c.view?.shown !== false)) shownAt = now
   const hours = hoursOf()
@@ -1144,7 +1220,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
     }
     if (!m || typeof m !== 'object' || Array.isArray(m)) throw new Error('widget.json: an object')
     const j = m as Manifest
-    if ((j.fetch || j.script) && j.sample === undefined) throw new Error('widget.json: a sample too, made-up data in the shape its fetch prints, for its preview (laki_extension_guide)') // every extension shows how it looks before it runs
+    if (needsSample(j) && j.sample === undefined) throw new Error('widget.json: a sample too, made-up data in the shape its data takes, for its preview (laki_extension_guide)') // every extension shows how it looks before it runs
   }
   mkdirSync(widgetHome(), { recursive: true })
   const at = statOf(d)
@@ -1522,7 +1598,7 @@ async function checkOne(x: Source, run: boolean, ws?: string): Promise<UiProblem
     const texts = [m.fetch, JSON.stringify(ui ?? ''), html, ...(x.file ? [readFileSync(join(x.d, x.file), 'utf8')] : filesIn(x.d).filter(n => /\.(sh|bash|zsh|py|rb|m?js|ts)$/.test(n)).map(n => (statSync(join(x.d, n)).size < 64 << 10 ? readFileSync(join(x.d, n), 'utf8') : '')))]
     if (!texts.some(t => typeof t === 'string' && WS_USE.test(t))) say('warn', head, 'per workspace, but its fetch and ui use nothing of the workspace ($LAKI_BRANCH, $PORT, {{workspace.branch}}…): "scope": "global"?')
   }
-  if (run && (m.fetch || m.script)) {
+  if (run && (m.fetch || m.script || sourceOk(m.source) || widgets.get(id)?.s.source)) {
     const w = widgets.get(id)
     if (!w || pathOf(w) !== pathOf(x)) say('warn', 'fetch', `not run: Laki doesn't have this one (laki widget dev ${pathOf(x)} links it)`)
     else if (!onOf(w) && w.s.by === 'ai') say('warn', 'fetch', "not run: Laki AI wrote it and it's off: turn it on first")
@@ -1533,7 +1609,8 @@ async function checkOne(x: Source, run: boolean, ws?: string): Promise<UiProblem
       const last = runs.get(keyOf(id, scoped(w) ? ws : undefined))?.[0]
       if (!r.ok) say('error', 'fetch', `${r.error}${last && !last.ok && last.exit ? ` (exit ${last.exit})` : ''}`)
       else {
-        say('ok', 'fetch', `printed ${last?.bytes ?? 0} B of JSON in ${last?.ms ?? 0} ms`)
+        const kind = sourceOf(w).kind
+        say('ok', 'fetch', kind === 'fetch' ? `printed ${last?.bytes ?? 0} B of JSON in ${last?.ms ?? 0} ms` : `read ${last?.bytes ?? 0} B from its ${kind === 'static' ? 'text' : kind} in ${last?.ms ?? 0} ms`)
         if (ui !== undefined) against(dataOf(w, scoped(w) ? ws : undefined).data, 'fetched')
       }
     }

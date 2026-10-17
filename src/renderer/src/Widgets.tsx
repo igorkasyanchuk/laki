@@ -9,7 +9,7 @@
 import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { ago, sayOf, uiBehave, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
-import { uiHtml } from '../../shared/widgetUi'
+import { DO, type UiDo, uiHtml } from '../../shared/widgetUi'
 import { daemonBase } from './api'
 import { ask, Icon, IconButton, isIconName } from './ui'
 
@@ -22,6 +22,7 @@ export type WidgetApi = {
   close: () => void // the full view's dialog (Esc in a JS widget's frame)
   action: (id: string, action: string, arg: string, label?: string, ws?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
   say: (id: string, s: WidgetSay, ws?: string) => void // a toast, a dialog with buttons
+  do: (w: WidgetView, cmd: UiDo, label?: string) => unknown // a Laki command (a button's do, laki.do): said and asked first
   settings: (id?: string) => void // its page (Extension.tsx); none: Settings › Extensions
   menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page
   key?: string // the daemon's key for JS widgets' pages
@@ -56,7 +57,7 @@ export function clean(html: string): DocumentFragment {
 }
 
 // the theme's variables, for a JS widget's page (another document: they don't reach it), in its address
-const VARS = ['--bg', '--side', '--panel', '--line', '--fg', '--muted', '--accent', '--accent-fg', '--sel', '--hover', '--running', '--waiting', '--done', '--error', '--radius', '--mono', '--ui-font']
+const VARS = ['--bg', '--side', '--panel', '--line', '--fg', '--muted', '--accent', '--accent-fg', '--sel', '--hover', '--running', '--waiting', '--done', '--error', '--radius', '--mono', '--ui-font', ...['red', 'orange', 'yellow', 'green', 'teal', 'blue', 'purple', 'pink', 'lime', 'brown', 'gray'].map(c => `--tc-${c}`)] // the palette: the UI kit's colors
 const themeVars = () => {
   const cs = getComputedStyle(document.documentElement)
   return { ...Object.fromEntries(VARS.map(v => [v, cs.getPropertyValue(v).trim()]).filter(([, x]) => x)), 'color-scheme': cs.colorScheme }
@@ -80,6 +81,7 @@ function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: Widg
   if (laki === 'run' && typeof action === 'string' && action) return (typeof confirm === 'string' && confirm ? ask(confirm.slice(0, 300), { ok: String(label || 'Run').slice(0, 40) }) : Promise.resolve(true)).then((yes): unknown => yes && api.action(w.id, action, String(arg ?? ''), String(label ?? ''), wsOf(w)))
   if (laki === 'copy' && typeof text === 'string') return api.copy(text)
   if (laki === 'say') return (s => void (s && api.say(w.id, s, wsOf(w))))(sayOf(m))
+  if (laki === 'do' && m.cmd && typeof m.cmd === 'object' && (DO as readonly string[]).includes(String((m.cmd as UiDo).do))) return void api.do(w, m.cmd as UiDo, typeof label === 'string' ? label.slice(0, 60) : undefined)
   if (laki === 'refresh') return void api.run(w.id, wsOf(w)).catch(() => {})
   if (laki === 'full' && !full && w.full) api.full(w.id)
 }

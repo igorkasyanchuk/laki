@@ -30,6 +30,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 2. While the app is open (and within *Working hours*, if set), each extension that is on runs its `fetch` every
    `every` minutes, and when it's turned on, when its settings change, on *Reload extensions* and on `laki widget run`.
 3. What the fetch prints must be JSON: it is kept as `data`. A failure keeps the last data and shows a red dot with why.
+   Or its data comes from [somewhere else](#where-its-data-comes-from-source): a text you type, a file, a URL.
 4. The page is filled from `data`, `config` (your settings), `at` (the last fetch) and `error`: `widget.html`'s view
    when it has one, else `ui`'s.
 
@@ -41,6 +42,22 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 | `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
 | `fixtures/<name>.json` | sample data: its Data tab shows each (*Sample ▾*), and *Check* fits `ui` to each |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
+
+### Where its data comes from (`source`)
+
+Each extension's card (Settings › Extensions, its page) has *Data*: pick where its data comes from. `widget.json`'s
+`source` is the first pick.
+
+| source | what |
+|---|---|
+| *Its fetch* (`{ "kind": "fetch" }`) | its `fetch` command or `script`, every `every` minutes (the default, when it has one) |
+| *Static* (`{ "kind": "static", "text": "…" }`) | a text you type there (64 KB): JSON is its data, anything else `{ "text" }`; shown at once, never fetched |
+| *File* (`{ "kind": "file", "path": "~/notes/today.md" }`) | a file of this Mac, read every `every` minutes (16 MB); relative: the extension's folder |
+| *URL* (`{ "kind": "url", "url": "https://…" }`) | an http(s) address, read every `every` minutes (30 s, 16 MB): a public JSON API needs no fetch |
+
+A file's or URL's JSON is its data; anything else (Markdown, plain text) is `{ "text": "…" }`, which a `markdown`
+element shows (`{ "type": "markdown", "value": "{{text}}" }`: the *note* starter). A path or URL may name settings and
+the workspace: `{{config.repo}}`, `{{workspace.path}}/TODO.md`. A failed read keeps the last data, as a fetch does.
 
 ### Settings (`config`)
 
@@ -214,10 +231,40 @@ truthy / falsy; an empty list is false), `each` (repeat it per item of a list), 
 
 | group | elements |
 |---|---|
-| Layout | `stack` (`children`, `gap` sm/md/lg), `row` (`align` start/center/end/between, `wrap`), `grid` (`columns` 1-6, fewer as it narrows), `section` (`title`, `subtitle`, `collapsed`), `tabs` (`tabs: [{ label, badge, children }]`), `divider` |
-| Text | `text` (`value`, `size` sm-xl, `weight`, `mono`, `muted`, `wrap`), `heading` (`level` 1-3), `markdown`, `code` (`copy`) |
-| Data | `stat` (`value`, `label`, `delta`, `spark`, `icon`), `stats`, `kv`, `list`, `table`, `chart` (`kind` line/area/bars, `x`, `y`, `series`, `min`, `max`, `unit`), `spark`, `progress` (`style` bar/ring), `tags`, `badge`, `timeline`, `image` |
-| Actions | `button` (`run` + `arg`, `open`, `refresh`, `full` or `copy`; `confirm`; `style` primary/quiet/danger), `actions`, `links`, `form` (`fields`, `submit`: the action gets the fields' JSON as `$WIDGET_ARG`), `empty` (`text`, `icon`, `action`) |
+| Layout | `stack` (`children`, `gap` sm/md/lg), `row` (`align` start/center/end/between, `wrap`), `grid` (`columns` 1-6, fewer as it narrows), `section` (`title`, `subtitle`, `collapsed`), `tabs` (`tabs: [{ label, badge, children }]`), `header` (`icon`, `title`, `subtitle`, `href`, `actions`), `footer` (`text`, `actions`), `toolbar` (`items`: icon buttons, their words as tooltips; `labels`), `spacer` (pushes the rest of a `row` to its end), `divider` |
+| Text | `text` (`value`, `size` sm-xl, `weight`, `mono`, `muted`, `wrap`, `color`), `heading` (`level` 1-3), `markdown` (headings, lists, tasks, tables, code, links, https pictures), `code` (`copy`), `callout` (`title`, `text`, `icon`, `action`; its `tone`), `icon` (`name`, `size`, `color`) |
+| Data | `stat` (`value`, `label`, `delta`, `spark`, `icon`), `stats`, `kv`, `list`, `table`, `chart` (below), `spark`, `progress` (`style` bar/ring), `gauge` (`value`, `min`, `max`, `unit`), `heatmap` (`x`, `value`, `rows`: days of activity), `status` (`label`, `state`: up, degraded, down… colored by its word), `checklist` (`text`, `done`), `avatars` (GitHub logins), `tags`, `badge`, `timeline`, `image`, `card` (`title`, `text`, `image`, `icon`, `tag`, `href`) |
+| Actions | `button` (`run` + `arg`, `open`, `do`, `refresh`, `full` or `copy`; `confirm`; `style` primary/quiet/danger), `actions`, `links`, `form` (`fields`, `submit`: the action gets the fields' JSON as `$WIDGET_ARG`), `empty` (`text`, `icon`, `action`) |
+
+**Colors.** A `color` (text, heading, icon, badge, spark, progress, gauge, heatmap, a header's icon, a stat's and a
+tag's dot) is a tone (`good`, `bad`, `warn`, `accent`, `muted`), one of Laki's palette (`blue`, `green`, `red`,
+`orange`, `yellow`, `purple`, `pink`, `teal`, `lime`, `brown`, `gray`: each theme's own) or a hex (`d73a4a`), or a
+template that gives one (`"{{#if late}}bad{{else}}good{{/if}}"`). The UI kit page's *Colors* example shows them all.
+
+**Charts.** `kind`: `line` (the default), `area`, `bars`, `stacked` (series on each other), `hbars` (a bar per row,
+its label beside it), `pie`, `donut` (its total in the middle) and `scatter` (`x` and `y` numbers). One number per row
+(`y`) or `series: [{ "label", "y", "color" }]`; `colors: ["blue", "orange", "#d73a4a"]` in order (default: the
+palette); a row's own `color` template, or a `tone` map over its `x`, colors a slice or a bar; `legend` (on with
+several series, a pie and a donut), `unit`, `min`, `max`, `height`, `label`.
+
+**Laki commands.** A button's `do` asks Laki to do something; Laki says what and asks first:
+
+| `do` | with | what |
+|---|---|---|
+| `new` | `prompt`, `project` (a name; none: the selected workspace's), `agent` (a profile or agent; none: your default) | a new workspace whose agent starts on the prompt |
+| `send` | `prompt` | to the selected workspace's agent (a per-workspace extension: its own), after its turn |
+| `ai` | `prompt` | to Laki AI (on) |
+| `terminal` | `command` | a new terminal that runs it |
+| `browse` | `url` | the page in a Laki browser tab (no question: a link) |
+
+```json
+{ "type": "toolbar", "items": [
+  { "icon": "agent", "label": "Fix it", "do": "new", "prompt": "Fix the failing test in {{suite}}" },
+  { "icon": "ai", "label": "Ask Laki AI", "do": "ai", "prompt": "What changed in {{repo}} today?" },
+  { "icon": "terminal", "label": "Logs", "do": "terminal", "command": "tail -f log/development.log" } ] }
+```
+
+A JS page: `laki.do({ do: "send", prompt: "Run the tests" })`, right after a click as `laki.run`.
 
 A `list` row has `title`, `subtitle`, `icon`, `avatar` (a GitHub login), `href`, `accessories` (`[{ tag | text | badge
 | icon | avatar | ago | date, tone }]`), `actions`, and the list `limit` (the preview: as many as fit, then *+N more*),
@@ -301,7 +348,8 @@ the daemon either way.
 Every extension shows how it looks before it ever runs: its page (Settings › Extensions › the extension) has *Live* and
 *Sample*, and a Desk tile Laki AI just made shows its sample until it's turned on. `sample` is what its fetch would
 print (the same shape, realistic values), `sampleConfig` the settings to show it with; templates get `sample: true`
-meanwhile, and its links and buttons do nothing. Laki AI's `laki_extension_write` refuses a fetch without a sample.
+meanwhile, and its links and buttons do nothing. Every extension with data has one: Laki AI's `laki_extension_write`
+refuses a fetch, a script, a file or a URL source without it, and `laki widget check` says so.
 
 ```json
 { "name": "Open issues", "fetch": "sh fetch.sh", "every": 10,
@@ -349,7 +397,9 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `number` | a count with its label, a change and a sparkline |
 | `list` | rows with avatars, tags and a button each; grouped, filtered, *+N more* |
 | `table` | columns, sorted, a filter box; columns that hide when narrow |
-| `chart` | a line, area or bars from a list of numbers |
+| `chart` | lines, areas, bars, stacked, horizontal bars, a pie, a donut or a scatter from a list of numbers |
+| `note` | Markdown: typed on its card (*Static*), or a file or a URL; no fetch |
+| `launcher` | buttons that ask Laki: a workspace, a prompt to the agent or Laki AI, a terminal, a page |
 | `button` | an icon on the rail with a count; a click runs its action |
 | `form` | fields and a button: an action gets them as JSON |
 | `panel` | a JS page of yours that draws with the UI kit (`laki.mount`), typed by `laki.d.ts` |

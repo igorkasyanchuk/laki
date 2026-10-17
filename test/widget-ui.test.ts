@@ -2,14 +2,14 @@ import assert from 'node:assert/strict'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { bytes, dur, num, pageOf, pct, render } from '../src/shared/widget.ts'
-import { chartPoints, near, uiCheck, uiHtml, UI_SAMPLES, UI_TYPES } from '../src/shared/widgetUi.ts'
+import { bytes, dur, num, pageOf, pct, render, uiBehave } from '../src/shared/widget.ts'
+import { CHARTS, chartPoints, colorCss, COLORS, near, TONES, uiCheck, UI_EXAMPLES, uiHtml, UI_SAMPLES, UI_TYPES } from '../src/shared/widgetUi.ts'
 import { fresh, until } from './helpers.ts'
 
 const at = Date.parse('2026-10-17T10:00:00Z')
 
 test('UI kit: every element has a sample, and every sample draws at a 1×1 preview, a bar and in full', () => {
-  assert.equal(UI_TYPES.length, 27)
+  assert.equal(UI_TYPES.length, 39)
   assert.deepEqual(UI_SAMPLES.map(s => s.type), UI_TYPES, 'a sample per element, in order')
   for (const s of UI_SAMPLES) {
     const ctx = { data: s.data, config: {}, at }
@@ -107,14 +107,14 @@ test('UI kit: each, if, unless, tone maps, limits and +N more, groups, sort, for
 test('UI kit: charts in SVG, an empty series draws nothing', () => {
   assert.deepEqual(chartPoints([3, 5, 4], 3, 5), [[0, 38], [50, 2], [100, 20]])
   const html = uiHtml({ type: 'chart', each: 'd', x: '{{x}}', y: '{{y}}', unit: 'ms', label: 'p95' }, { data: { d: [{ x: 'a', y: 3 }, { x: 'b', y: 5 }, { x: 'c', y: 4 }] } }, { full: true })
-  assert.match(html, /<polyline class="t-accent" points="0.0,38.0 50.0,2.0 100.0,20.0"/)
+  assert.match(html, /<polyline points="0.0,38.0 50.0,2.0 100.0,20.0"[^>]*style="color:var\(--tc-blue, #7aa2f7\)"/)
   assert.match(html, /<title>b: 5ms<\/title>/)
-  assert.match(html, /k-ch-dot t-accent" style="left:100.0%;top:50.0%"/, 'the last point marked')
+  assert.match(html, /k-ch-dot" style="left:100.0%;top:50.0%;background:var\(--tc-blue/, 'the last point marked')
   assert.match(html, /<b>4ms<\/b>/, 'the last value')
   assert.match(html, /<span>5ms<\/span><span>3ms<\/span>/, 'max and min')
   const bars = uiHtml({ type: 'chart', kind: 'bars', each: 'd', y: '{{y}}', tone: '{{#if bad}}bad{{/if}}' }, { data: { d: [{ y: 1 }, { y: 2, bad: true }] } })
-  assert.equal(bars.match(/<rect class="t-accent"/g)?.length, 1)
-  assert.equal(bars.match(/<rect class="t-bad"/g)?.length, 1, 'a bar toned per point')
+  assert.equal(bars.match(/<rect [^>]*style="color:var\(--tc-blue/g)?.length, 1)
+  assert.equal(bars.match(/<rect [^>]*style="color:var\(--error/g)?.length, 1, 'a bar toned per point')
   assert.equal(uiHtml({ type: 'chart', each: 'd', y: '{{y}}' }, { data: { d: [] } }), '<div class="k" data-kit="preview"></div>')
   assert.equal(uiHtml({ type: 'chart', each: 'd', y: '{{y}}' }, { data: { d: [{ y: 'x' }] } }), '<div class="k" data-kit="preview"></div>')
 })
@@ -174,4 +174,89 @@ test('a widget with ui and no widget.html: rendered by the daemon and the CLI; w
   await rig.rpc('widgetReload')
   assert.equal(await rig.rpc('widgetRender', { id: 'deploys' }), '2 deploys')
   assert.match(await rig.rpc('widgetRender', { id: 'deploys', full: true }), /data-kit="full"/)
+})
+
+test('UI kit: colors, every chart kind, the examples', () => {
+  assert.equal(colorCss('bad'), 'var(--error, #f7768e)')
+  assert.equal(colorCss('Blue'), 'var(--tc-blue, #7aa2f7)')
+  assert.deepEqual([colorCss('d73a4a'), colorCss('#0e8a16'), colorCss('fff'), colorCss('nope'), colorCss('constructor'), colorCss('red;x')], ['#d73a4a', '#0e8a16', '#fff', '', '', ''])
+  for (const c of [...TONES, ...COLORS]) assert.ok(colorCss(c), c)
+  assert.match(uiHtml({ type: 'text', value: 'hi', color: 'purple' }, {}), /<div class="k-text" style="color:var\(--tc-purple, #bb9af7\)">hi<\/div>/)
+  assert.match(uiHtml({ type: 'badge', value: '3', color: '{{c}}' }, { data: { c: 'teal' } }), /class="k-badge c" style="color:var\(--tc-teal/)
+  assert.match(uiHtml({ type: 'tags', each: 'l', tag: '{{n}}', color: '{{c}}' }, { data: { l: [{ n: 'bug', c: 'd73a4a' }] } }), /border-color:#d73a4a.*background:#d73a4a/)
+  // a check flags a color it doesn't know
+  assert.match(uiCheck({ type: 'text', value: 'x', color: 'bleu' }).map(p => p.text).join(), /color bleu: .*did you mean blue/)
+  assert.deepEqual(uiCheck({ type: 'chart', kind: 'pie', each: 'd', x: '{{x}}', y: '{{y}}', colors: ['red', '{{c}}', 'abcdef'] }), [])
+  const d = { d: [{ x: 'a', y: 3, z: 1 }, { x: 'b', y: 5, z: 2 }, { x: 'c', y: 2, z: 4 }] }
+  for (const kind of CHARTS) {
+    const html = uiHtml({ type: 'chart', kind, each: 'd', x: '{{x}}', y: '{{y}}', label: 'L' }, { data: d }, { full: true })
+    assert.match(html, new RegExp(`class="k-chart k-${kind}"`), kind)
+    assert.doesNotMatch(html, /k-chip-err|NaN|undefined/, kind)
+    assert.ok(uiHtml({ type: 'chart', kind, each: 'd', x: '{{x}}', y: '{{y}}' }, { data: d }, { cells: [2, 0.5] }).includes(`k-${kind}`), `${kind} in a bar`)
+  }
+  const pie = uiHtml({ type: 'chart', kind: 'donut', each: 'd', x: '{{x}}', y: '{{y}}', label: 'tickets', colors: ['green', 'red'] }, { data: d }, { full: true })
+  assert.equal(pie.match(/<circle /g)?.length, 3, 'a slice per row')
+  assert.match(pie, /stroke-dasharray="30.0 70.0" stroke-dashoffset="0.0"[^>]*><title>a: 3 \(30%\)/, 'its share of the whole')
+  assert.match(pie, /color:var\(--tc-green[\s\S]*color:var\(--tc-red[\s\S]*color:var\(--tc-green/, 'colors in order, again from the first')
+  assert.match(pie, /<div class="k-pie-mid"><b>10<\/b><span>tickets<\/span>/, 'the total in the middle')
+  assert.match(pie, /class="k-legend"><span><i style="background:var\(--tc-green[^>]*><\/i>a<b>30%<\/b>/)
+  const stacked = uiHtml({ type: 'chart', kind: 'stacked', each: 'd', x: '{{x}}', series: [{ label: 'y', y: '{{y}}', color: 'blue' }, { label: 'z', y: '{{z}}', color: 'orange' }] }, { data: d }, { full: true })
+  assert.equal(stacked.match(/<rect x=[^>]*fill="currentColor"/g)?.length, 6)
+  assert.match(stacked, /<b>6<\/b>/, "the last row's total")
+  assert.match(stacked, /class="k-legend"><span><i style="background:var\(--tc-blue[^>]*><\/i>y<\/span><span><i style="background:var\(--tc-orange/)
+  const hbars = uiHtml({ type: 'chart', kind: 'hbars', each: 'd', x: '{{x}}', y: '{{y}}', unit: '%' }, { data: d }, { full: true })
+  assert.match(hbars, /<span class="k-hb-l">b<\/span><span class="k-hb-t"><i style="width:100.0%;background:var\(--tc-orange[^"]*"><\/i><\/span><b>5%<\/b>/)
+  const sc = uiHtml({ type: 'chart', kind: 'scatter', each: 'd', x: '{{z}}', y: '{{y}}' }, { data: d }, { full: true })
+  assert.match(sc, /class="k-sc-dot" style="left:100.0%;top:[\d.]+%;background:var\(--tc-blue/, 'x by its number')
+  assert.equal(uiHtml({ type: 'chart', kind: 'pie', each: 'd', y: '{{y}}' }, { data: { d: [{ y: 0 }, { y: -1 }] } }), '<div class="k" data-kit="preview"></div>', 'nothing above 0: no pie')
+  // the examples: more than ten, each draws clean and checks clean
+  assert.ok(UI_EXAMPLES.length >= 10)
+  for (const x of UI_EXAMPLES) {
+    for (const o of [{ cells: [3, 2] as [number, number] }, { cells: [2, 0.5] as [number, number] }, { full: true }]) assert.doesNotMatch(uiHtml(x.spec, { data: x.data, at }, o), /k-chip-err|NaN/, x.title)
+    assert.deepEqual(uiCheck(x.spec, x.data).filter(p => p.level === 'error'), [], x.title)
+  }
+})
+
+test('UI kit: the new elements, and buttons that ask Laki to do things', () => {
+  const h = (spec: object, data?: unknown, o: object = { full: true }) => uiHtml(spec, { data, at }, o)
+  assert.match(h({ type: 'header', icon: 'github', title: '{{r}}', href: 'https://github.com/{{r}}', actions: [{ icon: 'refresh', label: 'Refresh', refresh: true }] }, { r: 'acme/web' }), /k-header.*<a href="https:\/\/github.com\/acme\/web"[^>]*>acme\/web<\/a>.*data-laki="refresh"/s)
+  assert.match(h({ type: 'toolbar', items: [{ icon: 'copy', label: 'Copy it', copy: 'x' }, { label: 'Words' }] }), /<button type="button" class="k-btn sm bare" title="Copy it" data-copy="x" aria-label="Copy it"><svg[\s\S]*?<\/svg><\/button><button type="button" class="k-btn sm"><span>Words<\/span>/, 'icons alone, their words the tooltip; one without an icon keeps its words')
+  assert.match(h({ type: 'footer', text: 'Updated {{n}}', actions: [{ label: 'Go', open: 'https://x.test' }] }, { n: 3 }), /k-footer"><span class="k-ft-t">Updated 3<\/span>/)
+  assert.match(h({ type: 'callout', tone: 'bad', title: 'Down' }), /class="k-callout t-bad"/)
+  assert.match(h({ type: 'callout', title: 'Note' }), /class="k-callout t-accent"/, 'accent unless it says')
+  assert.match(h({ type: 'gauge', value: '{{v}}', max: 200, unit: '%' }, { v: 50 }), /stroke-dasharray="25.0 100".*<b>50%<\/b>/s)
+  const hm = h({ type: 'heatmap', each: 'd', x: '{{day}}', value: '{{n}}' }, { d: [{ day: 'Mon', n: 0 }, { day: 'Tue', n: 4 }, { day: 'Wed', n: 1 }] })
+  assert.deepEqual([...hm.matchAll(/<i class="l(\d)"/g)].map(m => m[1]), ['0', '4', '1'])
+  assert.match(hm, /title="Tue: 4"/)
+  const st = h({ type: 'status', each: 's', label: '{{name}}', state: '{{state}}' }, { s: [{ name: 'API', state: 'up' }, { name: 'DB', state: 'degraded' }, { name: 'Q', state: 'down' }, { name: 'X', state: 'odd' }] })
+  assert.deepEqual([...st.matchAll(/k-st-s (t-\w+)/g)].map(m => m[1]), ['t-good', 't-warn', 't-bad', 't-muted'], 'its state word colors it')
+  const ck = h({ type: 'checklist', each: 't', text: '{{text}}', done: 'done' }, { t: [{ text: 'a', done: true }, { text: 'b' }] })
+  assert.match(ck, /<b>1\/2<\/b>/)
+  assert.equal(ck.match(/k-ck on/g)?.length, 1)
+  const av = h({ type: 'avatars', each: 'l', max: 2 }, { l: ['octocat', 'hubot', 'bad login!', 'monalisa'] })
+  assert.equal(av.match(/<img /g)?.length, 2)
+  assert.match(av, /\+1<\/span>/, 'a bad login left out, the rest counted')
+  assert.match(h({ type: 'card', title: 'T', image: 'https://x.test/a.png', href: 'https://x.test' }), /k-cards one.*data-open="https:\/\/x.test".*<img class="k-card-img" src="https:\/\/x.test\/a.png"/s)
+  assert.doesNotMatch(h({ type: 'image', src: 'http://x.test/a.png' }), /<img/, 'https only')
+  assert.match(h({ type: 'row', children: [{ type: 'text', value: 'a' }, { type: 'spacer' }, { type: 'text', value: 'b' }] }), /<div class="k-spacer"><\/div>/)
+  assert.match(h({ type: 'icon', name: 'check', size: 'xl', color: 'good' }), /class="k-ic" style="color:var\(--done[^"]*"><svg[^>]*width="32"/)
+  // do: the command filled in, as JSON; one with no command it knows is off
+  const b = h({ type: 'button', label: 'Fix', do: 'new', prompt: 'Fix {{t}} "now"', project: 'web', agent: 'codex' }, { t: '<x>' })
+  const cmd = JSON.parse(/data-do="([^"]*)"/.exec(b)![1].replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&'))
+  assert.deepEqual(cmd, { do: 'new', prompt: 'Fix <x> "now"', agent: 'codex', project: 'web' })
+  assert.match(h({ type: 'button', label: 'X', do: 'rm' }), /disabled/)
+  const probs = uiCheck({ type: 'stack', children: [{ type: 'button', label: 'a', do: 'terminal' }, { type: 'button', label: 'b', do: 'nuke' }, { type: 'toolbar', items: [{ icon: 'x', run: 'nope', label: 'n' }] }] }, undefined, { actions: ['go'] })
+  assert.match(probs.map(p => `${p.level}: ${p.text}`).join('\n'), /warn: do terminal without command[\s\S]*error: do: one of new, send, ai, terminal, browse[\s\S]*error: runs nope/)
+})
+
+test('UI kit: a click on a do button asks the app, with the command', () => {
+  const sent: any[] = []
+  const listeners: Record<string, (e: any) => void> = {}
+  const root = { addEventListener: (t: string, f: any) => (listeners[t] = f), removeEventListener: () => {} }
+  uiBehave(root, m => sent.push(m))
+  const el = (attrs: Record<string, string>, text = '') => ({ closest: (q: string) => (q === '[data-do]' && attrs['data-do'] !== undefined ? { getAttribute: (k: string) => attrs[k] ?? null, textContent: text } : null) })
+  listeners.click({ target: el({ 'data-do': JSON.stringify({ do: 'ai', prompt: 'hi' }) }, ' Ask '), preventDefault() {} })
+  listeners.click({ target: el({ 'data-do': '{not json' }), preventDefault() {} })
+  assert.deepEqual(sent, [{ laki: 'do', cmd: { do: 'ai', prompt: 'hi' }, label: 'Ask', confirm: undefined }])
+  assert.match(pageOf('', {}), /do: \(cmd, label\) => say\(\{ laki: 'do', cmd/)
 })

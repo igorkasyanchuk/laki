@@ -225,8 +225,8 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     name: 'laki_extension_guide',
     description: 'How a Laki extension (a widget) is made (widget.json, widget.html, its fetch command or JS script, the template language, JS pages). Read it before laki_extension_write.',
     inputSchema: obj({}),
-    max: 12000,
-    run: async () => `Examples that come with Laki (laki_extension_read): links (a JS page, no fetch), my-prs (a shell fetch with gh and jq, a template, its sample). Write a new one under a new id with laki_extension_write; change one you made by its id (files you leave out stay; never the user's own nor one that comes with Laki). A fetch runs in the extension's folder; for a JS script, "script": "fetch.mjs". It is saved turned off: the user looks at it (its page shows it with its sample) and turns it on in Settings › Extensions (laki://settings/widgets).\n\n${widgetFormat()}`,
+    max: 40000, // the whole guide: its catalog and examples too
+    run: async () => `Examples that come with Laki (laki_extension_read): links (a JS page, no fetch), my-prs (a shell fetch with gh and jq, its ui and sample). Write a new one under a new id with laki_extension_write; change one you made by its id (files you leave out stay; never the user's own nor one that comes with Laki). A fetch runs in the extension's folder; for a JS script, "script": "fetch.mjs". It is saved turned off: the user looks at it (its page shows it with its sample) and turns it on in Settings › Extensions (laki://settings/widgets).\n\n${widgetFormat()}`,
   },
   {
     name: 'laki_extension_read',

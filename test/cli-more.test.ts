@@ -260,7 +260,7 @@ test('cli: widget ls, reload, run, on/off, render, action, as the app would show
 
   assert.deepEqual([(r = await rig.cli('widget', 'run', 'cnt')).code, r.out], [0, 'fetched\n'])
   assert.deepEqual([(r = await rig.cli('widget', 'run', 'bad')).code, r.out], [0, '✗ oops\n'])
-  assert.equal((await rig.cli('widget', 'run', 'still')).out, '✗ still has no fetch or script\n')
+  assert.equal((await rig.cli('widget', 'run', 'still')).out, '✗ still has no fetch or script: give it a source (static, file or url)\n')
 
   assert.equal((await rig.cli('widget', 'off', 'cnt')).out, 'cnt off\n')
   assert.match((await rig.cli('widget')).out, /^cnt {2}off /m)

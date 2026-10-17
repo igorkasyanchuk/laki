@@ -209,6 +209,7 @@ ${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `.k-tabs:has(> .k-tabbar > label:nth-child($
 .k-h { margin: 0; font-weight: 600; line-height: 1.25; } h1.k-h { font-size: 17px; } h2.k-h { font-size: 14px; } h3.k-h { font-size: 12px; color: var(--muted, #7a8294); }
 .k-md { line-height: 1.5; overflow-wrap: anywhere; min-width: 0; } .k-md > :last-child { margin-bottom: 0; } .k-md :is(p, ul, ol, blockquote, pre, .tw) { margin: 0 0 8px; } .k-md :is(ul, ol) { padding-left: 18px; }
 .k-md :is(h1, h2, h3, h4, h5, h6) { margin: 4px 0 6px; font-size: 13px; } .k-md h1 { font-size: 15px; } .k-md blockquote { padding-left: 10px; border-left: 2px solid var(--line, #232833); color: var(--muted, #7a8294); }
+.k-md li:has(> input[type=checkbox]) { list-style: none; margin-left: -16px; } .k-md li > input[type=checkbox] { margin: 0 6px 0 0; vertical-align: -1px; } .k-md li > input[type=checkbox] + p { display: inline; } .k-md li > p { margin: 0; } .k-md img { max-height: 240px; vertical-align: middle; }
 .k-md code { font: 11px var(--mono, ui-monospace, Menlo, monospace); padding: 0 3px; border-radius: 3px; background: var(--hover, #1b2029); } .k-md pre { padding: 8px 10px; overflow: auto; border-radius: var(--radius, 6px); background: var(--hover, #1b2029); } .k-md pre code { padding: 0; background: none; } .k-md .tw { overflow-x: auto; } .k-md img { max-width: 100%; }
 .k-code { position: relative; min-width: 0; } .k-code pre { margin: 0; padding: 8px 10px; overflow: auto; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); background: var(--hover, #1b2029); font: 11.5px/1.45 var(--mono, ui-monospace, Menlo, monospace); } .k-code > .k-copy { position: absolute; top: 4px; right: 4px; }
 .k-copy { padding: 0 5px; font-size: 10px; line-height: 16px; } .k-copy .k-icon { vertical-align: -3px; }
@@ -272,6 +273,37 @@ ${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `.k-tabs:has(> .k-tabbar > label:nth-child($
 .k:not([data-line]) .k-table :is(th, td):first-child:not(.wrap) { width: 100%; max-width: 0; } .k[data-line] .k-kv { display: flex; gap: 6px; overflow: hidden; } .k[data-line] .k-kv :is(dt, dd) { flex: none; margin: 0; } .k[data-line] .k-chart { flex: 1; flex-direction: row; align-items: center; } .k[data-line] .k-ch-body { flex: 1; height: 16px; } .k[data-line] .k-ch-dot { display: none; }
 .k[data-line] .k-actions { flex-wrap: nowrap; overflow: hidden; } .k[data-line] .k-links { flex-wrap: nowrap; overflow: hidden; } .k[data-line] .k-links > * { flex: none; } .k[data-line] .k-empty > div { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .k[data-line] .k-btn { flex: none; } .k[data-line] .k-form { flex-direction: row; align-items: center; } .k[data-line] .k-form > :is(.k-field, .k-check) { display: none; } .k[data-line] .k-hr { flex: none; width: 1px; height: 12px; margin: 0; border-top: 0; border-left: 1px solid var(--line, #232833); } .k[data-line] .k-tabbar { display: none; } .k[data-line] :is(.k-tabs, .k-tabs > .k-panel) { flex-direction: row; align-items: center; }
 .k[data-line] .k-grid { display: flex; gap: 8px; overflow: hidden; } .k[data-line] .k-grid > * { flex: none; }
+.k-header { display: flex; align-items: center; gap: 8px; min-width: 0; } .k-hd-i { flex: none; display: inline-flex; color: var(--accent, #7aa2f7); } .k-hd-t { overflow: hidden; font-size: 13px; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; } .k-hd-t a { color: inherit; text-decoration: none; } .k-hd-t a:hover { text-decoration: underline; }
+.k-footer { display: flex; align-items: center; gap: 8px; min-width: 0; margin-top: auto; padding-top: 6px; border-top: 1px solid var(--line, #232833); color: var(--muted, #7a8294); font-size: 11px; } .k-ft-t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k-toolbar { display: flex; flex-wrap: wrap; gap: 2px; min-width: 0; } .k-toolbar.a-end { justify-content: flex-end; } .k-toolbar.a-between { justify-content: space-between; } .k .k-btn.bare { padding: 3px 5px; } .k-spacer { flex: 1; min-width: 0; }
+.k-callout { display: flex; align-items: flex-start; gap: 8px; min-width: 0; padding: 7px 10px; border: 1px solid color-mix(in srgb, currentColor 35%, transparent); border-radius: var(--radius, 6px); background: color-mix(in srgb, currentColor 9%, transparent); } .k-callout > .k-icon, .k-callout > .k-emoji { margin-top: 2px; } .k-callout > .k-main { color: var(--fg, #d5d9e3); } .k-co-t { color: var(--muted, #7a8294); font-size: 11px; overflow-wrap: anywhere; } .k-callout > .k-btn { flex: none; align-self: center; }
+.k-ic { display: inline-flex; align-items: center; }
+.k-gauge { display: flex; flex-direction: column; align-items: center; min-width: 0; color: var(--accent, #7aa2f7); } .k-ga-c { position: relative; width: 100%; max-width: 150px; } .k[data-kit=preview] .k-ga-c { max-width: 84px; } .k-ga-c svg { display: block; width: 100%; height: auto; } .k-gauge .bg { stroke: var(--hover, #1b2029); } .k-gauge .fg { stroke: currentColor; }
+.k-ga-c b { position: absolute; right: 0; bottom: 0; left: 0; color: var(--fg, #d5d9e3); font-size: 15px; font-weight: 600; line-height: 1; text-align: center; font-variant-numeric: tabular-nums; } .k-ga-l { color: var(--muted, #7a8294); font-size: 11px; }
+.k[data-line] .k-gauge { flex-direction: row; gap: 6px; } .k[data-line] .k-ga-c { display: flex; align-items: center; gap: 4px; width: auto; max-width: none; } .k[data-line] .k-ga-c svg { width: 24px; } .k[data-line] .k-ga-c b { position: static; font-size: 12px; }
+.k-hm { display: grid; grid-auto-flow: column; grid-template-rows: repeat(var(--rows, 7), 9px); grid-auto-columns: 9px; gap: 2px; justify-content: end; min-width: 0; overflow: hidden; color: var(--tc-green, #9ece6a); } .k[data-kit=full] .k-hm { grid-template-rows: repeat(var(--rows, 7), 12px); grid-auto-columns: 12px; gap: 3px; justify-content: start; }
+.k-hm i { border-radius: 2px; background: var(--hover, #1b2029); } .k-hm .l1 { background: color-mix(in srgb, currentColor 30%, var(--hover, #1b2029)); } .k-hm .l2 { background: color-mix(in srgb, currentColor 55%, var(--hover, #1b2029)); } .k-hm .l3 { background: color-mix(in srgb, currentColor 78%, var(--hover, #1b2029)); } .k-hm .l4 { background: currentColor; } .k[data-line] .k-hm { grid-template-rows: 12px; grid-auto-columns: 6px; }
+.k-status { display: flex; flex-direction: column; min-width: 0; } .k-st { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 22px; } .k-st + .k-st { border-top: 1px solid var(--line, #232833); } .k-st[data-open] { cursor: pointer; } .k-st[data-open]:hover { background: var(--hover, #1b2029); }
+.k-st-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 0 3px color-mix(in srgb, currentColor 18%, transparent); } .k-st-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-st .k-sub { flex: 1; } .k-st-s { flex: none; margin-left: auto; font-size: 11px; }
+.k[data-line] .k-status { flex-direction: row; gap: 10px; overflow: hidden; } .k[data-line] .k-st { border: 0; }
+.k-checks { display: flex; flex-direction: column; gap: 2px; min-width: 0; } .k-ck-h { display: flex; align-items: center; gap: 8px; margin-bottom: 2px; color: var(--done, #9ece6a); font-size: 11px; } .k-ck-h b { color: var(--fg, #d5d9e3); font-weight: 600; font-variant-numeric: tabular-nums; } .k-ck-h .k-bar { flex: 1; height: 4px; }
+.k-ck { display: flex; align-items: center; gap: 7px; min-width: 0; min-height: 20px; } .k-box { flex: none; display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border: 1px solid var(--muted, #7a8294); border-radius: 4px; } .k-ck.on .k-box { border-color: var(--done, #9ece6a); background: var(--done, #9ece6a); color: var(--bg, #0f1117); }
+.k-ck-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-ck.on .k-ck-t { color: var(--muted, #7a8294); text-decoration: line-through; } .k[data-line] .k-checks { flex-direction: row; align-items: center; gap: 8px; } .k[data-line] .k-ck-h { margin: 0; } .k[data-line] .k-ck-h .k-bar { flex: none; width: 36px; }
+.k-avs { display: flex; align-items: center; min-width: 0; } .k-avs .k-av { width: 22px; height: 22px; box-shadow: 0 0 0 2px var(--bg, #0f1117); } .k-avs .k-av + .k-av { margin-left: -6px; } .k-avs-n { margin-left: 5px; color: var(--muted, #7a8294); font-size: 11px; } .k[data-line] .k-avs .k-av { width: 16px; height: 16px; }
+.k-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px; min-width: 0; } .k-cards.one { display: block; } .k[data-kit=preview] .k-cards { grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); }
+.k-card { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); } .k-card.link { cursor: pointer; } .k-card.link:hover { background: var(--hover, #1b2029); } .k-card-img { display: block; width: 100%; height: 80px; object-fit: cover; background: var(--hover, #1b2029); } .k[data-kit=preview] .k-card-img { height: 44px; }
+.k-card-ic { padding: 8px 10px 0; } .k-card-b { display: flex; flex-direction: column; gap: 3px; min-width: 0; padding: 7px 10px; } .k-card-h { display: flex; align-items: center; gap: 6px; min-width: 0; } .k-card-h b { min-width: 0; overflow: hidden; font-weight: 600; text-overflow: ellipsis; white-space: nowrap; } .k-card-h .k-tag { flex: none; margin-left: auto; }
+.k-card-t { display: -webkit-box; overflow: hidden; color: var(--muted, #7a8294); font-size: 11px; -webkit-box-orient: vertical; -webkit-line-clamp: 2; }
+.k[data-line] .k-cards { display: flex; gap: 10px; overflow: hidden; } .k[data-line] .k-card { flex: none; border: 0; } .k[data-line] :is(.k-card-img, .k-card-t, .k-card-ic) { display: none; } .k[data-line] .k-card-b { padding: 0; }
+.k-hbars { display: flex; flex-direction: column; gap: 3px; min-width: 0; } .k-hb { display: grid; grid-template-columns: minmax(0, 32%) minmax(0, 1fr) auto; align-items: center; gap: 6px; min-height: 15px; font-size: 11px; } .k-hb-l { overflow: hidden; color: var(--muted, #7a8294); text-overflow: ellipsis; white-space: nowrap; }
+.k-hb-t { height: 8px; overflow: hidden; border-radius: 3px; background: var(--hover, #1b2029); } .k-hb-t > i { display: block; height: 100%; border-radius: 3px; } .k-hb > b { color: var(--fg, #d5d9e3); font-weight: 600; font-variant-numeric: tabular-nums; } .k[data-line] .k-hbars, .k[data-line] .k-hb { flex: 1; }
+.k-pie-body { display: flex; flex: 1; align-items: center; gap: 10px; min-width: 0; min-height: 0; } .k-pie-c { position: relative; flex: none; container-type: size; } .k-pie-c svg { display: block; width: 100%; height: 100%; }
+.k-pie-mid { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1.1; pointer-events: none; } .k-pie-mid b { font-size: 14px; font-weight: 600; font-variant-numeric: tabular-nums; } .k-pie-mid span { color: var(--muted, #7a8294); font-size: 9.5px; } @container (max-width: 64px) { .k-pie-mid { display: none; } }
+.k-pie-body .k-legend { flex-direction: column; flex-wrap: nowrap; min-width: 0; overflow: hidden; } .k-legend span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-pie-body .k-legend i { flex: none; height: 8px; border-radius: 2px; } .k-legend b { margin-left: 4px; color: var(--fg, #d5d9e3); font-weight: 500; } .k[data-line] .k-pie-body { gap: 4px; }
+.k-sc-dot { position: absolute; width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; border-radius: 50%; opacity: 0.85; } .k-ch-x { display: flex; justify-content: space-between; color: var(--muted, #7a8294); font-size: 9.5px; }
+.k-badge.c { background: color-mix(in srgb, currentColor 18%, transparent); }
+.k[data-line] :is(.k-callout, .k-header, .k-footer, .k-st, .k-gauge, .k-ck, .k-ck-h, .k-avs, .k-card, .k-toolbar, .k-hm) { flex: none; } .k[data-line] .k-callout .k-main b { white-space: nowrap; }
+.k[data-line] .k-callout { align-items: center; padding: 0 6px; } .k[data-line] :is(.k-callout .k-co-t, .k-header .k-sub) { display: none; } .k[data-line] .k-callout > :is(.k-icon, .k-emoji) { margin: 0; } .k[data-line] .k-footer { margin: 0; padding: 0; border: 0; } .k[data-line] .k-header .k-hd-t { font-size: 12px; }
 /* tones last, over an element's own color (a badge's, a bar's, a chart's) */
 .k .t-good { color: var(--done, #9ece6a); } .k .t-bad { color: var(--error, #f7768e); } .k .t-warn { color: var(--waiting, #e0af68); } .k .t-accent { color: var(--accent, #7aa2f7); } .k .t-muted { color: var(--muted, #7a8294); } .k .k-badge.t-accent { color: var(--accent-fg, #fff); }`
 
@@ -344,6 +376,7 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     const at = (q: string) => t.closest(q)
     const more = at('[data-more]')
     const r = at('[data-run]')
+    const d = at('[data-do]')
     const c = at('[data-copy]')
     const a = at('a[href]')
     const o = at('[data-open]')
@@ -368,6 +401,14 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       r.setAttribute('data-busy', '')
       const p: any = send({ laki: 'run', action: r.getAttribute('data-run'), arg, label: (r.textContent || '').trim(), confirm: r.getAttribute('data-confirm') || undefined })
       if (p && typeof p.then === 'function') p.then(() => r.removeAttribute('data-busy'), () => r.removeAttribute('data-busy'))
+    } else if (d) {
+      // a Laki command: the app says what it will do and asks first
+      e.preventDefault()
+      let cmd = null
+      try {
+        cmd = JSON.parse(d.getAttribute('data-do') || 'null')
+      } catch {}
+      if (cmd && typeof cmd === 'object') send({ laki: 'do', cmd, label: (d.textContent || d.getAttribute('aria-label') || '').trim(), confirm: d.getAttribute('data-confirm') || undefined })
     } else if (c) e.preventDefault(), send({ laki: 'copy', text: c.getAttribute('data-copy') })
     else if (a) e.preventDefault(), send({ laki: 'open', url: a.getAttribute('href') })
     else if (o) e.preventDefault(), send({ laki: 'open', url: o.getAttribute('data-open') })
@@ -391,7 +432,7 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
 }
 
 // a JS widget's page (the daemon serves it, sandboxed, to a frame of the app): the filled template with window.laki
-// (data, config, at, error, full; refresh(), open(url), expand(), run(action, arg), toast(text), modal({ title, text,
+// (data, config, at, error, full; refresh(), open(url), expand(), run(action, arg), do({ do, prompt… }), toast(text), modal({ title, text,
 // buttons }), ui(spec, data) and mount(el, spec, data): the UI kit's HTML, which the app makes); its clicks are
 // uiBehave's; Esc closes the full view. The app takes them only right after a click in the frame
 // vars: the app's theme (its CSS variables), as the app asked for the page
@@ -405,7 +446,7 @@ export function pageOf(body: string, ctx: Record<string, unknown>, vars: Record<
   return `<!doctype html><html><head><meta charset="utf-8"><style>:root { ${theme} } html { height: 100%; } ${WIDGET_CSS}</style><script>
 const say = m => parent.postMessage(m, '*')
 const uiWait = new Map()
-window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url => say({ laki: 'open', url: String(url) }), expand: () => say({ laki: 'full' }), run: (action, arg, label) => say({ laki: 'run', action: String(action), arg: arg === undefined ? '' : String(arg), label: label === undefined ? '' : String(label) }), toast: text => say({ laki: 'say', toast: String(text) }), modal: m => say({ laki: 'say', modal: m }),
+window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url => say({ laki: 'open', url: String(url) }), expand: () => say({ laki: 'full' }), run: (action, arg, label) => say({ laki: 'run', action: String(action), arg: arg === undefined ? '' : String(arg), label: label === undefined ? '' : String(label) }), toast: text => say({ laki: 'say', toast: String(text) }), modal: m => say({ laki: 'say', modal: m }), do: (cmd, label) => say({ laki: 'do', cmd, label: label === undefined ? '' : String(label) }),
   ui: (spec, data) => new Promise(ok => { const req = uiWait.size + Math.random(); uiWait.set(req, ok); say({ laki: 'ui', req, spec, ctx: { data: data === undefined ? laki.data : data, config: laki.config, at: laki.at, error: laki.error, full: laki.full, workspace: laki.workspace } }) }),
   mount: (el, spec, data) => laki.ui(spec, data).then(html => { el.innerHTML = html }) }
 ;(${String(uiBehave)})(window, say)

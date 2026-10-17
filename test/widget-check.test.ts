@@ -16,7 +16,7 @@ const errors = (ps: any[]) => ps.filter(p => p.level === 'error')
 
 test('starters: each kind made through the CLI is on, checks out with its fetch, and shows its fixture', async t => {
   const rig = await fresh(t)
-  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'stream' /* per workspace, a stream: widget-ws and widget-events tests */)) {
+  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'stream' && k !== 'launcher' /* per workspace, a stream: widget-ws and widget-events tests; the launcher: no data, below */)) {
     const made = await rig.cli('widget', 'new', `My ${kind}`, '--kind', kind)
     assert.equal(made.code, 0, made.err)
     const id = `my-${kind}`
@@ -27,12 +27,18 @@ test('starters: each kind made through the CLI is on, checks out with its fetch,
     const check = await rig.cli('widget', 'check', id)
     assert.equal(check.code, 0, `${kind}: ${check.out}${check.err}`)
     assert.doesNotMatch(check.out, /✗/)
-    assert.match(check.out, /✓ fetch: printed \d+ B of JSON/)
+    assert.match(check.out, kind === 'note' ? /✓ fetch: read \d+ B from its text/ : /✓ fetch: printed \d+ B of JSON/)
     if (kind === 'button') assert.equal(w.badge, '3', 'its badge from the fixture')
     else assert.ok(await rig.rpc('widgetRender', { id }), `${kind}: a preview`)
   }
   assert.match(await rig.rpc('widgetRender', { id: 'my-number' }), /<div class="k-v">1,284<\/div>|k-v/)
   assert.match(await rig.rpc('widgetRender', { id: 'my-onefile' }), /hello · \d\d:\d\d/)
+  assert.match(await rig.rpc('widgetRender', { id: 'my-note' }), /<h2>This week<\/h2>/, 'the note: its text, no fetch')
+  // the launcher: buttons only, no data; each asks Laki for something
+  assert.equal((await rig.cli('widget', 'new', 'My launcher', '--kind', 'launcher')).code, 0)
+  const launch = await rig.rpc('widgetRender', { id: 'my-launcher', sample: true })
+  assert.equal(launch.match(/data-do=/g)?.length, 5)
+  assert.doesNotMatch((await rig.cli('widget', 'check', 'my-launcher')).out, /✗/)
   const files = (await rig.rpc('widgetFiles', { id: 'my-list' })).files
   assert.deepEqual(Object.keys(files).sort(), ['README.md', 'fetch.sh', 'fixtures/empty.json', 'fixtures/sample.json', 'widget.json'])
   assert.match(files['widget.json'], /"\$schema": "https:\/\/raw\.githubusercontent\.com\/igorkasyanchuk\/laki\/main\/docs\/widget\.schema\.json"/)
@@ -49,7 +55,7 @@ test('the schema: docs/widget.schema.json in step, every manifest key and UI ele
   const file = readFileSync(join(root, 'docs/widget.schema.json'), 'utf8')
   assert.equal(file, `${JSON.stringify(WIDGET_SCHEMA, null, 2)}\n`, 'docs/widget.schema.json is out of date: node --experimental-strip-types scripts/widget-schema.ts')
   // the keys widgets.ts reads (its Manifest type): this list, and the schema's
-  const KEYS = ['name', 'description', 'size', 'every', 'view', 'place', 'fetch', 'script', 'config', 'actions', 'icon', 'label', 'badge', 'tip', 'click', 'sample', 'sampleConfig', 'ui', 'scope', 'on', 'stream']
+  const KEYS = ['name', 'description', 'size', 'every', 'view', 'place', 'fetch', 'script', 'config', 'actions', 'icon', 'label', 'badge', 'tip', 'click', 'sample', 'sampleConfig', 'ui', 'scope', 'on', 'stream', 'source']
   const src = readFileSync(join(root, 'src/daemon/widgets.ts'), 'utf8')
   const manifest = /type Manifest = \{([^\n]*)\}\n/.exec(src)![1]
   assert.deepEqual([...manifest.matchAll(/(\w+)\?:/g)].map(m => m[1]).sort(), [...KEYS].sort(), "widgets.ts' Manifest and this list")

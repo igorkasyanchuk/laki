@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
 import type { UiProblem } from '../../shared/widgetUi'
@@ -1784,7 +1784,7 @@ function SkillSection({ api }: { api: SkillApi }) {
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour)
+  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from
   desk?: boolean // Desk is on (experimental): a place too
   run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
   rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, for good (asked first here)
@@ -1795,7 +1795,7 @@ export type WidgetsApi = {
   kit?: () => void // the UI kit's page: its elements and their samples
   runs?: (id: string, ws?: string) => Promise<WidgetRuns> // the inspector's: its runs, env, fixtures
   mock?: (id: string, o: { data?: unknown; fixture?: string; off?: boolean; ws?: string }) => Promise<unknown> // sample data by hand, or Live again
-  files?: (id: string) => Promise<string[]> // its folder's files
+  files?: (id: string) => Promise<Record<string, string>> // its folder's files: each one's text
   make?: (kind: StarterKind) => Promise<unknown> // New ▾'s starters (widgetNew): yours, on, its page opened
   check?: (id: string, run: boolean, ws?: string) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
   revoke?: (id: string, action: string, ws: string) => Promise<unknown> // a tool's Always in a workspace taken back (widgetGrantRm)
@@ -1896,6 +1896,40 @@ function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string
   )
 }
 
+// where an extension's data comes from: its fetch, a text typed in, a file or a URL (each read as it fetches)
+const SOURCES: [WidgetSource['kind'], string, string][] = [
+  ['fetch', 'Its fetch', 'What its own command or script prints'],
+  ['static', 'Static', 'Text you type: JSON, or words (a note)'],
+  ['file', 'File', 'A file of this Mac, read each time it fetches: JSON, or words'],
+  ['url', 'URL', 'An http(s) address, read each time it fetches: JSON, or words'],
+]
+function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
+  const src = w.source!
+  const [pick, setPick] = useState(src.kind)
+  useEffect(() => setPick(src.kind), [src.kind])
+  const save = (s: WidgetSource) => void api.set(w.id, { source: s })
+  const kinds = SOURCES.filter(([k]) => k !== 'fetch' || w.ownFetch)
+  return (
+    <div className="wc-src">
+      <div className="row">
+        <span className="small" data-tip="Where its data comes from: pick one">
+          Data
+        </span>
+        <div className="seg" role="tablist" aria-label="Its data's source">
+          {kinds.map(([k, n, tip]) => (
+            <button key={k} type="button" role="tab" aria-selected={pick === k} className={pick === k ? 'on' : ''} data-tip={tip} onClick={() => (setPick(k), k === 'fetch' ? save({ kind: 'fetch' }) : k === 'static' && save({ kind: 'static', text: src.text ?? '' }))}>
+              {n}
+            </button>
+          ))}
+        </div>
+      </div>
+      {pick === 'static' && <textarea key={`${w.id}:${src.text ?? ''}`} className="mono" rows={4} maxLength={65536} defaultValue={src.text ?? ''} placeholder={'{ "open": 3 }, or a note in Markdown'} spellCheck={false} onBlur={e => e.target.value !== (src.text ?? '') && save({ kind: 'static', text: e.target.value })} />}
+      {pick === 'file' && <input key={`${w.id}:${src.path ?? ''}`} className="mono" defaultValue={src.path ?? ''} placeholder="~/notes/today.md, or {{workspace.path}}/TODO.md" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.path ?? '') && save({ kind: 'file', path: e.target.value.trim() })} />}
+      {pick === 'url' && <input key={`${w.id}:${src.url ?? ''}`} className="mono" type="url" defaultValue={src.url ?? ''} placeholder="https://status.example.com/api/v2/summary.json" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.url ?? '') && save({ kind: 'url', url: e.target.value.trim() })} />}
+    </div>
+  )
+}
+
 export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const options = w.options ?? Object.keys(w.config).map(key => ({ key, type: 'text' as const })) // an older daemon's: text only
   const [menu, openMenu] = useMenu() // where it shows: a place each pick turns on or off
@@ -1964,6 +1998,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         )}
       </div>
       {w.description && <div className="muted small">{w.description}</div>}
+      {w.source && <SourceField w={w} api={api} />}
       {w.js && (
         <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
           <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its fetch gave it. Its fetch command always has the network" />

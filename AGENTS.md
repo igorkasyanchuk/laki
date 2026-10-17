@@ -97,7 +97,8 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`); 77: the studio (`widgetSlug`, `widgetUndo`, `widgetRemix`, `widgetRun` `once`, a widget's `history`, the `widget:<id>` chat). A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`); 77: the studio (`widgetSlug`, `widgetUndo`, `widgetRemix`, `widgetRun` `once`, a widget's `history`, the `widget:<id>` chat); 78: a widget's `source` and `ownFetch`, `widgetSet`
+`source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1100,6 +1101,33 @@ as lines. `widgetRun` on a stream starts it again; `due` skips them; `checkOne` 
 ignored). `widgetPush` (`laki widget push <id> [json|-] [--ws] [--merge]`): `keep`, a `push` run, refused when off. The
 `stream` starter. The inspector's Runs shows `WidgetRuns.stream` (`WidgetStream`).
 
+Sources (`test/widget-source.test.ts`): `types.ts` `WIDGET_SOURCES`, `WidgetSource`; widget.json's `source` the
+default, the store's (`widgetSet` `source`, `sourceOk`: a static text 64 KB, a path, an http(s) URL; `fetch` only with
+`ownFetch`) wins, `sourceOf`. `fetches` is a fetch of its own or any other source; `due` skips static; `streaming` only
+its own fetch. `widgetRun` reads a source through `sourceText` (static: its text; file: `fill`ed over `{ config,
+workspace }`, `~` home, relative to its folder, `MAX_OUT`; URL: `fetch`, `SOURCE_WAIT` 30 s, its status said without
+the query) and `parsed` (JSON when it starts with `{` or `[`, else `{ text }`; a static text that doesn't parse is an
+error). A static pick is kept at once (`keep`), on or off. `needsSample` (widgetSchema.ts: a fetch, a script, a file
+or a URL) is `manifestCheck`'s and `widgetWrite`'s rule. Settings' `SourceField` on `WidgetCard`: *Data*, a segment
+per kind (its fetch only with `ownFetch`), the text, path or URL saved on blur.
+
+Laki commands (`widgetUi.ts` `DO`, a button's `do`, `doOf`: `data-do`, its JSON filled; `uiBehave` sends `{ laki:
+'do', cmd, label }`, a JS page's `laki.do`): Widgets.tsx' `act` hands it to `WidgetApi.do`, App's `widgetDo`: `browse`
+(`quickNew('browsers', url)`, no question), `terminal` (`ask` danger, `quickNew` shells, then `send` to `<ws>/1` 1.5 s
+later), `ai` (`aiAsk`, the AI page or the floating chat), `send` (`send` `agent` `whenIdle` to `w.here` or the selected
+workspace), `new` (`wsNew` in `project` by id or name, else the workspace's project; `preset: agent`; a `git: false`
+one's `another`), each but browse after `ask` with the words in quotes. `uiCheck` (`NEEDS`) warns at one without its
+field, errors at an unknown `do`.
+
+Colors and charts: `colorCss` (a tone's var, the palette's `var(--tc-<name>, <fallback>)` (`TC`), a hex), `hue` over
+a template, `at`'s `color` (a style `color`); Widgets.tsx' `VARS` pass `--tc-*` to a JS page. `chart`: `CHARTS`, pie and
+donut as `pathLength` circles, hbars as HTML rows (`data-rows`, *+N more*), stacked, scatter as HTML dots, `PALETTE`,
+`legendOf`. The other new elements: header, footer, toolbar (`button` `bare`), spacer, callout (`CALLOUT` icons),
+icon (`SIZE`), gauge, heatmap (`level`), status (`STATE` words), checklist, avatars, card. `UI_EXAMPLES`: the UI kit
+page's Examples (`UiKit.tsx` `KitCard`), the guide's examples (`widgetGuide.ts` `examples`); `UI_SAMPLES` stays one
+per element. The app's CSP takes `img-src https:` (the kit's images, Markdown's pictures). The guide tool's `max`:
+40,000. Starters `note` (a static source) and `launcher` (`do` buttons).
+
 Tools for agents (widgets.ts' tools section; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an
 action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPES`, `TOOL_ASKS`; `ask` unset: first).
 `widgetTools` lists the ones that are on (`tool` `<id>.<action>`, the input as a JSON Schema, `agents`: its folder's
@@ -1265,7 +1293,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     for a closed PR only: a merged one stays purple.
   - The sidebar's filter (`find`, the head's funnel, ⌘K): `shows` (words in a name, branch, PR title, author or
     `#n`, and `ONLY`: needs you, working, with a PR); matching rows only, flat (no seps), no drag meanwhile.
-  - A PR's author's picture (`Avatar`, Info.tsx: `avatars.githubusercontent.com/<login>`, the CSP's `img-src`) before
+  - A PR's author's picture (`Avatar`, Info.tsx: `avatars.githubusercontent.com/<login>`, the CSP's `img-src`: https) before
     the row's PR mark and in the PR section, unless it's `mine`.
   - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check

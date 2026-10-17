@@ -835,8 +835,11 @@ or pick one of its `fixtures/*.json`, to see it with that data, *Sample data* on
 20 fetches and actions, why each ran, a click for its stderr), **Env** (what its fetch gets, tokens masked) and
 **Files**, and **Check**. A right click on an extension opens it there (*Inspect*), and so does `laki://settings/widgets/<id>/inspect`.
 
-To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a button, a form, a JS
-page or one file; it runs at once on sample data, and its page opens), or `laki widget new "Deploys" --kind table`.
+To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
+button, a form, a JS page or one file; it runs at once on sample data, and its page opens), or `laki widget new
+"Deploys" --kind table`. Its card's *Data* says where its data comes from: its fetch, a text you type (JSON, or a
+Markdown note), a file or a URL. Its buttons can ask Laki to start a workspace, send a prompt to the agent or Laki AI,
+run a command in a terminal or open a page (`do`; Laki asks first).
 `laki widget check <id>` (its page's **Check**) says what's wrong: unknown keys (with a guess), places, actions, the
 `ui` against its sample and fixtures, and its fetch run once. One file is an extension too: `prs.5m.sh`, run every
 5 minutes, its name, place and settings in comment lines (`# <laki.place>status</laki.place>`).
@@ -1456,7 +1459,7 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, workspace, stream, tool, onefile
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
 laki widget tools [--json]                              # the extensions' tools for agents, their input and when to use them

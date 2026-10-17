@@ -4,6 +4,12 @@ version it builds, with the date. -->
 
 ## Next
 
+- **More for extensions**: pick where one's data comes from on its card: its fetch, a text you type (JSON, or a
+  Markdown note), a file or a URL. The UI kit gets headers, footers, toolbars, callouts, icons, gauges, heatmaps,
+  status lists, checklists, avatars and cards; charts as stacked or horizontal bars, pie, donut and scatter; colors from
+  the theme's palette or a hex; buttons that ask Laki to start a workspace, send a prompt to an agent or Laki AI, run a
+  command in a terminal or open a page. The UI kit page has 13 examples and every color, and an extension's Files tab
+  shows its files. New starters: a note and a launcher.
 - **The UI kit for extensions**: draw one with JSON in its widget.json (`ui`): stats, lists, tables, charts, forms,
   tabs and more, in the app's theme and at any size, no HTML. Settings › Extensions › *UI kit* shows every element with
   its sample and the JSON to copy (`laki widget kit` in a terminal); Laki AI and the Extension creator skill use it.

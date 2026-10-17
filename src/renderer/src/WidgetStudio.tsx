@@ -351,7 +351,7 @@ function StudioPreview({ w, api, sample }: { w: WidgetView; api: WidgetApi; samp
             <CellButton w={w} api={api} />
           </div>
         ) : (
-          <div className={`widget ext-tile ${bar ? 'bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : { width: cell[0] * 92, height: cell[1] * 64 }}>
+          <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : { width: cell[0] * 92, height: cell[1] * 64 }}>
             <WidgetBody key={`${sample}${where}`} w={w} full={false} api={api} sample={sample} cells={bar ? [w.size[0], 0.5] : cell} />
           </div>
         )}

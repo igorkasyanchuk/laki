@@ -42,7 +42,33 @@ function kit(o: { spec: unknown; data: unknown; empty: unknown; real: string; si
 }
 const toast = (what: string) => `printf '{"toast": "${what}: %s"}' "$WIDGET_ARG"`
 
-export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'button', 'form', 'panel', 'workspace', 'stream', 'tool', 'onefile'] as const
+const NOTE = `## This week
+
+- [x] Ship **search v2**
+- [ ] Renew the staging cert
+
+Runbook: [wiki/oncall](https://example.com/wiki/oncall)
+`
+// the launcher's buttons: Laki's commands (the app asks before each)
+const LAUNCH = {
+  type: 'stack',
+  children: [
+    { type: 'header', icon: 'run', title: '{{config.project}}', subtitle: 'Its buttons start things in Laki; it asks first' },
+    {
+      type: 'grid',
+      columns: 2,
+      children: [
+        { type: 'button', label: 'Fix a flaky test', icon: 'agent', do: 'new', project: '{{config.project}}', prompt: 'Find and fix the flakiest test in this repo' },
+        { type: 'button', label: 'Ask the agent', icon: 'run', do: 'send', prompt: 'Run the tests and tell me what fails' },
+        { type: 'button', label: 'Ask Laki AI', icon: 'ai', do: 'ai', prompt: 'Which of my workspaces need me now?' },
+        { type: 'button', label: 'Disk usage', icon: 'terminal', do: 'terminal', command: 'df -h /' },
+        { type: 'button', label: 'Open the docs', icon: 'globe', do: 'browse', url: 'https://github.com/igorkasyanchuk/laki' },
+      ],
+    },
+  ],
+}
+
+export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'note', 'launcher', 'button', 'form', 'panel', 'workspace', 'stream', 'tool', 'onefile'] as const
 export type StarterKind = (typeof STARTER_KINDS)[number]
 
 export const STARTERS: Record<StarterKind, Starter> = {
@@ -63,8 +89,24 @@ export const STARTERS: Record<StarterKind, Starter> = {
   },
   chart: {
     title: 'A chart',
-    blurb: 'A line, area or bars from a list of numbers',
+    blurb: 'Lines, areas, bars, stacked, horizontal, pie, donut or scatter',
     files: kit({ spec: sample('chart').spec, data: sample('chart').data, empty: { days: [] }, real: `curl -fsS "https://api.example.com/latency?days=5" | jq '{days: [.[] | {day: .label, ms: .p95}]}'` }),
+  },
+  note: {
+    title: 'A note',
+    blurb: 'Markdown you type on its card, or from a file or a URL: lists, links, pictures',
+    files: (id, name) => ({
+      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Markdown: its text on its card (Data: Static), or a file or a URL', size: [3, 2], source: { kind: 'static', text: NOTE }, ui: { type: 'markdown', value: '{{text}}' }, sample: { text: NOTE } }),
+      'README.md': `# ${name}\n\nA Laki extension that shows Markdown. Its card (Settings › Extensions) says where the text comes from: Static (typed there), File (\`~/notes/today.md\`, read each time) or URL. A file or a URL that gives JSON is data for a \`ui\` of your own instead.\n`,
+    }),
+  },
+  launcher: {
+    title: 'A launcher',
+    blurb: 'Buttons that start Laki things: a workspace, a prompt, Laki AI, a terminal, a page',
+    files: (id, name) => ({
+      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Buttons with do: Laki says what each will do and asks first', size: [3, 2], config: { project: { type: 'text', label: 'Project', hint: 'Its name: where Fix a flaky test starts', default: '' } }, sampleConfig: { project: 'web' }, ui: LAUNCH }),
+      'README.md': `# ${name}\n\nA Laki extension of buttons that ask Laki to do things (\`do\`): \`new\` (a workspace, its agent on \`prompt\`), \`send\` (\`prompt\` to the workspace's agent), \`ai\` (\`prompt\` to Laki AI), \`terminal\` (\`command\`), \`browse\` (\`url\`). Laki shows what and asks before each.\n`,
+    }),
   },
   button: {
     title: 'A button',
