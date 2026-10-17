@@ -1917,13 +1917,13 @@ function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         </span>
         <div className="seg" role="tablist" aria-label="Its data's source">
           {kinds.map(([k, n, tip]) => (
-            <button key={k} type="button" role="tab" aria-selected={pick === k} className={pick === k ? 'on' : ''} data-tip={tip} onClick={() => (setPick(k), k === 'fetch' ? save({ kind: 'fetch' }) : k === 'static' && save({ kind: 'static', text: src.text ?? '' }))}>
+            <button key={k} type="button" role="tab" aria-selected={pick === k} className={pick === k ? 'on' : ''} data-tip={tip} onClick={() => (setPick(k), k === 'fetch' && src.kind !== 'fetch' && save({ kind: 'fetch' }))}>
               {n}
             </button>
           ))}
         </div>
       </div>
-      {pick === 'static' && <textarea key={`${w.id}:${src.text ?? ''}`} className="mono" rows={4} maxLength={65536} defaultValue={src.text ?? ''} placeholder={'{ "open": 3 }, or a note in Markdown'} spellCheck={false} onBlur={e => e.target.value !== (src.text ?? '') && save({ kind: 'static', text: e.target.value })} />}
+      {pick === 'static' && <textarea key={`${w.id}:${src.text ?? ''}`} className="mono" rows={4} maxLength={65536} defaultValue={src.text ?? ''} placeholder={'{ "open": 3 }, or a note in Markdown'} spellCheck={false} onBlur={e => (src.kind !== 'static' ? e.target.value.trim() !== '' : e.target.value !== (src.text ?? '')) && save({ kind: 'static', text: e.target.value })} />}
       {pick === 'file' && <input key={`${w.id}:${src.path ?? ''}`} className="mono" defaultValue={src.path ?? ''} placeholder="~/notes/today.md, or {{workspace.path}}/TODO.md" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.path ?? '') && save({ kind: 'file', path: e.target.value.trim() })} />}
       {pick === 'url' && <input key={`${w.id}:${src.url ?? ''}`} className="mono" type="url" defaultValue={src.url ?? ''} placeholder="https://status.example.com/api/v2/summary.json" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.url ?? '') && save({ kind: 'url', url: e.target.value.trim() })} />}
     </div>

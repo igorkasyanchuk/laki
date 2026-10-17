@@ -254,9 +254,29 @@ test('UI kit: a click on a do button asks the app, with the command', () => {
   const listeners: Record<string, (e: any) => void> = {}
   const root = { addEventListener: (t: string, f: any) => (listeners[t] = f), removeEventListener: () => {} }
   uiBehave(root, m => sent.push(m))
-  const el = (attrs: Record<string, string>, text = '') => ({ closest: (q: string) => (q === '[data-do]' && attrs['data-do'] !== undefined ? { getAttribute: (k: string) => attrs[k] ?? null, textContent: text } : null) })
-  listeners.click({ target: el({ 'data-do': JSON.stringify({ do: 'ai', prompt: 'hi' }) }, ' Ask '), preventDefault() {} })
-  listeners.click({ target: el({ 'data-do': '{not json' }), preventDefault() {} })
+  // a tiny DOM: a tag, attributes and a parent; matches knows a list of [attr], tag and tag[attr]
+  type N = { tag: string; attrs: Record<string, string>; parent?: N; textContent: string; getAttribute: (k: string) => string | null; hasAttribute: (k: string) => boolean; setAttribute: (k: string, v: string) => void; removeAttribute: (k: string) => void; matches: (q: string) => boolean; closest: (q: string) => N | null }
+  const el = (tag: string, attrs: Record<string, string>, parent?: N, text = ''): N => {
+    const n: N = {
+      tag, attrs, parent, textContent: text,
+      getAttribute: k => attrs[k] ?? null,
+      hasAttribute: k => k in attrs,
+      setAttribute: (k, v) => void (attrs[k] = v),
+      removeAttribute: k => void delete attrs[k],
+      matches: q => q.split(',').some(one => (m => !!m && (!m[1] || m[1] === tag) && (!m[2] || m[2] in attrs))(/^\s*([a-z]*)(?:\[([\w-]+)(?:="[^"]*")?\])?\s*$/.exec(one))),
+      closest: q => (n.matches(q) ? n : (parent?.closest(q) ?? null)),
+    }
+    return n
+  }
+  listeners.click({ target: el('button', { 'data-do': JSON.stringify({ do: 'ai', prompt: 'hi' }) }, undefined, ' Ask '), preventDefault() {} })
+  listeners.click({ target: el('button', { 'data-do': '{not json' }), preventDefault() {} })
   assert.deepEqual(sent, [{ laki: 'do', cmd: { do: 'ai', prompt: 'hi' }, label: 'Ask', confirm: undefined }])
+  // the innermost wins: a do button or a copy in a row that runs an action, and the row itself
+  sent.length = 0
+  const row = el('div', { 'data-run': 'open', 'data-arg': '7' })
+  listeners.click({ target: el('span', {}, el('button', { 'data-do': JSON.stringify({ do: 'browse', url: 'https://x.dev' }) }, row, 'Go')), preventDefault() {} })
+  listeners.click({ target: el('button', { 'data-copy': 'abc' }, row), preventDefault() {} })
+  listeners.click({ target: el('span', {}, row), preventDefault() {} })
+  assert.deepEqual(sent.map(m => m.laki), ['do', 'copy', 'run'])
   assert.match(pageOf('', {}), /do: \(cmd, label\) => say\(\{ laki: 'do', cmd/)
 })

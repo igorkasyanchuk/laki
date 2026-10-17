@@ -212,6 +212,7 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     if (!src || typeof src !== 'object' || !['fetch', 'static', 'file', 'url'].includes(String(src.kind))) say('error', 'widget.json source', '{ "kind": "fetch" | "static" | "file" | "url", "text" | "path" | "url" }')
     else if (src.kind === 'fetch' && !m.fetch && !m.script) say('error', 'widget.json source', 'fetch: but no fetch nor script')
     else if (src.kind === 'url' && typeof src.url === 'string' && !/^https?:\/\//i.test(src.url) && !src.url.includes('{{')) say('error', 'widget.json source', 'url: http or https')
+    else if (src.kind === 'static' && (typeof (src.text ?? '') !== 'string' || String(src.text ?? '').length > 64 << 10)) say('error', 'widget.json source', 'static: a text, 64 KB at most')
   }
   if (m.stream !== undefined && typeof m.stream !== 'boolean') say('error', 'widget.json stream', `true or false, not ${kindOf(m.stream)}`)
   if (m.stream === true && m.scope === 'workspace') say('error', 'widget.json stream', 'a stream is global only: not with "scope": "workspace"') // ponytail: one process per workspace

@@ -1238,6 +1238,7 @@ export function App() {
   // a widget button's Laki command (the UI kit's do, a JS page's laki.do): said and asked first (a page in a browser
   // tab only opens, like a link), then done. Its workspace: a per-workspace one's, else the selected one
   const widgetDo = async (w: WidgetView, c: UiDo, label?: string) => {
+    if (!w.on) return toast(`${w.name} is off: turn it on first`) // as its actions: an off one does nothing
     const by = `${w.name}${label ? ` › ${label}` : ''} asks`
     const shown = (t: string) => `“${t.length > 600 ? `${t.slice(0, 600)}…` : t}”`
     const here = w.here ? view?.workspaces.find(x => x.id === w.here) : ws
@@ -1273,7 +1274,7 @@ export function App() {
     }
     if (c.do === 'new') {
       const want = String(c.project ?? '').trim().toLowerCase()
-      const p = want ? view?.projects.find(x => x.id === want || x.name.toLowerCase() === want) : view?.projects.find(x => x.id === here?.project)
+      const p = want ? view?.projects.find(x => x.id.toLowerCase() === want || x.name.toLowerCase() === want) : view?.projects.find(x => x.id === here?.project)
       if (!p || p.kind) return toast(want ? `${w.name}: no project ${c.project}` : `${w.name}: select a workspace of the project to start it in`)
       const agent = String(c.agent ?? '').trim()
       if (!(await ask(`Start a new workspace in ${p.name}?`, { text: `${by}${agent ? `, with ${agent}` : ''}: ${shown(prompt)}`, ok: 'Start' }))) return

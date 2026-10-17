@@ -19,6 +19,9 @@ test('sources: static, file and URL, each JSON or { text }; its fetch again; wid
   make('note', { name: 'Note', source: { kind: 'static', text: '# Hi\n\nthere' }, ui: { type: 'markdown', value: '{{text}}' } })
   make('bare', { name: 'Bare', ui: { type: 'text', value: '{{n}}' } })
   await rig.rpc('widgetReload')
+  // a typed-in text shows off, before anything is fetched or kept
+  assert.match(await rig.rpc('widgetRender', { id: 'note' }), /<h1>Hi<\/h1>/)
+  assert.match(await rig.rpc('widgetRender', { id: 'note', sample: true }), /<h1>Hi<\/h1>/)
   // a source picked while it's on is read at once (a fetch of its own)
   const shows = (id: string, re: RegExp) => until(async () => re.test(await rig.rpc('widgetRender', { id })), `${id} shows ${re}`)
   const idle = (id: string) => until(async () => !(await find(rig, id)).running, `${id} done fetching`)
@@ -67,6 +70,7 @@ test('sources: static, file and URL, each JSON or { text }; its fetch again; wid
   assert.doesNotMatch(err, /SECRET/)
   await assert.rejects(rig.rpc('widgetSet', { id: 'n', source: { kind: 'url', url: 'file:///etc/passwd' } }), /http or https/)
   await assert.rejects(rig.rpc('widgetSet', { id: 'n', source: { kind: 'nope' } }), /a source/)
+  await assert.rejects(rig.rpc('widgetSet', { id: 'n', source: { kind: 'static', text: 'x'.repeat(70_000) } }), /64 KB/, 'too long: refused, not emptied')
   await assert.rejects(rig.rpc('widgetSet', { id: 'bare', source: { kind: 'fetch' } }), /no fetch of its own/)
 
   // its own fetch again; null: widget.json's

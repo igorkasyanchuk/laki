@@ -373,7 +373,9 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
   const click = (e: any) => {
     const t = e.target && e.target.closest ? e.target : null
     if (!t) return
-    const at = (q: string) => t.closest(q)
+    // the innermost thing to click wins: a button in a row that runs an action is the button's
+    const hit = t.closest('[data-more], [data-run], [data-do], [data-copy], a[href], [data-open], [data-laki]')
+    const at = (q: string) => (hit && hit.matches(q) ? hit : null)
     const more = at('[data-more]')
     const r = at('[data-run]')
     const d = at('[data-do]')
@@ -413,7 +415,7 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     else if (a) e.preventDefault(), send({ laki: 'open', url: a.getAttribute('href') })
     else if (o) e.preventDefault(), send({ laki: 'open', url: o.getAttribute('data-open') })
     else if (b) e.preventDefault(), send({ laki: b.getAttribute('data-laki') })
-    else if (!at('button, input, select, textarea, label, summary, [data-kit="full"]')) send({ laki: 'full' })
+    else if (!t.closest('button, input, select, textarea, label, summary, [data-kit="full"]')) send({ laki: 'full' })
   }
   const input = (e: any) => {
     const f = e.target && e.target.closest ? e.target.closest('[data-filter]') : null

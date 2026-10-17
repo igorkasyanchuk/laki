@@ -59,12 +59,15 @@ export function sourceOk(v: unknown): WidgetSource | undefined {
   const o = v as Record<string, unknown>
   const kind = WIDGET_SOURCES.find(k => k === o.kind)
   if (!kind) return undefined
-  const str = (x: unknown, max: number) => (typeof x === 'string' && x.length <= max ? x : undefined)
-  return { kind, ...(kind === 'static' && { text: str(o.text, 64 << 10) ?? '' }), ...(kind === 'file' && { path: str(o.path, 1024)?.trim() ?? '' }), ...(kind === 'url' && { url: str(o.url, 2048)?.trim() ?? '' }) }
+  const key = kind === 'static' ? 'text' : kind === 'file' ? 'path' : kind === 'url' ? 'url' : ''
+  const val = key ? (o[key] ?? '') : ''
+  if (typeof val !== 'string' || val.length > SOURCE_MAX[key]) return undefined // too long: refused, never emptied
+  return { kind, ...(key && { [key]: key === 'text' ? val : val.trim() }) }
 }
+const SOURCE_MAX: Record<string, number> = { text: 64 << 10, path: 1024, url: 2048 }
 const sourceOf = (w: Entry): WidgetSource => w.s.source ?? sourceOk(w.m.source) ?? { kind: 'fetch' }
 const ownFetch = (w: Entry) => !!(w.m.fetch || w.m.script)
-const fetches = (w: Entry) => (k => (k === 'fetch' ? ownFetch(w) : true))(sourceOf(w).kind)
+const fetches = (w: Entry) => sourceOf(w).kind !== 'fetch' || ownFetch(w)
 const wLog = (w: { id: string }, text: string | (() => string)) => devLog(`widget:${w.id}`, text) // a function: only in dev mode
 const fetchable = (w: Entry, ws?: string) => onOf(w) && fetches(w) && !running.has(keyOf(w.id, ws)) && !metaOf(w, ws).mock // on, with a fetch, not fetching now, not showing data put there by hand
 const due = (w: Entry, now: number, ws?: string) => !streaming(w) && sourceOf(w).kind !== 'static' && fetchable(w, ws) && now - (metaOf(w, ws).at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
@@ -500,9 +503,10 @@ export function widgetRender(o: { id: string; full?: boolean; vars?: Record<stri
   const s = dataOf(w, x?.id)
   const sc = w.m.sampleConfig && typeof w.m.sampleConfig === 'object' && !Array.isArray(w.m.sampleConfig) ? w.m.sampleConfig : {}
   const workspace = x ? wsInfo(x) : scoped(w) ? SAMPLE_WS : undefined
+  const typed = () => (src => (src.kind === 'static' ? parsed(src.text ?? '', 'static').data : undefined))(sourceOf(w)) // a typed-in text: its own data, before any fetch
   const ctx = o.sample
-    ? { data: w.m.sample, config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
-    : { data: s.data, config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace }
+    ? { data: w.m.sample ?? typed(), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
+    : { data: s.data ?? typed(), config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace }
   const cells = Array.isArray(o.cells) ? (o.cells.map(Number) as [number, number]) : undefined
   const body = fromUi ? uiHtml(w.m.ui, ctx, { full: !!o.full, cells: cells ?? (o.full ? undefined : sizeOf(w)) }) : render(own!, ctx)
   return hasScript(file) ? pageOf(body, ctx, o.vars) : body // as the app shows it (js): a script in either view makes both pages
@@ -573,7 +577,7 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   if (o.source !== undefined) {
     // null: widget.json's again; a fetch of its own only when it has one
     const src = o.source === null ? undefined : sourceOk(o.source)
-    if (o.source !== null && !src) throw new Error(`a source: { kind: ${WIDGET_SOURCES.join(' | ')}, text | path | url }`)
+    if (o.source !== null && !src) throw new Error(`a source: { kind: ${WIDGET_SOURCES.join(' | ')}, text (64 KB at most) | path | url }`)
     if (src?.kind === 'fetch' && !ownFetch(w)) throw new Error(`${w.m.name || w.id} has no fetch of its own: pick static, file or url`)
     if (src?.kind === 'url' && src.url && !/^https?:\/\//i.test(src.url) && !src.url.includes('{{')) throw new Error('a URL: http or https')
     s.source = src
@@ -590,6 +594,7 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   w.s = meta
   w.face = faceOf(w, data) // its config, in its words
   changed()
+  if (o.source !== undefined && !streaming(w)) stopStream(w.id) // its last line saved now, not over the new source's data
   if (sourceOf(w).kind === 'static' && o.source !== undefined && !scoped(w))
     keep(w, undefined, st => {
       // typed in: shown at once, on or off (a per-workspace one's instances: as each fetches)
@@ -790,9 +795,14 @@ async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
   const res = await fetch(url, { signal: AbortSignal.timeout(SOURCE_WAIT), headers: { accept: 'application/json, text/plain;q=0.9, */*;q=0.5' } })
   if (!res.ok) throw new Error(`${url.replace(/[?#].*$/, '')}: HTTP ${res.status}`) // its query may hold a key
   if (Number(res.headers.get('content-length') ?? 0) > MAX_OUT) throw new Error('over 16 MB')
-  const t = await res.text()
-  if (t.length > MAX_OUT) throw new Error('over 16 MB')
-  return t
+  const parts: Buffer[] = []
+  let size = 0
+  for await (const b of res.body ?? []) {
+    size += b.length
+    if (size > MAX_OUT) throw new Error('over 16 MB') // the timeout's signal ends the request
+    parts.push(Buffer.from(b))
+  }
+  return Buffer.concat(parts).toString('utf8')
 }
 // what a source gave as data: JSON (an object or a list), else the words as { text }
 function parsed(out: string, kind: WidgetSource['kind']): { data?: unknown; error?: string } {
