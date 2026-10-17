@@ -1,0 +1,18 @@
+{
+  "stats": [
+    {
+      "name": "open",
+      "n": 0
+    },
+    {
+      "name": "drafts",
+      "n": 0
+    },
+    {
+      "name": "conflicts",
+      "n": 0,
+      "bad": false
+    }
+  ],
+  "groups": []
+}

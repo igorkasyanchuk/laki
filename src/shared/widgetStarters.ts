@@ -1,6 +1,7 @@
 // laki widget new <name> --kind <k> (widgetNew, Settings › Extensions › New ▾): an extension that runs at once, with no
-// network: its fetch prints fixtures/sample.json (fetch.sh says what to put there instead), fixtures/empty.json beside
-// it, "$schema" for the editor, a README with the next steps. The UI kit's samples (widgetUi.ts) are the looks.
+// network: its fetch prints fixtures/sample.json (fetch.sh says what to put there instead), fixtures/empty.json and
+// three more made-up variants beside it (its page's Sample ▾), "$schema" for the editor, a README with the next steps.
+// The UI kit's samples (widgetUi.ts) are the looks.
 import { LAKI_DTS, WIDGET_SCHEMA_URL } from './widgetSchema.ts'
 import { UI_SAMPLES, type UiType } from './widgetUi.ts'
 
@@ -28,17 +29,27 @@ A Laki extension. Its data comes from \`fetch.sh\` (now: \`fixtures/sample.json\
 
 - \`laki widget dev .\` here: on, reloaded as you save, each fetch printed as it runs.
 - \`laki widget check ${id}\`: what's wrong with it, its fetch run once.
-- Its page (a right click on it › Inspect): its data (try \`fixtures/empty.json\`), runs, env and files.
+- Its page (a right click on it › Inspect): its data (try \`fixtures/empty.json\` and the other fixtures: made-up
+  variants its preview's Sample ▾ shows), runs, env and files.
 `
 // a starter of a UI kit look: widget.json with its ui, the fetch, the fixtures, the README
-function kit(o: { spec: unknown; data: unknown; empty: unknown; real: string; size?: [number, number]; actions?: Record<string, string>; place?: string; extra?: Record<string, unknown> }) {
+function kit(o: { spec: unknown; data: unknown; empty: unknown; more: Record<string, unknown>; real: string; size?: [number, number]; actions?: Record<string, string>; place?: string; extra?: Record<string, unknown> }) {
   return (id: string, name: string): Files => ({
     'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Made from a starter: change its fetch and its ui', every: 5, size: o.size ?? [3, 2], ...(o.place && { place: o.place }), fetch: 'sh fetch.sh', ...o.extra, ui: o.spec, ...(o.actions && { actions: o.actions }), sample: o.data }),
     'fetch.sh': fetchSh(o.real),
     'fixtures/sample.json': json(o.data),
     'fixtures/empty.json': json(o.empty),
+    ...variants(o.more),
     'README.md': readme(id, name),
   })
+}
+// made-up variants beside the sample: fixtures/<name>.json, each a case worth a look (busy, quiet, an odd one)
+const variants = (more: Record<string, unknown>): Files => Object.fromEntries(Object.entries(more).map(([n, v]) => [`fixtures/${n}.json`, json(v)]))
+const pr = (number: number, title: string, author: string, ci: string, state: string, updated: string, labels: string[] = []) => ({ number, title, url: `https://github.com/acme/web/pull/${number}`, author, ci, state, updated: `2026-10-${updated}Z`, labels })
+const PRS = {
+  many: { prs: [pr(431, 'Split the checkout into steps', 'octocat', 'failing', 'Failing CI', '16T09:00:00', ['feature']), pr(433, 'Upgrade React to 19', 'hubot', 'pending', 'In review', '15T11:00:00'), pr(436, 'Rename orders to purchases', 'monalisa', 'passing', 'Approved', '14T16:00:00', ['refactor']), pr(438, 'Cache the product images', 'octocat', 'passing', 'In review', '17T08:00:00', ['feature']), pr(440, 'Fix the flaky login test', 'defunkt', 'failing', 'Failing CI', '17T07:30:00', ['bug']), pr(442, 'Show tax in the cart', 'hubot', 'passing', 'Approved', '13T10:00:00', ['feature']), pr(444, 'Log slow queries', 'mojombo', 'pending', 'In review', '17T09:10:00'), pr(446, 'Paginate the audit log', 'monalisa', 'passing', 'In review', '12T15:00:00', ['bug'])] },
+  green: { prs: [pr(450, 'Show tax in the cart', 'hubot', 'passing', 'Approved', '16T10:00:00', ['feature']), pr(451, 'Fix the date picker on Safari', 'octocat', 'passing', 'Approved', '15T10:00:00', ['bug']), pr(452, 'Retry webhooks with backoff', 'monalisa', 'passing', 'Approved', '17T10:00:00')] },
+  one: { prs: [pr(460, 'Hotfix: payments time out after the deploy, roll back the client and add a retry around the charge call', 'defunkt', 'failing', 'Failing CI', '17T09:40:00', ['bug', 'p1'])] },
 }
 const toast = (what: string) => `printf '{"toast": "${what}: %s"}' "$WIDGET_ARG"`
 
@@ -75,28 +86,30 @@ export const STARTERS: Record<StarterKind, Starter> = {
   number: {
     title: 'A number',
     blurb: 'A count with its label, a change and a sparkline',
-    files: kit({ spec: sample('stat').spec, data: sample('stat').data, empty: {}, size: [2, 1], real: `curl -fsS "https://api.example.com/stats" | jq '{visits: .today, change: .delta, week: .last7}'` }),
+    files: kit({ spec: sample('stat').spec, data: sample('stat').data, empty: {}, more: { spike: { visits: 48210, change: '+276%', week: [8, 9, 7, 11, 10, 12, 48] }, drop: { visits: 3120, change: '-74%', week: [12, 13, 11, 12, 14, 12, 3] }, flat: { visits: 12000, change: '0%', week: [12, 12, 12, 12, 12, 12, 12] } }, size: [2, 1], real: `curl -fsS "https://api.example.com/stats" | jq '{visits: .today, change: .delta, week: .last7}'` }),
   },
   list: {
     title: 'A list',
     blurb: 'Rows with avatars, tags and a button each; grouped, filtered, +N more',
-    files: kit({ spec: sample('list').spec, data: sample('list').data, empty: { prs: [] }, real: `gh pr list --json number,title,author,url,updatedAt,state \\\n  --jq '{prs: [.[] | {number, title, url, updated: .updatedAt, state, author: .author.login, ci: "passing"}]}'`, actions: { review: toast('Review') } }),
+    files: kit({ spec: sample('list').spec, data: sample('list').data, empty: { prs: [] }, more: PRS, real: `gh pr list --json number,title,author,url,updatedAt,state \\\n  --jq '{prs: [.[] | {number, title, url, updated: .updatedAt, state, author: .author.login, ci: "passing"}]}'`, actions: { review: toast('Review') } }),
   },
   table: {
     title: 'A table',
     blurb: 'Columns, sorted, a filter box; columns that hide when narrow',
-    files: kit({ spec: sample('table').spec, data: sample('table').data, empty: { prs: [] }, real: `gh pr list --json number,title,author,url,updatedAt \\\n  --jq '{prs: [.[] | {number, title, url, updated: .updatedAt, author: .author.login, ci: "pending"}]}'` }),
+    files: kit({ spec: sample('table').spec, data: sample('table').data, empty: { prs: [] }, more: PRS, real: `gh pr list --json number,title,author,url,updatedAt \\\n  --jq '{prs: [.[] | {number, title, url, updated: .updatedAt, author: .author.login, ci: "pending"}]}'` }),
   },
   chart: {
     title: 'A chart',
     blurb: 'Lines, areas, bars, stacked, horizontal, pie, donut or scatter',
-    files: kit({ spec: sample('chart').spec, data: sample('chart').data, empty: { days: [] }, real: `curl -fsS "https://api.example.com/latency?days=5" | jq '{days: [.[] | {day: .label, ms: .p95}]}'` }),
+    files: kit({ spec: sample('chart').spec, data: sample('chart').data, empty: { days: [] }, more: { spike: { days: [{ day: 'Mon', ms: 310 }, { day: 'Tue', ms: 290 }, { day: 'Wed', ms: 1840 }, { day: 'Thu', ms: 420 }, { day: 'Fri', ms: 300 }] }, steady: { days: [{ day: 'Mon', ms: 250 }, { day: 'Tue', ms: 252 }, { day: 'Wed', ms: 248 }, { day: 'Thu', ms: 251 }, { day: 'Fri', ms: 249 }] }, week: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => ({ day, ms: [320, 280, 410, 300, 260, 120, 90][i] })) } }, real: `curl -fsS "https://api.example.com/latency?days=5" | jq '{days: [.[] | {day: .label, ms: .p95}]}'` }),
   },
   note: {
     title: 'A note',
     blurb: 'Markdown you type on its card, or from a file or a URL: lists, links, pictures',
     files: (id, name) => ({
       'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Markdown: its text on its card (Data: Static), or a file or a URL', size: [3, 2], source: { kind: 'static', text: NOTE }, ui: { type: 'markdown', value: '{{text}}' }, sample: { text: NOTE } }),
+      'fixtures/sample.json': json({ text: NOTE }),
+      ...variants({ todo: { text: '## Today\n\n- [x] Review #412\n- [ ] Answer the API question\n- [ ] Deploy the docs\n- [ ] 1:1 at 15:00' }, table: { text: '## On call\n\n| Week | Who |\n|---|---|\n| 42 | octocat |\n| 43 | hubot |\n| 44 | monalisa |' }, links: { text: '## Links\n\n![octocat](https://avatars.githubusercontent.com/octocat?s=48) [Runbook](https://example.com/runbook) · [Status](https://status.example.com) · [Dashboards](https://example.com/grafana)' } }),
       'README.md': `# ${name}\n\nA Laki extension that shows Markdown. Its card (Settings › Extensions) says where the text comes from: Static (typed there), File (\`~/notes/today.md\`, read each time) or URL. A file or a URL that gives JSON is data for a \`ui\` of your own instead.\n`,
     }),
   },
@@ -116,13 +129,14 @@ export const STARTERS: Record<StarterKind, Starter> = {
       'fetch.sh': fetchSh(`gh search prs --review-requested @me --state open --json number --jq '{count: length}'`),
       'fixtures/sample.json': json({ count: 3 }),
       'fixtures/empty.json': json({ count: 0 }),
+      ...variants({ one: { count: 1 }, many: { count: 27 }, lots: { count: 1200 } }),
       'README.md': readme(id, name, ' As a button it has no ui: its icon, `label`, `badge` and `tip` are templates over its data, and `click` runs one of its actions.'),
     }),
   },
   form: {
     title: 'A form',
     blurb: 'Fields and a button: an action gets them as JSON',
-    files: kit({ spec: { type: 'stack', children: [{ type: 'heading', value: 'New issue', level: 3 }, sample('form').spec, { type: 'text', value: 'Last: {{last}}', muted: true, if: 'last' }] }, data: { last: '' }, empty: {}, size: [3, 3], real: 'echo \'{"last": ""}\'', actions: { file: `# $WIDGET_ARG: the form's fields as JSON ({"title": …, "urgent": …, "team": …})\n${toast('Would file')}` } }),
+    files: kit({ spec: { type: 'stack', children: [{ type: 'heading', value: 'New issue', level: 3 }, sample('form').spec, { type: 'text', value: 'Last: {{last}}', muted: true, if: 'last' }] }, data: { last: '' }, empty: {}, more: { filed: { last: '#512 Login loops on Safari' }, urgent: { last: '#513 Checkout returns 500 (urgent)' }, long: { last: '#514 The CSV export drops every row after the first thousand when a filter is on, on every browser we tried' } }, size: [3, 3], real: 'echo \'{"last": ""}\'', actions: { file: `# $WIDGET_ARG: the form's fields as JSON ({"title": …, "urgent": …, "team": …})\n${toast('Would file')}` } }),
   },
   panel: {
     title: 'A JS page',
@@ -144,6 +158,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
       'fetch.sh': fetchSh(`gh pr list --json isDraft --jq '{stats: [{name: "open", n: length}, {name: "drafts", n: map(select(.isDraft)) | length}]}'`),
       'fixtures/sample.json': json(sample('stats').data),
       'fixtures/empty.json': json({ stats: [] }),
+      ...variants({ busy: { stats: [{ name: 'open', n: 24 }, { name: 'drafts', n: 5 }, { name: 'conflicts', n: 4, bad: true }, { name: 'bug', n: 9, color: 'd73a4a' }] }, clean: { stats: [{ name: 'open', n: 3 }, { name: 'drafts', n: 0 }, { name: 'conflicts', n: 0 }] }, labels: { stats: [{ name: 'open', n: 6 }, { name: 'bug', n: 3, color: 'd73a4a' }, { name: 'p1', n: 2, color: 'b60205' }, { name: 'needs-review', n: 4, color: 'fbca04' }] } }),
       'README.md': readme(id, name, ' Its look is `widget.html`: a script that draws with `laki.mount` (types: `laki.d.ts`).'),
     }),
   },
@@ -162,6 +177,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
       },
       data: { commits: 3 },
       empty: { commits: 0 },
+      more: { one: { commits: 1 }, many: { commits: 27 }, lots: { commits: 240 } },
       real: `# per workspace: $LAKI_BRANCH, $LAKI_BASE, $LAKI_PATH, $PORT, $LAKI_PR are the selected workspace's
 printf '{"commits": %s}' "$(git -C "$LAKI_PATH" rev-list --count "$LAKI_BASE..HEAD" 2>/dev/null || echo 0)"`,
     }),
@@ -185,6 +201,7 @@ done
 `,
       'fixtures/sample.json': json({ n: 42, time: '09:41:07' }),
       'fixtures/empty.json': json({ n: 0, time: '' }),
+      ...variants({ first: { n: 1, time: '09:00:02' }, noon: { n: 2048, time: '12:00:00' }, big: { n: 98231, time: '23:59:58' } }),
       'README.md': readme(id, name, ' It streams (`"stream": true`): `stream.sh` runs all along, each line of JSON it prints its data.'),
     }),
   },
@@ -224,6 +241,7 @@ one short line each. Never put secrets in a note.
 `,
         'fixtures/sample.json': json(notes),
         'fixtures/empty.json': json({ notes: [] }),
+        ...variants({ one: { notes: [{ text: 'Rotate the API keys' }] }, many: { notes: ['Ask Dana about the rate limit', 'The login test is flaky on CI', 'Staging cert renews on the 30th', 'Migrations need a backup first', 'Search v2 behind a flag', 'Billing webhooks retry 5 times', 'Docs: the new env vars', 'Bump Node to 22'].map(text => ({ text })) }, long: { notes: [{ text: 'The checkout test fails only when it runs after the cart tests: they share a user and leave an order behind, so the next run sees two' }] } }),
         'README.md': readme(id, name, ' Its `add` action is a tool for agents (`"tool"` in widget.json, `AGENTS.md` says when to use it): `laki widget tools` lists it, `laki widget tool ' + id + ' add \'{"text": "hi"}\'` runs it, after you allow it.'),
       }
     },

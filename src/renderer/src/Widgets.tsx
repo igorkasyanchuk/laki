@@ -14,7 +14,7 @@ import { daemonBase } from './api'
 import { ask, Icon, IconButton, isIconName } from './ui'
 
 export type WidgetApi = {
-  render: (id: string, full: boolean, sample?: boolean, cells?: [number, number], ws?: string) => Promise<string | null> // sample: widget.json's made-up data; cells: where it shows (the UI kit's size); ws: a per-workspace one's instance
+  render: (id: string, full: boolean, sample?: boolean | string, cells?: [number, number], ws?: string) => Promise<string | null> // sample: widget.json's made-up data (a name: fixtures/<name>.json's); cells: where it shows (the UI kit's size); ws: a per-workspace one's instance
   run: (id: string, ws?: string) => Promise<unknown>
   open: (url: string) => void // http(s), mailto, laki://
   copy: (text: string) => void
@@ -88,7 +88,7 @@ function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: Widg
 
 // one widget's preview or full view; a click on a preview (not a link or button) opens the full view. sample: with its
 // made-up data, as it would look (nothing it shows does anything). cells: where it shows, across and down (½: a bar)
-export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; full: boolean; api: WidgetApi; sample?: boolean; cells?: [number, number] }) {
+export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; full: boolean; api: WidgetApi; sample?: boolean | string; cells?: [number, number] }) {
   const host = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [err, setErr] = useState('')
@@ -110,7 +110,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       return
     }
     if (w.js) {
-      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? '&sample=1' : ''}${size ? `&cells=${size}` : ''}${w.here ? `&ws=${encodeURIComponent(w.here)}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
+      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? `&sample=${sample === true ? 1 : encodeURIComponent(sample)}` : ''}${size ? `&cells=${size}` : ''}${w.here ? `&ws=${encodeURIComponent(w.here)}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
       return () => void (live = false)
     }
     const root = rootOf(host.current!)

@@ -1796,6 +1796,7 @@ export type WidgetsApi = {
   runs?: (id: string, ws?: string) => Promise<WidgetRuns> // the inspector's: its runs, env, fixtures
   mock?: (id: string, o: { data?: unknown; fixture?: string; off?: boolean; ws?: string }) => Promise<unknown> // sample data by hand, or Live again
   files?: (id: string) => Promise<Record<string, string>> // its folder's files: each one's text
+  save?: (id: string, path: string, text: string, was: string, force?: boolean) => Promise<unknown> // one of them edited by hand (the page's Files)
   make?: (kind: StarterKind) => Promise<unknown> // New ▾'s starters (widgetNew): yours, on, its page opened
   check?: (id: string, run: boolean, ws?: string) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
   revoke?: (id: string, action: string, ws: string) => Promise<unknown> // a tool's Always in a workspace taken back (widgetGrantRm)
@@ -1903,7 +1904,8 @@ const SOURCES: [WidgetSource['kind'], string, string][] = [
   ['file', 'File', 'A file of this Mac, read each time it fetches: JSON, or words'],
   ['url', 'URL', 'An http(s) address, read each time it fetches: JSON, or words'],
 ]
-function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
+// its page's Data tab shows it
+export function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const src = w.source!
   const [pick, setPick] = useState(src.kind)
   useEffect(() => setPick(src.kind), [src.kind])
@@ -1912,9 +1914,6 @@ function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   return (
     <div className="wc-src">
       <div className="row">
-        <span className="small" data-tip="Where its data comes from: pick one">
-          Data
-        </span>
         <div className="seg" role="tablist" aria-label="Its data's source">
           {kinds.map(([k, n, tip]) => (
             <button key={k} type="button" role="tab" aria-selected={pick === k} className={pick === k ? 'on' : ''} data-tip={tip} onClick={() => (setPick(k), k === 'fetch' && src.kind !== 'fetch' && save({ kind: 'fetch' }))}>
@@ -1922,8 +1921,9 @@ function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             </button>
           ))}
         </div>
+        <span className="muted small">{SOURCES.find(([k]) => k === pick)?.[2]}</span>
       </div>
-      {pick === 'static' && <textarea key={`${w.id}:${src.text ?? ''}`} className="mono" rows={4} maxLength={65536} defaultValue={src.text ?? ''} placeholder={'{ "open": 3 }, or a note in Markdown'} spellCheck={false} onBlur={e => (src.kind !== 'static' ? e.target.value.trim() !== '' : e.target.value !== (src.text ?? '')) && save({ kind: 'static', text: e.target.value })} />}
+      {pick === 'static' && <textarea key={`${w.id}:${src.text ?? ''}`} className="mono" rows={8} maxLength={65536} defaultValue={src.text ?? ''} placeholder={'{ "open": 3 }, or a note in Markdown'} spellCheck={false} onBlur={e => (src.kind !== 'static' ? e.target.value.trim() !== '' : e.target.value !== (src.text ?? '')) && save({ kind: 'static', text: e.target.value })} />}
       {pick === 'file' && <input key={`${w.id}:${src.path ?? ''}`} className="mono" defaultValue={src.path ?? ''} placeholder="~/notes/today.md, or {{workspace.path}}/TODO.md" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.path ?? '') && save({ kind: 'file', path: e.target.value.trim() })} />}
       {pick === 'url' && <input key={`${w.id}:${src.url ?? ''}`} className="mono" type="url" defaultValue={src.url ?? ''} placeholder="https://status.example.com/api/v2/summary.json" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.url ?? '') && save({ kind: 'url', url: e.target.value.trim() })} />}
     </div>
@@ -1998,7 +1998,6 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         )}
       </div>
       {w.description && <div className="muted small">{w.description}</div>}
-      {w.source && <SourceField w={w} api={api} />}
       {w.js && (
         <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
           <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its fetch gave it. Its fetch command always has the network" />

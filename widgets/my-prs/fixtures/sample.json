@@ -1,0 +1,147 @@
+{
+  "stats": [
+    {
+      "name": "open",
+      "n": 6
+    },
+    {
+      "name": "drafts",
+      "n": 1
+    },
+    {
+      "name": "conflicts",
+      "n": 1,
+      "bad": true
+    },
+    {
+      "name": "bug",
+      "n": 2,
+      "color": "d73a4a"
+    }
+  ],
+  "groups": [
+    {
+      "name": "Conflicts",
+      "prs": [
+        {
+          "number": 412,
+          "title": "Move billing to the new API",
+          "url": "https://github.com/acme/web/pull/412",
+          "createdAt": "2026-10-08T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ],
+          "ci": "failing",
+          "approved": false,
+          "changes": false,
+          "conflict": true
+        }
+      ]
+    },
+    {
+      "name": "Failing CI",
+      "prs": [
+        {
+          "number": 418,
+          "title": "Faster search on the orders page",
+          "url": "https://github.com/acme/web/pull/418",
+          "createdAt": "2026-10-05T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "feature",
+              "color": "0e8a16"
+            }
+          ],
+          "ci": "failing",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "Approved",
+      "prs": [
+        {
+          "number": 405,
+          "title": "Fix the date picker on Safari",
+          "url": "https://github.com/acme/web/pull/405",
+          "createdAt": "2026-10-01T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ],
+          "ci": "passing",
+          "approved": true,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "In review",
+      "prs": [
+        {
+          "number": 421,
+          "title": "Dark mode for the dashboard",
+          "url": "https://github.com/acme/web/pull/421",
+          "createdAt": "2026-10-08T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "feature",
+              "color": "0e8a16"
+            }
+          ],
+          "ci": "pending",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 423,
+          "title": "Retry webhooks with backoff",
+          "url": "https://github.com/acme/web/pull/423",
+          "createdAt": "2026-10-01T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [],
+          "ci": "passing",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "Drafts",
+      "prs": [
+        {
+          "number": 426,
+          "title": "Spike: streaming exports",
+          "url": "https://github.com/acme/web/pull/426",
+          "createdAt": "2026-10-04T10:00:00Z",
+          "draft": true,
+          "author": "you",
+          "labels": [],
+          "ci": "pending",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    }
+  ]
+}

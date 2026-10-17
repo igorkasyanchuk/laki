@@ -11,8 +11,8 @@ import type { UiProblem } from '../../shared/widgetUi'
 import { AiPage } from './Ai'
 import { highlight } from './highlight'
 import { Markdown } from './MarkdownView'
-import { WidgetCard, type WidgetsApi } from './Settings'
-import { escapes, Icon, IconButton, Page } from './ui'
+import { SourceField, WidgetCard, type WidgetsApi } from './Settings'
+import { ask, escapes, Icon, IconButton, Page } from './ui'
 import { CellButton, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk' }
@@ -33,6 +33,8 @@ const TABS: [ExtTab, string][] = [
 export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspaces, spots, here, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; spots: { id: string; name: string }[]; here: string | null; back: string; onAiSettings: () => void; onClose: () => void }) {
   const [cur, setCur] = useState(id)
   const [tab, setTab] = useState<ExtTab>(first ?? 'overview')
+  const [draft, setDraft] = useState<Draft | null>(null) // a file being edited in Files: kept across its tabs
+  const [spot, setSpot] = useState(0) // Edit: the settings' card scrolled to and lit, once per click
   // New extension: the first one that shows up meanwhile is the one Laki AI made
   const known = useRef(new Set(widgets.map(w => w.id)))
   const made = cur ? undefined : widgets.find(w => !known.current.has(w.id))
@@ -42,8 +44,10 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
   const seen = useRef(false) // one just made (New ▾) comes with the next view
   if (w) seen.current = true
   useEffect(() => void (cur && !w && seen.current && onClose()), [cur, !w]) // deleted meanwhile
-  const closeRef = useRef(onClose)
-  closeRef.current = onClose
+  // closing with a file's changes not saved asks first
+  const close = async () => (!draft || draft.text === draft.was || (await ask('Discard your changes?', { text: `${draft.path} has changes you haven't saved.`, ok: 'Discard', danger: true }))) && onClose()
+  const closeRef = useRef(close)
+  closeRef.current = close
   // Esc goes back, unless a menu or a dialog has it or the focused box has something typed (it stays)
   useEffect(() => {
     const typed = (el: Element | null) => (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement ? !!el.value.trim() : !!(el as HTMLElement | null)?.isContentEditable)
@@ -63,15 +67,22 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
       title={name}
       wide
       esc={false} /* Esc: ours, above (a field keeps it) */
-      onClose={onClose}
+      onClose={close}
       head={
-        <nav className="crumbs" aria-label="Where you are">
-          <button className="crumb" onClick={onClose}>
-            <Icon name="chevronLeft" size={12} /> {back}
-          </button>
-          <span className="muted">›</span>
-          <b className="crumb here">{name}</b>
-        </nav>
+        <>
+          <nav className="crumbs" aria-label="Where you are">
+            <button className="crumb" onClick={close}>
+              <Icon name="chevronLeft" size={12} /> {back}
+            </button>
+            <span className="muted">›</span>
+            <b className="crumb here">{name}</b>
+          </nav>
+          {w && (
+            <button className="sm ext-edit" data-tip="Its settings: where it shows, its size, its data, its options" onClick={() => (setTab('overview'), setSpot(n => n + 1))}>
+              <Icon name="pencil" size={12} /> Edit
+            </button>
+          )}
+        </>
       }
     >
       <div className="ext">
@@ -79,7 +90,7 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
           {w ? (
             <>
               <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} spots={spots} setAt={setAt} />
-              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} />}
+              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} spot={spot} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
             </>
           ) : cur ? (
             <p className="muted small">Reading…</p>
@@ -138,10 +149,29 @@ export const CELLS: [number, number][] = [
   [3, 2],
   [3, 4],
 ]
-function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi }) {
+function Preview({ w, api, cfg, spot = 0 }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi; spot?: number }) {
   const [pick, setPick] = useState<'live' | 'sample'>()
+  // Edit: its settings scrolled to, lit (Settings' spot) and its first field focused
+  const form = useRef<HTMLElement>(null)
+  useEffect(() => {
+    const el = form.current
+    if (!spot || !el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    el.classList.remove('spot')
+    void el.offsetWidth // the animation again on a second click
+    el.classList.add('spot')
+    el.querySelector<HTMLElement>('input, select, textarea, button[role="tab"], button[role="switch"]')?.focus({ preventScroll: true })
+    const t = setTimeout(() => el.classList.remove('spot'), 2700)
+    return () => clearTimeout(t)
+  }, [spot])
   const [cell, setCell] = useState<[number, number]>(w.size) // Everywhere's sidebar cell: any size, its own not changed
-  const sample = (pick ?? (w.sample && (!w.on || (w.every !== undefined && !w.at)) ? 'sample' : 'live')) === 'sample' && !!w.sample
+  // made-up data: widget.json's sample, or one of its fixtures (busy, empty…) by name
+  const variants = w.fixtures ?? []
+  const has = !!w.sample || !!variants.length
+  const [variant, setVariant] = useState('')
+  const v = variant && variants.includes(variant) ? variant : w.sample ? '' : (variants[0] ?? '')
+  const sample = (pick ?? (has && (!w.on || (w.every !== undefined && !w.at)) ? 'sample' : 'live')) === 'sample' && has
+  const made: boolean | string = sample && (v || true)
   const place = placesOf(w)[0] ?? 'side'
   const bar = place === 'top' || place === 'status'
   const desk = place === 'desk' // a tile there: its full view when it has one, sized on the Desk
@@ -168,10 +198,20 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
             <button role="tab" aria-selected={!sample} className={!sample ? 'on' : ''} onClick={() => setPick('live')}>
               Live
             </button>
-            <button role="tab" aria-selected={sample} className={sample ? 'on' : ''} disabled={!w.sample} data-tip={w.sample ? 'With the made-up data in widget.json' : 'It has no sample in widget.json'} onClick={() => setPick('sample')}>
+            <button role="tab" aria-selected={sample} className={sample ? 'on' : ''} disabled={!has} data-tip={has ? 'With made-up data: widget.json’s sample, or a fixture' : 'It has no sample in widget.json, nor fixtures'} onClick={() => setPick('sample')}>
               Sample
             </button>
           </div>
+          {sample && variants.length > 0 && (
+            <select className="sm" value={v} aria-label="Which made-up data" data-tip="Which made-up data: widget.json’s sample, or fixtures/<name>.json" onChange={e => setVariant(e.target.value)}>
+              {w.sample && <option value="">widget.json’s sample</option>}
+              {variants.map(f => (
+                <option key={f} value={f}>
+                  {f}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
         <div className="ext-stage">
           <span className="ext-where muted small">
@@ -184,7 +224,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
             </div>
           ) : (
             <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : desk ? { width: 400, height: 260 } : { width: w.size[0] * 92, height: w.size[1] * 64 }}>
-              <WidgetBody key={`${sample}`} w={w} full={desk && !!w.full} api={api} sample={sample} cells={bar ? [w.size[0], 0.5] : desk ? [3, 4] : w.size} />
+              <WidgetBody key={`${made}`} w={w} full={desk && !!w.full} api={api} sample={made} cells={bar ? [w.size[0], 0.5] : desk ? [3, 4] : w.size} />
             </div>
           )}
         </div>
@@ -195,7 +235,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
               <span className="muted small">a click away · {w.view === 's' ? 'small' : w.view === 'l' ? 'large' : 'medium'}</span>
             </div>
             <div className={`ext-full ${w.view ?? 'm'}`}>
-              <WidgetBody key={`${sample}`} w={w} full api={api} sample={sample} />
+              <WidgetBody key={`${made}`} w={w} full api={api} sample={made} />
             </div>
           </>
         )}
@@ -216,14 +256,14 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
           <div>
             <span className="muted small">Sidebar · {cell[0]}×{half(cell[1])}</span>
             <div className="widget ext-tile" style={{ width: cell[0] * 92, height: cell[1] * 64 }}>
-              {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${sample}`} w={w} full={false} api={api} sample={sample} cells={cell} />}
+              {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${made}`} w={w} full={false} api={api} sample={made} cells={cell} />}
             </div>
           </div>
           {(['Top bar', 'Status bar'] as const).map(where => (
             <div key={where}>
               <span className="muted small">{where}</span>
               <div className="widget ext-tile in-bar" style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }}>
-                {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${sample}`} w={w} full={false} api={api} sample={sample} cells={[w.size[0], 0.5]} />}
+                {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${made}`} w={w} full={false} api={api} sample={made} cells={[w.size[0], 0.5]} />}
               </div>
             </div>
           ))}
@@ -236,7 +276,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
           </div>
         </div>
       </section>
-      <section className="ext-card">
+      <section className="ext-card" ref={form}>
         <div className="ext-card-head">
           <b>Settings</b>
           <span className="muted small">saved as you change them</span>
@@ -304,7 +344,9 @@ const bytes = (b: number) => (b < 1024 ? `${b} B` : b < 1 << 20 ? `${(b / 1024).
 // the inspector's tabs: Data (its JSON, editable: Apply keeps it as sample data; a fixture; Live), Runs (newest first,
 // a click shows its stderr), Env (what a fetch is given, secrets masked), Files (and its folder). Read again as its
 // data or files change, and every 2 s while Runs shows
-export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check'> }) {
+export function Inspector({ w, cfg, tab, ...kept }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check'>; draft?: Draft | null; setDraft?: (d: Draft | null) => void }) {
+  const [own, setOwn] = useState<Draft | null>(null) // the studio's: no page to keep it across tabs
+  const [draft, setDraft] = kept.setDraft ? [kept.draft ?? null, kept.setDraft] : [own, setOwn]
   const [x, setX] = useState<WidgetRuns | null>(null)
   const [files, setFiles] = useState<Record<string, string> | null>(null)
   const [sel, setSel] = useState('')
@@ -312,6 +354,7 @@ export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab
   const [err, setErr] = useState('')
   const [open, setOpen] = useState<number | null>(null)
   const [tick, setTick] = useState(0)
+  const [read, setRead] = useState(0) // its files again: a save
   useEffect(() => {
     if (tab !== 'runs') return
     const t = setInterval(() => setTick(n => n + 1), 2000)
@@ -324,11 +367,11 @@ export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab
     return () => void (live = false)
   }, [w.id, w.at, w.rev, w.mock, w.running, w.here, tab, tick])
   useEffect(() => {
-    if (tab !== 'files') return
+    if (tab !== 'files' && tab !== 'data') return // Data's examples are its fixtures
     let live = true
     cfg.files?.(w.id).then(f => live && setFiles(f), () => live && setFiles({}))
     return () => void (live = false)
-  }, [w.id, w.rev, tab])
+  }, [w.id, w.rev, tab, read])
   const apply = () => {
     let data: unknown
     try {
@@ -342,31 +385,33 @@ export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab
   if (!x) return <section className="ext-card muted small">{err || 'Reading…'}</section>
   if (tab === 'data')
     return (
-      <section className="ext-card">
-        <div className="ext-card-head">
-          <b>Data</b>
-          <span className="muted small">{w.mock ? `sample data (${w.mock}): not fetched until Live` : w.at ? `as fetched ${ago(w.at)}` : 'not fetched yet'}</span>
-          <span className="grow" />
-          {!!x.fixtures.length && (
-            <select className="sm" value="" aria-label="A fixture" onChange={e => e.target.value && void cfg.mock?.(w.id, { fixture: e.target.value, ws: w.here ?? undefined }).then(() => setText(null), er => setErr(String(er?.message ?? er)))}>
-              <option value="">Sample ▾</option>
-              {x.fixtures.map(f => (
-                <option key={f} value={f}>
-                  fixtures/{f}.json
-                </option>
-              ))}
-            </select>
-          )}
-          <button className="sm" disabled={!w.mock} data-tip="Back to its fetch's data: fetched now" onClick={() => void cfg.mock?.(w.id, { off: true, ws: w.here ?? undefined }).then(() => setText(null))}>
-            Live
-          </button>
-          <button className="sm primary" disabled={text === null} data-tip="Show it with this data (sample data, not fetched meanwhile)" onClick={apply}>
-            Apply
-          </button>
-        </div>
-        {x.big ? <p className="muted small">Over 256 KB: not shown here.</p> : <textarea className="ext-json mono" spellCheck={false} value={text ?? x.data ?? 'null'} onChange={e => setText(e.target.value)} />}
-        {err && <p className="warn small">{err}</p>}
-      </section>
+      <>
+        {w.source && (
+          <section className="ext-card">
+            <div className="ext-card-head">
+              <b>Source</b>
+              <span className="muted small">where its data comes from</span>
+            </div>
+            <SourceField w={w} api={cfg} />
+          </section>
+        )}
+        <section className="ext-card">
+          <div className="ext-card-head">
+            <b>Data</b>
+            <span className="muted small">{w.mock ? `made-up data (${w.mock}): not fetched until Live` : w.at ? `as fetched ${ago(w.at)}` : 'not fetched yet'}</span>
+            <span className="grow" />
+            <button className="sm" disabled={!w.mock} data-tip="Back to its source's data: read now" onClick={() => void cfg.mock?.(w.id, { off: true, ws: w.here ?? undefined }).then(() => setText(null))}>
+              Live
+            </button>
+            <button className="sm primary" disabled={text === null} data-tip="Show it with this data (made-up, not fetched meanwhile)" onClick={apply}>
+              Apply
+            </button>
+          </div>
+          {x.big ? <p className="muted small">Over 256 KB: not shown here.</p> : <textarea className="ext-json mono" spellCheck={false} value={text ?? x.data ?? 'null'} onChange={e => setText(e.target.value)} />}
+          {err && <p className="warn small">{err}</p>}
+        </section>
+        <Examples w={w} cfg={cfg} files={files} onShown={() => setText(null)} />
+      </>
     )
   if (tab === 'runs')
     return (
@@ -439,40 +484,186 @@ export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab
       {files === null ? (
         <p className="muted small">Reading…</p>
       ) : (
-        <FileView files={files} sel={sel && Object.hasOwn(files, sel) ? sel : (Object.keys(files).find(f => f === 'widget.json') ?? Object.keys(files)[0] ?? '')} onSel={setSel} />
+        <FileView w={w} cfg={cfg} files={files} sel={draft && Object.hasOwn(files, draft.path) ? draft.path : sel && Object.hasOwn(files, sel) ? sel : (Object.keys(files).find(f => f === 'widget.json') ?? Object.keys(files)[0] ?? '')} onSel={setSel} draft={draft} setDraft={setDraft} onSaved={() => setRead(n => n + 1)} />
       )}
       {!!x.fixtures.length && <p className="muted small">fixtures/: {x.fixtures.map(f => `${f}.json`).join(', ')}</p>}
     </section>
   )
 }
 
-// its files: the list, and the picked one's text (colored; Markdown rendered), read-only: an editor or the studio changes them
-function FileView({ files, sel, onSel }: { files: Record<string, string>; sel: string; onSel: (f: string) => void }) {
+// Data's examples: widget.json's sample and each fixtures/<name>.json, the made-up data it can be shown with: one's
+// JSON, Show it with this (as made-up data until Live), Use as its source (a Static text)
+function Examples({ w, cfg, files, onShown }: { w: WidgetView; cfg: WidgetsApi; files: Record<string, string> | null; onShown: () => void }) {
+  const [pick, setPick] = useState<string | null>(null)
+  const [err, setErr] = useState('')
+  const all = useMemo(() => {
+    const out: { key: string; label: string; text: string }[] = []
+    try {
+      const m = JSON.parse(files?.['widget.json'] ?? '{}')
+      if (m.sample !== undefined) out.push({ key: '', label: 'widget.json’s sample', text: JSON.stringify(m.sample, null, 2) })
+    } catch {}
+    for (const [n, t] of Object.entries(files ?? {})) if (n.startsWith('fixtures/')) out.push({ key: n.slice(9, -5), label: n, text: t.trim() })
+    return out
+  }, [files])
+  const one = all.find(e => e.key === pick) ?? all[0]
+  const lines = useMemo(() => highlight('x.json', one?.text ?? ''), [one?.text])
+  const show = () => {
+    if (!one) return
+    setErr('')
+    let data: unknown
+    if (one.key === '')
+      try {
+        data = JSON.parse(one.text)
+      } catch {}
+    void cfg.mock?.(w.id, { ...(one.key ? { fixture: one.key } : { data }), ws: w.here ?? undefined }).then(onShown, e => setErr(String(e?.message ?? e)))
+  }
+  return (
+    <section className="ext-card">
+      <div className="ext-card-head">
+        <b>Examples</b>
+        <span className="muted small">made-up data it can be shown with: its sample and fixtures/</span>
+        <span className="grow" />
+        {one && (
+          <>
+            <button className="sm" disabled={!cfg.mock} data-tip="Show it with this (made-up data, not fetched until Live)" onClick={show}>
+              Show it with this
+            </button>
+            <button className="sm" data-tip="Its source becomes a Static text: this JSON" onClick={() => void cfg.set(w.id, { source: { kind: 'static', text: one.text } }).catch(e => setErr(String(e?.message ?? e)))}>
+              Use as its data
+            </button>
+          </>
+        )}
+      </div>
+      {files === null ? (
+        <p className="muted small">Reading…</p>
+      ) : !all.length ? (
+        <p className="muted small">None: widget.json’s sample and files in fixtures/ (busy.json, empty.json…) show here. Edit them in Files.</p>
+      ) : (
+        <div className="ext-fv">
+          <ul className="ext-files mono" role="listbox" aria-label="Its examples">
+            {all.map(e => (
+              <li key={e.key} role="option" aria-selected={e === one} className={e === one ? 'on' : ''} onClick={() => setPick(e.key)}>
+                {e.key || 'widget.json sample'}
+                {w.mock === (e.key || 'edited') && e.key && <span className="muted"> · shown</span>}
+              </li>
+            ))}
+          </ul>
+          <div className="ext-fv-body">
+            <pre className="mono">
+              {lines.map((l, i) => (
+                <div key={i} className="pv-line">
+                  <span className="pv-n">{i + 1}</span>
+                  {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
+                </div>
+              ))}
+            </pre>
+          </div>
+        </div>
+      )}
+      {err && <p className="warn small">{err}</p>}
+    </section>
+  )
+}
+
+// its files: the list, and the picked one's text (colored; Markdown rendered). Edit: the text in a box (⌘S saves, Esc
+// stops), saved as it is (widgetFileSave: refused when the file changed meanwhile, Save anyway; a .json one must parse);
+// one that comes with Laki, or too big to show, is read-only
+type Draft = { path: string; text: string; was: string }
+const UNSHOWN = /^\((over 64 KB|binary): not shown\)$/ // widgetFiles' words for one it doesn't give
+function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: WidgetView; cfg: WidgetsApi; files: Record<string, string>; sel: string; onSel: (f: string) => void; draft: Draft | null; setDraft: (d: Draft | null) => void; onSaved: () => void }) {
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
   const text = files[sel] ?? ''
   const md = /\.md$/i.test(sel)
   const lines = useMemo(() => (md ? [] : highlight(sel, text)), [sel, text, md])
+  const edit = draft?.path === sel ? draft : null
+  const dirty = !!edit && edit.text !== edit.was
+  const why = w.builtin ? 'It comes with Laki: Remix it to change a copy' : UNSHOWN.test(text) ? 'Too big or not text: open its folder to edit it' : !cfg.save ? 'Not here' : ''
+  const leave = async () => !dirty || (await ask('Discard your changes?', { text: `${sel} has changes you haven't saved.`, ok: 'Discard', danger: true }))
+  const pick = async (f: string) => f !== sel && (await leave()) && (setDraft(null), setErr(''), onSel(f))
+  const stop = async () => (await leave()) && (setDraft(null), setErr(''))
+  const save = (force?: boolean) => {
+    if (!edit || !cfg.save || busy) return
+    setBusy(true)
+    cfg.save(w.id, edit.path, edit.text, edit.was, force).then(
+      () => (setDraft(null), setErr(''), onSaved()),
+      e => setErr(String(e?.message ?? e)),
+    ).finally(() => setBusy(false))
+  }
   if (!Object.keys(files).length) return <p className="muted small">No files to show</p>
   return (
     <div className="ext-fv">
       <ul className="ext-files mono" role="listbox" aria-label="Its files">
         {Object.keys(files).map(f => (
-          <li key={f} role="option" aria-selected={f === sel} className={f === sel ? 'on' : ''} onClick={() => onSel(f)}>
+          <li key={f} role="option" aria-selected={f === sel} className={f === sel ? 'on' : ''} onClick={() => void pick(f)}>
             {f}
+            {draft?.path === f && draft.text !== draft.was && <span className="ext-fv-dot" aria-label="not saved"> ●</span>}
           </li>
         ))}
       </ul>
-      <div className="ext-fv-body">
-        {md ? (
-          <Markdown src={text} />
+      <div className="ext-fv-main">
+        <div className="ext-fv-bar">
+          <span className="mono small grow">{sel}</span>
+          {edit ? (
+            <>
+              <span className="muted small">{dirty ? 'not saved · ⌘S saves' : 'editing · Esc stops'}</span>
+              <button className="sm" onClick={() => void stop()}>
+                Cancel
+              </button>
+              <button className="sm primary" disabled={!dirty || busy} onClick={() => save()}>
+                {busy ? 'Saving…' : 'Save'}
+              </button>
+            </>
+          ) : (
+            <button className="sm" disabled={!!why} data-tip={why || 'Edit it here: ⌘S saves'} onClick={() => (setDraft({ path: sel, text, was: text }), setErr(''))}>
+              <Icon name="pencil" size={12} /> Edit
+            </button>
+          )}
+        </div>
+        {err && (
+          <p className="warn small ext-fv-err">
+            {err}
+            {/changed since you opened it/.test(err) && (
+              <button className="sm" onClick={() => save(true)}>
+                Save anyway
+              </button>
+            )}
+          </p>
+        )}
+        {edit ? (
+          <textarea
+            className="pv-edit ext-fv-edit"
+            value={edit.text}
+            wrap="off"
+            spellCheck={false}
+            autoFocus
+            aria-label={`Edit ${sel}`}
+            onChange={e => setDraft({ ...edit, text: e.target.value })}
+            onKeyDown={e => {
+              if (e.key === 's' && (e.metaKey || e.ctrlKey)) (e.preventDefault(), save())
+              else if (e.key === 'Escape') (e.preventDefault(), void stop())
+              else if (e.key === 'Tab' && !e.shiftKey && !e.metaKey && !e.ctrlKey && !e.altKey) {
+                // a tab is two spaces here, as widget.json's are
+                e.preventDefault()
+                document.execCommand('insertText', false, '  ')
+              }
+            }}
+          />
         ) : (
-          <pre className="mono">
-            {lines.map((l, i) => (
-              <div key={i} className="pv-line">
-                <span className="pv-n">{i + 1}</span>
-                {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
-              </div>
-            ))}
-          </pre>
+          <div className="ext-fv-body">
+            {md ? (
+              <Markdown src={text} />
+            ) : (
+              <pre className="mono">
+                {lines.map((l, i) => (
+                  <div key={i} className="pv-line">
+                    <span className="pv-n">{i + 1}</span>
+                    {l.length ? l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t)) : ' '}
+                  </div>
+                ))}
+              </pre>
+            )}
+          </div>
         )}
       </div>
     </div>

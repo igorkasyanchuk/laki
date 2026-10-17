@@ -40,7 +40,7 @@ test('starters: each kind made through the CLI is on, checks out with its fetch,
   assert.equal(launch.match(/data-do=/g)?.length, 5)
   assert.doesNotMatch((await rig.cli('widget', 'check', 'my-launcher')).out, /✗/)
   const files = (await rig.rpc('widgetFiles', { id: 'my-list' })).files
-  assert.deepEqual(Object.keys(files).sort(), ['README.md', 'fetch.sh', 'fixtures/empty.json', 'fixtures/sample.json', 'widget.json'])
+  assert.deepEqual(Object.keys(files).sort(), ['README.md', 'fetch.sh', 'fixtures/empty.json', 'fixtures/green.json', 'fixtures/many.json', 'fixtures/one.json', 'fixtures/sample.json', 'widget.json'])
   assert.match(files['widget.json'], /"\$schema": "https:\/\/raw\.githubusercontent\.com\/igorkasyanchuk\/laki\/main\/docs\/widget\.schema\.json"/)
   assert.match((await rig.rpc('widgetFiles', { id: 'my-panel' })).files['laki.d.ts'], /declare const laki: Laki/)
   // a second of the same name gets its own id; a folder of yours must be empty

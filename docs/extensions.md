@@ -40,7 +40,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 |---|---|
 | `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)), `on` ([events](#events-on) it answers), `stream` ([a fetch that runs all along](#streams-stream)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
 | `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
-| `fixtures/<name>.json` | sample data: its Data tab shows each (*Sample ▾*), and *Check* fits `ui` to each |
+| `fixtures/<name>.json` | sample data (`sample.json`, `empty.json`, and a few more: busy, all good, an odd one): its preview's *Sample* picks one, its Data tab lists them, and *Check* fits `ui` to each |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
 
 ### Where its data comes from (`source`)
@@ -409,7 +409,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `onefile` | one script, `<id>.5m.sh` (below) |
 
 Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its
-comments to swap in; `fixtures/empty.json` beside it (its Data tab's *Sample ▾* shows either). It has a `README.md`
+comments to swap in; `fixtures/empty.json` and three more made-up variants beside it (its preview's *Sample* picks one). It has a `README.md`
 with the next steps, and `"$schema"`, so VS Code and Cursor complete and check its `widget.json`
 ([`docs/widget.schema.json`](widget.schema.json), written from `src/shared/widgetSchema.ts` by
 `node --experimental-strip-types scripts/widget-schema.ts`). The id comes from the name, made unique. It's yours: on.
@@ -477,11 +477,11 @@ Its page's tabs show them:
 
 | tab | what |
 |---|---|
-| Overview | its preview where it sits, everywhere else (any sidebar size, the bars, as a button), its full view and settings |
-| Data | its last data as JSON: edit it and *Apply*, or pick one of its `fixtures/<name>.json` (*Sample ▾*), to see it with that data; *Live* fetches again |
+| Overview | its preview where it sits (*Live* or *Sample*, with a picker of its samples), everywhere else (any sidebar size, the bars, as a button), its full view and settings; the head's *Edit* goes to the settings |
+| Data | where its data comes from (its fetch, a text, a file, a URL); its last data as JSON: edit it and *Apply* to see it with that data, *Live* fetches again; its examples (widget.json's `sample`, each `fixtures/<name>.json`): *Show it with this*, or *Use as its data* |
 | Runs | the runs, newest first; a click shows one's stderr |
 | Env | what its fetch gets (`WIDGET_*`, `LAKI_*`, `PATH`); a setting named like a token, secret, key or password masked |
-| Files | its folder's files, and *Open folder* |
+| Files | its folder's files: *Edit*, then *Save* (⌘S); JSON is checked first, it reloads at once, and the studio's *Undo* has the version before. One that comes with Laki: Remix it first |
 | Check | *Check* above: *Check again*, *Check with a fetch* |
 
 Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.

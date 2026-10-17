@@ -1,0 +1,285 @@
+{
+  "stats": [
+    {
+      "name": "open",
+      "n": 14
+    },
+    {
+      "name": "drafts",
+      "n": 2
+    },
+    {
+      "name": "conflicts",
+      "n": 3,
+      "bad": true
+    },
+    {
+      "name": "bug",
+      "n": 5,
+      "color": "d73a4a"
+    }
+  ],
+  "groups": [
+    {
+      "name": "Conflicts",
+      "prs": [
+        {
+          "number": 431,
+          "title": "Split the checkout into steps",
+          "url": "https://github.com/acme/web/pull/431",
+          "createdAt": "2026-10-02T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "feature",
+              "color": "0e8a16"
+            }
+          ],
+          "ci": "failing",
+          "approved": false,
+          "changes": false,
+          "conflict": true
+        },
+        {
+          "number": 433,
+          "title": "Upgrade React to 19",
+          "url": "https://github.com/acme/web/pull/433",
+          "createdAt": "2026-09-28T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [],
+          "ci": "pending",
+          "approved": false,
+          "changes": false,
+          "conflict": true
+        },
+        {
+          "number": 436,
+          "title": "Rename orders to purchases",
+          "url": "https://github.com/acme/web/pull/436",
+          "createdAt": "2026-10-09T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ],
+          "ci": "passing",
+          "approved": false,
+          "changes": false,
+          "conflict": true
+        }
+      ]
+    },
+    {
+      "name": "Failing CI",
+      "prs": [
+        {
+          "number": 438,
+          "title": "Cache the product images",
+          "url": "https://github.com/acme/web/pull/438",
+          "createdAt": "2026-10-10T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "feature",
+              "color": "0e8a16"
+            }
+          ],
+          "ci": "failing",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 440,
+          "title": "Fix the flaky login test",
+          "url": "https://github.com/acme/web/pull/440",
+          "createdAt": "2026-10-12T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            },
+            {
+              "name": "p1",
+              "color": "b60205"
+            }
+          ],
+          "ci": "failing",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "Changes asked",
+      "prs": [
+        {
+          "number": 441,
+          "title": "Move emails to the queue",
+          "url": "https://github.com/acme/web/pull/441",
+          "createdAt": "2026-10-11T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [],
+          "ci": "passing",
+          "approved": false,
+          "changes": true,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "Approved",
+      "prs": [
+        {
+          "number": 442,
+          "title": "Show tax in the cart",
+          "url": "https://github.com/acme/web/pull/442",
+          "createdAt": "2026-10-13T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "feature",
+              "color": "0e8a16"
+            }
+          ],
+          "ci": "passing",
+          "approved": true,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 443,
+          "title": "Fix the date picker on Safari",
+          "url": "https://github.com/acme/web/pull/443",
+          "createdAt": "2026-10-14T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ],
+          "ci": "passing",
+          "approved": true,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "In review",
+      "prs": [
+        {
+          "number": 444,
+          "title": "Dark mode for the dashboard",
+          "url": "https://github.com/acme/web/pull/444",
+          "createdAt": "2026-10-14T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "feature",
+              "color": "0e8a16"
+            }
+          ],
+          "ci": "pending",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 445,
+          "title": "Retry webhooks with backoff",
+          "url": "https://github.com/acme/web/pull/445",
+          "createdAt": "2026-10-15T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [],
+          "ci": "passing",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 446,
+          "title": "Paginate the audit log",
+          "url": "https://github.com/acme/web/pull/446",
+          "createdAt": "2026-10-15T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ],
+          "ci": "passing",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 447,
+          "title": "Log slow queries",
+          "url": "https://github.com/acme/web/pull/447",
+          "createdAt": "2026-10-16T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [],
+          "ci": "pending",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "Drafts",
+      "prs": [
+        {
+          "number": 448,
+          "title": "Spike: streaming exports",
+          "url": "https://github.com/acme/web/pull/448",
+          "createdAt": "2026-10-16T10:00:00Z",
+          "draft": true,
+          "author": "you",
+          "labels": [],
+          "ci": "pending",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 449,
+          "title": "Try the new search index",
+          "url": "https://github.com/acme/web/pull/449",
+          "createdAt": "2026-10-17T10:00:00Z",
+          "draft": true,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ],
+          "ci": "none",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    }
+  ]
+}

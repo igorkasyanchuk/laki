@@ -98,7 +98,8 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
 a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`); 77: the studio (`widgetSlug`, `widgetUndo`, `widgetRemix`, `widgetRun` `once`, a widget's `history`, the `widget:<id>` chat); 78: a widget's `source` and `ownFetch`, `widgetSet`
-`source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts. A
+`source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts; 79: `widgetFileSave`, `widgetRender`
+`sample` as a fixture's name, a widget's `fixtures`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1031,18 +1032,24 @@ keys kept without dev mode (a dev widget's). Runs: `ran` per fetch and action (`
 `.widget-mock` chip), `fetchable` false meanwhile and `widgetRun` skips all but `manual`, whose data clears it; a
 stream stops first (`stopStream`: its last line saved, not over the mock); `widgetSet` turning one on (off to on) drops it.
 `widgetRm` refuses a dev widget (your code). The inspector is `Extension.tsx`' tabs (`ExtTab`; App's dialog
-`{ extension, tab }`): `InspectHead` (Run now, Reload, the watching dot, `devError`'s banner), Overview (`Preview` and
-its *Everywhere* card: a sidebar cell of any size, both bars, the button), `Inspector` (Data: `widgetRuns` `data`, Apply
-`widgetMock`, *Sample ▾* fixtures, Live; Runs, every 2 s while shown; Env; Files: `widgetFiles`' names, Open folder). A
+`{ extension, tab }`): `InspectHead` (Run now, Reload, the watching dot, `devError`'s banner), the head's *Edit* (Overview,
+the Settings card scrolled to and lit, `spot`), Overview (`Preview`: *Sample* with a picker of widget.json's `sample` and
+the view's `fixtures`, `widgetRender` `sample: <name>`, nothing kept; its *Everywhere* card: a sidebar cell of any size,
+both bars, the button), `Inspector` (Data: Source (`SourceField`), its data (`widgetRuns` `data`, Apply `widgetMock`,
+Live), `Examples` (the sample and each fixture: *Show it with this*, *Use as its data*: a static source); Runs, every 2 s
+while shown; Env; Files: `widgetFiles`' texts, editable (`FileView`: ⌘S, Esc, *Save anyway*; the draft is
+`ExtensionPage`'s, asked before it's lost) through `widgetFileSave` (`path` one of `widgetFiles`' names, `was`: refused
+as "changed since you opened it" unless `force`; JSON parsed first; never a built-in (Remix it), a link or a file over
+64 KB; the studio's `snapshot` first, so Undo has it; then `scanWidgets` and a `reload` fetch), Open folder). A
 widget's right click (`WidgetApi.menu`, App's: Fetch now, Inspect, Its page) and `laki://settings/widgets/<id>[/inspect]`
 (links.ts `extension`) open it. Tested in `test/widget-dev.test.ts`.
 
 Starters, the schema, the checker, one file (Part 3; `test/widget-check.test.ts`): `shared/widgetStarters.ts` `STARTERS`
 (`STARTER_KINDS`; each `files(id, name)`: widget.json with `$schema`, `fetch.sh` that cats `fixtures/sample.json`, the
-real fetch in its comments, `fixtures/empty.json`, a README; `panel`'s `laki.d.ts`; `onefile`'s `<id>.5m.sh`). `widgetNew`:
+real fetch in its comments, `fixtures/empty.json` and three more made-up variants (`variants`; not launcher's nor onefile's), a README; `panel`'s `laki.d.ts`; `onefile`'s `<id>.5m.sh`). `widgetNew`:
 the id slugged and made unique (`taken`: a widget, a store, a folder or file of it), `<data>/widgets/<id>` (`dir`: an
 empty folder of yours; `onefile` in the folder itself), the store `on`, fetched (reason manual, why made); the CLI's `new`,
-Settings' *New ▾* (`WidgetsApi.make`: App opens its page on Data; `ExtensionPage`'s `seen`: one not in the view yet isn't
+Settings' *New ▾* (`WidgetsApi.make`: App opens its page on Overview; `ExtensionPage`'s `seen`: one not in the view yet isn't
 "deleted meanwhile"). `shared/widgetSchema.ts`: `MANIFEST` (widget.json's keys, each described), `WIDGET_SCHEMA` (draft-07:
 `ui`'s elements a `oneOf` by `type` from `UI`'s words), `LAKI_DTS` (`window.laki` and `UiElement` for a JS page),
 `manifestCheck` (unknown keys with `near`, kinds, places, sizes, `click`, `config` specs); `WIDGET_SCHEMA_URL` from
@@ -1108,7 +1115,7 @@ its own fetch. `widgetRun` reads a source through `sourceText` (static: its text
 workspace }`, `~` home, relative to its folder, `MAX_OUT`; URL: `fetch`, `SOURCE_WAIT` 30 s, its status said without
 the query) and `parsed` (JSON when it starts with `{` or `[`, else `{ text }`; a static text that doesn't parse is an
 error). A static pick is kept at once (`keep`), on or off. `needsSample` (widgetSchema.ts: a fetch, a script, a file
-or a URL) is `manifestCheck`'s and `widgetWrite`'s rule. Settings' `SourceField` on `WidgetCard`: *Data*, a segment
+or a URL) is `manifestCheck`'s and `widgetWrite`'s rule. `SourceField`, the page's Data tab: a segment
 per kind (its fetch only with `ownFetch`), the text, path or URL saved on blur.
 
 Laki commands (`widgetUi.ts` `DO`, a button's `do`, `doOf`: `data-do`, its JSON filled; `uiBehave` sends `{ laki:

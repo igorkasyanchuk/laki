@@ -34,7 +34,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 type Store = { source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
-type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta> } // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
+type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
 // scope workspace: an instance per live workspace, its data in <data>/widget-data/<id>/ws/<wsId>.json (the settings stay
 // the store's, shared); in memory its last fetch and its button's words
 type Inst = { data?: unknown; at?: number; error?: string; mock?: string }
@@ -296,7 +296,7 @@ export function scanWidgets() {
       }
       if (typeof m === 'string') continue
       const { data, ...s } = readStore(id)
-      const e: Entry = { id, dir: d, file, builtin: !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s, inst: new Map() }
+      const e: Entry = { id, dir: d, file, builtin: !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s, inst: new Map(), fixtures: file ? [] : fixtureNames(d).map(n => n.slice(0, -5)) }
       e.face = faceOf(e, data)
       if (scoped(e)) e.inst = instsOf(id, e)
       widgets.set(id, e)
@@ -465,6 +465,7 @@ export const widgetsView = (): WidgetView[] =>
     devError: w.devError,
     mock: w.s.mock,
     sample: w.m.sample !== undefined || (!fetches(w) && w.m.sampleConfig !== undefined) || undefined, // a preview with made-up data
+    fixtures: w.fixtures.length ? w.fixtures : undefined, // more of it: widgetRender's sample by name
     rev,
     ...((placesOf(w).every(p => BUTTON_PLACES.includes(p)) || !w.preview) && { button: true }), // a tile elsewhere: its preview
     icon: iconOf(w),
@@ -495,8 +496,18 @@ function find(id: string) {
 // whole page (pageOf), for a frame. widget.html's view, else its ui's (the UI kit's HTML for the cells it shows in:
 // across, down, ½ a bar's line)
 // sample: with widget.json's made-up data (and sampleConfig over its settings), as it would look; sample in the context
-export function widgetRender(o: { id: string; full?: boolean; vars?: Record<string, string>; sample?: boolean; cells?: [number, number]; ws?: string }) {
+export function widgetRender(o: { id: string; full?: boolean; vars?: Record<string, string>; sample?: boolean | string; cells?: [number, number]; ws?: string }) {
   const w = find(o.id)
+  // sample: widget.json's, or a fixture's by its name (fixtures/<name>.json: busy, empty…)
+  let made: unknown = w.m.sample
+  if (typeof o.sample === 'string') {
+    if (!fixturesOf(w).includes(o.sample)) throw new Error(`${w.m.name || w.id} has no fixtures/${o.sample}.json`)
+    try {
+      made = JSON.parse(readFileSync(join(w.dir, 'fixtures', `${o.sample}.json`), 'utf8'))
+    } catch (e) {
+      throw new Error(`fixtures/${o.sample}.json: ${(e as Error).message}`)
+    }
+  }
   const x = o.sample && scoped(w) && !o.ws ? undefined : wsOf(w, o.ws) // a sample: a made-up workspace, unless one's named
   const file = w.file ? '' : htmlOf(w.dir)
   const own = file ? viewOf(file, !!o.full) : undefined // no widget.html: ui's, or no view
@@ -507,7 +518,7 @@ export function widgetRender(o: { id: string; full?: boolean; vars?: Record<stri
   const sc = w.m.sampleConfig && typeof w.m.sampleConfig === 'object' && !Array.isArray(w.m.sampleConfig) ? w.m.sampleConfig : {}
   const workspace = x ? wsInfo(x) : scoped(w) ? SAMPLE_WS : undefined
   const ctx = o.sample
-    ? { data: w.m.sample ?? typedData(w), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
+    ? { data: made ?? typedData(w), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
     : { data: s.data ?? typedData(w), config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace }
   const cells = Array.isArray(o.cells) ? (o.cells.map(Number) as [number, number]) : undefined
   const body = fromUi ? uiHtml(w.m.ui, ctx, { full: !!o.full, cells: cells ?? (o.full ? undefined : sizeOf(w)) }) : render(own!, ctx)
@@ -529,7 +540,7 @@ export function widgetPage(id: string, query: URLSearchParams): { code: number; 
       vars = JSON.parse(query.get('theme') || '{}')
     } catch {}
     const cells = /^(\d)x(\d(?:\.5)?)$/.exec(query.get('cells') ?? '')
-    html = widgetRender({ id, full: query.get('full') === '1', sample: query.get('sample') === '1', vars: vars && typeof vars === 'object' ? vars : {}, cells: cells ? [Number(cells[1]), Number(cells[2])] : undefined, ws: query.get('ws') || undefined })
+    html = widgetRender({ id, full: query.get('full') === '1', sample: (v => (v === '1' ? true : v || undefined))(query.get('sample')), vars: vars && typeof vars === 'object' ? vars : {}, cells: cells ? [Number(cells[1]), Number(cells[2])] : undefined, ws: query.get('ws') || undefined })
   } catch (e) {
     html = `<!doctype html><p style="color:#f7768e;font:12px system-ui">${String((e as Error).message).replace(/[&<>]/g, '')}</p>`
   }
@@ -1192,6 +1203,42 @@ export function widgetFiles(o: { id: string }) {
     files[n] = !buf ? '(over 64 KB: not shown)' : buf.includes(0) ? '(binary: not shown)' : buf.toString('utf8')
   }
   return { id: w.id, builtin: w.builtin || undefined, files }
+}
+
+// the inspector's Files, edited by hand: one of the files widgetFiles lists, written in place (its mode stays). was: the
+// text the edit started from (changed meanwhile: refused unless force); a .json one must parse (widget.json: an object),
+// so a slip doesn't take the extension away. Not one that comes with Laki (an update would undo it: Remix makes a copy);
+// one of Laki's folder is kept for the studio's Undo first. Read again at once (a dev one: its watch does it)
+export function widgetFileSave(o: { id: string; path: string; text: string; was?: string; force?: boolean }) {
+  const w = find(o.id)
+  if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: Remix it to change a copy`)
+  const names = w.file ? [w.file] : [...filesIn(w.dir), ...fixturesOf(w).map(f => `fixtures/${f}.json`)]
+  if (typeof o.path !== 'string' || !names.includes(o.path)) throw new Error(`${o.path}: not one of its files`)
+  if (typeof o.text !== 'string' || o.text.length > 256 << 10) throw new Error('its text, up to 256 KB')
+  if (o.path.startsWith('fixtures/') && !statOf(join(w.dir, 'fixtures'))?.isDirectory()) throw new Error('fixtures is a link there')
+  const p = join(w.dir, o.path)
+  if (!statOf(p)?.isFile()) throw new Error(`${o.path} is a link or a folder there`)
+  const buf = readFileSync(p)
+  if (buf.length > 64 << 10 || buf.includes(0)) throw new Error(`${o.path} is over 64 KB or not text: open its folder to edit it`)
+  if (!o.force && typeof o.was === 'string' && buf.toString('utf8') !== o.was) throw new Error(`${o.path} changed since you opened it`)
+  if (/\.json$/i.test(o.path)) {
+    let j: unknown
+    try {
+      j = JSON.parse(o.text)
+    } catch (e) {
+      throw new Error(`${o.path}: not JSON: ${(e as Error).message}`)
+    }
+    if (o.path === 'widget.json' && (!j || typeof j !== 'object' || Array.isArray(j))) throw new Error('widget.json: an object')
+  }
+  if (w.dir === join(widgetHome(), w.id)) snapshot(w.id, w.dir)
+  writeFileSync(p, o.text)
+  wLog(w, `edited by hand: ${o.path}`)
+  if (!w.dev) {
+    scanWidgets()
+    const now = widgets.get(w.id)
+    if (now) refetch(now, 'reload', `${o.path} edited`)
+  }
+  return widgetsView().find(x => x.id === w.id)
 }
 
 // an extension made or changed by Laki AI or an MCP client (laki_extension_write): its files in Laki's own folder only

@@ -84,8 +84,10 @@ export const widgetFormat = () => `## widget.json
 
 ## Fixtures and the check
 
-- Write \`fixtures/sample.json\` (the sample, as its fetch would print it) and \`fixtures/empty.json\` (nothing to show):
-  its page's Data tab shows each, and the check fits the ui to each.
+- Write \`fixtures/sample.json\` (the sample, as its fetch would print it), \`fixtures/empty.json\` (nothing to show)
+  and, when its data can vary, three more made-up variants a person would want to see it with (\`fixtures/busy.json\`:
+  a lot of it; a quiet or all-good one; an odd one: a long title, a huge number, a failure): its preview's Sample ▾ and
+  its Data tab show each, and the check fits the ui to each.
 - After every write, check it (\`laki_extension_check\`, or \`laki widget check <id> --no-run\`) and fix every ✗ before
   you answer; a ! is a hint (a field no row has, an icon it doesn't know).
 - \`"$schema": "${WIDGET_SCHEMA_URL}"\` in widget.json lets an

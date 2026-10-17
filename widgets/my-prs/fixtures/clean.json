@@ -1,0 +1,83 @@
+{
+  "stats": [
+    {
+      "name": "open",
+      "n": 3
+    },
+    {
+      "name": "drafts",
+      "n": 0
+    },
+    {
+      "name": "conflicts",
+      "n": 0,
+      "bad": false
+    },
+    {
+      "name": "bug",
+      "n": 1,
+      "color": "d73a4a"
+    }
+  ],
+  "groups": [
+    {
+      "name": "Approved",
+      "prs": [
+        {
+          "number": 450,
+          "title": "Show tax in the cart",
+          "url": "https://github.com/acme/web/pull/450",
+          "createdAt": "2026-10-13T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "feature",
+              "color": "0e8a16"
+            }
+          ],
+          "ci": "passing",
+          "approved": true,
+          "changes": false,
+          "conflict": false
+        },
+        {
+          "number": 451,
+          "title": "Fix the date picker on Safari",
+          "url": "https://github.com/acme/web/pull/451",
+          "createdAt": "2026-10-14T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [
+            {
+              "name": "bug",
+              "color": "d73a4a"
+            }
+          ],
+          "ci": "passing",
+          "approved": true,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    },
+    {
+      "name": "In review",
+      "prs": [
+        {
+          "number": 452,
+          "title": "Retry webhooks with backoff",
+          "url": "https://github.com/acme/web/pull/452",
+          "createdAt": "2026-10-15T10:00:00Z",
+          "draft": false,
+          "author": "you",
+          "labels": [],
+          "ci": "passing",
+          "approved": false,
+          "changes": false,
+          "conflict": false
+        }
+      ]
+    }
+  ]
+}

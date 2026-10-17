@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Edit an extension in Laki**: its page's Files tab edits its files (⌘S saves; JSON is checked, it reloads at once),
+  and *Edit* in its head goes to its settings. The Data tab has where its data comes from, its data and its examples;
+  the preview's *Sample* picks one of them. Every starter, and My PRs, comes with three more made-up variants.
 - **More for extensions**: pick where one's data comes from on its card: its fetch, a text you type (JSON, or a
   Markdown note), a file or a URL. The UI kit gets headers, footers, toolbars, callouts, icons, gauges, heatmaps,
   status lists, checklists, avatars and cards; charts as stacked or horizontal bars, pie, donut and scatter; colors from
