@@ -592,7 +592,7 @@ async function call(name: string, args: unknown) {
   if (!tool && name.startsWith('ext_')) {
     const t = (await extTools()).find(x => extName(x) === name)
     if (!t) throw new Error(`no tool ${name}: its extension is off, or Laki isn't running`)
-    return extCall(own, t.tool, args ?? {}, process.env.LAKI_WORKSPACE || undefined)
+    return extCall(own, t.tool, args ?? {}, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined)
   }
   if (!tool) throw new Error(`no tool ${name}`)
   await (daemon ??= ensureDaemon().catch(e => ((daemon = undefined), Promise.reject(e))))

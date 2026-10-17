@@ -73,7 +73,7 @@ export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: str
     if (w && rev.current !== w.rev) (rev.current = w.rev), setLive(false)
   }, [w?.rev])
   useEffect(() => {
-    if (!w || live || w.scope) return
+    if (!w || live || w.scope || w.on) return // one that's on shows its live data: a mock would stay in the sidebar
     cfg.mock?.(w.id, { fixture: 'sample' }).then(
       () => setNoFixture(false),
       () => setNoFixture(true),
@@ -392,7 +392,8 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
       e => (setErr(String(e?.message ?? e)), setBusy(false)),
     )
   }
-  const turnOn = () => void cfg.set(w.id, { on: true }).then(() => onOn(stay), e => setErr(String(e?.message ?? e)))
+  // on: the studio's sample data off too (a mock would keep it from fetching), so it fetches now
+  const turnOn = () => void cfg.set(w.id, { on: true }).then(() => (w.mock ? cfg.mock?.(w.id, { off: true }) : undefined)).then(() => onOn(stay), e => setErr(String(e?.message ?? e)))
   return (
     <Modal title={on ? `Turn on ${w.name}?` : `Try ${w.name} live?`} onClose={onClose}>
       <p className="muted small">{on ? 'From now on Laki runs this on its schedule, and its buttons run their commands, as you on this Mac.' : 'Its fetch runs once, now, as you on this Mac: the preview then shows what it really prints. Nothing else runs.'}</p>
