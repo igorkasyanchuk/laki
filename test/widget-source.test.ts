@@ -41,6 +41,11 @@ test('sources: static, file and URL, each JSON or { text }; its fetch again; wid
   w = await find(rig, 'n')
   assert.match(w.error, /not JSON/)
   assert.match(await rig.rpc('widgetRender', { id: 'n' }), /n=7/, 'the last good data stays')
+  // a note that starts with a link is words, not broken JSON
+  await rig.rpc('widgetSet', { id: 'note', source: { kind: 'static', text: '[Runbook](https://x.dev) first' } })
+  assert.equal((await find(rig, 'note')).error, undefined)
+  assert.match(await rig.rpc('widgetRender', { id: 'note' }), /href="https:\/\/x.dev"/)
+  await rig.rpc('widgetSet', { id: 'note', source: null })
 
   // a file, read as it fetches: relative to its folder, ~ is home; words are { text }
   await rig.rpc('widgetSet', { id: 'n', on: true })

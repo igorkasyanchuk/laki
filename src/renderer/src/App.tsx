@@ -1240,7 +1240,10 @@ export function App() {
   const widgetDo = async (w: WidgetView, c: UiDo, label?: string) => {
     if (!w.on) return toast(`${w.name} is off: turn it on first`) // as its actions: an off one does nothing
     const by = `${w.name}${label ? ` › ${label}` : ''} asks`
-    const shown = (t: string) => `“${t.length > 600 ? `${t.slice(0, 600)}…` : t}”`
+    const shown = (t: string) => `“${t}”` // all of it: the dialog scrolls, and a cut could hide what runs
+    const unseen = /[\u0000-\u0008\u000b-\u001f\u007f\u202a-\u202e\u2066-\u2069]/ // control and direction characters: ⌃U would hide a line's start
+    const bad = [c.prompt, c.command].find(t => typeof t === 'string' && (t.length > 4000 || unseen.test(t)))
+    if (bad !== undefined) return toast(`${w.name}: its ${c.command === bad ? 'command' : 'prompt'} is too long or has characters the dialog can't show`)
     const here = w.here ? view?.workspaces.find(x => x.id === w.here) : ws
     const prompt = String(c.prompt ?? '').trim()
     if (c.do === 'browse') {

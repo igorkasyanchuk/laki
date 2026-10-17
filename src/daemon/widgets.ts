@@ -65,6 +65,8 @@ export function sourceOk(v: unknown): WidgetSource | undefined {
   return { kind, ...(key && { [key]: key === 'text' ? val : val.trim() }) }
 }
 const SOURCE_MAX: Record<string, number> = { text: 64 << 10, path: 1024, url: 2048 }
+// a typed-in text's own data: what it shows before anything's fetched and kept
+const typedData = (w: Entry) => (src => (src.kind === 'static' ? parsed(src.text ?? '', 'static').data : undefined))(sourceOf(w))
 const sourceOf = (w: Entry): WidgetSource => w.s.source ?? sourceOk(w.m.source) ?? { kind: 'fetch' }
 const ownFetch = (w: Entry) => !!(w.m.fetch || w.m.script)
 const fetches = (w: Entry) => sourceOf(w).kind !== 'fetch' || ownFetch(w)
@@ -362,6 +364,7 @@ const plain = (html: string) =>
     .trim()
 function faceOf(w: Entry, data: unknown, ws?: string, meta: Omit<Inst, 'data'> = ws ? (w.inst.get(ws) ?? {}) : w.s): Face {
   const x = ws ? state.workspaces.find(v => v.id === ws) : undefined
+  data ??= typedData(w)
   const ctx = { ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}), data, config: typedOf(w), at: meta.at, error: meta.error, workspace: x && wsInfo(x) } // {{open}} as {{data.open}}
   const fill = (t: unknown, n: number) => {
     if (typeof t !== 'string' || !t.trim()) return undefined
@@ -503,10 +506,9 @@ export function widgetRender(o: { id: string; full?: boolean; vars?: Record<stri
   const s = dataOf(w, x?.id)
   const sc = w.m.sampleConfig && typeof w.m.sampleConfig === 'object' && !Array.isArray(w.m.sampleConfig) ? w.m.sampleConfig : {}
   const workspace = x ? wsInfo(x) : scoped(w) ? SAMPLE_WS : undefined
-  const typed = () => (src => (src.kind === 'static' ? parsed(src.text ?? '', 'static').data : undefined))(sourceOf(w)) // a typed-in text: its own data, before any fetch
   const ctx = o.sample
-    ? { data: w.m.sample ?? typed(), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
-    : { data: s.data ?? typed(), config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace }
+    ? { data: w.m.sample ?? typedData(w), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
+    : { data: s.data ?? typedData(w), config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace }
   const cells = Array.isArray(o.cells) ? (o.cells.map(Number) as [number, number]) : undefined
   const body = fromUi ? uiHtml(w.m.ui, ctx, { full: !!o.full, cells: cells ?? (o.full ? undefined : sizeOf(w)) }) : render(own!, ctx)
   return hasScript(file) ? pageOf(body, ctx, o.vars) : body // as the app shows it (js): a script in either view makes both pages
@@ -807,7 +809,7 @@ async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
 // what a source gave as data: JSON (an object or a list), else the words as { text }
 function parsed(out: string, kind: WidgetSource['kind']): { data?: unknown; error?: string } {
   const t = out.trim()
-  if (/^[[{]/.test(t))
+  if (/^\{|^\[[\s\S]*\]$/.test(t)) // JSON's shape: a note that starts with [a link](…) is words
     try {
       return { data: JSON.parse(t) }
     } catch (e) {
@@ -1605,7 +1607,7 @@ async function checkOne(x: Source, run: boolean, ws?: string): Promise<UiProblem
     else if (statSync(agents).size > 4096) say('warn', 'AGENTS.md', 'over 4 KB: agents get its first 4 KB')
   }
   if (m.scope === 'workspace') {
-    const texts = [m.fetch, JSON.stringify(ui ?? ''), html, ...(x.file ? [readFileSync(join(x.d, x.file), 'utf8')] : filesIn(x.d).filter(n => /\.(sh|bash|zsh|py|rb|m?js|ts)$/.test(n)).map(n => (statSync(join(x.d, n)).size < 64 << 10 ? readFileSync(join(x.d, n), 'utf8') : '')))]
+    const texts = [m.fetch, JSON.stringify(ui ?? ''), JSON.stringify(m.source ?? ''), html, ...(x.file ? [readFileSync(join(x.d, x.file), 'utf8')] : filesIn(x.d).filter(n => /\.(sh|bash|zsh|py|rb|m?js|ts)$/.test(n)).map(n => (statSync(join(x.d, n)).size < 64 << 10 ? readFileSync(join(x.d, n), 'utf8') : '')))]
     if (!texts.some(t => typeof t === 'string' && WS_USE.test(t))) say('warn', head, 'per workspace, but its fetch and ui use nothing of the workspace ($LAKI_BRANCH, $PORT, {{workspace.branch}}…): "scope": "global"?')
   }
   if (run && (m.fetch || m.script || sourceOk(m.source) || widgets.get(id)?.s.source)) {
