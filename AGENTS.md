@@ -99,7 +99,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
 a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`); 77: the studio (`widgetSlug`, `widgetUndo`, `widgetRemix`, `widgetRun` `once`, a widget's `history`, the `widget:<id>` chat); 78: a widget's `source` and `ownFetch`, `widgetSet`
 `source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts; 79: `widgetFileSave`, `widgetRender`
-`sample` as a fixture's name, a widget's `fixtures`. A
+`sample` as a fixture's name, a widget's `fixtures`; 80: an AI source (`widgetSet` `source` `ai`), settings' `widgetAgent`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1013,8 +1013,10 @@ embeds `String(uiBehave)`): +N more, `data-run` (`data-arg`, `data-confirm`, `da
 fields as JSON), `data-copy`, links, `data-open`, `data-laki`, `data-filter`, else a click opens the full view;
 `Widgets.tsx` `act` asks a confirm (`ask`) and copies through the app. A JS page's `laki.ui(spec, data)` /
 `laki.mount(el, …)` post `{ laki: 'ui', req }`, answered with `uiHtml` before the click checks (it only computes HTML).
-`UiKit.tsx` `UiKitPage` (App's dialog `{ uikit, back }`, Settings › Extensions › *UI kit*): a card per sample at 1×1,
-3×1, 3×2 or full and as a status bar item, its JSON to copy. Tested in `test/widget-ui.test.ts`.
+`UiKit.tsx` `UiKitPage` (App's dialog `{ uikit, icons, back }`, Settings › Extensions › *UI kit* and *Icons*): a card per sample at 1×1,
+3×1, 3×2 or full and as a status bar item, its JSON to copy; *Icons* (`IconGallery`): every `ICONS` name, a filter
+(`wordsOf`: ciFail is "ci fail"), a click picks it and copies its name, the picked one at four sizes, in each tone, and
+as JSON (the icon element, a button, the rail); the CLI's `laki widget kit icons`. Tested in `test/widget-ui.test.ts`.
 
 Dev mode (`laki widget dev`, the CLI's `dev`: `widgetDev` `folder`, then `widgetRuns` every 500 ms, a line per new run
 and each `devError` change; `off`, `list`): `settings.widgetDev` (`SETTINGS_KEPT`; `settingsSet` rescans as it changes,
@@ -1117,6 +1119,30 @@ the query) and `parsed` (JSON when it starts with `{` or `[`, else `{ text }`; a
 error). A static pick is kept at once (`keep`), on or off. `needsSample` (widgetSchema.ts: a fetch, a script, a file
 or a URL) is `manifestCheck`'s and `widgetWrite`'s rule. `SourceField`, the page's Data tab: a segment
 per kind (its fetch only with `ownFetch`), the text, path or URL saved on blur.
+An AI source (`ai`: `prompt` 16 KB, `tools` claude's names, never one starting with `-`, `profile`): `sourceText` fills
+the prompt like a path, `agentOf` (its `profile`, refused when gone; else `settings.widgetAgent`, Settings › Extensions'
+*Agent profile*, `extAgent`; else the first claude preset; else plain claude), then `ai.ts` `aiOnce` `preset`: that
+preset's model, effort, env and account with the user's own config (claude `-p --output-format json --allowedTools
+<tools>`, no `--tools ''`; codex `exec` without `--ignore-user-config`, read-only), 10 minutes, its own `own` row, a line
+in `ai-calls.jsonl` (`extension <id>: …`); `aiSystem` tells it to change nothing and answer in `sample`'s shape; the last
+```json block is the data (none: `{ text }`). `everyOf`: `AI_SOURCE_EVERY` (60) unless set, 15 at least; `widgetCheck`
+doesn't run one. The studio's Try/Turn on sheet shows its prompt and tools instead of the fetch.
+An AI action (`widgetSchema.ts` `aiActOf`: `{ ai, tools, profile }`, no `run`): `widgetAction`'s `aiAnswer` fills the
+prompt over `{ arg, config, data, …data, workspace }`, `aiOnce` as a source's, `lastJson` for its JSON (`toast`, `modal`,
+`data` as a command's), else its words as a `modal`; no `soon` after it; never an event's handler (`ev`: refused, and
+`manifestCheck` says so: each run costs). `TOOLS_BAD`: claude's tools go as one argument, refused only when it starts with
+`-` (an option of claude's). `notify` (widget.json): `keep` renders it
+(`faceOf`'s `one`) over the data it keeps with a new `at`, not a mock (nor one let go of: Live); a text not `told` before (the store's or instance's) is
+broadcast as `widget-say` `notify` (App: a notification, its click the full view or the page, and a toast), `told` kept
+(empty clears it). Tested in `test/widget-source.test.ts`.
+Settings › Extensions: the UI kit first (`.kit-hero`), New ▾ *With Laki AI…* or *From a starter…* (UiKit.tsx'
+`StarterPicker`: each starter's `files` drawn by `KitBody` on its sample, a rail button as one, one file's head, a JS
+page's note). Desk's resize (`resize`): the size from the pointer over the tile now (`dx`, `dy`: where on its corner),
+the grid's `minHeight` held meanwhile (a shrinking bottom tile would scroll the page up under the pointer), its scroller's
+`scroll` counted, its edges scroll it (`edge`, rAF). The Picker: `data-widget`/`data-view`/`data-sample` on an
+extension's body, frame and buttons (Widgets.tsx), a shadow root's own `elementsFromPoint`, `extOf` (its id, view, the
+kit's element by its root's class, `kitOf` from `UI_SAMPLES`, places, size, source, folder) in the dialog and
+`pickedText`. The studio's preview has a Desk tab (its full view, else its preview, as a tile).
 
 Laki commands (`widgetUi.ts` `DO`, a button's `do`, `doOf`: `data-do`, its JSON filled; `uiBehave` sends `{ laki:
 'do', cmd, label }`, a JS page's `laki.do`): Widgets.tsx' `act` hands it to `WidgetApi.do`, App's `widgetDo`: `browse`
@@ -1130,7 +1156,13 @@ Colors and charts: `colorCss` (a tone's var, the palette's `var(--tc-<name>, <fa
 a template, `at`'s `color` (a style `color`); Widgets.tsx' `VARS` pass `--tc-*` to a JS page. `chart`: `CHARTS`, pie and
 donut as `pathLength` circles, hbars as HTML rows (`data-rows`, *+N more*), stacked, scatter as HTML dots, `PALETTE`,
 `legendOf`. The other new elements: header, footer, toolbar (`button` `bare`), spacer, callout (`CALLOUT` icons),
-icon (`SIZE`), gauge, heatmap (`level`), status (`STATE` words), checklist, avatars, card. `UI_EXAMPLES`: the UI kit
+icon (`SIZE`), gauge, heatmap (`level`), status (`STATE` words), checklist, avatars, card; then quote, diff (each line's
+kind: file, hunk, added, removed; the counts), countdown (`howLong`, warn within `soon` hours; its words as of the
+render), steps (`STEP` words to done, now, fail, skip, todo; vertical in a narrow cell), meter (parts of `max` or their
+sum, `legendOf`), board (columns by `column`, `columns` first even empty; `cap` per column), tree (`nested`, `open`
+levels, a node's own fields only), log (the newest `cap` lines, `levelTone` by its word or the line's, `clock`), json
+(`jsonHtml`: folding, 3000 nodes, one line in a bar) and toggle (`role="switch"`, `data-run` with `data-arg` on/off;
+`uiCheck` checks its run). `UI_EXAMPLES`: the UI kit
 page's Examples (`UiKit.tsx` `KitCard`), the guide's examples (`widgetGuide.ts` `examples`); `UI_SAMPLES` stays one
 per element. The app's CSP takes `img-src https:` (the kit's images, Markdown's pictures). The guide tool's `max`:
 40,000. Starters `note` (a static source) and `launcher` (`do` buttons).
@@ -1599,13 +1631,19 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   this day*). App.tsx passes a `CalendarApi`.
 - **`Desk.tsx`**: Desk (experimental, `settings.desk`; the rail's Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
   among their `places` as tiles in a 12-column grid (`DESK_COLS`, rows `DESK_ROW`), `settings.deskTiles` their order and
-  sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last): a head dragged onto another tile puts it
+  sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
+  `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;
+  the tab bar (`.desk-tabs`, shown once there's a tile or a tab): + (`addTab`, its name typed at once), a double-click
+  renames, a right click (`tabMenu`) moves it or removes it (its tiles to the first of the others, in one `save`), a
+  head dropped on a tab moves the tile there (`moveTo`: last), a tile's ⋯ › *Move to tab* too (or *A new tab*); Add
+  puts one on the tab shown; *Fetch* only that tab's. A head dragged onto another tile puts it
   before it (HTML5 drag), the corner resizes it (pointer, snapped to cells); a tile shows the full view when there is
   one (`WidgetBody` `full`), else the preview; Add: the others, turned on with `desk` added; *Take it off*: its only
   place goes to `side`, off. Laki AI's off ones placed here show too (`byAi`), dashed, with their sample and
   `.desk-off` (*Look*: its page, *Turn on*). *Build with AI* (`DeskApi.build`, App: the floating chat, or the AI page
-  with `ai.float` false; `widgetAsk(want, true)`: `place: desk`); `whereNow` names the Desk's tiles by id. `pending`:
-  the tiles just saved, shown until the settings bring them back.
+  with `ai.float` false; `widgetAsk(want, true)`: `place: desk`); `whereNow` names the Desk's tiles by id. `pending`
+  (and `pendingTabs`): the tiles and tabs just saved (`DeskApi.save`, one `settingsSet`), shown until the settings
+  bring them back.
 - **`Picker.tsx`**: development mode's element picker (the rail's *Pick*, `data-rail="picker"`, else the side head's
   crosshair beside Help; `settings.pickerKey`, unset: `PICKER_KEY` ⇧⌘C, '' none, App's capture-phase keys (`keyLabel`)
   before everything, so over dialogs too; Settings' `KeyField` records it; `settings.devMode`): a

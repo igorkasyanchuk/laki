@@ -10,10 +10,10 @@ import type { UiProblem } from '../../shared/widgetUi'
 import { STARTER_KINDS, STARTERS } from '../../shared/widgetStarters'
 import { Message, Tools, turns } from './Ai'
 import { api as daemon, bridge } from './api'
-import { CELLS, Check, half, Inspector, WHERE } from './Extension'
+import { CELLS, Check, DeskTile, half, Inspector, WHERE } from './Extension'
 import { Modal } from './panels'
 import { type Img, PromptInput } from './PromptInput'
-import type { WidgetsApi } from './Settings'
+import { extAgent, type WidgetsApi } from './Settings'
 import { escapes, Icon, Page, Switch } from './ui'
 import { CellButton, inWs, type WidgetApi, WidgetBody } from './Widgets'
 
@@ -32,6 +32,7 @@ const SHOWN: [string, string][] = [
   ['top', 'Top bar'],
   ['status', 'Status bar'],
   ['button', 'Button'],
+  ['desk', 'Desk'],
 ]
 const same = (t: string) => t
 
@@ -43,7 +44,7 @@ function runsOf(files: Record<string, string>): Runs {
     m = JSON.parse(files['widget.json'] ?? '{}')
   } catch {}
   const one = !files['widget.json'] ? Object.entries(files)[0] : undefined // a one-file extension: the file is it
-  const acts = Object.entries(m.actions && typeof m.actions === 'object' ? m.actions : {}).map(([k, v]: [string, any]) => [k, typeof v === 'string' ? v : String(v?.run ?? '')] as [string, string])
+  const acts = Object.entries(m.actions && typeof m.actions === 'object' ? m.actions : {}).map(([k, v]: [string, any]) => [k, typeof v === 'string' ? v : typeof v?.ai === 'string' && v.run === undefined ? `an agent answers: ${v.ai}${v.tools ? ` (may use unasked: ${v.tools})` : ''}` : String(v?.run ?? '')] as [string, string])
   return { fetch: typeof m.fetch === 'string' ? m.fetch : undefined, script: m.script ? [m.script, files[m.script] ?? '(not found)'] : one, actions: acts, stream: m.stream === true }
 }
 
@@ -320,7 +321,7 @@ function StudioChat({ chat, w, mine, ask, undo, err }: { chat: string; w?: Widge
 // the preview: where it shows (a place to look at, its own not changed), its size there, the full view
 function StudioPreview({ w, api, sample }: { w: WidgetView; api: WidgetApi; sample: boolean }) {
   const first = placesOf(w)[0] ?? 'side'
-  const [where, setWhere] = useState(w.button || first === 'rail' || first === 'foot' ? 'button' : first === 'desk' ? 'side' : first)
+  const [where, setWhere] = useState(w.button || first === 'rail' || first === 'foot' ? 'button' : first)
   const [cell, setCell] = useState<[number, number]>(w.size)
   const bar = where === 'top' || where === 'status'
   return (
@@ -350,13 +351,15 @@ function StudioPreview({ w, api, sample }: { w: WidgetView; api: WidgetApi; samp
           <div className="ext-button">
             <CellButton w={w} api={api} />
           </div>
+        ) : where === 'desk' ? (
+          <DeskTile w={w} api={api} sample={sample} />
         ) : (
           <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : { width: cell[0] * 92, height: cell[1] * 64 }}>
             <WidgetBody key={`${sample}${where}`} w={w} full={false} api={api} sample={sample} cells={bar ? [w.size[0], 0.5] : cell} />
           </div>
         )}
       </div>
-      {w.full && (
+      {w.full && where !== 'desk' && (
         <>
           <div className="ext-card-head sub">
             <b>Full view</b>
@@ -378,6 +381,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [stay, setStay] = useState(false)
+  const ai = w.source?.kind === 'ai' ? w.source : undefined // an agent runs, not its fetch
   useEffect(() => {
     daemon.call<{ files: Record<string, string> }>('widgetFiles', { id: w.id }).then(
       x => setR(runsOf(x.files)),
@@ -401,7 +405,13 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
         <p className="muted small">{err || 'Reading its files…'}</p>
       ) : (
         <div className="studio-runs">
-          {r.fetch && (
+          {ai && (
+            <>
+              <b className="small">An agent, {ai.profile || extAgent(cfg)}, with your MCP servers{ai.tools ? `; it may use unasked: ${ai.tools}` : ''}</b>
+              <pre className="mono">{ai.prompt}</pre>
+            </>
+          )}
+          {r.fetch && !ai && (
             <>
               <b className="small">Its fetch{r.stream ? ' (a stream: runs all along once on)' : ''}</b>
               <pre className="mono">{r.fetch}</pre>
@@ -423,7 +433,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
               ))}
             </>
           )}
-          {!r.fetch && !r.script && !r.actions.length && <p className="muted small">It runs nothing: what it shows is its own page.</p>}
+          {!r.fetch && !r.script && !ai && !r.actions.length && <p className="muted small">It runs nothing: what it shows is its own page.</p>}
           {w.js && (
             <Switch className="switch-row" on={!!w.net} onChange={net => void cfg.set(w.id, { net })}>
               <span>Network access: its page may fetch() from https sites</span>
@@ -434,7 +444,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
       {err && r && <div className="ai-err">{err}</div>}
       <div className="studio-btns">
         {on && (
-          <label className="small grow">
+          <label className="ask-check small grow">
             <input type="checkbox" checked={stay} onChange={e => setStay(e.target.checked)} /> Stay in the studio
           </label>
         )}

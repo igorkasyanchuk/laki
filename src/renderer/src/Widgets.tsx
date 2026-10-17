@@ -152,7 +152,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
   // the host stays mounted under an error: the next render (a fixed template, a reload) draws into it again
   return (
     <>
-      {w.js && !none ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" /> : <div ref={host} className="widget-body" />}
+      {w.js && !none ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" data-widget={w.id} data-view={full ? 'full' : 'preview'} data-sample={sample ? '' : undefined} /> : <div ref={host} className="widget-body" data-widget={w.id} data-view={full ? 'full' : 'preview'} data-sample={sample ? '' : undefined} />}
       {err && <div className="widget-msg warn small">{err}</div>}
     </>
   )
@@ -190,7 +190,7 @@ function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
 // a button widget in a cell (the sidebar's grid, a bar): its icon, label and badge across the cell
 export function CellButton({ w, api }: { w: WidgetView; api: WidgetApi }) {
   return (
-    <button className="widget-button" onClick={() => click(w, api)}>
+    <button className="widget-button" data-widget={w.id} data-view="button" onClick={() => click(w, api)}>
       <Glyph w={w} />
       <span className="widget-button-label">{w.label ?? w.name}</span>
       {w.badge && <span className="widget-badge">{w.badge}</span>}
@@ -205,7 +205,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
   return on.map(w => {
     const dot = w.running ? 'rail-dot' : w.error ? 'rail-dot bad' : ''
     return look === 'rail' ? (
-      <button key={`widget:${w.id}`} type="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
         <span className="rail-icon">
           <Glyph w={w} size={18} />
           {w.badge ? <span className="rail-count">{w.badge}</span> : dot && <span className={dot} />}
@@ -213,7 +213,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
         {words && <span className="rail-label">{w.label ?? w.name}</span>}
       </button>
     ) : (
-      <button key={`widget:${w.id}`} type="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''} ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+      <button key={`widget:${w.id}`} type="button" data-widget={w.id} data-view="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''} ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
         <Glyph w={w} />
         {words && <span className="ib-label">{w.label ?? w.name}</span>}
         {w.badge && <span className="widget-badge">{w.badge}</span>}

@@ -4,6 +4,21 @@ version it builds, with the date. -->
 
 ## Next
 
+- **AI as an extension's data**: an extension's Data can be *AI*: an agent (Settings › Extensions › *Agent profile*,
+  claude or codex) finds it with your own MCP servers and sums it up, every hour: Slack's new messages, Linear's
+  tickets, anything an MCP server reaches. It's told to change nothing; each run shows in Laki AI's Calls.
+- **Agents in extensions' buttons, and notifications**: an action can be a prompt an agent answers (*Draft a reply*,
+  *Explain this failure*), its answer in a dialog; `notify` posts a notification when an extension's data says
+  something new (*3 new mentions*).
+- **New extension**: *With Laki AI*, or *From a starter*: every starter shown on its sample data. The UI kit is first
+  on Settings › Extensions (*Browse 49 elements*). The studio's preview has the Desk view too.
+- **Desk**: resizing a tile at the bottom of a scrolled Desk no longer jumps; dragging near the edge scrolls.
+- **Pick an element** (development mode) knows extensions: which one, its view, the UI kit's element, its data and folder.
+- **Ten more UI kit elements**: quote, diff, countdown, steps (a pipeline), meter (one bar in parts), board (cards in
+  columns), tree (rows that fold), log, json and toggle (a switch that runs an action). An example: a deploy.
+- **Icons**: Settings › Extensions › *Icons* shows every icon an extension can use, with a search; a click copies its
+  name (`laki widget kit icons` in a terminal).
+- **Desk tabs**: keep tiles apart in tabs; drag a tile's head onto a tab, or use its ⋯ › *Move to tab*.
 - **Edit an extension in Laki**: its page's Files tab edits its files (⌘S saves; JSON is checked, it reloads at once),
   and *Edit* in its head goes to its settings. The Data tab has where its data comes from, its data and its examples;
   the preview's *Sample* picks one of them. Every starter, and My PRs, comes with three more made-up variants.

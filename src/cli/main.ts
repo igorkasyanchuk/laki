@@ -11,6 +11,7 @@ import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
+import { ICONS } from '../shared/icons.ts'
 import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 
 const argv = process.argv.slice(2)
@@ -89,10 +90,12 @@ async function dev(folder?: string) {
 function kit(type?: string) {
   const kind = (k: unknown) => (Array.isArray(k) ? k.join('|') : String(k))
   const props = (t: UiType) => Object.entries(UI[t].props as Record<string, { kind: unknown; desc: string }>).map(([name, p]) => ({ name, kind: kind(p.kind), desc: p.desc }))
+  // every icon an extension can name: a button's, a row's, the icon element's (or any emoji)
+  if (type === 'icons') return out(Object.keys(ICONS), [`${Object.keys(ICONS).length} icons, by name (or any emoji): Settings › Extensions › Icons shows them`, '', ...Object.keys(ICONS).reduce<string[][]>((rows, n, i) => (i % 6 ? rows.at(-1)!.push(n) : rows.push([n]), rows), []).map(r => r.map(n => n.padEnd(16)).join('').trimEnd())].join('\n'))
   if (!type)
     return out(
       UI_SAMPLES.map(s => ({ type: s.type, group: s.group, blurb: s.blurb, props: props(s.type).map(p => p.name) })),
-      [`Laki's UI kit: widget.json's "ui", one element or { "preview": …, "full": … }. Each element takes ${Object.keys(COMMON).join(', ')} too.`, '', ...UI_SAMPLES.map(s => `${s.group.padEnd(8)} ${s.type.padEnd(10)} ${s.blurb}`), '', 'laki widget kit <element>: its props and a sample'].join('\n'),
+      [`Laki's UI kit: widget.json's "ui", one element or { "preview": …, "full": … }. Each element takes ${Object.keys(COMMON).join(', ')} too.`, '', ...UI_SAMPLES.map(s => `${s.group.padEnd(8)} ${s.type.padEnd(10)} ${s.blurb}`), '', 'laki widget kit <element>: its props and a sample; laki widget kit icons: every icon'].join('\n'),
     )
   const s = UI_SAMPLES.find(x => x.type === type)
   if (!s) throw new Error(`no element ${type}: ${Object.keys(UI).join(', ')}`)

@@ -5,8 +5,10 @@ import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
-import type { UiProblem } from '../../shared/widgetUi'
+import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
+import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
+import { ICONS } from '../../shared/icons'
+import { StarterPicker } from './UiKit'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge, openExternal } from './api'
@@ -172,6 +174,7 @@ export type AppSettings = Paint & {
   dockIcon?: string // the Dock's icon while Laki runs (dock.ts DOCK_ICONS; unset: the app's own)
   fun?: boolean // the sidebar foot's smiley, Meme (unset: on)
   widgetDirs?: string[] // folders of widgets, besides Laki's own
+  widgetAgent?: string // the claude or codex profile an AI source runs (unset: the first claude one)
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
   pickerKey?: string // the element picker's hotkey (unset: PICKER_KEY; '': none)
@@ -1786,13 +1789,15 @@ export type WidgetsApi = {
   home?: string // Laki's own widgets folder
   set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from
   desk?: boolean // Desk is on (experimental): a place too
+  agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
+  agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
   run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
   rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, for good (asked first here)
   reload: () => Promise<unknown>
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
   logs?: (id: string) => void // development mode's: its fetches and actions
-  kit?: () => void // the UI kit's page: its elements and their samples
+  kit?: (icons?: boolean) => void // the UI kit's page: its elements and their samples; icons: its icon gallery
   runs?: (id: string, ws?: string) => Promise<WidgetRuns> // the inspector's: its runs, env, fixtures
   mock?: (id: string, o: { data?: unknown; fixture?: string; off?: boolean; ws?: string }) => Promise<unknown> // sample data by hand, or Live again
   files?: (id: string) => Promise<Record<string, string>> // its folder's files: each one's text
@@ -1903,7 +1908,10 @@ const SOURCES: [WidgetSource['kind'], string, string][] = [
   ['static', 'Static', 'Text you type: JSON, or words (a note)'],
   ['file', 'File', 'A file of this Mac, read each time it fetches: JSON, or words'],
   ['url', 'URL', 'An http(s) address, read each time it fetches: JSON, or words'],
+  ['ai', 'AI', 'An agent finds it and sums it up, with your MCP servers (Slack, Linear…), on a schedule'],
 ]
+// Settings › Extensions' agent: the claude or codex profile an AI source runs, unless it names one
+export const extAgent = (api: WidgetsApi) => api.agent && api.agents?.some(a => a.name === api.agent) ? api.agent : (api.agents?.find(a => a.agent === 'claude')?.name ?? 'claude')
 // its page's Data tab shows it
 export function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const src = w.source!
@@ -1911,6 +1919,10 @@ export function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   useEffect(() => setPick(src.kind), [src.kind])
   const save = (s: WidgetSource) => void api.set(w.id, { source: s })
   const kinds = SOURCES.filter(([k]) => k !== 'fetch' || w.ownFetch)
+  const tools = useRef<HTMLInputElement>(null)
+  const profile = useRef<HTMLSelectElement>(null)
+  const ai = (prompt = src.prompt ?? ''): WidgetSource => ({ kind: 'ai', prompt, tools: tools.current?.value.trim() || undefined, profile: profile.current?.value || undefined })
+  const isAi = src.kind === 'ai'
   return (
     <div className="wc-src">
       <div className="row">
@@ -1925,6 +1937,26 @@ export function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
       </div>
       {pick === 'static' && <textarea key={`${w.id}:${src.text ?? ''}`} className="mono" rows={8} maxLength={65536} defaultValue={src.text ?? ''} placeholder={'{ "open": 3 }, or a note in Markdown'} spellCheck={false} onBlur={e => (src.kind !== 'static' ? e.target.value.trim() !== '' : e.target.value !== (src.text ?? '')) && save({ kind: 'static', text: e.target.value })} />}
       {pick === 'file' && <input key={`${w.id}:${src.path ?? ''}`} className="mono" defaultValue={src.path ?? ''} placeholder="~/notes/today.md, or {{workspace.path}}/TODO.md" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.path ?? '') && save({ kind: 'file', path: e.target.value.trim() })} />}
+      {pick === 'ai' && (
+        <>
+          <textarea key={`${w.id}:${src.prompt ?? ''}`} rows={5} maxLength={16384} defaultValue={isAi ? (src.prompt ?? '') : ''} placeholder="What's new in #eng on Slack since yesterday: decisions, questions for me, links. One line each." onBlur={e => (isAi ? e.target.value !== (src.prompt ?? '') : e.target.value.trim() !== '') && save(ai(e.target.value))} />
+          <div className="row wc-ai">
+            <label className="small" data-tip="Its model, effort, account and env: Settings › Agents & profiles">
+              Agent{' '}
+              <select ref={profile} key={`${w.id}:${src.profile ?? ''}`} defaultValue={isAi ? (src.profile ?? '') : ''} onChange={() => isAi && save(ai())}>
+                <option value="">{extAgent(api)} (Extensions' agent)</option>
+                {(api.agents ?? []).map(a => (
+                  <option key={a.name} value={a.name}>
+                    {a.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <input ref={tools} key={`${w.id}:${src.tools ?? ''}`} className="mono grow" defaultValue={isAi ? (src.tools ?? '') : ''} placeholder="claude's tools it may use unasked: mcp__slack, WebFetch" data-tip="Claude's tools by name, comma-separated; it's refused the others. Codex: its sandbox, read only" spellCheck={false} onKeyDown={enter} onBlur={e => isAi && e.target.value.trim() !== (src.tools ?? '') && save(ai())} />
+          </div>
+          <span className="muted small">Runs as you, with your own MCP servers{w.every ? `, every ${w.every} min while on` : ''}; it's told to change nothing. Each run costs: Laki AI's Calls lists them.</span>
+        </>
+      )}
       {pick === 'url' && <input key={`${w.id}:${src.url ?? ''}`} className="mono" type="url" defaultValue={src.url ?? ''} placeholder="https://status.example.com/api/v2/summary.json" spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value.trim() && e.target.value.trim() !== (src.url ?? '') && save({ kind: 'url', url: e.target.value.trim() })} />}
     </div>
   )
@@ -2038,15 +2070,18 @@ function WidgetList({ api }: { api: WidgetsApi }) {
   const mine = api.list.filter(w => !w.builtin)
   const theirs = api.list.filter(w => w.builtin)
   const [menu, openMenu] = useMenu()
-  // New ▾: a starter (one that runs at once on sample data, yours to change: laki widget new), or Laki AI's page
+  const [starters, setStarters] = useState(false)
+  // New ▾: Laki AI's page (the studio), or a starter picked from their previews (one that runs at once on sample data,
+  // yours to change: laki widget new)
   const newMenu = (e: MouseEvent) =>
     openMenu(e, [
-      { label: 'Make with Laki AI…', icon: 'bulb', sub: api.studio ? 'in the studio: describe it, see it on sample data' : 'describe it; or the prompt for any AI chat', run: () => (api.studio ? api.studio('') : api.page('')) },
-      ...(api.make ? [{ head: 'From a starter' }, ...STARTER_KINDS.map(k => ({ label: STARTERS[k].title, sub: STARTERS[k].blurb, run: () => void api.make!(k) }))] : []),
+      { label: 'With Laki AI…', icon: 'ai', sub: api.studio ? 'in the studio: describe it, see it on sample data' : 'describe it; or the prompt for any AI chat', run: () => (api.studio ? api.studio('') : api.page('')) },
+      ...(api.make ? [{ label: 'From a starter…', icon: 'panel' as const, sub: `${STARTER_KINDS.length} to pick from, each shown on its sample data`, run: () => setStarters(true) }] : []),
     ])
   return (
     <>
       {menu}
+      {starters && api.make && <StarterPicker onClose={() => setStarters(false)} onPick={k => (setStarters(false), void api.make!(k))} />}
       <Group
         title="Yours"
         hint="Ones you or Laki AI made: in Laki's folder or the folders below"
@@ -2103,7 +2138,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
   }
 }
 
-function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void; hours: string; onHours: (h: string) => void }) {
+function WidgetsSection({ api, dirs, onDirs, hours, onHours, onAgent }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void; hours: string; onHours: (h: string) => void; onAgent: (name: string) => void }) {
   const [busy, setBusy] = useState(false)
   const read = hours.trim() ? parseHours(hours) : null
   return (
@@ -2113,10 +2148,40 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
         Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 3 cells across, a line high in the top bar or the status bar, or buttons on the rail and in the sidebar's foot (an icon, a label, a count, a click that runs something): each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
         schedule) and widget.html (what it shows, and its full view, a click away). A click on one opens its page: a preview (with made-up data too), its settings and Laki AI to change it. New extension makes one with Laki AI, or gives you the prompt for any AI chat; an agent with the Extension creator skill (Agent skill) makes them too.
       </p>
-      <WidgetList api={api} />
       {api.kit && (
-        <Group title="UI kit" hint="An extension's UI as JSON elements (widget.json's ui): lists, tables, charts, stats, forms, tabs and more" act={<button type="button" onClick={api.kit}><Icon name="panel" size={12} /> Open the UI kit</button>}>
-          <p className="muted small">Every element with a sample at a few sizes, in the status bar, and its JSON to copy. Laki AI and the Extension creator skill build with it.</p>
+        <div className="kit-hero">
+          <span className="ico">
+            <Icon name="panel" size={20} />
+          </span>
+          <div>
+            <b>The UI kit: browse {UI_TYPES.length} elements</b>
+            <span className="muted small">Lists, tables, charts, boards, logs, forms and more (widget.json's ui), each with a sample at a few sizes and its JSON to copy; {Object.keys(ICONS).length} icons, found by name. Laki AI and the Extension creator skill build with it.</span>
+          </div>
+          <div className="row">
+            <button type="button" onClick={() => api.kit?.(true)}>
+              <Icon name="bulb" size={12} /> Icons
+            </button>
+            <button type="button" className="primary" onClick={() => api.kit?.()}>
+              Browse {UI_TYPES.length} elements
+            </button>
+          </div>
+        </div>
+      )}
+      <WidgetList api={api} />
+      {api.agents && (
+        <Group title="Agent" hint="What an extension's AI source runs: it finds and sums up its data, with your MCP servers">
+          <label>
+            <span>
+              Agent profile <span className="muted">· a claude or codex one: its model, effort, account and env (Agents & profiles); an extension may name another</span>
+            </span>
+            <select value={extAgent(api)} onChange={e => onAgent(e.target.value)}>
+              {(api.agents.length ? api.agents : [{ name: 'claude', agent: 'claude' }]).map(a => (
+                <option key={a.name} value={a.name}>
+                  {a.name} · {a.agent === 'codex' ? 'Codex' : 'Claude'}
+                </option>
+              ))}
+            </select>
+          </label>
         </Group>
       )}
       <Group title="Folders">
@@ -3310,7 +3375,7 @@ export function SettingsPage(p: {
             </>
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
-          {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} />}
+          {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} onAgent={widgetAgent => set({ widgetAgent })} />}
           {sec === 'remote' && p.remote && (
             <RemoteSection
               api={p.remote}

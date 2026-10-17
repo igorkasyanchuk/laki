@@ -345,7 +345,8 @@ export type Settings = {
   birdView?: boolean // experimental (Settings › General): the eye beside Help, every live session's screen at once, off unless true
   calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // experimental (Settings › General): the rail's Desk, extensions placed there as tiles, off unless true
-  deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size (an extension placed there without one: last, DESK_TILE)
+  deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
+  deskTabs?: DeskTab[] // the Desk's tabs in order (none: one, Desk)
   aiGlow?: boolean // experimental (Settings › General): a glow over what Laki AI looks at (a tab's pane, else the window), off unless true
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
@@ -408,6 +409,7 @@ export type Settings = {
   hotkeyOn?: boolean // the global hotkey: Laki forward from any app (main's globalShortcut; unset: on)
   hotkey?: string // its keys as keyLabel writes them (unset: ui.tsx HOTKEY; '': none)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
+  widgetAgent?: string // Settings › Extensions' agent: the claude or codex preset an AI source runs (unset: the first claude one)
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
   voice?: VoiceSettings // Settings › Voice: how the mic and hold Fn turn speech into text
@@ -471,7 +473,9 @@ export type Todo = { id: string; project: string; text: string; at: number; imag
 export type Reminder = { id: string; at: number; text: string; made: number; ws?: string; project?: string; by?: string; done?: boolean; fired?: boolean }
 export const REMINDERS_MAX = 500 // past it the oldest rung ones go
 // a tile on the Desk (experimental): an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
-export type DeskTile = { id: string; w: number; h: number }
+export type DeskTile = { id: string; w: number; h: number; tab?: string } // tab: a DeskTab's id (none, or one gone: the first tab)
+// a tab of the Desk: its tiles apart from the others' (none set: one tab, Desk)
+export type DeskTab = { id: string; name: string }
 export const DESK_COLS = 12
 export const DESK_ROW = 40
 export const DESK_TILE: Omit<DeskTile, 'id'> = { w: 4, h: 6 }
@@ -584,8 +588,11 @@ export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.op
 export type WidgetEvent = (typeof WIDGET_EVENTS)[number]
 // where an extension's data comes from: its own fetch (or script), a text typed in (JSON, else { text }), a file of this
 // Mac's or a URL (read each time it fetches: JSON, else { text }); widget.json's source is the default, the user's pick wins
-export const WIDGET_SOURCES = ['fetch', 'static', 'file', 'url'] as const
-export type WidgetSource = { kind: (typeof WIDGET_SOURCES)[number]; text?: string; path?: string; url?: string }
+export const WIDGET_SOURCES = ['fetch', 'static', 'file', 'url', 'ai'] as const
+// ai: an agent answers prompt with the user's own tools and MCP servers (claude: tools, the ones it may use unasked), its
+// last ```json block the data; profile: a claude or codex preset (unset: settings.widgetAgent, else claude)
+export type WidgetSource = { kind: (typeof WIDGET_SOURCES)[number]; text?: string; path?: string; url?: string; prompt?: string; tools?: string; profile?: string }
+export const AI_SOURCE_EVERY = 60 // minutes between an AI source's runs unless set; 15 at least: each one costs
 export type WidgetView = { id: string; name: string; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[] } // history: the studio's Undo, when each kept version was taken (ms), oldest first
 // an action an agent may call (its tool): Always granted in these workspaces ('': calls from none, Laki AI's)
 export type WidgetTool = { action: string; description: string; ask: 'always' | 'first' | 'never'; grants: string[] }
@@ -622,5 +629,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 79
+export const API = 80
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

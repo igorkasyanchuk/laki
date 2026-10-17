@@ -82,6 +82,9 @@ export const UI = {
   code: { group: 'Text', blurb: 'A block of code, with Copy.', props: { value: p('text', 'The code'), copy: p('bool', 'A copy button') } },
   callout: { group: 'Text', blurb: 'A box that stands out: a tip, a warning, an outage.', props: { title: p('text', 'Its first line, bold'), text: p('text', 'More words under it'), icon: p('icon', 'An icon or emoji (default: by its tone)'), action: p('button', 'A button at its end') } },
   icon: { group: 'Text', blurb: 'An icon of Laki’s or an emoji, any size and color.', props: { name: p('icon', 'An icon of Laki’s by name, or an emoji'), size: p(['sm', 'md', 'lg', 'xl'] as const, 'sm, md (the default), lg or xl'), color: COLOR } },
+  quote: { group: 'Text', blurb: 'Words someone said, and who.', props: { text: p('text', 'The words'), by: p('text', 'Who said it'), href: p('text', 'Where it’s from: a link its name opens') } },
+  diff: { group: 'Text', blurb: 'A diff, git’s: added lines green, removed red, hunks and files marked, how many of each.', props: { value: p('text', 'The unified diff (git diff’s, a patch)'), limit: p('number', 'Lines at most (a preview: as many as fit), then +N more') } },
+  countdown: { group: 'Text', blurb: 'Time left until a moment, or since it: a release, a freeze, an on-call shift.', props: { to: p('text', 'When: an ISO date or ms'), label: p('text', 'What happens then (“until the freeze”)'), soon: p('number', 'Hours: it turns warn when it’s this close (24)'), past: p('text', 'What it says once it’s past (default: how long ago)') } },
   stat: { group: 'Data', blurb: 'One number with its label, a change and a sparkline.', props: STAT },
   stats: { group: 'Data', blurb: 'A few numbers in a line.', rows: true, props: { items: p('items', 'Each one’s stat props: [{ "value", "label", "delta", "tone" }]'), ...STAT } },
   kv: { group: 'Data', blurb: 'Names and values.', rows: true, props: { items: p('items', 'Each row: [{ "key", "value", "tone", "mono", "copy" }]'), key: p('text', 'With each: a row’s name'), value: p('text', 'With each: a row’s value'), mono: p('bool', 'Values in the monospace font'), copy: p('bool', 'A copy button by each value') } },
@@ -147,7 +150,14 @@ export const UI = {
   timeline: { group: 'Data', blurb: 'What happened, newest first.', rows: true, props: { time: p('text', 'When (an ISO date or ms: shown as 3 hours ago; else as written)'), title: p('text', 'What happened'), text: p('text', 'More words under it'), icon: p('icon', 'An icon or emoji') } },
   image: { group: 'Data', blurb: 'A picture: a data: image or an https one.', props: { src: p('text', 'A data:image/… or https:// URL'), alt: p('text', 'What it shows'), height: p('number', 'Its height in px') } },
   card: { group: 'Data', blurb: 'A box with a picture, a title, words and a tag: a link to open.', rows: true, props: { title: p('text', 'Its title'), text: p('text', 'Its words'), image: p('text', 'A picture: data: or https'), icon: p('icon', 'Or an icon or emoji'), tag: p('text', 'A pill by its title'), href: p('text', 'A link a click opens') } },
+  steps: { group: 'Data', blurb: 'Stages in order, each done, running, failed, skipped or to do: a pipeline, a deploy, an onboarding.', rows: true, props: { label: p('text', 'A step’s name'), state: p('text', 'Its state: done, running, failed, skipped or todo (passed, success, current, error… count too)'), text: p('text', 'Words under it: how long, who'), href: p('text', 'A link a click opens') } },
+  meter: { group: 'Data', blurb: 'One bar split into parts, a legend under it: disk, a budget, test results.', rows: true, props: { items: p('items', 'Each part: [{ "label", "value", "color" }]'), label: p('text', 'With each: a part’s name'), value: p('text', 'With each: its number'), color: p('text', 'With each: its color (default: the palette’s next)'), title: p('text', 'Its title, above it with the total'), max: p('number', 'The whole (default: the parts’ sum): the rest of the bar stays empty'), unit: p('text', 'After each number: GB, $, %'), legend: p('bool', 'Each part’s name and number under it: on by default') } },
+  board: { group: 'Data', blurb: 'Cards in columns by a field, kanban style: issues by state, PRs by review.', rows: true, props: { column: p('text', 'A card’s column: a template over its row ({{state}} by default)'), columns: p('items', 'The columns in order, even empty: ["Todo", "Doing", "Done"] (default: as first seen)'), title: p('text', 'A card’s title ({{title}} by default)'), subtitle: p('text', 'A second line'), tag: p('text', 'A pill on it'), avatar: p('text', 'A GitHub login: its picture'), href: p('text', 'A link a click opens'), limit: p('number', 'Cards per column at most, then +N more') } },
+  tree: { group: 'Data', blurb: 'Nested rows that fold: folders and files, tasks and subtasks, a sitemap.', rows: true, props: { label: p('text', 'A node’s words ({{label}} by default)'), text: p('text', 'Muted words beside it'), icon: p('icon', 'An icon or emoji before it: a template too ({{#if children}}folder{{else}}file{{/if}})'), href: p('text', 'A link a click opens'), nested: p('text', 'The field with a node’s children (children by default)'), open: p('number', 'Levels open at first (1; 0: all folded)') } },
+  log: { group: 'Data', blurb: 'Log lines in the monospace font, the newest last, errors red and warnings yellow.', rows: true, props: { value: p('text', 'The whole log as text, a line each (instead of each)'), text: p('text', 'With each: a line ({{text}} by default)'), time: p('text', 'With each: when (an ISO date or ms: shown as 09:10:03)'), level: p('text', 'With each: error, warn, info or debug (default: read off the line)'), limit: p('number', 'Lines at most, the newest (a preview: as many as fit), then +N more'), wrap: p('bool', 'Wrap long lines') } },
+  json: { group: 'Data', blurb: 'Any value as JSON that folds: what a fetch printed, an API’s answer.', props: { value: p('path', 'What to show: a path (data, data.items); data by default'), open: p('number', 'Levels open at first (1)') } },
   button: { group: 'Actions', blurb: 'Runs an action or a Laki command, opens a link, refreshes, copies.', props: BUTTON },
+  toggle: { group: 'Actions', blurb: 'A switch that runs an action with on or off: a feature flag, maintenance mode.', props: { label: p('text', 'Its words'), text: p('text', 'Words under it'), on: p('text', 'A path or template: on when truthy'), run: p('text', 'One of widget.json’s actions, run with $WIDGET_ARG on or off (what it’s turned to); then it fetches again and shows what’s true'), confirm: p('text', 'A question the app asks first') } },
   actions: { group: 'Actions', blurb: 'A row of buttons.', props: { items: p('buttons', 'The buttons') } },
   links: { group: 'Actions', blurb: 'Links in a line, a rule between them.', rows: true, props: { items: p('items', 'Each one: { "label", "href" }'), label: p('text', 'With each: a link’s words'), href: p('text', 'With each: where it goes') } },
   form: { group: 'Actions', blurb: 'Fields and a button that runs an action with them.', props: { fields: p('items', 'Its fields: [{ "id", "type": "text" | "number" | "bool" | "choice" | "textarea", "label", "hint", "default", "choices" }]'), submit: p('button', 'Its button: { "label", "run", "confirm" }; the action gets the fields as JSON in $WIDGET_ARG') } },
@@ -509,6 +519,38 @@ const SIZE: Record<string, number> = { sm: 12, md: 16, lg: 22, xl: 32 }
 // the items of a stats, kv, tags or links: written ones (their props templates), or each row with the element's own
 const itemsOf = (e: El, s: S): [El, S][] => (Array.isArray(e.items) ? e.items.filter(x => !obj(x) || !hidden(x, s)).map(x => [obj(x) ? x : { tag: x, value: x, label: x }, s] as [El, S]) : listAt(e.each, s).map((item, i) => [e, inner(s, item, i)] as [El, S]))
 
+// a step's state: its word to done, now, fail, skip, else todo
+const STEP: [RegExp, string][] = [
+  [/^(done|passed|pass|success|succeeded|ok|complete|completed|finished|shipped)$/i, 'done'],
+  [/^(running|current|active|in.progress|doing|building|deploying|started)$/i, 'now'],
+  [/^(failed|failing|fail|error|errored|broken|cancell?ed|timed.out)$/i, 'fail'],
+  [/^(skipped|skip|n\/a)$/i, 'skip'],
+]
+// a log line's level: its word, else read off the line
+const LEVEL: [RegExp, Tone][] = [
+  [/\b(error|err|fatal|critical|panic|exception|failed)\b/i, 'bad'],
+  [/\b(warn|warning)\b/i, 'warn'],
+  [/\b(debug|trace)\b/i, 'muted'],
+]
+const levelTone = (lv: string, line: string) => (lv ? (LEVEL.find(([re]) => re.test(lv))?.[1] ?? '') : (LEVEL.find(([re]) => re.test(line))?.[1] ?? ''))
+const howLong = (ms: number) => (m => (d => (d ? `${d}d ${Math.floor((m % 1440) / 60)}h` : m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : m ? `${m}m` : 'under a minute'))(Math.floor(m / 1440)))(Math.floor(ms / 60_000))
+const clock = (t: number | string) => (d => (Number.isFinite(d.getTime()) ? d.toTimeString().slice(0, 8) : ''))(new Date(t))
+// a JSON value that folds: strings cut at 500, 3000 nodes and 40 levels at most
+function jsonHtml(v: unknown, open: number) {
+  let count = 0
+  const leaf = (x: unknown) => (typeof x === 'string' ? `<span class="k-js-s">"${esc(x.length > 500 ? `${x.slice(0, 500)}…` : x)}"</span>` : typeof x === 'number' ? `<span class="k-js-n">${x}</span>` : `<span class="k-js-b">${x === undefined ? 'null' : String(x)}</span>`)
+  const walk = (k: string, x: unknown, depth: number): string => {
+    if (++count > 3000 || depth > 40) return count === 3001 || depth === 41 ? '<div class="k-js-r k-sub">…</div>' : ''
+    const key = k ? `<span class="k-js-k">${esc(k)}</span>: ` : ''
+    if (!x || typeof x !== 'object') return `<div class="k-js-r">${key}${leaf(x)}</div>`
+    const entries: [string, unknown][] = Array.isArray(x) ? x.map((y, i) => [String(i), y]) : Object.entries(x)
+    const sum = Array.isArray(x) ? `[${entries.length}]` : `{${entries.length}}`
+    if (!entries.length) return `<div class="k-js-r">${key}<span class="k-sub">${Array.isArray(x) ? '[]' : '{}'}</span></div>`
+    return `<details class="k-js-d"${depth < open ? ' open' : ''}><summary class="k-js-r">${key}<span class="k-sub">${sum}</span></summary><div class="k-js-c">${entries.map(([a, b]) => walk(a, b, depth + 1)).join('')}</div></details>`
+  }
+  return walk('', v, 0)
+}
+
 const R: Record<UiType, (e: El, s: S) => string> = {
   stack: (e, s) => `<div${at(e, s, `k-stack${gap(e.gap)}`)}>${kids(e.children, s)}</div>`,
   row: (e, s) => `<div${at(e, s, `k-row${gap(e.gap)} a-${['start', 'center', 'end', 'between'].includes(String(e.align)) ? e.align : 'center'}${e.wrap === true ? ' wrap' : ''}`)}>${kids(e.children, s)}</div>`,
@@ -544,6 +586,26 @@ const R: Record<UiType, (e: El, s: S) => string> = {
   icon: (e, s) => `<span${at(e, s, 'k-ic', '', e.color)}>${icon(e.name, s, SIZE[String(e.size)] ?? 16)}</span>`,
   markdown: (e, s) => `<div${at(e, s, 'k-md')}>${markdownHtml(txt(e.value, s))}</div>`,
   code: (e, s) => (v => `<div${at(e, s, 'k-code')}><pre><code>${esc(v)}</code></pre>${e.copy === true ? copyBtn(v) : ''}</div>`)(txt(e.value, s)),
+  quote: (e, s) => (by => `<figure${at(e, s, 'k-quote')}><blockquote>${h(e.text, s)}</blockquote>${by ? `<figcaption>— ${e.href !== undefined ? link(txt(e.href, s), esc(by)) : esc(by)}</figcaption>` : ''}</figure>`)(txt(e.by, s)),
+  diff: (e, s) => {
+    const lines = txt(e.value, s).replace(/\r/g, '').split('\n')
+    while (lines.length && lines.at(-1) === '') lines.pop()
+    let hunk = false // in a hunk, --- and +++ are lines removed and added; a file's header comes before its first @@
+    const kinds = lines.map(l => (l.startsWith('diff ') ? ((hunk = false), 'f') : l.startsWith('@@') ? ((hunk = true), 'h') : !hunk && /^(index |\+\+\+ |--- |new file|deleted file|rename |similarity |old mode|new mode)/.test(l) ? 'f' : l.startsWith('+') ? 'a' : l.startsWith('-') ? 'd' : ''))
+    const max = cap(e, s, 16)
+    const rows = lines.map((l, i) => (i >= max && !s.full ? '' : `<div class="k-dl${kinds[i] ? ` ${kinds[i]}` : ''}" data-row${i >= max ? ' data-extra hidden' : ''}>${esc(l) || ' '}</div>`)).join('')
+    return `<div${at({ tip: e.tip }, s, 'k-diff')} data-rows><div class="k-df-h"><span class="t-good">+${kinds.filter(k => k === 'a').length}</span><span class="t-bad">−${kinds.filter(k => k === 'd').length}</span></div>${lines.length ? `<div class="k-df-b">${rows}</div>` : ''}${s.line ? '' : more(lines.length - Math.min(max, lines.length))}</div>`
+  },
+  // ponytail: its words as of the render (the app draws it again at each fetch): minutes, never seconds ticking
+  countdown: (e, s) => {
+    const t = timeOf(txt(e.to, s).trim())
+    const ms = t === undefined ? NaN : new Date(t).getTime()
+    const label = txt(e.label, s)
+    const left = ms - Date.now()
+    const words = !Number.isFinite(ms) ? '–' : left > 0 ? `in ${howLong(left)}` : e.past !== undefined ? txt(e.past, s) : ago(ms)
+    const tone = e.tone !== undefined || !Number.isFinite(ms) ? '' : left <= 0 ? ' t-muted' : left < (n(e.soon, s) ?? 24) * 3_600_000 ? ' t-warn' : ''
+    return `<div${at(e, s, `k-cd${tone}`, words)}${Number.isFinite(ms) && e.tip === undefined ? ` title="${esc(new Date(ms).toLocaleString())}"` : ''}><b>${esc(words)}</b>${label ? `<span>${esc(label)}</span>` : ''}</div>`
+  },
   stat,
   stats: (e, s) => `<div${at({ tip: e.each === undefined ? e.tip : undefined }, s, 'k-stats')}>${itemsOf(e, s).map(([x, r]) => stat(x === e ? e : { ...x, tone: x.tone ?? e.tone }, r)).join('')}</div>`,
   kv: (e, s) =>
@@ -654,7 +716,91 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     return `<div${at({ tip: e.tip }, s, 'k-cards')} data-rows>${items.map((item, i) => one(inner(s, item, i))).join('')}${empty(e, s, items.length)}</div>`
   },
   image: (e, s) => (u => (imageOk(u) ? `<img${at(e, s, 'k-img')} src="${esc(u)}" alt="${h(e.alt, s)}"${(x => (x ? ` style="height:${Math.min(2000, x)}px"` : ''))(n(e.height, s))}>` : ''))(txt(e.src, s).trim()),
+  steps: (e, s) => {
+    const items = listAt(e.each ?? e.items, s)
+    return `<ol${at({ tip: e.tip }, s, 'k-steps')}>${items
+      .map((item, i) => {
+        const r = inner(s, item, i)
+        const state = txt(e.state ?? '{{state}}', r).trim()
+        const k = STEP.find(([re]) => re.test(state))?.[1] ?? 'todo'
+        const label = txt(e.label ?? '{{label}}', r)
+        const text = e.text !== undefined ? txt(e.text, r) : ''
+        const href = e.href !== undefined ? safeUrl(txt(e.href, r)) : ''
+        return `<li class="k-sp ${k}"${href ? ` data-open="${esc(href)}"` : ''} title="${esc(`${label}${state ? `: ${state}` : ''}`)}"><i class="k-sp-dot">${k === 'done' ? iconSvg('check', 10) : k === 'fail' ? iconSvg('x', 10) : ''}</i><div class="k-main"><b>${esc(label)}</b>${text ? `<span class="k-sub">${esc(text)}</span>` : ''}</div></li>`
+      })
+      .join('')}</ol>${empty(e, s, items.length)}`
+  },
+  meter: (e, s) => {
+    const parts = itemsOf(e, s)
+      .map(([x, r], i) => ({ label: txt(x.label, r), v: n(x.value, r) ?? 0, c: hue(x.color, r) || colorCss(PALETTE[i % PALETTE.length]) }))
+      .filter(x => x.v > 0)
+    const unit = txt(e.unit, s)
+    const total = parts.reduce((a, x) => a + x.v, 0)
+    const whole = Math.max(n(e.max, s) ?? total, total) || 1
+    const title = txt(e.title, s)
+    const bar = `<div class="k-meter-b">${parts.map(x => `<i style="width:${f1((x.v / whole) * 100)}%;background:${x.c}" title="${esc(`${x.label}: ${num(x.v)}${unit}`)}"></i>`).join('')}</div>`
+    const of = n(e.max, s) !== undefined ? ` of ${num(whole)}${unit}` : ''
+    return `<div${at({ tip: e.tip }, s, 'k-meter')}>${title ? `<div class="k-ch-head"><span>${esc(title)}</span><b>${esc(`${num(total)}${unit}${of}`)}</b></div>` : ''}${bar}${e.legend === false ? '' : legendOf(parts.map(x => [x.label, x.c, `${num(x.v)}${unit}`]))}</div>`
+  },
+  board: (e, s) => {
+    const items = listAt(e.each ?? e.items, s)
+    const cols = new Map<string, S[]>()
+    for (const c of Array.isArray(e.columns) ? e.columns : []) cols.set(txt(c, s), [])
+    items.forEach((item, i) => (r => (k => cols.set(k, [...(cols.get(k) ?? []), r]))(txt(e.column ?? '{{state}}', r)))(inner(s, item, i)))
+    const max = cap(e, s, 46)
+    const card = (r: S, extra: boolean) => {
+      const title = txt(e.title ?? '{{title}}', r)
+      const sub = e.subtitle !== undefined ? txt(e.subtitle, r) : ''
+      const tag = e.tag !== undefined ? txt(e.tag, r) : ''
+      const href = e.href !== undefined ? safeUrl(txt(e.href, r)) : ''
+      const av = e.avatar !== undefined ? avatarUrl(txt(e.avatar, r)) : ''
+      return `<div class="k-bd-c" data-row${extra ? ' data-extra hidden' : ''}${href ? ` data-open="${esc(href)}"` : ''}><div class="k-bd-t ${toneOf(e, title, r)}">${esc(title)}</div>${sub || tag || av ? `<div class="k-bd-m">${av ? `<img class="k-av" src="${av}" alt="">` : ''}${sub ? `<span class="k-sub">${esc(sub)}</span>` : ''}${tag ? `<span class="k-tag ${toneOf(e, tag, r)}">${esc(tag)}</span>` : ''}</div>` : ''}</div>`
+    }
+    return `<div${at({ tip: e.tip }, s, 'k-board')}>${[...cols]
+      .map(([name, rs]) => `<div class="k-bd-col" data-rows><div class="k-gh">${esc(name || '–')}<span class="k-sub">${rs.length}</span></div>${rs.map((r, i) => (i >= max && !s.full ? '' : card(r, i >= max))).join('')}${s.line ? '' : more(rs.length - Math.min(max, rs.length))}</div>`)
+      .join('')}</div>${empty(e, s, items.length)}`
+  },
+  tree: (e, s) => {
+    const field = txt(e.nested, s).trim() || 'children'
+    const open = Math.max(0, Math.round(n(e.open, s) ?? 1))
+    let count = 0
+    const nodeOf = (item: unknown, i: number, depth: number): string => {
+      if (++count > 2000 || depth > 30) return ''
+      const r = inner(s, item, i) // a node's own fields only: never its parent's through the scopes
+      const kids = obj(item) && Array.isArray(item[field]) ? (item[field] as unknown[]) : []
+      const label = e.label !== undefined ? txt(e.label, r) : typeof item === 'string' ? item : txt('{{label}}', r)
+      const side = e.text !== undefined ? txt(e.text, r) : ''
+      const href = e.href !== undefined ? safeUrl(txt(e.href, r)) : ''
+      const line = `${e.icon !== undefined ? icon(e.icon, r, 13) : ''}<span class="k-tr-l ${toneOf(e, label, r)}">${esc(label)}</span>${side ? `<span class="k-sub">${esc(side)}</span>` : ''}`
+      if (!kids.length) return `<div class="k-tr-n" data-row${href ? ` data-open="${esc(href)}"` : ''}>${line}</div>`
+      return `<details class="k-tr-d"${depth < open ? ' open' : ''}><summary class="k-tr-n">${line}<span class="k-tr-c">${kids.length}</span></summary><div class="k-tr-k">${kids.map((x, j) => nodeOf(x, j, depth + 1)).join('')}</div></details>`
+    }
+    const items = listAt(e.each ?? e.items, s)
+    return `<div${at({ tip: e.tip }, s, 'k-tree')}>${items.map((x, i) => nodeOf(x, i, 0)).join('')}</div>${empty(e, s, items.length)}`
+  },
+  log: (e, s) => {
+    const lines =
+      e.value !== undefined
+        ? (l => (l.at(-1) === '' ? l.slice(0, -1) : l))(txt(e.value, s).replace(/\r/g, '').split('\n')).map(text => ({ text, time: '', level: '' }))
+        : listAt(e.each ?? e.items, s).map((item, i) => (r => ({ text: e.text !== undefined ? txt(e.text, r) : typeof item === 'string' ? item : txt('{{text}}', r), time: e.time !== undefined ? txt(e.time, r).trim() : '', level: e.level !== undefined ? txt(e.level, r).trim() : '' }))(inner(s, item, i)))
+    const max = cap(e, s, 16)
+    const from = Math.max(0, lines.length - max) // the newest: the last ones
+    const row = (x: (typeof lines)[number], i: number) => {
+      const t = levelTone(x.level, x.text)
+      const when = x.time ? (w => (w === undefined ? x.time : clock(w) || x.time))(timeOf(x.time)) : ''
+      return `<div class="k-lg-l${t ? ` t-${t}` : ''}" data-row${i < from ? ' data-extra hidden' : ''}>${when ? `<span class="k-lg-t">${esc(when)}</span>` : ''}<span class="k-lg-x">${esc(x.text) || ' '}</span></div>`
+    }
+    return `<div${at({ tip: e.tip }, s, `k-log${e.wrap === true ? ' wrap' : ''}`)} data-rows>${s.line ? '' : more(from)}${lines.map((x, i) => (i < from && !s.full ? '' : row(x, i))).join('')}</div>${empty(e, s, lines.length)}`
+  },
+  json: (e, s) => (v => (s.line ? `<span${at({ tip: e.tip }, s, 'k-json mono')}>${esc((JSON.stringify(v) ?? 'null').slice(0, 300))}</span>` : `<div${at({ tip: e.tip }, s, 'k-json')}>${jsonHtml(v, Math.max(0, Math.round(n(e.open, s) ?? 1)))}</div>`))(valueAt(e.value ?? 'data', s.scopes)),
   button: (e, s) => button(e, s),
+  toggle: (e, s) => {
+    const on = e.on !== undefined && holds(e.on, s)
+    const label = txt(e.label, s)
+    const text = e.text !== undefined ? txt(e.text, s) : ''
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    return `<button type="button" role="switch" aria-checked="${on}"${at(e, s, `k-toggle${on ? ' on' : ''}`, label)}${run ? ` data-run="${esc(run)}" data-arg="${on ? 'off' : 'on'}"` : ' disabled'}${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}><span class="k-main"><span class="k-tg-l">${esc(label)}</span>${text ? `<span class="k-sub">${esc(text)}</span>` : ''}</span><i class="k-tg-s"></i></button>`
+  },
   actions: (e, s) => `<div${at(e, s, 'k-actions')}>${buttons(e.items, s, false)}</div>`,
   links: (e, s) => `<div${at(e, s, 'linkbar k-links')}>${itemsOf(e, s).map(([x, r]) => link(txt(x.href, r), h(x.label ?? x.href, r))).join('')}</div>`,
   form: (e, s) => {
@@ -779,7 +925,7 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
       else if (pr.kind === 'icon' && !iconOk(v)) say('warn', here, `icon ${v} isn't one of Laki's icons${mean(String(v), Object.keys(ICON_WORDS))} or an emoji`)
     }
     for (const c of [el.color, ...(Array.isArray(el.colors) ? el.colors : []), ...(Array.isArray(el.series) ? el.series.map(x => (obj(x) ? x.color : undefined)) : [])]) if (!colorOk(c)) say('warn', here, `color ${c}: a tone (${TONES.join(', ')}), one of ${COLORS.join(', ')}, or a hex${mean(String(c), [...TONES, ...COLORS])}`)
-    if (type === 'button') runs(el, here)
+    if (type === 'button' || type === 'toggle') runs(el, here)
     if (type === 'form') runs(el.submit, `${here}.submit`)
     for (const k of ['action', 'submit']) if (obj(el[k]) && type !== 'form') runs(el[k], `${here}.${k}`)
     for (const k of ['actions', 'items'] as const) if (UI[type as UiType].props[k as never] && (UI[type as UiType].props as Record<string, Prop>)[k].kind === 'buttons') (Array.isArray(el[k]) ? (el[k] as unknown[]) : []).forEach((b, i) => runs(b, `${here}.${k}[${i}]`))
@@ -796,7 +942,8 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
         if (items.length && def.rows) {
           const fields = new Set(items.flatMap(x => (obj(x) ? Object.keys(x) : [])))
           const outer = new Set(scopes.flatMap(sc => Object.keys(sc)))
-          const skip = new Set(['each', 'items', 'empty', 'limit', 'filter', 'sort', 'kind', 'height', 'min', 'max', 'label', 'unit', 'if', 'unless', 'tip', 'series', 'colors', 'legend', 'rows', 'count'])
+          const skip = new Set(['each', 'items', 'empty', 'limit', 'filter', 'sort', 'kind', 'height', 'min', 'max', 'label', 'unit', 'if', 'unless', 'tip', 'series', 'colors', 'legend', 'rows', 'count', 'nested', 'open', 'wrap', ...(type === 'board' ? ['columns'] : []), ...(type === 'log' ? ['value'] : []), ...(type === 'meter' ? ['title'] : [])])
+          if (type === 'meter' || type === 'tree' || type === 'steps') skip.delete('label') // a row's name there, not a title
           for (const [k, val] of Object.entries(el)) {
             if (skip.has(k)) continue
             for (const r of refs(k === 'columns' && Array.isArray(val) ? val.map(c => (obj(c) ? { ...c, title: undefined } : c)) : val)) if (!NAMES.has(r) && !fields.has(r) && !outer.has(r)) say('warn', here, `${k} uses ${r}, which no item of ${path} has${mean(r, [...fields])}`)
@@ -829,6 +976,15 @@ const PRS = [
 ]
 // twelve weeks of activity, the heatmap's sample
 const DAYS = Array.from({ length: 84 }, (_, i) => ({ date: new Date(Date.UTC(2026, 6, 27 + i)).toISOString().slice(0, 10), n: i % 7 > 4 ? (i * 3) % 2 : ((i * 37) % 11) % 6 }))
+// a moment a few days after it loads: a countdown's sample ahead of the clock (the daemon's catalog only quotes it)
+const SOON = new Date(Date.now() + 2.2 * 86_400_000).toISOString()
+const LOG = [
+  { at: '2026-10-17T09:10:01Z', level: 'info', text: 'GET /api/orders 200 41ms' },
+  { at: '2026-10-17T09:10:02Z', level: 'info', text: 'GET /api/search?q=shoes 200 88ms' },
+  { at: '2026-10-17T09:10:04Z', level: 'warn', text: 'slow query: orders by customer 1.2s' },
+  { at: '2026-10-17T09:10:07Z', level: 'error', text: 'POST /api/checkout 500 TypeError: card is undefined' },
+  { at: '2026-10-17T09:10:09Z', level: 'info', text: 'GET /api/orders 200 39ms' },
+]
 const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   stack: { spec: { type: 'stack', gap: 'sm', children: [{ type: 'text', value: '{{repo}}', weight: 'semibold' }, { type: 'text', value: '{{open}} open · {{drafts}} drafts', muted: true }] }, data: { repo: 'acme/web', open: 6, drafts: 1 } },
   row: { spec: { type: 'row', align: 'between', children: [{ type: 'text', value: 'Deploys today' }, { type: 'badge', value: '{{n}}', tone: 'good' }] }, data: { n: 4 } },
@@ -846,6 +1002,9 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   code: { spec: { type: 'code', value: '{{cmd}}', copy: true }, data: { cmd: 'gh pr checkout 412' } },
   callout: { spec: { type: 'callout', tone: 'warn', title: 'Staging is slow', text: '{{why}}', action: { label: 'Status', open: 'https://status.example.com' } }, data: { why: 'p95 over 2 s since 09:10' } },
   icon: { spec: { type: 'row', children: [{ type: 'icon', name: 'check', color: 'good', size: 'lg' }, { type: 'icon', name: 'ciFail', color: 'bad', size: 'lg' }, { type: 'icon', name: 'clock', color: 'orange', size: 'lg' }, { type: 'icon', name: 'github', color: 'purple', size: 'lg' }, { type: 'icon', name: '🚀', size: 'lg' }] } },
+  quote: { spec: { type: 'quote', text: '{{text}}', by: '{{by}}' }, data: { text: 'Make it work, make it right, make it fast.', by: 'Kent Beck' } },
+  diff: { spec: { type: 'diff', value: '{{patch}}' }, data: { patch: 'diff --git a/src/search.ts b/src/search.ts\n@@ -12,6 +12,7 @@ export function search(q: string) {\n   const terms = q.split(/\\s+/)\n-  return db.scan(terms)\n+  const hits = index.find(terms)\n+  return hits.length ? hits : db.scan(terms)\n }' } },
+  countdown: { spec: { type: 'countdown', to: '{{freeze}}', label: 'until the code freeze', soon: 72 }, data: { freeze: SOON } },
   stat: { spec: { type: 'stat', value: '{{num visits}}', label: 'visits today', delta: '{{change}}', spark: 'week' }, data: { visits: 12840, change: '+12%', week: [8, 9, 7, 11, 10, 12, 13] } },
   stats: { spec: { type: 'stats', each: 'stats', value: '{{n}}', label: '{{name}}', color: '{{color}}', tone: '{{#if bad}}bad{{/if}}' }, data: { stats: [{ name: 'open', n: 6 }, { name: 'drafts', n: 1 }, { name: 'conflicts', n: 1, bad: true }, { name: 'bug', n: 2, color: 'd73a4a' }] } },
   kv: { spec: { type: 'kv', items: [{ key: 'Branch', value: '{{branch}}', mono: true, copy: true }, { key: 'Status', value: '{{status}}', tone: { live: 'good', down: 'bad' } }, { key: 'Updated', value: '{{ago at}}' }] }, data: { branch: 'feat/search', status: 'live', at: '2026-10-17T08:00:00Z' } },
@@ -870,6 +1029,19 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   timeline: { spec: { type: 'timeline', each: 'events', time: '{{at}}', title: '{{what}}', text: '{{who}}', tone: { 'Deploy failed': 'bad', Deployed: 'good' } }, data: { events: [{ at: '2026-10-17T09:10:00Z', what: 'Deployed', who: 'v2.4.0 by octocat' }, { at: '2026-10-17T08:40:00Z', what: 'Deploy failed', who: 'v2.4.0-rc1' }, { at: '2026-10-16T17:00:00Z', what: 'Merged #418', who: 'hubot' }] } },
   card: { spec: { type: 'card', each: 'posts', title: '{{title}}', text: '{{blurb}}', icon: '{{icon}}', tag: '{{tag}}', href: '{{url}}', tone: { new: 'accent' } }, data: { posts: [{ title: 'Search, 30% faster', blurb: 'How we cut p95 by moving to the new index.', icon: '⚡', tag: 'new', url: 'https://example.com/blog/search' }, { title: 'Dark mode', blurb: 'The dashboard follows your system now.', icon: '🌙', tag: 'ui', url: 'https://example.com/blog/dark' }] } },
   image: { spec: { type: 'image', src: 'https://avatars.githubusercontent.com/{{login}}?s=80', alt: '{{login}}', height: 40 }, data: { login: 'octocat' } },
+  steps: { spec: { type: 'steps', each: 'stages', label: '{{name}}', state: '{{state}}', text: '{{took}}' }, data: { stages: [{ name: 'Build', state: 'done', took: '1m 12s' }, { name: 'Test', state: 'done', took: '3m 40s' }, { name: 'Deploy', state: 'running', took: 'now' }, { name: 'Smoke', state: 'todo', took: '' }] } },
+  meter: { spec: { type: 'meter', each: 'disk', label: '{{name}}', value: '{{gb}}', color: '{{color}}', max: 512, unit: ' GB', title: 'Disk' }, data: { disk: [{ name: 'Apps', gb: 120, color: 'blue' }, { name: 'Docker', gb: 96, color: 'purple' }, { name: 'Photos', gb: 74, color: 'orange' }, { name: 'System', gb: 38, color: 'gray' }] } },
+  board: {
+    spec: { type: 'board', each: 'issues', column: '{{state}}', columns: ['Todo', 'Doing', 'Done'], title: '{{title}}', subtitle: '#{{number}}', avatar: '{{who}}', tag: '{{label}}', tone: { bug: 'bad' } },
+    data: { issues: [{ number: 512, title: 'Login loops on Safari', state: 'Doing', who: 'octocat', label: 'bug' }, { number: 498, title: 'Export orders as CSV', state: 'Todo', who: 'hubot', label: 'feature' }, { number: 505, title: 'Dark mode for emails', state: 'Todo', who: 'monalisa', label: 'ui' }, { number: 471, title: 'Faster search', state: 'Done', who: 'hubot', label: 'perf' }] },
+  },
+  tree: { spec: { type: 'tree', each: 'files', label: '{{name}}', text: '{{size}}', icon: '{{#if children}}folder{{else}}file{{/if}}' }, data: { files: [{ name: 'src', size: '', children: [{ name: 'main.ts', size: '4 KB' }, { name: 'ui', size: '', children: [{ name: 'App.tsx', size: '12 KB' }, { name: 'theme.css', size: '3 KB' }] }] }, { name: 'package.json', size: '1 KB' }, { name: 'README.md', size: '2 KB' }] } },
+  log: { spec: { type: 'log', each: 'lines', text: '{{text}}', time: '{{at}}', level: '{{level}}' }, data: { lines: LOG } },
+  json: { spec: { type: 'json', value: 'data', open: 2 }, data: { repo: 'acme/web', open: 6, ci: { passing: true, took: 412 }, labels: ['bug', 'docs'], owner: null } },
+  toggle: {
+    spec: { type: 'stack', children: [{ type: 'toggle', label: 'Maintenance mode', text: 'Shows the banner on {{site}}', on: 'maintenance', run: 'maintenance', confirm: 'Turn maintenance mode {{#if maintenance}}off{{else}}on{{/if}}?' }, { type: 'toggle', label: 'Deploys', text: 'Merges to main ship at once', on: 'deploys', run: 'deploys' }] },
+    data: { site: 'acme.com', maintenance: false, deploys: true },
+  },
   button: { spec: { type: 'button', label: 'Deploy', icon: 'ship', style: 'primary', run: 'deploy', arg: '{{branch}}', confirm: 'Deploy {{branch}} to production?' }, data: { branch: 'main' } },
   actions: { spec: { type: 'actions', items: [{ label: 'Refresh', icon: 'refresh', refresh: true }, { label: 'GitHub', icon: 'github', open: 'https://github.com/{{repo}}' }, { label: 'Copy repo', copy: '{{repo}}', style: 'quiet' }] }, data: { repo: 'acme/web' } },
   links: { spec: { type: 'links', items: [{ label: 'Linear', href: 'https://linear.app' }, { label: 'Status', href: 'https://status.example.com' }, { label: 'Board', href: 'laki://board' }] } },
@@ -894,5 +1066,6 @@ export const UI_EXAMPLES: { title: string; blurb: string; spec: UiElement; data?
   { title: 'Laki commands', blurb: 'Buttons that ask Laki: a new workspace, a prompt to the agent or Laki AI, a terminal, a browser tab. The app shows what and asks first.', spec: { type: 'grid', columns: 2, children: [{ type: 'button', label: 'Fix the flaky test', icon: 'agent', do: 'new', prompt: 'Find and fix the flaky test in {{suite}}' }, { type: 'button', label: 'Ask the agent', icon: 'run', do: 'send', prompt: 'Run the tests and tell me what fails' }, { type: 'button', label: 'Ask Laki AI', icon: 'ai', do: 'ai', prompt: 'Which of my workspaces need me?' }, { type: 'button', label: 'Tail the logs', icon: 'terminal', do: 'terminal', command: 'tail -f log/development.log' }, { type: 'button', label: 'Open staging', icon: 'globe', do: 'browse', url: 'https://staging.example.com' }, { type: 'button', label: 'Copy the URL', icon: 'copy', copy: 'https://staging.example.com', style: 'quiet' }] }, data: { suite: 'checkout' } },
   { title: 'A Markdown note', full: true, blurb: 'Formatted text: headings, lists, tasks, a table, code, links and https pictures.', spec: { type: 'markdown', value: '{{text}}' }, data: { text: '## On call this week\n\n![octocat](https://avatars.githubusercontent.com/octocat?s=48) **@octocat**, then **@hubot**.\n\n- [x] Rotate the API keys\n- [ ] Renew the TLS cert (`staging`)\n\n| Service | Owner |\n|---|---|\n| API | octocat |\n| Web | hubot |\n\nRunbook: [wiki/oncall](https://example.com/wiki/oncall)' } },
   { title: 'A status page', blurb: 'A header, each service’s state colored by its word, a callout for the worst.', spec: { type: 'stack', children: [{ type: 'header', icon: 'server', title: 'Production', subtitle: '{{services.length}} services' }, { type: 'callout', if: 'incident', tone: 'bad', title: '{{incident}}', action: { label: 'Fix it', icon: 'agent', do: 'new', prompt: 'Look into: {{incident}}' } }, { type: 'status', each: 'services', label: '{{name}}', state: '{{state}}' }] }, data: { incident: 'Search is down since 09:10', services: [{ name: 'API', state: 'up' }, { name: 'Workers', state: 'degraded' }, { name: 'Search', state: 'down' }] } },
+  { title: 'A deploy', blurb: 'A header, the pipeline’s steps, its log’s last lines and a switch for the next ones.', spec: { type: 'stack', children: [{ type: 'header', icon: 'ship', title: 'Deploy {{version}}', subtitle: 'to production · started {{ago at}}' }, { type: 'steps', each: 'stages', label: '{{name}}', state: '{{state}}' }, { type: 'log', each: 'lines', text: '{{text}}', time: '{{at}}', level: '{{level}}', limit: 3 }, { type: 'toggle', label: 'Ship merges at once', on: 'auto', run: 'auto' }] }, data: { version: 'v2.4.0', at: '2026-10-17T09:08:00Z', auto: true, stages: [{ name: 'Build', state: 'done' }, { name: 'Test', state: 'done' }, { name: 'Deploy', state: 'running' }, { name: 'Smoke', state: 'todo' }], lines: LOG } },
   { title: 'Gauges in a grid', blurb: 'A few dials side by side, each its color.', spec: { type: 'grid', columns: 3, children: [{ type: 'gauge', value: '{{cpu}}', unit: '%', label: 'CPU', color: 'teal' }, { type: 'gauge', value: '{{mem}}', unit: '%', label: 'Memory', color: 'purple' }, { type: 'gauge', value: '{{disk}}', unit: '%', label: 'Disk', color: '{{#if full}}bad{{else}}blue{{/if}}' }] }, data: { cpu: 42, mem: 68, disk: 91, full: true } },
 ]

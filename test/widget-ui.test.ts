@@ -9,7 +9,7 @@ import { fresh, until } from './helpers.ts'
 const at = Date.parse('2026-10-17T10:00:00Z')
 
 test('UI kit: every element has a sample, and every sample draws at a 1×1 preview, a bar and in full', () => {
-  assert.equal(UI_TYPES.length, 39)
+  assert.equal(UI_TYPES.length, 49)
   assert.deepEqual(UI_SAMPLES.map(s => s.type), UI_TYPES, 'a sample per element, in order')
   for (const s of UI_SAMPLES) {
     const ctx = { data: s.data, config: {}, at }
@@ -18,8 +18,68 @@ test('UI kit: every element has a sample, and every sample draws at a 1×1 previ
       assert.match(html, /^<div class="k" data-kit="(preview|full)"/, s.type)
       assert.doesNotMatch(html, /k-chip-err/, `${s.type}: no error chip`)
     }
-    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file'] }), [], `${s.type}'s sample checks clean`)
+    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file', 'maintenance', 'deploys'] }), [], `${s.type}'s sample checks clean`)
   }
+})
+
+test('UI kit: diff, log, steps, board, tree, json, meter, countdown, toggle and quote', () => {
+  const draw = (spec: object, data: object, o: object = { full: true }) => uiHtml(spec, { data, config: {}, at }, o)
+  // a diff: its counts, each line by its kind; a preview cut with +N more
+  const patch = 'diff --git a/x b/x\n--- a/x\n+++ b/x\n@@ -1,2 +1,2 @@\n-old <b>\n+new\n same\n'
+  const d = draw({ type: 'diff', value: '{{p}}' }, { p: patch })
+  assert.match(d, /\+1<\/span><span class="t-bad">−1/)
+  assert.match(d, /class="k-dl d" data-row>-old &lt;b&gt;</)
+  assert.match(d, /class="k-dl a" data-row>\+new</)
+  assert.match(d, /class="k-dl h" data-row>@@/)
+  assert.match(draw({ type: 'diff', value: '{{p}}', limit: 2 }, { p: patch }, { cells: [3, 1] }), /\+5 more/)
+  assert.match(draw({ type: 'diff', value: '{{p}}' }, { p: '@@ -1 +1 @@\n--- a SQL comment\n+++ big' }), /\+1<\/span><span class="t-bad">−1.*k-dl d" data-row>--- a SQL.*k-dl a" data-row>\+\+\+ big/, 'in a hunk: lines, not headers')
+  // a log: the newest lines, the level by its word or the line's
+  const lines = [{ text: 'a ok' }, { text: 'b failed hard' }, { text: 'c', level: 'warn' }, { text: 'd', time: '2026-10-17T09:10:03Z' }]
+  const lg = draw({ type: 'log', each: 'lines', text: '{{text}}', level: '{{level}}', time: '{{time}}', limit: 3 }, { lines }, { cells: [3, 4] })
+  assert.match(lg, /\+1 more.*k-lg-l t-bad" data-row><span class="k-lg-x">b failed/, 'the newest three, the older behind +1 more')
+  assert.doesNotMatch(lg, /a ok/)
+  assert.match(lg, /k-lg-l t-warn" data-row><span class="k-lg-x">c</)
+  assert.match(lg, /k-lg-t">\d\d:\d\d:\d\d</)
+  assert.match(uiHtml({ preview: { type: 'log', each: 'lines' }, full: { type: 'log', each: 'lines', limit: 1 } }, { data: { lines }, config: {}, at }, { full: true }), /data-extra hidden><span class="k-lg-x">a ok/, 'a full view with a limit: the older ones a click away')
+  assert.match(draw({ type: 'log', value: 'one\ntwo ERROR\n' }, {}), /t-bad" data-row><span class="k-lg-x">two ERROR/)
+  // steps: their words to a state
+  const st = draw({ type: 'steps', each: 's', label: '{{n}}', state: '{{st}}' }, { s: [{ n: 'A', st: 'passed' }, { n: 'B', st: 'in progress' }, { n: 'C', st: 'error' }, { n: 'D', st: 'skipped' }, { n: 'E', st: '' }] })
+  assert.deepEqual([...st.matchAll(/k-sp (\w+)/g)].map(m => m[1]), ['done', 'now', 'fail', 'skip', 'todo'])
+  // a board: the columns given first, even empty, then the rest as seen; +N more per column
+  const bd = draw({ type: 'board', each: 'i', column: '{{s}}', columns: ['Todo', 'Done'], limit: 1 }, { i: [{ title: 'x', s: 'Doing' }, { title: 'y', s: 'Todo' }, { title: 'z', s: 'Todo' }] })
+  assert.deepEqual([...bd.matchAll(/class="k-gh">([^<]*)<span class="k-sub">(\d+)/g)].map(m => `${m[1]} ${m[2]}`), ['Todo 2', 'Done 0', 'Doing 1'])
+  assert.match(draw({ type: 'board', each: 'i', column: '{{s}}', limit: 1 }, { i: [{ title: 'y', s: 'Todo' }, { title: 'z', s: 'Todo' }] }, { cells: [3, 4] }), /\+1 more/, 'a preview: its limit per column')
+  // a tree: nested, the first level open, a node never takes its parent's fields
+  const tr = draw({ type: 'tree', each: 'f', label: '{{name}}', text: '{{size}}' }, { f: [{ name: 'src', size: '9 KB', children: [{ name: 'a.ts' }, { name: 'ui', children: [{ name: 'b.tsx', size: '1 KB' }] }] }] })
+  assert.match(tr, /<details class="k-tr-d" open><summary class="k-tr-n"><span class="k-tr-l ">src<\/span><span class="k-sub">9 KB<\/span><span class="k-tr-c">2/)
+  assert.match(tr, /<details class="k-tr-d"><summary class="k-tr-n"><span class="k-tr-l ">ui</, 'deeper: folded')
+  assert.match(tr, /k-tr-l ">a.ts<\/span><\/div>/, 'no size of its own: none, not src’s')
+  // json: escaped, folded past its levels
+  const js = draw({ type: 'json', open: 1 }, { a: '<x>', n: 2, deep: { b: [true, null] } })
+  assert.match(js, /<span class="k-js-k">a<\/span>: <span class="k-js-s">"&lt;x&gt;"/)
+  assert.match(js, /<details class="k-js-d"><summary class="k-js-r"><span class="k-js-k">deep<\/span>: <span class="k-sub">\{1\}/)
+  // a meter: each part's share of the whole; past it nothing
+  const mt = draw({ type: 'meter', each: 'p', label: '{{n}}', value: '{{v}}', max: 200, title: 'Disk', unit: ' GB' }, { p: [{ n: 'a', v: 50 }, { n: 'b', v: 100 }, { n: 'c', v: 0 }] })
+  assert.match(mt, /width:25\.0%.*width:50\.0%/)
+  assert.match(mt, /<b>150 GB of 200 GB<\/b>/)
+  assert.doesNotMatch(mt, />c</, 'zero: no part')
+  // a countdown: in, soon (warn), past (ago, or its words)
+  const cd = (to: number, extra = {}) => draw({ type: 'countdown', to: '{{t}}', label: 'go', ...extra }, { t: to })
+  assert.match(cd(Date.now() + 3 * 86_400_000 + 7_200_000), /class="k-cd"[^>]*><b>in 3d 2h<\/b><span>go/)
+  assert.match(cd(Date.now() + 90 * 60_000), /class="k-cd t-warn"[^>]*><b>in 1h 3\dm/)
+  assert.match(cd(Date.now() - 3 * 3_600_000), /class="k-cd t-muted"[^>]*><b>3 hours ago/)
+  assert.match(cd(Date.now() - 1000, { past: 'Frozen' }), /<b>Frozen<\/b>/)
+  assert.match(draw({ type: 'countdown', to: 'nope' }, {}), /<b>–<\/b>/)
+  // a toggle: runs its action with what it's turned to; checked as a run
+  assert.match(draw({ type: 'toggle', label: 'Flag', on: 'f', run: 'flag' }, { f: true }), /role="switch" aria-checked="true" class="k-toggle on"[^>]* data-run="flag" data-arg="off"/)
+  assert.match(draw({ type: 'toggle', label: 'Flag', on: 'f', run: 'flag' }, { f: false }), /aria-checked="false"[^>]* data-arg="on"/)
+  assert.match(uiCheck({ type: 'toggle', label: 'x', run: 'flg' }, {}, { actions: ['flag'] })[0].text, /runs flg, which isn't one of widget.json's actions \(did you mean flag\?\)/)
+  // a quote: its source a link only when it's one
+  assert.match(draw({ type: 'quote', text: 'hi', by: 'me', href: 'https://x.dev' }, {}), /<figcaption>— <a href="https:\/\/x.dev"/)
+  assert.doesNotMatch(draw({ type: 'quote', text: 'hi', by: 'me', href: 'javascript:alert(1)' }, {}), /javascript/)
+  // the rows' field check still reads a heatmap's value and a table's columns
+  assert.match(uiCheck({ type: 'heatmap', each: 'd', value: '{{nn}}' }, { d: [{ n: 1 }] })[0].text, /value uses nn/)
+  assert.match(uiCheck({ type: 'tree', each: 'd', label: '{{nme}}' }, { d: [{ name: 'a' }] })[0].text, /label uses nme/)
 })
 
 test('UI kit: helpers', () => {

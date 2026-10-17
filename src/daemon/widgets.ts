@@ -9,14 +9,15 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { BUTTON_PLACES, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
+import { AI_SOURCE_EVERY, BUTTON_PLACES, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
-import { actionCmd, manifestCheck, needsSample, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
+import { actionCmd, aiActOf, manifestCheck, needsSample, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
-import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, q, save, settingsSet, state, wsVars } from './core.ts'
+import { aiOnce } from './ai.ts'
+import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, presets, q, save, settingsSet, state, wsVars } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -26,18 +27,18 @@ import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own
 // character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions).
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
-type ActionDef = string | { run?: string; tool?: unknown } // a command, or one an agent may call too (widgetSchema.ts' toolOf)
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
+type ActionDef = string | { run?: string; tool?: unknown; ai?: string; tools?: string; profile?: string } // a command, or one an agent may call too (widgetSchema.ts' toolOf), or a prompt an agent answers (aiActOf)
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; notify?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string } // told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
 // scope workspace: an instance per live workspace, its data in <data>/widget-data/<id>/ws/<wsId>.json (the settings stay
 // the store's, shared); in memory its last fetch and its button's words
-type Inst = { data?: unknown; at?: number; error?: string; mock?: string }
+type Inst = { data?: unknown; at?: number; error?: string; mock?: string; told?: string }
 type InstMeta = Omit<Inst, 'data'> & { face: Face }
 type Run = WidgetRun // what each fetch and action did (widgetRuns, the inspector's Runs, laki widget dev's lines): the last RUNS, newest first
 
@@ -59,12 +60,20 @@ export function sourceOk(v: unknown): WidgetSource | undefined {
   const o = v as Record<string, unknown>
   const kind = WIDGET_SOURCES.find(k => k === o.kind)
   if (!kind) return undefined
+  if (kind === 'ai') {
+    // an agent's prompt; claude's tools by name (mcp__slack, WebFetch, Bash(gh pr list:*)), never an option of its own
+    const { prompt = '', tools = '', profile = '' } = o
+    if (typeof prompt !== 'string' || prompt.length > SOURCE_MAX.prompt || typeof tools !== 'string' || tools.length > SOURCE_MAX.tools || TOOLS_BAD.test(tools) || typeof profile !== 'string' || profile.length > 200) return undefined
+    return { kind, prompt, ...(tools.trim() && { tools: tools.trim() }), ...(profile.trim() && { profile: profile.trim() }) }
+  }
   const key = kind === 'static' ? 'text' : kind === 'file' ? 'path' : kind === 'url' ? 'url' : ''
   const val = key ? (o[key] ?? '') : ''
   if (typeof val !== 'string' || val.length > SOURCE_MAX[key]) return undefined // too long: refused, never emptied
   return { kind, ...(key && { [key]: key === 'text' ? val : val.trim() }) }
 }
-const SOURCE_MAX: Record<string, number> = { text: 64 << 10, path: 1024, url: 2048 }
+// claude's tools as one argument: one starting with - would be an option of claude's ("Bash(git log --oneline:*)" isn't)
+export const TOOLS_BAD = /[\n\r]|^\s*-/
+const SOURCE_MAX: Record<string, number> = { text: 64 << 10, path: 1024, url: 2048, prompt: 16 << 10, tools: 1024 }
 // a typed-in text's own data: what it shows before anything's fetched and kept
 const typedData = (w: Entry) => (src => (src.kind === 'static' ? parsed(src.text ?? '', 'static').data : undefined))(sourceOf(w))
 const sourceOf = (w: Entry): WidgetSource => w.s.source ?? sourceOk(w.m.source) ?? { kind: 'fetch' }
@@ -141,7 +150,15 @@ const dataOf = (w: Entry, ws?: string): Inst => (ws ? readInst(w.id, ws) : (st =
 const metaOf = (w: Entry, ws?: string): Omit<Inst, 'data'> => (ws ? (w.inst.get(ws) ?? {}) : w.s)
 function keep(w: Entry, ws: string | undefined, f: (s: Inst) => void) {
   const s = ws ? readInst(w.id, ws) : readStore(w.id) // its settings may have changed meanwhile
+  const at = s.at
   f(s)
+  // its notify, over data just kept (fetched, pushed, an action's: a new at; not sample data, nor a mock let go of):
+  // said once each time it reads anew
+  const said = s.mock || !w.m.notify ? undefined : faceOf(w, s.data, ws, s, w.m.notify)
+  if (said !== s.told && !s.mock && s.at !== at) {
+    if (said && onOf(widgets.get(w.id) ?? w)) broadcast({ ev: 'widget-say', widget: w.id, ws, notify: said }) // as it is now: turned off meanwhile, nothing
+    s.told = said
+  }
   if (ws) writeInst(w.id, ws, s)
   else writeStore(w.id, s as Store)
   const cur = widgets.get(w.id) ?? w
@@ -362,7 +379,9 @@ const plain = (html: string) =>
     .replace(/&(amp|lt|gt|quot|#39);/g, (_, e) => ENT[e])
     .replace(/\s+/g, ' ')
     .trim()
-function faceOf(w: Entry, data: unknown, ws?: string, meta: Omit<Inst, 'data'> = ws ? (w.inst.get(ws) ?? {}) : w.s): Face {
+function faceOf(w: Entry, data: unknown, ws?: string, meta?: Omit<Inst, 'data'>): Face
+function faceOf(w: Entry, data: unknown, ws: string | undefined, meta: Omit<Inst, 'data'>, one: string): string | undefined
+function faceOf(w: Entry, data: unknown, ws?: string, meta: Omit<Inst, 'data'> = ws ? (w.inst.get(ws) ?? {}) : w.s, one?: string): Face | string | undefined {
   const x = ws ? state.workspaces.find(v => v.id === ws) : undefined
   data ??= typedData(w)
   const ctx = { ...(data && typeof data === 'object' && !Array.isArray(data) ? data : {}), data, config: typedOf(w), at: meta.at, error: meta.error, workspace: x && wsInfo(x) } // {{open}} as {{data.open}}
@@ -374,6 +393,7 @@ function faceOf(w: Entry, data: unknown, ws?: string, meta: Omit<Inst, 'data'> =
       return undefined
     }
   }
+  if (one !== undefined) return fill(one, 300) // a notify's text
   return { label: fill(w.m.label, 40), badge: fill(w.m.badge, 6), tip: fill(w.m.tip, 300) }
 }
 // an icon: a name of the app's (the renderer knows which), or a character or two (an emoji, 👨‍👩‍👧 one too)
@@ -390,7 +410,7 @@ const sizeOf = (w: Entry): [number, number] => {
   const [a, b] = w.s.size ?? w.m.size ?? [1, 1]
   return [clamp(a, 1, 3, 1), down(b)]
 }
-const everyOf = (w: Entry) => clamp(w.s.every ?? w.m.every, 1, 1440, WIDGET_EVERY)
+const everyOf = (w: Entry) => (sourceOf(w).kind === 'ai' ? clamp(w.s.every ?? w.m.every, 15, 1440, AI_SOURCE_EVERY) : clamp(w.s.every ?? w.m.every, 1, 1440, WIDGET_EVERY)) // an agent's run costs: every 15 minutes at most
 const onOf = (w: Entry) => !!w.s.on // every extension starts off: Settings › Extensions turns it on
 // an off one runs nothing, its fetch nor its actions (its page's clicks and scripts, a preview's too): one Laki AI wrote
 // is off until you've looked at it
@@ -745,14 +765,14 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   running.add(k)
   changed()
   const t0 = Date.now()
-  wLog(w, `fetch (${reason}${once ? ', once while off' : ''}${x ? `, ${x.id}` : ''}): ${src.kind !== 'fetch' ? `${src.kind} ${src.path ?? src.url ?? ''}`.trim() : script ? `node ${w.m.script}` : w.m.fetch}`)
+  wLog(w, `fetch (${reason}${once ? ', once while off' : ''}${x ? `, ${x.id}` : ''}): ${src.kind !== 'fetch' ? `${src.kind} ${src.path ?? src.url ?? (src.kind === 'ai' ? (src.profile ?? state.settings?.widgetAgent ?? 'claude') : '')}`.trim() : script ? `node ${w.m.script}` : w.m.fetch}`)
   let data: unknown
   let error: string | undefined
   let r: Ran | undefined
   let fail: Failed | undefined
   try {
     if (src.kind !== 'fetch') {
-      // a text, a file or a URL: JSON, else { text }
+      // a text, a file, a URL or an agent's answer: JSON, else { text }
       r = { out: await sourceText(w, src, x), err: '' }
       const p = parsed(r.out, src.kind)
       if (p.error) throw new Error(p.error)
@@ -787,12 +807,19 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   return error ? { ok: false, error } : { ok: true }
 }
 
-// a source's text: typed in, a file (~ is home, relative: the widget's folder) or a URL (30 s), each 16 MB at most;
-// a path or URL may name settings and the workspace: {{config.repo}}, {{workspace.path}}
+// a source's text: typed in, a file (~ is home, relative: the widget's folder), a URL (30 s), each 16 MB at most, or an
+// agent's answer (its last ```json block); a path, URL or prompt may name settings and the workspace: {{config.repo}},
+// {{workspace.path}}
 const SOURCE_WAIT = 30_000
 async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
   const at = (t: string) => fill(t, [{ config: typedOf(w), workspace: x ? wsInfo(x) : undefined }]).trim()
   if (src.kind === 'static') return src.text ?? ''
+  if (src.kind === 'ai') {
+    const prompt = at(src.prompt ?? '')
+    if (!prompt) throw new Error('no prompt: say what it should find')
+    const out = await aiOnce({ preset: agentOf(src), tools: src.tools, prompt, system: aiSystem(w), ask: `extension ${w.id}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (AI)` })
+    return lastJson(out) // ponytail: no block, its words as { text }
+  }
   if (src.kind === 'file') {
     const f = at(src.path ?? '')
     if (!f) throw new Error('no file: give its path')
@@ -817,6 +844,34 @@ async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
   }
   return Buffer.concat(parts).toString('utf8')
 }
+// an AI source's agent: its profile, else Settings › Extensions', else the first claude preset, else plain claude
+const agentOf = (src: WidgetSource): Preset & { agent: 'claude' | 'codex' } => {
+  const ok = (p?: Preset): p is Preset & { agent: 'claude' | 'codex' } => p?.agent === 'claude' || p?.agent === 'codex'
+  const named = (n?: string) => (n ? presets().find(p => p.name === n) : undefined)
+  if (src.profile) {
+    const p = named(src.profile)
+    if (!ok(p)) throw new Error(`no claude or codex profile ${src.profile}: Settings › Agents & profiles`)
+    return p
+  }
+  const on = (p?: Preset): p is Preset & { agent: 'claude' | 'codex' } => ok(p) && !p.off // off: out of the pickers, Settings' too
+  const p = named(state.settings?.widgetAgent)
+  return on(p) ? p : (presets().find(on) as (Preset & { agent: 'claude' }) | undefined) ?? { name: 'claude', agent: 'claude' }
+}
+// an agent's answer's last ```json block, else all of it
+const lastJson = (out: string) => [...out.matchAll(/```json\s*\n([\s\S]*?)```/gi)].pop()?.[1] ?? out
+// an AI action: its prompt filled ({{arg}}, settings, its data, the workspace), the agent's answer
+async function aiAnswer(w: Entry, action: string, a: { prompt: string; tools?: string; profile?: string }, arg: string, x?: Workspace) {
+  const data = dataOf(w, x?.id).data
+  const prompt = fill(a.prompt, [{ ...(isObj(data) ? data : {}), data, arg, config: typedOf(w), workspace: x ? wsInfo(x) : undefined }]).trim() // its data's fields, never over arg or config
+  if (!prompt) throw new Error(`${action}: no prompt`)
+  const system = `You answer "${action}", a button of "${w.m.name || w.id}", an extension (a small view) in Laki, the app the user runs coding agents in. Do what the prompt asks with the tools you have (their MCP servers among them); change nothing it doesn't ask you to. No one answers questions: decide yourself. Answer in a few short lines of plain text: the user reads it in a small dialog. Or end with a \`\`\`json block: { "toast": "…" }, { "modal": { "title", "text" } }, or { "data": … } (the extension's new data, in the shape of what it shows now).`
+  return aiOnce({ preset: agentOf(a as WidgetSource), tools: a.tools, prompt, system, ask: `extension ${w.id} · ${action}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (${action})` })
+}
+// what an AI source's agent is told: find, change nothing, end with the data in the shape its views read (the sample's)
+const aiSystem = (w: Entry) => {
+  const sample = w.m.sample === undefined ? '' : JSON.stringify(w.m.sample).slice(0, 4000)
+  return `You make the data for "${w.m.name || w.id}", an extension (a small view) in Laki, the app the user runs coding agents in. Find what the user's prompt asks for with the tools you have (their MCP servers among them). Change nothing anywhere: read, search and fetch only. No one answers questions: decide yourself. End your answer with the data as one JSON object in a \`\`\`json block, ${sample ? `in the same shape as this sample (its keys; values of your own): ${sample}` : 'as { "text": "<what you found, in Markdown>" }'}.`
+}
 // what a source gave as data: JSON (an object or a list), else the words as { text }
 function parsed(out: string, kind: WidgetSource['kind']): { data?: unknown; error?: string } {
   const t = out.trim()
@@ -838,17 +893,20 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
   const x = wsOf(w, o.ws) // a scope workspace one's: the workspace it was clicked in
   const k = keyOf(w.id, x?.id)
   if (!onOf(w)) return { ok: false, error: OFF(w) }
-  const cmd = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? actionCmd(w.m.actions[o.action]) : undefined
-  if (typeof cmd !== 'string') return { ok: false, error: `${w.m.name || w.id} has no action ${o.action}` }
+  const def = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
+  const cmd = actionCmd(def)
+  const ai = aiActOf(def) // an agent answers it
+  if (typeof cmd !== 'string' && !ai) return { ok: false, error: `${w.m.name || w.id} has no action ${o.action}` }
+  if (ai && ev) return { ok: false, error: `${o.action}: an agent's action runs on a click, not on an event (each run costs)` }
   wLog(w, `action ${o.action}${o.arg ? ` (${String(o.arg).slice(0, 200)})` : ''}`)
   const reason = why ?? `action:${o.action}`
   const t0 = Date.now()
   try {
-    const { out, err } = await exec(w, '/bin/sh', ['-c', cmd], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env }, ev?.stdin)
+    const { out, err } = ai ? { out: await aiAnswer(w, o.action, ai, String(o.arg ?? ''), x), err: '' } : await exec(w, '/bin/sh', ['-c', cmd!], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env }, ev?.stdin)
     ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 })
     wLog(w, `action ${o.action} done: ${lastLine(out) ?? 'printed nothing'}`)
     let j: Record<string, unknown> | undefined
-    for (const s of [out, lastLine(out)]) // all of it, or its last line after some log lines
+    for (const s of ai ? [lastJson(out)] : [out, lastLine(out)]) // all of it, or its last line after some log lines; an agent's json block
       try {
         const v = JSON.parse(s ?? '')
         if (isObj(v)) {
@@ -861,8 +919,8 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
       const d = j.data
       keep(w, x?.id, s => ((s.data = j!.merge === true && isObj(s.data) && isObj(d) ? { ...s.data, ...d } : d), (s.at = Date.now()), (s.error = s.mock = undefined)))
       changed()
-    } else if (fetches(w) && live) soon({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? `action:${o.action}` : 'manual', ws: x?.id }) // fetching already: once more after it
-    const say = j && sayOf(j)
+    } else if (!ai && fetches(w) && live) soon({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? `action:${o.action}` : 'manual', ws: x?.id }) // fetching already: once more after it
+    const say = (j && sayOf(j)) ?? (ai && !(j && 'data' in j) ? { modal: { title: `${w.m.name || w.id} · ${o.action}`, text: out.trim().slice(0, 2000), buttons: [{ label: 'OK', primary: true }] } } : undefined) // an agent's words: a dialog
     return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }) }
   } catch (e) {
     const f = e as Failed
@@ -1214,7 +1272,7 @@ export function widgetFileSave(o: { id: string; path: string; text: string; was?
   if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: Remix it to change a copy`)
   const names = w.file ? [w.file] : [...filesIn(w.dir), ...fixturesOf(w).map(f => `fixtures/${f}.json`)]
   if (typeof o.path !== 'string' || !names.includes(o.path)) throw new Error(`${o.path}: not one of its files`)
-  if (typeof o.text !== 'string' || o.text.length > 256 << 10) throw new Error('its text, up to 256 KB')
+  if (typeof o.text !== 'string' || Buffer.byteLength(o.text) > 64 << 10) throw new Error('its text, up to 64 KB (more: open its folder)') // widgetFiles shows no more
   if (o.path.startsWith('fixtures/') && !statOf(join(w.dir, 'fixtures'))?.isDirectory()) throw new Error('fixtures is a link there')
   const p = join(w.dir, o.path)
   if (!statOf(p)?.isFile()) throw new Error(`${o.path} is a link or a folder there`)
@@ -1663,13 +1721,14 @@ async function checkOne(x: Source, run: boolean, ws?: string): Promise<UiProblem
     else if (!onOf(w) && w.s.by === 'ai') say('warn', 'fetch', "not run: Laki AI wrote it and it's off: turn it on first")
     else if (scoped(w) && !ws) say('warn', 'fetch', 'not run: per workspace, which one? (--ws <id>)')
     else if (streaming(w)) say('warn', 'fetch', 'not run: it streams (laki widget dev prints its lines as they come)')
+    else if (sourceOf(w).kind === 'ai') say('warn', 'fetch', 'not run: an agent makes its data, and each run costs (Run now on its page runs it)')
     else {
       const r = await widgetRun({ id, reason: 'manual', why: 'check', ws }, true).catch(e => ({ ok: false, error: (e as Error).message }))
       const last = runs.get(keyOf(id, scoped(w) ? ws : undefined))?.[0]
       if (!r.ok) say('error', 'fetch', `${r.error}${last && !last.ok && last.exit ? ` (exit ${last.exit})` : ''}`)
       else {
         const kind = sourceOf(w).kind
-        say('ok', 'fetch', kind === 'fetch' ? `printed ${last?.bytes ?? 0} B of JSON in ${last?.ms ?? 0} ms` : `read ${last?.bytes ?? 0} B from its ${kind === 'static' ? 'text' : kind} in ${last?.ms ?? 0} ms`)
+        say('ok', 'fetch', kind === 'fetch' ? `printed ${last?.bytes ?? 0} B of JSON in ${last?.ms ?? 0} ms` : `read ${last?.bytes ?? 0} B from its ${kind === 'static' ? 'text' : kind === 'ai' ? 'agent' : kind} in ${last?.ms ?? 0} ms`)
         if (ui !== undefined) against(dataOf(w, scoped(w) ? ws : undefined).data, 'fetched')
       }
     }

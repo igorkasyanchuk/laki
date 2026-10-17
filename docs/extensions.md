@@ -30,7 +30,8 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 2. While the app is open (and within *Working hours*, if set), each extension that is on runs its `fetch` every
    `every` minutes, and when it's turned on, when its settings change, on *Reload extensions* and on `laki widget run`.
 3. What the fetch prints must be JSON: it is kept as `data`. A failure keeps the last data and shows a red dot with why.
-   Or its data comes from [somewhere else](#where-its-data-comes-from-source): a text you type, a file, a URL.
+   Or its data comes from [somewhere else](#where-its-data-comes-from-source): a text you type, a file, a URL, or an
+   agent with your MCP servers (Slack, Linear…) that sums it up.
 4. The page is filled from `data`, `config` (your settings), `at` (the last fetch) and `error`: `widget.html`'s view
    when it has one, else `ui`'s.
 
@@ -54,6 +55,17 @@ Each extension's card (Settings › Extensions, its page) has *Data*: pick where
 | *Static* (`{ "kind": "static", "text": "…" }`) | a text you type there (64 KB): JSON is its data, anything else `{ "text" }`; shown at once, never fetched |
 | *File* (`{ "kind": "file", "path": "~/notes/today.md" }`) | a file of this Mac, read every `every` minutes (16 MB); relative: the extension's folder |
 | *URL* (`{ "kind": "url", "url": "https://…" }`) | an http(s) address, read every `every` minutes (30 s, 16 MB): a public JSON API needs no fetch |
+| *AI* (`{ "kind": "ai", "prompt": "…", "tools": "mcp__slack" }`) | an agent finds it and sums it up, every hour unless `every` says (15 minutes at least: each run costs; 10 minutes a run) |
+
+An AI source runs Settings › Extensions' *Agent profile* (a claude or codex profile of Agents & profiles: its model,
+effort, account and env; `"profile"` names another) with your own config, so your MCP servers come along: *"What's new
+in #eng on Slack since yesterday: decisions, questions for me, links"*, with `"tools": "mcp__slack"`, is a summary to
+read over coffee. Claude may use the tools named in `tools` unasked (comma-separated: `mcp__slack, WebFetch,
+Bash(gh pr list:*)`) and is refused the rest; codex runs in its read-only sandbox. Its prompt may name settings and the
+workspace, like a path. The agent is told to change nothing and to end its answer with the data as a json block in the
+shape of `sample` (no sample: `{ "text" }` in Markdown, for a `markdown` element); its last json block is the data, an
+answer without one `{ "text" }`. Each run is in Laki AI's Calls (Settings › AI) with its cost; `laki widget check` doesn't
+run it.
 
 A file's or URL's JSON is its data; anything else (Markdown, plain text) is `{ "text": "…" }`, which a `markdown`
 element shows (`{ "type": "markdown", "value": "{{text}}" }`: the *note* starter). A path or URL may name settings and
@@ -222,7 +234,8 @@ The *A tool for agents* starter (`laki widget new Notes --kind tool`) is one: an
 
 The quickest way to draw one: `widget.json`'s `"ui"`, elements as JSON that follow the app's theme and fit any size
 (1-3 cells across, the ½-high bars: a single line). Every element with its sample, at each size, and its JSON to
-copy: Settings › Extensions › *UI kit*, or `laki widget kit [element] [--json]` in a terminal.
+copy: Settings › Extensions › *UI kit*, or `laki widget kit [element] [--json]` in a terminal. Every icon an
+`icon` can name, found by name, a click to copy it: Settings › Extensions › *Icons* (`laki widget kit icons`); any emoji works too.
 
 `ui` is one element (the preview and the full view alike; the full view shows every row) or `{ "preview": …, "full": … }`.
 An element is `{ "type": "<name>", …props }`, and each also takes `if` / `unless` (a path or a template: shown when
@@ -232,9 +245,9 @@ truthy / falsy; an empty list is false), `each` (repeat it per item of a list), 
 | group | elements |
 |---|---|
 | Layout | `stack` (`children`, `gap` sm/md/lg), `row` (`align` start/center/end/between, `wrap`), `grid` (`columns` 1-6, fewer as it narrows), `section` (`title`, `subtitle`, `collapsed`), `tabs` (`tabs: [{ label, badge, children }]`), `header` (`icon`, `title`, `subtitle`, `href`, `actions`), `footer` (`text`, `actions`), `toolbar` (`items`: icon buttons, their words as tooltips; `labels`), `spacer` (pushes the rest of a `row` to its end), `divider` |
-| Text | `text` (`value`, `size` sm-xl, `weight`, `mono`, `muted`, `wrap`, `color`), `heading` (`level` 1-3), `markdown` (headings, lists, tasks, tables, code, links, https pictures), `code` (`copy`), `callout` (`title`, `text`, `icon`, `action`; its `tone`), `icon` (`name`, `size`, `color`) |
-| Data | `stat` (`value`, `label`, `delta`, `spark`, `icon`), `stats`, `kv`, `list`, `table`, `chart` (below), `spark`, `progress` (`style` bar/ring), `gauge` (`value`, `min`, `max`, `unit`), `heatmap` (`x`, `value`, `rows`: days of activity), `status` (`label`, `state`: up, degraded, down… colored by its word), `checklist` (`text`, `done`), `avatars` (GitHub logins), `tags`, `badge`, `timeline`, `image`, `card` (`title`, `text`, `image`, `icon`, `tag`, `href`) |
-| Actions | `button` (`run` + `arg`, `open`, `do`, `refresh`, `full` or `copy`; `confirm`; `style` primary/quiet/danger), `actions`, `links`, `form` (`fields`, `submit`: the action gets the fields' JSON as `$WIDGET_ARG`), `empty` (`text`, `icon`, `action`) |
+| Text | `text` (`value`, `size` sm-xl, `weight`, `mono`, `muted`, `wrap`, `color`), `heading` (`level` 1-3), `markdown` (headings, lists, tasks, tables, code, links, https pictures), `code` (`copy`), `callout` (`title`, `text`, `icon`, `action`; its `tone`), `icon` (`name`, `size`, `color`), `quote` (`text`, `by`, `href`), `diff` (`value`: a unified diff, colored, its counts; `limit`), `countdown` (`to`, `label`, `soon` hours: warn, `past`) |
+| Data | `stat` (`value`, `label`, `delta`, `spark`, `icon`), `stats`, `kv`, `list`, `table`, `chart` (below), `spark`, `progress` (`style` bar/ring), `gauge` (`value`, `min`, `max`, `unit`), `heatmap` (`x`, `value`, `rows`: days of activity), `status` (`label`, `state`: up, degraded, down… colored by its word), `checklist` (`text`, `done`), `avatars` (GitHub logins), `tags`, `badge`, `timeline`, `image`, `card` (`title`, `text`, `image`, `icon`, `tag`, `href`), `steps` (`label`, `state`: done, running, failed, skipped, todo; `text`), `meter` (one bar in parts: `label`, `value`, `color`, `max`, `unit`, `title`), `board` (cards in columns: `column`, `columns`, `title`, `subtitle`, `tag`, `avatar`, `href`, `limit`), `tree` (nested rows that fold: `label`, `text`, `icon`, `nested`, `open`), `log` (`text`, `time`, `level`, or `value` a whole log; the newest lines, errors red), `json` (`value`: a path, folding; `open` levels) |
+| Actions | `button` (`run` + `arg`, `open`, `do`, `refresh`, `full` or `copy`; `confirm`; `style` primary/quiet/danger), `actions`, `links`, `form` (`fields`, `submit`: the action gets the fields' JSON as `$WIDGET_ARG`), `empty` (`text`, `icon`, `action`), `toggle` (a switch: `label`, `text`, `on`, `run`: its action gets `on` or `off` as `$WIDGET_ARG`, then it fetches again; `confirm`) |
 
 **Colors.** A `color` (text, heading, icon, badge, spark, progress, gauge, heatmap, a header's icon, a stat's and a
 tag's dot) is a tone (`good`, `bad`, `warn`, `accent`, `muted`), one of Laki's palette (`blue`, `green`, `red`,
@@ -308,6 +321,20 @@ A JS page gets the kit too: `await laki.ui(spec, data)` gives its HTML, `await l
 again. What the action prints as JSON can say more: `{"data": …}` ([its data](#an-actions-data), no fetch then), `{"toast": "Done"}`, or `{"modal": {"title", "text", "buttons"}}`
 (up to 4 buttons, each `run`ning another action, `open`ing an http(s), mailto or `laki://` link, or closing).
 `data-laki="refresh"` fetches again.
+
+An action can be an agent instead of a command: `"draft": { "ai": "Draft a short reply to {{arg}}", "tools":
+"mcp__slack__post_message" }`. Its prompt gets `{{arg}}`, the settings (`{{config.x}}`), the data's fields and the
+workspace filled in; the agent is Settings › Extensions' *Agent profile* (`"profile"` names another), with your MCP
+servers, and may use the `tools` named (claude's, comma-separated) unasked. Its answer shows in a dialog; a json block at
+its end may say `{"toast"}`, `{"modal"}` or `{"data"}` (the extension's new data), like a command's JSON. No fetch
+follows an agent's action (its run costs).
+
+### Notifications (`notify`)
+
+`"notify": "{{#if mentions}}{{mentions}} new mentions in Slack{{/if}}"`: a template over the data. After each fetch (a
+push, an action's data), when it reads as something new, not empty and not what it last said, Laki posts it as a
+notification (a click opens the extension) and a toast. The same words again say nothing; empty, then words again,
+say them again. Sample data never does.
 
 ### JS pages (`window.laki`)
 

@@ -2,13 +2,18 @@
 // tells what it is (a CSS selector, the React components around it, its classes, text and styles) with a screenshot of
 // it, to copy and paste into a prompt while working on Laki itself. Esc or a right click stops picking.
 import { Fragment, useEffect, useState } from 'react'
+import { placesOf, type WidgetView } from '../../shared/types'
+import { uiHtml, UI_SAMPLES } from '../../shared/widgetUi'
 import { api, bridge } from './api'
 import { Modal } from './panels'
 import { Icon } from './ui'
 
 export const PICKER_KEY = '⇧⌘C' // settings.pickerKey unset: as a browser's Inspect
 
-export type Picked = { selector: string; components: string[]; tag: string; classes: string[]; attrs: [string, string][]; text: string; rect: { x: number; y: number; w: number; h: number }; styles: [string, string][]; html: string; shot?: string; png?: string }
+// ext: an extension the element is in or is (its body, a JS page's frame, its button), and the UI kit's element there
+export type Picked = { selector: string; components: string[]; tag: string; classes: string[]; attrs: [string, string][]; text: string; rect: { x: number; y: number; w: number; h: number }; styles: [string, string][]; html: string; shot?: string; png?: string; ext?: PickedExt }
+const VIEWS: Record<string, string> = { preview: 'preview', full: 'full view', button: 'button' }
+type PickedExt = { id: string; name: string; view: string; sample: boolean; kit?: string; js?: boolean; places: string; size: string; source: string; dir: string; on: boolean }
 
 const STYLES = ['display', 'position', 'color', 'background-color', 'font-family', 'font-size', 'font-weight', 'padding', 'margin', 'border', 'border-radius', 'gap', 'opacity']
 const ATTRS = /^(id|role|title|aria-label|data-[\w-]+|href|type|name|placeholder)$/
@@ -42,7 +47,25 @@ export function componentsOf(el: Element): string[] {
   return out
 }
 
-export function inspect(el: Element): Picked {
+// the UI kit's elements by their root's class (k-ck: checklist), from drawing each one's sample once
+let kitClass: Map<string, string> | undefined
+const kitOf = (c: string) =>
+  (kitClass ??= new Map(
+    UI_SAMPLES.map(x => [/class="(k-[\w-]+)/.exec(uiHtml(x.spec, { data: x.data, config: {}, at: 0 }, { full: true }))?.[1] ?? '', x.type] as [string, string]).filter(([k], i, all) => k && all.findIndex(y => y[0] === k) === i),
+  )).get(c)
+// an extension's (data-widget on its body, frame or button: Widgets.tsx); inside a template's shadow root, its host's.
+// The kit's element: the nearest k-<type> class (a JS page's frame keeps what's in it to itself: its pixels only)
+function extOf(el: Element, widgets: WidgetView[]): PickedExt | undefined {
+  const host = el.closest('[data-widget]') ?? ((el.getRootNode() as ShadowRoot).host?.closest('[data-widget]') as Element | undefined)
+  const w = host && widgets.find(x => x.id === host.getAttribute('data-widget'))
+  if (!host || !w) return undefined
+  let kit: string | undefined
+  for (let e: Element | null = el; e && e !== host && !kit; e = e.parentElement) kit = [...e.classList].map(kitOf).find(Boolean)
+  const src = w.source
+  return { id: w.id, name: w.name, view: host.getAttribute('data-view') ?? 'preview', sample: host.hasAttribute('data-sample'), kit, js: !!w.js, places: placesOf(w).join(', '), size: w.size.join('×'), source: !src || src.kind === 'fetch' ? 'its fetch' : src.kind === 'ai' ? `AI: ${src.prompt?.slice(0, 120) ?? ''}` : `${src.kind} ${src.path ?? src.url ?? ''}`.trim(), dir: w.dir, on: w.on }
+}
+
+export function inspect(el: Element, widgets: WidgetView[] = []): Picked {
   const r = el.getBoundingClientRect()
   const cs = getComputedStyle(el)
   const text = ((el as HTMLElement).innerText ?? el.textContent ?? '').replace(/\s+/g, ' ').trim()
@@ -57,13 +80,21 @@ export function inspect(el: Element): Picked {
     rect: { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) },
     styles: STYLES.map(k => [k, cs.getPropertyValue(k)] as [string, string]).filter(([, v]) => v && v !== 'none' && v !== 'normal' && v !== '0px' && v !== 'rgba(0, 0, 0, 0)'),
     html: html.length > 800 ? `${html.slice(0, 800)}…` : html,
+    ext: extOf(el, widgets),
   }
 }
 
 // what Copy puts on the clipboard: Markdown an agent reads as the context of "this thing here"
 export function pickedText(p: Picked): string {
   const lines = [
-    `UI element in Laki: \`${p.selector}\``,
+    p.ext ? `UI element in the Laki extension "${p.ext.name}" (${p.ext.id}): \`${p.selector}\`` : `UI element in Laki: \`${p.selector}\``,
+    ...(p.ext
+      ? [
+          `- Extension: ${p.ext.id}, its folder ${p.ext.dir} (widget.json${p.ext.js ? ', widget.html: a JS page' : ''}); ${p.ext.on ? 'on' : 'off'}, in ${p.ext.places}, ${p.ext.size} cells`,
+          `- Its ${VIEWS[p.ext.view] ?? p.ext.view}${p.ext.sample ? ', on sample data' : ''}${p.ext.kit ? `; the UI kit's ${p.ext.kit} element` : ''}; its data: ${p.ext.source}`,
+          `- laki widget check ${p.ext.id} checks it; its page: laki://settings/widgets/${p.ext.id}/inspect`,
+        ]
+      : []),
     p.components.length ? `- React: ${p.components.join(' › ')}` : '',
     `- Element: <${p.tag}>${p.classes.length ? ` classes ${p.classes.map(c => `.${c}`).join(' ')}` : ''}`,
     ...p.attrs.map(([k, v]) => `- ${k}: ${v}`),
@@ -88,14 +119,18 @@ async function shoot(r: Picked['rect']): Promise<{ png: string; path: string } |
   return { png, path }
 }
 
-export function Picker({ onClose, copy }: { onClose: () => void; copy: (text: string) => void }) {
+export function Picker({ onClose, copy, widgets = [] }: { onClose: () => void; copy: (text: string) => void; widgets?: WidgetView[] }) {
   const [over, setOver] = useState<{ el: Element; r: DOMRect } | null>(null)
   const [picked, setPicked] = useState<Picked | null>(null)
   const [busy, setBusy] = useState(false)
   useEffect(() => {
     if (picked || busy) return
     // under the shield (it keeps frames, webviews and the app's hovers from the pointer): the first that isn't the picker's
-    const at = (e: PointerEvent) => document.elementsFromPoint(e.clientX, e.clientY).find(x => !x.closest('.picker-shield, .picker-hl, .picker-bar')) ?? null
+    // an extension's template draws in a shadow root: what's under the pointer in there
+    const at = (e: PointerEvent) => {
+      const el = document.elementsFromPoint(e.clientX, e.clientY).find(x => !x.closest('.picker-shield, .picker-hl, .picker-bar')) ?? null
+      return el?.shadowRoot?.elementsFromPoint(e.clientX, e.clientY).find(x => x.tagName !== 'STYLE' && el.shadowRoot!.contains(x)) ?? el
+    }
     const move = (e: PointerEvent) => {
       const el = at(e)
       setOver(el ? { el, r: el.getBoundingClientRect() } : null)
@@ -106,7 +141,7 @@ export function Picker({ onClose, copy }: { onClose: () => void; copy: (text: st
       const el = at(e)
       if (e.button !== 0 || el?.closest('.picker-toggle, [data-rail="picker"]')) return onClose() // a right click or the crosshair again: stop picking
       if (!el) return
-      const p = inspect(el)
+      const p = inspect(el, widgets)
       setOver(null)
       setBusy(true)
       // the highlight off the screen first: two frames, then the window's pixels
@@ -140,6 +175,20 @@ export function Picker({ onClose, copy }: { onClose: () => void; copy: (text: st
         <div className="picked">
           {picked.png && <img className="picked-shot" src={`data:image/png;base64,${picked.png}`} alt="The element" />}
           <dl className="picked-facts">
+            {picked.ext && (
+              <>
+                <dt>Extension</dt>
+                <dd>
+                  <b>{picked.ext.name}</b> <code>{picked.ext.id}</code> · its {VIEWS[picked.ext.view] ?? picked.ext.view}
+                  {picked.ext.sample ? ' on sample data' : ''}
+                  {picked.ext.kit && <> · the UI kit's <code>{picked.ext.kit}</code></>} · {picked.ext.on ? 'on' : 'off'}, in {picked.ext.places}, {picked.ext.size}
+                </dd>
+                <dt>Its data</dt>
+                <dd>{picked.ext.source}</dd>
+                <dt>Folder</dt>
+                <dd><code>{picked.ext.dir}</code></dd>
+              </>
+            )}
             <dt>Selector</dt>
             <dd><code>{picked.selector}</code></dd>
             {picked.components.length > 0 && (

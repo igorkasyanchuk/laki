@@ -816,6 +816,12 @@ one), its settings under them, and Laki AI's chat beside them: say what to chang
 of yours, in Laki's folder), saved off until you turn it on, the preview showing each version. The crumb at the top,
 or Esc, goes back where you came from (Settings, the Desk).
 
+*Edit* at its top goes to its settings, lit. Its **Data** tab says where the data comes from (its fetch, a text, a
+file, a URL), shows the data, and its examples (its sample and each `fixtures/*.json`: *Show it with this*); the
+preview's *Sample* picks one. Its **Files** tab edits its files: *Edit*, then *Save* or ⌘S (JSON is checked first, it
+reloads at once, and the studio's *Undo* keeps the version before). One that comes with Laki: Remix it first.
+Settings › Extensions › *Icons* shows every icon an extension can name, with a search; a click copies the name.
+
 To make one: Settings › Extensions › *Yours* › **New extension** opens a new extension's page. Describe it in the chat
 there (with Laki AI on): it asks you at least two questions (what it shows, where it sits, what a click does), then
 writes it, and the page turns into its page, the preview with its sample data; ask for changes until you like it,
@@ -838,8 +844,13 @@ or pick one of its `fixtures/*.json`, to see it with that data, *Sample data* on
 To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
 button, a form, a JS page or one file; it runs at once on sample data, and its page opens), or `laki widget new
 "Deploys" --kind table`. Its card's *Data* says where its data comes from: its fetch, a text you type (JSON, or a
-Markdown note), a file or a URL. Its buttons can ask Laki to start a workspace, send a prompt to the agent or Laki AI,
-run a command in a terminal or open a page (`do`; Laki asks first).
+Markdown note), a file, a URL, or *AI*: an agent finds it with your own MCP servers and sums it up, every hour (a
+prompt such as *"What's new in #eng on Slack since yesterday: decisions, questions for me"*, the tools it may use
+unasked, `mcp__slack`; Settings › Extensions › *Agent profile* picks which claude or codex profile runs it, each run in
+Laki AI's Calls). Its buttons can ask Laki to start a workspace, send a prompt to the agent or Laki AI,
+run a command in a terminal or open a page (`do`; Laki asks first); an action can be a prompt the agent answers
+(`{ "ai": "Draft a reply to {{arg}}" }`, the answer in a dialog), and `notify` posts a notification when its data says
+something new. *New ▾* makes one *With Laki AI* or *From a starter* (each shown on its sample data).
 `laki widget check <id>` (its page's **Check**) says what's wrong: unknown keys (with a guess), places, actions, the
 `ui` against its sample and fixtures, and its fetch run once. One file is an extension too: `prs.5m.sh`, run every
 5 minutes, its name, place and settings in comment lines (`# <laki.place>status</laki.place>`).
@@ -1026,6 +1037,10 @@ Turn it on in Settings › General › *Experimental*; the rail's Desk (⌘K too
 overview of what's going on. *Add* puts one there (it can stay in the sidebar too: Settings › Extensions' place menu
 ticks every place it shows in). Drag a tile's head onto another to move it, its corner to resize it; Laki keeps the
 layout. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to stay on.
+
+**Tabs** keep tiles apart (Work, Team, Home): + beside them adds one (type its name), a double-click renames it, a
+right click moves or removes it (its tiles go to the first tab). Drag a tile's head onto a tab, or pick a tile's ⋯ ›
+*Move to tab*, to move it there; *Add* puts an extension on the tab you're on.
 
 **Build with AI** (with Laki AI on) asks what it should show, then hands it to Laki AI's floating chat: it asks a few
 questions and writes the extension for the Desk. It shows as a tile right away, dashed, with its made-up data and

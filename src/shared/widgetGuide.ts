@@ -40,7 +40,13 @@ export const widgetFormat = () => `## widget.json
   \`{ "type": "markdown", "value": "{{text}}" }\`, no fetch at all), \`{ "kind": "file", "path": "~/notes/today.md" }\` or
   \`{ "kind": "url", "url": "https://…" }\` (read each \`every\` minutes: JSON is the data, anything else \`{ text }\`; a path
   or URL may say \`{{config.repo}}\`, \`{{workspace.path}}\`). A public JSON API needs no fetch: a URL source.
-- \`sample\` (**required** with a \`fetch\`, a \`script\`, a file or a URL): made-up data in exactly the shape the data takes, realistic and
+  \`{ "kind": "ai", "prompt": "Sum up #eng on Slack since yesterday: decisions, questions for me", "tools": "mcp__slack" }\`:
+  an agent makes its data (Settings › Extensions' agent profile, claude or codex; \`"profile"\` names another), with the
+  user's own MCP servers (Slack, Linear, Gmail…) and the tools named in \`tools\` (claude's, comma-separated: it may use
+  them unasked, the rest are refused). It's told to change nothing and to end with the data as a json block in the
+  shape of \`sample\` (none: \`{ text }\` in Markdown). Every hour unless \`every\` says (15 at least: each run costs).
+  The way to give the user a summary of what an MCP server reaches, with no API key or script.
+- \`sample\` (**required** with a \`fetch\`, a \`script\`, a file, a URL or an AI source): made-up data in exactly the shape the data takes, realistic and
   varied (one of each state it shows: a failing one, an approved one…): the user sees it before it ever runs
   (\`window.laki.sample\` is true then, and its buttons do nothing). \`sampleConfig\`: settings for that preview.
 - \`size\`: cells [across 1–3, down 0.5 or 1–4]; a cell is about 70×64 px, 0.5 a line 29 px tall. \`every\`: minutes
@@ -60,9 +66,15 @@ export const widgetFormat = () => `## widget.json
 - \`actions\`: commands its buttons run by name, the button's arg as \`$WIDGET_ARG\` (never paste it into the command);
   then it fetches again. Its output's last line is a toast, or print JSON: \`{"toast": "Done"}\`, \`{"modal": {"title",
   "text", "buttons": [{"label", "run", "arg", "open", "primary"}]}}\` (4 buttons at most; \`open\`: http(s), mailto, laki://).
+  An action may be an agent instead of a command: \`"draft": { "ai": "Draft a short reply to {{arg}}", "tools":
+  "mcp__slack__post_message" }\` (\`{{arg}}\`, \`{{config.x}}\`, its data's fields and \`{{workspace.branch}}\` filled in; the
+  agent of Settings › Extensions, with the user's MCP servers; \`tools\`: claude's it may use unasked). Its answer shows
+  in a dialog, or its json block's \`toast\`, \`modal\` or \`data\` (the extension's new data); no fetch after it.
+- \`notify\`: a template over its data, \`"{{#if mentions}}{{mentions}} new mentions{{/if}}"\`: after each fetch, when it
+  reads as something new (not empty, not what it last said) Laki posts it as a notification and a toast.
 - A **button** (in \`rail\` or \`foot\`, or with no preview at all): \`icon\` (Laki's by name: \`board\`, \`bell\`, \`clock\`,
   \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`, \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`,
-  \`smile\`…, or an emoji), \`label\`, \`badge\` (a short count) and \`tip\`: templates over its data, as plain text
+  \`smile\`…: \`laki widget kit icons\` lists every one; or an emoji), \`label\`, \`badge\` (a short count) and \`tip\`: templates over its data, as plain text
   (\`"badge": "{{#if open}}{{open}}{{/if}}"\`); \`click\`: one of its actions (none: its full view, else a fetch).
 - \`"scope": "workspace"\`: one per workspace, for what's about the selected one (its branch's CI, its server, its PR):
   each workspace its own data, fetched while it's selected. Its fetch and actions get \`$LAKI_WORKSPACE\`,
@@ -119,6 +131,7 @@ its links, buttons and filters work. Use widget.html only for a look the kit can
   (\`new\`: a workspace whose agent starts on \`prompt\`, in \`project\` (a name; none: the selected one's) with \`agent\`
   (none: the default); \`send\`: \`prompt\` to the selected workspace's agent; \`ai\`: \`prompt\` to Laki AI; \`terminal\`:
   \`command\` in a new terminal; \`browse\`: \`url\` in a Laki browser tab). A JS page: \`laki.do({ do, prompt… })\`.
+  A \`toggle\` is a switch: its \`run\` gets \`on\` or \`off\` (what it's turned to) as \`$WIDGET_ARG\`, its \`on\` reads the state back.
 - **Layouts**: a \`header\` (icon, title, buttons), the body, a \`footer\` (muted words, buttons) in a \`stack\`; a
   \`toolbar\` of icon buttons; a \`spacer\` pushes what follows it in a \`row\` to the end.
 

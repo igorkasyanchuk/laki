@@ -93,3 +93,93 @@ test('sources: static, file and URL, each JSON or { text }; its fetch again; wid
   const check = await rig.cli('widget', 'check', 'n')
   assert.match(check.out, /✓ fetch: read 8 B from its file/)
 })
+
+test('an AI source: the agent of Settings › Extensions (or its own profile) answers its prompt, its last json block the data', async t => {
+  const rig = await fresh(t)
+  const dir = join(rig.data, 'widgets', 'slack')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify({ name: 'Slack', config: { channel: 'eng' }, source: { kind: 'ai', prompt: 'Sum up #{{config.channel}}', tools: 'mcp__slack, WebFetch' }, sample: { text: 'two decisions' }, ui: { type: 'text', value: '{{text}}|{{tools}}|{{account}}' } }))
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'work', agent: 'claude', env: { TEST_ACCOUNT: 'work' } }, { name: 'cx', agent: 'codex' }] })
+  await rig.rpc('widgetReload')
+  let w = await find(rig, 'slack')
+  assert.equal(w.every, 60, 'an hour unless set: each run costs')
+  assert.match(await rig.rpc('widgetRender', { id: 'slack', sample: true }), /two decisions/, 'its sample')
+  const shows = (re: RegExp) => until(async () => re.test(await rig.rpc('widgetRender', { id: 'slack' })), `shows ${re}`)
+  const idle = () => until(async () => !(await find(rig, 'slack')).running, 'done')
+
+  await rig.rpc('widgetSet', { id: 'slack', on: true }) // turned on: run now, with the prompt filled
+  await shows(/Sum up #eng\|mcp__slack, WebFetch\|</)
+  const call = rig.fakeLog().filter((l: any) => l.bin === 'claude' && l.args.includes('--output-format')).pop()
+  assert.ok(call.args.includes('--allowedTools') && !call.args.includes('--tools'), 'the user’s own tools and MCP servers, the named ones unasked')
+  assert.match(call.args[call.args.indexOf('--append-system-prompt') + 1], /Change nothing anywhere[\s\S]*two decisions/, 'told the shape: its sample')
+
+  // Settings › Extensions' agent: its env; the source's own profile wins
+  await idle()
+  await rig.rpc('settingsSet', { widgetAgent: 'work' })
+  await rig.rpc('widgetRun', { id: 'slack' })
+  await shows(/\|work</)
+  await idle()
+  await rig.rpc('widgetSet', { id: 'slack', source: { kind: 'ai', prompt: 'words only', profile: 'claude' } })
+  await shows(/Just words: words only\|\|</)
+  await idle()
+  await rig.rpc('widgetSet', { id: 'slack', source: { kind: 'ai', prompt: 'x', profile: 'gone' } })
+  await until(async () => /no claude or codex profile gone/.test((await find(rig, 'slack')).error ?? ''), 'a profile gone: said')
+  await idle()
+  await rig.rpc('widgetSet', { id: 'slack', source: { kind: 'ai', prompt: 'fail now' } })
+  await until(async () => /it broke/.test((await find(rig, 'slack')).error ?? ''), "claude's own error")
+
+  // every 15 minutes at most; tools never an option; the check doesn't spend a run
+  await rig.rpc('widgetSet', { id: 'slack', every: 5 })
+  w = await find(rig, 'slack')
+  assert.equal(w.every, 15)
+  await assert.rejects(rig.rpc('widgetSet', { id: 'slack', source: { kind: 'ai', prompt: 'x', tools: '--dangerously-skip-permissions' } }), /a source/, 'one argument: never an option of claude’s')
+  await rig.rpc('widgetSet', { id: 'slack', source: { kind: 'ai', prompt: 'x', tools: 'Bash(git log --oneline:*)' } })
+  const check = await rig.cli('widget', 'check', 'slack')
+  assert.match(check.out, /not run: an agent makes its data/)
+})
+
+test('AI actions answer in a dialog, a toast or new data; notify posts what its data says, once each time it reads anew', async t => {
+  const rig = await fresh(t)
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  const dir = join(rig.data, 'widgets', 'acts')
+  mkdirSync(dir, { recursive: true })
+  const m = { name: 'Acts', fetch: `cat ${join(dir, 'n.json')}`, notify: '{{#if n}}{{n}} new{{/if}}', ui: { type: 'stat', value: '{{n}}' }, sample: { n: 1 }, actions: { draft: { ai: 'words: draft for {{arg}} at {{n}}' }, upd: { ai: 'data now' }, ping: { ai: 'toast it', tools: 'mcp__slack__post_message' } } }
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify(m))
+  writeFileSync(join(dir, 'n.json'), '{"n": 3}')
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'acts', on: true })
+  const said = (text: string) => until(() => app.events.find(e => e.ev === 'widget-say' && e.widget === 'acts' && e.notify === text), `notified: ${text}`)
+  await said('3 new')
+  await until(async () => !(await find(rig, 'acts')).running, 'fetched')
+
+  // a dialog with its words, {{arg}} and the data filled in; no fetch after it (another agent's run would cost)
+  const runs = async () => (await rig.rpc('widgetRuns', { id: 'acts' })).runs.length
+  const before = await runs()
+  const r = await rig.rpc('widgetAction', { id: 'acts', action: 'draft', arg: 'PR 412' })
+  assert.equal(r.modal.title, 'Acts · draft')
+  assert.equal(r.modal.text, 'Just words: words: draft for PR 412 at 3')
+  assert.equal(await runs(), before + 1, 'the action alone, no fetch')
+  const ping = await rig.rpc('widgetAction', { id: 'acts', action: 'ping' })
+  assert.equal(ping.toast, 'sent')
+  const call = rig.fakeLog().filter((l: any) => l.bin === 'claude' && l.args.at(-1) === 'toast it').pop()
+  assert.equal(call.args[call.args.indexOf('--allowedTools') + 1], 'mcp__slack__post_message')
+  // its json's data is the extension's: kept, said by notify
+  await rig.rpc('widgetAction', { id: 'acts', action: 'upd' })
+  await said('9 new')
+  assert.match(await rig.rpc('widgetRender', { id: 'acts' }), />9</)
+
+  // the same words again: nothing; empty, then words again: said again
+  const n = () => app.events.filter(e => e.ev === 'widget-say' && e.notify).length
+  const was = n()
+  writeFileSync(join(dir, 'n.json'), '{"n": 9}')
+  await rig.rpc('widgetRun', { id: 'acts' })
+  writeFileSync(join(dir, 'n.json'), '{"n": 0}')
+  await rig.rpc('widgetRun', { id: 'acts' })
+  assert.equal(n(), was)
+  writeFileSync(join(dir, 'n.json'), '{"n": 9}')
+  await rig.rpc('widgetRun', { id: 'acts' })
+  await until(() => n() === was + 1, 'said again')
+  const check = await rig.cli('widget', 'check', 'acts', '--no-run')
+  assert.doesNotMatch(check.out, /✗|actions\./)
+})

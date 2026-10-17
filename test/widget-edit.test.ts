@@ -61,6 +61,11 @@ test('made-up variants: each starter with data has three more fixtures, My PRs t
   assert.match(await rig.rpc('widgetRender', { id: 'my-prs', sample: 'busy' }), /<div class="k-v">14<\/div>/)
   assert.match(await rig.rpc('widgetRender', { id: 'my-prs', sample: 'none', full: true }), /No open PRs/)
   await assert.rejects(rig.rpc('widgetRender', { id: 'my-prs', sample: 'nope' }), /no fixtures\/nope.json/)
+  // every icon by name, for agents (the app's gallery shows them)
+  const icons = await rig.cli('widget', 'kit', 'icons')
+  assert.match(icons.out, /^\d+ icons, by name/)
+  assert.match(icons.out, /\bciFail\b/)
+  assert.ok(JSON.parse((await rig.cli('widget', 'kit', 'icons', '--json')).out).includes('github'))
   // the check fits the ui to each of them
   const check = await rig.cli('widget', 'check', 'my-prs', '--no-run')
   assert.doesNotMatch(check.out, /✗/)

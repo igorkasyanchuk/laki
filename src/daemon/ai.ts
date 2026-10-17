@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
-import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View, EFFORTS } from '../shared/types.ts'
+import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -470,23 +470,27 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
 
 // one question, one answer, outside any chat and with no tools (memory's compaction): Settings › AI's backend, OpenRouter
 // through aiComplete, or claude -p / codex exec with nothing but the prompt (their preset's account and env, as the
-// chat's); logged among Laki AI's calls
-export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean }): Promise<string> {
+// chat's); logged among Laki AI's calls. agent: an extension's AI source, that agent with the user's own config (its
+// MCP servers; claude's tools: the ones it may use unasked, its other asks refused; codex's sandbox read-only), 10 minutes
+export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; name?: string }): Promise<string> {
   const s = state.settings?.ai ?? {}
-  const backend: AiBackend = s.backend ?? 'openrouter'
+  const agent = !!o.preset // an extension's: the preset's model, effort, env and account; the user's own config
+  const backend: AiBackend = o.preset?.agent ?? s.backend ?? 'openrouter'
   if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text
-  const model = s.models?.[backend]
+  const pre = o.preset ?? presetOf(backend)
+  const model = agent ? o.preset!.model : s.models?.[backend]
+  const effort = effortArgs(backend, agent ? (o.preset!.effort ?? '') : undefined)
   const call: AiCall = { at: Date.now(), backend, model: model || backend, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
   const args =
     backend === 'claude'
-      ? ['-p', '--output-format', 'json', '--tools', '', '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effortArgs('claude'), '--', o.prompt]
-      : ['exec', '--json', '--skip-git-repo-check', '--ignore-user-config', '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effortArgs('codex'), '--', o.prompt]
+      ? ['-p', '--output-format', 'json', ...(agent ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '']), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
+      : ['exec', '--json', '--skip-git-repo-check', ...(agent ? [] : ['--ignore-user-config']), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
   mkdirSync(home, { recursive: true })
-  const env = { ...process.env, ...state.settings?.env, ...presetOf(backend)?.env, ...accountEnv(presetOf(backend)?.account ?? accountUsed(backend)) }
+  const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)) }
   try {
     const out = await new Promise<string>((ok, no) => {
-      const c = execFile(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: 300000 }, (e, so, se) => (e ? no(new Error(`${backend}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed (not on PATH)' : String(se).trim().split('\n').pop() || e.message}`)) : ok(so)))
-      own(c, `Laki AI · ${backend}`, 'ai')
+      const c = execFile(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: agent ? 600_000 : 300_000 }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`${backend}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed (not on PATH)' : (e as { killed?: boolean }).killed ? 'took too long' : String(se).trim().split('\n').pop() || e.message}`)) : ok(so)))
+      own(c, o.name ?? `Laki AI · ${backend}`, agent ? undefined : 'ai')
     })
     let text = ''
     for (const l of backend === 'claude' ? [out] : out.split('\n')) { // claude: one JSON document; codex: a line each
@@ -601,8 +605,8 @@ function cli(o: Opts, cmd: AiBackend, args: string[], line: (j: any) => void) {
 }
 
 // Settings › AI's effort for claude -p or codex exec, as a tab's (agentCmd): one of EFFORTS, else theirs
-const effortArgs = (backend: 'claude' | 'codex') => {
-  const e = state.settings?.ai?.efforts?.[backend]
+const effortArgs = (backend: 'claude' | 'codex', own?: string) => {
+  const e = own ?? state.settings?.ai?.efforts?.[backend] // own: an extension's preset's ('': none)
   if (!e || !EFFORTS[backend]?.includes(e)) return []
   return backend === 'claude' ? ['--effort', e] : ['-c', `model_reasoning_effort="${e}"`]
 }

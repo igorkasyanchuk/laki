@@ -5,6 +5,17 @@ const args = process.argv.slice(2)
 fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'claude', tab: process.env.LAKI_TAB, port: process.env.PORT, storage: process.env.LAKI_STORAGE_FOLDER, args, env: Object.fromEntries(Object.entries(process.env).filter(([k]) => k.startsWith('TEST_') || k === 'LAKI_PROGRESS' || k === 'CLAUDE_CONFIG_DIR')) }) + '\n')
 // -p (Laki's AI): stream-json, one laki_state call through the --mcp-config server; "fail…" fails, "slow…" waits;
 // a brainstorm writes its ideas.md
+// -p --output-format json (an extension's AI source, aiOnce): one result; "fail…" fails, "words…" has no json block
+if (args[0] === '-p' && args[args.indexOf('--output-format') + 1] === 'json') {
+  const prompt = args[args.length - 1]
+  const tools = args.includes('--allowedTools') ? args[args.indexOf('--allowedTools') + 1] : ''
+  const done = result => process.stdout.write(JSON.stringify({ type: 'result', subtype: 'success', is_error: false, result, total_cost_usd: 0.002, usage: { input_tokens: 10, output_tokens: 5 } }))
+  if (prompt.startsWith('fail')) return process.stdout.write(JSON.stringify({ type: 'result', subtype: 'error_during_execution', is_error: true, result: 'it broke' })), (process.exitCode = 1)
+  if (prompt.startsWith('words')) return done(`Just words: ${prompt}`)
+  if (prompt.startsWith('data')) return done('Done.\n\n```json\n{"data": {"n": 9}}\n```')
+  if (prompt.startsWith('toast')) return done('```json\n{"toast": "sent"}\n```')
+  return done(`Found it.\n\n\`\`\`json\n{"text": "draft"}\n\`\`\`\n\nThe data:\n\n\`\`\`json\n${JSON.stringify({ text: prompt, tools, account: process.env.TEST_ACCOUNT ?? '' })}\n\`\`\`\n`)
+}
 if (args[0] === '-p') {
   const out = o => process.stdout.write(JSON.stringify(o) + '\n')
   const prompt = args[args.length - 1]

@@ -61,7 +61,7 @@ const WidgetStudio = lazy(() => import('./WidgetStudio').then(m => ({ default: m
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
 const SCRIPT_ICONS: Record<RunScript, IconName> = { test: 'check', lint: 'search', format: 'code', deploy: 'ship' }
 const toolAsks = new Set<string>() // an extension tool's asks still on screen, by req (their dialogs' tag)
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab } | { uikit: true; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -717,7 +717,13 @@ export function App() {
   useEffect(() => {
     const off = api.on(m => {
       if (m.ev === 'state') setView(m.view)
-      else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
+      else if (m.ev === 'widget-say' && typeof m.notify === 'string') {
+        // an extension's notify: its new words, a notification (its click: its full view, else its page) and a toast
+        const w = viewRef.current?.widgets?.find(x => x.id === m.widget)
+        const open = () => setDialog(w?.full ? { widget: m.widget } : { extension: m.widget })
+        if (viewRef.current?.settings.notify !== false && !document.hasFocus()) notify(w?.name ?? m.widget, m.notify, '', open, viewRef.current?.settings.notifySound) // looking at Laki: the toast is enough
+        toast(`${w?.name ?? m.widget}: ${m.notify}`, open, 'Open')
+      } else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
       else if (m.ev === 'toolAsk') toolAsk.current?.(m)
       else if (m.ev === 'toolDone') toolAsks.delete(m.req) && unchoose(m.req)
       else if (m.ev === 'problem') setProblem(m.text)
@@ -1305,6 +1311,8 @@ export function App() {
     home: view?.widgetHome,
     set: (id, o) => call('widgetSet', { id, ...o }),
     desk: settings.desk === true,
+    agents: (view?.presets ?? []).filter(p => !p.off && (p.agent === 'claude' || p.agent === 'codex')).map(p => ({ name: p.name, agent: p.agent })),
+    agent: settings.widgetAgent,
     run: (id, ws) => call('widgetRun', { id, ws }),
     rm: id => call('widgetRm', { id }).then(() => done('Deleted')),
     reload: () => call('widgetReload'),
@@ -1320,7 +1328,7 @@ export function App() {
       openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])
     },
     logs: settings.devMode ? id => setDialog({ logs: `widget:${id}`, title: `Logs · ${view?.widgets?.find(x => x.id === id)?.name ?? id}`, back: dialog }) : undefined,
-    kit: () => setDialog({ uikit: true, back: dialog }),
+    kit: icons => setDialog({ uikit: true, icons, back: dialog }),
     runs: (id, ws) => api.call<WidgetRuns>('widgetRuns', { id, data: true, ws }),
     mock: (id, o) => call('widgetMock', { id, ...o }),
     files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => r.files),
@@ -2799,19 +2807,20 @@ export function App() {
             <WidgetStudio key={s.studio || 'new'} id={s.studio} widgets={view.widgets ?? []} cfg={extCfg} api={widgetApi} back={backWord(s.back)} onClose={() => setDialog(s.back ?? null)} />
           </Suspense>
         ))(settings.ai?.on ? studioOf(dialog) : undefined)}
-        {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
+        {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
         {dialog === 'help' && <HelpPage cli="laki" ship zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
-        {picking && <Picker copy={copy} onClose={() => setPicking(false)} />}
+        {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}
         {dialog === 'desk' && deskOn && (
           <DeskPage
             widgets={shownWidgets}
             tiles={settings.deskTiles}
+            tabs={settings.deskTabs}
             api={{
               ...widgetApi,
               place: (id, place, on) => call('widgetSet', { id, place, ...(on !== undefined && { on }) }),
               build: settings.ai?.on ? want => (settings.ai?.float === false ? setDialog('ai') : setAiFloat(true), void api.call('aiAsk', { text: widgetAsk(want, true) }).catch(fail)) : undefined, // the floating chat: questions, then it writes it; the Desk shows it
-              tiles: deskTiles => void call('settingsSet', { deskTiles }).catch(() => {}),
+              save: o => void call('settingsSet', { ...(o.tiles && { deskTiles: o.tiles }), ...(o.tabs && { deskTabs: o.tabs }) }).catch(() => {}),
             }}
             onClose={() => setDialog(null)}
           />

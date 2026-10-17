@@ -76,10 +76,21 @@ export const MANIFEST: Record<string, J> = {
             },
           },
         },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['ai'],
+          properties: {
+            ai: str('An agent answers this prompt ({{arg}}, {{config.x}}, {{data.x}}, {{workspace.branch}} filled in), with the user’s own MCP servers; its answer shows in a dialog, or its json block’s { "toast" }, { "modal" } or { "data" }'),
+            tools: str('Claude’s tools it may use unasked, by name, comma-separated (mcp__slack__post_message); others are refused'),
+            profile: str('A claude or codex profile (unset: Settings › Extensions’ agent)'),
+          },
+        },
       ],
     },
-    description: 'Commands its buttons run by name, with $WIDGET_ARG: a command, or { "run", "tool" } (agents may call it); what one prints as JSON may say { "toast" }, { "modal" } or { "data" }',
+    description: 'Commands its buttons run by name, with $WIDGET_ARG: a command, { "run", "tool" } (agents may call it), or { "ai": a prompt } (an agent answers it); what one prints as JSON may say { "toast" }, { "modal" } or { "data" }',
   },
+  notify: str('A notification, a template over its data ("{{#if mentions}}{{mentions}} new mentions{{/if}}"): posted when it reads as something new after a fetch, not empty and not what it last said'),
   icon: str('As a button: an icon of Laki’s by name, or an emoji'),
   label: str('As a button: its words, a template over its data'),
   badge: str('As a button: a short count, a template ("{{#if n}}{{n}}{{/if}}")'),
@@ -89,8 +100,8 @@ export const MANIFEST: Record<string, J> = {
     type: 'object',
     additionalProperties: false,
     required: ['kind'],
-    properties: { kind: { enum: ['fetch', 'static', 'file', 'url'], description: 'fetch: its own fetch or script; static: the text below; file: a file read each time (JSON, else { "text" }); url: an http(s) page read each time' }, text: str('With static: JSON, or words (its data: { "text" })'), path: str('With file: its path (~ is home; relative: the extension’s folder; {{config.x}}, {{workspace.path}})'), url: str('With url: the address ({{config.x}} too)') },
-    description: 'Where its data comes from at first: the user picks another on its card (Its fetch, Static, File, URL)',
+    properties: { kind: { enum: ['fetch', 'static', 'file', 'url', 'ai'], description: 'fetch: its own fetch or script; static: the text below; file: a file read each time (JSON, else { "text" }); url: an http(s) page read each time; ai: an agent (claude or codex, with the user’s own MCP servers) answers prompt, its last ```json block the data' }, text: str('With static: JSON, or words (its data: { "text" })'), path: str('With file: its path (~ is home; relative: the extension’s folder; {{config.x}}, {{workspace.path}})'), url: str('With url: the address ({{config.x}} too)'), prompt: str('With ai: what the agent finds and sums up ({{config.x}}, {{workspace.branch}} too); it answers in the shape of sample'), tools: str('With ai, claude: the tools it may use unasked, by name, comma-separated (mcp__slack, WebFetch, Bash(gh pr list:*)); others are refused'), profile: str('With ai: a claude or codex profile of Settings › Agents & profiles (unset: Settings › Extensions’ agent)') },
+    description: 'Where its data comes from at first: the user picks another on its card (Its fetch, Static, File, URL, AI)',
   },
   sample: { description: 'Made-up data in the shape its data takes, for its preview before it runs (needed with a fetch, a script, a file or a URL)' },
   sampleConfig: { type: 'object', description: 'Settings to show the sample with' },
@@ -130,8 +141,8 @@ export const WIDGET_SCHEMA = {
   },
 }
 
-// what has data to show before it runs: a fetch, a script, a file or a URL (a text typed in is its own)
-export const needsSample = (m: Record<string, unknown>) => !!(m.fetch || m.script) || ['file', 'url'].includes(String((m.source as { kind?: unknown } | undefined)?.kind))
+// what has data to show before it runs: a fetch, a script, a file, a URL or an agent (a text typed in is its own)
+export const needsSample = (m: Record<string, unknown>) => !!(m.fetch || m.script) || ['file', 'url', 'ai'].includes(String((m.source as { kind?: unknown } | undefined)?.kind))
 // laki.d.ts: window.laki for a JS page (widget.html with a <script>), and the UI kit's elements as types
 const tsOf = (k: Kind): string =>
   Array.isArray(k) ? k.map(w => JSON.stringify(w)).join(' | ') : ({ text: 'Text', icon: 'string', number: 'number | string', bool: 'boolean', path: 'string | unknown[]', children: 'UiElement[]', button: 'UiButton', buttons: 'UiButton[]', tone: 'Tone | string | Record<string, Tone>', items: 'any[]', object: 'Record<string, unknown>' } as Record<string, string>)[k as string]
@@ -196,7 +207,7 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   const say = (level: UiProblem['level'], where: string, text: string) => out.push({ level, where, text })
   const keys = Object.keys(MANIFEST)
   for (const k of Object.keys(m)) if (!keys.includes(k)) say('warn', 'widget.json', `no key ${k}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(k, keys))}`)
-  for (const k of ['name', 'description', 'fetch', 'script', 'icon', 'label', 'badge', 'tip', 'click'])
+  for (const k of ['name', 'description', 'fetch', 'script', 'icon', 'label', 'badge', 'tip', 'click', 'notify'])
     if (m[k] !== undefined && typeof m[k] !== 'string') say('error', `widget.json ${k}`, `text, not ${kindOf(m[k])}`)
   if (m.size !== undefined && !(Array.isArray(m.size) && m.size.length === 2 && SIZES_ACROSS.includes(Number(m.size[0])) && SIZES_DOWN.includes(Number(m.size[1]))))
     say('error', 'widget.json size', `[across, down]: across 1-3, down ½ (0.5) or 1-4, not ${JSON.stringify(m.size)}`)
@@ -209,7 +220,9 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   if (needsSample(m) && m.sample === undefined) say('warn', 'widget.json', 'no sample: its preview has nothing to show before it runs')
   if (m.source !== undefined) {
     const src = m.source as Record<string, unknown> | null
-    if (!src || typeof src !== 'object' || !['fetch', 'static', 'file', 'url'].includes(String(src.kind))) say('error', 'widget.json source', '{ "kind": "fetch" | "static" | "file" | "url", "text" | "path" | "url" }')
+    if (!src || typeof src !== 'object' || !['fetch', 'static', 'file', 'url', 'ai'].includes(String(src.kind))) say('error', 'widget.json source', '{ "kind": "fetch" | "static" | "file" | "url" | "ai", "text" | "path" | "url" | "prompt" }')
+    else if (src.kind === 'ai' && (typeof src.prompt !== 'string' || !src.prompt.trim())) say('error', 'widget.json source', 'ai: a prompt, what the agent finds')
+    else if (src.kind === 'ai' && src.tools !== undefined && (typeof src.tools !== 'string' || /[\n\r]|^\s*-/.test(src.tools))) say('error', 'widget.json source', 'ai: tools by name, comma-separated (mcp__slack, WebFetch), no options')
     else if (src.kind === 'fetch' && !m.fetch && !m.script) say('error', 'widget.json source', 'fetch: but no fetch nor script')
     else if (src.kind === 'url' && typeof src.url === 'string' && !/^https?:\/\//i.test(src.url) && !src.url.includes('{{')) say('error', 'widget.json source', 'url: http or https')
     else if (src.kind === 'static' && (typeof (src.text ?? '') !== 'string' || String(src.text ?? '').length > 64 << 10)) say('error', 'widget.json source', 'static: a text, 64 KB at most')
@@ -223,8 +236,14 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   for (const [n, c] of Object.entries(actions ?? {})) {
     if (typeof c === 'string') continue
     const where = `widget.json actions.${n}`
+    if (isObj(c) && 'ai' in c && !('run' in c)) {
+      if (typeof c.ai !== 'string' || !c.ai.trim()) say('error', where, 'ai: a prompt, what the agent answers')
+      if (c.tools !== undefined && (typeof c.tools !== 'string' || /[\n\r]|^\s*-/.test(c.tools))) say('error', `${where}.tools`, 'tools by name, comma-separated (mcp__slack__post_message), no options')
+      for (const k of Object.keys(c)) if (!['ai', 'tools', 'profile'].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, ['ai', 'tools', 'profile']))}`)
+      continue
+    }
     if (!isObj(c) || typeof c.run !== 'string') {
-      say('error', where, `a command (text), or { "run": a command, "tool": … }, not ${isObj(c) ? 'an object without run' : kindOf(c)}`)
+      say('error', where, `a command (text), { "run": a command, "tool": … } or { "ai": a prompt }, not ${isObj(c) ? 'an object without run' : kindOf(c)}`)
       continue
     }
     for (const k of Object.keys(c)) if (!['run', 'tool'].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, ['run', 'tool']))}`)
@@ -256,6 +275,7 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
       if (!(WIDGET_EVENTS as readonly string[]).includes(e)) say('error', where, `no event ${e}${(n => (n ? ` (did you mean ${n}?)` : `: ${WIDGET_EVENTS.join(', ')}`))(near(e, WIDGET_EVENTS))}`)
       if (h === 'refresh') !(m.fetch || m.script) && say('error', where, 'refresh: it has no fetch or script')
       else if (typeof h !== 'string' || !Object.hasOwn(actions ?? {}, h)) say('error', where, `refresh, or one of its actions${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(h), Object.keys(actions ?? {})))}`)
+      else if (aiActOf(actions![h])) say('error', where, `${h} is an agent's action: those run on a click, not on an event (each run costs)`)
     }
   if (typeof m.click === 'string' && !Object.hasOwn(actions ?? {}, m.click)) say('error', 'widget.json click', `${m.click} isn't one of its actions${(n => (n ? ` (did you mean ${n}?)` : ''))(near(m.click, Object.keys(actions ?? {})))}`)
   const config = m.config
@@ -282,6 +302,8 @@ export type ToolField = { type: (typeof TOOL_TYPES)[number]; description?: strin
 export type ToolSpec = { description: string; input: Record<string, ToolField>; required: string[]; ask: (typeof TOOL_ASKS)[number] }
 // an action's command: the string, or the object's run
 export const actionCmd = (a: unknown) => (typeof a === 'string' ? a : isObj(a) && typeof a.run === 'string' ? a.run : undefined)
+// an action an agent answers: { "ai": a prompt, "tools", "profile" } (an AI source's agent, Settings › Extensions')
+export const aiActOf = (a: unknown) => (isObj(a) && typeof a.ai === 'string' && typeof a.run !== 'string' ? { prompt: a.ai, ...(typeof a.tools === 'string' && { tools: a.tools }), ...(typeof a.profile === 'string' && { profile: a.profile }) } : undefined)
 // an action's tool as the daemon takes it (what check flags left out); none: not one
 export function toolOf(a: unknown): ToolSpec | undefined {
   if (!isObj(a) || typeof a.run !== 'string' || !isObj(a.tool)) return

@@ -43,7 +43,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's)
   laki widget render <id> [--full] [--ws <ws>]  the HTML it shows now, filled from its data
   laki widget action <id> <action> [arg] [--ws <ws>]  run one of its widget.json actions: what the app would show
-  laki widget kit [element] [--json]          the UI kit (widget.json's "ui"): its elements, or one's props and a sample
+  laki widget kit [element|icons] [--json]    the UI kit (widget.json's "ui"): its elements, one's props and a sample, or every icon
   laki widget dev [folder]                    dev mode: link your extension's folder (on, watched), then its runs as they come
   laki widget dev --off <id|folder> | --list  unlink one | the linked folders
   laki widget new <name> [--kind <k>] [--dir <folder>]  a starter (number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, onefile), on

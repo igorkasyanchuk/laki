@@ -149,6 +149,19 @@ export const CELLS: [number, number][] = [
   [3, 2],
   [3, 4],
 ]
+// as a Desk tile shows it: its full view when it has one (room for a long table or list), else its preview (sample: a fixture by name too)
+export function DeskTile({ w, api, sample, note }: { w: WidgetView; api: WidgetApi; sample: boolean | string; note?: string }) {
+  return (
+    <div className="desk-tile ext-desk">
+      <div className="desk-head">
+        <b>{w.name}</b>
+        <span className="muted small">{note ?? (sample ? 'made-up data' : status(w) || (w.on ? 'live' : 'off'))}</span>
+      </div>
+      <div className="desk-body">{w.button && !w.full ? <CellButton w={w} api={api} /> : <WidgetBody key={`${sample}desk`} w={w} full={!!w.full} api={api} sample={sample} />}</div>
+    </div>
+  )
+}
+
 function Preview({ w, api, cfg, spot = 0 }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi; spot?: number }) {
   const [pick, setPick] = useState<'live' | 'sample'>()
   // Edit: its settings scrolled to, lit (Settings' spot) and its first field focused
@@ -273,6 +286,10 @@ function Preview({ w, api, cfg, spot = 0 }: { w: WidgetView; api: WidgetApi; cfg
               <CellButton w={w} api={api} />
             </div>
             <span className="muted small">tip: {w.tip ?? w.name}</span>
+          </div>
+          <div className="ext-desk-spot">
+            <span className="muted small">Desk tile · {w.full ? 'its full view' : 'its preview'}, room for a long table or list</span>
+            <DeskTile w={w} api={api} sample={made} note={sample ? 'made-up data' : undefined} />
           </div>
         </div>
       </section>
@@ -528,7 +545,7 @@ function Examples({ w, cfg, files, onShown }: { w: WidgetView; cfg: WidgetsApi; 
             <button className="sm" disabled={!cfg.mock} data-tip="Show it with this (made-up data, not fetched until Live)" onClick={show}>
               Show it with this
             </button>
-            <button className="sm" data-tip="Its source becomes a Static text: this JSON" onClick={() => void cfg.set(w.id, { source: { kind: 'static', text: one.text } }).catch(e => setErr(String(e?.message ?? e)))}>
+            <button className="sm" disabled={UNSHOWN.test(one.text)} data-tip="Its source becomes a Static text: this JSON" onClick={() => void cfg.set(w.id, { source: { kind: 'static', text: one.text } }).catch(e => setErr(String(e?.message ?? e)))}>
               Use as its data
             </button>
           </>

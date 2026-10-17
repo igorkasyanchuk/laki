@@ -250,7 +250,7 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .wc-every input { width: 52px; padding: 4px 6px; }
 .ib.spin svg { animation: spin 0.8s linear infinite; } /* fetching */
 .tag-soft { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 400; }
-.wc-src { display: flex; flex-direction: column; gap: 6px; } .wc-src > .row { align-items: center; justify-content: flex-start; gap: 10px; } .wc-src :is(textarea, input) { width: 100%; font-size: 11.5px; } .wc-src textarea { resize: vertical; }
+.wc-src { display: flex; flex-direction: column; gap: 6px; } .wc-src > .row { align-items: center; justify-content: flex-start; gap: 10px; } .wc-src :is(textarea, input) { width: 100%; font-size: 11.5px; } .wc-src textarea { resize: vertical; } .wc-src .wc-ai { flex-wrap: wrap; } .wc-ai > label { display: flex; align-items: center; gap: 6px; flex: none; } .wc-ai > input { flex: 1; min-width: 200px; width: auto; }
 .wc-opts { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 8px 12px; }
 .wo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .wo > span:first-child { align-self: flex-start; white-space: nowrap; }
@@ -2013,7 +2013,30 @@ html.picking, html.picking * { cursor: crosshair !important; }
 /* Settings › Extensions › UI kit (UiKit.tsx): a card per element, its sample at a size and in the status bar, its JSON */
 .kit { display: flex; flex-direction: column; gap: 14px; }
 .kit-head { display: flex; flex-direction: column; gap: 10px; }
-.kit-find { max-width: 420px; }
+.kit-find { max-width: 420px; } .kit-view { margin-left: 12px; }
+.kit-icons { display: flex; flex-direction: column; gap: 12px; } .kit-icons-head { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; } .kit-icons-body { display: grid; grid-template-columns: minmax(0, 1fr) 300px; align-items: start; gap: 14px; }
+.kit-icon-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 6px; } .kit-icon { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; padding: 12px 4px 8px; border: 1px solid var(--line); border-radius: var(--rs, 8px); background: none; color: var(--fg); }
+.kit-icon > .mono { max-width: 100%; overflow: hidden; color: var(--muted); font-size: 10.5px; text-overflow: ellipsis; white-space: nowrap; } .kit-icon:hover { background: var(--hover); } .kit-icon.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); } .kit-icon.on > .mono { color: var(--fg); }
+.kit-icon-pick { position: sticky; top: 0; display: flex; flex-direction: column; gap: 12px; } .kit-icon-sizes, .kit-icon-tones { display: flex; align-items: flex-end; gap: 18px; } .kit-icon-sizes > span { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.kit-icon-use { display: flex; flex-direction: column; gap: 3px; min-width: 0; } .kit-icon-use > button { min-width: 0; padding: 5px 8px; overflow-wrap: anywhere; text-align: left; white-space: normal; }
+@media (max-width: 720px) { .kit-icons-body { grid-template-columns: minmax(0, 1fr); } .kit-icon-pick { position: static; } }
+/* New ▾ › From a starter: a card each, its look on sample data over its name */
+.starter-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); gap: 12px; margin: 10px -4px 0; padding: 2px 4px 4px; max-height: calc(100vh - 220px); overflow-y: auto; overscroll-behavior: contain; }
+.starter-card { display: flex; flex-direction: column; align-items: stretch; gap: 4px; padding: 10px; text-align: left; height: auto; white-space: normal; border: 1px solid var(--line); border-radius: var(--rs, 10px); background: var(--panel); cursor: pointer; }
+.starter-card:hover, .starter-card:focus-visible { border-color: var(--accent); }
+.starter-look { display: grid; place-items: center; height: 214px; margin-bottom: 6px; overflow: hidden; pointer-events: none; border-radius: var(--rs, 8px); background: radial-gradient(color-mix(in srgb, var(--fg) 9%, transparent) 1px, transparent 1px) 0 0 / 14px 14px, var(--bg); }
+.starter-look .ext-tile { max-width: 100%; }
+.starter-btn { position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 14px; border: 1px solid var(--line); border-radius: var(--rs, 10px); background: var(--panel); }
+.starter-badge { position: absolute; top: -6px; right: -6px; min-width: 18px; padding: 1px 5px; border-radius: 999px; background: var(--accent); color: var(--accent-fg, #fff); font-size: 11px; text-align: center; }
+.starter-code { align-self: start; justify-self: stretch; min-width: 0; margin: 0; padding: 12px 14px; font-size: 11px; line-height: 1.45; overflow: hidden; white-space: pre; text-overflow: ellipsis; }
+.starter-js { display: flex; flex-direction: column; align-items: center; gap: 8px; }
+/* Settings › Extensions' UI kit, first and lit: an easy way into what extensions can show */
+.kit-hero { display: flex; align-items: center; gap: 14px; margin: 4px 0 18px; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: var(--rs, 12px); background: linear-gradient(120deg, color-mix(in srgb, var(--accent) 16%, var(--panel)), var(--panel) 70%); }
+.kit-hero > .ico { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--rs, 10px); background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent-ink, var(--accent)); }
+.kit-hero > div { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.kit-hero b { color: var(--accent-ink, var(--accent)); font-size: 14px; }
+.kit-hero > .row { flex: none; flex-direction: row; gap: 8px; }
+.narrow .kit-hero { flex-wrap: wrap; }
 .kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 14px; }
 .kit-card .ext-card-head { flex-wrap: wrap; } .kit-card-head .seg { margin-left: auto; } .kit-blurb { flex-basis: 100%; min-width: 0; }
 .kit-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; line-height: 1.5; } .kit-h { margin: 18px 0 8px; font-size: 13px; }
@@ -2061,7 +2084,7 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .studio-chips { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
 .studio-chips button.tag { cursor: pointer; border: none; font: inherit; }
 .studio-acts { display: inline-flex; gap: 6px; }
-.studio-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.studio-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; } .studio-btns > .ask-check { margin: 0; }
 .studio-runs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
 .studio-runs pre { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--bg); font-size: 11.5px; white-space: pre-wrap; word-break: break-word; }
 .narrow .page-body > .studio { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
@@ -2074,7 +2097,11 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .desk-build > .small { flex-basis: 100%; }
 .desk-tile.off { border-style: dashed; }
 .desk-tile.off .desk-body { opacity: 0.85; }
+.ext-desk-spot { flex-basis: 100%; display: flex; flex-direction: column; gap: 4px; min-width: 0; } .ext-desk { width: min(100%, 560px); height: 340px; } .ext-desk .desk-head { cursor: default; }
 .desk-off { flex: none; display: flex; align-items: center; gap: 6px; padding: 6px 8px 6px 12px; border-top: 1px solid var(--line); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); font-size: 12px; }
 .desk-off > svg { color: var(--accent-ink); }
 .desk-off > button { height: 24px; padding: 0 9px; font-size: 12px; }
 .desk-empty > .row { justify-content: center; gap: 8px; }
+.desk-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; margin-bottom: 12px; } .desk-tab { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border-color: transparent; background: none; color: var(--muted); }
+.desk-tab:hover { background: var(--hover); color: var(--fg); } .desk-tab.on { border-color: var(--line); background: var(--hover); color: var(--fg); font-weight: 600; } .desk-tab.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); color: var(--fg); }
+.desk-tab-name { width: 140px; height: 28px; }
