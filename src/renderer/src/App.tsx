@@ -709,9 +709,11 @@ export function App() {
   }
 
   // the daemon connection
+  const widgetSay = useRef<WidgetApi['say']>(undefined) // an extension's event handler's toast or dialog (widget-say)
   useEffect(() => {
     const off = api.on(m => {
       if (m.ev === 'state') setView(m.view)
+      else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
       else if (m.ev === 'remote') {
@@ -1224,6 +1226,7 @@ export function App() {
       ]),
     key: view?.widgetKey,
   }
+  widgetSay.current = widgetApi.say
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {
     list: view?.widgets ?? [],

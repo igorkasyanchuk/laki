@@ -19,6 +19,10 @@ version it builds, with the date. -->
 - **Extensions per workspace**: `"scope": "workspace"` makes one show the selected workspace's own data (its branch, PR,
   port, path as `$LAKI_BRANCH`, `$PORT`…, and `{{workspace.branch}}` in its look), fetched while it's selected; the
   *This branch* starter is one. `--ws` picks the instance in `laki widget run|render|action|check`.
+- **Extensions that answer events, stream and take pushes**: `"on": { "turn.done": "an action" }` runs one as an agent's
+  turn ends or asks something, a PR's checks fail or pass, it merges, a workspace is made or archived, a scheduled task
+  runs; the action gets the event as JSON and can set the data itself. `"stream": true` keeps its command running, each
+  line of JSON shown as it comes. `laki widget push <id> '<json>'` puts data in one from a cron job, a git hook or CI.
 - **A tab in its own window**: a tab's right click › *Float in its own window* (or ⌘K): its terminal, live, in a window over
   every app, as big as you like; its ✕ (or *Bring it back* in its pane) puts it back.
 - **Headless**: `./Laki.AppImage --headless --tailscale` (or `laki serve`) runs Laki on a server with no screen, used

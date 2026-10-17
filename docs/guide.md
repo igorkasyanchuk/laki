@@ -847,6 +847,12 @@ while it's selected. With none selected (the Board, Scheduled tasks) it says *Se
 the workspace is deleted and stays while it's archived. `--ws <workspace>` picks the instance for `laki widget run`,
 `render`, `action` and `check`; its page has a workspace picker.
 
+Extensions can answer what happens (`"on": { "turn.done": "an action" }` in widget.json: an agent's turn ending or
+asking something, a PR's checks failing or passing, a merge, a new or archived workspace, a scheduled run, the app
+opening): the action gets the event as JSON on stdin. One can **stream** (`"stream": true`: its command runs all along,
+each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
+(a cron job, a git hook, CI).
+
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
 
@@ -1440,8 +1446,9 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, workspace, onefile
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, workspace, stream, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
+laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers
 laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over

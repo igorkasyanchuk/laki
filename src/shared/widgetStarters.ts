@@ -42,7 +42,7 @@ function kit(o: { spec: unknown; data: unknown; empty: unknown; real: string; si
 }
 const toast = (what: string) => `printf '{"toast": "${what}: %s"}' "$WIDGET_ARG"`
 
-export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'button', 'form', 'panel', 'workspace', 'onefile'] as const
+export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'button', 'form', 'panel', 'workspace', 'stream', 'onefile'] as const
 export type StarterKind = (typeof STARTER_KINDS)[number]
 
 export const STARTERS: Record<StarterKind, Starter> = {
@@ -122,6 +122,28 @@ export const STARTERS: Record<StarterKind, Starter> = {
       empty: { commits: 0 },
       real: `# per workspace: $LAKI_BRANCH, $LAKI_BASE, $LAKI_PATH, $PORT, $LAKI_PR are the selected workspace's
 printf '{"commits": %s}' "$(git -C "$LAKI_PATH" rev-list --count "$LAKI_BASE..HEAD" 2>/dev/null || echo 0)"`,
+    }),
+  },
+  stream: {
+    title: 'A stream',
+    blurb: 'A command that runs all along: each line of JSON it prints shows at once',
+    files: (id, name) => ({
+      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'A stream: stream.sh prints a line of JSON every 2 s, each shown as it comes', size: [2, 1], stream: true, fetch: 'sh stream.sh', ui: { type: 'stat', value: '{{n}}', label: 'ticks · {{time}}' }, sample: { n: 42, time: '09:41:07' } }),
+      'stream.sh': `#!/bin/sh
+# A stream: this runs all along while Laki's window is open (and starts again if it ends). Each line of JSON it prints
+# is the extension's data, shown at once; other lines go to its log. The real thing, for example:
+#   tail -F /var/log/deploy.log | jq -c --unbuffered '{last: .message, at: .time}'
+#   kubectl get pods -w -o json | jq -c --unbuffered '{pod: .metadata.name, phase: .status.phase}'
+i=0
+while :; do
+  i=$((i + 1))
+  printf '{"n": %s, "time": "%s"}\n' "$i" "$(date +%H:%M:%S)"
+  sleep 2
+done
+`,
+      'fixtures/sample.json': json({ n: 42, time: '09:41:07' }),
+      'fixtures/empty.json': json({ n: 0, time: '' }),
+      'README.md': readme(id, name, ' It streams (`"stream": true`): `stream.sh` runs all along, each line of JSON it prints its data.'),
     }),
   },
   onefile: {

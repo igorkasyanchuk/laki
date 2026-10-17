@@ -17,7 +17,7 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'merge'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -437,6 +437,21 @@ async function main() {
         return
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
+      if (sub === 'push') {
+        // its data from a cron job, a git hook, CI: JSON as an argument, or on stdin (- or none)
+        if (!id) throw new Error('usage: laki widget push <id> [json | -] [--ws <workspace>] [--merge]')
+        const text = action === undefined || action === '-' ? await new Promise<string>(r => {
+          let s = ''
+          process.stdin.on('data', d => (s += d)).on('end', () => r(s)).on('error', () => r(s))
+        }) : [action, ...arg].join(' ')
+        let data: unknown
+        try {
+          data = JSON.parse(text)
+        } catch {
+          throw new Error(`not JSON: ${text.trim().slice(0, 80) || '(nothing)'}`)
+        }
+        return out(await rpc('widgetPush', { id, data, ws, merge: !!flags.merge }), `pushed to ${id}${ws ? ` (${ws})` : ''}`)
+      }
       if (sub === 'run') {
         const r = await rpc('widgetRun', { id, ws }, 130000)
         return out(r, r.ok ? 'fetched' : `✗ ${r.error}`)
@@ -449,7 +464,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws }, 130000)
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>]')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge]')
     }
     case 'ai': {
       const [sub] = rest

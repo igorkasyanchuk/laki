@@ -1,6 +1,7 @@
 // How to make a widget, in words: the laki-widget skill's body (daemon/skill.ts) and the prompt Settings › Extensions
 // copies for any AI chat (widgetPrompt). One text, so both say the same.
 
+import { WIDGET_EVENTS } from './types.ts'
 import { WIDGET_SCHEMA_URL } from './widgetSchema.ts'
 import { UI, UI_SAMPLES } from './widgetUi.ts'
 
@@ -62,6 +63,12 @@ export const widgetFormat = () => `## widget.json
   \`$LAKI_STORAGE_FOLDER\`); a script \`workspace\`; templates and ui \`{{workspace.branch}}\`, \`{{workspace.port}}\`,
   \`{{workspace.pr}}\`, \`{{workspace.path}}\`; a JS page \`laki.workspace\`. Use it (\`--ws <id>\` checks one); the
   default, \`global\`, is one for everything.
+- \`"on": { "turn.done": "<action>" | "refresh" }\`: events it answers, the event as JSON on stdin (and
+  \`$LAKI_EVENT_FILE\`, \`$LAKI_EVENT\` its name): ${WIDGET_EVENTS.join(', ')}. Each has \`event\`, \`at\`, \`ws\`
+  (\`{ id, name, project, branch, pr }\`), \`tab\` and its own fields (\`turn.done\`: \`last\`; \`pr.*\`: \`pr: { number, url, title }\`).
+- An action that prints \`{"data": …}\` sets the data (\`"merge": true\`: over it) instead of a fetch.
+- \`"stream": true\`: its fetch runs all along, each line of JSON it prints its data (a script: an async generator,
+  each \`yield\`); global only, no \`every\`. \`laki widget push <id> '<json>'\` sets its data from outside.
 
 ## Fixtures and the check
 

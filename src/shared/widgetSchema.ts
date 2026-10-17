@@ -3,7 +3,7 @@
 // (LAKI_DTS: window.laki and the UI kit's elements, for a JS page), and manifestCheck, the checker's widget.json part
 // (widgetCheck in daemon/widgets.ts adds the files, the ui against data, the fixtures and a fetch). The ui elements'
 // words are the UI kit's own (widgetUi.ts UI), so the schema, the types, the guide and the gallery say the same.
-import { REPO, WIDGET_PLACES } from './types.ts'
+import { REPO, WIDGET_EVENTS, WIDGET_PLACES } from './types.ts'
 import { BUTTON, COMMON, type Kind, near, type Prop, UI, UI_TYPES, type UiProblem } from './widgetUi.ts'
 
 export const WIDGET_SCHEMA_URL = `${REPO.replace('https://github.com/', 'https://raw.githubusercontent.com/')}/main/docs/widget.schema.json`
@@ -44,6 +44,8 @@ export const MANIFEST: Record<string, J> = {
   view: { enum: VIEWS, description: 'Its full view’s size: s, m (the default) or l' },
   place: { anyOf: [PLACE, { type: 'array', items: PLACE }], description: 'Where it shows at first (the user’s choice wins): one place or several' },
   scope: { enum: ['global', 'workspace'], description: 'global (the default): one for the app; workspace: one per workspace, its fetch given $LAKI_BRANCH, $PORT, $LAKI_PATH… and its ui {{workspace.branch}}' },
+  on: { type: 'object', propertyNames: { enum: [...WIDGET_EVENTS] }, additionalProperties: { type: 'string' }, description: 'Events it answers: { "turn.done": "one of its actions" | "refresh" }; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT' },
+  stream: { type: 'boolean', description: 'Its fetch runs all along: each line of JSON it prints is its data (every is ignored; global only)' },
   fetch: str('A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON'),
   script: str('Or a JS file of its folder: its default export gets { config, last, workspace } and returns the data'),
   config: { type: 'object', additionalProperties: SPEC, description: 'Its settings, by name (a letter or _, then letters, digits, _)' },
@@ -161,9 +163,22 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   if (m.fetch && m.script) say('error', 'widget.json', 'fetch or script, not both')
   if (m.scope !== undefined && m.scope !== 'global' && m.scope !== 'workspace') say('error', 'widget.json scope', `global or workspace, not ${JSON.stringify(m.scope)}`)
   if ((m.fetch || m.script) && m.sample === undefined) say('warn', 'widget.json', 'no sample: its preview has nothing to show before it runs')
+  if (m.stream !== undefined && typeof m.stream !== 'boolean') say('error', 'widget.json stream', `true or false, not ${kindOf(m.stream)}`)
+  if (m.stream === true && m.scope === 'workspace') say('error', 'widget.json stream', 'a stream is global only: not with "scope": "workspace"') // ponytail: one process per workspace
+  if (m.stream === true && !(m.fetch || m.script)) say('error', 'widget.json stream', 'a stream needs a fetch or a script that runs all along')
+  if (m.stream === true && m.every !== undefined) say('warn', 'widget.json every', 'ignored: a stream runs all along')
   const actions = m.actions && typeof m.actions === 'object' && !Array.isArray(m.actions) ? (m.actions as Record<string, unknown>) : undefined
   if (m.actions !== undefined && !actions) say('error', 'widget.json actions', 'an object: { "name": "a command" }')
   for (const [n, c] of Object.entries(actions ?? {})) if (typeof c !== 'string') say('error', `widget.json actions.${n}`, `a command (text), not ${kindOf(c)}`)
+  const on = m.on
+  if (on !== undefined && (!on || typeof on !== 'object' || Array.isArray(on))) say('error', 'widget.json on', 'an object: { "turn.done": "an action" or "refresh" }')
+  else
+    for (const [e, h] of Object.entries((on ?? {}) as Record<string, unknown>)) {
+      const where = `widget.json on.${e}`
+      if (!(WIDGET_EVENTS as readonly string[]).includes(e)) say('error', where, `no event ${e}${(n => (n ? ` (did you mean ${n}?)` : `: ${WIDGET_EVENTS.join(', ')}`))(near(e, WIDGET_EVENTS))}`)
+      if (h === 'refresh') !(m.fetch || m.script) && say('error', where, 'refresh: it has no fetch or script')
+      else if (typeof h !== 'string' || !Object.hasOwn(actions ?? {}, h)) say('error', where, `refresh, or one of its actions${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(h), Object.keys(actions ?? {})))}`)
+    }
   if (typeof m.click === 'string' && !Object.hasOwn(actions ?? {}, m.click)) say('error', 'widget.json click', `${m.click} isn't one of its actions${(n => (n ? ` (did you mean ${n}?)` : ''))(near(m.click, Object.keys(actions ?? {})))}`)
   const config = m.config
   if (config !== undefined && (typeof config !== 'object' || config === null || Array.isArray(config))) say('error', 'widget.json config', 'an object: { "name": a default or a spec }')

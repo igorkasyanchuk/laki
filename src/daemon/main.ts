@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, widgetAction, widgetCheck, widgetDev, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, widgetAction, widgetEvent, widgetPush, widgetStreamStop, widgetCheck, widgetDev, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -262,6 +262,7 @@ const api: Record<string, Handler> = {
     if (k === 'ai') return aiStop()
     if (k === 'remote') return core.remoteStop()
     if (k === 'share') return core.stopShares()
+    if (k.startsWith('stream:')) return widgetStreamStop(k.slice(7))
     if (t) return core.tunnelStop({ ws: t[1], port: Number(t[2]) })
     throw new Error(`nothing to stop called ${k}`)
   },
@@ -295,6 +296,7 @@ const api: Record<string, Handler> = {
   widgetFiles: p => widgetFiles(p),
   widgetWrite: p => widgetWrite(p), // Laki AI's and MCP's: saved off
   widgetTick: p => widgetTick(p.now), // tests move the clock
+  widgetPush: p => widgetPush(p),
   widgetRuns: p => widgetRuns(p), // the inspector's Runs, Env, fixtures; laki widget dev's lines
   widgetMock: p => widgetMock(p), // the inspector's sample data: by hand or a fixture, off
   widgetDev: p => widgetDev(p), // laki widget dev: link, unlink, list
@@ -399,7 +401,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     }
     core.clients.add(c)
     core.hello(c)
-    if (core.clients.size === 1) widgetTick(undefined, 'open'), core.reminderTick() // the app is back: what fell due meanwhile
+    if (core.clients.size === 1) widgetTick(undefined, 'open'), core.reminderTick(), widgetEvent('app.open') // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }
       try {

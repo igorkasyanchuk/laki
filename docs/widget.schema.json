@@ -93,6 +93,36 @@
       ],
       "description": "global (the default): one for the app; workspace: one per workspace, its fetch given $LAKI_BRANCH, $PORT, $LAKI_PATH… and its ui {{workspace.branch}}"
     },
+    "on": {
+      "type": "object",
+      "propertyNames": {
+        "enum": [
+          "turn.done",
+          "turn.failed",
+          "turn.waiting",
+          "pr.opened",
+          "pr.checks.failed",
+          "pr.checks.passed",
+          "pr.review",
+          "pr.merged",
+          "pr.closed",
+          "workspace.new",
+          "workspace.archived",
+          "workspace.restored",
+          "workspace.removed",
+          "schedule.ran",
+          "app.open"
+        ]
+      },
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Events it answers: { \"turn.done\": \"one of its actions\" | \"refresh\" }; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT"
+    },
+    "stream": {
+      "type": "boolean",
+      "description": "Its fetch runs all along: each line of JSON it prints is its data (every is ignored; global only)"
+    },
     "fetch": {
       "type": "string",
       "description": "A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON"

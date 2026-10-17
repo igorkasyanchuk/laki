@@ -372,13 +372,20 @@ function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclu
           <b>Runs</b>
           <span className="muted small">its last {x.runs.length} fetches and actions, newest first</span>
         </div>
+        {x.stream && (
+          <p className={`small ${x.stream.running ? '' : 'warn'}`}>
+            {x.stream.stopped ? 'Stream stopped in Resources: Run now starts it again' : x.stream.running ? `Streaming since ${hm(x.stream.since ?? Date.now())}` : x.stream.next ? `Stream ended: again at ${hm(x.stream.next)}` : 'Stream not running: it runs while the window is open'}
+            {x.stream.restarts ? ` · ${x.stream.restarts} restart${x.stream.restarts > 1 ? 's' : ''}` : ''}
+            {x.stream.last && <span className="mono muted"> · last: {x.stream.last.slice(0, 120)}</span>}
+          </p>
+        )}
         {!x.runs.length && <p className="muted small">None yet{w.on ? '' : ': it is off'}.</p>}
         <ul className="ext-runs">
           {x.runs.map(r => (
             <li key={r.at + r.reason + (r.action ?? '')} className={r.ok ? '' : 'bad'}>
               <button className="ext-run" onClick={() => setOpen(o => (o === r.at ? null : r.at))} aria-expanded={open === r.at}>
                 <span className="mono">{hm(r.at)}</span>
-                <b>{r.action ? `action ${r.action}` : 'fetch'}</b>
+                <b>{r.action ? `action ${r.action}` : r.reason === 'stream' ? 'stream' : r.reason === 'push' ? 'push' : 'fetch'}</b>
                 <span className={r.ok ? 'good' : 'warn'}>{r.ok ? 'ok' : `failed${r.exit ? ` (${r.exit})` : ''}`}</span>
                 <span className="muted">{r.ms} ms</span>
                 {r.ok && <span className="muted">{bytes(r.bytes)}</span>}

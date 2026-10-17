@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick } from './widgets.ts'
+import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -1812,6 +1812,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   } finally {
     changed() // the workspace is made, even when its agent didn't start
   }
+  widgetEvent('workspace.new', { prompt: o.prompt ? o.prompt.slice(0, 2000) : undefined, agent: preset === 'none' ? undefined : preset }, ws.id)
   return ws
 }
 
@@ -1904,6 +1905,8 @@ async function teardown(ws: Workspace) {
 
 const saidTried = new Map<string, string>() // prFromSaid's: the PR link each workspace's agents named last, tried
 function dropWs(ws: Workspace) {
+  widgetEvent('workspace.removed', {}, ws.id) // its payload now, while it's there
+  prSeen.delete(ws.id)
   saidTried.delete(ws.id)
   widgetsGone(ws.id) // its extensions' instances
   if (state.layouts?.[ws.id]) delete state.layouts[ws.id]
@@ -1974,6 +1977,7 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
   state.tabs = state.tabs.filter(t => t.workspace !== ws.id || t.kind === 'agent' || t.kind === 'shell')
   save()
   changed()
+  widgetEvent('workspace.archived', {}, ws.id)
 }
 
 export async function wsRestore(ref: string) {
@@ -1993,6 +1997,7 @@ export async function wsRestore(ref: string) {
   forward(ws)
   for (const t of tabsOf(ws.id)) spawnTab(t, { resume: true })
   changed()
+  widgetEvent('workspace.restored', {}, ws.id)
   return ws
 }
 
@@ -2251,6 +2256,11 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       r.limit = undefined
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text: pl.message ?? '' })
       phone(tab, 'waiting', pl.message ?? '')
+      setTimeout(() => {
+        // the extensions' turn.waiting, a moment later: its menu is often drawn after the hook
+        const s = sessions.get(tab.id)
+        if (r.status === 'waiting') widgetEvent('turn.waiting', { question: String(pl.message ?? '').slice(0, 2000), options: s && !s.exited ? askOf(s.screenText(16))?.options : undefined }, tab.workspace, tab)
+      }, 800)
       break
     case 'idle':
     case 'done': // codex notify: {"type":"agent-turn-complete","thread-id":…,"last-assistant-message":…}
@@ -2273,6 +2283,8 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       if (!viewed(tab.id)) r.done = true
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: r.limit ? 'limit' : 'done', text: r.last ?? '' })
       if (!r.limit) phone(tab, 'done', r.last ?? '')
+      if (r.limit || p.state === 'failed') widgetEvent('turn.failed', { error: (typeof err === 'string' ? err : JSON.stringify(err)).slice(0, 4000) || undefined, limit: r.limit }, tab.workspace, tab)
+      else widgetEvent('turn.done', { last: last ? String(last).slice(0, 4000) : undefined, seconds: r.runAt ? Math.round((Date.now() - r.runAt) / 1000) : undefined }, tab.workspace, tab)
       if (!r.limit) setTimeout(() => deliver(tab.id), 800) // after the hook returns: the agent redraws its prompt
       for (const f of turnEnds)
         try {
@@ -3350,6 +3362,7 @@ async function scanPR(ws: Workspace) {
     }
   } catch (e) {
     wsLog(ws, `PR: gh pr view ${ws.prUrl ?? ws.branch}: ${firstLine(e)}`)
+    if (/no pull requests found/i.test(String((e as { stderr?: string }).stderr ?? (e as Error).message))) prSeen.set(ws.id, null) // none: the next one found is pr.opened
     if (prs.delete(ws.id)) changed()
     if (!ws.prUrl) await prFromSaid(ws)
     return
@@ -3360,8 +3373,29 @@ async function scanPR(ws: Workspace) {
     prs.set(ws.id, pr)
     changed()
   }
+  prEvents(ws, pr)
   await autoPR(ws, pr).catch(e => log(`autoPR ${ws.id}: ${e.message}`))
   if (pr.state === 'MERGED') await archiveMerged(ws, pr).catch(e => log(`archive merged ${ws.id}: ${e.message}`))
+}
+
+// the extensions' pr.* events (widget.json's on): each change once, from what the last scan saw of the workspace's PR
+// (null: none). The first scan since the daemon started only notes it: a restart replays nothing. Checks failed and
+// passed once per head commit (failHead, passHead: a re-run's pending in between doesn't fire it again)
+type Seen = { number: number; state: string; failHead?: string; passHead?: string; approved: string[]; changes: string[] }
+const prSeen = new Map<string, Seen | null>()
+function prEvents(ws: Workspace, pr: PR) {
+  const was = prSeen.get(ws.id)
+  const same = !!was && was.number === pr.number
+  const now: Seen = { number: pr.number, state: pr.state, failHead: pr.checks === 'fail' ? pr.head : same ? was.failHead : undefined, passHead: pr.checks === 'pass' ? pr.head : same ? was.passHead : undefined, approved: pr.approved ?? [], changes: pr.changes ?? [] }
+  prSeen.set(ws.id, now)
+  if (was === undefined) return
+  const fire = (e: Parameters<typeof widgetEvent>[0], extra: Record<string, unknown> = {}) => widgetEvent(e, { pr: { number: pr.number, url: pr.url, title: pr.title, draft: !!pr.draft }, ...extra }, ws.id)
+  if (!same) fire('pr.opened')
+  if (now.failHead && now.failHead !== (same ? was.failHead : undefined)) fire('pr.checks.failed', { failing: (pr.list ?? []).filter(c => c.state === 'fail').slice(0, 50).map(c => ({ name: c.name, url: c.url })) })
+  if (now.passHead && now.passHead !== (same ? was.passHead : undefined)) fire('pr.checks.passed')
+  if (same && (now.approved.some(n => !was.approved.includes(n)) || now.changes.some(n => !was.changes.includes(n)))) fire('pr.review', { approved: now.approved, changes: now.changes })
+  if (same && was.state !== pr.state && pr.state === 'MERGED') fire('pr.merged')
+  if (same && was.state !== pr.state && pr.state === 'CLOSED') fire('pr.closed')
 }
 
 // a workspace whose PR merged, archived when Settings say so (archiveMerged): only clean (nothing uncommitted, no
@@ -4658,6 +4692,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
     r.ok = false
     r.what = (e as Error).message
   }
+  widgetEvent('schedule.ran', { task: { id: s.id, name: s.name ?? runName(s, now) }, ok: r.ok, what: r.what }, r.ws)
   return logRun(r)
 }
 

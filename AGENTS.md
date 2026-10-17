@@ -97,7 +97,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`. A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1072,6 +1072,30 @@ host's) is the view's `ws` and `Widgets.tsx` `inWs` (an instance over the widget
 `NO_WS`, dimmed `.no-ws`); `WidgetApi`'s render, run, action and say and `WidgetsApi`'s run, runs, mock and check take
 `ws` (`w.here`); `ExtensionPage`'s `spots` and `here`, the inspector's picker (`.ext-ws`); Settings' row says *per
 workspace*. The `workspace` starter (*This branch*).
+
+Events, streams, push (Part 5; `test/widget-events.test.ts`): `types.ts` `WIDGET_EVENTS`; core calls `widgetEvent(name,
+fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.failed` on a failure or limit, `turn.waiting`
+800 ms later with `askOf`'s options), `prEvents` after each `scanPR` (`prSeen` per workspace: the first scan only notes it,
+null for "no pull requests found"; `failHead`/`passHead`: checks once per head; new logins in approved/changes;
+MERGED/CLOSED as the state changes), `makeWs`'s end (`workspace.new`), `wsArchive`, `wsRestore`, `dropWs`
+(`workspace.removed`, every way one goes), `runSchedule` (`schedule.ran`), main.ts' first client (`app.open`). Its
+payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
+`EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
+its workspace's, live) gets a `Job` in `queues` (`QUEUE_MAX` 20, the oldest dropped and logged), `drain` runs one at a
+time: `handle` writes `LAKI_EVENT_FILE` (tmpdir, 0600, removed after) and runs `widgetRun` (refresh) or `widgetAction`
+with `Ev` (`LAKI_EVENT`, the file, the JSON on stdin: `exec`'s `stdin`, ended at once otherwise) and reason
+`event:<name>`; an action's toast or modal is broadcast as `widget-say` (`widget`, `ws`; App's `widgetSay` ref). An
+action's JSON with `data` (`merge`: shallow over an object) is kept through `keep`, no fetch after. Streams (`streaming`:
+`stream: true`, not scoped, with a fetch): `streamSync` (each `widgetTick`, `widgetSet`, `scanWidgets` (which stops every
+one first)) starts each that's on, not mocked, not `stopped`, while a window was shown within `STREAM_IDLE` (10 min,
+`shownAt`) and in `widgetHours`; `startStream` spawns it (`own`, stop key `stream:<id>`: `resourceStop` →
+`widgetStreamStop`, `stopped` until Run now, a switch or a reload), each stdout line that parses is `data` (`streamView`:
+the view within 250 ms, the store every 5 s and as it ends; `dataOf` reads the in-memory line), others the log; an exit is
+a run (reason stream) and `wait` 1, 2, 4… 60 s (1 again after a minute up). `RUN_JS` streams an async generator's yields
+as lines. `widgetRun` on a stream starts it again; `due` skips them; `checkOne` doesn't run them; `manifestCheck` checks
+`on`'s events (`near`) and handlers (an action or refresh with a fetch) and `stream` (global, with a fetch, `every`
+ignored). `widgetPush` (`laki widget push <id> [json|-] [--ws] [--merge]`): `keep`, a `push` run, refused when off. The
+`stream` starter. The inspector's Runs shows `WidgetRuns.stream` (`WidgetStream`).
 
 ### Notifications
 

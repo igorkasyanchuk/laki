@@ -237,7 +237,8 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget ls                   # each one: on or off, size, schedule, last error
     laki widget kit [element]        # the UI kit's elements, or one's props and a sample
     laki widget check <id> --no-run  # what's wrong with it: fix every ✗ before you answer (after every change)
-    laki widget new <name> --kind <k> # a starter to begin from: number, list, table, chart, button, form, panel, workspace (per workspace), onefile
+    laki widget new <name> --kind <k> # a starter to begin from: number, list, table, chart, button, form, panel, workspace (per workspace), stream, onefile
+    laki widget push <id> '<json>'   # its data from outside (a hook, a cron job): no fetch; --merge over it, --ws <id> per workspace
 
 For the user working on an extension of their own (in their code, not Laki's folder): \`laki widget dev\` in its
 folder links it (on, first, reloaded on each save, the last good version kept over a broken file) and prints each run;

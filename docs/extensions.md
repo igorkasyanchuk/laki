@@ -37,7 +37,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 
 | file | what |
 |---|---|
-| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
+| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)), `on` ([events](#events-on) it answers), `stream` ([a fetch that runs all along](#streams-stream)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
 | `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
 | `fixtures/<name>.json` | sample data: its Data tab shows each (*Sample ▾*), and *Check* fits `ui` to each |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
@@ -88,6 +88,84 @@ Templates, `ui` and a JS page (`laki.workspace`) see it as `workspace`: `{{works
 - `laki widget run|render|action|check <id> --ws <workspace>` name the instance (a global one refuses `--ws`); its
   inspector has a workspace picker. *Check* warns when a per-workspace one uses nothing of the workspace.
 - The `workspace` starter (*This branch*) shows the branch, PR, port and path, and links to `http://localhost:$PORT`.
+
+## Events (`on`)
+
+`"on": { "<event>": "<action>" | "refresh" }` answers what happens in Laki: as it happens, an extension that's on runs
+that action, or fetches again (`refresh`). The handler gets `$LAKI_EVENT` (its name), the event as JSON on stdin and in
+`$LAKI_EVENT_FILE` (deleted after), and `$LAKI_REFRESH_REASON` `event:<name>`. A per-workspace one gets its own
+workspace's events only, in that instance; a global one gets every event once. One handler runs at a time per
+extension, 20 wait at most (past that the oldest is dropped); each is a run in its inspector.
+
+```json
+{ "on": { "turn.done": "note", "pr.checks.failed": "refresh" },
+  "actions": { "note": "jq -r '.last' > last.txt; echo '{\"toast\": \"Done\"}'" } }
+```
+
+Each event is `{ event, at, ws: { id, name, project, branch, pr }, tab: { id, name, agent } }` (the workspace and tab
+when it has them) and its own fields, 64 KB at most:
+
+| event | when | its fields |
+|---|---|---|
+| `turn.done` | an agent's turn ends | `last` (its answer, 4,000 characters), `seconds` |
+| `turn.failed` | a turn fails, or hits a usage limit | `error`, `limit` (when it resets) |
+| `turn.waiting` | an agent asks something | `question`, `options` (its menu's) |
+| `pr.opened` | a workspace gets a PR | `pr: { number, url, title, draft }` |
+| `pr.checks.failed` | checks fail on a head commit (once per commit) | `pr`, `failing: [{ name, url }]` |
+| `pr.checks.passed` | all checks pass on a head commit (once per commit) | `pr` |
+| `pr.review` | a new approval or request for changes | `pr`, `approved`, `changes` (logins) |
+| `pr.merged`, `pr.closed` | as named | `pr` |
+| `workspace.new` | a workspace is made | `prompt` (2,000 characters), `agent` |
+| `workspace.archived`, `workspace.restored`, `workspace.removed` | as named | |
+| `schedule.ran` | a scheduled task ran or failed | `task: { id, name }`, `ok`, `what` |
+| `app.open` | Laki's window comes back | |
+
+PR events come from Laki's PR scans: the first scan after the daemon starts only notes where each PR is, so a restart
+replays nothing. What an action prints can set the data (below); its `toast` or `modal` shows in the app while its
+window is open.
+
+### An action's data
+
+An action (a button's, or an event's) that prints JSON with `"data"` replaces the extension's data (a per-workspace
+one's instance's) instead of fetching again: `{"data": {"count": 3}, "toast": "Saved"}`. With `"merge": true` it goes
+over the data it had, key by key.
+
+## Streams (`stream`)
+
+`"stream": true` runs its fetch all along instead of every few minutes: each line of JSON it prints is its data at once
+(the view follows within ¼ s, its store every 5 s); other lines go to its log. A JS `script` streams with an async
+generator (`export default async function* ({ config }) { … yield data … }`).
+
+- It runs while it's on and Laki's window was shown in the last 10 minutes (and within *Working hours*); it stops when
+  it's turned off, reloaded or deleted, and as Laki quits. Settings › Resources lists it, with a Stop (until *Run now*,
+  its switch or a reload).
+- After it ends, it starts again 1, 2, 4… up to 60 seconds later (1 again once it ran a minute). Its inspector's Runs
+  says since when it runs, how many restarts, and its last line.
+- Global only (not with `"scope": "workspace"`); `every` is ignored. The `stream` starter prints a line every 2 s.
+
+```sh
+#!/bin/sh
+tail -F /var/log/deploy.log | jq -c --unbuffered '{last: .message, at: .time}'
+```
+
+## Push (`laki widget push`)
+
+Something else can put the data there, with no fetch: a cron job, a git hook, CI on this Mac, another app (as
+Übersicht's and SwiftBar's refreshes do).
+
+```sh
+laki widget push deploys '{"last": "v1.4.2", "ok": true}'   # its data now
+echo '{"ok": false}' | laki widget push deploys - --merge   # over what it has, key by key
+laki widget push this-branch '{"tests": "green"}' --ws fix-login
+```
+
+An extension that's off refuses it. A git hook that counts today's commits in an extension of yours
+(`.git/hooks/post-commit`, made executable):
+
+```sh
+#!/bin/sh
+laki widget push commits "{\"today\": $(git log --since=midnight --oneline | wc -l)}" >/dev/null 2>&1 || true
+```
 
 ## The UI kit (`ui`)
 
@@ -146,7 +224,7 @@ A JS page gets the kit too: `await laki.ui(spec, data)` gives its HTML, `await l
 ### Buttons and actions
 
 `<button data-run="review" data-arg="{{url}}">` runs `actions.review` with `$WIDGET_ARG`; then the extension fetches
-again. What the action prints as JSON can say more: `{"toast": "Done"}`, or `{"modal": {"title", "text", "buttons"}}`
+again. What the action prints as JSON can say more: `{"data": …}` ([its data](#an-actions-data), no fetch then), `{"toast": "Done"}`, or `{"modal": {"title", "text", "buttons"}}`
 (up to 4 buttons, each `run`ning another action, `open`ing an http(s), mailto or `laki://` link, or closing).
 `data-laki="refresh"` fetches again.
 
@@ -242,6 +320,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `form` | fields and a button: an action gets them as JSON |
 | `panel` | a JS page of yours that draws with the UI kit (`laki.mount`), typed by `laki.d.ts` |
 | `workspace` | *This branch*: per workspace, its branch, PR, port and path, a link to its server |
+| `stream` | a command that runs all along: a line of JSON every 2 s, shown as it comes |
 | `onefile` | one script, `<id>.5m.sh` (below) |
 
 Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its

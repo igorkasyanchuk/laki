@@ -2,20 +2,21 @@
 // fetch command and how often it runs) and widget.html (a template, shared/widget.ts). The daemon runs each
 // widget's fetch on its schedule and keeps what it printed (JSON) in the widget's storage, <data>/widget-data/<id>.json,
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
-import { execFile } from 'node:child_process'
+import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { chmodSync, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
-import { homedir } from 'node:os'
+import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
+import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { BUTTON_PLACES, type Workspace, type WidgetOption, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
+import { BUTTON_PLACES, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
 import { hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
 import { manifestCheck } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
-import { changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, q, settingsSet, state, wsVars } from './core.ts'
+import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, q, settingsSet, state, wsVars } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -25,7 +26,7 @@ import { changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv,
 // character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions).
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown }
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
@@ -54,7 +55,7 @@ export const widgetKey = randomBytes(16).toString('hex')
 const fetches = (w: Entry) => !!(w.m.fetch || w.m.script)
 const wLog = (w: { id: string }, text: string | (() => string)) => devLog(`widget:${w.id}`, text) // a function: only in dev mode
 const fetchable = (w: Entry, ws?: string) => onOf(w) && fetches(w) && !running.has(keyOf(w.id, ws)) && !metaOf(w, ws).mock // on, with a fetch, not fetching now, not showing data put there by hand
-const due = (w: Entry, now: number, ws?: string) => fetchable(w, ws) && now - (metaOf(w, ws).at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
+const due = (w: Entry, now: number, ws?: string) => !streaming(w) && fetchable(w, ws) && now - (metaOf(w, ws).at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
 
 const storePath = (id: string) => join(dir, 'widget-data', `${id}.json`)
 const home = (p: string) => (p.startsWith('~/') ? join(homedir(), p.slice(2)) : p)
@@ -119,7 +120,7 @@ function wsEnv(w: Entry, x?: Workspace): Record<string, string> {
   return { LAKI_WORKSPACE: i.id, LAKI_WORKSPACE_NAME: i.name, LAKI_PROJECT: i.project ?? '', LAKI_BRANCH: i.branch ?? '', LAKI_BASE: i.base ?? '', LAKI_PATH: i.path, PORT: String(i.port ?? ''), LAKI_PR: i.pr ?? '', ...(i.storage && { LAKI_STORAGE_FOLDER: i.storage }), LAKI_WIDGET_FILE: instPath(w.id, x.id), LAKI_WIDGET_WS: JSON.stringify(i) } // never makes a storage folder
 }
 // an instance's (or a global one's) data, and its last fetch kept; the in-memory copy follows (a rescan's entry too)
-const dataOf = (w: Entry, ws?: string): Inst => (ws ? readInst(w.id, ws) : readStore(w.id))
+const dataOf = (w: Entry, ws?: string): Inst => (ws ? readInst(w.id, ws) : (st => (st?.data !== undefined ? { ...readStore(w.id), data: st.data, at: w.s.at, error: undefined } : readStore(w.id)))(streams.get(w.id))) // a stream's last line, kept every 5 s
 const metaOf = (w: Entry, ws?: string): Omit<Inst, 'data'> => (ws ? (w.inst.get(ws) ?? {}) : w.s)
 function keep(w: Entry, ws: string | undefined, f: (s: Inst) => void) {
   const s = ws ? readInst(w.id, ws) : readStore(w.id) // its settings may have changed meanwhile
@@ -285,6 +286,8 @@ export function scanWidgets() {
   for (const k of [...devKeep]) if (k.startsWith('widget:')) devKeep.delete(k)
   for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
   watchDev(dev)
+  for (const id of [...streams.keys()]) stopStream(id) // reloaded: started again as they read now
+  streamSync()
   changed()
 }
 
@@ -327,6 +330,7 @@ function devChanged(root: string, why: string) {
 export function widgetsStop() {
   for (const w of watchers.values()) w.close()
   watchers.clear()
+  for (const id of [...streams.keys()]) stopStream(id)
 }
 
 // a button's words: widget.json's label, badge and tip filled from its data (as a preview is), plain text on a line
@@ -555,7 +559,8 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
   w.s = meta
   w.face = faceOf(w, data) // its config, in its words
   changed()
-  if (onOf(w) && (o.on || o.config)) refetch(w, 'settings', undefined, () => true) // its data for the new settings (fetching: once more after)
+  if (onOf(w) && (o.on || o.config)) refetch(w, 'settings', undefined, () => true) // its data for the new settings (fetching: once more after; a stream starts again)
+  streamSync() // off: a stream ends
   return widgetsView().find(x => x.id === w.id)
 }
 
@@ -604,17 +609,18 @@ function envOf(w: Entry, extra: Record<string, string>) {
 type Ran = { out: string; err: string }
 type Failed = Error & { stderr?: string; exit?: number }
 // a widget's command, in its folder: stdout and stderr, or why it failed (with its stderr and exit code)
-function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>) {
-  return new Promise<Ran>((ok, no) =>
-    own(
-      execFile(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
-        e
-          ? no(Object.assign(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message)), { stderr: String(stderr), exit: typeof e.code === 'number' ? e.code : undefined }))
-          : ok({ out: String(stdout), err: String(stderr) }),
-      ),
-      `Extension · ${w.m.name || w.id}`,
-    ),
-  )
+// stdin: an event's JSON (a handler's); else nothing to read
+function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>, stdin = '') {
+  return new Promise<Ran>((ok, no) => {
+    const p = execFile(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
+      e
+        ? no(Object.assign(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message)), { stderr: String(stderr), exit: typeof e.code === 'number' ? e.code : undefined }))
+        : ok({ out: String(stdout), err: String(stderr) }),
+    )
+    p.stdin?.on('error', () => {}) // one that never reads it
+    p.stdin?.end(stdin)
+    own(p, `Extension · ${w.m.name || w.id}`)
+  })
 }
 
 const RUNS = 20
@@ -627,7 +633,8 @@ function ran(id: string, r: Run) {
   runs.set(id, l)
 }
 
-// a script's default export gets { config, last, workspace } (a scope workspace one's) and returns the data; one without prints it. What it throws is the
+// a script's default export gets { config, last, workspace } (a scope workspace one's) and returns the data (an async
+// generator: each yield a line, a stream's); one without prints it. What it throws is the
 // error, its message alone (node would print the stack, then its version)
 const RUN_JS = `import { readFileSync, writeSync } from 'node:fs'
 import { pathToFileURL } from 'node:url'
@@ -636,8 +643,9 @@ try {
   if (typeof m.default === 'function') {
     let last
     try { last = JSON.parse(readFileSync(process.env.LAKI_WIDGET_FILE, 'utf8')).data } catch {}
-    const data = await m.default({ config: JSON.parse(process.env.LAKI_WIDGET_CONFIG || '{}'), last, workspace: process.env.LAKI_WIDGET_WS ? JSON.parse(process.env.LAKI_WIDGET_WS) : undefined })
-    process.stdout.write(JSON.stringify(data ?? null))
+    const r = m.default({ config: JSON.parse(process.env.LAKI_WIDGET_CONFIG || '{}'), last, workspace: process.env.LAKI_WIDGET_WS ? JSON.parse(process.env.LAKI_WIDGET_WS) : undefined })
+    if (r && typeof r[Symbol.asyncIterator] === 'function') for await (const x of r) writeSync(1, JSON.stringify(x ?? null) + '\\n') // a stream: a line per yield
+    else process.stdout.write(JSON.stringify((await r) ?? null))
   }
 } catch (e) {
   writeSync(2, String(e?.message ?? e) + '\\n') // at once: a pipe's write is async on macOS, exit wouldn't wait
@@ -647,18 +655,25 @@ try {
 // run the widget's fetch now (exec); what it prints must be JSON. A failure keeps the last data and says why.
 // reason (RUN_REASONS: manual unless said; $LAKI_REFRESH_REASON), why: what changed (dev mode's file). Data put there by
 // hand (widgetMock) stays: only Fetch now (manual) runs then, and its data replaces it
-export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select'] // and action:<name>
+export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream'] // and action:<name>, event:<name>
+type Ev = { env: Record<string, string>; stdin: string } // an event handler's: $LAKI_EVENT, $LAKI_EVENT_FILE, the JSON
 const AT_ONCE = 4 // a scope workspace one's instances fetching at a time
 // force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote).
 // ws: a scope workspace one's instance (its workspace's env, its own data)
-export async function widgetRun(o: { id: string; reason?: string; why?: string; ws?: string }, force = false): Promise<{ ok: boolean; error?: string }> {
+export async function widgetRun(o: { id: string; reason?: string; why?: string; ws?: string }, force = false, ev?: Ev): Promise<{ ok: boolean; error?: string }> {
   const w = find(o.id)
   const x = wsOf(w, o.ws)
   const k = keyOf(w.id, x?.id)
   const meta = metaOf(w, x?.id)
-  const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^action:[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
+  const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^(action|event):[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
   if (!onOf(w) && !(force && w.s.by !== 'ai')) return { ok: false, error: OFF(w) }
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script` }
+  if (streaming(w)) {
+    // a stream: started again (a Stop in Resources ends there)
+    stopStream(w.id)
+    streamSync()
+    return streams.get(w.id)?.p ? { ok: true } : { ok: false, error: "a stream runs while Laki's window is open" }
+  }
   if (meta.mock && reason !== 'manual') return wLog(w, `not fetched (${reason}): showing sample data (${meta.mock})`), { ok: false, error: `showing sample data (${meta.mock}): Live in its inspector fetches again` }
   if (running.has(k)) return again.add(k), { ok: false, error: 'already fetching: it fetches again after this one' }
   if (x && [...running].filter(r => r.startsWith(`${w.id}@`)).length >= AT_ONCE) return { ok: false, error: `${AT_ONCE} of its workspaces fetch now: again in a moment` } // ponytail: the next tick's, no queue
@@ -674,7 +689,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   let fail: Failed | undefined
   try {
     // a script on Laki's own node (Electron's, as node, in the app)
-    r = await exec(w, script ? process.execPath : '/bin/sh', script ? ['--input-type=module', '-e', RUN_JS, script] : ['-c', w.m.fetch!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...(script && process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) })
+    r = await exec(w, script ? process.execPath : '/bin/sh', script ? ['--input-type=module', '-e', RUN_JS, script] : ['-c', w.m.fetch!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env, ...(script && process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) }, ev?.stdin)
     try {
       data = JSON.parse(r.out)
     } catch {
@@ -703,7 +718,9 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
 
 // a button's command (widget.json's actions), its data-arg as $WIDGET_ARG (never in the command line); then the widget
 // fetches again, to show what it changed. What it prints as JSON with toast or modal (sayOf) is what the app shows
-export async function widgetAction(o: { id: string; action: string; arg?: string; ws?: string }): Promise<{ ok: boolean; out?: string; error?: string } & WidgetSay> {
+// What it prints as JSON with data replaces the extension's data (its instance's), merge: true over it (shallow); no
+// fetch follows then. reason, ev: an event's handler (event:<name>, its JSON on stdin)
+export async function widgetAction(o: { id: string; action: string; arg?: string; ws?: string }, why?: string, ev?: Ev): Promise<{ ok: boolean; out?: string; error?: string } & WidgetSay> {
   const w = find(o.id)
   const x = wsOf(w, o.ws) // a scope workspace one's: the workspace it was clicked in
   const k = keyOf(w.id, x?.id)
@@ -711,18 +728,28 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
   const cmd = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
   if (typeof cmd !== 'string') return { ok: false, error: `${w.m.name || w.id} has no action ${o.action}` }
   wLog(w, `action ${o.action}${o.arg ? ` (${String(o.arg).slice(0, 200)})` : ''}`)
-  const reason = `action:${o.action}`
+  const reason = why ?? `action:${o.action}`
   const t0 = Date.now()
   try {
-    const { out, err } = await exec(w, '/bin/sh', ['-c', cmd], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x) })
+    const { out, err } = await exec(w, '/bin/sh', ['-c', cmd], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env }, ev?.stdin)
     ran(k, { at: t0, ms: Date.now() - t0, reason, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 })
     wLog(w, `action ${o.action} done: ${lastLine(out) ?? 'printed nothing'}`)
-    if (fetches(w) && (!x || state.workspaces.includes(x))) soon({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? reason : 'manual', ws: x?.id }) // fetching already: once more after it
-    let say: WidgetSay | null = null
+    let j: Record<string, unknown> | undefined
     for (const s of [out, lastLine(out)]) // all of it, or its last line after some log lines
       try {
-        if ((say = sayOf(JSON.parse(s ?? '')))) break
+        const v = JSON.parse(s ?? '')
+        if (isObj(v)) {
+          j = v
+          break
+        }
       } catch {}
+    const live = !x || state.workspaces.includes(x)
+    if (j && 'data' in j && live) {
+      const d = j.data
+      keep(w, x?.id, s => ((s.data = j!.merge === true && isObj(s.data) && isObj(d) ? { ...s.data, ...d } : d), (s.at = Date.now()), (s.error = s.mock = undefined)))
+      changed()
+    } else if (fetches(w) && live) soon({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? `action:${o.action}` : 'manual', ws: x?.id }) // fetching already: once more after it
+    const say = j && sayOf(j)
     return say ? { ok: true, ...say } : { ok: true, out: lastLine(out) }
   } catch (e) {
     const f = e as Failed
@@ -739,9 +766,10 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
 // A scope workspace one fetches only its instances on screen (onScreen): every minutes each, and at once (select) as its
 // workspace is selected if it's older than that. ponytail: never the others (the sidebar's rows would want them)
 export function widgetTick(now = Date.now(), reason: 'schedule' | 'open' | 'select' = 'schedule') {
+  streamSync(now)
   if (![...clients].some(c => c.view?.shown !== false)) return
   const here = onScreen()
-  const hours = typeof state.settings?.widgetHours === 'string' && state.settings.widgetHours.trim() ? parseHours(state.settings.widgetHours) : null
+  const hours = hoursOf()
   if (hours && !('error' in hours) && !inHours(hours, now)) {
     for (const w of widgets.values()) if (scoped(w) ? here.some(ws => due(w, now, ws)) : due(w, now)) wLog(w, () => `not fetched: outside the working hours (${describeHours(hours)})`)
     return
@@ -765,6 +793,188 @@ function onScreen() {
     if (x && instOk(x)) ids.add(x.id)
   }
   return [...ids]
+}
+
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+const hoursOf = () => (typeof state.settings?.widgetHours === 'string' && state.settings.widgetHours.trim() ? parseHours(state.settings.widgetHours) : null)
+
+// ---------- events (widget.json's on: { "<event>": "<action>" | "refresh" }): core calls widgetEvent as each happens.
+// Every extension that's on and answers it runs that action, or fetches again, with LAKI_EVENT, the event's JSON on
+// stdin and in LAKI_EVENT_FILE (deleted after) and reason event:<name>; a scope workspace one only its workspace's, in
+// that instance. One at a time per extension, QUEUE_MAX waiting (past it the oldest goes). What a handler's action says
+// (toast, modal) goes to the app's windows
+const QUEUE_MAX = 20
+const EVENT_MAX = 64 << 10
+type Job = { name: string; json: string; h: string; ws?: string }
+const queues = new Map<string, Job[]>()
+const draining = new Set<string>()
+export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = {}, ws?: string, tab?: { id: string; name: string; preset?: string }) {
+  if (![...widgets.values()].some(w => w.m.on && Object.hasOwn(w.m.on, name))) return // none answers it: nothing built
+  const x = ws ? state.workspaces.find(v => v.id === ws) : undefined
+  const i = x && wsInfo(x)
+  const head = { event: name, at: Date.now(), ...(i && { ws: { id: i.id, name: i.name, project: i.project, branch: i.branch, pr: i.pr } }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }) }
+  let json = JSON.stringify({ ...head, ...extra })
+  if (json.length > EVENT_MAX) json = JSON.stringify({ ...head, cut: true }) // ponytail: past 64 KB its own fields all go
+  for (const w of widgets.values()) {
+    const h = w.m.on && Object.hasOwn(w.m.on, name) ? w.m.on[name] : undefined
+    if (typeof h !== 'string' || !onOf(w)) continue
+    if (scoped(w) && !(x && instOk(x))) continue // its workspace's only
+    const q = queues.get(w.id) ?? []
+    q.push({ name, json, h, ws: scoped(w) ? x!.id : undefined })
+    if (q.length > QUEUE_MAX) wLog(w, `event ${q.shift()!.name}: dropped, ${QUEUE_MAX} more waiting`)
+    queues.set(w.id, q)
+    void drain(w.id)
+  }
+}
+async function drain(id: string) {
+  if (draining.has(id)) return
+  draining.add(id)
+  try {
+    for (let j = queues.get(id)?.shift(); j; j = queues.get(id)?.shift()) await handle(id, j).catch(e => wLog({ id }, `event ${j!.name}: ${(e as Error).message}`))
+  } finally {
+    draining.delete(id)
+    queues.delete(id)
+  }
+}
+async function handle(id: string, j: Job) {
+  const w = widgets.get(id)
+  if (!w || !onOf(w)) return
+  const file = join(tmpdir(), `laki-event-${randomBytes(8).toString('hex')}.json`)
+  writeFileSync(file, j.json, { mode: 0o600 })
+  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file }, stdin: j.json }
+  try {
+    if (j.h === 'refresh') {
+      const r = await widgetRun({ id, reason: `event:${j.name}`, ws: j.ws }, false, ev)
+      if (!r.ok) wLog(w, `event ${j.name}: not fetched: ${r.error}`)
+    } else {
+      const r = await widgetAction({ id, action: j.h, ws: j.ws }, `event:${j.name}`, ev)
+      if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: id, ws: j.ws, toast: r.toast, modal: r.modal })
+    }
+  } finally {
+    rmSync(file, { force: true })
+  }
+}
+
+// ---------- streams (widget.json's stream: true; global ones only): its fetch runs all along (spawn), each line of
+// JSON it prints its data, other lines its log. The view follows at most every 250 ms, the store every 5 s and as it
+// ends. It runs while it's on and a window was shown in the last STREAM_IDLE (and within widgetHours); it stops when
+// it's off, gone, reloaded, Stopped in Settings › Resources (until Fetch now, a switch or a reload) and at shutdown;
+// after an exit it starts again 1, 2, 4… 60 s later (1 again once it ran a minute)
+type Stream = { p?: ChildProcess; since?: number; restarts: number; last?: string; next?: number; wait: number; timer?: NodeJS.Timeout; view?: NodeJS.Timeout; save?: NodeJS.Timeout; data?: unknown; unsaved?: boolean; ending?: boolean; stopped?: boolean; err: string }
+const streams = new Map<string, Stream>()
+const STREAM_IDLE = 10 * 60_000
+let shownAt = 0 // the last time a window was shown
+const streaming = (w: Entry) => w.m.stream === true && !scoped(w) && fetches(w)
+function streamSync(now = Date.now()) {
+  if ([...clients].some(c => c.view?.shown !== false)) shownAt = now
+  const hours = hoursOf()
+  const ok = now - shownAt < STREAM_IDLE && (!hours || 'error' in hours || inHours(hours, now))
+  for (const [id, st] of streams) {
+    const w = widgets.get(id)
+    if (w && streaming(w) && onOf(w) && !w.s.mock && ok) continue
+    if (st.stopped && w && onOf(w)) continue // a Stop stays while it's on: nothing runs
+    stopStream(id)
+  }
+  if (ok) for (const w of widgets.values()) if (streaming(w) && onOf(w) && !w.s.mock && !streams.get(w.id)?.stopped) startStream(w)
+}
+function startStream(w: Entry) {
+  const was = streams.get(w.id)
+  if (was?.p || was?.timer) return
+  const script = w.m.script ? resolve(w.dir, w.m.script) : undefined
+  if (script && !script.startsWith(w.dir + '/')) return
+  const st: Stream = was ?? { restarts: 0, wait: 1, err: '' }
+  streams.set(w.id, st)
+  const p = spawn(script ? process.execPath : '/bin/sh', script ? ['--input-type=module', '-e', RUN_JS, script] : ['-c', w.m.fetch!], { cwd: w.dir, env: envOf(w, { LAKI_REFRESH_REASON: 'stream', ...(script && process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) }), stdio: ['ignore', 'pipe', 'pipe'] })
+  own(p, `Extension · ${w.m.name || w.id} (stream)`, `stream:${w.id}`)
+  Object.assign(st, { p, since: Date.now(), next: undefined, ending: false })
+  wLog(w, `stream: ${script ? `node ${w.m.script}` : w.m.fetch}`)
+  createInterface({ input: p.stdout! }).on('line', line => {
+    st.last = line.slice(0, 500)
+    let d: unknown
+    try {
+      d = JSON.parse(line)
+    } catch {
+      return wLog(w, `stream: ${line.slice(0, 300)}`)
+    }
+    st.data = d
+    st.unsaved = true
+    st.view ??= setTimeout(() => streamView(w.id), 250)
+  })
+  p.stderr!.on('data', b => (st.err = (st.err + b).slice(-4096)))
+  p.on('error', e => wLog(w, `stream: ${e.message}`))
+  p.on('exit', (code, sig) => {
+    st.p = undefined
+    streamView(w.id, true)
+    const up = Date.now() - (st.since ?? Date.now())
+    ran(w.id, { at: st.since ?? Date.now(), ms: up, reason: 'stream', ok: !code || st.ending === true, bytes: 0, error: code && !st.ending ? lastLine(st.err) || `exit ${code}` : undefined, stderr: tail(st.err), exit: code ?? 0 })
+    st.err = ''
+    changed()
+    if (st.ending || streams.get(w.id) !== st) return // stopped
+    if (up >= 60_000) st.wait = 1
+    st.restarts++
+    st.next = Date.now() + st.wait * 1000
+    wLog(w, `stream ended (${sig ?? `exit ${code}`}) after ${Math.round(up / 1000)} s: again in ${st.wait} s`)
+    st.timer = setTimeout(() => {
+      st.timer = undefined
+      if (streams.get(w.id) === st && !st.stopped) streamSync()
+    }, st.wait * 1000)
+    st.wait = Math.min(60, st.wait * 2)
+  })
+  changed()
+}
+// its last line to the view (at), and to the store every 5 s (end: now)
+function streamView(id: string, end = false) {
+  const st = streams.get(id)
+  const w = widgets.get(id)
+  if (!st || !w) return
+  clearTimeout(st.view)
+  st.view = undefined
+  if (st.data !== undefined && st.unsaved) {
+    w.s = { ...w.s, at: Date.now(), error: undefined }
+    w.face = faceOf(w, st.data)
+    changed()
+  }
+  const save = () => {
+    clearTimeout(st.save)
+    st.save = undefined
+    if (!st.unsaved) return
+    st.unsaved = false
+    keep(w, undefined, s => ((s.data = st.data), (s.at = w.s.at), (s.error = undefined)))
+  }
+  if (end) save()
+  else st.save ??= setTimeout(save, 5000)
+}
+function stopStream(id: string, park = false) {
+  const st = streams.get(id)
+  if (!st) return
+  clearTimeout(st.timer)
+  st.timer = undefined
+  st.ending = true
+  streamView(id, true)
+  st.p?.kill()
+  if (park) (st.stopped = true), (st.next = undefined)
+  else streams.delete(id)
+  changed()
+}
+// Settings › Resources' Stop: until Fetch now, a switch or a reload
+export const widgetStreamStop = (id: string) => stopStream(find(id).id, true)
+const streamOf = (id: string): WidgetStream | undefined => (st => st && { running: !!st.p, since: st.p ? st.since : undefined, restarts: st.restarts, last: st.last, next: st.timer ? st.next : undefined, stopped: st.stopped })(streams.get(id))
+
+// laki widget push (a cron job, a git hook, CI on this Mac, another app): data put there as a fetch would, none run;
+// merge: over its last data, shallow (both objects). An off one refuses it
+export function widgetPush(o: { id: string; data?: unknown; ws?: string; merge?: boolean }) {
+  const w = find(o.id)
+  if (!onOf(w)) throw new Error(OFF(w))
+  if (!('data' in o)) throw new Error('data: JSON to show')
+  const x = wsOf(w, o.ws)
+  const t0 = Date.now()
+  keep(w, x?.id, s => ((s.data = o.merge && isObj(s.data) && isObj(o.data) ? { ...s.data, ...o.data } : o.data), (s.at = t0), (s.error = s.mock = undefined)))
+  const st = streams.get(w.id)
+  if (st && !x) st.data = undefined // a stream's line until then: the push shows
+  ran(keyOf(w.id, x?.id), { at: t0, ms: 0, reason: 'push', ok: true, bytes: Buffer.byteLength(JSON.stringify(o.data) ?? ''), exit: 0 })
+  wLog(w, `pushed${o.merge ? ', merged' : ''}${x ? ` (${x.id})` : ''}`)
+  changed()
+  return { ok: true }
 }
 
 // an extension's files, as text (Laki AI's and MCP's laki_extension_read: an example to copy, or the one to change):
@@ -891,7 +1101,7 @@ export function widgetRuns(o: { id: string; data?: boolean; ws?: string }): Widg
       .map(([k, v]) => [k, k === 'LAKI_WIDGET_CONFIG' ? JSON.stringify(Object.fromEntries(Object.entries(typedOf(w)).map(([n, x]) => [n, masked.has(n) ? '••••' : x]))) : [...masked].some(n => k === `WIDGET_${n.toUpperCase()}`) ? '••••' : v])
       .sort(([a], [b]) => a.localeCompare(b)),
   )
-  return { runs: runs.get(k) ?? [], env, fixtures: fixturesOf(w), devError: w.devError, mock: metaOf(w, x?.id).mock, ...(data !== undefined && { data: data.length > 256 << 10 ? undefined : data, big: data.length > 256 << 10 || undefined }) }
+  return { runs: runs.get(k) ?? [], env, fixtures: fixturesOf(w), devError: w.devError, mock: metaOf(w, x?.id).mock, ...(streaming(w) && { stream: streamOf(w.id) }), ...(data !== undefined && { data: data.length > 256 << 10 ? undefined : data, big: data.length > 256 << 10 || undefined }) }
 }
 const fixtureNames = (d: string) => {
   try {
@@ -1094,6 +1304,7 @@ async function checkOne(x: Source, run: boolean, ws?: string): Promise<UiProblem
     if (!w || pathOf(w) !== pathOf(x)) say('warn', 'fetch', `not run: Laki doesn't have this one (laki widget dev ${pathOf(x)} links it)`)
     else if (!onOf(w) && w.s.by === 'ai') say('warn', 'fetch', "not run: Laki AI wrote it and it's off: turn it on first")
     else if (scoped(w) && !ws) say('warn', 'fetch', 'not run: per workspace, which one? (--ws <id>)')
+    else if (streaming(w)) say('warn', 'fetch', 'not run: it streams (laki widget dev prints its lines as they come)')
     else {
       const r = await widgetRun({ id, reason: 'manual', why: 'check', ws }, true).catch(e => ({ ok: false, error: (e as Error).message }))
       const last = runs.get(keyOf(id, scoped(w) ? ws : undefined))?.[0]
