@@ -86,7 +86,7 @@ export function DeskPage({ widgets, tiles: saved = [], api, onClose }: { widgets
     ])
   const tileMenu = (e: React.MouseEvent, w: WidgetView) =>
     openMenu(e, [
-      ...(w.on && w.every !== undefined ? [{ label: 'Fetch now', icon: 'refresh', run: () => void api.run(w.id).catch(() => {}) } as MenuItem] : []),
+      ...(w.on && w.every !== undefined && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh', run: () => void api.run(w.id, w.here ?? undefined).catch(() => {}) } as MenuItem] : []),
       ...(w.full ? [{ label: 'Open its full view', icon: 'expand', run: () => api.full(w.id) } as MenuItem] : []),
       { label: 'Its page: settings, Laki AI', icon: 'settings', run: () => api.settings(w.id) },
       null,
@@ -101,7 +101,7 @@ export function DeskPage({ widgets, tiles: saved = [], api, onClose }: { widgets
       onClose={onClose}
       tools={
         <>
-          {here.some(w => w.on && w.every !== undefined) && <IconButton icon="refresh" title="Fetch them all now" onClick={() => here.forEach(w => w.on && w.every !== undefined && void api.run(w.id).catch(() => {}))} />}
+          {here.some(w => w.on && w.every !== undefined && w.here !== null) && <IconButton icon="refresh" title="Fetch them all now" onClick={() => here.forEach(w => w.on && w.every !== undefined && w.here !== null && void api.run(w.id, w.here ?? undefined).catch(() => {}))} />}
           {api.build && (
             <button type="button" className={want !== null ? 'on' : ''} onClick={() => setWant(w => (w === null ? '' : null))}>
               <Icon name="ai" size={12} /> Build with AI

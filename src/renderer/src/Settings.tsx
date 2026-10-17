@@ -1786,18 +1786,18 @@ export type WidgetsApi = {
   home?: string // Laki's own widgets folder
   set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour)
   desk?: boolean // Desk is on (experimental): a place too
-  run: (id: string) => Promise<unknown>
+  run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
   rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, for good (asked first here)
   reload: () => Promise<unknown>
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
   logs?: (id: string) => void // development mode's: its fetches and actions
   kit?: () => void // the UI kit's page: its elements and their samples
-  runs?: (id: string) => Promise<WidgetRuns> // the inspector's: its runs, env, fixtures
-  mock?: (id: string, o: { data?: unknown; fixture?: string; off?: boolean }) => Promise<unknown> // sample data by hand, or Live again
+  runs?: (id: string, ws?: string) => Promise<WidgetRuns> // the inspector's: its runs, env, fixtures
+  mock?: (id: string, o: { data?: unknown; fixture?: string; off?: boolean; ws?: string }) => Promise<unknown> // sample data by hand, or Live again
   files?: (id: string) => Promise<string[]> // its folder's files
   make?: (kind: StarterKind) => Promise<unknown> // New ▾'s starters (widgetNew): yours, on, its page opened
-  check?: (id: string, run: boolean) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
+  check?: (id: string, run: boolean, ws?: string) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
 }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
@@ -1941,7 +1941,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             ))}
           </select>
         )}
-        {w.on && w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
+        {w.on && w.every !== undefined && (!w.scope || w.here) && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id, w.here ?? undefined)} />}
         {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
         {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
         {api.rm && !w.builtin && (
@@ -2026,11 +2026,11 @@ function WidgetList({ api }: { api: WidgetsApi }) {
                   {w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}
                 </span>
                 {w.every !== undefined && <span className="tag">every {w.every} min</span>}
-                {w.every !== undefined && <span className={`tag ${w.error && !w.running ? 'tag-closed' : ''}`}>{w.running ? 'fetching…' : w.error ? 'last fetch failed' : w.at ? `fetched ${ago(w.at)}` : 'not fetched yet'}</span>}
+                {w.scope ? <span className="tag" data-tip="An instance in each workspace: its data, fetched while it's on screen">per workspace</span> : w.every !== undefined && <span className={`tag ${w.error && !w.running ? 'tag-closed' : ''}`}>{w.running ? 'fetching…' : w.error ? 'last fetch failed' : w.at ? `fetched ${ago(w.at)}` : 'not fetched yet'}</span>}
               </span>
             </button>
             <span className="sched-acts">
-              {w.on && w.every !== undefined && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
+              {w.on && w.every !== undefined && !w.scope && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
             </span>
             <Switch on={w.on} tip={w.on ? `${w.name}: on` : `${w.name}: off`} onChange={on => void api.set(w.id, { on })} />
           </div>

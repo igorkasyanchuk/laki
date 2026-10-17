@@ -43,8 +43,9 @@ export const MANIFEST: Record<string, J> = {
   every: { type: 'integer', minimum: 1, maximum: 1440, description: 'Minutes between fetches (5 by default)' },
   view: { enum: VIEWS, description: 'Its full view’s size: s, m (the default) or l' },
   place: { anyOf: [PLACE, { type: 'array', items: PLACE }], description: 'Where it shows at first (the user’s choice wins): one place or several' },
+  scope: { enum: ['global', 'workspace'], description: 'global (the default): one for the app; workspace: one per workspace, its fetch given $LAKI_BRANCH, $PORT, $LAKI_PATH… and its ui {{workspace.branch}}' },
   fetch: str('A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON'),
-  script: str('Or a JS file of its folder: its default export gets { config, last } and returns the data'),
+  script: str('Or a JS file of its folder: its default export gets { config, last, workspace } and returns the data'),
   config: { type: 'object', additionalProperties: SPEC, description: 'Its settings, by name (a letter or _, then letters, digits, _)' },
   actions: { type: 'object', additionalProperties: { type: 'string' }, description: 'Commands its buttons run by name, with $WIDGET_ARG; what one prints as JSON may say { "toast" } or { "modal" }' },
   icon: str('As a button: an icon of Laki’s by name, or an emoji'),
@@ -158,6 +159,7 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   for (const p of m.place === undefined ? [] : Array.isArray(m.place) ? m.place : [m.place])
     if (!(WIDGET_PLACES as readonly string[]).includes(p as string)) say('error', 'widget.json place', `${JSON.stringify(p)} isn't a place: ${WIDGET_PLACES.join(', ')}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(p), WIDGET_PLACES))}`)
   if (m.fetch && m.script) say('error', 'widget.json', 'fetch or script, not both')
+  if (m.scope !== undefined && m.scope !== 'global' && m.scope !== 'workspace') say('error', 'widget.json scope', `global or workspace, not ${JSON.stringify(m.scope)}`)
   if ((m.fetch || m.script) && m.sample === undefined) say('warn', 'widget.json', 'no sample: its preview has nothing to show before it runs')
   const actions = m.actions && typeof m.actions === 'object' && !Array.isArray(m.actions) ? (m.actions as Record<string, unknown>) : undefined
   if (m.actions !== undefined && !actions) say('error', 'widget.json actions', 'an object: { "name": "a command" }')

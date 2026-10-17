@@ -86,13 +86,20 @@
       ],
       "description": "Where it shows at first (the user’s choice wins): one place or several"
     },
+    "scope": {
+      "enum": [
+        "global",
+        "workspace"
+      ],
+      "description": "global (the default): one for the app; workspace: one per workspace, its fetch given $LAKI_BRANCH, $PORT, $LAKI_PATH… and its ui {{workspace.branch}}"
+    },
     "fetch": {
       "type": "string",
       "description": "A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON"
     },
     "script": {
       "type": "string",
-      "description": "Or a JS file of its folder: its default export gets { config, last } and returns the data"
+      "description": "Or a JS file of its folder: its default export gets { config, last, workspace } and returns the data"
     },
     "config": {
       "type": "object",

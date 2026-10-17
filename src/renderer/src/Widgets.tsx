@@ -14,14 +14,14 @@ import { daemonBase } from './api'
 import { ask, Icon, IconButton, isIconName } from './ui'
 
 export type WidgetApi = {
-  render: (id: string, full: boolean, sample?: boolean, cells?: [number, number]) => Promise<string | null> // sample: widget.json's made-up data; cells: where it shows (the UI kit's size)
-  run: (id: string) => Promise<unknown>
+  render: (id: string, full: boolean, sample?: boolean, cells?: [number, number], ws?: string) => Promise<string | null> // sample: widget.json's made-up data; cells: where it shows (the UI kit's size); ws: a per-workspace one's instance
+  run: (id: string, ws?: string) => Promise<unknown>
   open: (url: string) => void // http(s), mailto, laki://
   copy: (text: string) => void
   full: (id: string) => void
   close: () => void // the full view's dialog (Esc in a JS widget's frame)
-  action: (id: string, action: string, arg: string, label?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
-  say: (id: string, s: WidgetSay) => void // a toast, a dialog with buttons
+  action: (id: string, action: string, arg: string, label?: string, ws?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
+  say: (id: string, s: WidgetSay, ws?: string) => void // a toast, a dialog with buttons
   settings: (id?: string) => void // its page (Extension.tsx); none: Settings › Extensions
   menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page
   key?: string // the daemon's key for JS widgets' pages
@@ -62,15 +62,25 @@ const themeVars = () => {
   return { ...Object.fromEntries(VARS.map(v => [v, cs.getPropertyValue(v).trim()]).filter(([, x]) => x)), 'color-scheme': cs.colorScheme }
 }
 
+// a per-workspace one (scope workspace) as it shows in a workspace: that instance's fetch and button words over the
+// widget's; ws null or undefined: none on screen (Board, Schedule, the AI page), `here` null: "Select a workspace"
+export const inWs = (w: WidgetView, ws: string | null | undefined): WidgetView => {
+  if (!w.scope) return w
+  const i = ws ? w.inst?.[ws] : undefined
+  return { ...w, here: ws ?? null, at: i?.at, error: i?.error, running: i?.running, mock: i?.mock, ...(i && { label: i.label, badge: i.badge, tip: i.tip }) }
+}
+const wsOf = (w: WidgetView) => w.here ?? undefined
+const NO_WS = uiHtml({ type: 'empty', icon: 'folder', text: 'Select a workspace' }, {}, {})
+
 // what a click in a widget asks for (uiBehave's messages, a JS page's laki.…): a link, an action (asked first when it
 // says confirm), a copy, a toast or dialog, a fetch, the full view. Done when the action is
 function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: WidgetApi): Promise<unknown> | void {
   const { laki, url, action, arg, label, confirm, text } = m
   if (laki === 'open' && typeof url === 'string' && OPEN.test(url)) return api.open(url)
-  if (laki === 'run' && typeof action === 'string' && action) return (typeof confirm === 'string' && confirm ? ask(confirm.slice(0, 300), { ok: String(label || 'Run').slice(0, 40) }) : Promise.resolve(true)).then((yes): unknown => yes && api.action(w.id, action, String(arg ?? ''), String(label ?? '')))
+  if (laki === 'run' && typeof action === 'string' && action) return (typeof confirm === 'string' && confirm ? ask(confirm.slice(0, 300), { ok: String(label || 'Run').slice(0, 40) }) : Promise.resolve(true)).then((yes): unknown => yes && api.action(w.id, action, String(arg ?? ''), String(label ?? ''), wsOf(w)))
   if (laki === 'copy' && typeof text === 'string') return api.copy(text)
-  if (laki === 'say') return (s => void (s && api.say(w.id, s)))(sayOf(m))
-  if (laki === 'refresh') return void api.run(w.id).catch(() => {})
+  if (laki === 'say') return (s => void (s && api.say(w.id, s, wsOf(w))))(sayOf(m))
+  if (laki === 'refresh') return void api.run(w.id, wsOf(w)).catch(() => {})
   if (laki === 'full' && !full && w.full) api.full(w.id)
 }
 
@@ -91,12 +101,17 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
   useEffect(() => {
     let live = true
     setErr('')
+    if (w.here === null) {
+      // per workspace, none on screen
+      if (host.current) rootOf(host.current).replaceChildren(Object.assign(document.createElement('style'), { textContent: WIDGET_CSS }), clean(NO_WS))
+      return
+    }
     if (w.js) {
-      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? '&sample=1' : ''}${size ? `&cells=${size}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
+      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? '&sample=1' : ''}${size ? `&cells=${size}` : ''}${w.here ? `&ws=${encodeURIComponent(w.here)}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
       return () => void (live = false)
     }
     const root = rootOf(host.current!)
-    api.render(w.id, full, sample, cells).then(
+    api.render(w.id, full, sample, cells, wsOf(w)).then(
       html => {
         if (!live) return
         const style = document.createElement('style')
@@ -106,7 +121,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, w.net, full, config, api.key, theme, sample, size]) // net: Network access's CSP needs the page loaded again
+  }, [w.id, w.js, w.at, w.rev, w.net, w.here, full, config, api.key, theme, sample, size]) // net: Network access's CSP needs the page loaded again
   // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything
   useEffect(() => {
     if (w.js || !host.current) return
@@ -134,7 +149,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
   // the host stays mounted under an error: the next render (a fixed template, a reload) draws into it again
   return (
     <>
-      {w.js ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" /> : <div ref={host} className="widget-body" />}
+      {w.js && w.here !== null ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" /> : <div ref={host} className="widget-body" />}
       {err && <div className="widget-msg warn small">{err}</div>}
     </>
   )
@@ -162,8 +177,8 @@ function useParked() {
 // a widget as a button (its view's button: a rail or foot place, or no preview of its own): a click runs its click
 // action, else opens its full view, else fetches it now (else its settings)
 const click = (w: WidgetView, api: WidgetApi) =>
-  w.click ? void api.action(w.id, w.click, '', w.name).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id).catch(() => {}) : api.settings(w.id)
-const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
+  w.here === null ? undefined : w.click ? void api.action(w.id, w.click, '', w.name, wsOf(w)).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
+const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${w.here === null ? ' · per workspace: select one' : status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
 // its icon: one of the app's by name, an emoji as it is, else its name's first letter
 function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
   if (isIconName(w.icon)) return <Icon name={w.icon} size={size} />
@@ -187,7 +202,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
   return on.map(w => {
     const dot = w.running ? 'rail-dot' : w.error ? 'rail-dot bad' : ''
     return look === 'rail' ? (
-      <button key={`widget:${w.id}`} type="button" className="rail-kind nodrag" aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+      <button key={`widget:${w.id}`} type="button" className={`rail-kind nodrag ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
         <span className="rail-icon">
           <Glyph w={w} size={18} />
           {w.badge ? <span className="rail-count">{w.badge}</span> : dot && <span className={dot} />}
@@ -195,7 +210,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
         {words && <span className="rail-label">{w.label ?? w.name}</span>}
       </button>
     ) : (
-      <button key={`widget:${w.id}`} type="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
+      <button key={`widget:${w.id}`} type="button" className={`ib widget-foot ${words ? 'labeled' : ''} ${w.error && !w.running ? 'dot' : ''} ${w.here === null ? 'no-ws' : ''}`} aria-label={tipOf(w)} data-tip={tipOf(w)} onClick={() => click(w, api)}>
         <Glyph w={w} />
         {words && <span className="ib-label">{w.label ?? w.name}</span>}
         {w.badge && <span className="widget-badge">{w.badge}</span>}
@@ -207,7 +222,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
 // a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
 function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number] }) {
   return (
-    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''}`} style={style} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
+    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''} ${w.here === null ? 'no-ws' : ''}`} style={style} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
       {w.button ? (
         <CellButton w={w} api={api} />
       ) : w.js && parked ? (
@@ -266,7 +281,7 @@ export function WidgetDialog({ w, api, onClose }: { w: WidgetView; api: WidgetAp
           <b>{w.name}</b>
           <span className={`small ${w.error && !w.running ? 'warn' : 'muted'}`}>{status(w)}</span>
           <span className="spacer" />
-          {w.every !== undefined && <IconButton icon="refresh" title="Fetch now" onClick={() => void api.run(w.id).catch(() => {})} />}
+          {w.every !== undefined && <IconButton icon="refresh" title="Fetch now" onClick={() => void api.run(w.id, wsOf(w)).catch(() => {})} />}
           <IconButton icon="settings" title="Its page: settings, preview, Laki AI" onClick={() => api.settings(w.id)} />
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
         </div>

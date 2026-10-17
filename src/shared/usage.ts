@@ -40,14 +40,14 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow run <workflow> <project> <task> [--dry]  start a run (--dry: a PR, approve, merge said, not done)
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
-  laki widget on|off|run <id>                 show or hide one | run its fetch now
-  laki widget render <id> [--full]            the HTML it shows now, filled from its data
-  laki widget action <id> <action> [arg]      run one of its widget.json actions: what the app would show
+  laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's)
+  laki widget render <id> [--full] [--ws <ws>]  the HTML it shows now, filled from its data
+  laki widget action <id> <action> [arg] [--ws <ws>]  run one of its widget.json actions: what the app would show
   laki widget kit [element] [--json]          the UI kit (widget.json's "ui"): its elements, or one's props and a sample
   laki widget dev [folder]                    dev mode: link your extension's folder (on, watched), then its runs as they come
   laki widget dev --off <id|folder> | --list  unlink one | the linked folders
-  laki widget new <name> [--kind <k>] [--dir <folder>]  a starter (number, list, table, chart, button, form, panel, onefile), on
-  laki widget check [id|folder] [--no-run]    what's wrong with one: widget.json, its ui against its data, its fetch once
+  laki widget new <name> [--kind <k>] [--dir <folder>]  a starter (number, list, table, chart, button, form, panel, workspace, onefile), on
+  laki widget check [id|folder] [--no-run] [--ws <ws>]  what's wrong with one: widget.json, its ui against its data, its fetch once
   laki ai [--image png] <ask> | new | log     ask Laki's AI (Settings › AI) to work Laki: "what are my agents doing?",
                                               "review the 3 PRs in this screenshot" | a new conversation | its calls
                                               and cost; laki ai alone: the conversation

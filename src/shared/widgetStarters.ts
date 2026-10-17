@@ -42,7 +42,7 @@ function kit(o: { spec: unknown; data: unknown; empty: unknown; real: string; si
 }
 const toast = (what: string) => `printf '{"toast": "${what}: %s"}' "$WIDGET_ARG"`
 
-export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'button', 'form', 'panel', 'onefile'] as const
+export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'button', 'form', 'panel', 'workspace', 'onefile'] as const
 export type StarterKind = (typeof STARTER_KINDS)[number]
 
 export const STARTERS: Record<StarterKind, Starter> = {
@@ -103,6 +103,25 @@ export const STARTERS: Record<StarterKind, Starter> = {
       'fixtures/sample.json': json(sample('stats').data),
       'fixtures/empty.json': json({ stats: [] }),
       'README.md': readme(id, name, ' Its look is `widget.html`: a script that draws with `laki.mount` (types: `laki.d.ts`).'),
+    }),
+  },
+  workspace: {
+    title: 'This branch',
+    blurb: 'Per workspace: the selected one’s branch, PR, port and path, and a link to its server',
+    files: kit({
+      extra: { scope: 'workspace' },
+      size: [3, 2],
+      spec: {
+        type: 'stack',
+        children: [
+          { type: 'kv', mono: true, items: [{ key: 'Branch', value: '{{workspace.branch}}', copy: true }, { key: 'Ahead', value: '{{commits}} commits on {{workspace.base}}' }, { key: 'PR', value: '{{workspace.pr}}', if: 'workspace.pr' }, { key: 'Port', value: '{{workspace.port}}' }, { key: 'Path', value: '{{workspace.path}}', copy: true }] },
+          { type: 'links', items: [{ label: 'localhost:{{workspace.port}}', href: 'http://localhost:{{workspace.port}}' }, { label: 'Its PR', href: '{{workspace.pr}}', if: 'workspace.pr' }] },
+        ],
+      },
+      data: { commits: 3 },
+      empty: { commits: 0 },
+      real: `# per workspace: $LAKI_BRANCH, $LAKI_BASE, $LAKI_PATH, $PORT, $LAKI_PR are the selected workspace's
+printf '{"commits": %s}' "$(git -C "$LAKI_PATH" rev-list --count "$LAKI_BASE..HEAD" 2>/dev/null || echo 0)"`,
     }),
   },
   onefile: {

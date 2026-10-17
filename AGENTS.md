@@ -97,7 +97,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`. A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1052,6 +1052,26 @@ error; the CLI prints ✓ ! ✗ and exits 1 on an error; the inspector's Check t
 `Source`'s `file`, `oneFile` parses `<laki.*>` tags (`VAR`: xbar's settings) into a `Manifest` whose fetch runs the file
 (its shebang when it isn't executable); `pathOf` is its path, `widgetFiles` gives the file only, `widgetRm` removes it
 only. `widgetWrite` and `widgetFiles` take `fixtures/<name>.json` (`FIXTURE`; the folder not a link).
+
+Per workspace (Part 4; `test/widget-ws.test.ts`): widget.json's `scope: 'workspace'` (`scoped`) makes an instance per
+workspace (`instOk`: live, not Terminals' or Browsers', not on a host: ponytail), its data `<data>/widget-data/<id>/ws/<ws>.json`
+(`Inst`: data, at, error, mock; `readInst`/`writeInst`), its meta and face in the entry's `inst`; the store keeps the
+settings. `keyOf` (`<id>@<ws>`) keys `running`, `again` and `runs`; `wsOf` resolves a call's `ws` (required when scoped,
+refused when not, never an archived one); `keep` writes a fetch's or a mock's result to the store or the instance.
+`wsInfo` (core's `wsVars`: `agentVars`' values, as `varsIn`) is templates' and `ui`'s `workspace`, a script's
+`workspace` (`LAKI_WIDGET_WS`) and `wsEnv`'s `LAKI_WORKSPACE`, `_NAME`, `LAKI_PROJECT`, `LAKI_BRANCH`, `LAKI_BASE`,
+`LAKI_PATH`, `PORT`, `LAKI_PR`, `LAKI_STORAGE_FOLDER` (once `ws.storage`), and `LAKI_WIDGET_FILE` its file; `SAMPLE_WS`
+a sample's. Fetched only on screen (`onScreen`: each shown client's `view.ws`, else its tab's workspace): `widgetTick`
+per instance (`due`), `select` (core's `setView` as a window's workspace changes) only the scoped ones; `refetch` (dev,
+settings, reload, linked) does the same; `AT_ONCE` (4) per extension, more refused till the next tick; `soon` runs one
+and logs a refusal. `instView` gives the view's `inst` (the ones fetched, live). `widgetsGone` (core's `dropWs`) deletes
+a workspace's files; `widgetRm` the `<id>/` folder; archive keeps them (not in `inst` while archived). `checkOne` warns
+when a scoped one uses nothing of the workspace (`WS_USE`) and wants `ws` to run; `manifestCheck` refuses another scope.
+The renderer: App's `wsHere` (none under a page over every workspace: `covered`, nor a terminal's, a browser's, a
+host's) is the view's `ws` and `Widgets.tsx` `inWs` (an instance over the widget, `here`: null is *Select a workspace*,
+`NO_WS`, dimmed `.no-ws`); `WidgetApi`'s render, run, action and say and `WidgetsApi`'s run, runs, mock and check take
+`ws` (`w.here`); `ExtensionPage`'s `spots` and `here`, the inspector's picker (`.ext-ws`); Settings' row says *per
+workspace*. The `workspace` starter (*This branch*).
 
 ### Notifications
 

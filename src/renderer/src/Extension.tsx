@@ -11,7 +11,7 @@ import type { UiProblem } from '../../shared/widgetUi'
 import { AiPage } from './Ai'
 import { WidgetCard, type WidgetsApi } from './Settings'
 import { escapes, Icon, IconButton, Page } from './ui'
-import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
+import { CellButton, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
 const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk' }
 const half = (d: number) => (d === 0.5 ? '½' : String(d))
@@ -26,14 +26,17 @@ const TABS: [ExtTab, string][] = [
   ['check', 'Check'],
 ]
 
-export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspaces, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; back: string; onAiSettings: () => void; onClose: () => void }) {
+// spots, here: the workspaces a per-workspace one has an instance in (live, no terminal, browser or SSH host), the one on
+// screen (the picker's first)
+export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspaces, spots, here, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; spots: { id: string; name: string }[]; here: string | null; back: string; onAiSettings: () => void; onClose: () => void }) {
   const [cur, setCur] = useState(id)
   const [tab, setTab] = useState<ExtTab>(first ?? 'overview')
   // New extension: the first one that shows up meanwhile is the one Laki AI made
   const known = useRef(new Set(widgets.map(w => w.id)))
   const made = cur ? undefined : widgets.find(w => !known.current.has(w.id))
   useEffect(() => void (made && setCur(made.id)), [made?.id])
-  const w = widgets.find(x => x.id === cur)
+  const [at, setAt] = useState(here ?? spots[0]?.id ?? null) // a per-workspace one: whose instance
+  const w = (x => x && inWs(x, spots.some(s => s.id === at) ? at : null))(widgets.find(x => x.id === cur))
   const seen = useRef(false) // one just made (New ▾) comes with the next view
   if (w) seen.current = true
   useEffect(() => void (cur && !w && seen.current && onClose()), [cur, !w]) // deleted meanwhile
@@ -73,7 +76,7 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
         <div className="ext-main">
           {w ? (
             <>
-              <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} />
+              <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} spots={spots} setAt={setAt} />
               {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} />}
             </>
           ) : cur ? (
@@ -158,7 +161,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
           <b>Preview</b>
           <span className={`small ${w.error && !w.running && !sample ? 'warn' : 'muted'}`}>{sample ? 'made-up data' : status(w) || (w.on ? 'live' : 'off')}</span>
           <span className="grow" />
-          {w.on && w.every !== undefined && !sample && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id).catch(() => {})} />}
+          {w.on && w.every !== undefined && !sample && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && w.here !== null && void api.run(w.id, w.here ?? undefined).catch(() => {})} />}
           <div className="seg" role="tablist" aria-label="Its data">
             <button role="tab" aria-selected={!sample} className={!sample ? 'on' : ''} onClick={() => setPick('live')}>
               Live
@@ -244,7 +247,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
 
 // the inspector's head: its tabs, Run now and Reload, a dot while laki widget dev watches it, and why its files don't
 // read now (the last good version runs on)
-function InspectHead({ w, cfg, tab, setTab }: { w: WidgetView; cfg: WidgetsApi; tab: ExtTab; setTab: (t: ExtTab) => void }) {
+function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg: WidgetsApi; tab: ExtTab; setTab: (t: ExtTab) => void; spots: { id: string; name: string }[]; setAt: (ws: string) => void }) {
   return (
     <>
       <div className="ext-tabs">
@@ -256,6 +259,16 @@ function InspectHead({ w, cfg, tab, setTab }: { w: WidgetView; cfg: WidgetsApi; 
           ))}
         </div>
         <span className="grow" />
+        {w.scope && (
+          <select className="sm ext-ws" value={w.here ?? ''} aria-label="Whose instance" data-tip="Per workspace: whose instance this page shows, fetches and checks" onChange={e => setAt(e.target.value)}>
+            {!w.here && <option value="">No workspace</option>}
+            {spots.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
         {w.dev && (
           <span className="ext-watch small muted" data-tip="laki widget dev links its folder: a save reloads it">
             <i className="ext-watch-dot" /> watching
@@ -263,7 +276,7 @@ function InspectHead({ w, cfg, tab, setTab }: { w: WidgetView; cfg: WidgetsApi; 
         )}
         {w.mock && <span className="tag" data-tip="Data put there by hand: Live in Data fetches again">sample data: {w.mock}</span>}
         {w.every !== undefined && (
-          <button className="sm" disabled={!w.on || w.running} data-tip={w.on ? 'Fetch now' : 'Turn it on first'} onClick={() => void cfg.run(w.id).catch(() => {})}>
+          <button className="sm" disabled={!w.on || w.running || w.here === null} data-tip={w.here === null ? 'Per workspace: pick one' : w.on ? 'Fetch now' : 'Turn it on first'} onClick={() => void cfg.run(w.id, w.here ?? undefined).catch(() => {})}>
             <Icon name="refresh" size={12} /> {w.running ? 'Fetching…' : 'Run now'}
           </button>
         )}
@@ -303,9 +316,10 @@ function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclu
   }, [tab])
   useEffect(() => {
     let live = true
-    cfg.runs?.(w.id).then(r => live && setX(r), e => live && setErr(String(e?.message ?? e)))
+    if (w.here === null) return setX(null) // per workspace, none picked
+    cfg.runs?.(w.id, w.here).then(r => live && setX(r), e => live && setErr(String(e?.message ?? e)))
     return () => void (live = false)
-  }, [w.id, w.at, w.rev, w.mock, w.running, tab, tick])
+  }, [w.id, w.at, w.rev, w.mock, w.running, w.here, tab, tick])
   useEffect(() => {
     if (tab !== 'files') return
     let live = true
@@ -320,7 +334,7 @@ function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclu
       return setErr(`Not JSON: ${(e as Error).message}`)
     }
     setErr('')
-    void cfg.mock?.(w.id, { data }).then(() => setText(null), e => setErr(String(e?.message ?? e)))
+    void cfg.mock?.(w.id, { data, ws: w.here ?? undefined }).then(() => setText(null), e => setErr(String(e?.message ?? e)))
   }
   if (!x) return <section className="ext-card muted small">{err || 'Reading…'}</section>
   if (tab === 'data')
@@ -331,7 +345,7 @@ function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclu
           <span className="muted small">{w.mock ? `sample data (${w.mock}): not fetched until Live` : w.at ? `as fetched ${ago(w.at)}` : 'not fetched yet'}</span>
           <span className="grow" />
           {!!x.fixtures.length && (
-            <select className="sm" value="" aria-label="A fixture" onChange={e => e.target.value && void cfg.mock?.(w.id, { fixture: e.target.value }).then(() => setText(null), er => setErr(String(er?.message ?? er)))}>
+            <select className="sm" value="" aria-label="A fixture" onChange={e => e.target.value && void cfg.mock?.(w.id, { fixture: e.target.value, ws: w.here ?? undefined }).then(() => setText(null), er => setErr(String(er?.message ?? er)))}>
               <option value="">Sample ▾</option>
               {x.fixtures.map(f => (
                 <option key={f} value={f}>
@@ -340,7 +354,7 @@ function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclu
               ))}
             </select>
           )}
-          <button className="sm" disabled={!w.mock} data-tip="Back to its fetch's data: fetched now" onClick={() => void cfg.mock?.(w.id, { off: true }).then(() => setText(null))}>
+          <button className="sm" disabled={!w.mock} data-tip="Back to its fetch's data: fetched now" onClick={() => void cfg.mock?.(w.id, { off: true, ws: w.here ?? undefined }).then(() => setText(null))}>
             Live
           </button>
           <button className="sm primary" disabled={text === null} data-tip="Show it with this data (sample data, not fetched meanwhile)" onClick={apply}>
@@ -427,12 +441,12 @@ function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
   const [busy, setBusy] = useState(false)
   const go = (run: boolean) => {
     setBusy(true)
-    cfg.check?.(w.id, run).then(
+    cfg.check?.(w.id, run, w.here ?? undefined).then(
       x => (setR({ ...x, run }), setErr('')),
       e => setErr(String(e?.message ?? e)),
     ).finally(() => setBusy(false))
   }
-  useEffect(() => go(false), [w.id, w.rev])
+  useEffect(() => go(false), [w.id, w.rev, w.here])
   const n = (l: UiProblem['level']) => r?.problems.filter(p => p.level === l).length ?? 0
   const aiOff = w.byAi && !w.on
   return (

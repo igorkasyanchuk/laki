@@ -16,6 +16,9 @@ version it builds, with the date. -->
   table, chart, button, form, JS page or one-file extension that runs at once on sample data. `laki widget check` (its
   page's *Check* tab) finds unknown keys with a guess, bad places, missing actions and fields its rows use that the data
   hasn't. Editors complete widget.json from its schema, and one script named `prs.5m.sh` is a whole extension.
+- **Extensions per workspace**: `"scope": "workspace"` makes one show the selected workspace's own data (its branch, PR,
+  port, path as `$LAKI_BRANCH`, `$PORT`…, and `{{workspace.branch}}` in its look), fetched while it's selected; the
+  *This branch* starter is one. `--ws` picks the instance in `laki widget run|render|action|check`.
 - **A tab in its own window**: a tab's right click › *Float in its own window* (or ⌘K): its terminal, live, in a window over
   every app, as big as you like; its ✕ (or *Bring it back* in its pane) puts it back.
 - **Headless**: `./Laki.AppImage --headless --tailscale` (or `laki serve`) runs Laki on a server with no screen, used

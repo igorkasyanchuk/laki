@@ -194,7 +194,7 @@ export const api = new Api()
 // tell the daemon what this window shows (App's panes, a floated tab's window): it clears their ● and sets none while
 // you look. focused and shown (the window isn't hidden: closing it only hides it, so widgets fetch only while it's
 // open) are added here, again as they change and as the socket opens. The cleanup, for an effect
-export function reportView(what: () => { tab: string | null; tabs: string[]; browse?: boolean }) {
+export function reportView(what: () => { tab: string | null; tabs: string[]; browse?: boolean; ws?: string | null }) {
   const report = () => api.send('view', { ...what(), focused: document.hasFocus(), shown: document.visibilityState === 'visible' })
   report()
   window.addEventListener('focus', report)

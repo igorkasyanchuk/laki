@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetHome, widgetKey, widgetsOff, widgetsView, widgetTick } from './widgets.ts'
+import { scanWidgets, widgetDir, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -79,7 +79,7 @@ const prs = new Map<string, PR>()
 export const prOf = (ws: string) => prs.get(ws)
 // what follows agents' turns (workflows): each turn's end, its last answer, a usage limit's reset, a failure
 export const turnEnds = new Set<(tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => void>()
-export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden)
+export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
 
@@ -545,10 +545,12 @@ const agentSaid = (ws: string, at: string) => {
 const shown = (v: { tab: string | null; tabs?: string[] }) => v.tabs ?? (v.tab ? [v.tab] : [])
 const viewed = (tab: string) => [...clients].some(c => c.view?.focused && shown(c.view).includes(tab))
 
-export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean }) {
+export function setView(c: Conn, v: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null }) {
   const hidden = c.view?.shown === false
+  const wsWas = c.view && (c.view.ws === undefined ? state.tabs.find(t => t.id === c.view?.tab)?.workspace : c.view.ws)
   c.view = v
   if (hidden && v.shown !== false) widgetTick() // the window's back: what fell due meanwhile
+  else if (v.shown !== false && (v.ws === undefined ? state.tabs.find(t => t.id === v.tab)?.workspace : v.ws) !== wsWas) widgetTick(undefined, 'select') // another workspace: its extensions' instances, if stale
   if (!v.focused) return
   for (const id of shown(v)) {
     const r = rt.get(id)
@@ -1903,6 +1905,7 @@ async function teardown(ws: Workspace) {
 const saidTried = new Map<string, string>() // prFromSaid's: the PR link each workspace's agents named last, tried
 function dropWs(ws: Workspace) {
   saidTried.delete(ws.id)
+  widgetsGone(ws.id) // its extensions' instances
   if (state.layouts?.[ws.id]) delete state.layouts[ws.id]
   stopTunnels(ws.id)
   stopShares({ ws: ws.id })
@@ -2331,10 +2334,12 @@ export function typeInto(s: Session, text: string | Promise<string>, enter = tru
 // what's typed into a tab: on an SSH host, with the images it names copied there (toHost); never fails
 // the agent variables ({{branch}}…, shared/types.ts AGENT_VARS) in a text going to a tab: an action's, a template's,
 // a scheduled prompt's (vars), never a message as typed
+// a workspace's agent variables (no tab's): varsIn's, and a scope workspace extension's env and {{workspace.…}}
+export const wsVars = (ws: Workspace, tab?: Tab) => agentVars(ws, { project: state.projects.find(p => p.id === ws.project)?.name, pr: prOf(ws.id)?.url ?? ws.prUrl, tab })
 export function varsIn(tab: Tab, text: string) {
   const ws = state.workspaces.find(w => w.id === tab.workspace)
   if (!ws || !text.includes('{{')) return text
-  const vars = agentVars(ws, { project: state.projects.find(p => p.id === ws.project)?.name, pr: prOf(ws.id)?.url ?? ws.prUrl, tab })
+  const vars = wsVars(ws, tab)
   // a shell runs what it's typed: a value it would read as code (a branch named a;$(…), a tab's name) goes in quoted
   if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@%+=:,./-]+$/.test(v)) vars[k] = q(v)
   return fillVars(text, vars)

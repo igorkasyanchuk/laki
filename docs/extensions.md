@@ -37,7 +37,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 
 | file | what |
 |---|---|
-| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below); as a button: `icon`, `label`, `badge`, `tip`, `click` |
+| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
 | `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
 | `fixtures/<name>.json` | sample data: its Data tab shows each (*Sample ▾*), and *Check* fits `ui` to each |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
@@ -59,7 +59,35 @@ Each setting is a default or `{ "type", "label", "hint", "default", "choices" }`
 | `$WIDGET_ARG` | an action's argument (`data-arg`), never pasted into the command |
 
 It runs in the extension's folder with your PATH (gh, jq, curl…), 2 minutes at most. A JS `script`'s default export
-gets `{ config, last }` and returns the data.
+gets `{ config, last }` (a per-workspace one's `workspace` too) and returns the data.
+
+## Per workspace (`scope`)
+
+`"scope": "workspace"` makes an extension an instance in each workspace: what it shows in the sidebar, the bars and on
+its button is the selected workspace's. Its settings are shared; each instance keeps its own data in
+`<data>/widget-data/<id>/ws/<workspace>.json`. Its fetch and actions get that workspace's values (the agents'
+`{{branch}}`…):
+
+| variable | what |
+|---|---|
+| `$LAKI_WORKSPACE`, `$LAKI_WORKSPACE_NAME` | its id and name |
+| `$LAKI_PROJECT`, `$LAKI_BRANCH`, `$LAKI_BASE` | its project's name, its branch, the branch it came off |
+| `$LAKI_PATH`, `$PORT` | its folder, its `$PORT` |
+| `$LAKI_PR` | its PR's URL, if it has one |
+| `$LAKI_STORAGE_FOLDER` | its storage folder, once it has one |
+
+Templates, `ui` and a JS page (`laki.workspace`) see it as `workspace`: `{{workspace.branch}}`, `{{workspace.port}}`,
+`id`, `name`, `project`, `base`, `path`, `pr`, `storage`. A preview with its sample gets a made-up one.
+
+- It fetches only where it shows: the workspace selected in a window that's open, every `every` minutes, and at once
+  as you select a workspace whose data is older than that. Others wait until they're selected; four of one extension
+  fetch at a time.
+- With no workspace on screen (the Board, Scheduled tasks, the AI page) it says *Select a workspace* and its buttons
+  are dimmed. Terminals, Browsers and workspaces on an SSH host have none.
+- Its data goes with its workspace: deleted with it, kept while it's archived and shown again as it's restored.
+- `laki widget run|render|action|check <id> --ws <workspace>` name the instance (a global one refuses `--ws`); its
+  inspector has a workspace picker. *Check* warns when a per-workspace one uses nothing of the workspace.
+- The `workspace` starter (*This branch*) shows the branch, PR, port and path, and links to `http://localhost:$PORT`.
 
 ## The UI kit (`ui`)
 
@@ -129,6 +157,7 @@ A `widget.html` with a `<script>` is a JS extension: a page of its own in a sand
 | `window.laki.` | what |
 |---|---|
 | `data`, `config`, `at`, `error`, `full` | what a template sees |
+| `workspace` | a per-workspace one's workspace (`branch`, `port`…) |
 | `refresh()` | fetch again |
 | `open(url)` | a link, in the browser |
 | `expand()` | the full view |
@@ -212,6 +241,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `button` | an icon on the rail with a count; a click runs its action |
 | `form` | fields and a button: an action gets them as JSON |
 | `panel` | a JS page of yours that draws with the UI kit (`laki.mount`), typed by `laki.d.ts` |
+| `workspace` | *This branch*: per workspace, its branch, PR, port and path, a link to its server |
 | `onefile` | one script, `<id>.5m.sh` (below) |
 
 Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its

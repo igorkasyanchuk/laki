@@ -413,10 +413,11 @@ async function main() {
     case 'widget':
     case 'widgets': {
       const [sub = 'ls', id, action, ...arg] = rest
+      const ws = typeof flags.ws === 'string' ? flags.ws : undefined // a per-workspace one's instance
       if (sub === 'ls') {
-        const ws: WidgetView[] = (await rpc('state')).widgets ?? []
-        const line = (w: WidgetView) => `${w.id}  ${w.on ? 'on ' : 'off'}  ${w.size.join('×')}  ${w.every ? `every ${w.every}m` : 'no fetch'}  ${w.error ? `✗ ${w.error}` : w.at ? '✓' : ''}  ${w.dir}`
-        return out(ws, ws.map(line).join('\n') || 'no widgets')
+        const list: WidgetView[] = (await rpc('state')).widgets ?? []
+        const line = (w: WidgetView) => `${w.id}  ${w.on ? 'on ' : 'off'}  ${w.size.join('×')}  ${w.every ? `every ${w.every}m` : 'no fetch'}${w.scope ? '  per workspace' : ''}  ${w.error ? `✗ ${w.error}` : w.at ? '✓' : ''}  ${w.dir}`
+        return out(list, list.map(line).join('\n') || 'no widgets')
       }
       if (sub === 'reload') return out(await rpc('widgetReload'), 'reloaded')
       if (sub === 'kit') return kit(id)
@@ -429,7 +430,7 @@ async function main() {
       }
       if (sub === 'check') {
         const at = id === undefined ? resolve('.') : existsSync(id) ? resolve(id) : undefined
-        const r: { id?: string; problems: UiProblem[] } = await rpc('widgetCheck', { ...(at ? { dir: at } : { id }), run: !flags['no-run'] }, 130000)
+        const r: { id?: string; problems: UiProblem[] } = await rpc('widgetCheck', { ...(at ? { dir: at } : { id }), run: !flags['no-run'], ws }, 130000)
         const bad = r.problems.some(p => p.level === 'error')
         out(r, r.problems.map(p => `${{ ok: '✓', warn: '!', error: '✗' }[p.level]} ${p.where}: ${p.text}`).join('\n') || 'nothing to check')
         if (bad) process.exitCode = 1
@@ -437,18 +438,18 @@ async function main() {
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
       if (sub === 'run') {
-        const r = await rpc('widgetRun', { id }, 130000)
+        const r = await rpc('widgetRun', { id, ws }, 130000)
         return out(r, r.ok ? 'fetched' : `✗ ${r.error}`)
       }
       if (sub === 'render') {
-        const html: string | null = await rpc('widgetRender', { id, full: !!flags.full })
+        const html: string | null = await rpc('widgetRender', { id, full: !!flags.full, ws })
         return out(html, html ?? `${id} has no ${flags.full ? 'full' : 'preview'} view`)
       }
       if (sub === 'action') {
-        const r = await rpc('widgetAction', { id, action, arg: arg.join(' ') }, 130000)
+        const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws }, 130000)
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run]')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>]')
     }
     case 'ai': {
       const [sub] = rest

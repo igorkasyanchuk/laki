@@ -841,6 +841,12 @@ page or one file; it runs at once on sample data, and its page opens), or `laki 
 `ui` against its sample and fixtures, and its fetch run once. One file is an extension too: `prs.5m.sh`, run every
 5 minutes, its name, place and settings in comment lines (`# <laki.place>status</laki.place>`).
 
+An extension can be **per workspace** (`"scope": "workspace"` in its widget.json; the *This branch* starter is one):
+what it shows is about the selected workspace (its branch, PR, port, path), each workspace with its own data, fetched
+while it's selected. With none selected (the Board, Scheduled tasks) it says *Select a workspace*. Its data goes when
+the workspace is deleted and stays while it's archived. `--ws <workspace>` picks the instance for `laki widget run`,
+`render`, `action` and `check`; its page has a workspace picker.
+
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
 
@@ -1428,14 +1434,14 @@ laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule 
 laki flow run my-flow app "add CSV export" [--dry]     # a workflow run (experimental: Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
-laki widget on|off|run <id>                             # show or hide one | fetch now
+laki widget on|off|run <id> [--ws <ws>]                 # show or hide one | fetch now (--ws: a per-workspace one's instance)
 laki widget render <id> --full                          # the HTML its full view shows now
 laki widget action <id> <action> [arg]                  # run one of its buttons' actions: what the app would show
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, onefile
-laki widget check [id|folder] [--no-run] [--json]       # what's wrong with one: widget.json, ui, fixtures, its fetch once
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, workspace, onefile
+laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers
 laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over

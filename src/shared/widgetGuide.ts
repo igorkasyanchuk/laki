@@ -56,6 +56,12 @@ export const widgetFormat = () => `## widget.json
   \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`, \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`,
   \`smile\`…, or an emoji), \`label\`, \`badge\` (a short count) and \`tip\`: templates over its data, as plain text
   (\`"badge": "{{#if open}}{{open}}{{/if}}"\`); \`click\`: one of its actions (none: its full view, else a fetch).
+- \`"scope": "workspace"\`: one per workspace, for what's about the selected one (its branch's CI, its server, its PR):
+  each workspace its own data, fetched while it's selected. Its fetch and actions get \`$LAKI_WORKSPACE\`,
+  \`$LAKI_WORKSPACE_NAME\`, \`$LAKI_PROJECT\`, \`$LAKI_BRANCH\`, \`$LAKI_BASE\`, \`$LAKI_PATH\`, \`$PORT\`, \`$LAKI_PR\` (and
+  \`$LAKI_STORAGE_FOLDER\`); a script \`workspace\`; templates and ui \`{{workspace.branch}}\`, \`{{workspace.port}}\`,
+  \`{{workspace.pr}}\`, \`{{workspace.path}}\`; a JS page \`laki.workspace\`. Use it (\`--ws <id>\` checks one); the
+  default, \`global\`, is one for everything.
 
 ## Fixtures and the check
 

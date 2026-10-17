@@ -17,7 +17,7 @@ import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
 import { UiKitPage } from './UiKit'
-import { type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
+import { inWs, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
 import type { UiProblem } from '../../shared/widgetUi'
 import { widgetAsk } from '../../shared/widgetGuide'
@@ -852,7 +852,11 @@ export function App() {
   current.current = tab?.id ?? null
   const shownTabs = useRef<string[]>([])
   shownTabs.current = visible
-  useEffect(() => reportView(() => ({ tab: current.current, tabs: shownTabs.current, browse: !!bridge?.browse })), [tab?.id, visible.join()])
+  // the workspace whose per-workspace extensions show (scope workspace: Widgets.tsx inWs), and fetch: none under a page
+  // over every workspace (Board, Schedule, the AI page…), nor a terminal's, a browser's or one on an SSH host
+  const covered = schedulesOf(dialog) !== undefined || dialog === 'board' || dialog === 'calendar' || dialog === 'desk' || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog)
+  const wsHere = !covered && ws && !ws.host && !project?.kind ? ws.id : null
+  useEffect(() => reportView(() => ({ tab: current.current, tabs: shownTabs.current, browse: !!bridge?.browse, ws: wsHere })), [tab?.id, visible.join(), wsHere])
 
   // a folder dropped on the window becomes a project (git or not), then a new workspace in it
   useEffect(() => {
@@ -1183,29 +1187,29 @@ export function App() {
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)
   // widgets: the sidebar's grid and a widget's dialog (Widgets.tsx)
   const widgetApi: WidgetApi = {
-    render: (id, full, sample, cells) => api.call<string | null>('widgetRender', { id, full, ...(sample && { sample }), ...(cells && { cells }) }),
-    run: id => call('widgetRun', { id }),
+    render: (id, full, sample, cells, ws) => api.call<string | null>('widgetRender', { id, full, ...(sample && { sample }), ...(cells && { cells }), ws }),
+    run: (id, ws) => call('widgetRun', { id, ws }),
     open: url => (/^laki:\/\//i.test(url) ? setLink(url) : openExternal(url)),
     copy: text => void copy(text),
     full: id => setDialog({ widget: id, back: dialog }),
     close: () => setDialog(d => (d && typeof d === 'object' && 'widget' in d ? (d.back ?? null) : d)), // the full view's (Esc in its frame), not a page's
 
-    action: (id, action, arg, label) => {
+    action: (id, action, arg, label, ws) => {
       const what = label || action
       clearTimeout(noteTimer.current)
       setNote({ text: `${what}…`, busy: true }) // something is happening, until it says what
-      return api.call<{ ok: boolean; out?: string; error?: string } & WidgetSay>('widgetAction', { id, action, arg }).then(
-        r => (!r.ok ? toast(`${what} failed: ${r.error}`) : r.toast || r.modal ? (setNote(null), widgetApi.say(id, r)) : done(r.out || `${what}: done`)),
+      return api.call<{ ok: boolean; out?: string; error?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
+        r => (!r.ok ? toast(`${what} failed: ${r.error}`) : r.toast || r.modal ? (setNote(null), widgetApi.say(id, r, ws)) : done(r.out || `${what}: done`)),
         e => toast(`${what} failed: ${(e as Error).message}`),
       )
     },
-    say: (id, s) => {
+    say: (id, s, ws) => {
       if (s.toast) done(s.toast)
       const m = s.modal
       if (m)
         void choose(m.title, m.text, m.buttons).then(i => {
           const b = m.buttons[i]
-          if (b?.run) void widgetApi.action(id, b.run, b.arg ?? '', b.label)
+          if (b?.run) void widgetApi.action(id, b.run, b.arg ?? '', b.label, ws)
           else if (b?.open && /^laki:\/\//i.test(b.open)) setLink(b.open)
           else if (b?.open) openExternal(b.open)
         })
@@ -1214,7 +1218,7 @@ export function App() {
     menu: (w, e) =>
       openMenu(e, [
         { head: w.name },
-        ...(w.every !== undefined && w.on ? [{ label: 'Fetch now', icon: 'refresh' as const, run: () => void call('widgetRun', { id: w.id }) }] : []),
+        ...(w.every !== undefined && w.on && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh' as const, run: () => void call('widgetRun', { id: w.id, ws: w.here }) }] : []),
         { label: 'Inspect', icon: 'search' as const, sub: 'its data, runs, env and files', run: () => setDialog({ extension: w.id, back: dialog, tab: 'data' }) },
         { label: 'Its page', icon: 'settings' as const, run: () => setDialog({ extension: w.id, back: dialog }) },
       ]),
@@ -1226,7 +1230,7 @@ export function App() {
     home: view?.widgetHome,
     set: (id, o) => call('widgetSet', { id, ...o }),
     desk: settings.desk === true,
-    run: id => call('widgetRun', { id }),
+    run: (id, ws) => call('widgetRun', { id, ws }),
     rm: id => call('widgetRm', { id }).then(() => done('Deleted')),
     reload: () => call('widgetReload'),
     page: id => setDialog({ extension: id, back: dialog }),
@@ -1236,11 +1240,11 @@ export function App() {
     },
     logs: settings.devMode ? id => setDialog({ logs: `widget:${id}`, title: `Logs · ${view?.widgets?.find(x => x.id === id)?.name ?? id}`, back: dialog }) : undefined,
     kit: () => setDialog({ uikit: true, back: dialog }),
-    runs: id => api.call<WidgetRuns>('widgetRuns', { id, data: true }),
+    runs: (id, ws) => api.call<WidgetRuns>('widgetRuns', { id, data: true, ws }),
     mock: (id, o) => call('widgetMock', { id, ...o }),
     files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => Object.keys(r.files)),
     make: kind => api.call<{ id: string }>('widgetNew', { kind, name: `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog, tab: 'data' }), e => toast(String(e?.message ?? e))),
-    check: (id, run) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run }),
+    check: (id, run, ws) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run, ws }),
   }
   const fontSize = settings.fontSize ?? FONT_SIZE // Settings' size: every tab's, less its own zoom
   // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), Settings and
@@ -2267,6 +2271,7 @@ export function App() {
     const desk = dialog === 'desk' && (view.widgets ?? []).filter(onDesk).map(x => `"${x.name}" (extension id ${x.id}${x.byAi ? ', made by Laki AI' : ''}${x.on ? '' : ', off'})`)
     return [`On ${page}`, desk && (desk.length ? `its tiles: ${desk.join(', ')}` : 'no tiles yet'), w && `selected: ${w}`, t, screen.trim() && `the tab's screen now (its last 40 lines):\n${screen.replace(/\s+$/gm, '').slice(-5000)}`].filter(Boolean).join('; ')
   }
+  const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
   const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   const railBar = rail && sideOpen && (
@@ -2282,7 +2287,7 @@ export function App() {
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
       {railPins.map(pinButton)}
       {planPins.map(planButton)}
-      <WidgetButtons widgets={view.widgets ?? []} api={widgetApi} places={['rail']} look="rail" words={railWords} />
+      <WidgetButtons widgets={shownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} />
       <span className="spacer" />
       {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
       {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
@@ -2417,7 +2422,7 @@ export function App() {
             onClose={() => setWatch(w.id, () => null)}
           />
         ))}
-        <WidgetGrid widgets={view.widgets ?? []} api={widgetApi} desk={settings.desk === true} />
+        <WidgetGrid widgets={shownWidgets} api={widgetApi} desk={settings.desk === true} />
         {!onboard.off && onboardDone.size < STEPS.length && dialog !== 'onboard' && <OnboardBar done={STEPS.filter(x => onboardDone.has(x.id)).length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />}
         <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
           {!rail && ( // the rail layout has them on its rail
@@ -2432,7 +2437,7 @@ export function App() {
           <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
           <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
-          <WidgetButtons widgets={view.widgets ?? []} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={labels} />
+          <WidgetButtons widgets={shownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={labels} />
           {!rail && (
             <>
               <span className="spacer" />
@@ -2450,7 +2455,7 @@ export function App() {
           {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
-          <WidgetStrip widgets={view.widgets ?? []} api={widgetApi} place="top" />
+          <WidgetStrip widgets={shownWidgets} api={widgetApi} place="top" />
           {ws && <IconButton icon="maximize" title="Full screen: just this tab (⌘⇧⏎)" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
@@ -2686,7 +2691,7 @@ export function App() {
               }}
             />
           ))(sharing ? byId(sharing) : undefined)}
-        {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(dialog && typeof dialog === 'object' && 'widget' in dialog ? (dialog.back ?? null) : null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? view.widgets?.find(x => x.id === dialog.widget) : undefined)}
+        {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(dialog && typeof dialog === 'object' && 'widget' in dialog ? (dialog.back ?? null) : null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? shownWidgets.find(x => x.id === dialog.widget) : undefined)}
         {(e => e && (
           <ExtensionPage
             key={e.extension}
@@ -2697,6 +2702,8 @@ export function App() {
             api={widgetApi}
             ai={settings.ai}
             workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))}
+            spots={order.filter(w => !w.host && !view.projects.find(p => p.id === w.project)?.kind).map(w => ({ id: w.id, name: wsName(w) }))}
+            here={wsHere}
             back={backWord(e.back)}
             onAiSettings={() => setDialog({ section: 'ai' })}
             onClose={() => setDialog(e.back ?? null)}
@@ -2708,7 +2715,7 @@ export function App() {
         {picking && <Picker copy={copy} onClose={() => setPicking(false)} />}
         {dialog === 'desk' && deskOn && (
           <DeskPage
-            widgets={view.widgets ?? []}
+            widgets={shownWidgets}
             tiles={settings.deskTiles}
             api={{
               ...widgetApi,
@@ -3061,7 +3068,7 @@ export function App() {
             </button>
           )}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
-          <WidgetStrip widgets={view.widgets ?? []} api={widgetApi} place="status" />
+          <WidgetStrip widgets={shownWidgets} api={widgetApi} place="status" />
         </div>
         )}
         {aiFab && (
