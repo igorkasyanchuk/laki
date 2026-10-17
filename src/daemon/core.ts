@@ -2847,7 +2847,7 @@ async function cfReady(mails: boolean) {
 }
 
 // tailscale's CLI: on PATH (Linux, Homebrew), else the Mac app's own
-const TAILSCALE_APP = '/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+const TAILSCALE_APP = process.env.LAKI_TAILSCALE_APP || '/Applications/Tailscale.app/Contents/MacOS/Tailscale' // tests': none
 const tailscaleBin = () => (onPath('tailscale') ? 'tailscale' : process.platform === 'darwin' && existsSync(TAILSCALE_APP) ? TAILSCALE_APP : undefined)
 const TAILNET_URL = /https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net(?::\d+)?/i
 // this machine on its tailnet, or why not

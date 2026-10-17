@@ -10,6 +10,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BUTTON_PLACES, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
 import { hasFull, hasScript, pageOf, render, sayOf, viewOf, type WidgetSay } from '../shared/widget.ts'
+import { uiHtml, uiTree } from '../shared/widgetUi.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { changed, cliArgv, cliEnv, clients, devLog, dir, own, plainEnv, q, state } from './core.ts'
@@ -19,9 +20,10 @@ import { changed, cliArgv, cliEnv, clients, devLog, dir, own, plainEnv, q, state
 // (its default export, or what it prints); actions: commands its buttons run by name (data-run="name", data-arg:
 // $WIDGET_ARG); view: the full view's size; place: where it shows at first (side, top, status, rail, foot: the user's
 // choice wins). As a button (a rail or foot place, or no preview in widget.html): icon (an icon of the app's, or a
-// character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions)
+// character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions).
+// ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown> }
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
@@ -68,6 +70,15 @@ function writeStore(id: string, s: Store) {
   renameSync(`${p}.tmp`, p)
 }
 
+// widget.html, or none ('')
+function htmlOf(d: string) {
+  try {
+    return readFileSync(join(d, 'widget.html'), 'utf8')
+  } catch {
+    return ''
+  }
+}
+
 // a root is a widget's folder, or a folder of them
 function foldersIn(root: string): string[] {
   if (existsSync(join(root, 'widget.json'))) return [root]
@@ -91,12 +102,9 @@ export function scanWidgets() {
       if (widgets.has(id)) continue
       const m = readJson<Manifest>(join(d, 'widget.json'))
       if (!m || typeof m !== 'object') continue
-      let html = ''
-      try {
-        html = readFileSync(join(d, 'widget.html'), 'utf8')
-      } catch {}
+      const html = htmlOf(d)
       const { data, ...s } = readStore(id)
-      const e: Entry = { id, dir: d, builtin: !!BUILTIN && (d === BUILTIN || d.startsWith(BUILTIN + '/')), m, full: hasFull(html), js: hasScript(html), preview: !!viewOf(html, false)?.trim(), face: {}, s }
+      const e: Entry = { id, dir: d, builtin: !!BUILTIN && (d === BUILTIN || d.startsWith(BUILTIN + '/')), m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s }
       e.face = faceOf(e, data)
       widgets.set(id, e)
     }
@@ -218,19 +226,23 @@ function find(id: string) {
 }
 
 // the widget's preview or full view as HTML, filled from its storage; null: it has no such view. A JS widget's is a
-// whole page (pageOf), for a frame
+// whole page (pageOf), for a frame. widget.html's view, else its ui's (the UI kit's HTML for the cells it shows in:
+// across, down, ½ a bar's line)
 // sample: with widget.json's made-up data (and sampleConfig over its settings), as it would look; sample in the context
-export function widgetRender(o: { id: string; full?: boolean; vars?: Record<string, string>; sample?: boolean }) {
+export function widgetRender(o: { id: string; full?: boolean; vars?: Record<string, string>; sample?: boolean; cells?: [number, number] }) {
   const w = find(o.id)
-  const file = readFileSync(join(w.dir, 'widget.html'), 'utf8')
-  const html = viewOf(file, !!o.full)
-  if (html === undefined) return null
+  const file = htmlOf(w.dir)
+  const own = file ? viewOf(file, !!o.full) : undefined // no widget.html: ui's, or no view
+  const tree = uiTree(w.m.ui, !!o.full)
+  const fromUi = !!tree && !own?.trim()
+  if (own === undefined && !fromUi) return null
   const s = readStore(w.id)
   const sc = w.m.sampleConfig && typeof w.m.sampleConfig === 'object' && !Array.isArray(w.m.sampleConfig) ? w.m.sampleConfig : {}
   const ctx = o.sample
     ? { data: w.m.sample, config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true }
     : { data: s.data, config: typedOf(w), at: s.at, error: s.error, full: !!o.full }
-  const body = render(html, ctx)
+  const cells = Array.isArray(o.cells) ? (o.cells.map(Number) as [number, number]) : undefined
+  const body = fromUi ? uiHtml(w.m.ui, ctx, { full: !!o.full, cells: cells ?? (o.full ? undefined : sizeOf(w)) }) : render(own!, ctx)
   return hasScript(file) ? pageOf(body, ctx, o.vars) : body // as the app shows it (js): a script in either view makes both pages
 }
 
@@ -248,7 +260,8 @@ export function widgetPage(id: string, query: URLSearchParams): { code: number; 
     try {
       vars = JSON.parse(query.get('theme') || '{}')
     } catch {}
-    html = widgetRender({ id, full: query.get('full') === '1', sample: query.get('sample') === '1', vars: vars && typeof vars === 'object' ? vars : {} })
+    const cells = /^(\d)x(\d(?:\.5)?)$/.exec(query.get('cells') ?? '')
+    html = widgetRender({ id, full: query.get('full') === '1', sample: query.get('sample') === '1', vars: vars && typeof vars === 'object' ? vars : {}, cells: cells ? [Number(cells[1]), Number(cells[2])] : undefined })
   } catch (e) {
     html = `<!doctype html><p style="color:#f7768e;font:12px system-ui">${String((e as Error).message).replace(/[&<>]/g, '')}</p>`
   }

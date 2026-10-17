@@ -16,6 +16,7 @@ import { VoiceBar, withImages } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
+import { UiKitPage } from './UiKit'
 import { type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
 import { widgetAsk } from '../../shared/widgetGuide'
@@ -57,7 +58,7 @@ const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.W
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
 const SCRIPT_ICONS: Record<RunScript, IconName> = { test: 'check', lint: 'search', format: 'code', deploy: 'ship' }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog } | { uikit: true; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -1180,9 +1181,10 @@ export function App() {
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)
   // widgets: the sidebar's grid and a widget's dialog (Widgets.tsx)
   const widgetApi: WidgetApi = {
-    render: (id, full, sample) => api.call<string | null>('widgetRender', { id, full, ...(sample && { sample }) }),
+    render: (id, full, sample, cells) => api.call<string | null>('widgetRender', { id, full, ...(sample && { sample }), ...(cells && { cells }) }),
     run: id => call('widgetRun', { id }),
-    open: openExternal,
+    open: url => (/^laki:\/\//i.test(url) ? setLink(url) : openExternal(url)),
+    copy: text => void copy(text),
     full: id => setDialog({ widget: id, back: dialog }),
     close: () => setDialog(d => (d && typeof d === 'object' && 'widget' in d ? (d.back ?? null) : d)), // the full view's (Esc in its frame), not a page's
 
@@ -1224,6 +1226,7 @@ export function App() {
       openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])
     },
     logs: settings.devMode ? id => setDialog({ logs: `widget:${id}`, title: `Logs · ${view?.widgets?.find(x => x.id === id)?.name ?? id}`, back: dialog }) : undefined,
+    kit: () => setDialog({ uikit: true, back: dialog }),
   }
   const fontSize = settings.fontSize ?? FONT_SIZE // Settings' size: every tab's, less its own zoom
   // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), Settings and
@@ -2684,6 +2687,7 @@ export function App() {
             onClose={() => setDialog(e.back ?? null)}
           />
         ))(extOf(dialog))}
+        {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
         {dialog === 'help' && <HelpPage cli="laki" ship zoom={(fontSize / FONT_SIZE) * pageZoom} onClose={() => setDialog(null)} />}
         {dialog === 'about' && <About onClose={() => setDialog(null)} />}
         {picking && <Picker copy={copy} onClose={() => setPicking(false)} />}

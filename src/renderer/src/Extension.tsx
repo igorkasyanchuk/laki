@@ -143,7 +143,7 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
             </div>
           ) : (
             <div className={`widget ext-tile ${bar ? 'bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : desk ? { width: 400, height: 260 } : { width: w.size[0] * 92, height: w.size[1] * 64 }}>
-              <WidgetBody key={`${sample}`} w={w} full={desk && !!w.full} api={api} sample={sample} />
+              <WidgetBody key={`${sample}`} w={w} full={desk && !!w.full} api={api} sample={sample} cells={bar ? [w.size[0], 0.5] : desk ? [3, 4] : w.size} />
             </div>
           )}
         </div>

@@ -53,6 +53,7 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
     FAKE_LOG: join(home, 'fake.log'),
     FAKE_GH: join(home, 'gh'), // the fake gh's answers, when there (fakes/gh)
     LAKI_PAGE: join(home, 'page'), // the page remote access serves: a test's own, never the build
+    LAKI_TAILSCALE_APP: join(home, 'no-tailscale'), // the Mac app's place: none here, whatever this Mac has
     LAKI_PORT_SCAN_MS: '300',
     LAKI_PR_SCAN_MS: '500',
     LAKI_STAT_SCAN_MS: '300',

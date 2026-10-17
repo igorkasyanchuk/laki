@@ -6,16 +6,18 @@
 // the daemon's page for it, sandboxed, that talks to the app only in messages: open a link, refresh, the full view,
 // run one of its actions.
 // Only what's on screen is rendered: a folded grid, or a closed dialog, holds nothing.
-import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, useEffect, useRef, useState } from 'react'
 import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
-import { ago, sayOf, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
+import { ago, sayOf, uiBehave, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
+import { uiHtml } from '../../shared/widgetUi'
 import { daemonBase } from './api'
-import { Icon, IconButton, isIconName } from './ui'
+import { ask, Icon, IconButton, isIconName } from './ui'
 
 export type WidgetApi = {
-  render: (id: string, full: boolean, sample?: boolean) => Promise<string | null> // sample: widget.json's made-up data
+  render: (id: string, full: boolean, sample?: boolean, cells?: [number, number]) => Promise<string | null> // sample: widget.json's made-up data; cells: where it shows (the UI kit's size)
   run: (id: string) => Promise<unknown>
-  open: (url: string) => void
+  open: (url: string) => void // http(s), mailto, laki://
+  copy: (text: string) => void
   full: (id: string) => void
   close: () => void // the full view's dialog (Esc in a JS widget's frame)
   action: (id: string, action: string, arg: string, label?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
@@ -25,6 +27,7 @@ export type WidgetApi = {
 }
 
 const LINK = /^(https?:|mailto:)/i
+const OPEN = /^(https?:|mailto:|laki:\/\/)/i
 const DROP = new Set(['script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'form', 'base', 'meta', 'link', 'template', 'portal', 'animate', 'set', 'animatemotion', 'animatetransform', 'foreignobject'])
 const URL_ATTRS = new Set(['href', 'xlink:href', 'src', 'srcset', 'action', 'formaction', 'poster', 'background', 'ping'])
 
@@ -58,9 +61,21 @@ const themeVars = () => {
   return { ...Object.fromEntries(VARS.map(v => [v, cs.getPropertyValue(v).trim()]).filter(([, x]) => x)), 'color-scheme': cs.colorScheme }
 }
 
+// what a click in a widget asks for (uiBehave's messages, a JS page's laki.…): a link, an action (asked first when it
+// says confirm), a copy, a toast or dialog, a fetch, the full view. Done when the action is
+function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: WidgetApi): Promise<unknown> | void {
+  const { laki, url, action, arg, label, confirm, text } = m
+  if (laki === 'open' && typeof url === 'string' && OPEN.test(url)) return api.open(url)
+  if (laki === 'run' && typeof action === 'string' && action) return (typeof confirm === 'string' && confirm ? ask(confirm.slice(0, 300), { ok: String(label || 'Run').slice(0, 40) }) : Promise.resolve(true)).then((yes): unknown => yes && api.action(w.id, action, String(arg ?? ''), String(label ?? '')))
+  if (laki === 'copy' && typeof text === 'string') return api.copy(text)
+  if (laki === 'say') return (s => void (s && api.say(w.id, s)))(sayOf(m))
+  if (laki === 'refresh') return void api.run(w.id).catch(() => {})
+  if (laki === 'full' && !full && w.full) api.full(w.id)
+}
+
 // one widget's preview or full view; a click on a preview (not a link or button) opens the full view. sample: with its
-// made-up data, as it would look (nothing it shows does anything)
-export function WidgetBody({ w, full, api, sample }: { w: WidgetView; full: boolean; api: WidgetApi; sample?: boolean }) {
+// made-up data, as it would look (nothing it shows does anything). cells: where it shows, across and down (½: a bar)
+export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; full: boolean; api: WidgetApi; sample?: boolean; cells?: [number, number] }) {
   const host = useRef<HTMLDivElement>(null)
   const frame = useRef<HTMLIFrameElement>(null)
   const [err, setErr] = useState('')
@@ -68,16 +83,19 @@ export function WidgetBody({ w, full, api, sample }: { w: WidgetView; full: bool
   const config = JSON.stringify(w.config)
   const cfg = [...config].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 0) // a frame's address changes with it
   const theme = w.js ? JSON.stringify(themeVars()) : '' // and with the theme: read at each render (the app's renders follow a change of theme)
+  const size = cells?.join('x') ?? ''
+  const now = useRef({ w, full, api, sample, cells })
+  now.current = { w, full, api, sample, cells }
+  const rootOf = (el: HTMLDivElement) => el.shadowRoot ?? el.attachShadow({ mode: 'open' })
   useEffect(() => {
     let live = true
     setErr('')
     if (w.js) {
-      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? '&sample=1' : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
+      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? '&sample=1' : ''}${size ? `&cells=${size}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
       return () => void (live = false)
     }
-    const el = host.current!
-    const root = el.shadowRoot ?? el.attachShadow({ mode: 'open' })
-    api.render(w.id, full, sample).then(
+    const root = rootOf(host.current!)
+    api.render(w.id, full, sample, cells).then(
       html => {
         if (!live) return
         const style = document.createElement('style')
@@ -87,49 +105,35 @@ export function WidgetBody({ w, full, api, sample }: { w: WidgetView; full: bool
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, w.net, full, config, api.key, theme, sample]) // net: Network access's CSP needs the page loaded again
+  }, [w.id, w.js, w.at, w.rev, w.net, full, config, api.key, theme, sample, size]) // net: Network access's CSP needs the page loaded again
+  // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything
+  useEffect(() => {
+    if (w.js || !host.current) return
+    return uiBehave(rootOf(host.current), m => (n => (n.sample ? undefined : act(m, n.w, n.full, n.api)))(now.current))
+  }, [w.js])
   // a JS widget's messages: only from its own frame, and only right after a click in it (the frame has the focus,
   // the page a user activation), never on its script's own say (a refresh on load would loop: each fetch reloads it);
-  // Esc in it closes the full view
+  // Esc in it closes the full view. The UI kit's HTML (laki.ui, laki.mount) it gets any time: nothing runs
   useEffect(() => {
     if (!w.js) return
     const f = (e: MessageEvent) => {
-      if (e.source !== frame.current?.contentWindow || !e.data || typeof e.data !== 'object') return
-      const { laki, url, action, arg, label } = e.data as { laki?: string; url?: string; action?: string; arg?: string; label?: string }
-      if (laki === 'close' && full) return api.close()
+      const win = frame.current?.contentWindow
+      if (e.source !== win || !e.data || typeof e.data !== 'object') return
+      const m = e.data as Record<string, unknown>
+      if (m.laki === 'ui') return win?.postMessage({ laki: 'ui', req: m.req, html: uiHtml(m.spec, m.ctx && typeof m.ctx === 'object' ? (m.ctx as Record<string, unknown>) : {}, { full, cells: now.current.cells }) }, '*')
+      if (m.laki === 'close' && full) return api.close()
       if (sample) return // made-up data: its buttons and links do nothing
       if (document.activeElement !== frame.current || navigator.userActivation?.isActive === false) return
-      if (laki === 'open' && typeof url === 'string' && LINK.test(url)) api.open(url)
-      else if (laki === 'run' && typeof action === 'string')
-        void api.action(w.id, action, String(arg ?? ''), String(label ?? '')).then(() => frame.current?.contentWindow?.postMessage({ laki: 'done', action, arg: String(arg ?? '') }, '*')) // its button works again
-      else if (laki === 'say') (s => s && api.say(w.id, s))(sayOf(e.data))
-      else if (laki === 'refresh') void api.run(w.id).catch(() => {})
-      else if (laki === 'full' && !full && w.full) api.full(w.id)
+      const done = act(m, w, full, api)
+      if (m.laki === 'run') void Promise.resolve(done).finally(() => win?.postMessage({ laki: 'done', action: m.action, arg: String(m.arg ?? '') }, '*')) // its button works again
     }
     window.addEventListener('message', f)
     return () => window.removeEventListener('message', f)
   }, [w.js, w.id, w.full, full, sample])
-  const click = (e: MouseEvent) => {
-    if (sample) return e.preventDefault() // made-up data: nothing it shows does anything
-    const path = e.nativeEvent.composedPath().filter((n): n is Element => n instanceof Element)
-    const a = path.find(n => n.matches('a[href]'))
-    const b = path.find(n => n.matches('[data-laki]'))
-    const r = path.find(n => n.matches('[data-run]'))
-    if (a) {
-      e.preventDefault()
-      const href = a.getAttribute('href') ?? ''
-      if (LINK.test(href)) api.open(href)
-    } else if (r && !r.hasAttribute('data-busy')) {
-      r.setAttribute('data-busy', '') // until it's done
-      void api.action(w.id, r.getAttribute('data-run') ?? '', r.getAttribute('data-arg') ?? '', r.textContent?.trim()).then(() => r.removeAttribute('data-busy'))
-    }
-    else if (b?.getAttribute('data-laki') === 'refresh') void api.run(w.id).catch(() => {})
-    else if (!full && w.full && !path.some(n => n.matches('button, input, select, textarea, label'))) api.full(w.id)
-  }
   // the host stays mounted under an error: the next render (a fixed template, a reload) draws into it again
   return (
     <>
-      {w.js ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" /> : <div ref={host} className="widget-body" onClick={click} />}
+      {w.js ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" /> : <div ref={host} className="widget-body" />}
       {err && <div className="widget-msg warn small">{err}</div>}
     </>
   )
@@ -200,7 +204,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
 }
 
 // a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
-function Cell({ w, api, parked, load, style }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties }) {
+function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number] }) {
   return (
     <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''}`} style={style} data-tip={tipOf(w)}>
       {w.button ? (
@@ -210,7 +214,7 @@ function Cell({ w, api, parked, load, style }: { w: WidgetView; api: WidgetApi; 
           Stopped · load
         </button>
       ) : (
-        <WidgetBody w={w} full={false} api={api} />
+        <WidgetBody w={w} full={false} api={api} cells={cells} />
       )}
       {(w.error || w.running) && <span className={`widget-dot ${w.error && !w.running ? 'bad' : ''}`} />}
     </div>
@@ -226,7 +230,7 @@ export function WidgetGrid({ widgets, api, desk }: { widgets: WidgetView[]; api:
   return (
     <div className="widgets widget-grid">
       {on.map(w => (
-        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1] * 2}` /* half rows: ½ is a thin line */ }} />
+        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} cells={w.size} style={{ gridColumn: `span ${w.size[0]}`, gridRow: `span ${w.size[1] * 2}` /* half rows: ½ is a thin line */ }} />
       ))}
     </div>
   )
@@ -240,7 +244,7 @@ export function WidgetStrip({ widgets, api, place }: { widgets: WidgetView[]; ap
   return (
     <div className={`widget-strip ${place} nodrag`}>
       {on.map(w => (
-        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }} />
+        <Cell key={w.id} w={w} api={api} parked={parked.includes(w.id)} load={() => load(w.id)} cells={[w.size[0], 0.5]} style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }} />
       ))}
     </div>
   )

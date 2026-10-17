@@ -222,7 +222,7 @@ Extension and widget are two names for one thing: the app says extension (Settin
     ${join(dir, 'widgets')}/<id>/
 
 (the user can add more folders in Settings › Extensions). Two complete examples come with Laki, read them first:
-${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq, counts and groups, a template, its sample) and \`${join(BUILTIN, 'links')}\` (a JS page, no fetch, a list setting)` : 'my-prs and links in the app'}.
+${BUILTIN ? `\`${join(BUILTIN, 'my-prs')}\` (a shell fetch with gh and jq; its ui: stats, and a grouped list in the full view; its sample) and \`${join(BUILTIN, 'links')}\` (a JS page, no fetch, a list setting)` : 'my-prs and links in the app'}.
 Don't edit those: copy one to a new id.
 
 ${widgetFormat()}
@@ -235,8 +235,9 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget render <id> [--full] # the HTML it shows now
     laki widget action <id> <action> [arg] # a button's action: what the app would show (it really runs)
     laki widget ls                   # each one: on or off, size, schedule, last error
+    laki widget kit [element]        # the UI kit's elements, or one's props and a sample
 
-A new widget in Laki's folder is on as soon as it's found. Tell the user which settings to fill in (Settings ›
+A new widget in Laki's folder is found at once and starts off: the user turns it on in Settings › Extensions. Tell the user which settings to fill in (Settings ›
 Extensions) and what it fetches how often: each fetch may call an API.
 `
 

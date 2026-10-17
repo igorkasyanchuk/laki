@@ -1,25 +1,174 @@
 {
   "name": "My PRs",
   "description": "Your open pull requests in a repo (or someone's): how many, drafts, conflicts and up to 3 labels you count; a click groups them: conflicts, failing CI, changes asked, approved, in review, drafts.",
-  "size": [3, 1],
+  "size": [
+    3,
+    1
+  ],
   "every": 5,
   "view": "l",
   "config": {
-    "repo": {"label": "Repo", "hint": "owner/name, or its GitHub link"},
-    "author": {"label": "Author", "hint": "a GitHub login; empty: you", "default": "@me"},
-    "label1": {"label": "Count label 1", "hint": "e.g. bug"},
-    "label2": {"label": "Count label 2", "hint": "e.g. needs-review"},
-    "label3": {"label": "Count label 3", "hint": "e.g. p1"},
-    "only": {"type": "list", "label": "Only with labels", "hint": "any of these; empty: all"},
-    "hide": {"type": "list", "label": "Hide with labels", "hint": "e.g. wip, do-not-merge"}
+    "repo": {
+      "label": "Repo",
+      "hint": "owner/name, or its GitHub link"
+    },
+    "author": {
+      "label": "Author",
+      "hint": "a GitHub login; empty: you",
+      "default": "@me"
+    },
+    "label1": {
+      "label": "Count label 1",
+      "hint": "e.g. bug"
+    },
+    "label2": {
+      "label": "Count label 2",
+      "hint": "e.g. needs-review"
+    },
+    "label3": {
+      "label": "Count label 3",
+      "hint": "e.g. p1"
+    },
+    "only": {
+      "type": "list",
+      "label": "Only with labels",
+      "hint": "any of these; empty: all"
+    },
+    "hide": {
+      "type": "list",
+      "label": "Hide with labels",
+      "hint": "e.g. wip, do-not-merge"
+    }
   },
   "fetch": "sh fetch.sh",
+  "ui": {
+    "preview": {
+      "type": "stack",
+      "children": [
+        {
+          "type": "stats",
+          "each": "data.stats",
+          "value": "{{n}}",
+          "label": "{{name}}",
+          "color": "{{color}}",
+          "tone": "{{#if bad}}bad{{/if}}",
+          "tip": "{{n}} {{name}}",
+          "if": "data"
+        },
+        {
+          "type": "stat",
+          "unless": "data",
+          "value": "–",
+          "label": "my PRs",
+          "tone": "muted"
+        }
+      ]
+    },
+    "full": {
+      "type": "stack",
+      "children": [
+        {
+          "type": "stats",
+          "each": "data.stats",
+          "value": "{{n}}",
+          "label": "{{name}}",
+          "color": "{{color}}",
+          "tone": "{{#if bad}}bad{{/if}}",
+          "tip": "{{n}} {{name}}",
+          "if": "data"
+        },
+        {
+          "type": "text",
+          "if": "data",
+          "size": "sm",
+          "muted": true,
+          "value": "{{config.repo}} · by {{#if config.author}}{{config.author}}{{else}}@me{{/if}}{{#if at}} · checked {{ago at}}{{/if}}"
+        },
+        {
+          "type": "section",
+          "each": "data.groups",
+          "title": "{{name}}",
+          "subtitle": "{{prs.length}}",
+          "children": [
+            {
+              "type": "list",
+              "each": "prs",
+              "title": "#{{number}} {{title}}",
+              "subtitle": "{{author}} · opened {{date createdAt}}",
+              "avatar": "{{author}}",
+              "href": "{{url}}",
+              "accessories": [
+                {
+                  "tag": "{{#if draft}}{{#if conflict}}conflict{{/if}}{{/if}}",
+                  "tone": "bad"
+                },
+                {
+                  "each": "labels",
+                  "tag": "{{name}}",
+                  "color": "{{color}}"
+                },
+                {
+                  "text": "{{ci}}",
+                  "tone": {
+                    "failing": "bad",
+                    "passing": "good",
+                    "pending": "warn"
+                  }
+                },
+                {
+                  "text": "{{#if approved}}✓ approved{{else}}{{#if changes}}changes asked{{else}}waiting{{/if}}{{/if}}",
+                  "tone": {
+                    "✓ approved": "good",
+                    "changes asked": "bad",
+                    "waiting": "muted"
+                  }
+                }
+              ],
+              "actions": [
+                {
+                  "label": "Open",
+                  "open": "{{url}}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "empty",
+          "if": "data",
+          "unless": "data.groups",
+          "text": "No open PRs."
+        },
+        {
+          "type": "text",
+          "unless": "data",
+          "muted": true,
+          "wrap": true,
+          "value": "{{#if error}}{{error}}{{else}}Not fetched yet.{{/if}}"
+        }
+      ]
+    }
+  },
   "sample": {
     "stats": [
-      {"name": "open", "n": 6},
-      {"name": "drafts", "n": 1},
-      {"name": "conflicts", "n": 1, "bad": true},
-      {"name": "bug", "n": 2, "color": "d73a4a"}
+      {
+        "name": "open",
+        "n": 6
+      },
+      {
+        "name": "drafts",
+        "n": 1
+      },
+      {
+        "name": "conflicts",
+        "n": 1,
+        "bad": true
+      },
+      {
+        "name": "bug",
+        "n": 2,
+        "color": "d73a4a"
+      }
     ],
     "groups": [
       {
@@ -32,7 +181,12 @@
             "createdAt": "2026-10-08T10:00:00Z",
             "draft": false,
             "author": "you",
-            "labels": [{"name": "bug", "color": "d73a4a"}],
+            "labels": [
+              {
+                "name": "bug",
+                "color": "d73a4a"
+              }
+            ],
             "ci": "failing",
             "approved": false,
             "changes": false,
@@ -50,7 +204,12 @@
             "createdAt": "2026-10-05T10:00:00Z",
             "draft": false,
             "author": "you",
-            "labels": [{"name": "feature", "color": "0e8a16"}],
+            "labels": [
+              {
+                "name": "feature",
+                "color": "0e8a16"
+              }
+            ],
             "ci": "failing",
             "approved": false,
             "changes": false,
@@ -68,7 +227,12 @@
             "createdAt": "2026-10-01T10:00:00Z",
             "draft": false,
             "author": "you",
-            "labels": [{"name": "bug", "color": "d73a4a"}],
+            "labels": [
+              {
+                "name": "bug",
+                "color": "d73a4a"
+              }
+            ],
             "ci": "passing",
             "approved": true,
             "changes": false,
@@ -86,7 +250,12 @@
             "createdAt": "2026-10-08T10:00:00Z",
             "draft": false,
             "author": "you",
-            "labels": [{"name": "feature", "color": "0e8a16"}],
+            "labels": [
+              {
+                "name": "feature",
+                "color": "0e8a16"
+              }
+            ],
             "ci": "pending",
             "approved": false,
             "changes": false,

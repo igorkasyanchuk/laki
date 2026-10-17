@@ -1790,6 +1790,7 @@ export type WidgetsApi = {
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
   logs?: (id: string) => void // development mode's: its fetches and actions
+  kit?: () => void // the UI kit's page: its elements and their samples
 }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
@@ -2033,6 +2034,11 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours }: { api: WidgetsApi
         schedule) and widget.html (what it shows, and its full view, a click away). A click on one opens its page: a preview (with made-up data too), its settings and Laki AI to change it. New extension makes one with Laki AI, or gives you the prompt for any AI chat; an agent with the Extension creator skill (Agent skill) makes them too.
       </p>
       <WidgetList api={api} />
+      {api.kit && (
+        <Group title="UI kit" hint="An extension's UI as JSON elements (widget.json's ui): lists, tables, charts, stats, forms, tabs and more" act={<button type="button" onClick={api.kit}><Icon name="panel" size={12} /> Open the UI kit</button>}>
+          <p className="muted small">Every element with a sample at a few sizes, in the status bar, and its JSON to copy. Laki AI and the Extension creator skill build with it.</p>
+        </Group>
+      )}
       <Group title="Folders">
         <div className="muted small">
           Laki's own: <span className="mono">{api.home}</span>

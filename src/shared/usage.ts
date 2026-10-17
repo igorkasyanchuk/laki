@@ -43,6 +43,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget on|off|run <id>                 show or hide one | run its fetch now
   laki widget render <id> [--full]            the HTML it shows now, filled from its data
   laki widget action <id> <action> [arg]      run one of its widget.json actions: what the app would show
+  laki widget kit [element] [--json]          the UI kit (widget.json's "ui"): its elements, or one's props and a sample
   laki ai [--image png] <ask> | new | log     ask Laki's AI (Settings › AI) to work Laki: "what are my agents doing?",
                                               "review the 3 PRs in this screenshot" | a new conversation | its calls
                                               and cost; laki ai alone: the conversation

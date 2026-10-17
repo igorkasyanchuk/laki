@@ -10,6 +10,7 @@ import { USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { describe } from '../shared/when.ts'
+import { COMMON, UI, UI_SAMPLES, type UiType } from '../shared/widgetUi.ts'
 
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
@@ -46,6 +47,22 @@ async function hook(state: string, extra?: string) {
   } catch {}
   await rpc('hook', { tab, state, payload }, 700).catch(() => {})
   process.exit(0)
+}
+
+ // the UI kit's catalog (widget.json's "ui"), or one element's props and its sample: for agents and terminals
+function kit(type?: string) {
+  const kind = (k: unknown) => (Array.isArray(k) ? k.join('|') : String(k))
+  const props = (t: UiType) => Object.entries(UI[t].props as Record<string, { kind: unknown; desc: string }>).map(([name, p]) => ({ name, kind: kind(p.kind), desc: p.desc }))
+  if (!type)
+    return out(
+      UI_SAMPLES.map(s => ({ type: s.type, group: s.group, blurb: s.blurb, props: props(s.type).map(p => p.name) })),
+      [`Laki's UI kit: widget.json's "ui", one element or { "preview": …, "full": … }. Each element takes ${Object.keys(COMMON).join(', ')} too.`, '', ...UI_SAMPLES.map(s => `${s.group.padEnd(8)} ${s.type.padEnd(10)} ${s.blurb}`), '', 'laki widget kit <element>: its props and a sample'].join('\n'),
+    )
+  const s = UI_SAMPLES.find(x => x.type === type)
+  if (!s) throw new Error(`no element ${type}: ${Object.keys(UI).join(', ')}`)
+  const ps = props(s.type)
+  const w = Math.max(...ps.map(p => p.name.length))
+  return out({ type: s.type, group: s.group, blurb: s.blurb, props: ps, sample: { ui: s.spec, data: s.data } }, [`${s.type} (${s.group}): ${s.blurb}`, ...ps.map(p => `  ${p.name.padEnd(w)}  ${p.kind.padEnd(10)}  ${p.desc}`), `  + ${Object.keys(COMMON).join(', ')}`, '', 'a sample (widget.json\'s "ui", and data its fetch might print):', JSON.stringify({ ui: s.spec, ...(s.data !== undefined && { sample: s.data }) }, null, 2)].join('\n'))
 }
 
 const glyph: Record<string, string> = { running: '◐', waiting: '◆', idle: '○', exited: '✖' }
@@ -366,6 +383,7 @@ async function main() {
         return out(ws, ws.map(line).join('\n') || 'no widgets')
       }
       if (sub === 'reload') return out(await rpc('widgetReload'), 'reloaded')
+      if (sub === 'kit') return kit(id)
       if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
       if (sub === 'run') {
         const r = await rpc('widgetRun', { id }, 130000)
@@ -379,7 +397,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' ') }, 130000)
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg]')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] | kit [element]')
     }
     case 'ai': {
       const [sub] = rest

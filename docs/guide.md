@@ -824,7 +824,9 @@ save the files it gives you in `<data>/widgets/<id>/` and press *Reload extensio
 creator* skill (Settings › Agent skill) and ask your agent ("an extension with my open issues"). An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
 sandboxed frame that can't reach the app, nor the network unless you turn on its *Network access* (then its page may
 fetch from and show images of https sites; its data otherwise comes from its fetch, which always has the network).
-`laki widget` lists, reloads, fetches and renders them.
+Most draw with the **UI kit**: widget.json's `ui`, elements as JSON (stats, lists, tables, charts, forms, tabs…) that
+follow the theme and fit any size; Settings › Extensions › *UI kit* shows each with its sample and its JSON to copy
+(`laki widget kit` in a terminal). `laki widget` lists, reloads, fetches and renders them.
 
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
@@ -1416,6 +1418,7 @@ laki widget | widget reload                             # the sidebar's extensio
 laki widget on|off|run <id>                             # show or hide one | fetch now
 laki widget render <id> --full                          # the HTML its full view shows now
 laki widget action <id> <action> [arg]                  # run one of its buttons' actions: what the app would show
+laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers
 laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over

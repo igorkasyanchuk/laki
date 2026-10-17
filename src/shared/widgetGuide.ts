@@ -1,173 +1,95 @@
 // How to make a widget, in words: the laki-widget skill's body (daemon/skill.ts) and the prompt Settings › Extensions
 // copies for any AI chat (widgetPrompt). One text, so both say the same.
 
+import { UI, UI_SAMPLES } from './widgetUi.ts'
+
 export const WIDGET_EVERY = 5 // minutes between fetches when widget.json doesn't say
 
-// widget.json and widget.html, all a widget is
+// the UI kit's catalog, from its table: each element's props in a line, then its sample
+const catalog = () => UI_SAMPLES.map(s => `- \`${s.type}\` (${Object.keys(UI[s.type].props).join(', ') || 'no props'}): ${s.blurb}\n  \`${JSON.stringify(s.spec)}\``).join('\n')
+
+// widget.json, its ui and widget.html: all a widget is
 export const widgetFormat = () => `## widget.json
 
 \`\`\`json
 {
   "name": "PRs with conflicts",
   "description": "One line: what it shows (Settings › Extensions shows it).",
-  "size": [1, 1],
+  "size": [3, 1],
   "every": 5,
-  "view": "m",
   "place": "side",
   "config": {
     "repo": { "label": "Repo", "hint": "owner/name" },
-    "user": { "label": "Author", "default": "@me" },
-    "labels": { "type": "list", "label": "Only with labels" },
     "drafts": { "type": "bool", "label": "Include drafts", "default": true },
-    "limit": { "type": "number", "default": 50 },
-    "sort": { "type": "choice", "choices": ["newest", "oldest"] },
     "project": { "label": "Laki project", "hint": "the project a review opens in" }
   },
   "fetch": "sh fetch.sh",
   "actions": { "review": "\\"$LAKI_CLI\\" new \\"$WIDGET_PROJECT\\" --pr \\"$WIDGET_ARG\\" --prompt 'Review it'" },
-  "sample": [
-    { "number": 412, "title": "Move billing to the new API", "url": "https://github.com/acme/web/pull/412", "createdAt": "2026-10-02T10:00:00Z" },
-    { "number": 418, "title": "Faster search on the orders page", "url": "https://github.com/acme/web/pull/418", "createdAt": "2026-10-05T09:30:00Z" }
-  ],
+  "ui": { "type": "list", "each": "prs", "title": "#{{number}} {{title}}", "subtitle": "{{ago createdAt}}", "href": "{{url}}", "actions": [{ "label": "Review", "run": "review", "arg": "{{url}}" }], "empty": "None" },
+  "sample": { "prs": [{ "number": 412, "title": "Move billing to the new API", "url": "https://github.com/acme/web/pull/412", "createdAt": "2026-10-02T10:00:00Z" }] },
   "sampleConfig": { "repo": "acme/web" }
 }
 \`\`\`
 
 - \`sample\` (**required** with a \`fetch\` or \`script\`): made-up data in exactly the shape the fetch prints, realistic and
-  varied (a few items, one of each state the page shows: a failing one, an approved one…), so the user sees how it looks
-  before it ever runs (Settings › Extensions' and the extension's page's Preview, a tile not turned on yet).
-  \`sampleConfig\`: settings for that preview (a repo name, a few links) over the defaults. In a preview its buttons and
-  links do nothing, and \`window.laki.sample\` is true. No fetch: \`sampleConfig\` alone shows it filled in.
+  varied (one of each state it shows: a failing one, an approved one…): the user sees it before it ever runs
+  (\`window.laki.sample\` is true then, and its buttons do nothing). \`sampleConfig\`: settings for that preview.
+- \`size\`: cells [across 1–3, down 0.5 or 1–4]; a cell is about 70×64 px, 0.5 a line 29 px tall. \`every\`: minutes
+  between fetches (default ${WIDGET_EVERY}). \`view\`: the full view's size, \`s\`, \`m\` (default) or \`l\`. The user can change them.
+- \`place\`: one or a list: \`side\` (the sidebar's grid, the default), \`top\` or \`status\` (a bar: a line high, design it
+  ½ high), \`rail\` or \`foot\` (a button, below), \`desk\` (a Desk tile, its full view when it has one).
+- \`config\`: the settings the user fills in: a default (text, \`true\`/\`false\`, a number) or \`{ "type": text | number |
+  bool | choice | list, "label", "hint", "default", "choices" }\`. Never hard-code a repo, login or token: make it a setting.
+- \`fetch\`: a shell command (\`/bin/sh -c\` in the widget's folder: \`sh fetch.sh\`, \`python3 fetch.py\`), or \`script\`: a
+  JS file Laki's node runs, \`export default async ({ config, last }) => data\` (\`last\`: the previous data). What it prints
+  must be JSON: its data. To fail, exit non-zero with a line on stderr ("Set Repo in Settings › Extensions"): the last
+  data stays. 2 minutes at most. Prefer what every Mac has (sh with curl, gh, jq; python3's standard library; a JS
+  script) and shape the data there: small, with ready fields (\`"ci": "failing"\`): templates have no comparisons.
+- Its env: \`$WIDGET_<NAME>\` per setting (\`repo\`: \`$WIDGET_REPO\`; an on/off \`1\` or empty, a list comma-joined; quote
+  them), \`$LAKI_WIDGET_CONFIG\` (all of them, typed JSON), \`$LAKI_WIDGET_FILE\` (its storage: the last \`data\`),
+  \`$LAKI_CLI\` (the laki command: \`"$LAKI_CLI" ls --json\`).
+- \`actions\`: commands its buttons run by name, the button's arg as \`$WIDGET_ARG\` (never paste it into the command);
+  then it fetches again. Its output's last line is a toast, or print JSON: \`{"toast": "Done"}\`, \`{"modal": {"title",
+  "text", "buttons": [{"label", "run", "arg", "open", "primary"}]}}\` (4 buttons at most; \`open\`: http(s), mailto, laki://).
+- A **button** (in \`rail\` or \`foot\`, or with no preview at all): \`icon\` (Laki's by name: \`board\`, \`bell\`, \`clock\`,
+  \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`, \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`,
+  \`smile\`…, or an emoji), \`label\`, \`badge\` (a short count) and \`tip\`: templates over its data, as plain text
+  (\`"badge": "{{#if open}}{{open}}{{/if}}"\`); \`click\`: one of its actions (none: its full view, else a fetch).
 
-- \`size\`: cells [across 1–3, down 0.5 or 1–4] in the sidebar's grid; one cell is about 70×64 px, 0.5 a line 29 px tall. The user can change it.
-- \`every\`: minutes between fetches (default ${WIDGET_EVERY}); the user can change it. A fetch also runs when the widget is
-  turned on, when its settings change, on Reload and from \`laki widget run <id>\`.
-- \`place\`: where it shows at first, one place or a list of them (\`["side", "desk"]\`). The user can move it.
-  - \`side\`: the sidebar's grid, above its buttons (the default).
-  - \`desk\`: a tile on the Desk page (experimental), as big as the user drags it: its full view when it has one, else
-    its preview.
-  - \`top\` (the top bar) or \`status\` (the status bar's right end): a line high (about 26 px), as wide as its cells
-    across: design it as a ½-high one (a number and a word, a few links).
-  - \`rail\` (a button among the rail's icons on the left; without the rail, in the sidebar's foot) or \`foot\` (a button
-    in the sidebar's foot, beside Video, Meme and Timer): a button, never a page (below).
-- \`view\`: the full view's dialog, \`s\` (small), \`m\` (medium, the default) or \`l\` (large: for wide tables). The user
-  can change it.
-- \`config\`: the settings the user fills in (Settings › Extensions). Each is a default (a string: text; \`true\`/\`false\`:
-  an on/off; a number) or \`{ "type", "label", "hint", "default", "choices" }\`, \`type\` one of \`text\`, \`number\`, \`bool\`,
-  \`choice\` (one of \`choices\`) or \`list\` (words or names, typed as chips: logins, labels). Give each a short \`label\`
-  and, when it isn't obvious, a \`hint\`. Never hard-code a user's repo, login or token: make it a setting.
-- \`fetch\`: a shell command, run with \`/bin/sh -c\` in the widget's folder, so it can run a script of the widget's in
-  any language on the user's PATH: \`sh fetch.sh\`, \`python3 fetch.py\`, \`ruby fetch.rb\`. Or \`script\`: a JS file of
-  the widget's (\`fetch.mjs\`) that Laki's node runs; its \`export default async function ({ config, last })\` returns
-  the data (\`last\`: what the previous fetch returned, for history), or the script prints JSON itself. A thrown
-  error's message is what the user sees.
-- Prefer what every Mac has, so there's nothing to install: \`sh\` with \`curl\`/\`gh\`/\`jq\`, \`python3\` with its
-  standard library only, or a JS \`script\`. A Python fetch:
+## The UI kit: "ui" (prefer it)
 
-- A **button** (any widget in \`rail\` or \`foot\`, and one whose widget.html has no preview, or that has no
-  widget.html at all, wherever it is): its icon, its label and a badge, which its fetch keeps up to date in the
-  background, and a click that does something.
-  - \`icon\`: an icon of Laki's by name (\`board\`, \`bell\`, \`clock\`, \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`,
-    \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`, \`smile\`…), or an emoji. None: its
-    name's first letter.
-  - \`label\`, \`badge\` (a short count on the icon; empty or missing: none) and \`tip\` (the tooltip): templates over
-    its data, like widget.html's, with its fields by name too (\`"label": "{{open}} open"\`, as \`{{data.open}}\`; \`"badge": "{{#if failing}}{{failing}}{{/if}}"\`), as
-    plain text. They change with each fetch. No label: its name.
-  - \`click\`: one of its \`actions\`, run on a click (its toast and modal as below), then it fetches again. None: a click
-    opens its full view (a \`<template full>\`), else fetches now.
-  - A button that only does something: \`click\` and \`actions\`, no fetch. One that only watches: a fetch, a label or
-    a badge, and a full view to open.
+\`ui\` is one element (the preview, and the full view with every row) or \`{ "preview": element, "full": element }\`. An
+element is \`{ "type", …props }\`; each also takes \`if\` / \`unless\` (a path or a template: shown when truthy or falsy;
+an empty list is false), \`each\` (a path: it repeats per item; a list, table, chart… takes its rows from it), \`tip\` and
+\`tone\` (good, bad, warn, accent, muted, or a map from its text: \`{"failed": "bad"}\`). String props are templates over
+\`{ ...data, data, config, at, error, full }\` (in a row: the item's fields, \`this\`, \`@index\`); paths (each, items,
+values) are looked up as they are. It fits every size, bar and theme, a failed fetch shows its error and Retry, and
+its links, buttons and filters work. Use widget.html only for a look the kit can't make.
 
-\`\`\`json
-{
-  "name": "My PRs",
-  "place": "rail",
-  "icon": "pr",
-  "label": "PRs",
-  "badge": "{{#if open}}{{open}}{{/if}}",
-  "tip": "{{open}} open PRs of yours · click: GitHub",
-  "every": 5,
-  "fetch": "gh search prs --author @me --state open --json number --jq '{open: length}'",
-  "click": "github",
-  "actions": { "github": "open https://github.com/pulls" }
-}
-\`\`\`
+${catalog()}
 
-\`\`\`python
-import json, os, sys, urllib.request
-config = json.loads(os.environ["LAKI_WIDGET_CONFIG"])  # the settings, typed
-if not config["repo"]:
-    sys.exit("Set Repo in Settings › Extensions")  # stderr, exit 1: the error the user sees
-with urllib.request.urlopen(f"https://api.github.com/repos/{config['repo']}") as r:
-    repo = json.load(r)
-print(json.dumps({"stars": repo["stargazers_count"]}))  # stdout: the data
-\`\`\`
+## widget.html (a custom look)
 
-- What it prints (stdout) must be JSON: it's stored as \`data\`. Exit non-zero (with a line on stderr, e.g.
-  "Set Repo in Settings › Extensions") to fail: the widget keeps its last data and shows the error.
-- Its environment: \`$WIDGET_<NAME>\` for each setting (\`repo\` is \`$WIDGET_REPO\`; an on/off is \`1\` or empty, a list
-  its items joined by commas), \`$LAKI_WIDGET_CONFIG\` (all of them as JSON: an on/off \`true\`/\`false\`, a number a number,
-  a list an array), \`$LAKI_WIDGET_FILE\` (its storage, a JSON file with the last \`data\`), \`$LAKI_CLI\` (the laki command:
-  \`"$LAKI_CLI" ls --json\`). A script's \`config\` is the JSON one. Quote them: \`gh pr list --repo "$WIDGET_REPO"\`. CLIs on
-  the user's PATH work (gh, jq, curl…). 2 minutes at most.
-- Shape the data in the fetch (gh's \`--jq\`, jq, JS): small, only what the page shows, with ready-made fields
-  (\`"ci": "failing"\`, \`"approved": true\`), since templates have no comparisons.
-- \`actions\`: commands a button runs (\`<button data-run="review" data-arg="{{url}}">\`), with \`data-arg\` as \`$WIDGET_ARG\`
-  (never paste it into the command itself); then the widget fetches again. While it runs the app shows a toast and the
-  button waits; after, its output's last line is a toast, or print JSON (all of it, or its last line) to say more: \`{"toast": "Done"}\`, or
-  \`{"modal": {"title": "Review started", "text": "…", "buttons": [{"label": "Close"}, {"label": "Open it", "open":
-  "laki://ws/<id>", "primary": true}]}}\` (up to 4 buttons; each runs another action with \`"run"\` and \`"arg"\`, opens
-  an http(s), mailto or laki:// link with \`"open"\`, or just closes; no buttons: OK).
-  Like \`fetch\`, a shell command in the widget's folder with the same environment, so a script of the widget's works:
-  \`"done": "python3 mark_done.py"\`, \`"open": "sh open.sh"\`.
-
-## widget.html
-
-\`\`\`html
-<style> .x { color: var(--accent); } </style>
-<template preview>
-  <div class="tile"><div class="num {{#if data}}bad{{/if}}">{{data.length}}</div><div class="label">PRs with conflicts</div></div>
-</template>
-<template full>
-  <table>
-    <tr><th>Title</th><th>Created</th></tr>
-    {{#each data}}<tr><td><a href="{{url}}">#{{number}} {{title}}</a></td><td>{{date createdAt}}</td></tr>
-    {{else}}<tr><td colspan="2" class="muted">None.</td></tr>{{/each}}
-  </table>
-</template>
-\`\`\`
-
-- \`<template preview>\`: the sidebar's tile (keep it to a number and a word or two, or a chart). \`<template full>\`: the
-  dialog a click on the tile opens (optional). Outside both: shared, a \`<style>\`. No templates: it's all the preview.
-- Templates: \`{{a.b}}\` (escaped; a list's \`.length\`), \`{{#each list}}…{{else}}…{{/each}}\` (inside: the item's fields,
-  \`{{this}}\`, \`{{@index}}\`, and the outer names), \`{{#if x}}…{{else}}…{{/if}}\`, \`{{#unless x}}…{{/unless}}\` (an empty list
-  is false), \`{{date x}}\` (Sep 2, 2026), \`{{ago x}}\` (3 hours ago), \`{{spark list}}\` (a line chart of numbers, SVG).
-  Names: \`data\` (the fetch's JSON), \`config\` (the settings, as in \`$LAKI_WIDGET_CONFIG\`), \`at\` (the last fetch, ms),
-  \`error\`, \`full\`, \`sample\` (a preview with widget.json's \`sample\`).
-- Ready-made classes (use them before your own CSS: they follow the app's theme):
-  - a number: \`tile\` (centered), \`num\`, \`label\`; text: \`muted\`, \`small\`, \`nowrap\`, \`ellipsis\`, \`title\`, \`sub\`,
-    \`bad\`, \`good\`, \`warn\`; \`tag\` (a pill, for labels), \`badge\` (a count), \`dot\` (a status dot in the current color), \`spark\`;
-  - layout: \`row\`, \`col\`, \`grow\`, \`wrap\`, \`fill\`, \`center\`; \`panel\` (a card); \`list\` (a \`<ul>\` of rows) or
-    \`item\` rows; \`empty\` (nothing to show);
-  - links: \`link\` (one that reads as text), \`linkbar\` (plain links in a line with a rule between them, wrapping;
-    \`linkbar spread\`: they share the width);
-  - buttons: plain (secondary), \`primary\`, \`quiet\`, \`danger\`, \`sm\`; tables and links are styled too.
-- Colors: the app's theme variables, \`var(--fg)\`, \`var(--muted)\`, \`var(--accent)\`, \`var(--error)\`, \`var(--done)\`, \`var(--waiting)\`, \`var(--line)\`, \`var(--bg)\`, \`var(--panel)\`.
-- Links open in the browser. \`data-laki="refresh"\` on an element fetches again; \`data-run\` runs an action (above).
-- Without a \`<script>\` the widget is drawn inside the app: no scripts, frames, forms or \`on…\` attributes (they're removed).
-- With a \`<script>\` it's a JS widget: its page runs in a sandboxed frame with no network (no fetch, no external
-  scripts: inline everything) unless the user turns on its *Network access* (Settings › Extensions: then \`fetch()\` and
-  images from https sites work, with CORS: the page's origin is \`null\`; get data in the fetch when you can, it always has
-  the network, and say in \`description\` when the page needs it), and gets \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`,
-  \`open(url)\`, \`expand()\` (the full view), \`run(action, arg)\`, \`toast(text)\`, \`modal({ title, text, buttons })\`
-  (the same as an action's JSON; these only work right after a click in the widget). Templates are filled first, so both work. Use it for
-  canvas charts, sorting, filtering; build HTML with your own escaping. Draw a canvas at a fixed size (its \`width\` and
-  \`height\` attributes, CSS stretching it): the frame's size may not be known yet while the page runs.
+- \`<template preview>…</template>\` (the tile) and \`<template full>…</template>\` (a click away); outside both: shared (a
+  \`<style>\`); no templates: all of it is the preview. Its own view wins over \`ui\`'s; \`ui\` fills the one it lacks.
+- Templates: \`{{a.b}}\` (escaped; a list's \`.length\`), \`{{#each list}}…{{else}}…{{/each}}\`, \`{{#if x}}…{{else}}…{{/if}}\`,
+  \`{{#unless x}}\`, and helpers \`{{date x}}\`, \`{{ago x}}\`, \`{{num x}}\` (1.2k), \`{{pct x}}\` (42%), \`{{bytes x}}\`,
+  \`{{dur ms}}\` (2m 3s), \`{{upper x}}\`, \`{{lower x}}\`, \`{{spark list}}\` (an SVG line); ui's props take them too. Names:
+  \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`sample\`.
+- Classes that follow the theme: \`tile\`, \`num\`, \`label\`, \`muted\`, \`small\`, \`bad\`, \`good\`, \`warn\`, \`tag\`, \`badge\`,
+  \`row\`, \`col\`, \`grow\`, \`list\`, \`item\`, \`panel\`, \`link\`, \`linkbar\`; buttons \`primary\`, \`quiet\`, \`danger\`, \`sm\`;
+  colors \`var(--fg)\`, \`--muted\`, \`--accent\`, \`--error\`, \`--done\`, \`--waiting\`, \`--line\`.
+- Links open in the browser; \`data-laki="refresh"\` fetches; \`data-run="review" data-arg="{{url}}"\` runs an action.
+  Without a script it's drawn in the app: scripts, frames, forms and \`on…\` attributes are removed.
+- With a \`<script>\`: a page in a sandboxed frame with no network (unless the user turns on its Network access) and
+  \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`, \`open(url)\`, \`expand()\`, \`run(action, arg)\`,
+  \`toast(text)\`, \`modal({…})\` (these right after a click), \`ui(spec, data)\` and \`mount(el, spec, data)\` (the kit's
+  HTML). Inline everything; draw a canvas at a fixed size.
 `
 
 // how Laki AI makes one (ai.ts' SYSTEM: questions first); desk: the Desk's Build with Laki AI, so not where it sits
 const howMake = (desk?: boolean) =>
-  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from, ${desk ? '' : "where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), "}what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (with a sample in widget.json: its preview).${desk ? ' It goes on my Desk: "place": "desk" in widget.json, a tile there.' : ''} It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
+  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from, ${desk ? '' : "where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), "}what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (its ui from the UI kit, with a sample in widget.json: its preview).${desk ? ' It goes on my Desk: "place": "desk" in widget.json, a tile there.' : ''} It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
 
 // the Desk's Build with Laki AI: the ask the floating chat gets
 export const widgetAsk = (want: string, desk?: boolean) => `Make me a Laki extension: ${want.trim()}
@@ -191,6 +113,6 @@ export const widgetPrompt = (want: string, home: string) => `Make me a widget fo
 
 What I want: ${want.trim() || '<describe what it should show, where the data comes from, and what a click should do>'}
 
-Everything a widget is, below. Answer with the files (widget.json, widget.html, and the scripts it runs: its fetch, fetch.sh, fetch.py or fetch.mjs, and any its actions run), each in a code block headed by its file name, and a folder name for it (its id: lowercase, dashes). I'll put them in ${home}/<id>/ and press Reload in Settings › Extensions. Then tell me which settings to fill in, and what it fetches how often.
+Everything a widget is, below. Answer with the files (widget.json with its ui, widget.html only for a custom look, and the scripts it runs: its fetch, fetch.sh, fetch.py or fetch.mjs, and any its actions run), each in a code block headed by its file name, and a folder name for it (its id: lowercase, dashes). I'll put them in ${home}/<id>/ and press Reload in Settings › Extensions. Then tell me which settings to fill in, and what it fetches how often.
 
 ${widgetFormat()}`

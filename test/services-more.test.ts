@@ -272,7 +272,7 @@ test('widgets: folders from ~/, a widget as a folder, the first of an id, bad on
   assert.equal(by('solo').dir, join(rig.home, 'solo'))
   assert.deepEqual([by('nohtml').full, by('nohtml').js], [false, undefined])
   assert.equal(await rig.rpc('widgetRender', { id: 'link' }), 'linked')
-  await assert.rejects(rig.rpc('widgetRender', { id: 'nohtml' }), /ENOENT/)
+  assert.equal(await rig.rpc('widgetRender', { id: 'nohtml' }), null, 'no widget.html and no ui: no view')
 
   // a setting's kind from its default when its type isn't one
   assert.deepEqual(
@@ -304,7 +304,8 @@ test('widgets: folders from ~/, a widget as a folder, the first of an id, bad on
   assert.equal(res.status, 200)
   assert.match(await res.text(), /<p style="color:#f7768e;font:12px system-ui">no widget nothere<\/p>/)
   res = await page(`nohtml?key=${widgetKey}`)
-  assert.match(await res.text(), /system-ui">ENOENT: no such file or directory, open '[^<]*\/nohtml\/widget\.html'<\/p>$/)
+  assert.equal(res.status, 404, 'no widget.html and no ui')
+  assert.equal(await res.text(), 'no such view')
 
   // a script outside its folder doesn't run (a sibling folder whose name starts the same included)
   widget(join(own, 'outside-x'), {}, null, { 'fetch.mjs': 'export default () => ({ ran: true })' })

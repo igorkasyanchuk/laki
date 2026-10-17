@@ -70,7 +70,7 @@ you. Each run keeps its decisions and log.
   laki-widget skill, or any AI chat: Settings has the prompt; each previewed with made-up data before it runs), or buttons on the rail and in the sidebar's foot (an icon, a label,
   a count, a click that runs something), each fed by a command on a schedule (within working hours, if
   you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.
-  The SDK: [docs/extensions.md](docs/extensions.md).
+  Drawn with the UI kit (JSON elements: stats, lists, tables, charts, forms; Settings › Extensions › *UI kit*). The SDK: [docs/extensions.md](docs/extensions.md).
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new
   workspace's prompt. Agents take their own of the iOS Simulator or any app's window (`laki screen shot`), and with
   idb tap, swipe and type in the simulator to check what they built.

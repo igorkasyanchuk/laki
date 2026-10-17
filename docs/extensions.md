@@ -1,13 +1,14 @@
 # Laki extensions: the SDK
 
 An extension (also called a widget or a plugin: one and the same) is a small live page in Laki: a count, a chart, a
-table or a row of links, with a full view a click away. It is a folder with two files, and Laki does the rest: runs
-its fetch on a schedule, keeps what it printed, fills the page and shows it where you put it.
+table or a row of links, with a full view a click away. It is a folder with a `widget.json` (and a `widget.html` only
+for a look of its own), and Laki does the rest: runs its fetch on a schedule, keeps what it printed, draws it with the
+UI kit and shows it where you put it.
 
 This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *New
 extension* (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), and in
 [`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which both are made from. Two examples come with Laki,
-in [`widgets/`](../widgets): `links` (a JS page, no fetch) and `my-prs` (a shell fetch with gh and jq, a template, its
+in [`widgets/`](../widgets): `links` (a JS page, no fetch) and `my-prs` (a shell fetch with gh and jq, its `ui`, its
 sample).
 
 ## How it works
@@ -16,6 +17,7 @@ sample).
 widget.json ──▶ fetch (a shell command, or a JS script) ──stdout JSON──▶ <data>/widget-data/<id>.json
                  every N minutes, while the app is open                      { data, at, error, your settings }
                                                                                          │
+widget.json's ui (the UI kit) ┐
 widget.html ──▶ <template preview> / <template full>, filled with data and config ◀──────┘
                  no <script>: drawn in the app (sanitized) · a <script>: a sandboxed page (window.laki)
 ```
@@ -25,14 +27,15 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 2. While the app is open (and within *Working hours*, if set), each extension that is on runs its `fetch` every
    `every` minutes, and when it's turned on, when its settings change, on *Reload extensions* and on `laki widget run`.
 3. What the fetch prints must be JSON: it is kept as `data`. A failure keeps the last data and shows a red dot with why.
-4. The page is filled from `data`, `config` (your settings), `at` (the last fetch) and `error`.
+4. The page is filled from `data`, `config` (your settings), `at` (the last fetch) and `error`: `widget.html`'s view
+   when it has one, else `ui`'s.
 
 ## The files
 
 | file | what |
 |---|---|
-| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run); as a button: `icon`, `label`, `badge`, `tip`, `click` |
-| `widget.html` | `<template preview>` (where it sits), `<template full>` (the dialog a click opens, optional), shared `<style>` outside both; none for a button that has no full view |
+| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below); as a button: `icon`, `label`, `badge`, `tip`, `click` |
+| `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
 
 ### Settings (`config`)
@@ -54,10 +57,58 @@ Each setting is a default or `{ "type", "label", "hint", "default", "choices" }`
 It runs in the extension's folder with your PATH (gh, jq, curl…), 2 minutes at most. A JS `script`'s default export
 gets `{ config, last }` and returns the data.
 
+## The UI kit (`ui`)
+
+The quickest way to draw one: `widget.json`'s `"ui"`, elements as JSON that follow the app's theme and fit any size
+(1-3 cells across, the ½-high bars: a single line). Every element with its sample, at each size, and its JSON to
+copy: Settings › Extensions › *UI kit*, or `laki widget kit [element] [--json]` in a terminal.
+
+`ui` is one element (the preview and the full view alike; the full view shows every row) or `{ "preview": …, "full": … }`.
+An element is `{ "type": "<name>", …props }`, and each also takes `if` / `unless` (a path or a template: shown when
+truthy / falsy; an empty list is false), `each` (repeat it per item of a list), `tip` (a tooltip) and `tone` (`good`,
+`bad`, `warn`, `accent`, `muted`, or a map from its text to one: `{ "failed": "bad", "live": "good" }`).
+
+| group | elements |
+|---|---|
+| Layout | `stack` (`children`, `gap` sm/md/lg), `row` (`align` start/center/end/between, `wrap`), `grid` (`columns` 1-6, fewer as it narrows), `section` (`title`, `subtitle`, `collapsed`), `tabs` (`tabs: [{ label, badge, children }]`), `divider` |
+| Text | `text` (`value`, `size` sm-xl, `weight`, `mono`, `muted`, `wrap`), `heading` (`level` 1-3), `markdown`, `code` (`copy`) |
+| Data | `stat` (`value`, `label`, `delta`, `spark`, `icon`), `stats`, `kv`, `list`, `table`, `chart` (`kind` line/area/bars, `x`, `y`, `series`, `min`, `max`, `unit`), `spark`, `progress` (`style` bar/ring), `tags`, `badge`, `timeline`, `image` |
+| Actions | `button` (`run` + `arg`, `open`, `refresh`, `full` or `copy`; `confirm`; `style` primary/quiet/danger), `actions`, `links`, `form` (`fields`, `submit`: the action gets the fields' JSON as `$WIDGET_ARG`), `empty` (`text`, `icon`, `action`) |
+
+A `list` row has `title`, `subtitle`, `icon`, `avatar` (a GitHub login), `href`, `accessories` (`[{ tag | text | badge
+| icon | avatar | ago | date, tone }]`), `actions`, and the list `limit` (the preview: as many as fit, then *+N more*),
+`filter` (a box in the full view), `group` (headings by a field) and `empty`. A `table` has `columns` (`title`, `value`,
+`tag`, `tone`, `align`, `mono`, `width`, `wrap`, `hide: "narrow"`) and `sort` (`"age desc"`).
+
+**Binding.** Strings are templates over `{ …data, data, config, at, error, full }`: `{{open}}` is `{{data.open}}`.
+Inside `each` the scope is the item (and `this`, `@index`). A path prop (`each`, `items`, `values`, `group`) is looked
+up as is. With an error and no data, the kit shows the error and *Retry*; a template that fails in one element shows
+a small chip there, the rest draws.
+
+```json
+{
+  "name": "Deploys", "every": 5, "size": [3, 2], "fetch": "sh fetch.sh",
+  "ui": {
+    "preview": { "type": "stats", "items": [{ "value": "{{today}}", "label": "today" }, { "value": "{{failed}}", "label": "failed", "tone": "bad", "if": "failed" }] },
+    "full": { "type": "list", "each": "deploys", "title": "{{name}}", "subtitle": "{{ago at}} by {{who}}", "href": "{{url}}",
+      "accessories": [{ "tag": "{{state}}", "tone": { "failed": "bad", "live": "good" } }],
+      "actions": [{ "label": "Roll back", "run": "rollback", "arg": "{{id}}", "confirm": "Roll back {{name}}?" }] }
+  },
+  "actions": { "rollback": "sh rollback.sh \"$WIDGET_ARG\"" },
+  "sample": { "today": 4, "failed": 1, "deploys": [{ "id": 7, "name": "web", "at": "2026-10-17T08:00:00Z", "who": "octocat", "state": "live", "url": "https://example.com/7" }] }
+}
+```
+
+A JS page gets the kit too: `await laki.ui(spec, data)` gives its HTML, `await laki.mount(el, spec, data)` puts it in
+`el` with its buttons, links, filters and tabs working.
+
+## widget.html: a look of its own
+
 ### Templates
 
 `{{a.b}}` (escaped), `{{#each list}}…{{else}}…{{/each}}`, `{{#if x}}…{{/if}}`, `{{#unless x}}…{{/unless}}`, `{{date x}}`,
-`{{ago x}}`, `{{spark list}}` (a line chart). Ready-made classes follow the app's theme: `tile`, `num`, `label`, `muted`,
+`{{ago x}}`, `{{num x}}` (1.2k), `{{pct x}}` (42%), `{{bytes x}}`, `{{dur ms}}` (2m 3s), `{{upper x}}`, `{{lower x}}`,
+`{{spark list}}` (a line chart); `ui`'s strings take them too. Ready-made classes follow the app's theme: `tile`, `num`, `label`, `muted`,
 `tag`, `badge`, `row`, `list`, `linkbar`, `primary`… and the theme's colors as `var(--accent)`, `var(--error)`, `var(--done)`.
 
 ### Buttons and actions
@@ -79,6 +130,7 @@ A `widget.html` with a `<script>` is a JS extension: a page of its own in a sand
 | `expand()` | the full view |
 | `run(action, arg)` | one of its actions |
 | `toast(text)`, `modal({ title, text, buttons })` | as an action's JSON |
+| `ui(spec, data?)`, `mount(el, spec, data?)` | the UI kit's HTML for an element, or put in `el` (both promises) |
 
 These work right after a click in the page. By default the page has no network: everything inline, its data from its
 fetch. **Network access** (a switch per extension in Settings › Extensions, off until you turn it on) lets its page

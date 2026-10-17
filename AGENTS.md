@@ -97,7 +97,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`. A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -988,9 +988,28 @@ ones that come with Laki: `widgets/links` (a JS page: each `links` chip `Label: 
 browser; no fetch; 3×½),
 `widgets/my-prs` (shell, gh `--jq`: an author's open PRs (`@me`, empty too) as `stats`, open,
 drafts, conflicts and `label1`–`label3`'s counts, and `groups`, each PR in the first of conflict, failing CI, changes,
-approved, in review, a draft first of all; a template; its `sample`) are tested on the fake gh's `pr list` (`$FAKE_GH/prlist.json`,
+approved, in review, a draft first of all; its `ui`, no widget.html; its `sample`) are tested on the fake gh's `pr list` (`$FAKE_GH/prlist.json`,
 `--author` and `--jq` applied with the real jq) in `test/widget.test.ts`. The browser pane doesn't paint cross-origin frames: check a JS
 widget's page in Chrome (headless `--screenshot`).
+
+The UI kit (`shared/widgetUi.ts`; the SDK's words: `docs/extensions.md` › The UI kit): widget.json's `ui`, one element
+(both views; the full one without row limits) or `{ preview, full }`; a view widget.html has wins (`widgetRender`'s
+`own`), `ui` fills the other (`uiTree`; scan's `full`/`preview` count it). `UI` (each type's group, blurb, `rows`: it
+repeats rows itself with `each`, and its props: the guide's catalog, `laki widget kit`, the checker), `COMMON` (`if`,
+`unless`, `each`, `tip`, `tone`: `hidden`, on items and accessories too), `uiHtml(spec, ctx, { full, cells })` (only
+`esc`'d values in fixed markup; strings are `fill`'s templates over `{ …data, data, config, at, error, full }`, a path
+prop is `valueAt`'s; an error with no data: the error block; one element's throw: a `.k-chip-err`), `uiCheck` (unknown
+types and props with `near`'s guess, wrong kinds, a run not in `actions`, a row field not in the data), `UI_SAMPLES` (one
+per type: the gallery's, the guide's catalog, the tests'). Rows a preview fits: `cells` down × 64 px (`data-line` at ½:
+the first row, a bar's line). `UI_CSS` (`shared/widget.ts`, in `WIDGET_CSS`, so a JS page has it): `.k` is a container
+(`kit`), container queries per element, `[data-line]` for the bars, tones last (`.k .t-*`). Icons are `shared/icons.ts`
+(`ICONS`, `iconSvg`; ui.tsx's `Icon` reads it). `uiBehave(root, send)` (`shared/widget.ts`, no outer names: `pageOf`
+embeds `String(uiBehave)`): +N more, `data-run` (`data-arg`, `data-confirm`, `data-submit`: the nearest `[data-form]`'s
+fields as JSON), `data-copy`, links, `data-open`, `data-laki`, `data-filter`, else a click opens the full view;
+`Widgets.tsx` `act` asks a confirm (`ask`) and copies through the app. A JS page's `laki.ui(spec, data)` /
+`laki.mount(el, …)` post `{ laki: 'ui', req }`, answered with `uiHtml` before the click checks (it only computes HTML).
+`UiKit.tsx` `UiKitPage` (App's dialog `{ uikit, back }`, Settings › Extensions › *UI kit*): a card per sample at 1×1,
+3×1, 3×2 or full and as a status bar item, its JSON to copy. Tested in `test/widget-ui.test.ts`.
 
 ### Notifications
 
@@ -1510,7 +1529,10 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/ai.ts` | Laki AI: OpenRouter's tool loop, claude -p and codex exec with `laki mcp`, the conversation, the key, the call log |
 | `src/renderer/src/Ai.tsx` | the AI page: its earlier chats' sidebar, Chat (a thread, the composer, images as thumbnails), Calls and Info tabs |
 | `src/renderer/src/voice.ts` | Settings › Voice's cloud: recording, hold Fn, the text typed where the cursor was |
-| `src/shared/widget.ts` | widgets' template language, views, base CSS, a JS widget's page |
+| `src/shared/widget.ts` | widgets' template language, views, base CSS (the UI kit's too), `uiBehave`, a JS widget's page |
+| `src/shared/widgetUi.ts` | the UI kit: its elements, `uiHtml`, `uiCheck`, `UI_SAMPLES` |
+| `src/shared/icons.ts` | the line icons' paths: the app's `Icon` and the UI kit's `iconSvg` |
+| `src/renderer/src/UiKit.tsx` | Settings › Extensions › UI kit: every element with its sample, at each size, its JSON |
 | `src/shared/widgetGuide.ts` | how to make a widget, in words: the laki-widget skill's body (`widgetFormat`) and Settings' AI prompt (`widgetPrompt`); `WIDGET_EVERY` |
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |
 | `src/renderer/src/Extension.tsx` | an extension's page: its preview (live or its sample), settings and Laki AI's chat; New extension |

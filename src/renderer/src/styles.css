@@ -1967,6 +1967,17 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-full.s { height: 320px; }
 .ext-full.l { height: 560px; }
 .ext-full .widget-frame { height: 100%; }
+/* Settings › Extensions › UI kit (UiKit.tsx): a card per element, its sample at a size and in the status bar, its JSON */
+.kit { display: flex; flex-direction: column; gap: 14px; }
+.kit-head { display: flex; flex-direction: column; gap: 10px; }
+.kit-find { max-width: 420px; }
+.kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 14px; }
+.kit-card .ext-card-head { flex-wrap: wrap; }
+.kit-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 0; padding: 20px 16px; }
+.kit-status { display: flex; align-items: center; gap: 8px; max-width: 100%; }
+.kit-json { position: relative; min-width: 0; }
+.kit-json pre { margin: 0; max-height: 180px; overflow: auto; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--bg); font-size: 11px; line-height: 1.45; }
+.kit-json button { position: absolute; top: 6px; right: 6px; }
 .ext-note { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: calc(var(--rs, 8px) + 2px); background: color-mix(in srgb, var(--accent) 8%, var(--panel)); font-size: 12.5px; }
 .ext-note > svg { flex: none; color: var(--accent-ink); }
 .ext-note > .grow { flex: 1 1 260px; }

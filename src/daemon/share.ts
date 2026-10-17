@@ -3,7 +3,7 @@
 // prompts, its answers, its tool calls a line each; anything else (a shell, gemini…): the terminal's text.
 import { existsSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
-import { type Block, type Inline, markdown } from '../shared/markdown.ts'
+import { markdownHtml } from '../shared/markdown.ts'
 
 export type Said = { who: 'you' | 'agent' | 'tool' | 'screen'; text: string }
 
@@ -90,47 +90,6 @@ export function shareMd(title: string, agent: string, said: Said[]) {
 // ---------- the page: everything escaped here (markdown.ts' tree holds no HTML); links http(s) and mailto only
 
 const esc = (s: string) => s.replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`)
-const url = (u: string) => (/^(https?:|mailto:)/i.test(u) ? esc(u) : '')
-const TAG = { b: 'strong', i: 'em', s: 's' } as const
-function inl(xs: Inline[]): string {
-  return xs
-    .map(x => {
-      if (typeof x === 'string') return esc(x)
-      if (x.t === 'code') return `<code>${esc(x.text)}</code>`
-      if (x.t === 'br') return '<br>'
-      if (x.t === 'img') return url(x.src) ? `<img src="${url(x.src)}" alt="${esc(x.alt)}" loading="lazy" referrerpolicy="no-referrer">` : esc(x.alt)
-      if (x.t === 'a') return url(x.href) ? `<a href="${url(x.href)}" target="_blank" rel="noopener noreferrer nofollow">${inl(x.kids)}</a>` : inl(x.kids)
-      return `<${TAG[x.t]}>${inl(x.kids)}</${TAG[x.t]}>`
-    })
-    .join('')
-}
-const al = (a: string) => (a ? ` class="${a}"` : '') // a class: the page's CSP has no inline styles
-function html(bs: Block[]): string {
-  return bs
-    .map(b => {
-      switch (b.t) {
-        case 'h':
-          return `<h${b.level}>${inl(b.inl)}</h${b.level}>`
-        case 'p':
-          return `<p>${inl(b.inl)}</p>`
-        case 'code':
-          return `<pre><code>${esc(b.text)}</code></pre>`
-        case 'quote':
-          return `<blockquote>${html(b.blocks)}</blockquote>`
-        case 'hr':
-          return '<hr>'
-        case 'list': {
-          const tag = b.ordered ? 'ol' : 'ul'
-          const items = b.items.map(i => `<li>${i.task === undefined ? '' : `<input type="checkbox" disabled${i.task ? ' checked' : ''}> `}${html(i.blocks)}</li>`).join('')
-          return `<${tag}${b.ordered && b.start !== 1 ? ` start="${b.start}"` : ''}>${items}</${tag}>`
-        }
-        case 'table':
-          return `<div class="tw"><table><thead><tr>${b.head.map((c, k) => `<th${al(b.align[k])}>${inl(c)}</th>`).join('')}</tr></thead><tbody>${b.rows.map(r => `<tr>${r.map((c, k) => `<td${al(b.align[k])}>${inl(c)}</td>`).join('')}</tr>`).join('')}</tbody></table></div>`
-      }
-    })
-    .join('')
-}
-
 // what was said as the page's main part (the page swaps it as it changes)
 export function shareBody(agent: string, said: Said[]) {
   if (!said.length) return '<p class="empty">Nothing here yet.</p>'
@@ -142,7 +101,7 @@ export function shareBody(agent: string, said: Said[]) {
         const n = s.text.split('\n').length
         return `<details class="tools"${n <= 3 ? ' open' : ''}><summary>${n} tool call${n === 1 ? '' : 's'}</summary>${lines}</details>`
       }
-      return `<section class="m ${s.who}"><div class="who">${s.who === 'you' ? 'You' : esc(agent)}</div><div class="md">${html(markdown(s.text))}</div></section>`
+      return `<section class="m ${s.who}"><div class="who">${s.who === 'you' ? 'You' : esc(agent)}</div><div class="md">${markdownHtml(s.text)}</div></section>`
     })
     .join('')
 }
