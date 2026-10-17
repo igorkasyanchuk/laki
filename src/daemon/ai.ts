@@ -15,6 +15,8 @@ import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
+import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetsView } from './widgets.ts'
+import { widgetFormat } from '../shared/widgetGuide.ts'
 
 const keyPath = join(dir, 'ai-key')
 const chatPath = join(dir, 'ai-chat.json')
@@ -50,8 +52,8 @@ const skilled = () => state.settings?.ai?.skill !== false
 // a spec's or brainstorm's chat: which one, so every ask in it is about it
 const system = (t: Thread) => {
   const own = String(state.settings?.ai?.context ?? '').trim().slice(0, CONTEXT_MAX)
-  const plan = t.id ? planOfChat(t.id) : undefined
-  return [SYSTEM, skilled() && SKILL, plan && aboutPlan(plan), own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
+  const plan = t.id && !t.id.startsWith('widget:') ? planOfChat(t.id) : undefined
+  return [SYSTEM, skilled() && SKILL, plan && aboutPlan(plan), t.about, own && `The user's own instructions for you (follow them, within the rules above):\n${own}`].filter(Boolean).join('\n')
 }
 // its README.md as it is at each ask (the user edits it as they talk), so a question that doesn't name it is still
 // about it; its files by name (laki_plan_read's file reads one)
@@ -67,6 +69,42 @@ function aboutPlan(plan: ReturnType<typeof planOfChat>) {
     md && `Its README.md (the user's ${plan.kind === 'spec' ? 'spec' : 'brief'}) as it is now:\n<readme>\n${md.slice(0, BRIEF_MAX)}${md.length > BRIEF_MAX ? '\n… (cut: laki_plan_read has the rest)' : ''}\n</readme>`,
     got?.files.length && `Files in its folder: ${got.files.slice(0, 60).map(f => f.path).join(', ')}.`,
   ].filter(Boolean).join('\n')
+}
+// a widget chat's (the studio's: widget:<id>), at each ask: which extension, the rules, the format with the UI kit's
+// catalog, its files and its last check as they are now (the user undoes, edits, or the last ask wrote)
+const FILES_MAX = 40000
+async function aboutWidget(id: string) {
+  const v = widgetsView().find(w => w.id === id)
+  let files: Record<string, string> = {}
+  let problems: { level: string; where: string; text: string }[] = []
+  if (v) {
+    try {
+      files = widgetFiles({ id }).files
+    } catch {}
+    try {
+      problems = (await widgetCheck({ id, run: false })).problems
+    } catch {}
+  }
+  let room = FILES_MAX
+  const shown = Object.entries(files).map(([n, t]) => {
+    const s = t.slice(0, Math.max(0, room))
+    room -= s.length
+    return `<file name="${n}">\n${s}${s.length < t.length ? '\n… (cut: laki_extension_read has all of it)' : ''}\n</file>`
+  })
+  return [
+    `This chat is Laki's extension studio for ${v ? `the extension "${v.name}" (id ${id})` : `a new extension: its id is ${id}`}. The user sees its preview, with its sample data, beside this chat: every ask in it is about it, even one that doesn't name it.${v && v.dir !== `${widgetHome()}/${id}` ? " It isn't in Laki's own folder (it comes with Laki, or it's in a folder of the user's): you can't write it; the user's Remix makes a copy you can." : ''}`,
+    `Rules here:
+1. Write only ${id}, with laki_extension_write.
+2. Prefer ui (the UI kit's elements); widget.html only for a look of its own.
+3. Always write fixtures/sample.json (realistic, in the shape its fetch will print; widget.json's sample the same) and fixtures/empty.json.
+4. After every write, run laki_extension_check and fix every error before you answer.
+5. Never run its fetch or its actions: say in one line what its fetch will run and what it needs (a CLI on PATH, a token setting).
+6. Keep answers short.
+7. Here, write it at once from what the user says (not the two questions first): ask with laki_ask only when you can't tell what it shows or where its data comes from.`,
+    `How an extension is made:\n${widgetFormat()}`,
+    shown.length ? `Its files now:\n${shown.join('\n')}` : 'It has no files yet.',
+    v && (problems.length ? `Its last check:\n${problems.map(p => `${p.level} ${p.where}: ${p.text}`).join('\n')}` : 'Its last check: no problems.'),
+  ].filter(Boolean).join('\n\n')
 }
 // the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress and agents' memory (an agent's own; it keeps the user's with laki_memory_write),
 // and the skill's
@@ -131,14 +169,14 @@ const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map
 
 // resume: claude's session, codex's thread, by sessionKey: the next ask goes on with it. at: the last message.
 // ended: a spec's or brainstorm's chat unused PLAN_CHAT_IDLE: the next ask starts it again, empty
-type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number }
+type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string } // about: a widget chat's brief for this ask (aboutWidget)
 const threads = new Map<string, Thread>()
 // ponytail: one ask at a time across every chat (laki_ask's aiQuestion finds its chat by it); a lock per chat, and the
 // chat's id through laki mcp's env, if brainstorms in parallel are wanted
 let busy: { kill: () => void; id: string } | null = null
 let asked = false // this ask's turn asked the user something (laki_ask): the pick comes as the next ask
 function thread(id = ''): Thread {
-  const file = id ? planOfChat(id).file : chatPath // a spec's gone, or off: that says so, each time
+  const file = !id ? chatPath : id.startsWith('widget:') ? widgetChatFile(id) : planOfChat(id).file // a spec's gone, or off: that says so, each time
   const known = threads.get(id)
   if (known) return known
   let j: any = {}
@@ -292,6 +330,8 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   const backend: AiBackend = s.backend ?? 'openrouter'
   if (backend === 'openrouter' && !hasKey()) throw new Error('no OpenRouter API key: Settings › AI')
   if (t.ended) fresh(t)
+  t.about = t.id.startsWith('widget:') ? await aboutWidget(t.id.slice(7)) : undefined
+  if (busy) throw new Error('the AI is still on the last ask') // another ask came while the brief was read
   const ctl = new AbortController()
   let child: ChildProcess | undefined
   busy = { kill: () => (ctl.abort(), child?.kill('SIGTERM')), id: t.id }

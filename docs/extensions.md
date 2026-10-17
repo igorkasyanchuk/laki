@@ -437,6 +437,27 @@ Its page's tabs show them:
 Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.
 A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/inspect`, opens the Data tab.
 
+## The studio
+
+With Laki AI on (Settings › AI), Settings › Extensions › *New ▾ › Make with Laki AI* (or ⌘K *New extension…*,
+`laki://settings/widgets/new`) opens the studio: a chat with Laki AI on the left, the extension on the right.
+
+- Say what it should show ("Show my open PRs as a list with CI status"), or pick a starter or an example. Laki AI
+  writes it with the UI kit, with `fixtures/sample.json` and `fixtures/empty.json`, checks it and fixes what's wrong.
+- The preview shows it on its sample data, in each place (sidebar at any size, the bars, a button) and its full view;
+  Data, Runs, Check and Files are the inspector's. A check that fails shows as a chip in the head; Laki AI hears of it
+  at your next ask.
+- Nothing runs by itself. **Try it live** shows exactly what will run (its fetch or script, each action's command, a
+  JS page's network switch), then runs its fetch once, while it's still off; *Back to sample* returns. **Turn on**
+  shows the same, then turns it on.
+- **Undo** puts the version before the last change back (the last 20 are kept); each turn's *Undo to here* goes back to
+  how it was after that turn.
+- A row's ✨ (*Edit with Laki AI*, one of yours in Laki's folder) opens it in the studio; **Remix** (any one's, built-in
+  too) makes a copy of it that's yours, in Laki's folder, and opens that (`laki://settings/widgets/<id>/studio`).
+
+Each extension's chat is kept beside its settings (`<data>/widget-data/widget:<id>.chat.json`) and goes when you delete
+it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat instead.
+
 ## Managing them
 
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,

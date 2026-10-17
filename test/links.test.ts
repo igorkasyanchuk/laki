@@ -11,6 +11,8 @@ test('links: workspaces, tabs, pages; nothing else', () => {
   assert.deepEqual(parseLink('laki://schedules'), { to: 'schedules', project: undefined })
   assert.deepEqual(parseLink('laki://settings/remote'), { to: 'settings', section: 'remote' })
   assert.deepEqual(parseLink('laki://settings/widgets/my-prs/inspect'), { to: 'extension', id: 'my-prs', inspect: true })
+  assert.deepEqual(parseLink('laki://settings/widgets/new'), { to: 'studio', id: '' })
+  assert.deepEqual(parseLink('laki://settings/widgets/my-prs/studio'), { to: 'studio', id: 'my-prs' })
   assert.deepEqual(parseLink('laki://settings/widgets/my-prs'), { to: 'extension', id: 'my-prs' })
   assert.deepEqual(parseLink('laki://settings/widgets'), { to: 'settings', section: 'widgets' })
   assert.deepEqual(parseLink('laki://help'), { to: 'help' })

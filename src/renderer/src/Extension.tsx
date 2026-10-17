@@ -13,8 +13,8 @@ import { WidgetCard, type WidgetsApi } from './Settings'
 import { escapes, Icon, IconButton, Page } from './ui'
 import { CellButton, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
-const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk' }
-const half = (d: number) => (d === 0.5 ? '½' : String(d))
+export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk' }
+export const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
 export type ExtTab = 'overview' | 'data' | 'runs' | 'env' | 'files' | 'check'
 const TABS: [ExtTab, string][] = [
@@ -128,7 +128,7 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
 
 // how it looks: in its first place (a cell of the sidebar's grid, a line of a bar, a button) and its full view, with
 // its data or its sample; then its settings
-const CELLS: [number, number][] = [
+export const CELLS: [number, number][] = [
   [1, 0.5],
   [1, 1],
   [2, 1],
@@ -302,7 +302,7 @@ const bytes = (b: number) => (b < 1024 ? `${b} B` : b < 1 << 20 ? `${(b / 1024).
 // the inspector's tabs: Data (its JSON, editable: Apply keeps it as sample data; a fixture; Live), Runs (newest first,
 // a click shows its stderr), Env (what a fetch is given, secrets masked), Files (and its folder). Read again as its
 // data or files change, and every 2 s while Runs shows
-function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check'> }) {
+export function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check'> }) {
   const [x, setX] = useState<WidgetRuns | null>(null)
   const [files, setFiles] = useState<string[] | null>(null)
   const [text, setText] = useState<string | null>(null) // Data's box as typed; null: as fetched
@@ -442,7 +442,7 @@ function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclu
 // Check (laki widget check): widget.json, its templates, its ui against its sample and fixtures, read again as its files
 // change; Check with a fetch runs it once (never one Laki AI wrote while it's off)
 const MARK = { ok: '✓', warn: '!', error: '✗' }
-function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
+export function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
   const [r, setR] = useState<{ problems: UiProblem[]; run: boolean } | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)

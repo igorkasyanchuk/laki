@@ -858,6 +858,11 @@ to ask): agents list them with `laki widget tools`, call one with `laki widget t
 MCP, and Laki shows you the command first (once per workspace, every time, or never, as the tool says). Settings ›
 Extensions lists each tool and where you allowed it always, with *Revoke*.
 
+With Laki AI on, *New ▾ › Make with Laki AI* (⌘K *New extension…*) opens the **extension studio**: say what it
+should show and Laki AI writes it beside its preview on sample data; *Try it live* shows what it runs and runs it once,
+*Undo* takes a change back, *Turn on* turns it on. A row's ✨ opens one of yours there, and *Remix* makes a copy of any
+one to change.
+
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
 

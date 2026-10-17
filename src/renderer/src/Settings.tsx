@@ -1799,6 +1799,10 @@ export type WidgetsApi = {
   make?: (kind: StarterKind) => Promise<unknown> // New ▾'s starters (widgetNew): yours, on, its page opened
   check?: (id: string, run: boolean, ws?: string) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
   revoke?: (id: string, action: string, ws: string) => Promise<unknown> // a tool's Always in a workspace taken back (widgetGrantRm)
+  studio?: (id: string) => void // the extension studio (Laki AI on): '' a new one
+  remix?: (id: string) => Promise<unknown> // a copy of any one, yours, opened in the studio
+  undo?: (id: string, after?: number) => Promise<unknown> // the studio's Undo (after: Undo to here)
+  tryOnce?: (id: string) => Promise<{ ok: boolean; error?: string }> // the studio's Try it live: its fetch once while off
   wsName?: (ws: string) => string // a grant's workspace, by name ('': no workspace, Laki AI's)
 }
 const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }
@@ -1945,6 +1949,8 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           </select>
         )}
         {w.on && w.every !== undefined && (!w.scope || w.here) && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id, w.here ?? undefined)} />}
+        {api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` && <IconButton icon="ai" title="Edit with Laki AI: the studio" onClick={() => api.studio!(w.id)} />}
+        {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
         {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
         {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
         {api.rm && !w.builtin && (
@@ -2001,7 +2007,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
   // New ▾: a starter (one that runs at once on sample data, yours to change: laki widget new), or Laki AI's page
   const newMenu = (e: MouseEvent) =>
     openMenu(e, [
-      { label: 'Make with Laki AI…', icon: 'bulb', sub: 'describe it; or the prompt for any AI chat', run: () => api.page('') },
+      { label: 'Make with Laki AI…', icon: 'bulb', sub: api.studio ? 'in the studio: describe it, see it on sample data' : 'describe it; or the prompt for any AI chat', run: () => (api.studio ? api.studio('') : api.page('')) },
       ...(api.make ? [{ head: 'From a starter' }, ...STARTER_KINDS.map(k => ({ label: STARTERS[k].title, sub: STARTERS[k].blurb, run: () => void api.make!(k) }))] : []),
     ])
   return (
@@ -2051,6 +2057,8 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               </span>
             </button>
             <span className="sched-acts">
+              {api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` && <IconButton icon="ai" title="Edit with Laki AI: the studio" onClick={() => api.studio!(w.id)} />}
+              {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
               {w.on && w.every !== undefined && !w.scope && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id)} />}
             </span>
             <Switch on={w.on} tip={w.on ? `${w.name}: on` : `${w.name}: off`} onChange={on => void api.set(w.id, { on })} />

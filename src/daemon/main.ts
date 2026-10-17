@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, widgetRemix, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -290,7 +290,10 @@ const api: Record<string, Handler> = {
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetRun: p => widgetRun(p),
-  widgetRm: p => widgetRm(p), // Settings' Delete, after its confirm: never MCP's nor Laki AI's
+  widgetRm: p => (aiForget(`widget:${p.id}`), widgetRm(p)), // Settings' Delete, after its confirm: never MCP's nor Laki AI's; its studio chat with it
+  widgetUndo: p => widgetUndo(p), // the studio's Undo and Undo to here
+  widgetRemix: p => widgetRemix(p), // Remix: a copy of any one, yours, Laki AI may change it
+  widgetSlug: p => widgetSlug(p), // the studio's first ask: a new one's id
   widgetAction: p => widgetAction(p),
   widgetReload: () => widgetReload(),
   widgetFiles: p => widgetFiles(p),

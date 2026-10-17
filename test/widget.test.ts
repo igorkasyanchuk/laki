@@ -389,12 +389,16 @@ test('extensions Laki AI writes: in its own folder only, saved off, read back; n
   mkdirSync(join(rig.data, 'widgets', 'mine'))
   writeFileSync(join(rig.data, 'widgets', 'mine', 'widget.json'), json)
   await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.json': json } }), /the user's own/)
-  // Edit with Laki AI: one rewrite, then it's theirs again
+  // Edit with Laki AI: rewrites for its hour (a write, a check, a fix), then it's theirs again
   await rig.rpc('widgetReload')
   await assert.rejects(rig.rpc('widgetSet', { id: 'links', ai: true }), /Laki's folder/, 'one that comes with Laki: never')
   await rig.rpc('widgetSet', { id: 'mine', ai: true })
   await rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.html': '<template preview>new</template>' } })
-  await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.html': 'again' } }), /the user's own/, 'the leave was for one rewrite')
+  await rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.html': '<template preview>fixed</template>' } })
+  assert.ok(!(await find(rig, 'mine')).byAi, 'still theirs')
+  const store = join(rig.data, 'widget-data', 'mine.json')
+  writeFileSync(store, JSON.stringify({ ...JSON.parse(readFileSync(store, 'utf8')), aiMay: Date.now() - 2 * 3600_000 }))
+  await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.html': 'again' } }), /the user's own/, 'the leave ran out')
 })
 
 test('extensions: a place (sidebar, top bar, status bar), network access for a JS page, deleted for good', async t => {

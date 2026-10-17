@@ -27,6 +27,9 @@ version it builds, with the date. -->
   call, through `laki widget tool` or MCP, Laki AI too; Laki shows you the command first (once per workspace, every
   time, or never, as the tool says), and Settings › Extensions lists where you allowed it with *Revoke*. The *A tool for
   agents* starter keeps notes your agents add.
+- **The extension studio**: with Laki AI on, *New ▾ › Make with Laki AI* (⌘K *New extension…*) opens a chat beside
+  the extension's preview: say what it should show, see it on sample data at once, try it live once (after a look at
+  what it runs), undo any change, then turn it on. *Remix* copies any extension, built-in ones too, as yours to change.
 - **A tab in its own window**: a tab's right click › *Float in its own window* (or ⌘K): its terminal, live, in a window over
   every app, as big as you like; its ✕ (or *Bring it back* in its pane) puts it back.
 - **Headless**: `./Laki.AppImage --headless --tailscale` (or `laki serve`) runs Laki on a server with no screen, used

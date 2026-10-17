@@ -2031,6 +2031,33 @@ html.picking, html.picking * { cursor: crosshair !important; }
   .ext-chat { flex: none; height: 560px; border-left: none; border-top: 1px solid var(--line); }
 }
 .narrow .ext-steps { grid-template-columns: minmax(0, 1fr); }
+/* the extension studio (WidgetStudio.tsx): the chat left, the preview and the inspector right */
+.page-body > .studio { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); }
+.studio-chat { min-height: 0; display: flex; flex-direction: column; border-right: 1px solid var(--line); background: var(--side); }
+.studio-thread { flex: 1; min-height: 0; overflow-y: auto; padding: 16px 14px; display: flex; flex-direction: column; gap: 12px; }
+.studio-thread .ai-working { margin-left: 0; }
+.studio-dock { padding: 10px 12px 14px; display: flex; flex-direction: column; gap: 6px; }
+.studio-hello { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 8px 4px; }
+.studio-hello > svg { color: var(--accent-ink); }
+.studio-hello p { margin: 0 0 4px; }
+.studio-starters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.studio-example { width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: calc(var(--rs, 8px) + 2px); background: var(--panel); color: var(--fg); font-size: 12.5px; }
+.studio-example:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
+.studio-turn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }
+.studio-turn > .link { padding: 0 2px 0 36px; }
+.studio-turn { min-width: 0; max-width: 100%; }
+.studio-turn > .ai-tools { max-width: calc(100% - 36px); }
+.studio-main { min-width: 0; overflow-y: auto; padding: 18px 22px 40px; display: flex; flex-direction: column; gap: 14px; }
+.studio-main > * { width: 100%; max-width: 860px; margin: 0 auto; }
+.studio-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; text-align: center; max-width: 380px; }
+.studio-chips { display: inline-flex; gap: 6px; margin-left: 10px; vertical-align: middle; }
+.studio-chips button.tag { cursor: pointer; border: none; font: inherit; }
+.studio-acts { display: inline-flex; gap: 6px; }
+.studio-btns { display: flex; align-items: center; justify-content: flex-end; gap: 8px; }
+.studio-runs { display: flex; flex-direction: column; gap: 6px; margin: 8px 0 12px; }
+.studio-runs pre { margin: 0; padding: 8px 10px; max-height: 180px; overflow: auto; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--bg); font-size: 11.5px; white-space: pre-wrap; word-break: break-word; }
+.narrow .page-body > .studio { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) minmax(0, 1fr); }
+.narrow .studio-chat { border-right: none; border-bottom: 1px solid var(--line); }
 
 /* the Desk's Build with Laki AI, and a tile Laki AI made: off, with its sample, until you look */
 .page-body > .desk-build { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: calc(var(--rs, 8px) + 2px); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }

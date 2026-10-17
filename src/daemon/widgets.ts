@@ -4,7 +4,7 @@
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -439,6 +439,7 @@ export const widgetsView = (): WidgetView[] =>
     ...(scoped(w) && { scope: 'workspace' as const, inst: instView(w) }),
     ...(toolsOf(w).length && { tools: toolsOf(w).map(([action, t]): WidgetTool => ({ action, description: t.description, ask: t.ask, grants: Object.keys(state.widgetGrants ?? {}).filter(ws => state.widgetGrants![ws].includes(`${w.id}.${action}`)) })) }),
     byAi: w.s.by === 'ai' || undefined,
+    ...(w.dir === join(widgetHome(), w.id) && (h => h.length && { history: h })(historyOf(w.id))),
     dev: w.dev || undefined,
     devError: w.devError,
     mock: w.s.mock,
@@ -667,14 +668,17 @@ type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boo
 const AT_ONCE = 4 // a scope workspace one's instances fetching at a time
 // force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote).
 // ws: a scope workspace one's instance (its workspace's env, its own data)
-export async function widgetRun(o: { id: string; reason?: string; why?: string; ws?: string }, force = false, ev?: Ev): Promise<{ ok: boolean; error?: string }> {
+// once: the studio's Try it live, the user's click on what will run: one fetch while it's off (an AI-written one too)
+export async function widgetRun(o: { id: string; reason?: string; why?: string; ws?: string; once?: boolean }, force = false, ev?: Ev): Promise<{ ok: boolean; error?: string }> {
   const w = find(o.id)
   const x = wsOf(w, o.ws)
   const k = keyOf(w.id, x?.id)
   const meta = metaOf(w, x?.id)
   const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^(action|event):[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
-  if (!onOf(w) && !(force && w.s.by !== 'ai')) return { ok: false, error: OFF(w) }
+  const once = o.once === true && !onOf(w)
+  if (!onOf(w) && !once && !(force && w.s.by !== 'ai')) return { ok: false, error: OFF(w) }
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script` }
+  if (once && streaming(w)) return { ok: false, error: 'a stream runs only while it is on' }
   if (streaming(w)) {
     // a stream: started again (a Stop in Resources ends there)
     stopStream(w.id)
@@ -689,7 +693,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   running.add(k)
   changed()
   const t0 = Date.now()
-  wLog(w, `fetch (${reason}${x ? `, ${x.id}` : ''}): ${script ? `node ${w.m.script}` : w.m.fetch}`)
+  wLog(w, `fetch (${reason}${once ? ', once while off' : ''}${x ? `, ${x.id}` : ''}): ${script ? `node ${w.m.script}` : w.m.fetch}`)
   let data: unknown
   let error: string | undefined
   let r: Ran | undefined
@@ -708,7 +712,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   }
   running.delete(k)
   const ms = Date.now() - t0
-  ran(k, { at: t0, ms, reason, why: o.why, ok: !error, bytes: r ? Buffer.byteLength(r.out) : 0, error, stderr: tail(fail?.stderr ?? r?.err), exit: error ? (fail?.exit ?? 0) : 0 })
+  ran(k, { at: t0, ms, reason, why: o.why ?? (once ? 'once while off: Try it live' : undefined), ok: !error, bytes: r ? Buffer.byteLength(r.out) : 0, error, stderr: tail(fail?.stderr ?? r?.err), exit: error ? (fail?.exit ?? 0) : 0 })
   wLog(w, () => (error ? `fetch failed after ${ms} ms: ${error}` : `fetched in ${ms} ms: ${JSON.stringify(data)?.length ?? 0} bytes of JSON`))
   const gone = !!x && !state.workspaces.includes(x) // deleted meanwhile: nothing kept
   if (!gone)
@@ -1133,6 +1137,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
   mkdirSync(widgetHome(), { recursive: true })
   const at = statOf(d)
   if (at && !at.isDirectory()) throw new Error(`${d} isn't a folder`)
+  snapshot(o.id, d)
   mkdirSync(d, { recursive: true })
   if (files.some(([n]) => n.startsWith('fixtures/'))) {
     const f = statOf(join(d, 'fixtures'))
@@ -1146,10 +1151,98 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
     writeFileSync(p, t as string)
     chmodSync(p, (t as string).startsWith('#!') ? 0o755 : 0o644) // a script with its interpreter's line runs as ./fetch.sh
   }
-  writeStore(o.id, { ...readStore(o.id), on: false, net: undefined, by: theirs ? was.by : 'ai', aiMay: undefined }) // net too: the user allows the network for the page they looked at, not a rewrite
+  writeStore(o.id, { ...readStore(o.id), on: false, net: undefined, by: theirs ? was.by : 'ai', aiMay: theirs ? was.aiMay : undefined }) // net too: the user allows the network for the page they looked at, not a rewrite; the user's own: its hour's leave stays (a write, a check, a fix)
   scanWidgets()
   wLog({ id: o.id }, `written: ${files.map(([n]) => n).join(', ')}; off until it's turned on`)
   return { ...widgetsView().find(w => w.id === o.id), note: 'Saved turned off: the user looks at it on its page (Settings › Extensions, with its sample) and turns it on' }
+}
+
+// ---------- the studio (WidgetStudio.tsx): each write undoable, a copy to change, a name for a new one
+
+// before each write: the folder as it was, <data>/widget-data/<id>.history/<ms>/ (none yet: an empty one with .none),
+// the last HISTORY. widgetUndo puts one back
+const HISTORY = 20
+const histDir = (id: string) => join(dir, 'widget-data', `${id}.history`)
+const historyOf = (id: string) => {
+  try {
+    return readdirSync(histDir(id)).filter(n => /^\d+$/.test(n)).map(Number).sort((a, b) => a - b)
+  } catch {
+    return []
+  }
+}
+function snapshot(id: string, d: string) {
+  const all = historyOf(id)
+  const at = Math.max(Date.now(), (all.at(-1) ?? 0) + 1) // two in one ms: still in order
+  const to = join(histDir(id), String(at))
+  if (statOf(d)?.isDirectory()) cpSync(d, to, { recursive: true, verbatimSymlinks: true })
+  else mkdirSync(to, { recursive: true }), writeFileSync(join(to, '.none'), '')
+  for (const n of all.slice(0, Math.max(0, all.length + 1 - HISTORY))) rmSync(join(histDir(id), String(n)), { recursive: true, force: true })
+}
+// Undo (after: the first one taken after then, a turn's Undo to here; none: the newest): that one back, it and the
+// newer ones gone. Laki's own folder only; off again, as a write leaves it
+export function widgetUndo(o: { id: string; after?: number }) {
+  if (typeof o.id !== 'string' || !ID.test(o.id)) throw new Error('an id: lowercase letters, digits and dashes')
+  const all = historyOf(o.id)
+  const at = o.after === undefined ? all.at(-1) : all.find(n => n > Number(o.after))
+  if (at === undefined) throw new Error('nothing to undo')
+  const d = join(widgetHome(), o.id)
+  const had = widgets.get(o.id)
+  if (had && had.dir !== d) throw new Error(`${o.id} isn't in Laki's folder`)
+  if (running.has(o.id)) throw new Error(`${o.id} is fetching: try again in a moment`)
+  const from = join(histDir(o.id), String(at))
+  rmSync(d, { recursive: true, force: true })
+  if (!existsSync(join(from, '.none'))) cpSync(from, d, { recursive: true, verbatimSymlinks: true })
+  for (const n of all.filter(n => n >= at)) rmSync(join(histDir(o.id), String(n)), { recursive: true, force: true })
+  if (existsSync(storePath(o.id))) writeStore(o.id, { ...readStore(o.id), on: false })
+  scanWidgets()
+  wLog({ id: o.id }, `undone: back to before ${new Date(at).toLocaleTimeString()}`)
+  return { ok: true, at, gone: !widgets.has(o.id) }
+}
+// Remix: a copy in Laki's folder under a new id (any one's: built-in, a folder of yours), the user's own (not by Laki
+// AI), off, with Laki AI's leave to rewrite it (aiMay). Not a one-file extension's (its file name is its id)
+export function widgetRemix(o: { id: string; newId?: string }) {
+  const w = find(String(o.id))
+  if (w.file) throw new Error(`${w.m.name || w.id} is one file: copy ${w.file} and rename it`)
+  const id = o.newId === undefined ? freeId(`${w.id}-copy`) : String(o.newId)
+  if (!ID.test(id)) throw new Error('an id: lowercase letters, digits and dashes')
+  const d = join(widgetHome(), id)
+  if (widgets.has(id) || statOf(d)) throw new Error(`${id} is taken`)
+  mkdirSync(widgetHome(), { recursive: true })
+  cpSync(w.dir, d, { recursive: true, verbatimSymlinks: true, filter: p => !/\/(\.git|node_modules)$/.test(p) })
+  try {
+    const m = JSON.parse(readFileSync(join(d, 'widget.json'), 'utf8'))
+    writeFileSync(join(d, 'widget.json'), `${JSON.stringify({ ...m, name: `${m.name || w.id} (copy)` }, null, 2)}\n`)
+  } catch {} // its scan says what's wrong
+  writeStore(id, { on: false, aiMay: Date.now() })
+  scanWidgets()
+  wLog({ id }, `a copy of ${w.id}`)
+  return { id }
+}
+// a new one's id from the first words of its first ask: lowercase, dashes, free (no extension, folder or chat of it)
+const freeId = (base: string) => {
+  const b = base.slice(0, 34).replace(/-+$/, '') || 'extension'
+  for (let i = 1; ; i++) {
+    const id = i === 1 ? b : `${b}-${i}`
+    if (!widgets.has(id) && !statOf(join(widgetHome(), id)) && !statOf(join(dir, 'widget-data', `widget:${id}.chat.json`))) return id
+  }
+}
+export const widgetSlug = (o: { text?: string }) => ({
+  id: freeId(
+    String(o.text ?? '')
+      .toLowerCase()
+      .replace(/[^a-z0-9\s-]/g, ' ')
+      .split(/\s+/)
+      .filter(x => x && !/^(a|an|the|my|me|show|make|of|for|with|to|and|in|on|i|want|please|that|which|as|is|at|from|by)$/.test(x))
+      .slice(0, 3)
+      .join('-'),
+  ),
+})
+// a widget chat's file (ai.ts' thread): <data>/widget-data/widget:<id>.chat.json, gone with widgetRm
+export const widgetChatFile = (chat: string) => {
+  const m = /^widget:([a-z0-9][a-z0-9-]{0,39})$/.exec(chat)
+  if (!m) throw new Error(`no chat ${chat}`)
+  mkdirSync(join(dir, 'widget-data'), { recursive: true })
+  return join(dir, 'widget-data', `${chat}.chat.json`)
 }
 
 // Settings › Extensions' Delete (after the app's confirm): its folder and its storage, for good. Not one that comes with
@@ -1164,6 +1257,8 @@ export function widgetRm(o: { id: string }) {
   rmSync(d, { recursive: !w.file, force: true }) // a link: only the link; a one-file extension: its file
   rmSync(storePath(w.id), { force: true })
   rmSync(join(dir, 'widget-data', w.id), { recursive: true, force: true }) // its workspaces' instances
+  rmSync(histDir(w.id), { recursive: true, force: true }) // the studio's: its undo and its chat
+  rmSync(join(dir, 'widget-data', `widget:${w.id}.chat.json`), { force: true })
   wLog(w, `deleted: ${d}`)
   scanWidgets()
   return { deleted: w.id }

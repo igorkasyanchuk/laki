@@ -6,6 +6,7 @@ export type Link =
   | { to: 'schedules'; project?: string }
   | { to: 'settings'; section?: string }
   | { to: 'extension'; id: string; inspect?: boolean } // laki://settings/widgets/<id>[/inspect]: its page, or its inspector
+  | { to: 'studio'; id: string } // laki://settings/widgets/new, laki://settings/widgets/<id>/studio: the extension studio ('': a new one)
   | { to: 'help' }
   | { to: 'board' }
   | { to: 'ai' }
@@ -39,6 +40,8 @@ export function parseLink(url: string): Link | null {
     case 'schedules':
       return { to: 'schedules', project: arg ?? q('project') }
     case 'settings':
+      if (arg === 'widgets' && parts[1] === 'new' && !parts[2]) return { to: 'studio', id: '' }
+      if (arg === 'widgets' && parts[1] && parts[2] === 'studio') return { to: 'studio', id: parts[1] }
       if (arg === 'widgets' && parts[1]) return { to: 'extension', id: parts[1], ...(parts[2] === 'inspect' && { inspect: true }) }
       return { to: 'settings', section: arg ?? q('section') }
     case 'help':
