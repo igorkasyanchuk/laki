@@ -1018,7 +1018,7 @@ Dev mode (`laki widget dev`, the CLI's `dev`: `widgetDev` `folder`, then `widget
 and each `devError` change; `off`, `list`): `settings.widgetDev` (`SETTINGS_KEPT`; `settingsSet` rescans as it changes,
 like `widgetDirs`), `devRoots` first in `widgetRoots` (a dev copy shadows the installed one of its id, sharing its
 store), linking turns its widgets on and fetches them (`dev`, why `linked`). `watchDev` (from `scanWidgets`):
-`fs.watch` recursive per root, 300 ms debounce, `devChanged`: `scanWidgets` again, then each of its widgets fetched
+`fs.watch` recursive per root (a one-file root: its folder, for its name: a save by rename ends a file's watch), 300 ms debounce, `devChanged`: `scanWidgets` again, then each of its widgets fetched
 (reason `dev`, why: the files). `scanWidgets` keeps the entry it had (`before`) when a dev widget's `manifestOf` or
 `templatesError` (shared/widget.ts `templateError`, widget.html's and every `ui` string) fails, with `devError` (the
 view's; Settings' *dev* tag, the tooltip, the page's banner). `widgetsStop` at shutdown. `devKeep` (core.ts): `devLog`
@@ -1027,7 +1027,8 @@ keys kept without dev mode (a dev widget's). Runs: `ran` per fetch and action (`
 `$LAKI_REFRESH_REASON` (`envOf`: one env for exec and `widgetRuns`' `env`, `SECRET` setting names masked, in
 `LAKI_WIDGET_CONFIG` too); `widgetTick`'s reason `schedule`, the first client's `open`. `widgetMock` (`data`, a
 `fixture`: `fixturesOf`, `fixtures/*.json`, or `off`: fetched now): the store's `mock` (the view's; Widgets.tsx'
-`.widget-mock` chip), `fetchable` false meanwhile and `widgetRun` skips all but `manual`, whose data clears it.
+`.widget-mock` chip), `fetchable` false meanwhile and `widgetRun` skips all but `manual`, whose data clears it; a
+stream stops first (`stopStream`: its last line saved, not over the mock); `widgetSet` turning one on (off to on) drops it.
 `widgetRm` refuses a dev widget (your code). The inspector is `Extension.tsx`' tabs (`ExtTab`; App's dialog
 `{ extension, tab }`): `InspectHead` (Run now, Reload, the watching dot, `devError`'s banner), Overview (`Preview` and
 its *Everywhere* card: a sidebar cell of any size, both bars, the button), `Inspector` (Data: `widgetRuns` `data`, Apply
@@ -1088,8 +1089,8 @@ time: `handle` writes `LAKI_EVENT_FILE` (tmpdir, 0600, removed after) and runs `
 with `Ev` (`LAKI_EVENT`, the file, the JSON on stdin: `exec`'s `stdin`, ended at once otherwise) and reason
 `event:<name>`; an action's toast or modal is broadcast as `widget-say` (`widget`, `ws`; App's `widgetSay` ref). An
 action's JSON with `data` (`merge`: shallow over an object) is kept through `keep`, no fetch after. Streams (`streaming`:
-`stream: true`, not scoped, with a fetch): `streamSync` (each `widgetTick`, `widgetSet`, `scanWidgets` (which stops every
-one first)) starts each that's on, not mocked, not `stopped`, while a window was shown within `STREAM_IDLE` (10 min,
+`stream: true`, not scoped, with a fetch): `streamSync` (each `widgetTick`, `widgetSet`, `scanWidgets` (which stops one whose
+folder, fetch, script, stream or scope changed, or that went: `runOf`)) starts each that's on, not mocked, not `stopped`, while a window was shown within `STREAM_IDLE` (10 min,
 `shownAt`) and in `widgetHours`; `startStream` spawns it (`own`, stop key `stream:<id>`: `resourceStop` →
 `widgetStreamStop`, `stopped` until Run now, a switch or a reload), each stdout line that parses is `data` (`streamView`:
 the view within 250 ms, the store every 5 s and as it ends; `dataOf` reads the in-memory line), others the log; an exit is
@@ -1125,13 +1126,16 @@ it), then `aiAsk` `chat: 'widget:<id>'` (one of yours: `widgetSet` `ai` first). 
 size, the full view), Extension.tsx' `Inspector` and `Check`; sample first: `widgetMock` `fixture: 'sample'` at each
 `rev` (else widget.json's `sample`), never a fetch. `TrySheet` (`runsOf` over `widgetFiles`: the fetch, a script's text,
 the actions' commands, a JS page's `net`): `widgetRun` `once` (an off one, Laki AI's too: one fetch, `manual`, the run's
-`why` says so; not a stream) or `widgetSet` `on` (then it closes unless *Stay*). `widgetWrite` snapshots the folder first
-(`snapshot`: `<data>/widget-data/<id>.history/<ms>/`, `.none` when there was none, `HISTORY` 20), the view's `history`
+`why` says so; not a stream; not a per-workspace one, whose preview is its sample on `SAMPLE_WS`) or `widgetSet` `on`
+(its mock dropped there; then it closes unless *Stay*). `widgetWrite` snapshots the folder first
+(`snapshot`: `<data>/widget-data/<id>.history/<ms>/`, `.none` when there was none, `HISTORY` 20; never its top-level
+`node_modules` or `.git`, `KEPT`, which Undo leaves where they are), the view's `history`
 (Laki's folder's only); `widgetUndo` (`after`: the first taken after then, a turn's *Undo to here*; none: the newest)
 puts it back, drops it and newer, off; `gone` when it was the first. A user's own written in its `aiMay` hour keeps
-`aiMay` (a write, a check, a fix). `widgetRemix` (`newId`, else `<id>-copy`, `freeId`): the folder copied (no `.git`,
-`node_modules`; not a one-file one), its name `(copy)`, the store `{ on: false, aiMay }`: yours. `widgetRm` (main.ts
-`aiForget` first) deletes the history and the chat. Tested in `test/widget-studio.test.ts`.
+`aiMay` (a write, a check, a fix). `widgetRemix` (`newId`, else `<id>-copy`, `freeId`): the folder copied (a linked one's
+target, `realpathSync`; no `.git`, `node_modules`; not a one-file one), its name `(copy)`, the store `{ on: false, aiMay }`:
+yours. `widgetRm` (refused while it or an instance fetches; main.ts' `aiForget` once it's gone) deletes the history and
+the chat. Tested in `test/widget-studio.test.ts`.
 
 ### Notifications
 

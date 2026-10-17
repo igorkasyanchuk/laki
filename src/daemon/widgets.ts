@@ -4,7 +4,7 @@
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
 import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, cpSync, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
+import { chmodSync, cpSync, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
@@ -289,7 +289,8 @@ export function scanWidgets() {
   for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
   watchDev(dev)
   for (const [id, was] of before) if (cmdsOf(was) !== cmdsOf(widgets.get(id))) ungrant(id) // its commands changed (a rewrite, an update): asked again
-  for (const id of [...streams.keys()]) stopStream(id) // reloaded: started again as they read now
+  const runOf = (w?: Entry) => w && JSON.stringify([pathOf(w), w.m.fetch, w.m.script, w.m.stream, w.m.scope])
+  for (const id of [...streams.keys()]) if (runOf(before.get(id)) !== runOf(widgets.get(id))) stopStream(id) // its command changed, or it went: started again as it reads now (the others run on)
   streamSync()
   changed()
 }
@@ -304,9 +305,10 @@ function watchDev(roots: string[]) {
     let timer: NodeJS.Timeout | undefined
     const files = new Set<string>()
     try {
-      const w = watch(r, { recursive: statSync(r).isDirectory() }, (_, f) => {
+      const one = !statSync(r).isDirectory() // a one-file extension: its folder watched, for that name (an editor's save by rename ends a watch of the file)
+      const w = watch(one ? dirname(r) : r, { recursive: !one }, (_, f) => {
         const name = String(f ?? '')
-        if (name.split('/').some(p => p.startsWith('.') || p === 'node_modules')) return
+        if (one ? name !== basename(r) : name.split('/').some(p => p.startsWith('.') || p === 'node_modules')) return
         files.add(name)
         clearTimeout(timer)
         timer = setTimeout(() => {
@@ -547,6 +549,7 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
     if (w.builtin || w.dir !== join(widgetHome(), w.id)) throw new Error(`${w.m.name ?? w.id} isn't in Laki's folder: Laki AI can't change it`)
     s.aiMay = Date.now()
   }
+  if (o.on === true && !s.on) s.mock = undefined // turned on: live, not the sample data put there while it was off (the studio's)
   if (o.on !== undefined) s.on = !!o.on
   if (o.on === false) ungrant(w.id) // off: its tools' Always go
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
@@ -1034,6 +1037,8 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
     broadcast({ ev: 'toolDone', req }) // the other windows' dialogs close
     if (how === 'none') throw new Error(`${w.m.name || w.id} ${o.action}: no answer: not run`)
     if (how === 'deny') throw new Error(`${w.m.name || w.id} ${o.action}: denied`)
+    const now = widgets.get(w.id)?.m.actions // read again meanwhile (a dev save, a reload): only what the user saw runs
+    if (actionCmd(now && Object.hasOwn(now, o.action) ? now[o.action] : undefined) !== cmd) throw new Error(`${w.m.name || w.id} ${o.action}: its command changed while you were asked: not run`)
     if (how === 'always' && t.ask === 'first') {
       const g = (state.widgetGrants ??= {})
       if (!g[ws]?.includes(key)) (g[ws] ??= []).push(key)
@@ -1076,6 +1081,13 @@ export function widgetPush(o: { id: string; data?: unknown; ws?: string; merge?:
 
 // an extension's files, as text (Laki AI's and MCP's laki_extension_read: an example to copy, or the one to change):
 // its folder's own files only, none hidden, and fixtures/*.json, 20 at most; a one-file extension's file
+const filesAndDirs = (d: string) => {
+  try {
+    return readdirSync(d)
+  } catch {
+    return []
+  }
+}
 const filesIn = (d: string) => {
   try {
     return readdirSync(d, { withFileTypes: true }).filter(x => x.isFile() && !x.name.startsWith('.')).map(x => x.name)
@@ -1162,6 +1174,8 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
 // before each write: the folder as it was, <data>/widget-data/<id>.history/<ms>/ (none yet: an empty one with .none),
 // the last HISTORY. widgetUndo puts one back
 const HISTORY = 20
+const KEPT = /^(\.git|node_modules)$/ // a folder's own, never in its versions: a snapshot, Undo and Remix leave them be
+const fetching = (id: string) => [...running].some(k => k === id || k.startsWith(`${id}@`)) // it, or one of its instances
 const histDir = (id: string) => join(dir, 'widget-data', `${id}.history`)
 const hist = new Map<string, number[]>() // read once per id, then kept in step by snapshot, widgetUndo and widgetRm
 const historyOf = (id: string) => {
@@ -1180,7 +1194,7 @@ function snapshot(id: string, d: string) {
   const all = historyOf(id)
   const at = Math.max(Date.now(), (all.at(-1) ?? 0) + 1) // two in one ms: still in order
   const to = join(histDir(id), String(at))
-  if (statOf(d)?.isDirectory()) cpSync(d, to, { recursive: true, verbatimSymlinks: true })
+  if (statOf(d)?.isDirectory()) cpSync(d, to, { recursive: true, verbatimSymlinks: true, filter: p => dirname(p) !== d || !KEPT.test(basename(p)) })
   else mkdirSync(to, { recursive: true }), writeFileSync(join(to, '.none'), '')
   for (const n of all.slice(0, Math.max(0, all.length + 1 - HISTORY))) rmSync(join(histDir(id), String(n)), { recursive: true, force: true })
   hist.delete(id)
@@ -1195,10 +1209,14 @@ export function widgetUndo(o: { id: string; after?: number }) {
   const d = join(widgetHome(), o.id)
   const had = widgets.get(o.id)
   if (had && had.dir !== d) throw new Error(`${o.id} isn't in Laki's folder`)
-  if ([...running].some(k => k === o.id || k.startsWith(`${o.id}@`))) throw new Error(`${o.id} is fetching: try again in a moment`)
+  if (fetching(o.id)) throw new Error(`${o.id} is fetching: try again in a moment`)
+  if (statOf(d)?.isSymbolicLink()) throw new Error(`${d} is a link: not undone`)
   const from = join(histDir(o.id), String(at))
-  rmSync(d, { recursive: true, force: true })
-  if (!existsSync(join(from, '.none'))) cpSync(from, d, { recursive: true, verbatimSymlinks: true })
+  if (existsSync(join(from, '.none'))) rmSync(d, { recursive: true, force: true })
+  else {
+    for (const n of filesAndDirs(d)) if (!KEPT.test(n)) rmSync(join(d, n), { recursive: true, force: true }) // its node_modules and .git stay
+    cpSync(from, d, { recursive: true, verbatimSymlinks: true })
+  }
   for (const n of all.filter(n => n >= at)) rmSync(join(histDir(o.id), String(n)), { recursive: true, force: true })
   hist.delete(o.id)
   if (existsSync(storePath(o.id))) writeStore(o.id, { ...readStore(o.id), on: false })
@@ -1216,7 +1234,8 @@ export function widgetRemix(o: { id: string; newId?: string }) {
   const d = join(widgetHome(), id)
   if (widgets.has(id) || statOf(d)) throw new Error(`${id} is taken`)
   mkdirSync(widgetHome(), { recursive: true })
-  cpSync(w.dir, d, { recursive: true, verbatimSymlinks: true, filter: p => p === w.dir || !/^(\.git|node_modules)$/.test(basename(p)) })
+  const src = realpathSync(w.dir) // a linked folder: what it links to, not the link
+  cpSync(src, d, { recursive: true, verbatimSymlinks: true, filter: p => p === src || !KEPT.test(basename(p)) })
   try {
     const m = JSON.parse(readFileSync(join(d, 'widget.json'), 'utf8'))
     writeFileSync(join(d, 'widget.json'), `${JSON.stringify({ ...m, name: `${m.name || w.id} (copy)` }, null, 2)}\n`)
@@ -1259,7 +1278,7 @@ export function widgetRm(o: { id: string }) {
   const w = find(o.id)
   if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: turn it off instead`)
   if (w.dev) throw new Error(`${w.m.name || w.id} is your code, linked by laki widget dev: unlink it instead (laki widget dev --off ${w.id})`)
-  if (running.has(w.id)) throw new Error(`${w.m.name || w.id} is fetching: try again in a moment`)
+  if (fetching(w.id)) throw new Error(`${w.m.name || w.id} is fetching: try again in a moment`)
   const d = resolve(pathOf(w))
   if (!w.file && [homedir(), dir, widgetHome(), '/'].includes(d)) throw new Error(`${d} isn't one extension's own folder`) // a widget.json put in one of those
   rmSync(d, { recursive: !w.file, force: true }) // a link: only the link; a one-file extension: its file
@@ -1288,8 +1307,9 @@ export function widgetReload() {
 const SECRET = /token|secret|key|password/i
 export function widgetRuns(o: { id: string; data?: boolean; ws?: string }): WidgetRuns {
   const w = find(o.id)
-  const x = wsOf(w, o.ws) // a scope workspace one's instance
+  const x = scoped(w) && !o.ws ? undefined : wsOf(w, o.ws) // a scope workspace one's instance; none: all of theirs (laki widget dev)
   const k = keyOf(w.id, x?.id)
+  const list = scoped(w) && !x ? [...runs].flatMap(([r, l]) => (r.startsWith(`${w.id}@`) ? l : [])).sort((a, b) => b.at - a.at).slice(0, RUNS) : (runs.get(k) ?? [])
   const data = o.data ? JSON.stringify(dataOf(w, x?.id).data ?? null, null, 2) : undefined // the inspector's Data: its JSON (256 KB of it at most)
   const masked = new Set(optionsOf(w).filter(x => SECRET.test(x.key) && configOf(w)[x.key]).map(x => x.key))
   const env = Object.fromEntries(
@@ -1298,7 +1318,7 @@ export function widgetRuns(o: { id: string; data?: boolean; ws?: string }): Widg
       .map(([k, v]) => [k, k === 'LAKI_WIDGET_CONFIG' ? JSON.stringify(Object.fromEntries(Object.entries(typedOf(w)).map(([n, x]) => [n, masked.has(n) ? '••••' : x]))) : [...masked].some(n => k === `WIDGET_${n.toUpperCase()}`) ? '••••' : v])
       .sort(([a], [b]) => a.localeCompare(b)),
   )
-  return { runs: runs.get(k) ?? [], env, fixtures: fixturesOf(w), devError: w.devError, mock: metaOf(w, x?.id).mock, ...(streaming(w) && { stream: streamOf(w.id) }), ...(data !== undefined && { data: data.length > 256 << 10 ? undefined : data, big: data.length > 256 << 10 || undefined }) }
+  return { runs: list, env, fixtures: fixturesOf(w), devError: w.devError, mock: metaOf(w, x?.id).mock, ...(streaming(w) && { stream: streamOf(w.id) }), ...(data !== undefined && { data: data.length > 256 << 10 ? undefined : data, big: data.length > 256 << 10 || undefined }) }
 }
 const fixtureNames = (d: string) => {
   try {
@@ -1332,6 +1352,7 @@ export async function widgetMock(o: { id: string; data?: unknown; fixture?: stri
     mock = n
   } else if ('data' in o) (data = o.data), (mock = 'edited')
   else throw new Error('data, a fixture, or off')
+  if (!ws) stopStream(w.id) // a stream: its last line kept now, not over this; streamSync starts it again once it's Live
   keep(w, ws, s => Object.assign(s, { data, at: Date.now(), error: undefined, mock }))
   wLog(w, `sample data: ${mock}${ws ? ` (${ws})` : ''}`)
   changed()

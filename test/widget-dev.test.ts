@@ -3,7 +3,7 @@
 // sample data by hand, masked settings, unlinking
 import assert from 'node:assert/strict'
 import { spawn } from 'node:child_process'
-import { mkdirSync, realpathSync, writeFileSync } from 'node:fs'
+import { mkdirSync, realpathSync, renameSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
@@ -105,6 +105,16 @@ test('widget dev: linked on and first, watched, the last good version kept, runs
   assert.match((await rig.cli('widget', 'dev', '--off', 'deploys')).err, /isn't linked/)
   mkdirSync(join(rig.env.HOME, 'empty'))
   assert.match((await rig.cli('widget', 'dev', join(rig.env.HOME, 'empty'))).err, /has no widget\.json, nor folders with one/)
+
+  // a one-file extension linked by itself: each save by rename (an editor's) reloads it, not only the first
+  const solo = join(realpathSync(rig.env.HOME), 'solo.1m.sh')
+  const save = (n: number) => (writeFileSync(`${solo}.tmp`, `#!/bin/sh\n# <laki.name>Solo ${n}</laki.name>\necho '{}'\n`, { mode: 0o755 }), renameSync(`${solo}.tmp`, solo))
+  save(1)
+  await rig.rpc('widgetDev', { folder: solo })
+  for (const n of [2, 3]) {
+    save(n)
+    await until(() => find(rig, 'solo').then(w => w?.name === `Solo ${n}`), `save ${n} reloaded`)
+  }
 })
 
 test('widget runs: an action and its fetch after, with their reason; LAKI_REFRESH_REASON per reason', async t => {

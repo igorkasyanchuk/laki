@@ -148,7 +148,7 @@ done
   },
   tool: {
     title: 'A tool for agents',
-    blurb: 'Notes your agents add through a tool (laki tool, MCP), asked once per workspace',
+    blurb: 'Notes your agents add through a tool (laki widget tool, MCP), asked once per workspace',
     files: (id, name) => {
       const notes = { notes: [{ text: 'Ask Dana about the rate limit' }, { text: 'The login test is flaky on CI' }] }
       return {
@@ -172,7 +172,7 @@ done
 awk 'BEGIN { printf "{\\"notes\\": [" } { gsub(/\\\\/, "\\\\\\\\"); gsub(/"/, "\\\\\\""); printf "%s{\\"text\\": \\"%s\\"}", (NR > 1 ? ", " : ""), $0 } END { print "]}" }' notes.txt
 `,
         'add.sh': `#!/bin/sh
-# The add tool: an agent runs it (laki tool ${id} add '{"text": "…"}', or its MCP tool), Laki asks you first. Its
+# The add tool: an agent runs it (laki widget tool ${id} add '{"text": "…"}', or its MCP tool), Laki asks you first. Its
 # input comes as $WIDGET_INPUT_<NAME>; what this prints goes back to the agent.
 { printf '%s' "$WIDGET_INPUT_TEXT" | tr -d '\\000-\\037'; echo; } >> notes.txt
 echo "Added. $(wc -l < notes.txt | tr -d ' ') notes now."
@@ -182,7 +182,7 @@ one short line each. Never put secrets in a note.
 `,
         'fixtures/sample.json': json(notes),
         'fixtures/empty.json': json({ notes: [] }),
-        'README.md': readme(id, name, ' Its `add` action is a tool for agents (`"tool"` in widget.json, `AGENTS.md` says when to use it): `laki tools` lists it, `laki tool ' + id + ' add \'{"text": "hi"}\'` runs it, after you allow it.'),
+        'README.md': readme(id, name, ' Its `add` action is a tool for agents (`"tool"` in widget.json, `AGENTS.md` says when to use it): `laki widget tools` lists it, `laki widget tool ' + id + ' add \'{"text": "hi"}\'` runs it, after you allow it.'),
       }
     },
   },

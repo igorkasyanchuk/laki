@@ -290,7 +290,7 @@ const api: Record<string, Handler> = {
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetRun: p => widgetRun(p),
-  widgetRm: p => (aiForget(`widget:${p.id}`), widgetRm(p)), // Settings' Delete, after its confirm: never MCP's nor Laki AI's; its studio chat with it
+  widgetRm: p => (r => (aiForget(`widget:${p.id}`), r))(widgetRm(p)), // Settings' Delete, after its confirm: never MCP's nor Laki AI's; its studio chat with it, once it's gone
   widgetUndo: p => widgetUndo(p), // the studio's Undo and Undo to here
   widgetRemix: p => widgetRemix(p), // Remix: a copy of any one, yours, Laki AI may change it
   widgetSlug: p => widgetSlug(p), // the studio's first ask: a new one's id

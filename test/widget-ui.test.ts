@@ -98,6 +98,10 @@ test('UI kit: each, if, unless, tone maps, limits and +N more, groups, sort, for
   assert.match(f, /<option selected>b<\/option>/)
   assert.match(f, /data-run="file" data-submit data-confirm="Sure\?">File</)
   assert.match(h({ type: 'button', label: 'Go', run: 'go', confirm: 'Really {{rows.length}}?' }), /data-run="go" data-confirm="Really 3\?"/)
+  // tabs repeated by each: a radio group each; a link's spaces don't make it an href
+  const names = [...h({ type: 'tabs', each: 'rows', tabs: [{ label: 'A' }, { label: 'B' }] }, { full: true }).matchAll(/name="(kt-[^"]+)"/g)].map(m => m[1])
+  assert.equal(new Set(names).size, 3)
+  assert.match(h({ type: 'links', items: [{ label: 'Board', href: ' laki://board' }] }), /<a data-open="laki:\/\/board">/)
 })
 
 test('UI kit: charts in SVG, an empty series draws nothing', () => {

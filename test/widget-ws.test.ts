@@ -44,6 +44,7 @@ test('scope workspace: an instance per workspace with its env, fetched on screen
   const file = (ws: string) => join(rig.data, 'widget-data', 'br', 'ws', `${ws}.json`)
   assert.deepEqual(JSON.parse(readFileSync(file(a.id), 'utf8')).data, { b: a.branch, port: String(a.port), ws: a.id })
   assert.equal((await rig.rpc('widgetRuns', { id: 'br', ws: a.id })).runs[0].reason, 'select')
+  assert.equal((await rig.rpc('widgetRuns', { id: 'br' })).runs[0].reason, 'select', 'no ws: every instance\'s runs (laki widget dev)')
 
   // b selected: its own, in its own file
   await app.call('view', { tab: null, focused: true, shown: true, ws: b.id })

@@ -138,7 +138,7 @@ export type UiSpec = UiElement | { preview?: UiElement; full?: UiElement }
 
 type El = Record<string, unknown> & { type?: string }
 type Scope = Record<string, unknown>
-type S = { scopes: Scope[]; full: boolean; single: boolean; cells: [number, number]; line: boolean; uid: string }
+type S = { scopes: Scope[]; full: boolean; single: boolean; cells: [number, number]; line: boolean; ids: { uid: string; n: number } } // ids: one counter for the whole tree (rows' copies of S share it)
 const obj = (v: unknown): v is El => !!v && typeof v === 'object' && !Array.isArray(v)
 
 // a widget's ui: one tree (the preview and the full view, which shows every row) or { preview, full }
@@ -175,7 +175,7 @@ function icon(v: unknown, s: S, size = 14) {
 const LINK = /^(https?:|mailto:|laki:\/\/)/i
 const safeUrl = (u: string) => (LINK.test(u.trim()) ? u.trim() : '')
 // a link: http(s) and mailto as one (the app opens it in the browser); laki:// through data-open (a widget's HTML keeps no other href)
-const link = (u: string, inner: string, cls = '') => (!safeUrl(u) ? `<span${cls ? ` class="${cls}"` : ''}>${inner}</span>` : /^laki:/i.test(u) ? `<a${cls ? ` class="${cls}"` : ''} data-open="${esc(u.trim())}">${inner}</a>` : `<a${cls ? ` class="${cls}"` : ''} href="${esc(u.trim())}" title="${esc(u.trim())}">${inner}</a>`)
+const link = (url: string, inner: string, cls = '') => (u => (!u ? `<span${cls ? ` class="${cls}"` : ''}>${inner}</span>` : /^laki:/i.test(u) ? `<a${cls ? ` class="${cls}"` : ''} data-open="${esc(u)}">${inner}</a>` : `<a${cls ? ` class="${cls}"` : ''} href="${esc(u)}" title="${esc(u)}">${inner}</a>`))(safeUrl(url))
 const avatarUrl = (login: string) => (/^[A-Za-z0-9-]{1,39}$/.test(login.trim()) ? `https://avatars.githubusercontent.com/${login.trim()}?s=40` : '')
 const imageOk = (u: string) => /^data:image\/(png|jpe?g|gif|webp);base64,[A-Za-z0-9+/=\s]+$/i.test(u) || /^https:\/\/avatars\.githubusercontent\.com\/[\w\-./?=&%]+$/.test(u)
 const hex = (v: string) => (/^#?[0-9a-f]{6}$/i.test(v.trim()) ? v.trim().replace(/^#/, '') : '')
@@ -395,7 +395,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
   },
   tabs: (e, s) => {
     const tabs = (Array.isArray(e.tabs) ? e.tabs : []).filter(obj).slice(0, 8)
-    const name = `kt-${s.uid}-${(s.uid = (Number.parseInt(s.uid, 36) + 1).toString(36))}`
+    const name = `kt-${s.ids.uid}-${++s.ids.n}`
     return `<div${at(e, s, 'k-tabs')}><div class="k-tabbar" role="tablist">${tabs.map((t, i) => `<label><input type="radio" name="${name}"${i ? '' : ' checked'}><span>${h(t.label, s)}</span>${(b => (b ? `<span class="k-badge">${esc(b)}</span>` : ''))(txt(t.badge, s))}</label>`).join('')}</div>${tabs.map(t => `<section class="k-panel">${kids(t.children, s)}</section>`).join('')}</div>`
   },
   divider: (e, s) => `<hr${at(e, s, 'k-hr')}>`,
@@ -484,7 +484,7 @@ export function uiHtml(spec: unknown, ctx: Record<string, unknown>, o: { full?: 
   const top = { ...(obj(data) ? data : {}), ...ctx, full: !!o.full }
   const cells: [number, number] = o.cells && o.cells.length === 2 ? [Number(o.cells[0]) || 1, Number(o.cells[1]) || 1] : o.full ? [3, 4] : [1, 1]
   const line = !o.full && cells[1] <= 0.5
-  const s: S = { scopes: [top], full: !!o.full, single: isElement(spec), cells, line, uid: Math.random().toString(36).slice(2, 7) }
+  const s: S = { scopes: [top], full: !!o.full, single: isElement(spec), cells, line, ids: { uid: Math.random().toString(36).slice(2, 7), n: 0 } }
   const failed = !!ctx.error && (data === undefined || data === null)
   const body = failed ? `<div class="k-error"><b>${line ? '⚠' : 'Couldn’t fetch it'}</b><div class="k-sub">${esc(ctx.error)}</div><button type="button" class="k-btn sm" data-laki="refresh">Retry</button></div>` : node(tree, s)
   return `<div class="k" data-kit="${o.full ? 'full' : 'preview'}"${line ? ' data-line' : ''}>${body}</div>`

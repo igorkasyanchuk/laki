@@ -1,7 +1,7 @@
 // The extension studio (WidgetStudio.tsx): its chat (widget:<id>) writes one with fixtures, off; each write undoable;
 // Try it live runs it once while off; Remix copies one as yours; a new one's id; its chat goes with it
 import { strict as assert } from 'node:assert'
-import { existsSync } from 'node:fs'
+import { existsSync, lstatSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
@@ -83,8 +83,31 @@ test('studio: its chat writes one off with fixtures, Undo, Try it live once, Rem
   await rig.rpc('widgetWrite', { id: copy, files: { 'notes.txt': 'one' } })
   await rig.rpc('widgetWrite', { id: copy, files: { 'notes.txt': 'two' } })
   assert.ok(!(await view(copy)).byAi, 'still yours')
+  // its node_modules never in its versions, and Undo leaves it
+  mkdirSync(join(rig.data, 'widgets', copy, 'node_modules', 'x'), { recursive: true })
+  await rig.rpc('widgetWrite', { id: copy, files: { 'notes.txt': 'three' } })
+  const last = (await view(copy)).history.at(-1)
+  assert.ok(!existsSync(join(rig.data, 'widget-data', `${copy}.history`, String(last), 'node_modules')), 'not in its versions')
+  await rig.rpc('widgetUndo', { id: copy })
+  assert.equal(readFileSync(join(rig.data, 'widgets', copy, 'notes.txt'), 'utf8'), 'two')
+  assert.ok(existsSync(join(rig.data, 'widgets', copy, 'node_modules', 'x')), 'Undo leaves it')
   await assert.rejects(rig.rpc('widgetRemix', { id: 'links', newId: copy }), /is taken/)
   assert.equal((await rig.rpc('widgetSlug', { text: 'links copy' })).id, 'links-copy-2')
+  // the studio's sample data goes as it's turned on anywhere (Settings' switch too): on is live
+  await rig.rpc('widgetMock', { id: copy, data: { links: [] } })
+  await rig.rpc('widgetSet', { id: copy, on: true })
+  assert.ok(!(await view(copy)).mock, 'turned on: no sample data')
+
+  // Remix of a linked folder copies what it links to, and leaves it as it was
+  const real = join(rig.home, 'real-ext')
+  mkdirSync(join(rig.home, 'exts'))
+  mkdirSync(real)
+  writeFileSync(join(real, 'widget.json'), JSON.stringify({ name: 'Linked' }))
+  symlinkSync(real, join(rig.home, 'exts', 'linked'))
+  await rig.rpc('settingsSet', { widgetDirs: [join(rig.home, 'exts')] })
+  const { id: twin } = await rig.rpc('widgetRemix', { id: 'linked' })
+  assert.ok(!lstatSync(join(rig.data, 'widgets', twin)).isSymbolicLink(), 'a folder of its own')
+  assert.equal(JSON.parse(readFileSync(join(real, 'widget.json'), 'utf8')).name, 'Linked', 'the original untouched')
 
   // its chat and history go with it
   answers.push(reply({ content: 'Hi.' }))

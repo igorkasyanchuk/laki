@@ -49,7 +49,7 @@ function runsOf(files: Record<string, string>): Runs {
 
 export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: string; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; back: string; onClose: () => void }) {
   const [cur, setCur] = useState(id)
-  const w = (x => x && inWs(x, x.here ?? null))(widgets.find(x => x.id === cur))
+  const w = (x => x && inWs(x, null))(widgets.find(x => x.id === cur)) // a per-workspace one: no workspace here, its sample's made-up one
   const mine = !!w && !w.builtin && !!cfg.home && w.dir === `${cfg.home}/${w.id}`
   const chat = cur ? `widget:${cur}` : ''
   const [tab, setTab] = useState<Tab>('preview')
@@ -147,7 +147,7 @@ export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: str
                 Back to sample
               </button>
             ) : (
-              <button className="sm" disabled={w.every === undefined && !w.js} data-tip="See what it runs, then run it once: its real data here" onClick={() => setSheet('try')}>
+              <button className="sm" disabled={(w.every === undefined && !w.js) || !!w.scope} data-tip={w.scope ? 'Per workspace: turn it on, then look in a workspace' : 'See what it runs, then run it once: its real data here'} onClick={() => setSheet('try')}>
                 Try it live
               </button>
             )}
@@ -174,7 +174,7 @@ export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: str
                   ))}
                 </div>
               </div>
-              {tab === 'preview' ? <StudioPreview w={w} api={api} sample={!live && noFixture} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} />}
+              {tab === 'preview' ? <StudioPreview w={w} api={api} sample={!live && (noFixture || !!w.scope)} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} />}
             </>
           ) : (
             <div className="studio-empty muted">
@@ -392,8 +392,8 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
       e => (setErr(String(e?.message ?? e)), setBusy(false)),
     )
   }
-  // on: the studio's sample data off too (a mock would keep it from fetching), so it fetches now
-  const turnOn = () => void cfg.set(w.id, { on: true }).then(() => (w.mock ? cfg.mock?.(w.id, { off: true }) : undefined)).then(() => onOn(stay), e => setErr(String(e?.message ?? e)))
+  // on: it fetches now (turning on drops the studio's sample data: widgetSet)
+  const turnOn = () => void cfg.set(w.id, { on: true }).then(() => onOn(stay), e => setErr(String(e?.message ?? e)))
   return (
     <Modal title={on ? `Turn on ${w.name}?` : `Try ${w.name} live?`} onClose={onClose}>
       <p className="muted small">{on ? 'From now on Laki runs this on its schedule, and its buttons run their commands, as you on this Mac.' : 'Its fetch runs once, now, as you on this Mac: the preview then shows what it really prints. Nothing else runs.'}</p>

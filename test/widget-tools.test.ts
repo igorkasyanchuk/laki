@@ -2,7 +2,7 @@
 import { strict as assert } from 'node:assert'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
@@ -126,11 +126,21 @@ test('tools: listed and called, asked first per workspace or always, denied, tim
   await answer(app.events.filter((e: any) => e.ev === 'toolAsk')[6].req, 'once')
   await call
 
+  // its command changed while the user was asked (a save, a reload): what they saw is all that may run
+  call = rig.rpc('widgetToolCall', { id: 'g', action: 'hi', input: { who: 'eve' } })
+  q = await ask(7)
+  const gm = JSON.parse(readFileSync(join(rig.data, 'widgets', 'g', 'widget.json'), 'utf8'))
+  gm.actions.hi.run = 'echo other'
+  writeFileSync(join(rig.data, 'widgets', 'g', 'widget.json'), JSON.stringify(gm))
+  await rig.rpc('widgetReload')
+  await answer(q.req, 'once')
+  await assert.rejects(call, /its command changed while you were asked: not run/)
+
   // the starter: an add tool, asked first, its note in the data after
   assert.equal((await rig.cli('widget', 'new', 'Notes', '--kind', 'tool')).code, 0)
   assert.equal((await rig.cli('widget', 'check', 'notes')).code, 0)
   call = rig.cli('widget', 'tool', 'notes', 'add', '{"text": "say \\"hi\\""}', '--ws', a.id)
-  await answer((await ask(7)).req, 'once')
+  await answer((await ask(8)).req, 'once')
   assert.equal((await call).out.trim(), 'Added. 1 notes now.')
   await until(async () => /say &quot;hi&quot;/.test(await rig.rpc('widgetRender', { id: 'notes' })), 'the note shown')
 

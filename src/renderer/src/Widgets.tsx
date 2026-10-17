@@ -98,10 +98,11 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
   const now = useRef({ w, full, api, sample, cells })
   now.current = { w, full, api, sample, cells }
   const rootOf = (el: HTMLDivElement) => el.shadowRoot ?? el.attachShadow({ mode: 'open' })
+  const none = w.here === null && !sample // per workspace, none on screen (a sample has a made-up one)
   useEffect(() => {
     let live = true
     setErr('')
-    if (w.here === null) {
+    if (none) {
       // per workspace, none on screen
       if (host.current) rootOf(host.current).replaceChildren(Object.assign(document.createElement('style'), { textContent: WIDGET_CSS }), clean(NO_WS))
       return
@@ -121,11 +122,12 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, w.net, w.here, full, config, api.key, theme, sample, size]) // net: Network access's CSP needs the page loaded again
-  // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything
+  }, [w.id, w.js, w.at, w.rev, w.net, w.here, none, full, config, api.key, theme, sample, size]) // net: Network access's CSP needs the page loaded again
+  // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything (a button
+  // clicked is done at once: uiBehave waits on what this returns)
   useEffect(() => {
     if (w.js || !host.current) return
-    return uiBehave(rootOf(host.current), m => (n => (n.sample ? undefined : act(m, n.w, n.full, n.api)))(now.current))
+    return uiBehave(rootOf(host.current), m => (n => (n.sample ? undefined : act(m, n.w, n.full, n.api)) ?? Promise.resolve())(now.current))
   }, [w.js])
   // a JS widget's messages: only from its own frame, and only right after a click in it (the frame has the focus,
   // the page a user activation), never on its script's own say (a refresh on load would loop: each fetch reloads it);
@@ -138,9 +140,8 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       const m = e.data as Record<string, unknown>
       if (m.laki === 'ui') return win?.postMessage({ laki: 'ui', req: m.req, html: uiHtml(m.spec, m.ctx && typeof m.ctx === 'object' ? (m.ctx as Record<string, unknown>) : {}, { full, cells: now.current.cells }) }, '*')
       if (m.laki === 'close' && full) return api.close()
-      if (sample) return // made-up data: its buttons and links do nothing
-      if (document.activeElement !== frame.current || navigator.userActivation?.isActive === false) return
-      const done = act(m, w, full, api)
+      const ok = !sample && document.activeElement === frame.current && navigator.userActivation?.isActive !== false // made-up data: its buttons and links do nothing
+      const done = ok ? act(m, w, full, api) : undefined
       if (m.laki === 'run') void Promise.resolve(done).finally(() => win?.postMessage({ laki: 'done', action: m.action, arg: String(m.arg ?? '') }, '*')) // its button works again
     }
     window.addEventListener('message', f)
@@ -149,7 +150,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
   // the host stays mounted under an error: the next render (a fixed template, a reload) draws into it again
   return (
     <>
-      {w.js && w.here !== null ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" /> : <div ref={host} className="widget-body" />}
+      {w.js && !none ? src && <iframe ref={frame} className="widget-frame" title={w.name} src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" /> : <div ref={host} className="widget-body" />}
       {err && <div className="widget-msg warn small">{err}</div>}
     </>
   )

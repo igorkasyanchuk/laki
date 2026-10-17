@@ -116,6 +116,13 @@ test('streams: each line of JSON is its data, again after an exit with backoff, 
   assert.ok(Math.abs(gap(r) - 2000) < 300, `then 2 s (${gap(r)})`)
   await until(() => rig.rpc('widgetRuns', { id: 'st' }).then((r: any) => r.stream.running), 'running again')
   assert.equal(JSON.parse(readFileSync(join(rig.data, 'widget-data', 'st.json'), 'utf8')).data.n, 3, 'kept in its store')
+  // sample data by hand: the stream stops, its lines never write over it; Live starts it again
+  await rig.rpc('widgetMock', { id: 'st', data: { n: 99 } })
+  assert.equal((await rig.rpc('widgetRuns', { id: 'st' })).stream, undefined, 'mocked: no stream')
+  await sleep(700)
+  assert.equal((await dataOf(rig, 'st'))?.n, 99, 'the sample data stays')
+  await rig.rpc('widgetMock', { id: 'st', off: true })
+  await until(() => rig.rpc('widgetRuns', { id: 'st' }).then((r: any) => r.stream?.running), 'Live: streaming again')
   await rig.rpc('widgetSet', { id: 'st', on: false })
   r = await rig.rpc('widgetRuns', { id: 'st' })
   assert.equal(r.stream, undefined, 'off: no stream')

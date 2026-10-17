@@ -449,7 +449,7 @@ With Laki AI on (Settings › AI), Settings › Extensions › *New ▾ › Make
   at your next ask.
 - Nothing runs by itself. **Try it live** shows exactly what will run (its fetch or script, each action's command, a
   JS page's network switch), then runs its fetch once, while it's still off; *Back to sample* returns. **Turn on**
-  shows the same, then turns it on.
+  shows the same, then turns it on; turned on anywhere (Settings' switch too), it fetches its real data.
 - **Undo** puts the version before the last change back (the last 20 are kept); each turn's *Undo to here* goes back to
   how it was after that turn.
 - A row's ✨ (*Edit with Laki AI*, one of yours in Laki's folder) opens it in the studio; **Remix** (any one's, built-in

@@ -1979,7 +1979,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
       {!!w.tools?.length && (
         <div className="wc-tools">
           <div className="small">
-            <b>Tools for agents</b> <span className="muted">· agents run these through laki tool and MCP</span>
+            <b>Tools for agents</b> <span className="muted">· agents run these through laki widget tool and MCP</span>
           </div>
           {w.tools.map(t => (
             <div key={t.action} className="wc-tool small">
