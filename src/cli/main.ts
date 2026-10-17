@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, DEVICE_OPS, type Memory, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, DEVICE_OPS, type Memory, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -15,8 +15,8 @@ import { COMMON, UI, UI_SAMPLES, type UiType } from '../shared/widgetUi.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -49,7 +49,42 @@ async function hook(state: string, extra?: string) {
   process.exit(0)
 }
 
- // the UI kit's catalog (widget.json's "ui"), or one element's props and its sample: for agents and terminals
+// laki widget dev [folder]: your extension's folder (this one by default) linked, on and watched; then its fetches and
+// actions as they run, a line each, until Ctrl-C (the link stays). --off <id|folder> unlinks, --list lists them
+async function dev(folder?: string) {
+  type Link = { folder: string; widgets: { id: string; name: string; on: boolean; devError?: string }[] }
+  if (flags.list) {
+    const { links } = (await rpc('widgetDev', { list: true })) as { links: Link[] }
+    return out(links, links.map(l => `${l.folder}  ${l.widgets.map(w => `${w.id}${w.devError ? ' ✗' : ''}`).join(', ') || '(no widget found)'}`).join('\n') || 'no folders linked: laki widget dev [folder]')
+  }
+  if (typeof flags.off === 'string') return out(await rpc('widgetDev', { off: flags.off }), `unlinked ${flags.off}`)
+  const t0 = Date.now()
+  const r = (await rpc('widgetDev', { folder: resolve(folder ?? '.') })) as { folder: string; widgets: { id: string; name: string; devError?: string }[]; broken: string[] }
+  if (json) return out(r)
+  for (const b of r.broken) console.log(`✗ ${b}`)
+  for (const w of r.widgets) if (w.devError) console.log(`✗ ${w.id}: ${w.devError}`)
+  console.log(`Watching ${r.folder} · open Settings › Extensions › ${r.widgets.map(w => w.name).join(', ') || '…'} › Inspect`)
+  const seen = new Map(r.widgets.map(w => [w.id, { at: t0 - 1, err: w.devError }]))
+  const hm = (ms: number) => new Date(ms).toTimeString().slice(0, 8)
+  const size = (b: number) => (b < 1024 ? `${b} B` : `${(b / 1024).toFixed(1)} KB`)
+  const many = seen.size > 1
+  for (;;) {
+    for (const [id, s] of seen) {
+      const x = (await rpc('widgetRuns', { id }).catch(() => null)) as WidgetRuns | null
+      if (!x) continue
+      const who = many ? `${id} ` : ''
+      if (x.devError !== s.err) console.log(x.devError ? `${hm(Date.now())} ${who}✗ last good version kept: ${x.devError}` : `${hm(Date.now())} ${who}reads again`), (s.err = x.devError)
+      for (const run of x.runs.filter(u => u.at > s.at).reverse()) {
+        const what = run.action ? `action ${run.action}` : 'fetch'
+        console.log(`${hm(run.at)} ${who}${what} ${run.ok ? `ok ${run.ms} ms ${size(run.bytes)}` : `failed ${run.ms} ms: ${run.error}`} (${run.reason}${run.why ? `: ${run.why}` : ''})`)
+        s.at = run.at
+      }
+    }
+    await new Promise(ok => setTimeout(ok, 500))
+  }
+}
+
+// the UI kit's catalog (widget.json's "ui"), or one element's props and its sample: for agents and terminals
 function kit(type?: string) {
   const kind = (k: unknown) => (Array.isArray(k) ? k.join('|') : String(k))
   const props = (t: UiType) => Object.entries(UI[t].props as Record<string, { kind: unknown; desc: string }>).map(([name, p]) => ({ name, kind: kind(p.kind), desc: p.desc }))
@@ -384,6 +419,7 @@ async function main() {
       }
       if (sub === 'reload') return out(await rpc('widgetReload'), 'reloaded')
       if (sub === 'kit') return kit(id)
+      if (sub === 'dev') return dev(id)
       if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
       if (sub === 'run') {
         const r = await rpc('widgetRun', { id }, 130000)
@@ -397,7 +433,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' ') }, 130000)
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] | kit [element]')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] | kit [element] | dev [folder] [--off <id|folder>] [--list]')
     }
     case 'ai': {
       const [sub] = rest

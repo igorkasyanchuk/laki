@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, widgetAction, widgetFiles, widgetKey, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, widgetAction, widgetDev, widgetFiles, widgetKey, widgetMock, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -295,6 +295,9 @@ const api: Record<string, Handler> = {
   widgetFiles: p => widgetFiles(p),
   widgetWrite: p => widgetWrite(p), // Laki AI's and MCP's: saved off
   widgetTick: p => widgetTick(p.now), // tests move the clock
+  widgetRuns: p => widgetRuns(p), // the inspector's Runs, Env, fixtures; laki widget dev's lines
+  widgetMock: p => widgetMock(p), // the inspector's sample data: by hand or a fixture, off
+  widgetDev: p => widgetDev(p), // laki widget dev: link, unlink, list
   planList: p => planList(p), // specs and brainstorms (experimental): plans.ts
   planNew: p => planNew(p),
   planGet: p => planGet(p),
@@ -394,7 +397,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
     }
     core.clients.add(c)
     core.hello(c)
-    if (core.clients.size === 1) widgetTick(), core.reminderTick() // the app is back: what fell due meanwhile
+    if (core.clients.size === 1) widgetTick(undefined, 'open'), core.reminderTick() // the app is back: what fell due meanwhile
     ws.on('message', async raw => {
       let m: { id?: number; method: string; params?: any }
       try {
@@ -467,6 +470,7 @@ function shutdown() {
   flowStopAll() // a run block's command
   aiStop() // its claude -p or codex would go on, and their laki mcp start a daemon again
   core.stopHosts()
+  widgetsStop() // dev mode's watchers
   try {
     core.keepShells() // what the shells run, for the next start
   } catch (e) {

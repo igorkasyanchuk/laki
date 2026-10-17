@@ -6,7 +6,7 @@
 // the daemon's page for it, sandboxed, that talks to the app only in messages: open a link, refresh, the full view,
 // run one of its actions.
 // Only what's on screen is rendered: a folded grid, or a closed dialog, holds nothing.
-import { type CSSProperties, useEffect, useRef, useState } from 'react'
+import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { ago, sayOf, uiBehave, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
 import { uiHtml } from '../../shared/widgetUi'
@@ -23,6 +23,7 @@ export type WidgetApi = {
   action: (id: string, action: string, arg: string, label?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
   say: (id: string, s: WidgetSay) => void // a toast, a dialog with buttons
   settings: (id?: string) => void // its page (Extension.tsx); none: Settings › Extensions
+  menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page
   key?: string // the daemon's key for JS widgets' pages
 }
 
@@ -162,7 +163,7 @@ function useParked() {
 // action, else opens its full view, else fetches it now (else its settings)
 const click = (w: WidgetView, api: WidgetApi) =>
   w.click ? void api.action(w.id, w.click, '', w.name).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id).catch(() => {}) : api.settings(w.id)
-const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${status(w) ? ` · ${status(w)}` : ''}`
+const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
 // its icon: one of the app's by name, an emoji as it is, else its name's first letter
 function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
   if (isIconName(w.icon)) return <Icon name={w.icon} size={size} />
@@ -206,7 +207,7 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
 // a widget in its place: its preview (or Stopped · load), and a dot while it fetches or after it failed
 function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number] }) {
   return (
-    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''}`} style={style} data-tip={tipOf(w)}>
+    <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''}`} style={style} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
       {w.button ? (
         <CellButton w={w} api={api} />
       ) : w.js && parked ? (
@@ -216,7 +217,8 @@ function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: Widg
       ) : (
         <WidgetBody w={w} full={false} api={api} cells={cells} />
       )}
-      {(w.error || w.running) && <span className={`widget-dot ${w.error && !w.running ? 'bad' : ''}`} />}
+      {(w.error || w.running || w.devError) && <span className={`widget-dot ${(w.error || w.devError) && !w.running ? 'bad' : ''}`} />}
+      {w.mock && <span className="widget-mock">Sample data</span>}
     </div>
   )
 }

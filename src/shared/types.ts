@@ -390,6 +390,7 @@ export type Settings = {
   dockIcon?: string // the Dock's icon while Laki runs: laki, dawn, terminal, glacier, bubbles, neon (unset: the app's own, laki)
   fun?: boolean // the sidebar foot's smiley (Meme): a meme for a break (unset: on)
   widgetDirs?: string[] // folders of widgets (or a widget's own), besides <data>/widgets (daemon/widgets.ts)
+  widgetDev?: string[] // laki widget dev's folders: your own code, scanned first and watched
   railLabels?: boolean // the rail layout's words under its icons; off: icons only, a narrower rail (unset: on)
   railShells?: boolean // the rail's Terminal button; off: Terminals is a project in Projects' list (unset: on)
   railBrowsers?: boolean // the rail's Browser button; off: Browsers is a project in Projects' list (unset: on)
@@ -572,7 +573,11 @@ export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'ch
 // button: it shows as a button (a rail or foot place, or no preview of its own): icon (one of the app's icons, or a
 // character or two), label, badge (a count on it) and tip, filled from its data; click: the action a click runs (none:
 // its full view, else a fetch)
-export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; sample?: boolean; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
+// a fetch's or an action's run (widgetRuns): reason schedule, open, settings, manual, reload, dev or action:<name>; why:
+// what changed (dev mode); stderr: its last 20 lines
+export type WidgetRun = { at: number; ms: number; reason: string; why?: string; action?: string; ok: boolean; bytes: number; error?: string; stderr?: string; exit?: number }
+export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtures: string[]; devError?: string; mock?: string; data?: string; big?: boolean } // data: its last data's JSON, when asked (big: over 256 KB, not given)
+export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string }
 export type WidgetSize = 's' | 'm' | 'l'
 // where an extension shows: the sidebar's grid (the default), the top bar or the status bar (a line high, by the bar's
 // right end), the rail (a button among its icons; without the rail, the sidebar's foot), the sidebar's foot (a button
@@ -603,4 +608,4 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 71
+export const API = 72

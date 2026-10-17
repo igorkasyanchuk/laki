@@ -828,6 +828,13 @@ Most draw with the **UI kit**: widget.json's `ui`, elements as JSON (stats, list
 follow the theme and fit any size; Settings › Extensions › *UI kit* shows each with its sample and its JSON to copy
 (`laki widget kit` in a terminal). `laki widget` lists, reloads, fetches and renders them.
 
+Working on one of your own: `laki widget dev` in its folder links it (it's on, ahead of an installed one of the same
+id, and every save reloads it and fetches it again; a file that doesn't read keeps the last good version running and
+says why), then prints each fetch as it runs. Its page has tabs beside Overview: **Data** (its JSON; edit it and Apply,
+or pick one of its `fixtures/*.json`, to see it with that data, *Sample data* on it until *Live*), **Runs** (the last
+20 fetches and actions, why each ran, a click for its stderr), **Env** (what its fetch gets, tokens masked) and
+**Files**. A right click on an extension opens it there (*Inspect*), and so does `laki://settings/widgets/<id>/inspect`.
+
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
 
@@ -1419,6 +1426,8 @@ laki widget on|off|run <id>                             # show or hide one | fet
 laki widget render <id> --full                          # the HTML its full view shows now
 laki widget action <id> <action> [arg]                  # run one of its buttons' actions: what the app would show
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
+laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
+laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers
 laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over

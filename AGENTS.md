@@ -97,7 +97,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`. A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1010,6 +1010,27 @@ fields as JSON), `data-copy`, links, `data-open`, `data-laki`, `data-filter`, el
 `laki.mount(el, …)` post `{ laki: 'ui', req }`, answered with `uiHtml` before the click checks (it only computes HTML).
 `UiKit.tsx` `UiKitPage` (App's dialog `{ uikit, back }`, Settings › Extensions › *UI kit*): a card per sample at 1×1,
 3×1, 3×2 or full and as a status bar item, its JSON to copy. Tested in `test/widget-ui.test.ts`.
+
+Dev mode (`laki widget dev`, the CLI's `dev`: `widgetDev` `folder`, then `widgetRuns` every 500 ms, a line per new run
+and each `devError` change; `off`, `list`): `settings.widgetDev` (`SETTINGS_KEPT`; `settingsSet` rescans as it changes,
+like `widgetDirs`), `devRoots` first in `widgetRoots` (a dev copy shadows the installed one of its id, sharing its
+store), linking turns its widgets on and fetches them (`dev`, why `linked`). `watchDev` (from `scanWidgets`):
+`fs.watch` recursive per root, 300 ms debounce, `devChanged`: `scanWidgets` again, then each of its widgets fetched
+(reason `dev`, why: the files). `scanWidgets` keeps the entry it had (`before`) when a dev widget's `manifestOf` or
+`templatesError` (shared/widget.ts `templateError`, widget.html's and every `ui` string) fails, with `devError` (the
+view's; Settings' *dev* tag, the tooltip, the page's banner). `widgetsStop` at shutdown. `devKeep` (core.ts): `devLog`
+keys kept without dev mode (a dev widget's). Runs: `ran` per fetch and action (`RUNS`, 20, newest first, in memory:
+`WidgetRun`, reason `RUN_REASONS` or `action:<name>`, `why`, stderr's `tail`), `exec` keeps stderr and the exit code;
+`$LAKI_REFRESH_REASON` (`envOf`: one env for exec and `widgetRuns`' `env`, `SECRET` setting names masked, in
+`LAKI_WIDGET_CONFIG` too); `widgetTick`'s reason `schedule`, the first client's `open`. `widgetMock` (`data`, a
+`fixture`: `fixturesOf`, `fixtures/*.json`, or `off`: fetched now): the store's `mock` (the view's; Widgets.tsx'
+`.widget-mock` chip), `fetchable` false meanwhile and `widgetRun` skips all but `manual`, whose data clears it.
+`widgetRm` refuses a dev widget (your code). The inspector is `Extension.tsx`' tabs (`ExtTab`; App's dialog
+`{ extension, tab }`): `InspectHead` (Run now, Reload, the watching dot, `devError`'s banner), Overview (`Preview` and
+its *Everywhere* card: a sidebar cell of any size, both bars, the button), `Inspector` (Data: `widgetRuns` `data`, Apply
+`widgetMock`, *Sample ▾* fixtures, Live; Runs, every 2 s while shown; Env; Files: `widgetFiles`' names, Open folder). A
+widget's right click (`WidgetApi.menu`, App's: Fetch now, Inspect, Its page) and `laki://settings/widgets/<id>[/inspect]`
+(links.ts `extension`) open it. Tested in `test/widget-dev.test.ts`.
 
 ### Notifications
 

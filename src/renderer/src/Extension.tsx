@@ -1,9 +1,11 @@
-// An extension's own page (Settings › Extensions' rows and New extension, a widget's ⚙, the Desk's tiles): how it
-// looks (live, or with widget.json's sample: made-up data), in its place and as its full view, its settings, and Laki
-// AI's chat beside them to make or change it; closing goes back where it was opened from. id '': a new one, which the
+// An extension's own page (Settings › Extensions' rows and New extension, a widget's ⚙ and right click, the Desk's
+// tiles, laki://settings/widgets/<id>/inspect): how it looks (live, or with widget.json's sample: made-up data), in its
+// place and as its full view, its settings, and Laki AI's chat beside them to make or change it; the inspector's tabs
+// (Data, Runs, Env, Files) beside Overview; closing goes back where it was opened from. id '': a new one, which the
 // page follows once Laki AI writes it. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
 import { useEffect, useRef, useState } from 'react'
-import { type AiSettings, placesOf, type WidgetView } from '../../shared/types'
+import { type AiSettings, placesOf, type WidgetRuns, type WidgetView } from '../../shared/types'
+import { ago } from '../../shared/widget'
 import { widgetHere, widgetPrompt } from '../../shared/widgetGuide'
 import { AiPage } from './Ai'
 import { WidgetCard, type WidgetsApi } from './Settings'
@@ -13,8 +15,18 @@ import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk' }
 const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
-export function ExtensionPage({ id, widgets, cfg, api, ai, workspaces, back, onAiSettings, onClose }: { id: string; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; back: string; onAiSettings: () => void; onClose: () => void }) {
+export type ExtTab = 'overview' | 'data' | 'runs' | 'env' | 'files'
+const TABS: [ExtTab, string][] = [
+  ['overview', 'Overview'],
+  ['data', 'Data'],
+  ['runs', 'Runs'],
+  ['env', 'Env'],
+  ['files', 'Files'],
+]
+
+export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspaces, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; back: string; onAiSettings: () => void; onClose: () => void }) {
   const [cur, setCur] = useState(id)
+  const [tab, setTab] = useState<ExtTab>(first ?? 'overview')
   // New extension: the first one that shows up meanwhile is the one Laki AI made
   const known = useRef(new Set(widgets.map(w => w.id)))
   const made = cur ? undefined : widgets.find(w => !known.current.has(w.id))
@@ -54,7 +66,16 @@ export function ExtensionPage({ id, widgets, cfg, api, ai, workspaces, back, onA
       }
     >
       <div className="ext">
-        <div className="ext-main">{w ? <Preview w={w} api={api} cfg={cfg} /> : <Start ai={!!ai?.on} home={cfg.home} onAiSettings={onAiSettings} />}</div>
+        <div className="ext-main">
+          {w ? (
+            <>
+              <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} />
+              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} />}
+            </>
+          ) : (
+            <Start ai={!!ai?.on} home={cfg.home} onAiSettings={onAiSettings} />
+          )}
+        </div>
         <aside className="ext-chat" aria-label="Laki AI">
           {ai?.on ? (
             <AiPage
@@ -98,8 +119,17 @@ export function ExtensionPage({ id, widgets, cfg, api, ai, workspaces, back, onA
 
 // how it looks: in its first place (a cell of the sidebar's grid, a line of a bar, a button) and its full view, with
 // its data or its sample; then its settings
+const CELLS: [number, number][] = [
+  [1, 0.5],
+  [1, 1],
+  [2, 1],
+  [3, 1],
+  [3, 2],
+  [3, 4],
+]
 function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi }) {
   const [pick, setPick] = useState<'live' | 'sample'>()
+  const [cell, setCell] = useState<[number, number]>(w.size) // Everywhere's sidebar cell: any size, its own not changed
   const sample = (pick ?? (w.sample && (!w.on || (w.every !== undefined && !w.at)) ? 'sample' : 'live')) === 'sample' && !!w.sample
   const place = placesOf(w)[0] ?? 'side'
   const bar = place === 'top' || place === 'status'
@@ -161,12 +191,224 @@ function Preview({ w, api, cfg }: { w: WidgetView; api: WidgetApi; cfg: WidgetsA
       </section>
       <section className="ext-card">
         <div className="ext-card-head">
+          <b>Everywhere</b>
+          <span className="muted small grow">how it looks in each place{sample ? ', with made-up data' : ''}</span>
+          <div className="seg" role="tablist" aria-label="Its size in the sidebar">
+            {CELLS.map(c => (
+              <button key={c.join()} role="tab" aria-selected={cell.join() === c.join()} className={cell.join() === c.join() ? 'on' : ''} onClick={() => setCell(c)}>
+                {c[0]}×{half(c[1])}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="ext-stage ext-places">
+          <div>
+            <span className="muted small">Sidebar · {cell[0]}×{half(cell[1])}</span>
+            <div className="widget ext-tile" style={{ width: cell[0] * 92, height: cell[1] * 64 }}>
+              {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${sample}`} w={w} full={false} api={api} sample={sample} cells={cell} />}
+            </div>
+          </div>
+          {(['Top bar', 'Status bar'] as const).map(where => (
+            <div key={where}>
+              <span className="muted small">{where}</span>
+              <div className="widget ext-tile bar" style={{ width: `calc(${w.size[0]} * var(--widget-cell, 92px))` }}>
+                {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${sample}`} w={w} full={false} api={api} sample={sample} cells={[w.size[0], 0.5]} />}
+              </div>
+            </div>
+          ))}
+          <div>
+            <span className="muted small">Rail or foot button</span>
+            <div className="ext-button">
+              <CellButton w={w} api={api} />
+            </div>
+            <span className="muted small">tip: {w.tip ?? w.name}</span>
+          </div>
+        </div>
+      </section>
+      <section className="ext-card">
+        <div className="ext-card-head">
           <b>Settings</b>
           <span className="muted small">saved as you change them</span>
         </div>
         <WidgetCard w={w} api={cfg} />
       </section>
     </>
+  )
+}
+
+// the inspector's head: its tabs, Run now and Reload, a dot while laki widget dev watches it, and why its files don't
+// read now (the last good version runs on)
+function InspectHead({ w, cfg, tab, setTab }: { w: WidgetView; cfg: WidgetsApi; tab: ExtTab; setTab: (t: ExtTab) => void }) {
+  return (
+    <>
+      <div className="ext-tabs">
+        <div className="seg" role="tablist" aria-label="Its page">
+          {TABS.map(([t, label]) => (
+            <button key={t} role="tab" aria-selected={tab === t} className={tab === t ? 'on' : ''} onClick={() => setTab(t)}>
+              {label}
+            </button>
+          ))}
+        </div>
+        <span className="grow" />
+        {w.dev && (
+          <span className="ext-watch small muted" data-tip="laki widget dev links its folder: a save reloads it">
+            <i className="ext-watch-dot" /> watching
+          </span>
+        )}
+        {w.mock && <span className="tag" data-tip="Data put there by hand: Live in Data fetches again">sample data: {w.mock}</span>}
+        {w.every !== undefined && (
+          <button className="sm" disabled={!w.on || w.running} data-tip={w.on ? 'Fetch now' : 'Turn it on first'} onClick={() => void cfg.run(w.id).catch(() => {})}>
+            <Icon name="refresh" size={12} /> {w.running ? 'Fetching…' : 'Run now'}
+          </button>
+        )}
+        <button className="sm" data-tip="Read every extension's folder again" onClick={() => void cfg.reload().catch(() => {})}>
+          Reload
+        </button>
+      </div>
+      {w.devError && (
+        <div className="ext-note bad">
+          <Icon name="conflict" />
+          <span className="grow">
+            <b>Last good version kept:</b> <span className="mono">{w.devError}</span>
+          </span>
+        </div>
+      )}
+    </>
+  )
+}
+
+const hm = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+const bytes = (b: number) => (b < 1024 ? `${b} B` : b < 1 << 20 ? `${(b / 1024).toFixed(1)} KB` : `${(b / (1 << 20)).toFixed(1)} MB`)
+
+// the inspector's tabs: Data (its JSON, editable: Apply keeps it as sample data; a fixture; Live), Runs (newest first,
+// a click shows its stderr), Env (what a fetch is given, secrets masked), Files (and its folder). Read again as its
+// data or files change, and every 2 s while Runs shows
+function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview'> }) {
+  const [x, setX] = useState<WidgetRuns | null>(null)
+  const [files, setFiles] = useState<string[] | null>(null)
+  const [text, setText] = useState<string | null>(null) // Data's box as typed; null: as fetched
+  const [err, setErr] = useState('')
+  const [open, setOpen] = useState<number | null>(null)
+  const [tick, setTick] = useState(0)
+  useEffect(() => {
+    if (tab !== 'runs') return
+    const t = setInterval(() => setTick(n => n + 1), 2000)
+    return () => clearInterval(t)
+  }, [tab])
+  useEffect(() => {
+    let live = true
+    cfg.runs?.(w.id).then(r => live && setX(r), e => live && setErr(String(e?.message ?? e)))
+    return () => void (live = false)
+  }, [w.id, w.at, w.rev, w.mock, w.running, tab, tick])
+  useEffect(() => {
+    if (tab !== 'files') return
+    let live = true
+    cfg.files?.(w.id).then(f => live && setFiles(f), () => live && setFiles([]))
+    return () => void (live = false)
+  }, [w.id, w.rev, tab])
+  const apply = () => {
+    let data: unknown
+    try {
+      data = JSON.parse(text ?? x?.data ?? 'null')
+    } catch (e) {
+      return setErr(`Not JSON: ${(e as Error).message}`)
+    }
+    setErr('')
+    void cfg.mock?.(w.id, { data }).then(() => setText(null), e => setErr(String(e?.message ?? e)))
+  }
+  if (!x) return <section className="ext-card muted small">{err || 'Reading…'}</section>
+  if (tab === 'data')
+    return (
+      <section className="ext-card">
+        <div className="ext-card-head">
+          <b>Data</b>
+          <span className="muted small">{w.mock ? `sample data (${w.mock}): not fetched until Live` : w.at ? `as fetched ${ago(w.at)}` : 'not fetched yet'}</span>
+          <span className="grow" />
+          {!!x.fixtures.length && (
+            <select className="sm" value="" aria-label="A fixture" onChange={e => e.target.value && void cfg.mock?.(w.id, { fixture: e.target.value }).then(() => setText(null), er => setErr(String(er?.message ?? er)))}>
+              <option value="">Sample ▾</option>
+              {x.fixtures.map(f => (
+                <option key={f} value={f}>
+                  fixtures/{f}.json
+                </option>
+              ))}
+            </select>
+          )}
+          <button className="sm" disabled={!w.mock} data-tip="Back to its fetch's data: fetched now" onClick={() => void cfg.mock?.(w.id, { off: true }).then(() => setText(null))}>
+            Live
+          </button>
+          <button className="sm primary" disabled={text === null} data-tip="Show it with this data (sample data, not fetched meanwhile)" onClick={apply}>
+            Apply
+          </button>
+        </div>
+        {x.big ? <p className="muted small">Over 256 KB: not shown here.</p> : <textarea className="ext-json mono" spellCheck={false} value={text ?? x.data ?? 'null'} onChange={e => setText(e.target.value)} />}
+        {err && <p className="warn small">{err}</p>}
+      </section>
+    )
+  if (tab === 'runs')
+    return (
+      <section className="ext-card">
+        <div className="ext-card-head">
+          <b>Runs</b>
+          <span className="muted small">its last {x.runs.length} fetches and actions, newest first</span>
+        </div>
+        {!x.runs.length && <p className="muted small">None yet{w.on ? '' : ': it is off'}.</p>}
+        <ul className="ext-runs">
+          {x.runs.map(r => (
+            <li key={r.at + r.reason + (r.action ?? '')} className={r.ok ? '' : 'bad'}>
+              <button className="ext-run" onClick={() => setOpen(o => (o === r.at ? null : r.at))} aria-expanded={open === r.at}>
+                <span className="mono">{hm(r.at)}</span>
+                <b>{r.action ? `action ${r.action}` : 'fetch'}</b>
+                <span className={r.ok ? 'good' : 'warn'}>{r.ok ? 'ok' : `failed${r.exit ? ` (${r.exit})` : ''}`}</span>
+                <span className="muted">{r.ms} ms</span>
+                {r.ok && <span className="muted">{bytes(r.bytes)}</span>}
+                <span className="muted grow">
+                  {r.reason}
+                  {r.why ? `: ${r.why}` : ''}
+                </span>
+              </button>
+              {open === r.at && (
+                <div className="ext-run-more">
+                  {r.error && <p className="warn small">{r.error}</p>}
+                  <pre className="mono">{r.stderr || '(nothing on stderr)'}</pre>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      </section>
+    )
+  if (tab === 'env')
+    return (
+      <section className="ext-card">
+        <div className="ext-card-head">
+          <b>Env</b>
+          <span className="muted small">what its fetch and actions are given; a setting named like a token, key or password masked</span>
+        </div>
+        <dl className="ext-env mono">
+          {Object.entries(x.env).map(([k, v]) => (
+            <div key={k}>
+              <dt>{k}</dt>
+              <dd>{v}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+    )
+  return (
+    <section className="ext-card">
+      <div className="ext-card-head">
+        <b>Files</b>
+        <span className="muted small grow">{w.dir}</span>
+        {cfg.folder && (
+          <button className="sm" onClick={e => cfg.folder!(w.id, e)}>
+            <Icon name="folder" size={12} /> Open folder
+          </button>
+        )}
+      </div>
+      <ul className="ext-files mono">{files === null ? <li className="muted">Reading…</li> : files.map(f => <li key={f}>{f}</li>)}</ul>
+      {!!x.fixtures.length && <p className="muted small">fixtures/: {x.fixtures.map(f => `${f}.json`).join(', ')}</p>}
+    </section>
   )
 }
 

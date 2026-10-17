@@ -237,6 +237,10 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget ls                   # each one: on or off, size, schedule, last error
     laki widget kit [element]        # the UI kit's elements, or one's props and a sample
 
+For the user working on an extension of their own (in their code, not Laki's folder): \`laki widget dev\` in its
+folder links it (on, first, reloaded on each save, the last good version kept over a broken file) and prints each run;
+its page's Data, Runs, Env and Files tabs show the rest. It runs until Ctrl-C: suggest it, don't run it yourself.
+
 A new widget in Laki's folder is found at once and starts off: the user turns it on in Settings › Extensions. Tell the user which settings to fill in (Settings ›
 Extensions) and what it fetches how often: each fetch may call an API.
 `

@@ -4,16 +4,16 @@
 // with the user's config. Only a list of them stays in memory: the page and the data are read when the app shows one.
 import { execFile } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
-import { chmodSync, existsSync, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { chmodSync, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { BUTTON_PLACES, type WidgetOption, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
-import { hasFull, hasScript, pageOf, render, sayOf, viewOf, type WidgetSay } from '../shared/widget.ts'
+import { BUTTON_PLACES, type WidgetOption, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
+import { hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { uiHtml, uiTree } from '../shared/widgetUi.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
-import { changed, cliArgv, cliEnv, clients, devLog, dir, own, plainEnv, q, state } from './core.ts'
+import { changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, q, settingsSet, state } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -27,10 +27,11 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY)
+type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
-type Entry = { id: string; dir: string; builtin: boolean; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'> }
+type Entry = { id: string; dir: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'> } // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
+type Run = WidgetRun // what each fetch and action did (widgetRuns, the inspector's Runs, laki widget dev's lines): the last RUNS, newest first
 
 const here = dirname(fileURLToPath(import.meta.url))
 // the app's own (the repo's widgets/, next to out/ when built), off until turned on
@@ -46,14 +47,17 @@ let rev = 0 // each reload: the app renders its widgets again
 export const widgetKey = randomBytes(16).toString('hex')
 const fetches = (w: Entry) => !!(w.m.fetch || w.m.script)
 const wLog = (w: { id: string }, text: string | (() => string)) => devLog(`widget:${w.id}`, text) // a function: only in dev mode
-const fetchable = (w: Entry) => onOf(w) && fetches(w) && !running.has(w.id) // on, with a fetch, not fetching now
+const fetchable = (w: Entry) => onOf(w) && fetches(w) && !running.has(w.id) && !w.s.mock // on, with a fetch, not fetching now, not showing data put there by hand
 const due = (w: Entry, now: number) => fetchable(w) && now - (w.s.at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
 
 const storePath = (id: string) => join(dir, 'widget-data', `${id}.json`)
 const home = (p: string) => (p.startsWith('~/') ? join(homedir(), p.slice(2)) : p)
 // where widgets are: Laki's own folder, the ones added in Settings, then the app's; the first of an id wins
 export const widgetHome = () => join(dir, 'widgets')
-export const widgetRoots = () => [widgetHome(), ...(state.settings?.widgetDirs ?? []).map(d => String(d).trim()).filter(Boolean).map(d => resolve(home(d))), ...(BUILTIN ? [BUILTIN] : [])]
+// dev mode's folders (settings.widgetDev, laki widget dev): first, so a copy you work on shadows the installed one
+const devRoots = () => [...new Set((state.settings?.widgetDev ?? []).map(d => String(d).trim()).filter(Boolean).map(d => resolve(home(d))))]
+const under = (d: string, root: string) => d === root || d.startsWith(root + '/')
+export const widgetRoots = () => [...devRoots(), widgetHome(), ...(state.settings?.widgetDirs ?? []).map(d => String(d).trim()).filter(Boolean).map(d => resolve(home(d))), ...(BUILTIN ? [BUILTIN] : [])]
 
 function readJson<T>(p: string): T | undefined {
   try {
@@ -92,23 +96,95 @@ function foldersIn(root: string): string[] {
   }
 }
 
-// read every folder again (Settings' Reload, `laki widget reload`): new and changed widgets without a restart
+// widget.json, or why it doesn't read
+function manifestOf(d: string): Manifest | string {
+  let m: unknown
+  try {
+    m = JSON.parse(readFileSync(join(d, 'widget.json'), 'utf8'))
+  } catch (e) {
+    return `widget.json: ${(e as Error).message}`
+  }
+  return m && typeof m === 'object' && !Array.isArray(m) ? (m as Manifest) : 'widget.json: an object'
+}
+// a template of widget.html's or ui's that doesn't read (dev mode's check before a reload)
+function templatesError(m: Manifest, html: string): string | undefined {
+  let bad = templateError(html)
+  if (bad) return `widget.html: ${bad}`
+  const strings = (v: unknown): string[] => (typeof v === 'string' ? [v] : Array.isArray(v) ? v.flatMap(strings) : v && typeof v === 'object' ? Object.values(v).flatMap(strings) : [])
+  for (const t of strings(m.ui)) if ((bad = templateError(t))) return `ui: ${bad} in "${t.slice(0, 60)}"`
+}
+
+// read every folder again (Settings' Reload, `laki widget reload`, a dev folder's change): new and changed widgets
+// without a restart. A dev widget whose files don't read keeps its last good version running, with devError
 export function scanWidgets() {
+  const before = new Map(widgets)
   widgets.clear()
   rev++
+  const dev = devRoots()
   for (const root of widgetRoots())
     for (const d of foldersIn(root)) {
       const id = d.split('/').pop()!.replace(/[^\w.-]/g, '-')
       if (widgets.has(id)) continue
-      const m = readJson<Manifest>(join(d, 'widget.json'))
-      if (!m || typeof m !== 'object') continue
-      const html = htmlOf(d)
+      const isDev = dev.some(r => under(d, r))
+      const last = before.get(id)?.dir === d ? before.get(id) : undefined
+      const m = manifestOf(d)
+      const html = typeof m === 'string' ? '' : htmlOf(d)
+      const bad = typeof m === 'string' ? m : isDev ? templatesError(m, html) : undefined
+      if (bad && isDev && last) {
+        widgets.set(id, { ...last, devError: bad })
+        continue
+      }
+      if (typeof m === 'string') continue
       const { data, ...s } = readStore(id)
-      const e: Entry = { id, dir: d, builtin: !!BUILTIN && (d === BUILTIN || d.startsWith(BUILTIN + '/')), m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s }
+      const e: Entry = { id, dir: d, builtin: !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s }
       e.face = faceOf(e, data)
       widgets.set(id, e)
     }
+  for (const k of [...devKeep]) if (k.startsWith('widget:')) devKeep.delete(k)
+  for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
+  watchDev(dev)
   changed()
+}
+
+// dev mode: each linked folder watched (fs.watch, recursive; not node_modules, .git or dotfiles), 300 ms after the last
+// change its widgets read again (scanWidgets: the last good version kept over a broken file) and fetch (reason dev)
+const watchers = new Map<string, FSWatcher>()
+function watchDev(roots: string[]) {
+  for (const [r, w] of watchers) if (!roots.includes(r)) (w.close(), watchers.delete(r))
+  for (const r of roots) {
+    if (watchers.has(r) || !existsSync(r)) continue
+    let timer: NodeJS.Timeout | undefined
+    const files = new Set<string>()
+    try {
+      const w = watch(r, { recursive: true }, (_, f) => {
+        const name = String(f ?? '')
+        if (name.split('/').some(p => p.startsWith('.') || p === 'node_modules')) return
+        files.add(name)
+        clearTimeout(timer)
+        timer = setTimeout(() => {
+          const why = `${[...files].slice(0, 3).join(', ') || 'a file'} changed`
+          files.clear()
+          devChanged(r, why)
+        }, 300)
+      })
+      w.on('error', () => (w.close(), watchers.delete(r))) // the folder went: linked still, watched again at the next scan
+      watchers.set(r, w)
+    } catch {}
+  }
+}
+function devChanged(root: string, why: string) {
+  if (!watchers.has(root)) return // unlinked meanwhile
+  scanWidgets()
+  for (const w of widgets.values()) {
+    if (!w.dev || !under(w.dir, root)) continue
+    wLog(w, w.devError ? `${why}: last good version kept: ${w.devError}` : `${why}: reloaded`)
+    if (!w.devError && fetchable(w)) void widgetRun({ id: w.id, reason: 'dev', why })
+  }
+}
+// at shutdown, and in tests
+export function widgetsStop() {
+  for (const w of watchers.values()) w.close()
+  watchers.clear()
 }
 
 // a button's words: widget.json's label, badge and tip filled from its data (as a preview is), plain text on a line
@@ -211,6 +287,9 @@ export const widgetsView = (): WidgetView[] =>
     error: w.s.error,
     running: running.has(w.id) || undefined,
     byAi: w.s.by === 'ai' || undefined,
+    dev: w.dev || undefined,
+    devError: w.devError,
+    mock: w.s.mock,
     sample: w.m.sample !== undefined || (!fetches(w) && w.m.sampleConfig !== undefined) || undefined, // a preview with made-up data
     rev,
     ...((placesOf(w).every(p => BUTTON_PLACES.includes(p)) || !w.preview) && { button: true }), // a tile elsewhere: its preview
@@ -317,7 +396,7 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
   w.s = meta
   w.face = faceOf(w, data) // its config, in its words
   changed()
-  if (onOf(w) && (o.on || o.config)) void widgetRun({ id: w.id }) // its data for the new settings
+  if (onOf(w) && (o.on || o.config)) void widgetRun({ id: w.id, reason: 'settings' }) // its data for the new settings
   return widgetsView().find(x => x.id === w.id)
 }
 
@@ -348,10 +427,9 @@ function launcher() {
   return (cli = p)
 }
 
-// a widget's command, in its folder: $WIDGET_<NAME> for each setting (and $LAKI_WIDGET_CONFIG, all of them as JSON),
-// $LAKI_WIDGET_FILE (its storage, for the last data), $LAKI_CLI (the laki command); stdout, or why it failed
-function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>) {
-  const config = configOf(w)
+// what a widget's command gets: $WIDGET_<NAME> for each setting (and $LAKI_WIDGET_CONFIG, all of them as JSON),
+// $LAKI_WIDGET_FILE (its storage, for the last data), $LAKI_CLI (the laki command), $LAKI_REFRESH_REASON (why it runs)
+function envOf(w: Entry, extra: Record<string, string>) {
   const env: Record<string, string> = {
     ...plainEnv(),
     LAKI_HOME: dir,
@@ -361,15 +439,33 @@ function exec(w: Entry, cmd: string, args: string[], extra: Record<string, strin
     LAKI_WIDGET_CONFIG: JSON.stringify(typedOf(w)),
     ...extra,
   }
-  for (const [k, v] of Object.entries(config)) env[`WIDGET_${k.toUpperCase()}`] = v
-  return new Promise<string>((ok, no) =>
+  for (const [k, v] of Object.entries(configOf(w))) env[`WIDGET_${k.toUpperCase()}`] = v
+  return env
+}
+type Ran = { out: string; err: string }
+type Failed = Error & { stderr?: string; exit?: number }
+// a widget's command, in its folder: stdout and stderr, or why it failed (with its stderr and exit code)
+function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>) {
+  return new Promise<Ran>((ok, no) =>
     own(
-      execFile(cmd, args, { cwd: w.dir, env, timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
-        e ? no(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message))) : ok(String(stdout)),
+      execFile(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
+        e
+          ? no(Object.assign(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message)), { stderr: String(stderr), exit: typeof e.code === 'number' ? e.code : undefined }))
+          : ok({ out: String(stdout), err: String(stderr) }),
       ),
       `Extension · ${w.m.name || w.id}`,
     ),
   )
+}
+
+const RUNS = 20
+const runs = new Map<string, Run[]>()
+const tail = (t?: string) => (t?.trim() ? t.trimEnd().split('\n').slice(-20).join('\n').slice(-4096) : undefined) // stderr's last 20 lines, 4 KB
+function ran(id: string, r: Run) {
+  const l = runs.get(id) ?? []
+  l.unshift(r)
+  if (l.length > RUNS) l.length = RUNS
+  runs.set(id, l)
 }
 
 // a script's default export gets { config, last } and returns the data; one without prints it. What it throws is the
@@ -390,42 +486,51 @@ try {
 }`
 
 // run the widget's fetch now (exec); what it prints must be JSON. A failure keeps the last data and says why.
-export async function widgetRun(o: { id: string }): Promise<{ ok: boolean; error?: string }> {
+// reason (RUN_REASONS: manual unless said; $LAKI_REFRESH_REASON), why: what changed (dev mode's file). Data put there by
+// hand (widgetMock) stays: only Fetch now (manual) runs then, and its data replaces it
+export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev'] // and action:<name>
+export async function widgetRun(o: { id: string; reason?: string; why?: string }): Promise<{ ok: boolean; error?: string }> {
   const w = find(o.id)
+  const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^action:[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
   if (!onOf(w)) return { ok: false, error: OFF(w) }
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script` }
+  if (w.s.mock && reason !== 'manual') return wLog(w, `not fetched (${reason}): showing sample data (${w.s.mock})`), { ok: false, error: `showing sample data (${w.s.mock}): Live in its inspector fetches again` }
   if (running.has(w.id)) return again.add(w.id), { ok: false, error: 'already fetching: it fetches again after this one' }
   const script = w.m.script ? resolve(w.dir, w.m.script) : undefined
   if (script && !script.startsWith(w.dir + '/')) return { ok: false, error: `${w.m.script} isn't in the widget's folder` }
   running.add(w.id)
   changed()
   const t0 = Date.now()
-  wLog(w, `fetch: ${script ? `node ${w.m.script}` : w.m.fetch}`)
+  wLog(w, `fetch (${reason}): ${script ? `node ${w.m.script}` : w.m.fetch}`)
   let data: unknown
   let error: string | undefined
+  let r: Ran | undefined
+  let fail: Failed | undefined
   try {
     // a script on Laki's own node (Electron's, as node, in the app)
-    const out = await exec(w, script ? process.execPath : '/bin/sh', script ? ['--input-type=module', '-e', RUN_JS, script] : ['-c', w.m.fetch!], script && process.versions.electron ? { ELECTRON_RUN_AS_NODE: '1' } : {})
+    r = await exec(w, script ? process.execPath : '/bin/sh', script ? ['--input-type=module', '-e', RUN_JS, script] : ['-c', w.m.fetch!], { LAKI_REFRESH_REASON: reason, ...(script && process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) })
     try {
-      data = JSON.parse(out)
+      data = JSON.parse(r.out)
     } catch {
-      throw new Error(`fetch printed no JSON: ${lastLine(out) ?? 'nothing'}`)
+      throw new Error(`fetch printed no JSON: ${lastLine(r.out) ?? 'nothing'}`)
     }
   } catch (e) {
-    error = (e as Error).message
+    fail = e as Failed
+    error = fail.message
   }
   running.delete(w.id)
   const ms = Date.now() - t0
+  ran(w.id, { at: t0, ms, reason, why: o.why, ok: !error, bytes: r ? Buffer.byteLength(r.out) : 0, error, stderr: tail(fail?.stderr ?? r?.err), exit: error ? (fail?.exit ?? 0) : 0 })
   wLog(w, () => (error ? `fetch failed after ${ms} ms: ${error}` : `fetched in ${ms} ms: ${JSON.stringify(data)?.length ?? 0} bytes of JSON`))
   const s = readStore(w.id) // its settings may have changed meanwhile
-  if (!error) s.data = data
+  if (!error) (s.data = data), (s.mock = undefined)
   s.at = Date.now()
   s.error = error
   writeStore(w.id, s)
   const cur = widgets.get(w.id)
-  if (cur) (cur.s = { ...cur.s, at: s.at, error }), (cur.face = faceOf(cur, s.data))
+  if (cur) (cur.s = { ...cur.s, at: s.at, error, mock: s.mock }), (cur.face = faceOf(cur, s.data))
   changed()
-  if (again.delete(w.id) && cur && onOf(cur)) void widgetRun({ id: w.id }) // with the settings as they are now
+  if (again.delete(w.id) && cur && onOf(cur)) void widgetRun({ id: w.id, reason }) // with the settings as they are now
   return error ? { ok: false, error } : { ok: true }
 }
 
@@ -437,10 +542,13 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
   const cmd = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
   if (typeof cmd !== 'string') return { ok: false, error: `${w.m.name || w.id} has no action ${o.action}` }
   wLog(w, `action ${o.action}${o.arg ? ` (${String(o.arg).slice(0, 200)})` : ''}`)
+  const reason = `action:${o.action}`
+  const t0 = Date.now()
   try {
-    const out = await exec(w, '/bin/sh', ['-c', cmd], { WIDGET_ARG: String(o.arg ?? '') })
+    const { out, err } = await exec(w, '/bin/sh', ['-c', cmd], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason })
+    ran(w.id, { at: t0, ms: Date.now() - t0, reason, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 })
     wLog(w, `action ${o.action} done: ${lastLine(out) ?? 'printed nothing'}`)
-    if (fetches(w)) void widgetRun({ id: w.id }) // fetching already: once more after it
+    if (fetches(w)) void widgetRun({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? reason : 'manual' }) // fetching already: once more after it
     let say: WidgetSay | null = null
     for (const s of [out, lastLine(out)]) // all of it, or its last line after some log lines
       try {
@@ -448,8 +556,10 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
       } catch {}
     return say ? { ok: true, ...say } : { ok: true, out: lastLine(out) }
   } catch (e) {
-    wLog(w, `action ${o.action} failed: ${(e as Error).message}`)
-    return { ok: false, error: (e as Error).message }
+    const f = e as Failed
+    ran(w.id, { at: t0, ms: Date.now() - t0, reason, action: o.action, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit })
+    wLog(w, `action ${o.action} failed: ${f.message}`)
+    return { ok: false, error: f.message }
   }
 }
 
@@ -457,14 +567,14 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
 // minutes since the last try, which a failure counts as), only while the app's window is open (a client whose page is
 // visible: closing the window only hides it) and within settings.widgetHours (9am-9pm weekdays; a line that doesn't
 // read: always): no API calls nobody sees. Fetch now and a change of settings still fetch
-export function widgetTick(now = Date.now()) {
+export function widgetTick(now = Date.now(), reason: 'schedule' | 'open' = 'schedule') {
   if (![...clients].some(c => c.view?.shown !== false)) return
   const hours = typeof state.settings?.widgetHours === 'string' && state.settings.widgetHours.trim() ? parseHours(state.settings.widgetHours) : null
   if (hours && !('error' in hours) && !inHours(hours, now)) {
     for (const w of widgets.values()) if (due(w, now)) wLog(w, () => `not fetched: outside the working hours (${describeHours(hours)})`)
     return
   }
-  for (const w of widgets.values()) if (due(w, now)) void widgetRun({ id: w.id })
+  for (const w of widgets.values()) if (due(w, now)) void widgetRun({ id: w.id, reason })
 }
 
 // an extension's files, as text (Laki AI's and MCP's laki_extension_read: an example to copy, or the one to change):
@@ -541,6 +651,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
 export function widgetRm(o: { id: string }) {
   const w = find(o.id)
   if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: turn it off instead`)
+  if (w.dev) throw new Error(`${w.m.name || w.id} is your code, linked by laki widget dev: unlink it instead (laki widget dev --off ${w.id})`)
   if (running.has(w.id)) throw new Error(`${w.m.name || w.id} is fetching: try again in a moment`)
   const d = resolve(w.dir)
   if ([homedir(), dir, widgetHome(), '/'].includes(d)) throw new Error(`${d} isn't one extension's own folder`) // a widget.json put in one of those
@@ -557,6 +668,93 @@ export const widgetDir = (id: string) => find(id).dir
 // Settings' Reload: the folders again, then every widget that's on fetches
 export function widgetReload() {
   scanWidgets()
-  for (const w of widgets.values()) if (fetchable(w)) void widgetRun({ id: w.id })
+  for (const w of widgets.values()) if (fetchable(w)) void widgetRun({ id: w.id, reason: 'reload' })
   return widgetsView()
+}
+
+// the inspector's Runs and Env and laki widget dev's lines: the last runs, what a fetch is given (a setting whose name
+// says token, secret, key or password masked, in $LAKI_WIDGET_CONFIG too), its fixtures (fixtures/<name>.json)
+const SECRET = /token|secret|key|password/i
+export function widgetRuns(o: { id: string; data?: boolean }): WidgetRuns {
+  const w = find(o.id)
+  const data = o.data ? JSON.stringify(readStore(w.id).data ?? null, null, 2) : undefined // the inspector's Data: its JSON (256 KB of it at most)
+  const masked = new Set(optionsOf(w).filter(x => SECRET.test(x.key) && configOf(w)[x.key]).map(x => x.key))
+  const env = Object.fromEntries(
+    Object.entries(envOf(w, { LAKI_REFRESH_REASON: runs.get(w.id)?.[0]?.reason ?? 'schedule' }))
+      .filter(([k]) => /^(WIDGET_|LAKI_)/.test(k) || k === 'PATH')
+      .map(([k, v]) => [k, k === 'LAKI_WIDGET_CONFIG' ? JSON.stringify(Object.fromEntries(Object.entries(typedOf(w)).map(([n, x]) => [n, masked.has(n) ? '••••' : x]))) : [...masked].some(n => k === `WIDGET_${n.toUpperCase()}`) ? '••••' : v])
+      .sort(([a], [b]) => a.localeCompare(b)),
+  )
+  return { runs: runs.get(w.id) ?? [], env, fixtures: fixturesOf(w), devError: w.devError, mock: w.s.mock, ...(data !== undefined && { data: data.length > 256 << 10 ? undefined : data, big: data.length > 256 << 10 || undefined }) }
+}
+const fixturesOf = (w: Entry) => {
+  try {
+    return readdirSync(join(w.dir, 'fixtures')).filter(n => /^[\w.-]+\.json$/.test(n)).map(n => n.slice(0, -5)).sort()
+  } catch {
+    return []
+  }
+}
+
+// sample data by hand (the inspector's Data): data, or a fixture of its folder's, kept as its data (mock: which), not
+// fetched meanwhile (a schedule skips it); off: back to live, fetched now. Runs nothing, so an off one takes it too
+export async function widgetMock(o: { id: string; data?: unknown; fixture?: string; off?: boolean }) {
+  const w = find(o.id)
+  const s = readStore(w.id)
+  if (o.off) {
+    s.mock = undefined
+    writeStore(w.id, s)
+    w.s = { ...w.s, mock: undefined }
+    changed()
+    return fetchable(w) ? widgetRun({ id: w.id }) : { ok: true }
+  }
+  let data: unknown
+  let mock: string
+  if (o.fixture !== undefined) {
+    const n = String(o.fixture)
+    if (!fixturesOf(w).includes(n)) throw new Error(`${w.m.name || w.id} has no fixtures/${n}.json`)
+    try {
+      data = JSON.parse(readFileSync(join(w.dir, 'fixtures', `${n}.json`), 'utf8'))
+    } catch (e) {
+      throw new Error(`fixtures/${n}.json: ${(e as Error).message}`)
+    }
+    mock = n
+  } else if ('data' in o) (data = o.data), (mock = 'edited')
+  else throw new Error('data, a fixture, or off')
+  Object.assign(s, { data, at: Date.now(), error: undefined, mock })
+  writeStore(w.id, s)
+  w.s = { ...w.s, at: s.at, error: undefined, mock }
+  w.face = faceOf(w, data)
+  wLog(w, `sample data: ${mock}`)
+  changed()
+  return { ok: true, mock }
+}
+
+// laki widget dev: link a folder of your own code (a widget's, or a folder of them): kept in settings.widgetDev,
+// scanned first and watched, its widgets turned on (you ran it on your own code) and fetched. off: unlink it (by its
+// folder or a widget's id); list: the links
+export function widgetDev(o: { folder?: string; off?: string; list?: boolean }) {
+  const links = () => devRoots().map(folder => ({ folder, widgets: [...widgets.values()].filter(w => w.dev && under(w.dir, folder)).map(w => ({ id: w.id, name: w.m.name || w.id, on: onOf(w), devError: w.devError })) }))
+  if (o.list) return { links: links() }
+  if (o.off !== undefined) {
+    const t = String(o.off)
+    const w = widgets.get(t)
+    const folder = devRoots().find(r => (w?.dev && under(w.dir, r)) || r === resolve(home(t)))
+    if (!folder) throw new Error(`${t} isn't linked (laki widget dev --list)`)
+    settingsSet({ widgetDev: devRoots().filter(r => r !== folder) })
+    return { unlinked: folder, links: links() }
+  }
+  const folder = resolve(home(String(o.folder ?? '')))
+  const found = foldersIn(folder)
+  if (!o.folder || !found.length) throw new Error(`${folder} has no widget.json, nor folders with one`)
+  const bad = found.map(d => [d, manifestOf(d)] as const).filter(([, m]) => typeof m === 'string')
+  settingsSet({ widgetDev: [...new Set([...devRoots(), folder])] }) // scans: its widgets first, watched
+  const mine = [...widgets.values()].filter(w => w.dev && under(w.dir, folder))
+  for (const w of mine)
+    if (!onOf(w)) {
+      writeStore(w.id, { ...readStore(w.id), on: true })
+      w.s = { ...w.s, on: true }
+    }
+  changed()
+  for (const w of mine) if (!w.devError && fetchable(w)) void widgetRun({ id: w.id, reason: 'dev', why: 'linked' })
+  return { folder, widgets: mine.map(w => ({ id: w.id, name: w.m.name || w.id, devError: w.devError })), broken: bad.map(([d, m]) => `${d}: ${m}`) }
 }

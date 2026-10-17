@@ -192,6 +192,35 @@ click that does something.
 }
 ```
 
+## Dev mode
+
+```sh
+cd ~/code/deploys && laki widget dev      # link it: on, watched; then a line per run until Ctrl-C (the link stays)
+laki widget dev --list                    # the linked folders
+laki widget dev --off deploys             # unlink it (by its id or its folder)
+```
+
+A linked folder (a widget's own, or a folder of them; kept in Settings as `widgetDev`) is read **first**, so your copy
+replaces an installed one of the same id while it's linked, and is turned on. Each save (300 ms after the last; not
+`node_modules`, `.git` or dotfiles) reads it again and fetches it (`$LAKI_REFRESH_REASON` is `dev`). A `widget.json`
+that doesn't parse, or a template of `widget.html` or `ui` that doesn't read, keeps the last good version running: its
+page and its tooltip say *Last good version kept* and why, until you fix it. Its log is kept with dev mode off too.
+
+Every fetch and action is recorded (the last 20): when, why (`$LAKI_REFRESH_REASON`: `schedule`, `open`, `settings`,
+`manual`, `reload`, `dev` or `action:<name>`), how long, how much it printed, its stderr's last lines and exit code.
+Its page's tabs show them:
+
+| tab | what |
+|---|---|
+| Overview | its preview where it sits, everywhere else (any sidebar size, the bars, as a button), its full view and settings |
+| Data | its last data as JSON: edit it and *Apply*, or pick one of its `fixtures/<name>.json` (*Sample ▾*), to see it with that data; *Live* fetches again |
+| Runs | the runs, newest first; a click shows one's stderr |
+| Env | what its fetch gets (`WIDGET_*`, `LAKI_*`, `PATH`); a setting named like a token, secret, key or password masked |
+| Files | its folder's files, and *Open folder* |
+
+Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.
+A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/inspect`, opens the Data tab.
+
 ## Managing them
 
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,

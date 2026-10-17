@@ -1967,6 +1967,30 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-full.s { height: 320px; }
 .ext-full.l { height: 560px; }
 .ext-full .widget-frame { height: 100%; }
+/* the extension page's inspector (Extension.tsx): its tabs and head, Data's JSON, Runs, Env, Files; a widget with sample data */
+.ext-tabs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.ext-card-head select { width: auto; flex: none; }
+.ext-watch { display: inline-flex; align-items: center; gap: 5px; }
+.ext-watch-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--done); box-shadow: 0 0 0 3px color-mix(in srgb, var(--done) 25%, transparent); }
+.ext-note.bad { border-color: color-mix(in srgb, var(--error) 50%, var(--line)); background: color-mix(in srgb, var(--error) 8%, var(--panel)); }
+.ext-note.bad > svg { color: var(--error); }
+.ext-json { min-height: 320px; resize: vertical; font-size: 11.5px; line-height: 1.45; white-space: pre; tab-size: 2; }
+.ext-runs, .ext-files { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ext-runs > li + li, .ext-files > li + li { border-top: 1px solid var(--line); }
+.ext-run { display: flex; align-items: baseline; gap: 10px; width: 100%; padding: 6px 4px; border: 0; background: none; color: inherit; font-size: 12px; text-align: left; cursor: pointer; }
+.ext-run:hover { background: var(--hover); }
+.ext-run .grow { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ext-runs .good { color: var(--done); } .ext-runs .warn { color: var(--error); }
+.ext-run-more { padding: 0 4px 8px; }
+.ext-run-more pre { margin: 0; max-height: 220px; overflow: auto; padding: 8px 10px; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: var(--bg); font-size: 11px; white-space: pre-wrap; }
+.ext-env { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 4px 14px; margin: 0; font-size: 11.5px; }
+.ext-env > div { display: contents; }
+.ext-env dt { color: var(--muted); } .ext-env dd { margin: 0; overflow-wrap: anywhere; }
+.ext-files > li { padding: 5px 4px; font-size: 12px; }
+.ext-places { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 22px; }
+.ext-places > div { display: flex; flex-direction: column; gap: 6px; }
+.widget-mock { position: absolute; left: 4px; bottom: 3px; padding: 0 5px; border-radius: 7px; background: var(--waiting); color: var(--bg); font-size: 9px; font-weight: 600; line-height: 13px; pointer-events: none; }
+.tag.bad { color: var(--error); border-color: color-mix(in srgb, var(--error) 45%, var(--line)); }
 /* Settings › Extensions › UI kit (UiKit.tsx): a card per element, its sample at a size and in the status bar, its JSON */
 .kit { display: flex; flex-direction: column; gap: 14px; }
 .kit-head { display: flex; flex-direction: column; gap: 10px; }

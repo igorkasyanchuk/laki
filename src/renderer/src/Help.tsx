@@ -105,6 +105,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
     [`${cli} schedule add <project> --when "weekdays at 9am" "…"`, 'a prompt on repeat (--where new|folder|<ws>, --name "Nightly {{DD-MM}}"); schedule, schedule log, on|off|run|rm <id>'],
     [`${cli} widget · widget reload · widget run <id> · widget render <id> --full`, "the sidebar's extensions (widgets): list them, read their folders again, fetch one now, the HTML it shows"],
     [`${cli} widget kit [element]`, "the UI kit's elements (widget.json's ui): each one's props and a sample; --json for all of it"],
+    [`${cli} widget dev [folder]`, 'dev mode: your extension linked, on and watched (a save reloads it), its runs as they come; --off <id>, --list'],
     [`${cli} flow · flow run <workflow> <project> "…" · flow show <run>`, 'workflows (Settings › General › Experimental): list them and their runs, start one on a task, see where it is'],
     [`${cli} ai "what are my agents doing?"`, 'ask Laki AI (Settings › AI); --image <png> with a screenshot; ai log: each call and its cost; ai new: start over'],
     [`${cli} mcp`, 'an MCP server for Claude Code, Codex…: Settings › Agent skill has the command that adds it'],

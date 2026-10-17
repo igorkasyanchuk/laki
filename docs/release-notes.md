@@ -8,6 +8,10 @@ version it builds, with the date. -->
   tabs and more, in the app's theme and at any size, no HTML. Settings › Extensions › *UI kit* shows every element with
   its sample and the JSON to copy (`laki widget kit` in a terminal); Laki AI and the Extension creator skill use it.
   My PRs is built with it.
+- **Dev mode for extensions**: `laki widget dev` in your extension's folder links it: on, reloaded as you save (a file
+  that doesn't read keeps the last good version running), each fetch printed as it runs. Its page gets Data (edit it, or
+  pick a fixture, to see it with that data), Runs (why each ran, its stderr), Env and Files tabs; a right click on an
+  extension › *Inspect* opens them.
 - **A tab in its own window**: a tab's right click › *Float in its own window* (or ⌘K): its terminal, live, in a window over
   every app, as big as you like; its ✕ (or *Bring it back* in its pane) puts it back.
 - **Headless**: `./Laki.AppImage --headless --tailscale` (or `laki serve`) runs Laki on a server with no screen, used

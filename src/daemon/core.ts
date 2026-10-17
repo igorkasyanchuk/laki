@@ -37,8 +37,12 @@ const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a)
 // dated anew and moved to the end; text may be a function, called only in development mode. ponytail: in memory, a daemon restart or dev mode
 // going off starts them over (a removed workspace's lines stay until then)
 const events = new Map<string, LogLine[]>()
+export const devKeep = new Set<string>() // keys logged without dev mode too: a widget laki widget dev linked (widget:<id>)
 export function devLog(key: string, line: string | (() => string)) {
-  if (!state.settings?.devMode) return void (events.size && events.clear())
+  if (!state.settings?.devMode && !devKeep.has(key)) {
+    for (const k of events.keys()) if (!devKeep.has(k)) events.delete(k)
+    return
+  }
   const text = typeof line === 'function' ? line() : line
   const l = events.get(key) ?? []
   const same = l.slice(-6).find(x => x.text === text)
@@ -1491,7 +1495,7 @@ export function reorder(o: { projects?: string[]; workspaces?: string[] }) {
 }
 
 export function settingsSet(o: Settings) {
-  const dirsWere = JSON.stringify(state.settings?.widgetDirs ?? [])
+  const dirsWere = JSON.stringify([state.settings?.widgetDirs ?? [], state.settings?.widgetDev ?? []])
   if (o.env) o = { ...o, env: Object.fromEntries(Object.entries(o.env).filter(([k]) => ENV_KEY.test(k))) }
   const { accounts: _, ...rest } = o // Laki's own (accountAdd…): folders it made, never one from an import
   o = rest
@@ -1500,13 +1504,13 @@ export function settingsSet(o: Settings) {
   save()
   changed()
   if ('diffStat' in o) void scanStats() // its numbers now, not at the next scan
-  if (JSON.stringify(state.settings.widgetDirs ?? []) !== dirsWere) scanWidgets() // the folders added or taken out
+  if (JSON.stringify([state.settings.widgetDirs ?? [], state.settings.widgetDev ?? []]) !== dirsWere) scanWidgets() // the folders added or taken out, dev mode's too
   return state.settings
 }
 
 // what Reset the interface keeps: what you set up or wrote (profiles, accounts, Laki AI and voice, phone pushes, remote
 // access, env, actions, templates, prompts, folders, your editor, rail pins). The rest, the experimental ones too: defaults
-export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'memoryCompact', 'flowVars']
+export const SETTINGS_KEPT: (keyof Settings)[] = ['presets', 'accounts', 'accountUse', 'ai', 'voice', 'webhook', 'remoteMail', 'remoteAuth', 'remoteTries', 'tunnelMails', 'env', 'actions', 'templates', 'planTemplates', 'prPrompts', 'storageDir', 'keepStorage', 'worktrees', 'widgetDirs', 'widgetDev', 'editor', 'editorCmd', 'railPlans', 'memory', 'imageDays', 'deskTiles', 'memoryCompact', 'flowVars']
 export function uiReset() {
   const s = state.settings ?? {}
   state.settings = Object.fromEntries(SETTINGS_KEPT.filter(k => s[k] !== undefined).map(k => [k, s[k]])) as Settings

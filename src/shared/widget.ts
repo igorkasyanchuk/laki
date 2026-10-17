@@ -141,6 +141,14 @@ function run(nodes: Node[], scopes: Record<string, unknown>[], text = false): st
 export const render = (template: string, ctx: Record<string, unknown>) => run(parseOnce(template), [ctx])
 // a template as plain text, over scopes (the innermost first): the UI kit's props
 export const fill = (template: string, scopes: Record<string, unknown>[]) => run(parseOnce(template), scopes, true)
+// why a template doesn't read (an unclosed {{#each}}…), or nothing: dev mode keeps the last good version over it
+export function templateError(src: string) {
+  try {
+    parse(src)
+  } catch (e) {
+    return (e as Error).message
+  }
+}
 
 // a widget's HTML file: <template preview>…</template> is what the sidebar shows, <template full>…</template> what
 // opens on a click (none: no full view); what's outside both (a <style>) goes with either. No templates: it's all
