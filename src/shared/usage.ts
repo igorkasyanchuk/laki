@@ -23,7 +23,11 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki send <ws>[/<tab>] [--when-idle] <text> type text into an agent (now, or when its turn ends)
   laki progress <0-100> [what you're on]      in an agent's tab: how far along its task is, shown on the tab
   laki screen <ws>[/<tab>] [--lines n]        the bottom of a tab's screen
-  laki diff <ws> | run <ws> | ship <ws> -m <message>
+  laki screen shot [app] | windows            a screenshot of the iOS Simulator, or of an app's window (its PNG's path)
+  laki screen tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe
+                                              the simulator's hands, in points (needs idb); describe: its elements
+  laki diff <ws> | run <ws> [test|lint|format|deploy] | ship <ws> -m <message>
+                                              run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
                                               a hidden browser on the workspace's localhost (the app must be open);
                                               screenshot prints a PNG's path; in a tab, <ws> is its own
@@ -44,4 +48,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               and cost; laki ai alone: the conversation
   laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
   laki daemon | stop                          run the daemon in the foreground | stop it
+  laki serve --tailscale [--pin] | --cloudflare --mail <you@x.com> | --cloudflare --pin  [--hours n]
+                                              headless: the daemon and remote access, until stopped (docs/headless.md)
+  laki remote [stop]                          remote access's link and PIN now | stop it
   --json prints machine-readable output`

@@ -2,16 +2,16 @@
 // the follow-up queue, ports and PRs. One process owns it all; clients get `View`s pushed on every change.
 import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_process'
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
-import { readdir, readFile, rm, stat } from 'node:fs/promises'
+import { chmod, copyFile, readdir, readFile, rm, stat, symlink } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
-import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, userInfo } from 'node:os'
-import { basename, dirname, extname, join, resolve, sep } from 'node:path'
+import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
@@ -60,7 +60,7 @@ const firstLine = (e: unknown) => String((e as { stderr?: string }).stderr || (e
 // the agents to start: Settings' presets, or each agent as it is: claude and codex, and the others found on PATH
 // ponytail: looked for once; one installed later shows after a daemon restart, or added in Settings
 let found: Preset[] | undefined
-const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
+export const onPath = (cmd: string) => (process.env.PATH ?? '').split(':').some(d => d && existsSync(join(d, cmd)))
 export const presets = (): Preset[] => state.settings?.presets ?? (found ??= AGENTS.filter(a => a === 'claude' || a === 'codex' || onPath(a)).map(a => ({ name: a, agent: a })))
 const presetNamed = (name?: string) => (name ? presets().find(p => p.name === name) : undefined)
 const presetOf = (t: Tab) => presetNamed(t.profile ?? t.preset)
@@ -459,7 +459,7 @@ export function view(): View {
   const tabs: TabView[] = state.tabs.map(t => {
     const s = sessions.get(t.id)
     const r = rtOf(t.id)
-    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : (shellAgents.get(t.id)?.status ?? (busyShells.has(t.id) ? 'running' : 'idle'))
+    const status: Status = asleep.has(t.id) ? 'idle' : !s || s.exited ? 'exited' : tracked(t) ? r.status : t.kind === 'script' ? 'running' : (shellAgents.get(t.id)?.status ?? (busyShells.has(t.id) ? 'running' : 'idle'))
     // a turn's start, seen here: every change of status comes with changed(), which builds a view within 30 ms
     if (status === 'running' || status === 'waiting') r.runAt ??= Date.now()
     else r.runAt = undefined
@@ -476,7 +476,7 @@ export function view(): View {
     workspaces: state.workspaces.map(w => {
       const c = projectConfig(w)
       const portNames = c.ports && typeof c.ports === 'object' ? Object.fromEntries(Object.entries(c.ports).filter(([, v]) => typeof v === 'string')) : undefined // a repo's file: strings only
-      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, stat: stats.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id) }
+      return { ...w, setup: existsSync(setupMarker(w)), ports: ports.get(w.id) ?? [], procs: procs.get(w.id), portNames, tunnels: tunnelsOf(w.id), pr: prs.get(w.id), run: !!c.run, scripts: RUN_SCRIPTS.filter(k => typeof c[k] === 'string' && c[k].trim()), stat: stats.get(w.id), artifacts: artifacts.get(w.id), links: links.get(w.id) }
     }),
     tabs,
     presets: presets(),
@@ -752,6 +752,7 @@ export function projectSet(ref: string, o: { name?: string; config?: ProjectConf
       setup: o.config.setup?.trim() || undefined,
       teardown: o.config.teardown?.trim() || undefined,
       run: o.config.run?.trim() || undefined,
+      ...Object.fromEntries(RUN_SCRIPTS.map(k => [k, o.config![k]?.trim() || undefined])),
       expose: o.config.expose?.trim() || undefined,
       actions: actionsOk(o.config.actions),
       templates: templatesOk(o.config.templates),
@@ -1264,7 +1265,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
     // it printed) is there, and Enter resumes it. A host's shell that lost its connection (ssh's 255) stays too
     if (((tab.kind === 'shell' && (!ws.host || code !== 255)) || (tab.kind === 'agent' && code === 0 && !tracked(tab))) && state.tabs.includes(tab)) return closeTab(tab.id)
     changed()
-    if (tab.kind !== 'agent' && tab.kind !== 'dev' && !(ws.host && tab.kind === 'shell')) return
+    if (tab.kind !== 'agent' && tab.kind !== 'dev' && tab.kind !== 'script' && !(ws.host && tab.kind === 'shell')) return
     s.term.write('', () => {
       wsLog(ws, () => `${tab.name}: ended with code ${code} after ${Math.round((Date.now() - born) / 1000)} s: ${s.screenText(4).trim().slice(-300)}`) // why a chat didn't come back (development mode)
       // a chat id claude/codex don't have (e.g. one with no message was never saved): Enter starts a new one. Only as it
@@ -1273,7 +1274,7 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
         tab.resumeId = undefined
         save()
         s.output('\x1b[2m[that chat can\'t be resumed · press Enter to start a new one]\x1b[0m\r\n')
-      } else s.output('\x1b[2m[press Enter to start it again]\x1b[0m\r\n')
+      } else s.output(tab.script === 'deploy' ? '\x1b[2m[Run ▾ › Deploy runs it again]\x1b[0m\r\n' : '\x1b[2m[press Enter to start it again]\x1b[0m\r\n')
     })
   }
   changed()
@@ -1813,25 +1814,35 @@ export const within = (root: string, p: string) => p === root || p.startsWith(ro
 
 // files git doesn't keep (.env…) that a new worktree needs: what .worktreeinclude (gitignore-style, at the repo's root)
 // and .laki.json's copy match in the main checkout (git ls-files does the matching), with their modes, before setup
-// and the agent start. One already in the worktree stays; a symlink counts only when it points inside the repo. A
-// failure is a line in daemon.log, not a failed workspace.
+// and the agent start; with settings.copyIgnored every ignored file, with copyUntracked the untracked ones too. One
+// already in the worktree stays; a symlink counts only when it points inside the repo. A failure is a line in
+// daemon.log, not a failed workspace. Copied one by one, awaited: node_modules' thousands don't hold the daemon up
 async function copyIncludes(proj: Project, ws: Workspace) {
   const list = projectConfig(ws).copy
   const pats = (Array.isArray(list) ? list : []).filter((p): p is string => typeof p === 'string' && !!p.trim()).map(p => `--exclude=${p.trim()}`)
   const file = join(proj.path, '.worktreeinclude')
   if (existsSync(file)) pats.push(`--exclude-from=${file}`)
-  if (!pats.length) return
+  const { copyIgnored, copyUntracked } = state.settings ?? {}
+  if (!pats.length && !copyIgnored && !copyUntracked) return
   const copied: string[] = []
   try {
     const root = realpathSync(proj.path)
     const to = realpathSync(ws.path)
-    const out = await git(proj, 'ls-files', '-z', '--others', '--ignored', ...pats)
-    for (const rel of out.split('\0').filter(Boolean)) {
+    const ls = (...a: string[]) => git(proj, 'ls-files', '-z', '--others', ...a).then(o => o.split('\0').filter(Boolean))
+    const rels = new Set([
+      ...(pats.length ? await ls('--ignored', ...pats) : []), // .worktreeinclude's and copy's, ignored or not
+      ...(copyIgnored ? await ls('--ignored', '--exclude-standard') : []),
+      ...(copyUntracked ? await ls('--exclude-standard') : []),
+    ])
+    for (const rel of rels) {
       const dst = join(ws.path, rel)
       try {
         if (lstatSync(dst, { throwIfNoEntry: false })) continue
-        const src = realpathSync(join(proj.path, rel))
-        if (!within(root, src) || !statSync(src).isFile()) {
+        const from = join(proj.path, rel)
+        const src = realpathSync(from)
+        // a relative link into the repo stays a link (node_modules/.bin's, pnpm's packages): to the worktree's own copy
+        const link = lstatSync(from).isSymbolicLink() && !isAbsolute(readlinkSync(from))
+        if (!within(root, src) || (!link && !statSync(src).isFile())) {
           log(`copy into ${ws.id}: skipped ${rel} (a link out of the repo, or not a file)`)
           continue
         }
@@ -1840,8 +1851,11 @@ async function copyIncludes(proj: Project, ws: Workspace) {
         if (!within(to, realpathSync(up))) continue
         mkdirSync(dirname(dst), { recursive: true })
         if (!within(to, realpathSync(dirname(dst)))) continue
-        copyFileSync(src, dst)
-        chmodSync(dst, statSync(src).mode & 0o7777)
+        if (link) await symlink(readlinkSync(from), dst)
+        else {
+          await copyFile(src, dst)
+          await chmod(dst, statSync(src).mode & 0o7777)
+        }
         copied.push(rel)
       } catch (e) {
         log(`copy into ${ws.id}: ${rel}: ${(e as Error).message}`)
@@ -1850,7 +1864,7 @@ async function copyIncludes(proj: Project, ws: Workspace) {
   } catch (e) {
     log(`copy into ${ws.id}: ${(e as Error).message}`)
   }
-  if (copied.length) log(`copied into ${ws.id}: ${copied.join(', ')}`)
+  if (copied.length) log(`copied into ${ws.id}: ${copied.length > 50 ? `${copied.length} files` : copied.join(', ')}`)
 }
 
 async function teardown(ws: Workspace) {
@@ -1910,6 +1924,25 @@ export async function wsRm(ref: string) {
   save()
   changed()
 }
+// archived workspaces past settings.archivedDays (hourly, and as the daemon starts) are deleted, their branch kept:
+// their worktree went as they were archived. One archived before archivedAt counts from now
+export function archivedTidy(now = Date.now()) {
+  const days = Number(state.settings?.archivedDays)
+  if (!(days > 0)) return
+  let n = 0
+  let dated = false
+  for (const ws of state.workspaces.filter(w => w.archived)) {
+    if (!ws.archivedAt) (ws.archivedAt = now), (dated = true)
+    if (now - ws.archivedAt < days * 86400e3) continue
+    dropWs(ws)
+    rmStorage(ws)
+    n++
+    log(`deleted ${ws.id} (${ws.name ?? ws.branch}): archived over ${days} days`)
+  }
+  if (dated || n) save()
+  if (n) changed()
+}
+
 // a deleted workspace's storage folder goes with it (settings.keepStorage: stays); only one Laki named, <…>-<id>
 function rmStorage(ws: Workspace) {
   if (ws.storage && !state.settings?.keepStorage && basename(ws.storage).includes(ws.id)) void rm(ws.storage, { recursive: true, force: true }).catch(e => log(`storage ${ws.storage}: ${e.message}`))
@@ -1927,6 +1960,7 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
   }
   await teardown(ws)
   ws.archived = true
+  ws.archivedAt = Date.now()
   ws.port = 0
   stopTunnels(ws.id) // one started during the teardown
   stopShares({ ws: ws.id })
@@ -1945,6 +1979,7 @@ export async function wsRestore(ref: string) {
   if (ws.host) await readHostCfgs(ws)
   else await copyIncludes(proj, ws) // archiving took them with the worktree
   ws.archived = false
+  ws.archivedAt = undefined
   if (ws.railPin && railTaken() > RAIL_PINS) ws.railPin = undefined // the rail filled up meanwhile
   ws.port = allocPort()
   save()
@@ -2371,8 +2406,8 @@ export function input(id: string, data: string, c?: Client) {
   if (!s) return
   if (c) s.follow(c)
   const tab = state.tabs.find(t => t.id === id)
-  if (s.exited && tab && (tab.kind === 'agent' || tab.kind === 'dev' || (tab.kind === 'shell' && state.workspaces.find(w => w.id === tab.workspace)?.host)) && /[\r\n]/.test(data)) {
-    spawnTab(tab, { resume: true }) // Enter on an ended agent or dev server (or a host's shell) starts it again
+  if (s.exited && tab && (againOnEnter(tab) || (tab.kind === 'shell' && state.workspaces.find(w => w.id === tab.workspace)?.host)) && /[\r\n]/.test(data)) {
+    spawnTab(tab, { resume: true }) // Enter on an ended agent, dev server or script (or a host's shell) starts it again
     if (tracked(tab) && tab.queue?.length) rtOf(id).status = 'running' // what waits for it goes once it's up (sweepRunning)
     return
   }
@@ -2459,7 +2494,7 @@ function syncBranches() {
     moveBranch(w, b)
     moved = true
   }
-  if (moved) save(), changed(), void scanPRs() // its PR now, not in a minute
+  if (moved) save(), changed(), state.settings?.bgRefresh !== false && void scanPRs() // its PR now, not in a minute
 }
 function moveBranch(w: Workspace, b: string) {
   w.branch = b
@@ -2500,7 +2535,7 @@ async function hostSync(ws: Workspace) {
 // a turn's end may have opened a PR (gh pr create): a scan soon, at most every 20 s
 let prSoonAt = 0
 function prSoon() {
-  if (Date.now() - prSoonAt < 20000) return
+  if (state.settings?.bgRefresh === false || Date.now() - prSoonAt < 20000) return
   prSoonAt = Date.now()
   setTimeout(() => void scanPRs(), 2000)
 }
@@ -2764,7 +2799,12 @@ export async function cloudflared(o: { ws?: string } = {}): Promise<{ version?: 
 type Cf = { stop: () => void }
 function cloudflare(target: string, mails: string[], ended: (why: string) => void, who: [name: string, stop: string]): { cf: Cf; url: Promise<string | undefined> } {
   // the values go in as arguments of their own (=), so one starting with - is no flag
-  const proc = spawn('cloudflared', ['tunnel', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], { stdio: ['ignore', 'pipe', 'pipe'] })
+  return publisher('cloudflared', 'cloudflared', ['tunnel', '--url', target, ...mails.map(m => `--allowed-mail=${m}`)], TUNNEL_URL, ended, who)
+}
+// a command that publishes something and prints its URL (cloudflared, tailscale serve), as a child of the daemon:
+// stopping it unpublishes
+function publisher(name: string, bin: string, args: string[], re: RegExp, ended: (why: string) => void, who: [name: string, stop: string]): { cf: Cf; url: Promise<string | undefined> } {
+  const proc = spawn(bin, args, { stdio: ['ignore', 'pipe', 'pipe'] })
   own(proc, ...who)
   let stopped = false
   const cf = { stop: () => ((stopped = true), proc.kill()) }
@@ -2778,10 +2818,10 @@ function cloudflare(target: string, mails: string[], ended: (why: string) => voi
       const tail = out.trim().split('\n').slice(-8).join('\n')
       reject(new Error(tail ? `${why}:\n${tail}` : why))
     }
-    const timer = setTimeout(() => fail('cloudflared gave no URL within 60 s'), 60000)
+    const timer = setTimeout(() => fail(`${name} gave no URL within 60 s`), 60000)
     const read = (b: Buffer) => {
       out = (out + b).slice(-16000)
-      const m = !got && TUNNEL_URL.exec(out)
+      const m = !got && re.exec(out)
       if (!m) return
       got = true
       clearTimeout(timer)
@@ -2789,9 +2829,9 @@ function cloudflare(target: string, mails: string[], ended: (why: string) => voi
     }
     proc.stdout!.on('data', read)
     proc.stderr!.on('data', read)
-    proc.on('error', e => fail(`cloudflared didn't start: ${e.message}`))
+    proc.on('error', e => fail(`${name} didn't start: ${e.message}`))
     proc.on('close', (code, sig) => { // after its output: an error's last line is in
-      if (!got) return fail(`cloudflared ended (${sig ?? `exit ${code}`})`)
+      if (!got) return fail(`${name} ended (${sig ?? `exit ${code}`})`)
       if (!stopped) ended(sig ?? `exit ${code}`)
     })
   })
@@ -2805,6 +2845,23 @@ async function cfReady(mails: boolean) {
   if (mails && version !== '?' && older(version, MAIL_VERSION))
     throw new Error(`cloudflared ${version} can't limit who opens a tunnel (that needs ${MAIL_VERSION}): brew upgrade cloudflared`)
 }
+
+// tailscale's CLI: on PATH (Linux, Homebrew), else the Mac app's own
+const TAILSCALE_APP = '/Applications/Tailscale.app/Contents/MacOS/Tailscale'
+const tailscaleBin = () => (onPath('tailscale') ? 'tailscale' : process.platform === 'darwin' && existsSync(TAILSCALE_APP) ? TAILSCALE_APP : undefined)
+const TAILNET_URL = /https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net(?::\d+)?/i
+// this machine on its tailnet, or why not
+async function tsReady() {
+  const bin = tailscaleBin()
+  if (!bin) throw new Error("tailscale isn't installed: https://tailscale.com/download (on a Mac, the app; on Linux, its package)")
+  const st = await run(bin, ['status', '--json'], { timeout: 10000 }).then(r => JSON.parse(r.stdout) as { BackendState?: string }, e => ({ BackendState: firstLine(e) }))
+  if (st.BackendState !== 'Running') throw new Error(`Tailscale isn't connected (${st.BackendState ?? '?'}): tailscale up`)
+  return bin
+}
+// tailscale serve in the foreground: https on this machine's tailnet name, for the tailnet's devices only (not
+// Funnel), until it's stopped. ponytail: port 443, its root; another serve of yours there is replaced while it runs
+const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string]) =>
+  publisher('tailscale serve', bin, ['serve', '--https=443', target], TAILNET_URL, ended, who)
 
 // tunnelStart resolves once cloudflared prints the URL (or was stopped meanwhile), and fails with its output
 export async function tunnelStart(o: { ws: string; port: number; mails?: string[] }): Promise<Tunnel> {
@@ -2993,29 +3050,34 @@ async function shareServe(q: IncomingMessage, r: ServerResponse) {
 export const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0]
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // pin: the PIN; access: the token it gives (token, the link's, is then good for remotePin only); left: wrong tries left
-type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access?: string; left?: number }
+type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access?: string; left?: number; via?: 'tailscale' }
 let remote: RemoteRun | undefined
 let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
 export const remoteToken = () => (remote?.pin ? remote.access : remote?.token)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(!remote.mail && !remote.pin && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
+  remote && { mail: remote.mail, ...(remote.via && { via: remote.via }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 
-export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean }): Promise<Remote | undefined> {
+// via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked)
+export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string }): Promise<Remote | undefined> {
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
+  if (o.via !== undefined && o.via !== 'cloudflare' && o.via !== 'tailscale') throw new Error(`through cloudflare or tailscale, not ${o.via}`)
+  const ts = o.via === 'tailscale'
   const pin = o.pin === true // Laki's PIN, no email
-  const open = !pin && o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
-  const mail = open || pin ? '' : (o.mail ?? state.settings?.remoteMail ?? '').trim()
-  if (!open && !pin && !ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
+  const open = !ts && !pin && o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
+  const mail = ts || open || pin ? '' : (o.mail ?? state.settings?.remoteMail ?? '').trim()
+  if (!ts && !open && !pin && !ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
   if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open and pin keep the saved one
   if (remote) return remoteView()
-  await cfReady(!!mail)
+  const bin = ts ? await tsReady() : (await cfReady(!!mail), '')
   if (remote) return remoteView() // started meanwhile
-  const { cf, url } = cloudflare(`http://127.0.0.1:${daemonPort}`, mail ? [mail] : [], why => (log(`remote access ended (${why})`), remoteStop()), ['Remote access', 'remote'])
-  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf }
+  const target = `http://127.0.0.1:${daemonPort}`
+  const ended = (why: string) => (log(`remote access ended (${why})`), remoteStop())
+  const { cf, url } = ts ? tailscale(bin, target, ended, ['Remote access', 'remote']) : cloudflare(target, mail ? [mail] : [], ended, ['Remote access', 'remote'])
+  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf, ...(ts && { via: 'tailscale' as const }) }
   if (pin) Object.assign(r, { pin: String(randomInt(0, 1e6)).padStart(6, '0'), access: randomBytes(32).toString('hex'), left: triesOf() })
   remote = r
   changed()
@@ -3026,7 +3088,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
     throw e
   }
   if (remote !== r) return undefined // stopped meanwhile
-  log(`remote access at ${r.url} for ${mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
+  log(`remote access at ${r.url} for ${ts ? `the tailnet's devices with the link${pin ? ' and its PIN' : ''}` : mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
   return remoteView()
 }
@@ -3106,7 +3168,7 @@ const checksOf = (list: Check[]): PR['checks'] =>
 // the timer's scan (every minute): once settings.prScan minutes have gone by (a little early: the timer drifts)
 let prLast = 0
 export function prTick(now = Date.now()) {
-  if (now - prLast < (state.settings?.prScan || PR_SCAN) * 60000 - 5000) return
+  if (state.settings?.bgRefresh === false || now - prLast < (state.settings?.prScan || PR_SCAN) * 60000 - 5000) return
   prLast = now
   return scanPRs()
 }
@@ -4085,24 +4147,28 @@ export async function timer(p: { act: string; minutes?: number; note?: string; w
 // the first-run screen's checks
 export async function doctor(): Promise<Doctor> {
   const gh = !onPath('gh') ? 'missing' : await run('gh', ['auth', 'status'], { timeout: 8000 }).then(() => 'in' as const, () => 'out' as const)
-  return { git: onPath('git'), gh, cloudflared: onPath('cloudflared'), agents: AGENTS.map(id => ({ id, found: onPath(id) })) }
+  return { git: onPath('git'), gh, cloudflared: onPath('cloudflared'), idb: onPath('idb'), agents: AGENTS.map(id => ({ id, found: onPath(id) })) }
 }
 
-function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<string, string>) {
+// the tab of that kind (a script's: of that script) goes, renamed or not, and a new one starts
+function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<string, string>, script?: RunScript) {
   const ws = findWs(wsRef)
-  for (const t of tabsOf(ws.id).filter(t => t.kind === kind)) closeTab(t.id)
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name: kind, kind, cmd }
+  for (const t of tabsOf(ws.id).filter(t => t.kind === kind && t.script === script)) closeTab(t.id)
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name: script ?? kind, kind, cmd, ...(script && { script }) }
   state.tabs.push(tab)
   save()
   spawnTab(tab, { cmd, env })
   return tab
 }
 
-export function runDev(ref: string) {
+// the run script (the dev server: the run tab), or a RUN_SCRIPTS one in a tab named as it; again: the one before goes
+export function runDev(ref: string, script?: string) {
   const ws = findWs(ref)
-  const cmd = projectConfig(ws).run
-  if (!cmd) throw new Error('no "run" command: set one in the project settings or .laki.json')
-  return replaceTab(ws.id, 'dev', cmd)
+  if (script !== undefined && !RUN_SCRIPTS.includes(script as RunScript)) throw new Error(`no script "${script}": ${RUN_SCRIPTS.join(', ')}`)
+  const k = (script ?? 'run') as 'run' | RunScript
+  const cmd = projectConfig(ws)[k]
+  if (typeof cmd !== 'string' || !cmd.trim()) throw new Error(`no "${k}" command: set one in the project settings or .laki.json`)
+  return script ? replaceTab(ws.id, 'script', cmd, undefined, script as RunScript) : replaceTab(ws.id, 'dev', cmd)
 }
 
 export function ship(ref: string, message: string) {

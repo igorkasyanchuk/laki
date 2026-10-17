@@ -3,15 +3,15 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, COMPACT_DAYS, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
+import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
 import { describeHours, parseHours } from '../../shared/when'
-import { bridge } from './api'
+import { bridge, openExternal } from './api'
 import { DOCK_ICONS } from './dock'
 import { applyTheme, GLASS, type Paint, paintKey, preview, termTheme, THEMES, transparent, UI_FONTS } from './themes'
 import './floater.css'
-import { ask, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ON, Switch, useMenu } from './ui'
+import { ask, HOTKEY, Icon, IconButton, type IconName, keep, keyLabel, keyRec, load, ON, Switch, useMenu } from './ui'
 import { PICKER_KEY } from './Picker'
 import { QR } from './Tunnel'
 import { mostRoom, USAGE_AGENTS } from './Usage'
@@ -141,10 +141,14 @@ export type AppSettings = Paint & {
   presets?: Preset[] | null // null: the daemon's defaults (every agent installed)
   accountUse?: Partial<Record<AccountAgent, string>> // each agent's default account for new sessions (unset: its own sign-in)
   remoteMail?: string // the one address remote access lets in
-  remoteAuth?: 'email' | 'pin' // remote access by Cloudflare's email code (unset too) or Laki's PIN
+  remoteAuth?: 'email' | 'pin' | 'tailscale' // remote access by Cloudflare's email code (unset too), Laki's PIN, or your tailnet
   remoteTries?: number // wrong PINs that stop it (unset: REMOTE_TRIES)
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
+  bgRefresh?: boolean // PR checks on their own (unset: on)
+  copyIgnored?: boolean // new worktrees get every ignored file (unset: off)
+  copyUntracked?: boolean // and the untracked ones (unset: off)
+  archivedDays?: number // archived workspaces deleted after so many days (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER, 8 hours; 0: always)
   webhook?: Webhook // pushes to your phone
@@ -169,6 +173,8 @@ export type AppSettings = Paint & {
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
   pickerKey?: string // the element picker's hotkey (unset: PICKER_KEY; '': none)
+  hotkeyOn?: boolean // the global hotkey (unset: on)
+  hotkey?: string // its keys (unset: HOTKEY; '': none)
   specs?: boolean // experimental: Specs & Brainstorms (Specs.tsx), off unless true
   workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
   birdView?: boolean // experimental: Bird view (Bird.tsx), every live session's screen at once, off unless true
@@ -197,6 +203,7 @@ const EXAMPLE_TEMPLATE: Template = {
 }
 
 // the PR switches' prompts (Settings › Pull requests): the status bar's names
+const ARCHIVED_DAYS: [number, string][] = [[0, 'Never'], [1, 'After a day'], [3, 'After 3 days'], [7, 'After a week'], [14, 'After 2 weeks'], [30, 'After a month']]
 const PR_KINDS: [FixWhat, string, string][] = [
   ['ci', 'Fix CI', 'the failing checks and the end of their logs go after it'],
   ['review', 'Review', 'the open review threads go after it'],
@@ -658,8 +665,12 @@ const SCRIPTS = [
   { k: 'setup', label: 'Setup', hint: 'Runs in each new worktree, in a setup tab; agents and Run wait for it. $LAKI_PROJECT_PATH is the repo itself.', eg: 'npm install\ncp "$LAKI_PROJECT_PATH/.env" .env' },
   { k: 'teardown', label: 'Teardown', hint: 'Runs when a worktree workspace is deleted or archived, for a minute at most (never in the project’s own folder).', eg: 'docker compose down' },
   { k: 'run', label: 'Run', hint: 'The Run button: starts it in a run tab, e.g. a dev server on $PORT.', eg: 'npm run dev -- --port $PORT' },
+  { k: 'test', label: 'Test', hint: 'Run ▾ › Test: in a test tab of its own; run again, the last one goes.', eg: 'npm test' },
+  { k: 'lint', label: 'Lint', hint: 'Run ▾ › Lint: in a lint tab of its own.', eg: 'npm run lint' },
+  { k: 'format', label: 'Format', hint: 'Run ▾ › Format: in a format tab of its own.', eg: 'npx prettier --write .' },
+  { k: 'deploy', label: 'Deploy', hint: 'Run ▾ › Deploy: in a deploy tab of its own, after you confirm.', eg: 'npm run deploy' },
 ] as const
-export type Scripts = { setup?: string; teardown?: string; run?: string }
+export type Scripts = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string }
 
 // a project's lifecycle scripts: one at a time, any number of lines; Import fills one from a file
 export function ScriptsField({ value, file = {}, git = true, tab, onChange }: { value: Scripts; file?: Scripts; git?: boolean; tab?: keyof Scripts; onChange: (s: Scripts) => void }) {
@@ -1018,7 +1029,7 @@ export function ProjectSection(p: {
           </div>
         </Group>
       )}
-      <Group title="Scripts" hint="For workspace setup, teardown and the Run button; empty: the repo's .laki.json">
+      <Group title="Scripts" hint="For workspace setup, teardown, the Run button and Run ▾'s Test, Lint, Format and Deploy; empty: the repo's .laki.json">
         <ScriptsField value={c} file={file} git={p.project.git} tab={p.script} onChange={x => setC(y => ({ ...y, ...x }))} />
       </Group>
       <Group title="Env" hint={`For every tab, setup and teardown${file.env && Object.keys(file.env).length ? ` · .laki.json has ${Object.keys(file.env).join(', ')}` : ''}`}>
@@ -1143,11 +1154,16 @@ const FIND: [string, string, string?][] = [
   ['voice', 'Model', 'voice speech to text transcribe mai whisper parakeet openrouter'],
   ['voice', 'Hold Fn to talk', 'push to talk fn globe key hold voice dictation'],
   ['general', 'Timers', 'timer countdown ends alarm sound dialog modal notification'],
+  ['git', 'Copy ignored files to new worktrees', 'gitignored env node_modules worktreeinclude untracked copy'],
+  ['git', 'Refresh PR status in the background', 'background refresh scan status rate limit ssh passphrase github'],
+  ['git', 'Delete archived workspaces', 'auto delete archived clean up cleanup days'],
   ['git', 'Folder for worktrees', 'folder directory location path where worktree workspaces disk'],
   ['general', 'Close tabs without asking', 'confirm confirmation dialog close tab running process stop ask'],
   ['general', 'Development mode', 'debug logs log events troubleshoot pr checks auto fix'],
   ['general', 'Specs & Brainstorms', 'experimental spec specs brainstorm requirements notion ideas prototypes diagrams mind map'],
   ['general', 'Workflows', 'experimental workflow flow flows blocks graph automation pipeline runs decisions'],
+  ['general', 'Global hotkey', 'shortcut key focus bring forward show from any app anywhere record'],
+  ['general', 'Developer', 'command line tool cli laki install path terminal reference skill'],
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
   ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
   ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
@@ -1160,7 +1176,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Creation log', 'new workspace create logs what ran command development'],
   ['general', 'Reset the interface', 'reset ui layout default defaults factory theme rail settings experimental extensions off get started onboarding widths sidebar panels broken localstorage development'],
   ['widgets', 'Fetch only', 'working hours night weekends sync schedule when'],
-  ['remote', 'Remote access', 'phone email cloudflare tunnel qr'],
+  ['remote', 'Remote access', 'phone email cloudflare tunnel qr tailscale tailnet ts.net headless server'],
   ['resources', 'Memory', 'ram cpu usage processes monitor activity heavy slow'],
   ['resources', 'Sleep idle agents after', 'memory ram free idle suspend hibernate'],
 ]
@@ -1441,29 +1457,34 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
 }
 
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
-// link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page); no link yet: starting
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string }
-export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+// link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
+// the tailnet's devices (via); no link yet: starting
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string; via?: 'tailscale' }
+export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale') => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
-type RemoteOpts = { mail: string; pin: boolean; tries: number }
+type RemoteAuth = 'email' | 'pin' | 'tailscale'
+type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number }
+const AUTHS: [RemoteAuth, string][] = [['email', 'Email (Cloudflare)'], ['pin', 'PIN (Laki)'], ['tailscale', 'Tailscale']]
 function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; set: (o: Partial<RemoteOpts>) => void }) {
-  const { mail, pin, tries } = opts
+  const { mail, auth, tries } = opts
+  const pin = auth === 'pin'
+  const ts = auth === 'tailscale'
   const [hours, setHours] = useState(1)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [sure, setSure] = useState('') // no email: confirm, typed
   const r = api.state
-  const open = !pin && !mail.trim()
-  const ok = pin || (open ? sure.trim().toLowerCase() === 'confirm' : ONE_MAIL.test(mail.trim()))
+  const open = !pin && !ts && !mail.trim()
+  const ok = pin || ts || (open ? sure.trim().toLowerCase() === 'confirm' : ONE_MAIL.test(mail.trim()))
   const fail = (e: unknown) => setErr(String((e as Error).message ?? e))
   const start = async () => {
     if (busy || !ok) return
     setBusy(true)
     setErr('')
-    await api.start(hours, mail.trim(), open, pin).then(() => setSure(''), fail) // the next start without an email asks again
+    await api.start(hours, mail.trim(), open, pin, ts ? 'tailscale' : undefined).then(() => setSure(''), fail) // the next start without an email asks again
     setBusy(false)
   }
   const stop = () => (setErr(''), api.stop().catch(fail))
@@ -1476,7 +1497,8 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
         random trycloudflare.com address; Cloudflare lets in only the email below, with a one-time code it sends there, and the link carries a key of
         its own (without an email, that key is the only lock). With a PIN instead, there's no Cloudflare sign-in: the page asks for a PIN Laki shows
         here, and a wrong one (twice, unless you pick otherwise) stops remote access. It stops after the time you pick (or never: Forever), when you
-        stop it, or with the daemon, and a stopped link never works again.
+        stop it, or with the daemon, and a stopped link never works again. With Tailscale, tailscale serve publishes it on this Mac's name in your
+        tailnet instead: only your tailnet's devices reach it, with the link's key.
       </p>
       <p className="warn-soft small">Whoever gets in has a shell on this Mac as you: use an address only you read.</p>
       {r?.link ? (
@@ -1496,6 +1518,10 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
                   The page asks for it. {r.tries === 1 ? 'One more wrong PIN stops' : `${r.tries} wrong PINs stop`} remote access. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
                 </span>
               </div>
+            ) : r.via === 'tailscale' ? (
+              <p className="muted small">
+                Only devices in your tailnet reach it, with this link. Open it on your phone or laptop with Tailscale on. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
+              </p>
             ) : r.open ? (
               <div className="remote-risk" role="alert">
                 <b>Anyone with this link gets in.</b>
@@ -1518,7 +1544,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
         </div>
       ) : r ? (
         <>
-          <p className="muted">Starting cloudflared… it takes a few seconds.</p>
+          <p className="muted">Starting {r.via ? 'tailscale serve' : 'cloudflared'}… it takes a few seconds.</p>
           {r.open && <p className="field-err">Without an email: anyone with the link will get in.</p>}
           <div className="row">
             <button onClick={stop}>Cancel</button>
@@ -1529,14 +1555,20 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
           <div className="field">
             <span>Sign in with</span>
             <div className="seg" role="radiogroup" aria-label="Sign in with">
-              {([[false, 'Email (Cloudflare)'], [true, 'PIN (Laki)']] as const).map(([v, label]) => (
-                <button key={label} type="button" role="radio" aria-checked={pin === v} className={pin === v ? 'on' : ''} onClick={() => set({ pin: v })}>
+              {AUTHS.map(([v, label]) => (
+                <button key={v} type="button" role="radio" aria-checked={auth === v} className={auth === v ? 'on' : ''} onClick={() => set({ auth: v })}>
                   {label}
                 </button>
               ))}
             </div>
           </div>
-          {pin ? (
+          {ts ? (
+            <p className="muted small">
+              tailscale serve publishes it at https://&lt;this Mac&gt;.&lt;your tailnet&gt;.ts.net, for your tailnet's devices only (never Funnel, the
+              public internet). It needs Tailscale here, connected, and HTTPS certificates on for the tailnet (its admin console › DNS). On Linux,
+              once: <code>sudo tailscale set --operator=$USER</code>.
+            </p>
+          ) : pin ? (
             <div className="field">
               <span>
                 Wrong PINs before it stops <span className="muted">· a new PIN each start, shown here</span>
@@ -1587,12 +1619,13 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
           </div>
           <div className="row">
             <button type="submit" className={open ? 'danger' : 'primary'} disabled={!ok || busy}>
-              {busy ? 'Starting…' : open ? 'Start without an email' : pin ? 'Start with a PIN' : 'Start remote access'}
+              {busy ? 'Starting…' : open ? 'Start without an email' : pin ? 'Start with a PIN' : ts ? 'Start on your tailnet' : 'Start remote access'}
             </button>
           </div>
         </form>
       )}
       {err && <p className="field-err">{err}</p>}
+      {(r ? !r.via : !ts) && (
       <div className="remote-tip">
         <p className="muted small">
           Won't start, or Cloudflare's sign-in won't let you in? Run this once in a terminal: it signs cloudflared in to your Cloudflare account (a browser
@@ -1603,6 +1636,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
           <IconButton icon="copy" title="Copy the command" onClick={() => api.copy('cloudflared tunnel login')} />
         </div>
       </div>
+      )}
     </>
   )
 }
@@ -1653,7 +1687,7 @@ function AccountsBlock({ agent, api, views, usage, use, onUse, reload }: { agent
   )
 }
 
-export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean, skill?: string) => Promise<SkillInfo[]> }
+export type SkillApi = { app: string; load: () => Promise<SkillInfo[]>; set: (agent: string, on: boolean, skill?: string) => Promise<SkillInfo[]>; doctor?: () => Promise<Doctor> }
 // the skills Settings offers, in its order: what each teaches
 const SKILL_KINDS: [string, string, string][] = [
   ['laki', 'Laki', 'list projects and workspaces, start a workspace with an agent and a prompt, message agents and read their screens, all through the command line'],
@@ -1666,8 +1700,10 @@ function SkillSection({ api }: { api: SkillApi }) {
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [copied, setCopied] = useState('')
+  const [doc, setDoc] = useState<Doctor | null>(null)
   const fail = (e: any) => setErr(String(e?.message ?? e))
   useEffect(() => void api.load().then(setRows, fail), [])
+  useEffect(() => void api.doctor?.().then(setDoc, () => {}), [])
   const set = (agent: string, on: boolean, skill?: string) => {
     setBusy(true)
     setErr('')
@@ -1706,6 +1742,14 @@ function SkillSection({ api }: { api: SkillApi }) {
         </Group>
       ))}
       <p className="muted small">It holds where {api.app} is installed: after moving the app, update it here.</p>
+      {doc && (
+        <Group title="The iOS Simulator and apps' windows" hint="laki screen (MCP's laki_device): agents take a screenshot of the booted simulator or of any app's window, to see what they built">
+          <div className="row">
+            <Says title={doc.idb ? 'idb found: agents can also tap, swipe and type in the simulator' : "idb isn't installed: agents take screenshots, but can't tap, swipe or type in the simulator"} hint={doc.idb ? 'laki screen tap, swipe, type and describe' : 'brew install facebook/fb/idb-companion, then pipx install fb-idb; open Settings again'} />
+          </div>
+          <p className="muted small">An app's window needs Screen Recording for {api.app}: System Settings › Privacy &amp; Security › Screen &amp; System Audio Recording.</p>
+        </Group>
+      )}
       {rows?.some(r => r.mcp) && (
         <>
           <h2>MCP server</h2>
@@ -2049,10 +2093,33 @@ function KeyField({ value, def, onSet }: { value: string; def: string; onSet: (v
   )
 }
 
+// the global hotkey (main's globalShortcut, registered by App as the settings come): on, and its keys; main says
+// when another app has them
+function HotkeyField({ on, keys, set }: { on: boolean; keys: string; set: (o: Partial<AppSettings>) => void }) {
+  const [taken, setTaken] = useState(false)
+  useEffect(() => void bridge?.hotkey?.(on ? keys : '').then(ok => setTaken(!ok)), [on, keys])
+  return (
+    <div className="setting-box">
+      <Switch className="switch-row" on={on} onChange={hotkeyOn => set({ hotkeyOn })}>
+        <Says title="Bring Laki forward from any app" hint="Whatever app you're in, these keys show Laki's window" />
+      </Switch>
+      {on && (
+        <div className="row">
+          <Says title="Hotkey" hint={taken ? "These keys can't be Laki's: record others" : 'Two of ⌃ ⌥ ⌘ with a key, or one of them with Space'} />
+          <span className="grow" />
+          <KeyField value={keys} def={HOTKEY} onSet={hotkey => set({ hotkey })} />
+        </div>
+      )}
+      {on && taken && <p className="field-err">{keys}: another app (or macOS) has these keys, or they need two of ⌃ ⌥ ⌘ (one is enough with Space or an F key)</p>}
+    </div>
+  )
+}
+
+const CLI_DOCS = 'https://github.com/igorkasyanchuk/laki/blob/main/docs/guide.md#cli' // panels.tsx' REPO
 // the laki command for any shell (core.ts cliInstall): a launcher in Homebrew's bin, /usr/local/bin or ~/.local/bin
 export type CliState = { path?: string; current: boolean; onPath: boolean; other?: string; to: string }
 export type CliApi = { state(): Promise<CliState>; install(): Promise<CliState>; remove(): Promise<CliState> }
-function CliField({ api }: { api: CliApi }) {
+function CliField({ api, onSkill }: { api: CliApi; onSkill?: () => void }) {
   const [st, setSt] = useState<CliState | null>(null)
   const [err, setErr] = useState('')
   useEffect(() => void api.state().then(setSt, e => setErr((e as Error).message)), [])
@@ -2061,8 +2128,25 @@ function CliField({ api }: { api: CliApi }) {
   const dir = st.to.replace(/\/laki$/, '')
   return (
     <div className="setting-box">
-      <div className="row">
-        <Says title={st.path ? (st.current ? 'Installed' : 'Installed, from another copy of Laki') : 'Not installed'} hint={st.path ? `${st.path}${st.current ? '' : ': install again to point it at this one'}` : `Puts a small launcher at ${st.to}`} />
+      <div className="row cli-row">
+        <Says
+          title={st.path ? (st.current ? 'Command line tool: installed' : 'Command line tool: installed, from another copy of Laki') : 'Command line tool'}
+          hint={
+            <>
+              {st.path ? `${st.path}${st.current ? '' : ': install again to point it at this one'}` : `Puts a small launcher at ${st.to}`}
+              <span className="cli-links">
+                <a href={CLI_DOCS} onClick={e => (e.preventDefault(), openExternal(CLI_DOCS))}>
+                  CLI reference ↗
+                </a>
+                {onSkill && (
+                  <a href="#skill" onClick={e => (e.preventDefault(), onSkill())}>
+                    Agent skill ›
+                  </a>
+                )}
+              </span>
+            </>
+          }
+        />
         <span className="grow" />
         {(!st.path || !st.current) && (
           <button type="button" className="primary" onClick={() => run(api.install)}>
@@ -2104,7 +2188,7 @@ export function SettingsPage(p: {
   widgets?: WidgetsApi
   resources?: ResourcesApi
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
-  cli?: CliApi // General › Command line: the laki command in any shell
+  cli?: CliApi // General › Developer: the laki command in any shell
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
   logs?: (key: string, title: string) => void // development mode's: new: what making a workspace ran
   presets: Preset[] // the daemon's: the settings', or its defaults
@@ -2410,6 +2494,37 @@ export function SettingsPage(p: {
                 <FolderField value={s.worktrees} label="Folder for worktrees" placeholder="Laki's data folder: ~/.laki/worktrees" onChange={v => set({ worktrees: v })} />
               </div>
               </Group>
+              <Group title="Files git doesn't keep" hint="A new worktree gets, from the repo's own folder, what .worktreeinclude (at the repo's root) and .laki.json's copy name; with these, more. Applies to projects on this Mac only">
+              <div className="setting-box">
+                <Switch className="switch-row" on={!!s.copyIgnored} onChange={v => set({ copyIgnored: v })}>
+                  <Says title="Copy ignored files to new worktrees" hint="Every file .gitignore leaves out (.env, builds, node_modules: can be big and slow to copy)" />
+                </Switch>
+                <Switch className="switch-row" on={!!s.copyUntracked} onChange={v => set({ copyUntracked: v })}>
+                  <Says title="Copy untracked files to new worktrees" hint="New files you haven't committed (or ignored) yet" />
+                </Switch>
+              </div>
+              </Group>
+              <Group title="In the background">
+              <div className="setting-box">
+                <Switch className="switch-row" on={s.bgRefresh !== false} onChange={v => set({ bgRefresh: v })}>
+                  <Says title="Refresh PR status in the background" hint="Checks each workspace's PR, CI and reviews every few minutes (Settings › Pull requests) and as an agent's turn ends. Off: only a PR's right click › Refresh, if gh asks for an SSH passphrase or GitHub limits you. The PR switches need it" />
+                </Switch>
+              </div>
+              </Group>
+              <Group title="Clean-up">
+              <div className="setting-box">
+              <label className="switch-row">
+                <select value={s.archivedDays ?? 0} onChange={e => set({ archivedDays: Number(e.target.value) })}>
+                  {[...ARCHIVED_DAYS, ...(ARCHIVED_DAYS.some(([d]) => d === (s.archivedDays ?? 0)) ? [] : [[s.archivedDays!, `After ${s.archivedDays} days`] as [number, string]])].map(([d, t]) => (
+                    <option key={d} value={d}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+                <Says title="Delete archived workspaces" hint="Archiving already removes the worktree's folder; this deletes the workspace too (its branch stays), so it can't be restored" />
+              </label>
+              </div>
+              </Group>
               <Group title="When a PR merges">
               <div className="setting-box">
                 <Switch className="switch-row" on={!!s.archiveMerged} onChange={v => set({ archiveMerged: v })}>
@@ -2434,6 +2549,11 @@ export function SettingsPage(p: {
                 </select>
               </label>
               </Group>
+              {bridge?.hotkey && (
+                <Group title="Global hotkey">
+                  <HotkeyField on={s.hotkeyOn !== false} keys={s.hotkey ?? HOTKEY} set={set} />
+                </Group>
+              )}
               <Group title="Notifications" hint="Phone pushes are in their own section">
               <div className="setting-box">
                 <Switch className="switch-row" on={s.notify !== false} onChange={v => set({ notify: v })}>
@@ -2554,8 +2674,8 @@ export function SettingsPage(p: {
               </div>
               </Group>
               {p.cli && (
-                <Group title="Command line" hint="The laki command in any terminal, not only in Laki's tabs: laki ls, laki new, laki remind…">
-                  <CliField api={p.cli} />
+                <Group title="Developer" hint="The laki command in any terminal, not only in Laki's tabs: laki ls, laki new, laki screen…; the skill teaches agents the same">
+                  <CliField api={p.cli} onSkill={() => openSec('skill')} />
                 </Group>
               )}
               <Group title="Experimental" hint="New things to try: they may change, or go">
@@ -3108,8 +3228,8 @@ export function SettingsPage(p: {
           {sec === 'remote' && p.remote && (
             <RemoteSection
               api={p.remote}
-              opts={{ mail: s.remoteMail ?? '', pin: s.remoteAuth === 'pin', tries: s.remoteTries ?? REMOTE_TRIES }}
-              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.pin !== undefined && { remoteAuth: o.pin ? 'pin' : 'email' }), ...(o.tries !== undefined && { remoteTries: o.tries }) })}
+              opts={{ mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES }}
+              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }) })}
             />
           )}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}

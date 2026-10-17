@@ -4,7 +4,7 @@ import { createInterface } from 'node:readline'
 import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from '../shared/layout.ts'
 import { BRAINSTORM_OUTPUT } from '../shared/plans.ts'
-import { AI_ACTS, API, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, mergeActions, prRef, rowsOf, templated, templatesFor, type View } from '../shared/types.ts'
+import { AI_ACTS, API, DEVICE_OPS, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, mergeActions, prRef, rowsOf, templated, templatesFor, type View } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { WORKFLOW_FORMAT } from '../shared/workflow.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
@@ -109,6 +109,24 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       ['ws', 'op'],
     ),
     run: a => rpc('browse', { ws: a.ws, op: a.op, url: a.url, selector: a.selector, text: a.text }, 45000),
+  },
+  {
+    name: 'laki_device',
+    description:
+      "See and drive what isn't a web page, on this Mac: shot takes a screenshot of the booted iOS Simulator, or with app of that app's frontmost window (a PNG's path, to read); windows lists the apps' windows on screen. In the simulator, with idb installed: tap and swipe in points (the simulator's screenshot is then drawn in points too: tap where you see a thing in it), type text into the focused field, and describe (its accessibility tree: each element's label and frame in points). Screenshots of app windows are in the window's points.",
+    inputSchema: obj(
+      {
+        op: { type: 'string', enum: [...DEVICE_OPS] },
+        app: str("for shot: an app's name (e.g. Safari, Xcode); none: the iOS Simulator's screen"),
+        x: { type: 'number', description: 'for tap and swipe: where, in points' },
+        y: { type: 'number', description: 'for tap and swipe' },
+        x2: { type: 'number', description: "for swipe: where it ends" },
+        y2: { type: 'number', description: 'for swipe' },
+        text: str('for type: what to type'),
+      },
+      ['op'],
+    ),
+    run: a => rpc('device', { op: a.op, app: a.app, x: a.x, y: a.y, x2: a.x2, y2: a.y2, text: a.text }, 45000),
   },
   {
     name: 'laki_send',

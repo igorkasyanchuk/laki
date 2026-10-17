@@ -4,8 +4,8 @@ import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
-import { daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, type Memory, REMOTE, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
+import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
+import { type AiCall, type AiMsg, type AiTotals, DEVICE_OPS, type Memory, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetView, type Workspace } from '../shared/types.ts'
 import { USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -50,6 +50,53 @@ async function hook(state: string, extra?: string) {
 
 const glyph: Record<string, string> = { running: '◐', waiting: '◆', idle: '○', exited: '✖' }
 
+// remote access in words: its link, who gets in, until when
+const remoteText = (r?: Remote) =>
+  !r ? 'remote access is off: laki serve, or Settings › Remote access' : !r.link ? 'remote access is starting…' :
+  [r.link, r.via && "your tailnet's devices only", r.pin ? `PIN ${r.pin} (${r.tries} wrong tries stop it)` : !r.via && (r.mail ? `only ${r.mail} (Cloudflare's code)` : 'anyone with the link'), r.until ? `until ${new Date(r.until).toLocaleString()}` : 'until stopped'].filter(Boolean).join('\n')
+
+// laki serve: headless, a server without the app (Linux too, or the AppImage's --headless): the daemon in this process
+// (or the one running), with remote access through tailscale or cloudflared for the browser, until stopped (Ctrl-C,
+// SIGTERM: systemd, laki stop). Remote access ending (its hours, cloudflared or tailscale gone) stops it too, so a
+// service manager (Restart=always) starts it again: a new link, laki remote prints it
+async function serve(a: string[]) {
+  const has = (f: string) => a.includes(`--${f}`)
+  const val = (f: string) => (i => (i >= 0 ? a[i + 1] : undefined))(a.indexOf(`--${f}`))
+  const via = has('tailscale') ? 'tailscale' : 'cloudflare'
+  const o = { via, hours: Number(val('hours') ?? 0), pin: has('pin'), mail: val('mail'), open: has('open') }
+  if (via === 'cloudflare' && !o.pin && !o.mail && !o.open) throw new Error('how do you get in? laki serve --tailscale [--pin] | --cloudflare --mail you@example.com | --cloudflare --pin  [--hours n]')
+  // started by Laki --headless, which waits on this process (not passed on to the daemon's agents)
+  const parent = Number(process.env.LAKI_HEADLESS_PARENT)
+  delete process.env.LAKI_HEADLESS_PARENT
+  const running = await alive()
+  if (!running) {
+    await import(pathToFileURL(daemonScript()).href) // the daemon: in this process, so Ctrl-C or a service manager stops both
+    for (let i = 0; i < 100 && !(await alive()); i++) await new Promise(r => setTimeout(r, 100))
+  }
+  let r: Remote | undefined
+  try {
+    r = await rpc('remoteStart', o, 90000)
+  } catch (e) {
+    if (!running) await rpc('shutdown').catch(() => {})
+    throw e
+  }
+  console.log(`laki: remote access\n${remoteText(r)}`)
+  if (running) return console.log('(in the daemon already running here: laki remote shows it again)')
+  const stop = (why: string) => {
+    clearInterval(watch)
+    clearInterval(orphan)
+    console.log(`laki: ${why}: stopping`)
+    void rpc('shutdown').catch(() => {})
+    setTimeout(() => process.exit(0), 3000) // the daemon's shutdown exits first
+  }
+  const watch = setInterval(async () => {
+    const v = await rpc<View>('state').catch(() => undefined)
+    if (v && !v.remote) stop(`remote access ended${o.hours ? ` (its ${o.hours} hours)` : ''}`)
+  }, 15000)
+  // Laki --headless killed (kill, docker stop): this goes too, and remote access with it
+  const orphan = setInterval(() => parent && process.ppid !== parent && stop('Laki --headless ended'), 2000)
+}
+
 async function main() {
   const [cmd, ...rest] = args
   switch (cmd) {
@@ -75,6 +122,14 @@ async function main() {
     }
     case 'stop':
       return rpc('shutdown').catch(() => {})
+    case 'serve':
+      return serve(rest)
+    case 'remote': {
+      // laki remote [stop]: remote access's link (and PIN) now, as Settings shows it; a headless server's way to it
+      if (rest[0] === 'stop') return rpc('remoteStop').then(() => out({ ok: true }, 'stopped'))
+      const r: Remote | undefined = (await rpc<View>('state')).remote
+      return out(r ?? null, remoteText(r))
+    }
     case 'mcp':
       return mcp() // starts the daemon at its first tool call: stdout is the protocol's
   }
@@ -225,6 +280,16 @@ async function main() {
       return out(r, `${r.pct}%`) // as the tab shows it: 0 to 100, whole
     }
     case 'screen': {
+      // laki screen shot [app] | windows | tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe: the iOS
+      // Simulator and apps' windows (daemon/device.ts); anything else is a tab's screen. ponytail: a workspace named
+      // as an op needs its id
+      const [op, ...more] = rest
+      if ((DEVICE_OPS as readonly string[]).includes(op)) {
+        const [x, y, x2, y2] = more
+        const r = await rpc('device', op === 'shot' ? { op, app: more.join(' ') } : op === 'type' ? { op, text: more.join(' ') } : { op, x, y, x2, y2 }, 45000)
+        const text = op === 'shot' ? r.path : op === 'windows' ? (r as { id: number; app: string; title: string }[]).map(w => `${w.app}${w.title ? `  ${w.title}` : ''}`).join('\n') : op === 'describe' ? JSON.stringify(r, null, 2) : 'ok'
+        return out(r, text)
+      }
       const text = await rpc('screen', { target: rest[0], lines: Number(flags.lines) || 30 })
       return out(text, text)
     }
@@ -233,7 +298,7 @@ async function main() {
       return out(d, d.diff)
     }
     case 'run': {
-      const t = await rpc('run', { ws: rest[0] })
+      const t = await rpc('run', { ws: rest[0], script: rest[1] })
       return out(t, `started ${t.name} (${t.id})`)
     }
     case 'ship': {

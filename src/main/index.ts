@@ -1,8 +1,8 @@
 // Electron main: one window, the daemon started (detached, as node) if it isn't running, and a few
 // native services for the renderer: daemon address, notifications, folder picker, external links, laki:// links,
 // the preview pane's webview (localhost only) and its screenshots.
-import { app, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
-import { execFile } from 'node:child_process'
+import { app, BrowserWindow, type BrowserWindowConstructorOptions, clipboard, ClipboardItem, dialog, globalShortcut, ipcMain, Menu, type MenuItemConstructorOptions, nativeImage, Notification, screen, session, shell, Tray, webContents } from 'electron'
+import { execFile, spawnSync } from 'node:child_process'
 import { appendFileSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { realpath, stat } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -20,6 +20,15 @@ let link: string | null = null // a laki:// link that came before the renderer l
 let linkReady = false // the renderer listens for links
 let shot: [string, string] | null = null // a screenshot (a PNG, base64, and its note) from the menu bar, before the renderer listened
 let shotReady = false // the renderer listens for screenshots
+
+// Laki.AppImage --headless … (Laki.app/Contents/MacOS/Laki too): laki serve through Electron's own node, before any
+// window or display: a server's daemon and remote access, no app (docs/headless.md)
+const headless = process.argv.indexOf('--headless')
+if (headless > 0) {
+  const cli = fileURLToPath(new URL('./cli.js', import.meta.url))
+  const r = spawnSync(process.execPath, [cli, 'serve', ...process.argv.slice(headless + 1)], { stdio: 'inherit', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', LAKI_HEADLESS_PARENT: String(process.pid) } })
+  process.exit(r.status ?? 1)
+}
 
 if (!app.requestSingleInstanceLock()) app.quit()
 app.on('second-instance', () => show())
@@ -221,6 +230,30 @@ function show(tab?: string) {
   win.focus()
   if (tab) win.webContents.send('focus-tab', tab)
 }
+
+// the global hotkey (Settings › General, ui.tsx keyLabel's text: ⌃⌥⌘L; '' none): Laki forward from any app. False:
+// another app (or macOS) has those keys
+const ACCEL_KEYS: Record<string, string> = { Space: 'Space', ArrowUp: 'Up', ArrowDown: 'Down', ArrowLeft: 'Left', ArrowRight: 'Right', Enter: 'Return', '+': 'Plus' }
+function accelOf(label: string) {
+  const m = /^(⌃?)(⌥?)(⇧?)(⌘?)(.+)$/.exec(label)
+  const mods = [m?.[1], m?.[2], m?.[4]].filter(Boolean).length
+  // a key with one of ⌃ ⌥ ⌘ (⌘K, ⌥A) would be taken from every app: two of them, or one with Space or an F key
+  if (!m || !mods || (mods < 2 && !/^(Space|F\d{1,2})$/.test(m[5]))) return ''
+  return [m[1] && 'Control', m[2] && 'Alt', m[3] && 'Shift', m[4] && (mac ? 'Command' : 'Super'), ACCEL_KEYS[m[5]] ?? m[5]].filter(Boolean).join('+')
+}
+let hotkey = ''
+ipcMain.handle('hotkey', (_e, label: unknown) => {
+  const a = typeof label === 'string' ? accelOf(label) : ''
+  if (a !== hotkey) {
+    if (hotkey) globalShortcut.unregister(hotkey)
+    hotkey = ''
+    try {
+      if (a && globalShortcut.register(a, () => (app.focus({ steal: true }), show()))) hotkey = a
+    } catch {} // keys Electron can't name
+  }
+  return a ? hotkey === a : !label // false: another app has them, or they can't be a global hotkey
+})
+app.on('will-quit', () => globalShortcut.unregisterAll())
 
 ipcMain.handle('conn', async () => {
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
@@ -512,8 +545,8 @@ function barWin() {
 }
 // the drop against an edge of the screen it's on (its spot's, or the main one's when that's on no screen: a laptop
 // undocked, home kept for its return): home's side, or, let go after a drag (to: the pointer), the edge nearest the
-// pointer; inside the screen along it. The page is told the side, for its shape (a row on top or bottom); a new
-// orientation keeps the length, centered where it was, until the page says its own. animate: after a drag
+// pointer, left or right (the user's ask: never the top or bottom); inside the screen along it. The page is told the
+// side. ponytail: the row on top or bottom (across) stays in the code, unreached. animate: after a drag
 function snap(animate = false, len = barLen(), to?: { x: number; y: number }) {
   if (!floater) return
   const at = home ?? { x: Infinity, y: 0 }
@@ -524,8 +557,7 @@ function snap(animate = false, len = barLen(), to?: { x: number; y: number }) {
   const was = across()
   if (!on) side = 'right'
   else if (to) {
-    const far: [Side, number][] = [['left', c.x - d.x], ['right', d.x + d.width - c.x], ['top', c.y - d.y], ['bottom', d.y + d.height - c.y]]
-    side = far.reduce((a, b) => (b[1] < a[1] ? b : a))[0]
+    side = c.x - d.x < d.x + d.width - c.x ? 'left' : 'right'
   } else side = home?.side ?? (c.x > d.x + d.width / 2 ? 'right' : 'left') // an older floater.json's: the nearer side
   const turned = !!to && across() !== was // dragged to an edge the other way: centered where it was let go
   if (!on) barAt = { x: d.x + d.width - BAR, y: d.y + Math.round(d.height * 0.6) }
@@ -541,7 +573,7 @@ function placeFloater() {
   if (!floater) {
     try {
       barAt = home ??= JSON.parse(readFileSync(floaterFile(), 'utf8'))
-      if (home && !['left', 'right', 'top', 'bottom'].includes(home.side as string)) delete home.side // an older file's: left or right, by where it is
+      if (home && !['left', 'right'].includes(home.side as string)) delete home.side // an older file's, or a row's on top or bottom: left or right, by where it is
     } catch {}
     const f = (floater = barWin())
     f.webContents.on('did-finish-load', () => (snap(), sendFloats()))
@@ -602,6 +634,7 @@ ipcMain.handle('procs', e => {
   if (annot && !annot.isDestroyed()) add(annot.webContents.getOSProcessId(), 'Screenshot editor')
   if (newWin && !newWin.isDestroyed()) add(newWin.webContents.getOSProcessId(), 'New workspace window')
   if (aiW && !aiW.isDestroyed()) add(aiW.webContents.getOSProcessId(), 'Laki AI window')
+  for (const w of tabWins.values()) if (!w.isDestroyed()) add(w.webContents.getOSProcessId(), 'Floating tab')
   return out
 })
 ipcMain.on('proc-stop', (e, what: unknown) => {
@@ -669,6 +702,23 @@ function aiWin() {
   const w = (aiW = panelWin({ window: 'ai' }, 560, 680, { minWidth: 420, minHeight: 360 }))
   w.on('closed', () => aiW === w && (aiW = null))
 }
+// a tab floated out of the app (a tab's right click › Float in its own window): its terminal alone (?window=tab), in a
+// panel over every app, Space and full-screen app, resizable; one per tab. Closing it (its ✕) puts it back: the app's
+// pane, which says where it went meanwhile (floating), shows it again
+const tabWins = new Map<string, BrowserWindow>()
+const floating = () => win?.webContents.send('floating', [...tabWins.keys()])
+ipcMain.handle('floating', () => [...tabWins.keys()])
+ipcMain.on('tab-float', (e, tab: unknown, on: unknown) => {
+  if (e.sender !== win?.webContents || typeof tab !== 'string' || !/^[\w-]{1,64}$/.test(tab)) return
+  const had = tabWins.get(tab)
+  if (on === false) return void had?.close()
+  if (had && !had.isDestroyed()) return void had.focus()
+  const w = panelWin({ window: 'tab', tab }, 720, 440, { minWidth: 320, minHeight: 160 })
+  tabWins.set(tab, w)
+  w.on('closed', () => tabWins.get(tab) === w && (tabWins.delete(tab), floating()))
+  floating()
+})
+
 // a page of the renderer alone in a panel over every app, Space and full-screen app, in the middle of the screen the
 // mouse is on, a third down
 function panelWin(query: Record<string, string>, width: number, height: number, more: BrowserWindowConstructorOptions) {
@@ -911,7 +961,8 @@ ipcMain.on('open-external', (_e, url: string) => {
 const DOCS = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|html?|pdf|png|jpe?g|gif|webp|svg|heic|mp4|mov|webm|mp3|m4a|wav)$/i
 const BUNDLE = /\.(app|bundle|framework|plugin|kext|pkg|mpkg|prefpane|workflow|action|saver|appex)\/?$/i
 ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
-  if (!win || e.sender !== win.webContents || typeof path !== 'string' || !path.startsWith('/')) return 'missing'
+  const from = (win && e.sender === win.webContents) || [...tabWins.values()].some(w => !w.isDestroyed() && w.webContents === e.sender) // the app's window, or a floated tab's
+  if (!from || typeof path !== 'string' || !path.startsWith('/')) return 'missing'
   const real = await realpath(path).catch(() => '')
   const st = real && (await stat(real).catch(() => null))
   if (!st) return 'missing'

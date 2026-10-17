@@ -1,8 +1,8 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type Account, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
+import { type Account, againOnEnter, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
-import { api, bridge, daemonBase, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
+import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
 import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, InfoTab, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
@@ -35,7 +35,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { ShownDialog, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec } from './ui'
+import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -54,6 +54,9 @@ const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API 
 const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // experimental: loaded as it opens
 
+// Run ▾'s project scripts besides run (RUN_SCRIPTS)
+const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
+const SCRIPT_ICONS: Record<RunScript, IconName> = { test: 'check', lint: 'search', format: 'code', deploy: 'ship' }
 type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
@@ -261,6 +264,9 @@ export function App() {
   useEffect(() => void daemonBase().then(setBase, () => {}), [])
   const [artsIn, setArtsIn] = useState<string | null>(null) // the workspace whose side panel Files shows its Artifacts (the others: their worktree)
   const [finds, setFinds] = useState<Record<string, number>>({}) // ⌘F presses per session, for its find bar
+  const [floated, setFloated] = useState<string[]>([]) // tabs in windows of their own (main's tabWin): their panes say so
+  const floatTab = (id: string, on = true) => bridge?.floatTab?.(id, on) // a tab in a window of its own over every app (on false: back)
+  useEffect(() => void (bridge?.onFloating?.(setFloated), bridge?.floating?.().then(setFloated)), [])
   // tabs (of panes) per workspace: the daemon's (view.layouts, API 60: every window, the phone, Laki AI see one), kept
   // here too for the first paint and an older daemon
   const [stored, setStored] = useState<Record<string, Layout[]>>(() => load('laki.groups', {}))
@@ -843,21 +849,7 @@ export function App() {
   current.current = tab?.id ?? null
   const shownTabs = useRef<string[]>([])
   shownTabs.current = visible
-  useEffect(() => {
-    // shown: the window isn't hidden (closing it only hides it), so widgets fetch only while it's open
-    const report = () => api.send('view', { tab: current.current, tabs: shownTabs.current, focused: document.hasFocus(), browse: !!bridge?.browse, shown: document.visibilityState === 'visible' })
-    report()
-    window.addEventListener('focus', report)
-    window.addEventListener('blur', report)
-    document.addEventListener('visibilitychange', report)
-    const off = api.on(m => m.ev === 'open' && report())
-    return () => {
-      window.removeEventListener('focus', report)
-      window.removeEventListener('blur', report)
-      document.removeEventListener('visibilitychange', report)
-      off()
-    }
-  }, [tab?.id, visible.join()])
+  useEffect(() => reportView(() => ({ tab: current.current, tabs: shownTabs.current, browse: !!bridge?.browse })), [tab?.id, visible.join()])
 
   // a folder dropped on the window becomes a project (git or not), then a new workspace in it
   useEffect(() => {
@@ -997,6 +989,11 @@ export function App() {
   const forkWs = (w: WorkspaceView) => call<WorkspaceView>('wsFork', { id: w.id }).then(x => showNew(x.id), () => {})
 
   const run = async () => ws && selectTab(await call<TabView>('run', { ws: ws.id }))
+  // a RUN_SCRIPTS one (Run ▾, ⌘K): its tab, the last one's replaced; deploy once you say so
+  const runScript = async (w: WorkspaceView, k: RunScript) => {
+    if (k === 'deploy' && !(await ask(`Deploy ${w.name ?? w.id}?`, { text: "Runs the project's deploy script in a deploy tab.", ok: 'Deploy' }))) return
+    call<TabView>('run', { ws: w.id, script: k }).then(selectTab, () => {})
+  }
   // the panel on the right, on a tab: Info (⌘I), Files, Changes, Review, Preview
   const showPanel = (t: PanelTab) => (setPanelTab(t), setPanelOpen(true))
   const panelShown = panelOpen
@@ -1032,10 +1029,11 @@ export function App() {
       { label: dev ? 'Restart' : 'Run', icon: 'run', key: 'r', run: () => (w.run ? call<TabView>('run', { ws: w.id }).then(selectTab, () => {}) : edit()) },
       ...(dev && dev.status !== 'exited' ? [{ label: 'Stop', icon: 'stop', key: 's', run: () => api.send('input', { tab: dev.id, data: '\x03' }) } as MenuItem] : []),
       ...(dev ? [{ label: 'Show the run tab', icon: 'terminal', key: 't', run: () => selectTab(dev.id) } as MenuItem] : []),
+      ...(w.scripts ?? []).map((k): MenuItem => ({ label: SCRIPT_LABELS[k], icon: SCRIPT_ICONS[k], run: () => runScript(w, k) })),
       { label: `Open localhost:${w.port}`, icon: 'link', key: 'o', run: () => openPort(w.port) },
       ...actionItems(w),
       null,
-      { label: w.run ? 'Edit the run script…' : 'Set a run script…', icon: 'pencil', key: 'e', run: edit },
+      { label: w.run || w.scripts?.length ? 'Edit scripts…' : 'Set a run script…', icon: 'pencil', key: 'e', run: edit },
       ...(p && !p.kind ? [{ label: 'Edit actions…', icon: 'pencil', run: () => setDialog({ settings: p.id, spot: 'Actions' }) } as MenuItem] : []),
     ]
   }
@@ -1127,6 +1125,8 @@ export function App() {
   })
   const settings = view?.settings ?? {}
   const pickKey = settings.pickerKey ?? PICKER_KEY // the element picker's hotkey ('' none)
+  const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
+  useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey)), [hotkey])
   // a rail of kinds (Slack's) beside a list of the one picked; a phone keeps the one drawer
   const rail = !narrow
   const railWords = settings.railLabels !== false // its own setting: words under its icons, or icons only (narrower)
@@ -1459,13 +1459,14 @@ export function App() {
   const tabMenu = (ids: string[]): MenuItem[] => {
     const ts = ids.map(byId).filter((t): t is TabView => !!t)
     const g = groups.find(g => tabsOf(g).includes(ids[0]))
-    const ended = ts.filter(t => t.status === 'exited' && (t.kind === 'agent' || t.kind === 'dev'))
+    const ended = ts.filter(t => t.status === 'exited' && againOnEnter(t))
     const others = groups.filter(x => x !== g).flatMap(x => tabsOf(x).map(byId)).filter((t): t is TabView => !!t)
     return [
       { label: 'Rename…', icon: 'pencil', key: 'r', run: () => setDialog({ rename: ts[0].id }) },
       { colors: TAB_COLORS, value: colorOf(ts[0]), pick: c => ts.forEach(t => call('tabSet', { id: t.id, color: c })) },
       { label: ts[0].muted ? 'Unmute notifications' : 'Mute notifications', icon: 'bell', key: 'm', run: () => ts.forEach(t => call('tabSet', { id: t.id, muted: !ts[0].muted })) },
       { label: 'Mark as unread', icon: 'unread', key: 'u', run: () => ts.forEach(t => markUnread(t.id)) },
+      ...(bridge?.floatTab && ts.length === 1 ? [floated.includes(ts[0].id) ? ({ label: 'Back from its own window', icon: 'popIn', run: () => floatTab(ts[0].id, false) } as MenuItem) : ({ label: 'Float in its own window', icon: 'popOut', sub: 'Over every app, so you can watch it from anywhere', run: () => floatTab(ts[0].id) } as MenuItem)] : []),
       ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
       ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),
       ts[0].share
@@ -1736,7 +1737,8 @@ export function App() {
     a({ label: find ? 'Stop filtering the sidebar' : 'Filter the sidebar…', icon: 'filter', run: () => (setSideOpen(true), setFind(f => (f ? null : { q: '' }))) })
     if (!view?.remote) {
       // the way Settings has it: Laki's PIN, or the saved email
-      if (settings.remoteAuth === 'pin') a({ label: 'Start remote access with a PIN, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, pin: true }).catch(() => {}), setDialog({ section: 'remote' })) })
+      if (settings.remoteAuth === 'tailscale') a({ label: 'Start remote access on your tailnet, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, via: 'tailscale' }).catch(() => {}), setDialog({ section: 'remote' })) })
+      else if (settings.remoteAuth === 'pin') a({ label: 'Start remote access with a PIN, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, pin: true }).catch(() => {}), setDialog({ section: 'remote' })) })
       else if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
       a({ label: 'Remote access…', icon: 'link', run: () => setDialog({ section: 'remote' }) })
     } else {
@@ -1752,8 +1754,10 @@ export function App() {
       if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
       if (git) a({ label: 'Review: PR checks and comments', icon: 'review', run: () => showPanel('review') })
       a({ label: 'Workspace info', icon: 'info', hint: '⌘I', run: () => showInfo(true) })
+      if (tab && bridge?.floatTab) a(floated.includes(tab.id) ? { label: 'Bring the tab back from its own window', icon: 'popIn', run: () => floatTab(tab.id, false) } : { label: 'Float the tab in its own window', icon: 'popOut', run: () => floatTab(tab.id) })
       a({ label: ws.run ? 'Run the run script' : 'Set a run script…', icon: 'run', run: ws.run ? run : editScripts })
       if (devRunning) a({ label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
+      for (const k of ws.scripts ?? []) a({ label: `Run the ${k} script`, icon: SCRIPT_ICONS[k], run: () => runScript(ws, k) })
       if (ws.kind === 'worktree') a({ label: 'Ship: commit, push, open a PR', icon: 'ship', run: () => setDialog('ship') })
       wsActions.forEach(a)
       if (previewed) a({ label: 'Close the file preview', icon: 'x', hint: '⌘W', run: closePreview })
@@ -2476,7 +2480,15 @@ export function App() {
                   const ts = (drag.whole ? tabsOf(groups.find(g => tabsOf(g).includes(drag.tab)) ?? null) : [drag.tab]).map(byId).filter((t): t is TabView => !!t)
                   return ts.length > 1 ? <><Glyph s={rollup(ts)} /><span>{ts.map(t => t.name).join(' · ')}</span></> : label(drag.tab)
                 })()}
-                render={id => (
+                render={id => floated.includes(id) ? (
+                  <div className="floated">
+                    <span>In a window of its own, over every app</span>
+                    <div className="row">
+                      <button onClick={() => floatTab(id)}>Show it</button>
+                      <button onClick={() => floatTab(id, false)}>Bring it back</button>
+                    </div>
+                  </div>
+                ) : (
                   <Term
                     key={transparent() ? 'clear' : 'solid' /* xterm takes allowTransparency only as it opens */}
                     tab={id}
@@ -2615,7 +2627,7 @@ export function App() {
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             onMemory={id => setDialog({ project: id, tab: 'memory' })}
             renameProjects
-            skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }) }}
+            skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }), doctor: () => api.call<Doctor>('doctor') }}
             accounts={layoutsOn ? accountsApi : undefined}
             ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
             webhookTest={w => api.call('webhookTest', w)}
@@ -2633,7 +2645,7 @@ export function App() {
               stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
               widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
             }}
-            remote={{ state: view.remote, start: (hours, mail, open, pin) => api.call('remoteStart', { hours, mail, open, pin }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+            remote={{ state: view.remote, start: (hours, mail, open, pin, via) => api.call('remoteStart', { hours, mail, open, pin, via }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             widgets={extCfg}
             logs={(key, title) => setDialog({ logs: key, title })}
             section={settingsFor ? `project:${settingsFor.id}` : section}

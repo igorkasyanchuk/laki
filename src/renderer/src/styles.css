@@ -958,7 +958,7 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .run-btn button.running { color: var(--error); }
 .run-btn .run-more { padding: 0 5px; border-left: 1px solid var(--line); color: var(--muted); }
 .scripts { display: flex; flex-direction: column; gap: 6px; }
-.scripts-tabs { display: flex; gap: 2px; border-bottom: 1px solid var(--line); }
+.scripts-tabs { display: flex; flex-wrap: wrap; gap: 2px; border-bottom: 1px solid var(--line); }
 .scripts-tabs button { display: inline-flex; align-items: center; gap: 6px; background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 4px 10px; color: var(--muted); }
 .scripts-tabs button:hover { color: var(--fg); background: none; }
 .scripts-tabs button.on { color: var(--fg); border-bottom-color: var(--accent); }
@@ -1330,6 +1330,19 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-body a[href^="laki:"]:hover { text-decoration: none; background: color-mix(in srgb, var(--accent) 24%, transparent); }
 .ai-foot, .ai-dock > .ai-err { margin-top: 6px; text-align: center; font-size: 11px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .ai-foot { color: var(--muted); }
+/* a tab floated out of the app (?window=tab, frameless, over every app): its head is the title bar, then the terminal */
+.tab-window { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--app-bg, var(--bg)); }
+.tab-win-head { flex: none; display: flex; align-items: center; gap: 8px; height: 30px; padding: 0 4px 0 10px; border-bottom: 1px solid var(--line); background: var(--side); font-size: 12px; -webkit-app-region: drag; user-select: none; }
+.tab-win-head b, .tab-win-head .muted { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tab-win-head button { -webkit-app-region: no-drag; }
+.tab-win-body { position: relative; flex: 1; min-height: 0; background: var(--term-bg, var(--bg)); }
+/* Settings › General › Developer: the CLI's links under its row */
+.cli-row { align-items: center; }
+.cli-links { display: flex; gap: 14px; margin-top: 3px; }
+.cli-links a { color: var(--accent-ink); }
+/* the app's pane of a floated tab: where it went, and the way back */
+.floated { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 10px; color: var(--muted); text-align: center; }
+.floated .row { gap: 8px; }
 /* the bubbles' AI window (?window=ai, frameless): its own head as the title bar, then the chat alone, tighter */
 .ai-window { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--app-bg, var(--bg)); isolation: isolate; }
 .ai-window::before { content: ''; position: absolute; inset: 0 0 auto; z-index: -1; height: 220px; background: radial-gradient(100% 100% at 50% -30%, color-mix(in srgb, var(--accent) 24%, transparent), transparent 70%); opacity: 0.75; transition: opacity 0.6s; pointer-events: none; }

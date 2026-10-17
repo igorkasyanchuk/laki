@@ -29,7 +29,9 @@ you. Each run keeps its decisions and log.
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
   update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in
-  your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top.
+  your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top. A tab floats
+  out in a window of its own, over every app (its right click › *Float in its own window*). Run ▾ runs the project's
+  test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
   ssh, with nothing to install; its `$PORT` comes back to localhost for the preview.
 - **PRs**: CI and reviews in the status bar (who approved, who asked for changes) and at a glance in the sidebar
@@ -52,7 +54,10 @@ you. Each run keeps its decisions and log.
   with the link reads, for some hours or until you stop it, with a QR code, and Copy and Download as Markdown.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only; or with Laki's own
   PIN instead (shown on your Mac, a new one each time; a wrong one, twice unless you pick otherwise, stops it); or for
-  anyone with the link, if you type *confirm* (a red warning says what that risks).
+  anyone with the link, if you type *confirm* (a red warning says what that risks); or through Tailscale, for your
+  tailnet's devices only.
+- **Headless**: on a server with no screen, `./Laki.AppImage --headless --tailscale`, and Laki in your browser
+  ([docs/headless.md](docs/headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
   look; the video, extensions, the preview or the floating bubbles stop with a click.
 - **Get started**: the first steps in a window that ticks them as you go, what's left at the sidebar's bottom.
@@ -67,14 +72,15 @@ you. Each run keeps its decisions and log.
   you like), with a full view a click away; their buttons answer with toasts and dialogs; a JS one reaches the web only if you allow it.
   The SDK: [docs/extensions.md](docs/extensions.md).
 - **Screenshots to agents**: from the menu bar, drawn on (crop, arrows, text, boxes) with a note, straight to a new
-  workspace's prompt.
+  workspace's prompt. Agents take their own of the iOS Simulator or any app's window (`laki screen shot`), and with
+  idb tap, swipe and type in the simulator to check what they built.
 - **A video while you work**: a YouTube link plays at the bottom of the sidebar.
 - **Laki AI** (optional): ask in plain words, or paste a screenshot of PR links, and it starts workspaces, reviews
   PRs, sends prompts, tells you what your agents are doing and makes extensions (saved off until you turn them on); with Laki's skill it also
   lists your PRs and others', runs your actions and templates, keeps a project's notes and memory, and asks you with options when unsure (it
   removes something only when you press Yes); a chat button on every page that knows what you're looking at; timers, reminders and messages for later on request;
   on OpenRouter or claude -p / codex exec, every ask's cost logged (shown or hidden).
-- **Keyboard and CLI**: ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
+- **Keyboard and CLI**: ⌃⌥⌘L brings Laki forward from any app, ⌘K for everything, ⌘⇧⏎ a tab full screen, ⌘+ / ⌘− one tab's text size, ⌘L send later; `laki` (also an MCP server) drives it all, agents included.
 
 ## Install
 

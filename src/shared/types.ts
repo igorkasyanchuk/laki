@@ -23,7 +23,7 @@ export type RunAction = { name: string; target: Agent | 'any' | 'shell'; text: s
 export type Template = { name: string; text: string }
 // copy: gitignore-style patterns of files git doesn't keep (.env…) a new worktree gets from the main checkout, with .worktreeinclude's
 // ports: names for the status bar's ports ({"3000": "web"})
-export type ProjectConfig = { setup?: string; teardown?: string; run?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod } // worktrees, pr, mergeMethod: the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way
+export type ProjectConfig = { setup?: string; teardown?: string; run?: string; test?: string; lint?: string; format?: string; deploy?: string; expose?: string; actions?: RunAction[]; templates?: Template[]; env?: Record<string, string>; copy?: string[]; ports?: Record<string, string>; worktrees?: string; pr?: PRAllow; mergeMethod?: MergeMethod } // worktrees, pr, mergeMethod: the app's only (never .laki.json): where new ones go; what the app may do to a PR; the last merge's way
 // what Laki may do to a project's PRs (its settings): approve, close and merge (each after a confirm) unless turned
 // off; merge when green only when turned on
 export type PRAllow = { approve?: boolean; close?: boolean; merge?: boolean; land?: boolean }
@@ -85,6 +85,7 @@ export type Workspace = {
   port: number
   created: number
   archived?: boolean
+  archivedAt?: number // when (ms), for settings.archivedDays
   color?: string // its sidebar color's name
   name?: string // shown instead of the id (which names the worktree and branch)
   schedule?: string // the scheduled task that made it (its clock in the sidebar)
@@ -227,7 +228,17 @@ export function webhookUrl(url?: string) {
 export const PR_SCAN = 1 // minutes between PR checks (settings.prScan)
 export const PR_TRIES = 3 // failing CI or conflicts go to the agent this many times in a row (settings.prTries), then over to you
 
-export type TabKind = 'agent' | 'shell' | 'setup' | 'dev' | 'ship'
+export type TabKind = 'agent' | 'shell' | 'setup' | 'dev' | 'ship' | 'script' // script: Run ▾'s test, lint, format or deploy (its name)
+// the project's scripts Run ▾ starts besides run, each in a tab of its own (named as it), set like run (the project's
+// settings, .laki.json)
+export const RUN_SCRIPTS = ['test', 'lint', 'format', 'deploy'] as const
+// laki screen's ops on what isn't a web page (daemon/device.ts): a screenshot of the iOS Simulator or an app's window,
+// the windows open, and the simulator's hands through idb
+export const DEVICE_OPS = ['shot', 'windows', 'tap', 'swipe', 'type', 'describe'] as const
+export type RunScript = (typeof RUN_SCRIPTS)[number]
+// Enter (or the tab menu's Restart) in its ended tab starts it again: an agent, the run tab, a script; a deploy only
+// through Run ▾, which asks (core's input, App's tab menu)
+export const againOnEnter = (t: { kind: TabKind; script?: RunScript }) => t.kind === 'agent' || t.kind === 'dev' || (t.kind === 'script' && t.script !== 'deploy')
 
 export type Tab = {
   id: string
@@ -248,6 +259,7 @@ export type Tab = {
   account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it
+  script?: RunScript // a script tab's (kind script): which RUN_SCRIPTS one, whatever it's named
 }
 
 // a few words of what a prompt asks, for a tab's name: its first line less links (a GitHub PR's or issue's is #n), flags,
@@ -337,7 +349,7 @@ export type Settings = {
   aiGlow?: boolean // experimental (Settings › General): a glow over what Laki AI looks at (a tab's pane, else the window), off unless true
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
-  remoteAuth?: 'email' | 'pin' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email)
+  remoteAuth?: 'email' | 'pin' | 'tailscale' // how remote access lets you in: email (unset too), Cloudflare's code; pin, Laki's own PIN (no email); tailscale, your tailnet (tailscale serve)
   remoteTries?: number // pin: wrong PINs that stop remote access (unset: REMOTE_TRIES)
   timers?: boolean // how long each turn has been going, on its tab and row (unset: off)
   projectLook?: ProjectLook // the sidebar's project names, over the theme's
@@ -356,6 +368,10 @@ export type Settings = {
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
+  bgRefresh?: boolean // PR checks on their own (each prScan minutes, a turn's end); off: only Refresh PR status (unset: on)
+  copyIgnored?: boolean // a new worktree gets every file git ignores from the main checkout, not only .worktreeinclude's (unset: off)
+  copyUntracked?: boolean // and the untracked ones (unset: off)
+  archivedDays?: number // archived workspaces deleted after this many days, their branch kept (unset or 0: never)
   prTries?: number // fix CI's and fix conflicts' tries in a row (unset: PR_TRIES)
   sleepAfter?: number // minutes an idle claude or codex nobody looks at keeps its process (unset: SLEEP_AFTER; 0: always)
   webhook?: Webhook // pushes to your phone
@@ -388,6 +404,8 @@ export type Settings = {
   progressLook?: 'pct' | 'bar' | 'both' // in the sidebar: the percent, a filling line, or both (unset: pct)
   railPlans?: PlanPin[] // specs and brainstorms pinned to the rail (RAIL_PINS at most), oldest first
   pickerKey?: string // development mode's element picker: its hotkey as ui.tsx' keyLabel writes it (unset: PICKER_KEY; '': none)
+  hotkeyOn?: boolean // the global hotkey: Laki forward from any app (main's globalShortcut; unset: on)
+  hotkey?: string // its keys as keyLabel writes them (unset: ui.tsx HOTKEY; '': none)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs, Settings › Widgets), in the daemon's memory (unset: off)
   widgetHours?: string // when widgets fetch on their own, in English (when.ts parseHours: 9am-9pm weekdays; unset: always)
   ai?: AiSettings // Laki's own AI (Settings › AI, the AI page)
@@ -461,7 +479,7 @@ export const DESK_TILE: Omit<DeskTile, 'id'> = { w: 4, h: 6 }
 // with the token
 // open: no email (mail ''), anyone with the link; pin: Laki's PIN instead of an email (shown here, typed on the page),
 // tries: wrong ones left before it stops
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string }
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string; via?: 'tailscale' } // via tailscale: tailscale serve, the tailnet's devices only
 export const REMOTE_TRIES = 2
 export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours unless Settings › Resources says otherwise
 export const IMAGE_DAYS = 30 // days a pasted image is kept (<data>/images: Laki AI's chats, prompts) unless Settings › AI says otherwise
@@ -530,18 +548,18 @@ export type Resources = { app: (ProcUse & { kind: string })[]; daemon: ProcUse &
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
 export type Tunnel = { port: number; url?: string; mails?: string[] }
 
-// run: the project has a dev command
+// run: the project has a dev command; scripts: the RUN_SCRIPTS it has
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
 // (new files' too), files, and paths not committed (dirty), every 10 s (settings.diffStat on, or a race's)
 export type Stat = { add: number; del: number; files: number; dirty: number }
 // procs: what listens on each of its ports (the status bar's ✕ stops it); portNames: .laki.json's ports; artifacts:
 // the files in its storage folder ($LAKI_STORAGE_FOLDER), the status bar's count
-export type WorkspaceView = Workspace & { setup: boolean; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; artifacts?: number; links?: Link[] }
+export type WorkspaceView = Workspace & { setup: boolean; scripts?: RunScript[]; ports: number[]; procs?: Record<number, Proc>; portNames?: Record<string, string>; tunnels: Tunnel[]; pr?: PR; run: boolean; stat?: Stat; artifacts?: number; links?: Link[] }
 // a link an agent kept in the storage folder (a .url file: what it published), its title the file's name
 export type Link = { path: string; url: string; title: string; at: number }
 export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent's own (no shell between: its browser bridge, an MCP server) or a browser: not in ports
 // the first-run screen's checks: git, gh (missing, signed out, in), which agents are on PATH
-export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; agents: { id: Agent; found: boolean }[] }
+export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean }[] } // idb: laki screen's simulator hands
 
 // a widget (daemon/widgets.ts): a folder with widget.json and widget.html; on: in the sidebar, fetching every `every`
 // minutes (none: no fetch command or script); size: cells, 1–3 across the sidebar's grid by 1–4 down; full: it has a
@@ -585,4 +603,4 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 69
+export const API = 70

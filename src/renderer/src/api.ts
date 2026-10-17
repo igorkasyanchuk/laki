@@ -23,6 +23,10 @@ type Bridge = {
   glass?(on: boolean): void
   fullScreen?(on: boolean): void // ⌘⇧⏎: the window full screen (the tab alone in it), or as it was
   dockIcon?(png: string): void // Settings' Dock icon, a PNG data URL (main's app.dock.setIcon)
+  hotkey?(label: string): Promise<boolean> // the global hotkey, keyLabel's text ('' none): false when another app has it (main's globalShortcut)
+  floatTab?(tab: string, on?: boolean): void // a tab in a window of its own over every app (main's tabWin), or back (on false)
+  floating?(): Promise<string[]> // the tabs floated out
+  onFloating?(cb: (tabs: string[]) => void): void
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)
   procs?(): Promise<{ pid: number; name: string; stop?: string }[]>
@@ -186,6 +190,24 @@ class Api {
 }
 
 export const api = new Api()
+
+// tell the daemon what this window shows (App's panes, a floated tab's window): it clears their ● and sets none while
+// you look. focused and shown (the window isn't hidden: closing it only hides it, so widgets fetch only while it's
+// open) are added here, again as they change and as the socket opens. The cleanup, for an effect
+export function reportView(what: () => { tab: string | null; tabs: string[]; browse?: boolean }) {
+  const report = () => api.send('view', { ...what(), focused: document.hasFocus(), shown: document.visibilityState === 'visible' })
+  report()
+  window.addEventListener('focus', report)
+  window.addEventListener('blur', report)
+  document.addEventListener('visibilitychange', report)
+  const off = api.on(m => m.ev === 'open' && report())
+  return () => {
+    window.removeEventListener('focus', report)
+    window.removeEventListener('blur', report)
+    document.removeEventListener('visibilitychange', report)
+    off()
+  }
+}
 
 // a laki:// link (the AI's to a workspace or tab) goes to the app's own router (App's onLakiLink); a window without one
 // (the AI window) hands it to main, which shows the app window and routes it there

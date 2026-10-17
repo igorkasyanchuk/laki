@@ -20,6 +20,10 @@ contextBridge.exposeInMainWorld('laki', {
   glass: (on: boolean) => ipcRenderer.send('glass', on), // the window's blur behind see-through backgrounds
   fullScreen: (on: boolean) => ipcRenderer.send('full-screen', on), // ⌘⇧⏎: the window full screen with the tab alone, or back
   dockIcon: (png: string) => ipcRenderer.send('dock-icon', png), // Settings' Dock icon
+  hotkey: (label: string): Promise<boolean> => ipcRenderer.invoke('hotkey', label), // the global hotkey ('' none): false when another app has it
+  floatTab: (tab: string, on = true) => ipcRenderer.send('tab-float', tab, on), // a tab in a window of its own over every app, or back
+  floating: (): Promise<string[]> => ipcRenderer.invoke('floating'), // the tabs in windows of their own
+  onFloating: (cb: (tabs: string[]) => void) => ipcRenderer.on('floating', (_e, tabs: string[]) => cb(tabs)),
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
   badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean) => ipcRenderer.send('badge', n, items, tray),
   onDeepLink: (cb: (url: string) => void) => {

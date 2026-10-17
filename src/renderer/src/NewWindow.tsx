@@ -1,21 +1,25 @@
 // The floating bubbles' + (and a voice prompt for a new session): the new-workspace page alone, in a window of its own
 // over every app (main's newWsWin, ?window=new), so Laki's own window and the app you're in stay where they are. The
 // workspace made, or Esc: it closes; the app's sidebar shows the new one. Its Ask Laki AI: the AI page, compact, in one
-// too (aiWin, ?window=ai).
+// too (aiWin, ?window=ai). A tab floated out of the app (a tab's right click › Float): its terminal alone, live, in a
+// window over every app (tabWin, ?window=tab&tab=<id>); its ✕ puts it back in the app.
 import { useEffect, useState } from 'react'
 import type { View, WorkspaceView } from '../../shared/types'
-import { api, bridge } from './api'
+import { api, bridge, reportView } from './api'
 import { AiPage } from './Ai'
+import { Glyph } from './Glyph'
 import { VoiceBar } from './PromptInput'
 import { NewWorkspace } from './panels'
-import { applyTheme, type Paint, paintOf } from './themes'
-import { AskHost, load, Tips } from './ui'
+import { FONT_SIZE, termLook } from './Settings'
+import { Term } from './Term'
+import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
+import { AskHost, IconButton, load, Tips } from './ui'
 
 // no glass, no see-through sidebar: the window has no blur behind it
 const paint = (p: Paint) => applyTheme({ ...p, glass: false, sideClear: 0 })
 // only in those windows: main.tsx imports this module in the app's too
 const which = new URLSearchParams(location.search).get('window')
-if (which === 'new' || which === 'ai') {
+if (which === 'new' || which === 'ai' || which === 'tab') {
   const last = load<string | Paint>('laki.theme', '') // the app's, until the daemon's settings arrive
   paint(typeof last === 'string' ? { theme: last } : last)
   if (which === 'new') document.documentElement.classList.add('new-window') // compact: styles.css' .new-window rules
@@ -32,6 +36,33 @@ function useView() {
   const theme = JSON.stringify(paintOf(view?.settings))
   useEffect(() => void (view && paint(paintOf(view.settings))), [theme])
   return view
+}
+
+export function TabWindow() {
+  const view = useView()
+  const id = new URLSearchParams(location.search).get('tab')
+  const t = view?.tabs.find(x => x.id === id)
+  const ws = t && view?.workspaces.find(w => w.id === t.workspace)
+  useEffect(() => void (view && !t && window.close()), [view, t]) // closed in the app (or gone): the window goes too
+  // on screen here: no ● while you look. No tab: the app's pane keeps the keyboard's
+  useEffect(() => (id ? reportView(() => ({ tab: null, tabs: [id] })) : undefined), [id])
+  if (!view || !t) return null
+  const s = view.settings
+  const zoom = Number(load<Record<string, unknown> | null>('laki.zoom', {})?.[t.id]) || 0 // the tab's ⌘± in the app (App's sizeOf)
+  return (
+    <div className="tab-window">
+      <div className="tab-win-head">
+        <Glyph s={t.status} />
+        <b>{t.name}</b>
+        {ws && <span className="muted">{ws.name || ws.id}</span>}
+        <span className="grow" />
+        <IconButton icon="popIn" title="Back in Laki" onClick={() => window.close()} />
+      </div>
+      <div className="tab-win-body">
+        <Term key={transparent() ? 'clear' : 'solid'} tab={t.id} fontSize={Math.min(32, Math.max(8, (s.fontSize ?? FONT_SIZE) + zoom))} onFile={p => void bridge?.openPath?.(p)} fontFamily={s.fontFamily} copyOnSelect={s.copyOnSelect !== false} editKeys={s.editKeys !== false} theme={paintKey(paintOf(s))} look={termLook(s)} />
+      </div>
+    </div>
+  )
 }
 
 export function AiWindow() {

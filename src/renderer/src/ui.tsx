@@ -38,6 +38,8 @@ const paths = {
   folderPlus: 'M2 4.5h4l1.5 1.5H14v7H2zM8 8v3.5M6.25 9.75h3.5',
   server: 'M2.5 2.5h11v4.5h-11zM2.5 9h11v4.5h-11zM5 4.75h.01M5 11.25h.01',
   splitRight: 'M2.5 2.5h11v11h-11zM8 2.5v11',
+  popOut: 'M7 3.5H3.5v9h9V9M9.5 2.5h4v4M13.5 2.5L8 8', // a window with an arrow out of it: a tab in its own window
+  popIn: 'M7 3.5H3.5v9h9V9M13.5 2.5L8.5 7.5M8.5 4v3.5H12', // and back in
   splitDown: 'M2.5 2.5h11v11h-11zM2.5 8h11',
   terminal: 'M2.5 2.5h11v11h-11zM5 6l2 2-2 2M8.5 10.5h2.5',
   agent: 'M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z',
@@ -249,9 +251,11 @@ export function AskHost() {
 // hotkey is kept as this text
 export const keyRec = { on: false } // Settings' KeyField is recording: App's keys stand aside (they'd run the combo)
 export const keyLabel = (e: { key: string; code: string; metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean }) => {
-  const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.key.length === 1 ? e.key.toUpperCase() : e.key
+  const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.code === 'Space' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key
   return `${e.ctrlKey ? '⌃' : ''}${e.altKey ? '⌥' : ''}${e.shiftKey ? '⇧' : ''}${e.metaKey ? '⌘' : ''}${k}`
 }
+
+export const HOTKEY = '⌃⌥⌘L' // the global hotkey's keys (settings.hotkey unset)
 
 export function Page({ title, head, tools, onClose, children, wide, esc = true }: { title: string; head?: ReactNode; tools?: ReactNode; onClose: () => void; children: ReactNode; wide?: boolean; esc?: boolean }) {
   useEffect(() => {

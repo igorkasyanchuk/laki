@@ -62,8 +62,8 @@ changing it: [AGENTS.md](../AGENTS.md).
   workspaces, reviews PRs in their own worktrees, sends prompts, tells you what your agents are doing, makes extensions. It runs on
   OpenRouter (your API key) or on claude -p / codex exec, and every ask's tokens and cost are logged.
 - **Git**: ship (commit, push, open a PR), fork a workspace with its chat, archive and restore.
-- **Scripts and ports**: setup, teardown and run scripts per project (any number of lines); ▷ Run starts the
-  run script in its tab, ■ stops it; listening ports you click to open, name (`.laki.json`), stop (✕), or expose to
+- **Scripts and ports**: setup, teardown, run, test, lint, format and deploy scripts per project (any number of
+  lines); ▷ Run starts the run script in its tab, ■ stops it, Run ▾ runs the others, each in a tab of its own; listening ports you click to open, name (`.laki.json`), stop (✕), or expose to
   the world (a public trycloudflare.com link and its QR code, optionally only for some email addresses).
 - **Look**: 98 themes, including Warp-style gradients and eighty that also change shapes, borders and type;
   glass (a see-through window, as see-through as you set, with a color glow); Inter and eleven terminal fonts
@@ -71,8 +71,15 @@ changing it: [AGENTS.md](../AGENTS.md).
   Inconsolata, Roboto Mono, Victor Mono); tab and
   workspace colors.
 - **Remote access**: the whole app in a browser on another computer or your phone, through a Cloudflare
-  tunnel that lets in one email address (or, if you type *confirm*, anyone with the link), for 1 hour to 3 days or
-  until you stop it; a QR code to open it.
+  tunnel that lets in one email address (or, if you type *confirm*, anyone with the link), or through Tailscale for
+  your tailnet's devices, for 1 hour to 3 days or until you stop it; a QR code to open it.
+- **Headless**: Laki on a server with no screen (`./Laki.AppImage --headless --tailscale`), used in a browser
+  ([headless.md](headless.md)).
+- **A tab in its own window**: a tab's right click › *Float in its own window* (⌘K too): its terminal, live, in a small
+  window over every app, as big as you drag it; its ✕ puts it back.
+- **The iOS Simulator and app windows**: `laki screen shot` gives an agent a screenshot of the booted simulator or any
+  app's window, and with idb it taps, swipes and types in the simulator (`laki screen tap`), to check what it built.
+- **A global hotkey**: ⌃⌥⌘L brings Laki forward from any app (Settings › General).
 - **Keys everywhere**: ⌘ shortcuts, a ⌘K palette, and a letter for every menu item.
 - **A break**: the smiley at the bottom of the sidebar shows a random meme from r/memes, r/ProgrammerHumor or r/wholesomememes (not
   one you've seen); *Next* (→, N) for another, a right click to copy, download or open it. Settings › Appearance hides it.
@@ -137,11 +144,14 @@ and `gh` in WSL and sign in there, and keep projects in its own folders (`~/…`
 boundary). On a desktop Ubuntu 24.04+, if it stops on the SUID sandbox helper (AppArmor), start it with `--no-sandbox`.
 On arm64 the AppImage's starter also wants `libz.so` (`sudo apt install zlib1g-dev`).
 
+On a server with no screen, `./Laki-*.AppImage --headless --tailscale` runs Laki for a browser instead of a window:
+[headless.md](headless.md).
+
 Not like the Mac: shortcuts written ⌘ are the Super key, and paste in a terminal is Ctrl+Shift+V (Ctrl+V and Ctrl+C go
 to the terminal); the window has the system's title bar (Alt shows the menu) and closing it quits Laki (the daemon and
 its agents keep running); no menu bar screenshots, timer sounds, *Open in* other apps, `laki open` or laki:// links.
 
-To put the CLI on your PATH as `laki`: Settings › General › *Command line* › *Install the laki command* (a small
+To put the CLI on your PATH as `laki`: Settings › General › *Developer* › *Install the laki command* (a small
 launcher in Homebrew's bin, /usr/local/bin or ~/.local/bin; it says when that folder isn't on your PATH), or from the
 repo:
 
@@ -365,7 +375,9 @@ workspace, then D deletes it, R renames it). ↑↓ and ⏎ work too, and 0–9 
 - search: the command palette (⌘K);
 - ⋯: split right/down, fork, archive, delete;
 - ▷ Run ▾: the project's run script in a *dev* tab, ■ Stop while it runs (^C). ▾ restarts it, shows its tab,
-  opens `localhost:$PORT` or edits the script. With no run script, Run opens the project's scripts.
+  opens `localhost:$PORT` or edits the scripts. With no run script, Run opens the project's scripts. The project's
+  *Test*, *Lint*, *Format* and *Deploy* scripts (when set) are in ▾ too, each in a tab named as it (run again, the
+  last one's tab goes; Deploy asks first); Enter in its ended tab runs it again (a deploy's: only Run ▾ › Deploy, which asks). ⌘K has *Run the test script*…
   ▾ also lists your actions (Settings → *Actions*, and the project's), worked out as it opens:
   - *Agent actions*: a prompt for an agent (Claude Code, Codex, Gemini, Grok, OpenCode, or *Any agent*), listed while the workspace runs that agent. It goes to
     the focused tab if it's that agent, else its first tab, now or (while it works) when its turn ends.
@@ -434,6 +446,10 @@ email address only, unless you leave the email out on purpose (below).
   browser page opens to pick your Cloudflare account). Settings › *Remote access* and Help say so too.
 - When the page can't reach Laki it says why: Cloudflare's sign-in ran out (it reloads, to sign in again), the
   link ended (remote access stopped or started again: open the newest one), or the Mac is out of reach.
+- With Tailscale instead (*Sign in with* › *Tailscale*): `tailscale serve` publishes it at
+  `https://<this Mac>.<your tailnet>.ts.net`, for your tailnet's devices only (never Funnel), with the link's key.
+  It needs Tailscale connected here and HTTPS certificates on for the tailnet (its admin console › DNS); the Mac app's
+  own `tailscale` is used when none is on your PATH. On a server with no screen: [headless.md](headless.md).
 - On a phone the app has its own layout: the sidebar slides over, one pane at a time (split tabs show as
   separate tabs), the panels and Settings take the whole screen, and a row of keys a phone keyboard lacks
   (⌨ to show it, Esc, Tab, ⇧Tab, ⌃C, arrows, Enter) sits above the status bar. A terminal takes the size of the
@@ -1014,6 +1030,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 
 | key | |
 |---|---|
+| ⌃⌥⌘L | from any app: bring Laki forward (Settings › General › *Global hotkey*: off, or other keys) |
 | ⌘O | open a project folder (or drop one on the sidebar; on a terminal it types the path), then a new workspace in it |
 | ⌘N | new workspace |
 | ⌘T / ⌘W | new shell tab / close tab (or the file in front in the preview, when one is open); in a browser: a new page / close it |
@@ -1051,7 +1068,7 @@ stronger, *Reduce transparency* keeps the window solid (no glass), *Reduce motio
 `state.json`. The page grows and shrinks with the terminal font size; on/off options are switches. *Find a
 setting* (the box above the sections) lists the settings that match what you type; Enter or a click opens one,
 lit for a moment.
-- *General*: the agent new workspaces start with, *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
+- *General*: the agent new workspaces start with, *Global hotkey* (on: ⌃⌥⌘L brings Laki forward from any app; *Record* other keys: two of ⌃ ⌥ ⌘ with a key, or one with Space or an F key, so no app loses its own ⌘K; it says when another app has them), *Developer* (the `laki` command for any terminal, with links to the CLI reference and the agent skill), *macOS notifications* (on by default; also *Turn macOS notifications off/on* in ⌘K) with a switch for each
   kind (waiting for you, finished, usage limit) and the sound (macOS's, or none), *Progress on tabs* (agents report how far
   along they are; off by default), *Timers* (a sidebar timer's end: Laki's dialog or a notification, and its sound), *Development mode* (an event log per workspace, ⋯ › *Logs*: each PR check with
   its checks, conflicts and review, what *fix CI*, *review* and *fix conflicts* sent to the agent or why not, what
@@ -1068,8 +1085,12 @@ lit for a moment.
 - *Git & worktrees*: the branch prefix for new worktrees (default `laki/`), *Sync the base branch* (off; *Origin's*,
   recommended: git fetch, then the worktree starts off `origin/<base>`; *Fast-forward mine*: your base branch moves up to
   origin's first, when it can; a failed fetch never stops a workspace), *Folder for worktrees* (a folder per project
-  inside it; empty: `~/.laki/worktrees`; a project's settings can pick its own; ones made already stay) and *Archive
-  workspace when its PR merges* (off).
+  inside it; empty: `~/.laki/worktrees`; a project's settings can pick its own; ones made already stay), *Copy ignored
+  files to new worktrees* (off: every file `.gitignore` leaves out, not only `.worktreeinclude`'s; `node_modules` too,
+  which can be slow) and *Copy untracked files to new worktrees* (off), *Refresh PR status in the background* (on;
+  off: a PR's status changes only with its right click › *Refresh PR status*, if `gh` asks for an SSH passphrase or
+  GitHub rate-limits you; the PR switches need it on), *Delete archived workspaces* (Never, or after a day to a month:
+  the workspace goes, its branch stays) and *Archive workspace when its PR merges* (off).
 - *Appearance*: what the window shows (*plan limits* for Claude Code and for Codex: the status bar's ring, on by
   default; *Pull requests in the sidebar*: GitHub's mark on a workspace with a PR, on by default, with *Your picture on your PRs* (on: your GitHub picture beside it, as others' show theirs); *Pull request marks*:
   ✓, ✓✓ and 👀, each on by default, and where they go; *Menu bar item*: the count and its menu, on by default; *Fun
@@ -1089,7 +1110,7 @@ lit for a moment.
   Space, with a circle per agent working or waiting for you (a pulse), two letters from its workspace's name inside (none the same; pr-, issue- and numbers skipped): hover one for
   its card, as the sidebar's: its name, project, branch and `$PORT`, its agents, what it asked or last said, its PR
   (state, checks, review, conflicts), diff size and ports; click to open it in Laki; drag it from anywhere on it (a circle too)
-  anywhere, and it sticks to the screen's edge nearest where you let go (left, right, or a row along the top or bottom), where it stays; hidden while Laki is
+  anywhere, and it sticks to the screen's side nearest where you let go (left or right), where it stays; hidden while Laki is
   in front; on by default. *While working* picks how a working agent's circle looks, each shown live: *Glow* (a soft
   halo), *Gradient* (its color turning slowly inside, the default), *Arc* (an arc going round), *Bricks* (pixel bars rising and falling inside it), *Comet* (a bright head going round, its tail fading behind), *Wave* (filled with its color, a slow tide rolling over) or *Still*; *Recent
   sessions too*: the last 1 to 5 agents you used (3 by default), idle or finished, as dimmer circles after the ones at work (finished
@@ -1326,6 +1347,8 @@ tab). Saved as you type:
     `$LAKI_PROJECT_PATH` is the repo itself, e.g. `cp "$LAKI_PROJECT_PATH/.env" .env`.
   - *Teardown*: runs when a workspace is deleted or archived.
   - *Run*: what ▷ Run starts, e.g. `npm run dev -- --port $PORT`.
+  - *Test*, *Lint*, *Format*, *Deploy*: Run ▾'s, e.g. `npm test`; `.laki.json` takes them as `test`, `lint`, `format`
+    and `deploy`.
 - *Env*: `KEY=value` lines for every tab of the project's workspaces, and its setup and teardown.
 - *Expose to the world*: who can open its tunnels, as addresses and `*@domains` (e.g. `me@x.dev, *@team.com`).
   The popup starts from it every time: *Only these emails*, filled in. Empty: *Anyone with the link*.
@@ -1374,6 +1397,10 @@ laki send fix-the-login --when-idle "now add tests"     # queued; typed in when 
 laki progress 40 "writing the tests"                    # in an agent's tab: its estimate, shown on the tab
 laki screen fix-the-login/claude
 laki diff fix-the-login | run fix-the-login | ship fix-the-login -m "Fix redirect"
+laki run fix-the-login test                             # the project's test script (lint, format, deploy) in its tab
+laki screen shot                                        # the booted iOS Simulator's screen: a PNG's path
+laki screen shot Safari | windows                       # an app's frontmost window | the windows open
+laki screen tap 120 640 | swipe 200 700 200 200 | type "hi" | describe   # the simulator's hands (idb)
 laki browser fix-the-login open /login                  # the agent browser (the app must be open)
 laki browser fix-the-login fill "#email" a@b.c | click "button[type=submit]" | text | screenshot
 laki archive fix-the-login | restore … | fork … | rm …
@@ -1396,7 +1423,15 @@ laki open                                               # the app
 laki mcp                                                # an MCP server on stdio (below)
 laki stop                                               # stop the daemon (agents resume when it starts again)
 laki daemon                                             # run the daemon in the foreground
+laki serve --tailscale                                  # headless: the daemon and remote access (headless.md)
+laki remote | remote stop                               # remote access's link (and PIN) | stop it
 ```
+
+`laki screen` shot and windows work on this Mac (an app's window needs Screen Recording for Laki: System Settings ›
+Privacy & Security › Screen & System Audio Recording). tap, swipe, type and describe need
+[idb](https://fbidb.io) (`brew install facebook/fb/idb-companion`, then `pipx install fb-idb`); Settings › Agent skill
+says whether it's found. They take points, and with idb a simulator screenshot is drawn in points too: a spot in the
+picture is where to tap. MCP's `laki_device` does the same.
 
 ### MCP
 

@@ -4,6 +4,22 @@ version it builds, with the date. -->
 
 ## Next
 
+- **A tab in its own window**: a tab's right click › *Float in its own window* (or ⌘K): its terminal, live, in a window over
+  every app, as big as you like; its ✕ (or *Bring it back* in its pane) puts it back.
+- **Headless**: `./Laki.AppImage --headless --tailscale` (or `laki serve`) runs Laki on a server with no screen, used
+  in a browser through remote access: [docs/headless.md](https://github.com/igorkasyanchuk/laki/blob/main/docs/headless.md).
+  `laki remote` prints the link.
+- **Remote access through Tailscale**: Settings › Remote access › *Sign in with* › *Tailscale*: your tailnet's
+  devices only, at this Mac's `ts.net` name.
+- **Test, Lint, Format and Deploy scripts**: set them beside Run in a project's settings (or `.laki.json`); Run ▾ runs
+  each in a tab of its own (Deploy asks first). `laki run <ws> test`.
+- **The iOS Simulator and app windows for agents**: `laki screen shot` (the booted simulator, or `laki screen shot
+  Safari`: an app's window), and with idb `laki screen tap`, `swipe`, `type`, `describe`; MCP's `laki_device`.
+- **Global hotkey**: ⌃⌥⌘L brings Laki forward from any app (Settings › General: off, or record other keys).
+- **Worktrees**: copy every ignored file, or the untracked ones, into new worktrees; *Refresh PR status in the
+  background* can go off; archived workspaces can delete themselves after a day to a month (Settings › Git & worktrees).
+- **Settings › General › Developer**: the command line tool, with links to the CLI reference and the agent skill.
+
 - **Calendar** (experimental: Settings › General › Experimental): a week or a month of scheduled tasks at their times,
   their runs and your reminders. Click a day to add one; Laki AI and agents add them too (`laki remind "tomorrow at
   9am" …`, MCP's `laki_reminder`). A reminder notifies you as it's due.
@@ -33,7 +49,6 @@ version it builds, with the date. -->
 - **Changes**: a file's header stays at the top while you scroll through its diff, as on GitHub; its head stays one
   line in a narrow panel.
 - **Board**: a to-do takes screenshots pasted or dropped in; they go to the agent with it.
-- **Floating bubbles** stick to the top or bottom of the screen too, as a row: drop them near that edge.
 - **A PR's failing CI has its own mark**: a red ⊗ beside the GitHub mark, which keeps the PR's color (red: closed).
 - **Get started** picks a theme from a dropdown. Dialogs have a ✕ and take the keyboard as they open, so Esc closes
   them (About Laki sent Esc to the agent). The AI page stays open on Esc. A group's menu says *Edit…*.

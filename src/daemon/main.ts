@@ -19,6 +19,7 @@ import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planU
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
 import { scanWidgets, widgetAction, widgetFiles, widgetKey, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetSet, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
+import { device } from './device.ts'
 
 const { dir } = core
 // a daemon a tab started (its laki CLI) is no tab's: what it runs (a widget's laki new, Laki AI's agents) comes from no workspace
@@ -241,7 +242,8 @@ const api: Record<string, Handler> = {
   prDiff: p => core.prDiff(p.ws),
   prFiles: p => core.prFiles(p.ws),
   prViewed: p => core.prViewed(p),
-  run: p => core.runDev(p.ws),
+  run: p => core.runDev(p.ws, p.script),
+  device: p => device(p), // laki screen's: the iOS Simulator and apps' windows
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
   usage: () => usage(core.state.settings?.usage, usageWho()),
   accounts: () => accountViews(),
@@ -282,6 +284,7 @@ const api: Record<string, Handler> = {
   remoteStart: p => core.remoteStart(p),
   remoteStop: () => core.remoteStop(),
   remoteTick: p => core.remoteTick(p.now), // tests move the clock
+  archivedTidy: p => core.archivedTidy(p.now), // tests move the clock
   shareTick: p => core.shareTick(p.now),
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
@@ -451,8 +454,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => widgetTick())
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
-  every(3600000, () => core.imagesTidy()) // pasted images past settings.imageDays
-  setTimeout(() => core.scanPRs().catch(() => {}), 2000)
+  every(3600000, () => (core.imagesTidy(), core.archivedTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays
+  setTimeout(() => (core.archivedTidy(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
 })
 
 function shutdown() {

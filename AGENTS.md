@@ -97,7 +97,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`. A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -140,7 +140,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   it waits): each due one not `fired` or `done` broadcast once as a `reminder` event (`reminder`: its id, never `id`),
   App's notification and toast; the CLI's `laki remind <when> <text> [--ws]` and `laki reminders [rm|done <id>]`, MCP's
   `laki_reminder` (agents' and Laki AI's: add, list, done, rm);
-- the laki command for any shell (Settings › General › Command line, `CliField`): `cliState` (`path`: Laki's launcher,
+- the laki command for any shell (Settings › General › Developer, `CliField`, with the CLI reference and agent skill links): `cliState` (`path`: Laki's launcher,
   `CLI_MARK` in it; `current`: its paths this install's; `onPath`; `other`: another laki first on PATH; `to`: where an
   install goes), `cliInstall` (the launcher, `LAKI_CLI`, in the first writable of `cliSpots` with no other `laki` there, a link too (never
   written through): `/opt/homebrew/bin`, `/usr/local/bin`, else `~/.local/bin`, made; none: refused; `LAKI_CLI_DIRS`: tests' own), `cliRemove` (only one with `CLI_MARK`);
@@ -273,6 +273,21 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   it does for a terminal whose agent shows a menu (`ask`: its keys would pick an option); `VoiceBar` (PromptInput.tsx)
   says what it's doing in the app and the new-workspace and AI windows (`html.away` doesn't pause it). Settings › Voice's
   Hold Fn group shows on a Mac only;
+- the project's scripts besides run (`RUN_SCRIPTS`: test, lint, format, deploy; `ProjectConfig`, `.laki.json`,
+  Settings' `ScriptsField`): `run` `script` (`runDev`: `replaceTab` kind `script`, named as it; it stays when it ends,
+  a tab's `script` says which (`replaceTab` replaces that one, renamed or not); Enter runs it again, like a dev tab, but a deploy only through Run ▾'s `ask`; `running` while it's alive; not kept over a restart), the view's `scripts` (the ones set: Run ▾'s, ⌘K's;
+  App's `runScript`, Deploy after `ask`);
+- `device` (`daemon/device.ts`; the CLI's `laki screen <op>`, MCP's `laki_device`; `DEVICE_OPS`): shot (the booted
+  simulator, `xcrun simctl io <udid> screenshot`, or `app`'s frontmost window: CoreGraphics' window list through JXA
+  (`osascript -l JavaScript`), `screencapture -x -o -l <id>`), scaled by `sips` to its size in points (an app window's
+  bounds; the simulator's from idb's `describe-all`, else at most `SHOT_MAX` across), saved by `imageSave`, its path
+  back; windows; tap, swipe, type, describe through `idb ui … --udid <booted> --` (on PATH: the user's install, as
+  cloudflared; Settings › Agent skill says, `doctor`'s `idb`);
+- clean-up: `archivedTidy` (hourly and at start: archived workspaces past `settings.archivedDays` dropped as `wsRm`
+  would, their branch kept; `archivedAt` set by `wsArchive`, one archived before it counts from the first look);
+  `settings.bgRefresh === false`: no `prTick`, `prSoon` or branch-move scans (only `prRefresh`); `settings.copyIgnored` /
+  `copyUntracked`: `copyIncludes` takes every ignored (`--exclude-standard`) / untracked file too, copied awaited (a
+  relative link into the repo made again as a link: node_modules/.bin's, pnpm's);
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`: resolves once there's a link),
   `remoteStop`, `remoteTick` (`now`: tests move the clock);
 - terminals: `screen`, `input`, `resize`, `view`, `detach`;
@@ -638,6 +653,20 @@ goes through the sign-in instead of loading from the cache with every other requ
 `src/renderer`; or `LAKI_PAGE`) whatever the
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's
 `connect-src 'self'` lets the page reach its own daemon over `wss://`.
+
+Through Tailscale (`via: 'tailscale'`, Settings' *Sign in with* › *Tailscale*, `remoteAuth`): `tailscale serve
+--https=443 http://127.0.0.1:<port>` in the foreground (`publisher`, the same child-process shape as `cloudflare()`:
+its URL, `TAILNET_URL`, from its output; stopping it unpublishes), after `tsReady` (`tailscaleBin`: PATH, else the
+Mac app's `TAILSCALE_APP`; `status --json` Running). No email; `open` never; a PIN if asked. The origin and token
+checks are as for cloudflared.
+
+Headless (`docs/headless.md`): the CLI's `serve` imports the daemon into its own process (or uses one running), then
+`remoteStart` (`--tailscale [--pin]`, `--cloudflare --mail|--pin|--open`, `--hours`), prints `remoteText`, and stops
+the daemon when remote access ends (a service's `Restart=always` starts it again, a new link: `laki remote`). Main's
+`--headless` (first thing in `src/main/index.ts`: `spawnSync` of `cli.js serve` with `ELECTRON_RUN_AS_NODE`, before
+Chromium touches a display) makes `Laki.AppImage --headless …` work with no X server and no `--no-sandbox` (tried in
+Docker: `scripts/linux.sh`'s image without Xvfb). It passes `LAKI_HEADLESS_PARENT`: `serve` stops when its parent goes
+(a kill of that pid alone), remote access with it.
 
 ### Scheduled tasks
 
@@ -1185,7 +1214,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   main's `placeFloater` shows the bar while Laki isn't in front (`front`: one of its own windows has the focus, not the
   drop, its card or the voice window: a press on the drop makes Laki the active app, and the drop would hide under the
   pointer), and with + on even with no circles; `type: 'panel'` windows over every Space and
-  full-screen app: `#bar` (labels: `text.ts` `initials`, two letters, unique, `pr`/`issue`/numbers skipped; a drop against the screen's left or right edge, or a row along its top or bottom (`data-side` from main's `floater-side`; `across`: the page's offsets and length along the row, main's `beside` puts the card, menu and voice windows below or above it):
+  full-screen app: `#bar` (labels: `text.ts` `initials`, two letters, unique, `pr`/`issue`/numbers skipped; a drop against the screen's left or right edge, never the top or bottom (`snap`; a row along them is still in the code, unreached: `data-side` from main's `floater-side`; `across`: the page's offsets and length along the row, main's `beside` puts the card, menu and voice windows below or above it):
   `.shape` with its flares, a slow wobble, a round blob while dragged; the circles; `.fl-btns`: the + (×, `.on`, while
   open) and `ACTS`, the menu bar's: New task, Say it, Screenshot area, Whole screen, and Ask Laki AI while
   `settings.ai.on` (`actsFor`, the floats' `ai`; the menu a row taller: `menuH`); `menu` stack: `.fl-acts` over the + in
@@ -1200,7 +1229,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   answers, or on Esc), Say it opens `#voice`; a click on a circle is `floater-open`: `show(tab)`; a drag from
   anywhere on it past 4px is `floater-drag` start/move/end with the pointer's screen offset, so its cursors (grab,
   pointer) work, which macOS's drag regions take away (macOS shows them only while Laki is the active app: a hovered
-  circle grows instead: `.hot`, set by `pointerover`, not `:hover`, which outlives the bar's hiding as a click brings Laki in front); at the end main's `snap` sticks it to the edge nearest the pointer, animated (another orientation: centered there, its length kept until the page says its own), and
+  circle grows instead: `.hot`, set by `pointerover`, not `:hover`, which outlives the bar's hiding as a click brings Laki in front); at the end main's `snap` sticks it to the side (left or right) nearest the pointer, animated (another orientation: centered there, its length kept until the page says its own), and
   `floater.json` in userData keeps where (`home`, with its `side`; an older one's: left or right by where it is: a screen gone puts it on the main one, `barAt`, and leaves `home` for
   the screen's return), `#card` (a hover's card, beside the bar toward the screen's middle, click-through: its own
   window so the bar never moves under the mouse; `floater-hover` and `floater-card` show it only while the cursor is
@@ -1213,6 +1242,15 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   which `will-navigate` would block): one renderer process, one row in Settings › Resources.
   `floater.css`: the circles' styles (`[data-fstyle]`: glow; gradient, the default; arc; bricks, box-shadow pixel bars stepped behind the initials; comet; wave, two turning rounded squares as a tide; still; idle and done dimmer; `[data-done='on']`: a done one filled green with a slow pulse, `floaterDone` unset or true: App keeps an unseen done one a bubble past `floaterRecent` and its hours),
   also Settings › Appearance's live previews.
+- **A floated tab** (main's `tabWins`, `tab-float` IPC through App's `floatTab`: the tab's menu › *Float in its own window* (`popOut`), ⌘K, and the
+  pane's *Show it* / *Bring it back*): `panelWin` `?window=tab&tab=<id>`, `NewWindow.tsx` `TabWindow` (its head the
+  title bar; a `Term` of its own at the tab's ⌘± size: one more client of the session, the PTY sizes to whoever typed last;
+  its ⌘-clicked files through main's `open-path`, which takes these windows too), closed when the
+  tab goes. Main sends `floating` (the ids) as one opens or closes; App's `floated` shows `.floated` in that pane
+  instead of a `Term`.
+- **The global hotkey** (`settings.hotkeyOn`, unset on; `hotkey`, unset `HOTKEY` ⌃⌥⌘L, keyLabel's text): App sends it
+  to main's `hotkey` IPC once settings come (main's `accelOf`: two of ⌃⌥⌘, or one with Space or an F key, else refused; → `globalShortcut`; it shows the app's window), Settings'
+  `HotkeyField` too, which says when another app has it (`register` false).
 - **`Find.tsx`**: the ⌘F bar (`@xterm/addon-search`). Matches are `--find` (yellow); while it's open the
   terminal's `minimumContrastRatio` keeps their text readable.
 - **`themes.ts`**: `THEMES`, `applyTheme` (sets the CSS variables on `<html>`, some also under the names Laki
@@ -1484,6 +1522,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/limits.ts` | usage-limit reset parsing (from wb) |
 | `src/daemon/usage.ts` | plan limits: Claude's and Codex's usage endpoints, with the agents' own sign-in, kept 5 minutes |
 | `src/daemon/push.ts` | phone pushes: each format's request (`pushRequest`), the URL's check, `pushTo` |
+| `src/daemon/device.ts` | laki screen's device ops: the iOS Simulator's and apps' windows' screenshots (in points), the simulator's taps, swipes, typing and elements through idb |
 | `src/daemon/fun.ts` | `meme`: r/memes, r/ProgrammerHumor, r/wholesomememes (`SUBS`, in a random order): each one's hot pictures (Reddit's `hot.json`, else meme-api.com's `gimme/<sub>/50`: Reddit's bot wall), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
