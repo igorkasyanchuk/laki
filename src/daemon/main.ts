@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, widgetAction, widgetDev, widgetFiles, widgetKey, widgetMock, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, widgetAction, widgetCheck, widgetDev, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -298,6 +298,8 @@ const api: Record<string, Handler> = {
   widgetRuns: p => widgetRuns(p), // the inspector's Runs, Env, fixtures; laki widget dev's lines
   widgetMock: p => widgetMock(p), // the inspector's sample data: by hand or a fixture, off
   widgetDev: p => widgetDev(p), // laki widget dev: link, unlink, list
+  widgetNew: p => widgetNew(p), // laki widget new, Settings › Extensions › New ▾: a starter, yours, on
+  widgetCheck: p => widgetCheck(p), // laki widget check, the inspector's Check (run: its fetch once), MCP's (never runs)
   planList: p => planList(p), // specs and brainstorms (experimental): plans.ts
   planNew: p => planNew(p),
   planGet: p => planGet(p),

@@ -11,8 +11,8 @@ export { UI_CSS }
 
 // a prop's kind: text (a template: {{field}}, helpers, #if), path (looked up raw: each, items, values), number, bool,
 // children (elements), button (a button's props), icon (a name of Laki's or an emoji), tone, or one of some words
-type Kind = 'text' | 'path' | 'number' | 'bool' | 'children' | 'button' | 'buttons' | 'icon' | 'tone' | 'items' | 'object' | readonly string[]
-type Prop = { kind: Kind; desc: string }
+export type Kind = 'text' | 'path' | 'number' | 'bool' | 'children' | 'button' | 'buttons' | 'icon' | 'tone' | 'items' | 'object' | readonly string[]
+export type Prop = { kind: Kind; desc: string }
 type Def = { group: 'Layout' | 'Text' | 'Data' | 'Actions'; blurb: string; props: Record<string, Prop>; rows?: boolean }
 const p = <K extends Kind>(kind: K, desc: string) => ({ kind, desc })
 
@@ -30,7 +30,7 @@ export const COMMON = {
 } as const
 
 // a button: one of run (+ arg), open, refresh, full, copy
-const BUTTON = {
+export const BUTTON = {
   label: p('text', 'Its words'),
   icon: p('icon', 'An icon of Laki’s by name (refresh, check, github…) or an emoji'),
   style: p(['primary', 'quiet', 'danger'] as const, 'primary, quiet or danger; none: plain'),
@@ -493,7 +493,7 @@ export function uiHtml(spec: unknown, ctx: Record<string, unknown>, o: { full?: 
 // ---------- what's wrong with a ui, for laki widget check, the inspector and agents: unknown elements and props,
 // props of the wrong kind, actions and icons that aren't there; with data (a fixture, the last fetch), each's lists
 // and the fields its rows use
-export type UiProblem = { level: 'error' | 'warn'; where: string; text: string }
+export type UiProblem = { level: 'error' | 'warn' | 'ok'; where: string; text: string } // ok: a check that passed (widgetCheck's)
 
 // the nearest of some words, for "did you mean": within a third of its length (2 at least) of edits
 export function near(word: string, words: readonly string[]) {

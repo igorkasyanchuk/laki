@@ -1,12 +1,13 @@
 // An extension's own page (Settings › Extensions' rows and New extension, a widget's ⚙ and right click, the Desk's
 // tiles, laki://settings/widgets/<id>/inspect): how it looks (live, or with widget.json's sample: made-up data), in its
 // place and as its full view, its settings, and Laki AI's chat beside them to make or change it; the inspector's tabs
-// (Data, Runs, Env, Files) beside Overview; closing goes back where it was opened from. id '': a new one, which the
+// (Data, Runs, Env, Files, Check) beside Overview; closing goes back where it was opened from. id '': a new one, which the
 // page follows once Laki AI writes it. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
 import { useEffect, useRef, useState } from 'react'
 import { type AiSettings, placesOf, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetHere, widgetPrompt } from '../../shared/widgetGuide'
+import type { UiProblem } from '../../shared/widgetUi'
 import { AiPage } from './Ai'
 import { WidgetCard, type WidgetsApi } from './Settings'
 import { escapes, Icon, IconButton, Page } from './ui'
@@ -15,13 +16,14 @@ import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk' }
 const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
-export type ExtTab = 'overview' | 'data' | 'runs' | 'env' | 'files'
+export type ExtTab = 'overview' | 'data' | 'runs' | 'env' | 'files' | 'check'
 const TABS: [ExtTab, string][] = [
   ['overview', 'Overview'],
   ['data', 'Data'],
   ['runs', 'Runs'],
   ['env', 'Env'],
   ['files', 'Files'],
+  ['check', 'Check'],
 ]
 
 export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspaces, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; back: string; onAiSettings: () => void; onClose: () => void }) {
@@ -32,7 +34,9 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
   const made = cur ? undefined : widgets.find(w => !known.current.has(w.id))
   useEffect(() => void (made && setCur(made.id)), [made?.id])
   const w = widgets.find(x => x.id === cur)
-  useEffect(() => void (cur && !w && onClose()), [cur, !w]) // deleted meanwhile
+  const seen = useRef(false) // one just made (New ▾) comes with the next view
+  if (w) seen.current = true
+  useEffect(() => void (cur && !w && seen.current && onClose()), [cur, !w]) // deleted meanwhile
   const closeRef = useRef(onClose)
   closeRef.current = onClose
   // Esc goes back, unless a menu or a dialog has it or the focused box has something typed (it stays)
@@ -70,8 +74,10 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
           {w ? (
             <>
               <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} />
-              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} />}
+              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} />}
             </>
+          ) : cur ? (
+            <p className="muted small">Reading…</p>
           ) : (
             <Start ai={!!ai?.on} home={cfg.home} onAiSettings={onAiSettings} />
           )}
@@ -283,7 +289,7 @@ const bytes = (b: number) => (b < 1024 ? `${b} B` : b < 1 << 20 ? `${(b / 1024).
 // the inspector's tabs: Data (its JSON, editable: Apply keeps it as sample data; a fixture; Live), Runs (newest first,
 // a click shows its stderr), Env (what a fetch is given, secrets masked), Files (and its folder). Read again as its
 // data or files change, and every 2 s while Runs shows
-function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview'> }) {
+function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check'> }) {
   const [x, setX] = useState<WidgetRuns | null>(null)
   const [files, setFiles] = useState<string[] | null>(null)
   const [text, setText] = useState<string | null>(null) // Data's box as typed; null: as fetched
@@ -408,6 +414,54 @@ function Inspector({ w, cfg, tab }: { w: WidgetView; cfg: WidgetsApi; tab: Exclu
       </div>
       <ul className="ext-files mono">{files === null ? <li className="muted">Reading…</li> : files.map(f => <li key={f}>{f}</li>)}</ul>
       {!!x.fixtures.length && <p className="muted small">fixtures/: {x.fixtures.map(f => `${f}.json`).join(', ')}</p>}
+    </section>
+  )
+}
+
+// Check (laki widget check): widget.json, its templates, its ui against its sample and fixtures, read again as its files
+// change; Check with a fetch runs it once (never one Laki AI wrote while it's off)
+const MARK = { ok: '✓', warn: '!', error: '✗' }
+function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
+  const [r, setR] = useState<{ problems: UiProblem[]; run: boolean } | null>(null)
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const go = (run: boolean) => {
+    setBusy(true)
+    cfg.check?.(w.id, run).then(
+      x => (setR({ ...x, run }), setErr('')),
+      e => setErr(String(e?.message ?? e)),
+    ).finally(() => setBusy(false))
+  }
+  useEffect(() => go(false), [w.id, w.rev])
+  const n = (l: UiProblem['level']) => r?.problems.filter(p => p.level === l).length ?? 0
+  const aiOff = w.byAi && !w.on
+  return (
+    <section className="ext-card">
+      <div className="ext-card-head">
+        <b>Check</b>
+        <span className="muted small grow">{r ? `${n('error')} errors, ${n('warn')} hints${r.run ? ', its fetch run' : ''}` : 'Checking…'}</span>
+        <button className="sm" disabled={busy} onClick={() => go(false)}>
+          Check again
+        </button>
+        {w.every !== undefined && (
+          <button className="sm" disabled={busy || aiOff} data-tip={aiOff ? 'Laki AI wrote it: turn it on first' : 'Run its fetch once and check its ui against what it prints'} onClick={() => go(true)}>
+            <Icon name="refresh" size={12} /> Check with a fetch
+          </button>
+        )}
+      </div>
+      {err && <p className="warn small">{err}</p>}
+      <ul className="ext-check">
+        {r?.problems.map((p, i) => (
+          <li key={i} data-level={p.level}>
+            <span className="ext-mark">{MARK[p.level]}</span>
+            <span className="mono">{p.where}</span>
+            <span>{p.text}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="muted small">
+        In a terminal: <span className="mono">laki widget check {w.id}</span> (<span className="mono">--no-run</span>: without its fetch)
+      </p>
     </section>
   )
 }

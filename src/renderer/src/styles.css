@@ -1987,6 +1987,13 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .ext-env > div { display: contents; }
 .ext-env dt { color: var(--muted); } .ext-env dd { margin: 0; overflow-wrap: anywhere; }
 .ext-files > li { padding: 5px 4px; font-size: 12px; }
+.ext-check { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.ext-check > li { display: grid; grid-template-columns: 16px minmax(90px, max-content) 1fr; gap: 8px; align-items: baseline; padding: 5px 4px; font-size: 12px; }
+.ext-check > li + li { border-top: 1px solid var(--line); }
+.ext-check .mono { color: var(--muted); overflow-wrap: anywhere; }
+.ext-check .ext-mark { font-weight: 600; text-align: center; color: var(--done); }
+.ext-check [data-level='warn'] .ext-mark { color: var(--waiting); }
+.ext-check [data-level='error'] .ext-mark { color: var(--error); }
 .ext-places { display: flex; flex-wrap: wrap; align-items: flex-start; gap: 16px 22px; }
 .ext-places > div { display: flex; flex-direction: column; gap: 6px; }
 .widget-mock { position: absolute; left: 4px; bottom: 3px; padding: 0 5px; border-radius: 7px; background: var(--waiting); color: var(--bg); font-size: 9px; font-weight: 600; line-height: 13px; pointer-events: none; }

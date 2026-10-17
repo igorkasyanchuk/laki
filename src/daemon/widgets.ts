@@ -10,7 +10,9 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { BUTTON_PLACES, type WidgetOption, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
 import { hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
-import { uiHtml, uiTree } from '../shared/widgetUi.ts'
+import { uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
+import { manifestCheck } from '../shared/widgetSchema.ts'
+import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, q, settingsSet, state } from './core.ts'
@@ -30,7 +32,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 type Store = { on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string } // by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
-type Entry = { id: string; dir: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'> } // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
+type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'> } // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
 type Run = WidgetRun // what each fetch and action did (widgetRuns, the inspector's Runs, laki widget dev's lines): the last RUNS, newest first
 
 const here = dirname(fileURLToPath(import.meta.url))
@@ -83,17 +85,77 @@ function htmlOf(d: string) {
   }
 }
 
-// a root is a widget's folder, or a folder of them
-function foldersIn(root: string): string[] {
-  if (existsSync(join(root, 'widget.json'))) return [root]
+// a one-file extension (SwiftBar's way): <id>.<n><s|m|h>.<ext> (prs.5m.sh), a script (#! or executable) whose name
+// says how often it runs and whose comment lines say the rest (oneFile)
+const ONE = /^([a-z0-9][\w-]{0,39})\.(\d{1,4})([smh])\.[A-Za-z0-9]{1,8}$/
+function isOne(p: string) {
+  if (!ONE.test(p.split('/').pop()!)) return false
+  try {
+    const st = statSync(p)
+    if (!st.isFile() || st.size > 256 << 10) return false
+    return !!(st.mode & 0o111) || readFileSync(p, 'utf8').startsWith('#!')
+  } catch {
+    return false
+  }
+}
+type Source = { d: string; file?: string }
+const idOf = (x: Source) => (x.file ? x.file.split('.')[0] : x.d.split('/').pop()!.replace(/[^\w.-]/g, '-'))
+const pathOf = (x: { dir?: string; d?: string; file?: string }) => (x.file ? join((x.dir ?? x.d)!, x.file) : (x.dir ?? x.d)!)
+// a root is a widget's folder, a one-file extension, or a folder of either
+function foldersIn(root: string): Source[] {
+  if (existsSync(join(root, 'widget.json'))) return [{ d: root }]
+  if (isOne(root)) return [{ d: dirname(root), file: root.split('/').pop() }]
   try {
     return readdirSync(root, { withFileTypes: true })
-      .filter(d => (d.isDirectory() || d.isSymbolicLink()) && existsSync(join(root, d.name, 'widget.json')))
-      .map(d => join(root, d.name))
-      .sort()
+      .flatMap((d): Source[] => ((d.isDirectory() || d.isSymbolicLink()) && existsSync(join(root, d.name, 'widget.json')) ? [{ d: join(root, d.name) }] : isOne(join(root, d.name)) ? [{ d: root, file: d.name }] : []))
+      .sort((a, b) => pathOf(a).localeCompare(pathOf(b)))
   } catch {
     return []
   }
+}
+// a one-file extension's widget.json, from its name and its comment lines: <laki.name>, description, place (one or
+// a comma list), icon, label, badge, tip, size (3x1), ui and sample (a line of JSON each), and xbar's settings,
+// <laki.var>text(REPO="acme/web"): Repo</laki.var> (text, number, bool, choice(a,b)). Its fetch runs the file
+const VAR = /^(text|number|bool|choice)(?:\(([^)]*)\))?\s*\(\s*([A-Za-z_]\w*)\s*=\s*("[^"]*"|[^)]*?)\s*\)\s*(?::\s*(.*))?$/
+function oneFile(d: string, file: string): (Manifest & { seconds?: number }) | string {
+  const [, , n, unit] = ONE.exec(file)!
+  let text: string
+  try {
+    text = readFileSync(join(d, file), 'utf8')
+  } catch (e) {
+    return `${file}: ${(e as Error).message}`
+  }
+  const tag = (k: string) => new RegExp(`<laki\\.${k}>([\\s\\S]*?)</laki\\.${k}>`).exec(text)?.[1].trim()
+  const m: Manifest & { seconds?: number } = { name: tag('name') || file.split('.')[0] }
+  for (const k of ['description', 'icon', 'label', 'badge', 'tip'] as const) if (tag(k)) m[k] = tag(k)
+  const place = tag('place')
+  if (place) m.place = place.includes(',') ? place.split(',').map(x => x.trim()) : place
+  const size = /^([1-3])\s*x\s*(0?\.5|[1-4])$/i.exec(tag('size') ?? '')
+  if (size) m.size = [Number(size[1]), Number(size[2])]
+  m.every = unit === 'h' ? Number(n) * 60 : unit === 'm' ? Number(n) : Math.max(1, Math.round(Number(n) / 60))
+  if (unit === 's') m.seconds = Number(n)
+  for (const k of ['ui', 'sample'] as const) {
+    const v = tag(k)
+    if (v)
+      try {
+        m[k] = JSON.parse(v)
+      } catch (e) {
+        return `${file} <laki.${k}>: ${(e as Error).message}`
+      }
+  }
+  for (const [, v] of text.matchAll(/<laki\.var>([\s\S]*?)<\/laki\.var>/g)) {
+    const x = VAR.exec(v.trim())
+    if (!x) return `${file} <laki.var>${v.trim()}</laki.var>: type(NAME="default"): label, the type text, number, bool or choice(a,b)`
+    const def = x[4].replace(/^"|"$/g, '')
+    ;(m.config ??= {})[x[3]] = { type: x[1], default: x[1] === 'bool' ? def === 'true' : x[1] === 'number' ? Number(def) : def, ...(x[5] && { label: x[5].trim() }), ...(x[1] === 'choice' && { choices: (x[2] ?? '').split(',').map(c => c.trim()).filter(Boolean) }) }
+  }
+  const shebang = /^#!\s*(\S.*)$/m.exec(text.split('\n')[0] ?? '')?.[1]
+  let exe = false
+  try {
+    exe = !!(statSync(join(d, file)).mode & 0o111)
+  } catch {}
+  m.fetch = exe || !shebang ? `./${q(file)}` : `${shebang} ./${q(file)}`
+  return m
 }
 
 // widget.json, or why it doesn't read
@@ -122,13 +184,13 @@ export function scanWidgets() {
   rev++
   const dev = devRoots()
   for (const root of widgetRoots())
-    for (const d of foldersIn(root)) {
-      const id = d.split('/').pop()!.replace(/[^\w.-]/g, '-')
+    for (const { d, file } of foldersIn(root)) {
+      const id = idOf({ d, file })
       if (widgets.has(id)) continue
-      const isDev = dev.some(r => under(d, r))
-      const last = before.get(id)?.dir === d ? before.get(id) : undefined
-      const m = manifestOf(d)
-      const html = typeof m === 'string' ? '' : htmlOf(d)
+      const isDev = dev.some(r => under(pathOf({ d, file }), r))
+      const last = before.get(id) && pathOf(before.get(id)!) === pathOf({ d, file }) ? before.get(id) : undefined
+      const m = file ? oneFile(d, file) : manifestOf(d)
+      const html = typeof m === 'string' || file ? '' : htmlOf(d)
       const bad = typeof m === 'string' ? m : isDev ? templatesError(m, html) : undefined
       if (bad && isDev && last) {
         widgets.set(id, { ...last, devError: bad })
@@ -136,7 +198,7 @@ export function scanWidgets() {
       }
       if (typeof m === 'string') continue
       const { data, ...s } = readStore(id)
-      const e: Entry = { id, dir: d, builtin: !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s }
+      const e: Entry = { id, dir: d, file, builtin: !!BUILTIN && under(d, BUILTIN), dev: isDev, devError: bad, m, full: hasFull(html) || !!uiTree(m.ui, true), js: hasScript(html), preview: !!viewOf(html, false)?.trim() || !!uiTree(m.ui, false), face: {}, s }
       e.face = faceOf(e, data)
       widgets.set(id, e)
     }
@@ -156,7 +218,7 @@ function watchDev(roots: string[]) {
     let timer: NodeJS.Timeout | undefined
     const files = new Set<string>()
     try {
-      const w = watch(r, { recursive: true }, (_, f) => {
+      const w = watch(r, { recursive: statSync(r).isDirectory() }, (_, f) => {
         const name = String(f ?? '')
         if (name.split('/').some(p => p.startsWith('.') || p === 'node_modules')) return
         files.add(name)
@@ -176,7 +238,7 @@ function devChanged(root: string, why: string) {
   if (!watchers.has(root)) return // unlinked meanwhile
   scanWidgets()
   for (const w of widgets.values()) {
-    if (!w.dev || !under(w.dir, root)) continue
+    if (!w.dev || !under(pathOf(w), root)) continue
     wLog(w, w.devError ? `${why}: last good version kept: ${w.devError}` : `${why}: reloaded`)
     if (!w.devError && fetchable(w)) void widgetRun({ id: w.id, reason: 'dev', why })
   }
@@ -310,7 +372,7 @@ function find(id: string) {
 // sample: with widget.json's made-up data (and sampleConfig over its settings), as it would look; sample in the context
 export function widgetRender(o: { id: string; full?: boolean; vars?: Record<string, string>; sample?: boolean; cells?: [number, number] }) {
   const w = find(o.id)
-  const file = htmlOf(w.dir)
+  const file = w.file ? '' : htmlOf(w.dir)
   const own = file ? viewOf(file, !!o.full) : undefined // no widget.html: ui's, or no view
   const tree = uiTree(w.m.ui, !!o.full)
   const fromUi = !!tree && !own?.trim()
@@ -489,10 +551,11 @@ try {
 // reason (RUN_REASONS: manual unless said; $LAKI_REFRESH_REASON), why: what changed (dev mode's file). Data put there by
 // hand (widgetMock) stays: only Fetch now (manual) runs then, and its data replaces it
 export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev'] // and action:<name>
-export async function widgetRun(o: { id: string; reason?: string; why?: string }): Promise<{ ok: boolean; error?: string }> {
+// force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote)
+export async function widgetRun(o: { id: string; reason?: string; why?: string }, force = false): Promise<{ ok: boolean; error?: string }> {
   const w = find(o.id)
   const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^action:[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
-  if (!onOf(w)) return { ok: false, error: OFF(w) }
+  if (!onOf(w) && !(force && w.s.by !== 'ai')) return { ok: false, error: OFF(w) }
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script` }
   if (w.s.mock && reason !== 'manual') return wLog(w, `not fetched (${reason}): showing sample data (${w.s.mock})`), { ok: false, error: `showing sample data (${w.s.mock}): Live in its inspector fetches again` }
   if (running.has(w.id)) return again.add(w.id), { ok: false, error: 'already fetching: it fetches again after this one' }
@@ -578,14 +641,21 @@ export function widgetTick(now = Date.now(), reason: 'schedule' | 'open' = 'sche
 }
 
 // an extension's files, as text (Laki AI's and MCP's laki_extension_read: an example to copy, or the one to change):
-// its folder's own files only, none hidden, 20 at most
+// its folder's own files only, none hidden, and fixtures/*.json, 20 at most; a one-file extension's file
+const filesIn = (d: string) => {
+  try {
+    return readdirSync(d, { withFileTypes: true }).filter(x => x.isFile() && !x.name.startsWith('.')).map(x => x.name)
+  } catch {
+    return []
+  }
+}
 export function widgetFiles(o: { id: string }) {
   const w = find(o.id)
   const files: Record<string, string> = {}
-  for (const d of readdirSync(w.dir, { withFileTypes: true }).filter(d => d.isFile() && !d.name.startsWith('.')).slice(0, 20)) {
-    const p = join(w.dir, d.name)
+  for (const n of (w.file ? [w.file] : [...filesIn(w.dir), ...fixturesOf(w).map(f => `fixtures/${f}.json`)]).slice(0, 20)) {
+    const p = join(w.dir, n)
     const buf = statSync(p).size > 64 << 10 ? null : readFileSync(p)
-    files[d.name] = !buf ? '(over 64 KB: not shown)' : buf.includes(0) ? '(binary: not shown)' : buf.toString('utf8')
+    files[n] = !buf ? '(over 64 KB: not shown)' : buf.includes(0) ? '(binary: not shown)' : buf.toString('utf8')
   }
   return { id: w.id, builtin: w.builtin || undefined, files }
 }
@@ -595,6 +665,7 @@ export function widgetFiles(o: { id: string }) {
 // commands a model wrote, so the user turns it on in Settings › Extensions after a look
 const ID = /^[a-z0-9][a-z0-9-]{0,39}$/
 const FILE = /^\w[\w.-]{0,59}$/
+const FIXTURE = /^fixtures\/\w[\w.-]{0,59}\.json$/ // the one folder: sample data
 const statOf = (p: string) => {
   try {
     return lstatSync(p)
@@ -607,7 +678,7 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
   const files = Object.entries(o.files && typeof o.files === 'object' && !Array.isArray(o.files) ? o.files : {})
   if (!files.length || files.length > 20) throw new Error('1 to 20 files')
   for (const [n, t] of files) {
-    if (!FILE.test(n) || n.includes('..')) throw new Error(`${n}: a file's name in the extension's folder, no folders`)
+    if (!(FILE.test(n) || FIXTURE.test(n)) || n.includes('..')) throw new Error(`${n}: a file's name in the extension's folder, no folders but fixtures/<name>.json`)
     if (typeof t !== 'string' || t.length > 256 << 10) throw new Error(`${n}: its text, up to 256 KB`)
   }
   const d = join(widgetHome(), o.id)
@@ -633,6 +704,11 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
   const at = statOf(d)
   if (at && !at.isDirectory()) throw new Error(`${d} isn't a folder`)
   mkdirSync(d, { recursive: true })
+  if (files.some(([n]) => n.startsWith('fixtures/'))) {
+    const f = statOf(join(d, 'fixtures'))
+    if (f && !f.isDirectory()) throw new Error('fixtures is a link or a file there')
+    mkdirSync(join(d, 'fixtures'), { recursive: true })
+  }
   for (const [n, t] of files) {
     const p = join(d, n)
     const was = statOf(p)
@@ -653,9 +729,9 @@ export function widgetRm(o: { id: string }) {
   if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: turn it off instead`)
   if (w.dev) throw new Error(`${w.m.name || w.id} is your code, linked by laki widget dev: unlink it instead (laki widget dev --off ${w.id})`)
   if (running.has(w.id)) throw new Error(`${w.m.name || w.id} is fetching: try again in a moment`)
-  const d = resolve(w.dir)
-  if ([homedir(), dir, widgetHome(), '/'].includes(d)) throw new Error(`${d} isn't one extension's own folder`) // a widget.json put in one of those
-  rmSync(d, { recursive: true, force: true }) // a link: only the link
+  const d = resolve(pathOf(w))
+  if (!w.file && [homedir(), dir, widgetHome(), '/'].includes(d)) throw new Error(`${d} isn't one extension's own folder`) // a widget.json put in one of those
+  rmSync(d, { recursive: !w.file, force: true }) // a link: only the link; a one-file extension: its file
   rmSync(storePath(w.id), { force: true })
   wLog(w, `deleted: ${d}`)
   scanWidgets()
@@ -687,13 +763,14 @@ export function widgetRuns(o: { id: string; data?: boolean }): WidgetRuns {
   )
   return { runs: runs.get(w.id) ?? [], env, fixtures: fixturesOf(w), devError: w.devError, mock: w.s.mock, ...(data !== undefined && { data: data.length > 256 << 10 ? undefined : data, big: data.length > 256 << 10 || undefined }) }
 }
-const fixturesOf = (w: Entry) => {
+const fixtureNames = (d: string) => {
   try {
-    return readdirSync(join(w.dir, 'fixtures')).filter(n => /^[\w.-]+\.json$/.test(n)).map(n => n.slice(0, -5)).sort()
+    return readdirSync(join(d, 'fixtures')).filter(n => /^[\w.-]+\.json$/.test(n)).sort()
   } catch {
     return []
   }
 }
+const fixturesOf = (w: Entry) => (w.file ? [] : fixtureNames(w.dir).map(n => n.slice(0, -5)))
 
 // sample data by hand (the inspector's Data): data, or a fixture of its folder's, kept as its data (mock: which), not
 // fetched meanwhile (a schedule skips it); off: back to live, fetched now. Runs nothing, so an off one takes it too
@@ -733,12 +810,12 @@ export async function widgetMock(o: { id: string; data?: unknown; fixture?: stri
 // scanned first and watched, its widgets turned on (you ran it on your own code) and fetched. off: unlink it (by its
 // folder or a widget's id); list: the links
 export function widgetDev(o: { folder?: string; off?: string; list?: boolean }) {
-  const links = () => devRoots().map(folder => ({ folder, widgets: [...widgets.values()].filter(w => w.dev && under(w.dir, folder)).map(w => ({ id: w.id, name: w.m.name || w.id, on: onOf(w), devError: w.devError })) }))
+  const links = () => devRoots().map(folder => ({ folder, widgets: [...widgets.values()].filter(w => w.dev && under(pathOf(w), folder)).map(w => ({ id: w.id, name: w.m.name || w.id, on: onOf(w), devError: w.devError })) }))
   if (o.list) return { links: links() }
   if (o.off !== undefined) {
     const t = String(o.off)
     const w = widgets.get(t)
-    const folder = devRoots().find(r => (w?.dev && under(w.dir, r)) || r === resolve(home(t)))
+    const folder = devRoots().find(r => (w?.dev && under(pathOf(w), r)) || r === resolve(home(t)))
     if (!folder) throw new Error(`${t} isn't linked (laki widget dev --list)`)
     settingsSet({ widgetDev: devRoots().filter(r => r !== folder) })
     return { unlinked: folder, links: links() }
@@ -746,9 +823,9 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean }) 
   const folder = resolve(home(String(o.folder ?? '')))
   const found = foldersIn(folder)
   if (!o.folder || !found.length) throw new Error(`${folder} has no widget.json, nor folders with one`)
-  const bad = found.map(d => [d, manifestOf(d)] as const).filter(([, m]) => typeof m === 'string')
+  const bad = found.map(x => [pathOf(x), x.file ? oneFile(x.d, x.file) : manifestOf(x.d)] as const).filter(([, m]) => typeof m === 'string')
   settingsSet({ widgetDev: [...new Set([...devRoots(), folder])] }) // scans: its widgets first, watched
-  const mine = [...widgets.values()].filter(w => w.dev && under(w.dir, folder))
+  const mine = [...widgets.values()].filter(w => w.dev && under(pathOf(w), folder))
   for (const w of mine)
     if (!onOf(w)) {
       writeStore(w.id, { ...readStore(w.id), on: true })
@@ -757,4 +834,142 @@ export function widgetDev(o: { folder?: string; off?: string; list?: boolean }) 
   changed()
   for (const w of mine) if (!w.devError && fetchable(w)) void widgetRun({ id: w.id, reason: 'dev', why: 'linked' })
   return { folder, widgets: mine.map(w => ({ id: w.id, name: w.m.name || w.id, devError: w.devError })), broken: bad.map(([d, m]) => `${d}: ${m}`) }
+}
+
+// laki widget new (Settings › Extensions › New ▾): a starter (widgetStarters.ts) in its own folder, <data>/widgets/<id>
+// (dir: another, empty or new, which laki widget dev then links; a one-file one goes in the folder itself), the id from
+// its name, made unique. The user's own (not by: 'ai'): on, and fetched at once
+export async function widgetNew(o: { kind?: string; name?: string; dir?: string }) {
+  const kind = String(o.kind ?? 'list') as StarterKind
+  if (!STARTER_KINDS.includes(kind)) throw new Error(`a kind: ${STARTER_KINDS.join(', ')}`)
+  const name = String(o.name ?? '').trim().slice(0, 60)
+  if (!name) throw new Error('a name')
+  const slug = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 32).replace(/-+$/, '') || 'extension'
+  const own = o.dir === undefined || !String(o.dir).trim()
+  const taken = (id: string) => widgets.has(id) || existsSync(storePath(id)) || (own && (existsSync(join(widgetHome(), id)) || filesIn(widgetHome()).some(n => n.startsWith(`${id}.`))))
+  let id = slug
+  for (let n = 2; taken(id); n++) id = `${slug}-${n}`
+  const files = STARTERS[kind].files(id, name)
+  const folder = own ? (kind === 'onefile' ? widgetHome() : join(widgetHome(), id)) : resolve(home(String(o.dir).trim()))
+  const there = statOf(folder)
+  if (!own && there && (!there.isDirectory() || (kind !== 'onefile' && readdirSync(folder).length))) throw new Error(`${folder} isn't an empty folder: a new one, or one with nothing in it`)
+  for (const [n, t] of Object.entries(files)) {
+    const p = join(folder, n)
+    if (statOf(p)) throw new Error(`${p} is there already`)
+    mkdirSync(dirname(p), { recursive: true })
+    writeFileSync(p, t)
+    chmodSync(p, t.startsWith('#!') ? 0o755 : 0o644)
+  }
+  writeStore(id, { on: true }) // yours, on
+  scanWidgets()
+  const at = kind === 'onefile' ? join(folder, Object.keys(files)[0]) : folder
+  const w = widgets.get(id)
+  const found = !!w && pathOf(w) === at // in a folder of your own: once laki widget dev links it
+  wLog({ id }, `made from the ${kind} starter in ${folder}`)
+  if (found && fetchable(w)) await widgetRun({ id, reason: 'manual', why: 'made' })
+  return { id, dir: at, files: Object.keys(files), found }
+}
+
+// laki widget check (the inspector's Check, MCP's laki_extension_check): what's wrong with an extension, by its id or a
+// folder (a widget's, a one-file one, or a folder of them): widget.json (manifestCheck), widget.html's and ui's
+// templates, ui (uiCheck) against its sample and each fixture, a one-file one's interval. run: its fetch once (manual,
+// as Fetch now), the ui against what it printed; never one Laki AI wrote while it's off: the user looks at it first
+export async function widgetCheck(o: { id?: string; dir?: string; run?: boolean }): Promise<{ id?: string; problems: UiProblem[] }> {
+  let srcs: Source[]
+  if (o.id !== undefined) {
+    const w = find(String(o.id))
+    srcs = [{ d: w.dir, file: w.file }]
+  } else {
+    const d = resolve(home(String(o.dir ?? '')))
+    srcs = o.dir ? foldersIn(d) : []
+    if (!srcs.length) throw new Error(`${d} has no widget.json, nor folders with one`)
+  }
+  const problems: UiProblem[] = []
+  for (const x of srcs) {
+    const ps = await checkOne(x, !!o.run)
+    problems.push(...(srcs.length > 1 ? ps.map(p => ({ ...p, where: `${idOf(x)}: ${p.where}` })) : ps))
+  }
+  return { id: srcs.length === 1 ? idOf(srcs[0]) : undefined, problems }
+}
+async function checkOne(x: Source, run: boolean): Promise<UiProblem[]> {
+  const out: UiProblem[] = []
+  const say = (level: UiProblem['level'], where: string, text: string) => out.push({ level, where, text })
+  const id = idOf(x)
+  const head = x.file ?? 'widget.json'
+  let m: Record<string, unknown>
+  if (x.file) {
+    const one = oneFile(x.d, x.file)
+    if (typeof one === 'string') return say('error', head, one), out
+    const { seconds, ...rest } = one
+    if (seconds) say('error', head, `every ${seconds} s: at most once a minute (${id}.1m.${x.file.split('.').pop()})`)
+    m = rest
+  } else {
+    let j: unknown
+    try {
+      j = JSON.parse(readFileSync(join(x.d, 'widget.json'), 'utf8'))
+    } catch (e) {
+      return say('error', head, (e as Error).message), out
+    }
+    if (!j || typeof j !== 'object' || Array.isArray(j)) return say('error', head, 'an object: { "name": … }'), out
+    m = j as Record<string, unknown>
+  }
+  const mp = manifestCheck(m).map(p => (x.file ? { ...p, where: p.where.replace(/^widget\.json/, x.file), text: p.text.replace('no sample:', 'no <laki.sample>:') } : p))
+  out.push(...mp)
+  if (!mp.some(p => p.level === 'error')) say('ok', head, 'reads')
+  if (typeof m.script === 'string') {
+    const p = resolve(x.d, m.script)
+    if (!p.startsWith(x.d + '/')) say('error', 'widget.json script', `${m.script} isn't in the extension's folder`)
+    else if (!existsSync(p)) say('error', 'widget.json script', `no file ${m.script}`)
+  }
+  const html = x.file ? '' : htmlOf(x.d)
+  const bad = templatesError(m as Manifest, html)
+  if (bad) say('error', bad.startsWith('ui:') ? 'ui' : 'widget.html', bad.replace(/^(ui|widget\.html): /, ''))
+  else if (html) say('ok', 'widget.html', 'its templates read')
+  // ui: alone, then against each set of data (only what the data adds)
+  const actions = m.actions && typeof m.actions === 'object' && !Array.isArray(m.actions) ? Object.keys(m.actions) : []
+  const ui = m.ui
+  const key = (p: UiProblem) => `${p.level}|${p.where}|${p.text}`
+  const alone = ui === undefined ? [] : uiCheck(ui, undefined, { actions })
+  const seen = new Set(alone.map(key))
+  const against = (data: unknown, what: string) => {
+    const ps = uiCheck(ui, data, { actions }).filter(p => !seen.has(key(p)))
+    out.push(...ps.map(p => ({ ...p, where: `${what} · ${p.where}` })))
+    if (!ps.length) say('ok', what, 'fits the ui')
+  }
+  if (ui !== undefined) {
+    out.push(...alone)
+    if (!alone.length) say('ok', 'ui', 'its elements check out')
+    if (m.sample !== undefined) against(m.sample, 'sample')
+  }
+  for (const n of x.file ? [] : fixtureNames(x.d)) {
+    let data: unknown
+    try {
+      data = JSON.parse(readFileSync(join(x.d, 'fixtures', n), 'utf8'))
+    } catch (e) {
+      say('error', `fixtures/${n}`, (e as Error).message)
+      continue
+    }
+    if (ui !== undefined) against(data, `fixtures/${n}`)
+    else say('ok', `fixtures/${n}`, 'reads')
+  }
+  // a one-file extension's id is its name's first part: renamed, its settings stay under the old one
+  if (x.file && !existsSync(storePath(id))) {
+    const lost = filesIn(join(dir, 'widget-data')).filter(n => n.endsWith('.json') && !widgets.has(n.slice(0, -5))).map(n => n.slice(0, -5))
+    if (lost.length) say('warn', head, `no settings kept for ${id}; ${lost.join(', ')} ${lost.length > 1 ? 'have' : 'has'} some, and no extension: renamed? The old name brings them back`)
+  }
+  if (run && (m.fetch || m.script)) {
+    const w = widgets.get(id)
+    if (!w || pathOf(w) !== pathOf(x)) say('warn', 'fetch', `not run: Laki doesn't have this one (laki widget dev ${pathOf(x)} links it)`)
+    else if (!onOf(w) && w.s.by === 'ai') say('warn', 'fetch', "not run: Laki AI wrote it and it's off: turn it on first")
+    else {
+      const r = await widgetRun({ id, reason: 'manual', why: 'check' }, true)
+      const last = runs.get(id)?.[0]
+      if (!r.ok) say('error', 'fetch', `${r.error}${last && !last.ok && last.exit ? ` (exit ${last.exit})` : ''}`)
+      else {
+        say('ok', 'fetch', `printed ${last?.bytes ?? 0} B of JSON in ${last?.ms ?? 0} ms`)
+        if (ui !== undefined) against(readStore(id).data, 'fetched')
+      }
+    }
+  }
+  return out
 }

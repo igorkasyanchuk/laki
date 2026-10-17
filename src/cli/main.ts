@@ -10,13 +10,14 @@ import { USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { describe } from '../shared/when.ts'
-import { COMMON, UI, UI_SAMPLES, type UiType } from '../shared/widgetUi.ts'
+import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
+import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -420,6 +421,20 @@ async function main() {
       if (sub === 'reload') return out(await rpc('widgetReload'), 'reloaded')
       if (sub === 'kit') return kit(id)
       if (sub === 'dev') return dev(id)
+      if (sub === 'new') {
+        const name = rest.slice(1).join(' ')
+        if (!name) throw new Error(`usage: laki widget new <name> [--kind ${STARTER_KINDS.join('|')}] [--dir <folder>]`)
+        const r: { id: string; dir: string; found: boolean } = await rpc('widgetNew', { name, kind: typeof flags.kind === 'string' ? flags.kind : undefined, dir: typeof flags.dir === 'string' ? resolve(flags.dir) : undefined }, 130000)
+        return out(r, [`made ${r.id} in ${r.dir}${r.found ? ': on, in Settings › Extensions' : ''}`, 'next:', `  laki widget dev ${r.dir}   reloads it as you save, prints each fetch`, `  laki widget check ${r.found ? r.id : r.dir}   says what's wrong with it`].join('\n'))
+      }
+      if (sub === 'check') {
+        const at = id === undefined ? resolve('.') : existsSync(id) ? resolve(id) : undefined
+        const r: { id?: string; problems: UiProblem[] } = await rpc('widgetCheck', { ...(at ? { dir: at } : { id }), run: !flags['no-run'] }, 130000)
+        const bad = r.problems.some(p => p.level === 'error')
+        out(r, r.problems.map(p => `${{ ok: '✓', warn: '!', error: '✗' }[p.level]} ${p.where}: ${p.text}`).join('\n') || 'nothing to check')
+        if (bad) process.exitCode = 1
+        return
+      }
       if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
       if (sub === 'run') {
         const r = await rpc('widgetRun', { id }, 130000)
@@ -433,7 +448,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' ') }, 130000)
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] | kit [element] | dev [folder] [--off <id|folder>] [--list]')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run]')
     }
     case 'ai': {
       const [sub] = rest

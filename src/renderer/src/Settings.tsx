@@ -5,6 +5,8 @@ import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
+import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
+import type { UiProblem } from '../../shared/widgetUi'
 import { importable, MAIL_OK, mergeActions, parseMails, type RunAction, shortPath, type Template, templatesFor } from './text'
 import { describeHours, parseHours } from '../../shared/when'
 import { bridge, openExternal } from './api'
@@ -1794,6 +1796,8 @@ export type WidgetsApi = {
   runs?: (id: string) => Promise<WidgetRuns> // the inspector's: its runs, env, fixtures
   mock?: (id: string, o: { data?: unknown; fixture?: string; off?: boolean }) => Promise<unknown> // sample data by hand, or Live again
   files?: (id: string) => Promise<string[]> // its folder's files
+  make?: (kind: StarterKind) => Promise<unknown> // New ▾'s starters (widgetNew): yours, on, its page opened
+  check?: (id: string, run: boolean) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
 }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
@@ -1972,18 +1976,26 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
 function WidgetList({ api }: { api: WidgetsApi }) {
   const mine = api.list.filter(w => !w.builtin)
   const theirs = api.list.filter(w => w.builtin)
+  const [menu, openMenu] = useMenu()
+  // New ▾: a starter (one that runs at once on sample data, yours to change: laki widget new), or Laki AI's page
+  const newMenu = (e: MouseEvent) =>
+    openMenu(e, [
+      { label: 'Make with Laki AI…', icon: 'bulb', sub: 'describe it; or the prompt for any AI chat', run: () => api.page('') },
+      ...(api.make ? [{ head: 'From a starter' }, ...STARTER_KINDS.map(k => ({ label: STARTERS[k].title, sub: STARTERS[k].blurb, run: () => void api.make!(k) }))] : []),
+    ])
   return (
     <>
+      {menu}
       <Group
         title="Yours"
         hint="Ones you or Laki AI made: in Laki's folder or the folders below"
         act={
-          <button type="button" className="primary" onClick={() => api.page('')}>
-            <Icon name="plus" size={12} /> New extension
+          <button type="button" className="primary" onClick={newMenu}>
+            <Icon name="plus" size={12} /> New ▾
           </button>
         }
       >
-        {mine.length ? list(mine) : <p className="muted small">None yet: New extension describes one to Laki AI (or gives you the prompt for any AI chat).</p>}
+        {mine.length ? list(mine) : <p className="muted small">None yet: New starts one from a starter, or describes one to Laki AI (or gives you the prompt for any AI chat).</p>}
       </Group>
       {!!theirs.length && <Group title="Built in" hint="Ones that come with Laki: turn on the ones you like">{list(theirs)}</Group>}
     </>

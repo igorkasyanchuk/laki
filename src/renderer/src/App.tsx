@@ -19,6 +19,7 @@ import { BoardPage } from './Board'
 import { UiKitPage } from './UiKit'
 import { type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
+import type { UiProblem } from '../../shared/widgetUi'
 import { widgetAsk } from '../../shared/widgetGuide'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
@@ -1238,6 +1239,8 @@ export function App() {
     runs: id => api.call<WidgetRuns>('widgetRuns', { id, data: true }),
     mock: (id, o) => call('widgetMock', { id, ...o }),
     files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => Object.keys(r.files)),
+    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog, tab: 'data' }), e => toast(String(e?.message ?? e))),
+    check: (id, run) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run }),
   }
   const fontSize = settings.fontSize ?? FONT_SIZE // Settings' size: every tab's, less its own zoom
   // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), Settings and

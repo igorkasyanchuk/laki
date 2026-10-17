@@ -241,11 +241,17 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     inputSchema: obj(
       {
         id: str('a new id for a new one: lowercase letters, digits and dashes (e.g. ny-clock)'),
-        files: { type: 'object', additionalProperties: { type: 'string' }, description: 'each file name and its whole text: widget.json, widget.html, and the scripts its fetch runs (fetch.sh, fetch.mjs…)' },
+        files: { type: 'object', additionalProperties: { type: 'string' }, description: 'each file name and its whole text: widget.json, widget.html, the scripts its fetch runs (fetch.sh, fetch.mjs…), and fixtures/<name>.json (sample data: fixtures/sample.json, fixtures/empty.json); no other folders' },
       },
       ['id', 'files'],
     ),
     run: a => rpc('widgetWrite', { id: a.id, files: typeof a.files === 'string' ? JSON.parse(a.files) : a.files }), // some models send the object as JSON text
+  },
+  {
+    name: 'laki_extension_check',
+    description: "What's wrong with an extension: widget.json (unknown keys, places, sizes, actions), its templates, its ui (elements, props, actions) against its sample and each fixtures/*.json. Never runs its fetch. Run it after every laki_extension_write and fix every error before you answer.",
+    inputSchema: obj({ id: str('its id, from laki_extensions') }, ['id']),
+    run: a => rpc('widgetCheck', { id: a.id, run: false }),
   },
   // specs and brainstorms (experimental: off, the daemon says so)
   {

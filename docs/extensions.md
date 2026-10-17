@@ -5,6 +5,9 @@ table or a row of links, with a full view a click away. It is a folder with a `w
 for a look of its own), and Laki does the rest: runs its fetch on a schedule, keeps what it printed, draws it with the
 UI kit and shows it where you put it.
 
+The quickest start: `laki widget new "Deploys" --kind list` (or Settings › Extensions › *New ▾*) makes one that runs at
+once on sample data; change its fetch and its `ui` from there (below: *Starters*).
+
 This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *New
 extension* (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), and in
 [`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which both are made from. Two examples come with Laki,
@@ -36,6 +39,7 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
 |---|---|
 | `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below); as a button: `icon`, `label`, `badge`, `tip`, `click` |
 | `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
+| `fixtures/<name>.json` | sample data: its Data tab shows each (*Sample ▾*), and *Check* fits `ui` to each |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
 
 ### Settings (`config`)
@@ -192,6 +196,73 @@ click that does something.
 }
 ```
 
+## Starters
+
+```sh
+laki widget new "Deploys" --kind table          # in Laki's folder (<data>/widgets/deploys), on, fetched
+laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or new): then laki widget dev there
+```
+
+| kind | what |
+|---|---|
+| `number` | a count with its label, a change and a sparkline |
+| `list` | rows with avatars, tags and a button each; grouped, filtered, *+N more* |
+| `table` | columns, sorted, a filter box; columns that hide when narrow |
+| `chart` | a line, area or bars from a list of numbers |
+| `button` | an icon on the rail with a count; a click runs its action |
+| `form` | fields and a button: an action gets them as JSON |
+| `panel` | a JS page of yours that draws with the UI kit (`laki.mount`), typed by `laki.d.ts` |
+| `onefile` | one script, `<id>.5m.sh` (below) |
+
+Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its
+comments to swap in; `fixtures/empty.json` beside it (its Data tab's *Sample ▾* shows either). It has a `README.md`
+with the next steps, and `"$schema"`, so VS Code and Cursor complete and check its `widget.json`
+([`docs/widget.schema.json`](widget.schema.json), written from `src/shared/widgetSchema.ts` by
+`node --experimental-strip-types scripts/widget-schema.ts`). The id comes from the name, made unique. It's yours: on.
+
+## Check
+
+```sh
+laki widget check deploys        # by its id, or a folder (laki widget check . in it); --no-run: without its fetch
+```
+
+```
+! widget.json: no key plcae (did you mean place?)
+✗ widget.json click: go isn't one of its actions
+! sample · ui (list): title uses titel, which no item of prs has (did you mean title?)
+✓ fetch: printed 412 B of JSON in 38 ms
+```
+
+It reads `widget.json` (unknown keys, the kinds of its fields, `place`, `size`, `every`, `view`, `config`'s specs and
+choices, `click`, `script` in the folder, `fetch` or `script`), each template of `widget.html` and `ui`, then `ui`
+(unknown elements and props, a `run` that names no action, icons) against its `sample` and each `fixtures/*.json` (each
+`each` a list, the fields its rows use in at least one item, a chart's numbers), and runs its fetch once (as *Fetch
+now*), checking `ui` against what it printed. ✗ is an error (it exits 1), ! a hint. One Laki AI wrote isn't run while
+it's off. Its page's *Check* tab shows the same; Laki AI and agents (`laki_extension_check`) check without the fetch.
+
+## One file
+
+A script named `<id>.<n><m|h>.<ext>` (`prs.5m.sh`, `cpu.1h.py`), executable or with a `#!` line, in Laki's folder, a
+folder you added, or linked with `laki widget dev`, is a whole extension: its name gives its id and how often it runs,
+what it prints (JSON) is its data, and comment lines give the rest of widget.json:
+
+```sh
+#!/bin/sh
+# <laki.name>Open PRs</laki.name>
+# <laki.place>status</laki.place>
+# <laki.size>2x1</laki.size>
+# <laki.label>{{n}} open</laki.label>
+# <laki.var>text(REPO="acme/web"): Repo</laki.var>
+# <laki.ui>{"type": "stat", "value": "{{n}}", "label": "open PRs"}</laki.ui>
+# <laki.sample>{"n": 3}</laki.sample>
+gh pr list -R "$WIDGET_REPO" --json number --jq '{n: length}'
+```
+
+Tags: `name`, `description`, `place` (one or a comma list), `icon`, `label`, `badge`, `tip`, `size`, `ui` and `sample`
+(a line of JSON each), and settings as `<laki.var>type(NAME="default"): Label</laki.var>` (`text`, `number`, `bool`,
+`choice(a,b)`), given as `$WIDGET_NAME`. Seconds (`.30s.`) are refused: at most once a minute. Renaming the file changes
+its id (its settings stay under the old one: *Check* says so).
+
 ## Dev mode
 
 ```sh
@@ -217,6 +288,7 @@ Its page's tabs show them:
 | Runs | the runs, newest first; a click shows one's stderr |
 | Env | what its fetch gets (`WIDGET_*`, `LAKI_*`, `PATH`); a setting named like a token, secret, key or password masked |
 | Files | its folder's files, and *Open folder* |
+| Check | *Check* above: *Check again*, *Check with a fetch* |
 
 Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.
 A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/inspect`, opens the Data tab.
@@ -226,13 +298,16 @@ A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/in
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
   size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, its folder, *Delete*
   (its folder and settings, for good, after a confirm; the ones that come with Laki only turn off), and Laki AI's chat
-  to change it. *New extension* (in *Yours*) makes one with Laki AI, or gives you the prompt for any AI chat. Search
+  to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Data), or with Laki AI, or gives you
+  the prompt for any AI chat. Search
   for *plugin* finds it too.
 - The Desk's *Build with AI*: Laki AI makes one for the Desk in its floating chat; it shows as a tile at once, with its
   sample, off until you turn it on.
 - The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget render <id> [--full]`,
-  `laki widget action <id> <action> [arg]`.
-- Laki AI and `laki mcp` (`laki_extensions`, `laki_extension_guide`, `laki_extension_read`, `laki_extension_write`):
+  `laki widget action <id> <action> [arg]`, `laki widget new <name> [--kind <k>] [--dir <folder>]`, `laki widget check
+  [id|folder] [--no-run]`, `laki widget kit [element]`, `laki widget dev [folder]`.
+- Laki AI and `laki mcp` (`laki_extensions`, `laki_extension_guide`, `laki_extension_read`, `laki_extension_write`,
+  `laki_extension_check`; `fixtures/<name>.json` is the one folder they may write):
   they make or change extensions in Laki's own folder, saved off: its fetch runs commands, so you look, then turn it on.
   They never delete one.
 

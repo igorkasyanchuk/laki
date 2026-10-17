@@ -1,6 +1,7 @@
 // How to make a widget, in words: the laki-widget skill's body (daemon/skill.ts) and the prompt Settings › Extensions
 // copies for any AI chat (widgetPrompt). One text, so both say the same.
 
+import { WIDGET_SCHEMA_URL } from './widgetSchema.ts'
 import { UI, UI_SAMPLES } from './widgetUi.ts'
 
 export const WIDGET_EVERY = 5 // minutes between fetches when widget.json doesn't say
@@ -55,6 +56,19 @@ export const widgetFormat = () => `## widget.json
   \`globe\`, \`github\`, \`pr\`, \`check\`, \`refresh\`, \`spec\`, \`bulb\`, \`timer\`, \`terminal\`, \`link\`, \`file\`, \`folder\`,
   \`smile\`…, or an emoji), \`label\`, \`badge\` (a short count) and \`tip\`: templates over its data, as plain text
   (\`"badge": "{{#if open}}{{open}}{{/if}}"\`); \`click\`: one of its actions (none: its full view, else a fetch).
+
+## Fixtures and the check
+
+- Write \`fixtures/sample.json\` (the sample, as its fetch would print it) and \`fixtures/empty.json\` (nothing to show):
+  its page's Data tab shows each, and the check fits the ui to each.
+- After every write, check it (\`laki_extension_check\`, or \`laki widget check <id> --no-run\`) and fix every ✗ before
+  you answer; a ! is a hint (a field no row has, an icon it doesn't know).
+- \`"$schema": "${WIDGET_SCHEMA_URL}"\` in widget.json lets an
+  editor complete and check it.
+- One file is a whole extension too: \`prs.5m.sh\` (its id, how often: \`5m\`, \`1h\`), executable or with a \`#!\` line,
+  printing JSON, its widget.json in comment lines: \`<laki.name>PRs</laki.name>\`, \`<laki.place>status</laki.place>\`,
+  \`<laki.size>2x1</laki.size>\`, \`<laki.ui>{"type": "text", "value": "{{n}} open"}</laki.ui>\`, \`<laki.sample>{"n": 3}</laki.sample>\`, settings as
+  \`<laki.var>text(REPO="acme/web"): Repo</laki.var>\` (text, number, bool, choice(a,b)), \`$WIDGET_REPO\` in it.
 
 ## The UI kit: "ui" (prefer it)
 

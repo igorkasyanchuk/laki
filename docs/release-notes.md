@@ -12,6 +12,10 @@ version it builds, with the date. -->
   that doesn't read keeps the last good version running), each fetch printed as it runs. Its page gets Data (edit it, or
   pick a fixture, to see it with that data), Runs (why each ran, its stderr), Env and Files tabs; a right click on an
   extension › *Inspect* opens them.
+- **Extension starters and a checker**: Settings › Extensions › *New ▾* (or `laki widget new`) makes a number, list,
+  table, chart, button, form, JS page or one-file extension that runs at once on sample data. `laki widget check` (its
+  page's *Check* tab) finds unknown keys with a guess, bad places, missing actions and fields its rows use that the data
+  hasn't. Editors complete widget.json from its schema, and one script named `prs.5m.sh` is a whole extension.
 - **A tab in its own window**: a tab's right click › *Float in its own window* (or ⌘K): its terminal, live, in a window over
   every app, as big as you like; its ✕ (or *Bring it back* in its pane) puts it back.
 - **Headless**: `./Laki.AppImage --headless --tailscale` (or `laki serve`) runs Laki on a server with no screen, used

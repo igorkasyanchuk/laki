@@ -833,7 +833,13 @@ id, and every save reloads it and fetches it again; a file that doesn't read kee
 says why), then prints each fetch as it runs. Its page has tabs beside Overview: **Data** (its JSON; edit it and Apply,
 or pick one of its `fixtures/*.json`, to see it with that data, *Sample data* on it until *Live*), **Runs** (the last
 20 fetches and actions, why each ran, a click for its stderr), **Env** (what its fetch gets, tokens masked) and
-**Files**. A right click on an extension opens it there (*Inspect*), and so does `laki://settings/widgets/<id>/inspect`.
+**Files**, and **Check**. A right click on an extension opens it there (*Inspect*), and so does `laki://settings/widgets/<id>/inspect`.
+
+To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a button, a form, a JS
+page or one file; it runs at once on sample data, and its page opens), or `laki widget new "Deploys" --kind table`.
+`laki widget check <id>` (its page's **Check**) says what's wrong: unknown keys (with a guess), places, actions, the
+`ui` against its sample and fixtures, and its fetch run once. One file is an extension too: `prs.5m.sh`, run every
+5 minutes, its name, place and settings in comment lines (`# <laki.place>status</laki.place>`).
 
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
@@ -1428,6 +1434,8 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, onefile
+laki widget check [id|folder] [--no-run] [--json]       # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers
 laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over

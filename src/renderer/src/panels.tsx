@@ -1,6 +1,6 @@
 import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
-import { AGENT_NAMES, type Doctor, HOME_ACCOUNT, EFFORTS, isAgent, type LogLine, MODELS, prIn, type View } from '../../shared/types'
+import { REPO, AGENT_NAMES, type Doctor, HOME_ACCOUNT, EFFORTS, isAgent, type LogLine, MODELS, prIn, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
 import icon from './icon.svg'
 import { Glyph } from './Glyph'
@@ -1122,7 +1122,7 @@ export function Palette({ items, onClose }: { items: PaletteItem[]; onClose: () 
   )
 }
 
-export const REPO = 'https://github.com/igorkasyanchuk/laki'
+export { REPO } // shared/types.ts': the schema's address is built from it too
 
 // a nudge to star the repo, at the foot of the empty pages
 export const StarLaki = () => (
