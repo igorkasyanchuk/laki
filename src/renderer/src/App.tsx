@@ -60,7 +60,7 @@ const WidgetStudio = lazy(() => import('./WidgetStudio').then(m => ({ default: m
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
 const SCRIPT_ICONS: Record<RunScript, IconName> = { test: 'check', lint: 'search', format: 'code', deploy: 'ship' }
-const toolTitles = new Map<string, string>() // an extension tool's ask still on screen: its req and its dialog's title
+const toolAsks = new Set<string>() // an extension tool's asks still on screen, by req (their dialogs' tag)
 type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab } | { uikit: true; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
@@ -719,7 +719,7 @@ export function App() {
       if (m.ev === 'state') setView(m.view)
       else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
       else if (m.ev === 'toolAsk') toolAsk.current?.(m)
-      else if (m.ev === 'toolDone') toolTitles.has(m.req) && (unchoose(toolTitles.get(m.req)!), toolTitles.delete(m.req))
+      else if (m.ev === 'toolDone') toolAsks.delete(m.req) && unchoose(m.req)
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
       else if (m.ev === 'remote') {
@@ -1244,9 +1244,9 @@ export function App() {
     const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, ...(m.ask === 'first' ? [{ label: where ? `Always in ${where}` : 'Always', allow: 'always' } as Pick] : []), { label: 'Deny', allow: 'deny' }]
     const answer = (allow: string) => void api.call('widgetToolAnswer', { req: m.req, allow }).catch(() => {})
     notify(title, `${m.description}${where ? ` · ${where}` : ''}`, m.tab ?? '', () => {}, settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
-    toolTitles.set(m.req, title)
+    toolAsks.add(m.req)
     // ponytail: one dialog at a time; a newer one (another agent's ask) closes this as Deny: its agent may ask again
-    void choose(title, `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks.map((p, i) => ({ label: p.label, primary: i === 0, danger: p.allow === 'deny' }))).then(i => toolTitles.has(m.req) && (toolTitles.delete(m.req), answer(picks[i]?.allow ?? 'deny')))
+    void choose(title, `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks.map((p, i) => ({ label: p.label, primary: i === 0, danger: p.allow === 'deny' })), undefined, m.req).then(i => toolAsks.delete(m.req) && answer(picks[i]?.allow ?? 'deny'))
   }
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {
@@ -1263,7 +1263,7 @@ export function App() {
       remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog({ studio: r.id, back: dialog }), e => toast(String(e?.message ?? e))),
     }),
     undo: (id, after) => api.call('widgetUndo', { id, after }),
-    tryOnce: id => api.call<{ ok: boolean; error?: string }>('widgetRun', { id, once: true }),
+    tryOnce: (id, ws) => api.call<{ ok: boolean; error?: string }>('widgetRun', { id, once: true, ws }),
     folder: (id, e) => {
       const w = view?.widgets?.find(x => x.id === id)
       openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])

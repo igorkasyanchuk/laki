@@ -6,7 +6,7 @@ import { type ChildProcess, execFile, spawn } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { chmodSync, cpSync, existsSync, type FSWatcher, lstatSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, watch, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { BUTTON_PLACES, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
@@ -1044,7 +1044,7 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
   const env = Object.fromEntries(Object.entries(input).map(([k, v]) => [`WIDGET_INPUT_${k.toUpperCase()}`, Array.isArray(v) ? v.join(',') : typeof v === 'boolean' ? (v ? '1' : '') : String(v ?? '')]))
   const why = `${ws || 'no workspace'}${from.tab ? `/${from.tab}` : ''}${from.agent ? ` (${from.agent})` : ''}, allowed ${how}`
   if (ws) devLog(`ws:${ws}`, `${w.m.name || w.id}: tool ${o.action} (${why})`)
-  const r = await widgetAction({ id: w.id, action: o.action, arg: JSON.stringify(input), ws: x?.id }, `tool:${o.action}`, { env, stdin: '', why, full: true })
+  const r = await widgetAction({ id: w.id, action: o.action, arg: JSON.stringify(input), ws: x?.id }, `tool:${o.action}`, { env, stdin: JSON.stringify(input), why, full: true })
   if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: w.id, ws: x?.id, toast: r.toast, modal: r.modal })
   const output = (r.stdout ?? '').slice(0, TOOL_OUT)
   return r.ok ? { ok: true, output } : { ok: false, output, error: r.error }
@@ -1163,12 +1163,18 @@ export function widgetWrite(o: { id: string; files: Record<string, unknown> }) {
 // the last HISTORY. widgetUndo puts one back
 const HISTORY = 20
 const histDir = (id: string) => join(dir, 'widget-data', `${id}.history`)
+const hist = new Map<string, number[]>() // read once per id, then kept in step by snapshot, widgetUndo and widgetRm
 const historyOf = (id: string) => {
-  try {
-    return readdirSync(histDir(id)).filter(n => /^\d+$/.test(n)).map(Number).sort((a, b) => a - b)
-  } catch {
-    return []
+  let h = hist.get(id)
+  if (!h) {
+    try {
+      h = readdirSync(histDir(id)).filter(n => /^\d+$/.test(n)).map(Number).sort((a, b) => a - b)
+    } catch {
+      h = []
+    }
+    hist.set(id, h)
   }
+  return h
 }
 function snapshot(id: string, d: string) {
   const all = historyOf(id)
@@ -1177,6 +1183,7 @@ function snapshot(id: string, d: string) {
   if (statOf(d)?.isDirectory()) cpSync(d, to, { recursive: true, verbatimSymlinks: true })
   else mkdirSync(to, { recursive: true }), writeFileSync(join(to, '.none'), '')
   for (const n of all.slice(0, Math.max(0, all.length + 1 - HISTORY))) rmSync(join(histDir(id), String(n)), { recursive: true, force: true })
+  hist.delete(id)
 }
 // Undo (after: the first one taken after then, a turn's Undo to here; none: the newest): that one back, it and the
 // newer ones gone. Laki's own folder only; off again, as a write leaves it
@@ -1188,11 +1195,12 @@ export function widgetUndo(o: { id: string; after?: number }) {
   const d = join(widgetHome(), o.id)
   const had = widgets.get(o.id)
   if (had && had.dir !== d) throw new Error(`${o.id} isn't in Laki's folder`)
-  if (running.has(o.id)) throw new Error(`${o.id} is fetching: try again in a moment`)
+  if ([...running].some(k => k === o.id || k.startsWith(`${o.id}@`))) throw new Error(`${o.id} is fetching: try again in a moment`)
   const from = join(histDir(o.id), String(at))
   rmSync(d, { recursive: true, force: true })
   if (!existsSync(join(from, '.none'))) cpSync(from, d, { recursive: true, verbatimSymlinks: true })
   for (const n of all.filter(n => n >= at)) rmSync(join(histDir(o.id), String(n)), { recursive: true, force: true })
+  hist.delete(o.id)
   if (existsSync(storePath(o.id))) writeStore(o.id, { ...readStore(o.id), on: false })
   scanWidgets()
   wLog({ id: o.id }, `undone: back to before ${new Date(at).toLocaleTimeString()}`)
@@ -1208,7 +1216,7 @@ export function widgetRemix(o: { id: string; newId?: string }) {
   const d = join(widgetHome(), id)
   if (widgets.has(id) || statOf(d)) throw new Error(`${id} is taken`)
   mkdirSync(widgetHome(), { recursive: true })
-  cpSync(w.dir, d, { recursive: true, verbatimSymlinks: true, filter: p => !/\/(\.git|node_modules)$/.test(p) })
+  cpSync(w.dir, d, { recursive: true, verbatimSymlinks: true, filter: p => p === w.dir || !/^(\.git|node_modules)$/.test(basename(p)) })
   try {
     const m = JSON.parse(readFileSync(join(d, 'widget.json'), 'utf8'))
     writeFileSync(join(d, 'widget.json'), `${JSON.stringify({ ...m, name: `${m.name || w.id} (copy)` }, null, 2)}\n`)
@@ -1258,6 +1266,7 @@ export function widgetRm(o: { id: string }) {
   rmSync(storePath(w.id), { force: true })
   rmSync(join(dir, 'widget-data', w.id), { recursive: true, force: true }) // its workspaces' instances
   rmSync(histDir(w.id), { recursive: true, force: true }) // the studio's: its undo and its chat
+  hist.delete(w.id)
   rmSync(join(dir, 'widget-data', `widget:${w.id}.chat.json`), { force: true })
   wLog(w, `deleted: ${d}`)
   scanWidgets()
@@ -1480,7 +1489,7 @@ async function checkOne(x: Source, run: boolean, ws?: string): Promise<UiProblem
   }
   // a one-file extension's id is its name's first part: renamed, its settings stay under the old one
   if (x.file && !existsSync(storePath(id))) {
-    const lost = filesIn(join(dir, 'widget-data')).filter(n => n.endsWith('.json') && !widgets.has(n.slice(0, -5))).map(n => n.slice(0, -5))
+    const lost = filesIn(join(dir, 'widget-data')).filter(n => n.endsWith('.json') && !n.endsWith('.chat.json') && !widgets.has(n.slice(0, -5))).map(n => n.slice(0, -5))
     if (lost.length) say('warn', head, `no settings kept for ${id}; ${lost.join(', ')} ${lost.length > 1 ? 'have' : 'has'} some, and no extension: renamed? The old name brings them back`)
   }
   if (Object.values(isObj(m.actions) ? m.actions : {}).some(a => toolOf(a))) {

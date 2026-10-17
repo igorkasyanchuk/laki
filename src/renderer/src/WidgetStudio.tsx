@@ -67,7 +67,11 @@ export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: str
     window.addEventListener('keydown', f)
     return () => window.removeEventListener('keydown', f)
   }, [])
-  // sample data first, again after each write (its rev): the studio never fetches by itself
+  // sample data first, again after each write (its rev: a rewrite ends Try it live): the studio never fetches by itself
+  const rev = useRef(w?.rev)
+  useEffect(() => {
+    if (w && rev.current !== w.rev) (rev.current = w.rev), setLive(false)
+  }, [w?.rev])
   useEffect(() => {
     if (!w || live || w.scope) return
     cfg.mock?.(w.id, { fixture: 'sample' }).then(
@@ -383,7 +387,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
   const run = () => {
     setBusy(true)
     setErr('')
-    cfg.tryOnce?.(w.id).then(
+    cfg.tryOnce?.(w.id, w.here ?? undefined).then(
       x => (x.ok ? onRan() : setErr(x.error ?? 'it failed'), setBusy(false)),
       e => (setErr(String(e?.message ?? e)), setBusy(false)),
     )

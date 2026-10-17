@@ -30,6 +30,7 @@ const tools = (rig: any) => {
       hi: { run: 'echo "hi $WIDGET_INPUT_WHO"; echo "$WIDGET_ARG" >&2', tool: { description: 'Say hi', input: { who: 'string' }, ask: 'always' } },
       echo: { run: 'echo "echo $WIDGET_INPUT_TEXT"', tool: { description: 'Echo it', input: { text: 'string', tags: 'string[]' }, ask: 'never' } },
       nope: { run: 'echo partial; echo it broke >&2; exit 3', tool: { description: 'Fails', ask: 'never' } },
+      stdin: { run: 'cat', tool: { description: 'Its input back', input: { a: 'string' }, ask: 'never' } },
       plain: 'echo a button',
     },
   })
@@ -65,6 +66,7 @@ test('tools: listed and called, asked first per workspace or always, denied, tim
   await assert.rejects(rig.rpc('widgetToolCall', { id: 'g', action: 'hi', input: { who: 'x' } }), /Laki's window isn't open: nobody to approve it/)
   const echo = await rig.cli('widget', 'tool', 'g', 'echo', '{"text": "yo"}')
   assert.equal(echo.out.trim(), 'echo yo')
+  assert.deepEqual(await rig.rpc('widgetToolCall', { id: 'g', action: 'stdin', input: { a: 'x' } }), { ok: true, output: '{"a":"x"}' }, 'the input as JSON on stdin')
   const nope = await rig.cli('widget', 'tool', 'g', 'nope')
   assert.equal(nope.code, 1)
   assert.match(nope.out, /partial/)

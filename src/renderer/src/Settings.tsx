@@ -1802,7 +1802,7 @@ export type WidgetsApi = {
   studio?: (id: string) => void // the extension studio (Laki AI on): '' a new one
   remix?: (id: string) => Promise<unknown> // a copy of any one, yours, opened in the studio
   undo?: (id: string, after?: number) => Promise<unknown> // the studio's Undo (after: Undo to here)
-  tryOnce?: (id: string) => Promise<{ ok: boolean; error?: string }> // the studio's Try it live: its fetch once while off
+  tryOnce?: (id: string, ws?: string) => Promise<{ ok: boolean; error?: string }> // the studio's Try it live: its fetch once while off
   wsName?: (ws: string) => string // a grant's workspace, by name ('': no workspace, Laki AI's)
 }
 const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }

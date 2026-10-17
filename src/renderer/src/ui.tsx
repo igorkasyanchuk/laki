@@ -79,16 +79,16 @@ export function Switch({ on, onChange, tip, className = '', disabled, children }
 // buttons (a widget's modal), the index picked, -1 for none; check: a checkbox under the text, its on as it was left.
 type Choice = { label: string; primary?: boolean; danger?: boolean }
 type Check = { label: string; on: boolean }
-type Asking = { title: string; text?: string; buttons: Choice[]; check?: Check; done: (i: number) => void }
+type Asking = { title: string; text?: string; buttons: Choice[]; check?: Check; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
 export const ask = (title: string, o: { text?: string; ok?: string; danger?: boolean } = {}) =>
   new Promise<boolean>(done =>
     asker ? asker({ title, text: o.text, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
   )
-export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check) => new Promise<number>(done => (asker ? asker({ title, text, buttons, check, done }) : done(-1)))
-// unchoose: closes the dialog shown with that title, as none (-1): answered elsewhere (a tool's notification)
-let closer: ((title: string) => void) | null = null
-export const unchoose = (title: string) => closer?.(title)
+export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string) => new Promise<number>(done => (asker ? asker({ title, text, buttons, check, done, tag }) : done(-1)))
+// unchoose: closes the dialog choose showed with that tag, as none (-1): answered elsewhere (a tool's notification)
+let closer: ((tag: string) => void) | null = null
+export const unchoose = (tag: string) => closer?.(tag)
 
 export function AskHost() {
   const [a, setA] = useState<Asking | null>(null)
@@ -127,7 +127,7 @@ export function AskHost() {
       setOn(!!next.check?.on)
       setA(next)
     }
-    closer = t => void (cur.current?.a.title === t && close(-1))
+    closer = t => void (cur.current?.a.tag === t && close(-1))
     const f = (e: KeyboardEvent) => onKey.current(e)
     window.addEventListener('keydown', f, true) // before the terminal and the page under it
     return () => {
