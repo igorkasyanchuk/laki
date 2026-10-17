@@ -1,7 +1,7 @@
 // `laki mcp`: Laki as an MCP server over stdio (JSON-RPC 2.0, a message per line), for Claude Code, Codex or
 // any MCP client. Its tools go through the daemon's API like the CLI's commands; none deletes, archives or ships.
 import { createInterface } from 'node:readline'
-import { ensureDaemon, rpc as conn } from '../shared/conn.ts'
+import { alive, ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from '../shared/layout.ts'
 import { BRAINSTORM_OUTPUT } from '../shared/plans.ts'
 import { AI_ACTS, API, DEVICE_OPS, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, mergeActions, prRef, rowsOf, templated, templatesFor, type View } from '../shared/types.ts'
@@ -252,6 +252,19 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     description: "What's wrong with an extension: widget.json (unknown keys, places, sizes, actions), its templates, its ui (elements, props, actions) against its sample and each fixtures/*.json. Never runs its fetch. Run it after every laki_extension_write and fix every error before you answer.",
     inputSchema: obj({ id: str('its id, from laki_extensions') }, ['id']),
     run: a => rpc('widgetCheck', { id: a.id, run: false }),
+  },
+  // the user's extensions' tools (an action with a tool): listed, and called (the user may be asked first)
+  {
+    name: 'laki_extension_tools',
+    description: "Tools the user's extensions give agents: each one's name (id.action), what it does, its input, whether Laki asks the user first, and the extension's notes on when to use it (agents). Call one with laki_extension_call.",
+    inputSchema: obj({}),
+    run: () => rpc('widgetTools'),
+  },
+  {
+    name: 'laki_extension_call',
+    description: "Call an extension's tool (laki_extension_tools): it runs a command of the user's extension on this Mac, in your workspace for a per-workspace one; Laki may ask the user first and they may deny it. Its output comes back.",
+    inputSchema: obj({ tool: str('id.action, from laki_extension_tools'), input: { type: 'object', description: 'its input, as its schema says' } }, ['tool']),
+    run: a => extCall(rpc, String(a.tool ?? ''), a.input, from, who),
   },
   // specs and brainstorms (experimental: off, the daemon says so)
   {
@@ -552,6 +565,21 @@ export const skillTools = (rpc: Rpc): Tool[] => [
 ]
 
 // Laki AI's looks at what the user sees (a tab's screen, the agent browser): said as its own (by: 'ai'), so the app can
+// an extension's tool (id.action), from this agent's workspace and tab (Laki AI: none, by its name): its output, or an
+// error with what it printed and why it failed; refused (bad input, denied, no answer) as the daemon says
+async function extCall(rpc: Rpc, tool: string, input: unknown, from?: string, who?: string) {
+  const at = tool.indexOf('.')
+  if (at < 1) throw new Error('tool: id.action, from laki_extension_tools')
+  const r: { ok: boolean; output: string; error?: string } = await rpc('widgetToolCall', { id: tool.slice(0, at), action: tool.slice(at + 1), input: typeof input === 'string' ? JSON.parse(input) : input, from: { ws: from, tab: from ? process.env.LAKI_TAB : undefined, agent: who } }, 300000)
+  if (!r.ok) throw new Error(`${r.output}${r.output && !r.output.endsWith('\n') ? '\n' : ''}✗ ${r.error}`)
+  return r.output || '(it printed nothing)'
+}
+// MCP's ext_<id>_<action>: each tool as one of its own, while a daemon runs (tools/list never starts one: stdout is the
+// protocol's)
+type ExtTool = { tool: string; id: string; action: string; name: string; description: string; input: object; agents?: string }
+const extName = (t: { id: string; action: string }) => `ext_${t.id}_${t.action}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)
+const extTools = async (): Promise<ExtTool[]> => ((await alive()) ? conn<ExtTool[]>('widgetTools').catch(() => []) : [])
+
 // light what it looked at (Settings › General › Experimental › Laki AI's glow)
 const AI_LOOKS = ['screen', 'browse']
 export const aiRpc = (rpc: Rpc): Rpc => (method, params, ms) => rpc(method, AI_LOOKS.includes(method) ? { ...params, by: 'ai' } : params, ms)
@@ -561,6 +589,11 @@ const own = process.env.LAKI_AI === '1' ? aiRpc(conn) : conn // Laki AI's claude
 const TOOLS = [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : [])]
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
+  if (!tool && name.startsWith('ext_')) {
+    const t = (await extTools()).find(x => extName(x) === name)
+    if (!t) throw new Error(`no tool ${name}: its extension is off, or Laki isn't running`)
+    return extCall(own, t.tool, args ?? {}, process.env.LAKI_WORKSPACE || undefined)
+  }
   if (!tool) throw new Error(`no tool ${name}`)
   await (daemon ??= ensureDaemon().catch(e => ((daemon = undefined), Promise.reject(e))))
   const r = await tool.run(args ?? {})
@@ -579,7 +612,7 @@ async function answer(m: any): Promise<object | undefined> {
     case 'ping':
       return {}
     case 'tools/list':
-      return { tools: TOOLS.map(({ run, max, ...t }) => t) }
+      return { tools: [...TOOLS.map(({ run, max, ...t }) => t), ...(await extTools()).map(t => ({ name: extName(t), description: `${t.name}: ${t.description}${t.agents ? `\n\n${t.agents}` : ''}`, inputSchema: t.input }))] }
     case 'tools/call':
       try {
         return { content: [{ type: 'text', text: await call(m.params?.name, m.params?.arguments) }] }

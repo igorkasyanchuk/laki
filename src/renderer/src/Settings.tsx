@@ -1798,7 +1798,10 @@ export type WidgetsApi = {
   files?: (id: string) => Promise<string[]> // its folder's files
   make?: (kind: StarterKind) => Promise<unknown> // New ▾'s starters (widgetNew): yours, on, its page opened
   check?: (id: string, run: boolean, ws?: string) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
+  revoke?: (id: string, action: string, ws: string) => Promise<unknown> // a tool's Always in a workspace taken back (widgetGrantRm)
+  wsName?: (ws: string) => string // a grant's workspace, by name ('': no workspace, Laki AI's)
 }
+const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }
 
 const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
 const PLACES: [WidgetPlace, string, string][] = [
@@ -1964,6 +1967,24 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         <div className="wc-opts">
           {options.map(o => (
             <WidgetOptionField key={o.key} o={o} value={w.config[o.key] ?? ''} onSet={v => void api.set(w.id, { config: { [o.key]: v } })} />
+          ))}
+        </div>
+      )}
+      {!!w.tools?.length && (
+        <div className="wc-tools">
+          <div className="small">
+            <b>Tools for agents</b> <span className="muted">· agents run these through laki tool and MCP</span>
+          </div>
+          {w.tools.map(t => (
+            <div key={t.action} className="wc-tool small">
+              <code>{t.action}</code> <span className="muted">{t.description} · {ASK_SAYS[t.ask]}</span>
+              {t.grants.map(g => (
+                <span key={g} className="tag-soft">
+                  always in {api.wsName?.(g) ?? (g || 'no workspace')}
+                  {api.revoke && <button type="button" className="link" data-tip="Ask again there" onClick={() => void api.revoke!(w.id, t.action, g)}>Revoke</button>}
+                </span>
+              ))}
+            </div>
           ))}
         </div>
       )}

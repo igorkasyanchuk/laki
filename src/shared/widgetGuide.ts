@@ -69,6 +69,11 @@ export const widgetFormat = () => `## widget.json
 - An action that prints \`{"data": …}\` sets the data (\`"merge": true\`: over it) instead of a fetch.
 - \`"stream": true\`: its fetch runs all along, each line of JSON it prints its data (a script: an async generator,
   each \`yield\`); global only, no \`every\`. \`laki widget push <id> '<json>'\` sets its data from outside.
+- An action as a tool for agents: \`"go": { "run": "<command>", "tool": { "description": "…", "input": { "name":
+  "string" | "number" | "boolean" | "string[]" }, "required": ["name"], "ask": "first" | "always" | "never" } }\`; its
+  input as \`$WIDGET_INPUT_<NAME>\` and JSON on stdin, what it prints goes back to the agent. \`AGENTS.md\` in its folder
+  says when to use them. Agents call it with \`laki widget tool <id> <action> '<json>'\` or MCP; Laki asks the user
+  (first: once per workspace). Never \`never\` for a command that changes things outside this Mac.
 
 ## Fixtures and the check
 

@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick } from './widgets.ts'
+import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -274,7 +274,10 @@ const LAKI_NOTE = () =>
 - \`laki pr . <url|number>\`: make the pull request you opened or work on this workspace's PR, when it isn't one on this branch (a PR of this branch, once pushed, is its PR on its own).
 - \`laki new . --prompt '<task>'\`: hand a separate task to another agent, in a new workspace (PRs the prompt names are only its related links; \`--link <url>\`: the PR it's about, as for a review).
 - \`laki browser open /path\`, \`laki browser screenshot\`: look at the app the workspace serves on $PORT.
-- ${STORAGE_NOTE}`
+- ${STORAGE_NOTE}${widgetTools().length ? TOOLS_NOTE : ''}`
+// the user's extensions give tools (an action's tool): said only while one is on
+const TOOLS_NOTE = `
+- \`laki widget tools\`: tools the user's Laki extensions give you (a deploy, a ticket, a note…) and when to use them; \`laki widget tool <id> <action> '<json>'\` runs one (Laki may ask the user first). MCP: their ext_ tools.`
 
 // a project's memory, for its claude and codex at every start (with Laki's note): Settings' global memory (the user's
 // rules for every project), the project's own from the user, then what agents learned (auto-memory), and how to add to

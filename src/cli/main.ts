@@ -437,6 +437,28 @@ async function main() {
         return
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
+      if (sub === 'tools') {
+        // what agents may call: each extension's actions with a tool, and its AGENTS.md
+        type T = { tool: string; name: string; description: string; ask: string; scope?: string; agents?: string; input: { properties: Record<string, { type: string; enum?: unknown[]; description?: string }>; required: string[] } }
+        const list: T[] = await rpc('widgetTools')
+        const field = (t: T, k: string, f: T['input']['properties'][string]) => `  ${k}: ${f.type === 'array' ? 'string[]' : f.type}${f.enum ? ` (${f.enum.join('|')})` : ''}${t.input.required.includes(k) ? ', required' : ''}${f.description ? ` · ${f.description}` : ''}`
+        return out(list, list.map(t => [`${t.tool}  ${t.description}  (${t.name}${t.scope ? ', per workspace' : ''}, asks ${t.ask === 'always' ? 'every time' : t.ask})`, ...Object.entries(t.input.properties).map(([k, f]) => field(t, k, f)), ...(t.agents ? t.agents.split('\n').map(l => `  │ ${l}`) : [])].join('\n')).join('\n\n') || 'no tools: an extension that is on with an action that has a "tool"')
+      }
+      if (sub === 'tool') {
+        // one tool, from this tab's workspace ($LAKI_WORKSPACE, $LAKI_TAB): the user may be asked first
+        if (!id || !action) throw new Error("usage: laki widget tool <id> <action> [json input] [--ws <workspace>]")
+        let input: unknown = {}
+        try {
+          if (arg.length) input = JSON.parse(arg.join(' '))
+        } catch {
+          throw new Error(`not JSON: ${arg.join(' ').slice(0, 80)}`)
+        }
+        const r: { ok: boolean; output: string; error?: string } = await rpc('widgetToolCall', { id, action, input, from: { ws: ws ?? process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB } }, 300000)
+        if (json) return out(r)
+        process.stdout.write(r.output)
+        if (!r.ok) (console.error(`✗ ${r.error}`), (process.exitCode = 1))
+        return
+      }
       if (sub === 'push') {
         // its data from a cron job, a git hook, CI: JSON as an argument, or on stdin (- or none)
         if (!id) throw new Error('usage: laki widget push <id> [json | -] [--ws <workspace>] [--merge]')
@@ -464,7 +486,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws }, 130000)
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge]')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json]')
     }
     case 'ai': {
       const [sub] = rest

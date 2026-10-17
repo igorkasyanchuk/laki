@@ -167,6 +167,40 @@ An extension that's off refuses it. A git hook that counts today's commits in an
 laki widget push commits "{\"today\": $(git log --since=midnight --oneline | wc -l)}" >/dev/null 2>&1 || true
 ```
 
+## Tools for agents (an action's `tool`)
+
+An action can be a tool your agents call: a deploy, a ticket, a note, a query. Give it a `tool` with what it does and
+its input; `run` is its command, as a plain action's string is:
+
+```json
+"actions": {
+  "preview": {
+    "run": "./deploy.sh --preview",
+    "tool": {
+      "description": "Deploy this workspace's branch to a preview URL",
+      "input": { "service": { "type": "string", "enum": ["web", "api"], "description": "which app" }, "dry": "boolean" },
+      "required": ["service"],
+      "ask": "first"
+    }
+  }
+}
+```
+
+- `input`: each field `string`, `number`, `boolean` or `string[]` (or `{ "type", "description", "enum" }`); checked
+  before anything runs, then given as `$WIDGET_INPUT_<NAME>` (a list joined by commas, `true` or empty) and all of it
+  as JSON on stdin. What the command prints goes back to the agent; a failure gives its output and stderr's last line.
+- `ask`: `first` (the default) asks you once per workspace (*Always in …* in the dialog; Settings › Extensions lists
+  each grant with *Revoke*), `always` every call, `never` not at all (the checker warns when its command looks outward:
+  a push, a merge, a deploy). Laki's window must be open to ask; no answer in 2 minutes refuses it. Turning the
+  extension off, or changing its commands, takes the grants back.
+- `AGENTS.md` in its folder says when to use its tools (4 KB at most); agents see it with the list.
+- Agents get them through `laki widget tools` (the list) and `laki widget tool <id> <action> '<json>'` (a call, in
+  their workspace), and in MCP as `ext_<id>_<action>` tools (with `laki_extension_tools` and `laki_extension_call`);
+  Laki AI calls them too. A per-workspace one runs in the caller's workspace. Only extensions that are on have tools.
+- Each call is a run (reason `tool:<action>`, who called it and how it was allowed) in its page's Runs.
+
+The *A tool for agents* starter (`laki widget new Notes --kind tool`) is one: an `add` tool that keeps notes you see.
+
 ## The UI kit (`ui`)
 
 The quickest way to draw one: `widget.json`'s `"ui"`, elements as JSON that follow the app's theme and fit any size
@@ -321,6 +355,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `panel` | a JS page of yours that draws with the UI kit (`laki.mount`), typed by `laki.d.ts` |
 | `workspace` | *This branch*: per workspace, its branch, PR, port and path, a link to its server |
 | `stream` | a command that runs all along: a line of JSON every 2 s, shown as it comes |
+| `tool` | *A tool for agents*: notes your agents add with its `add` tool (asked once per workspace), a Clear button |
 | `onefile` | one script, `<id>.5m.sh` (below) |
 
 Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its
@@ -424,6 +459,8 @@ A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/in
 
 - A fetch and an action are shell commands on your Mac, like a script you run: only turn on what you trust. One that
   Laki AI wrote is saved off and tagged *by Laki AI*.
+- An agent's tool call shows you the command and its input before it runs, unless the tool says `never` or you chose
+  *Always* in that workspace.
 - A template extension is sanitized (no scripts, frames, forms, `on…` attributes, or links other than http(s) and
   mailto). A JS one runs in a sandboxed frame with an opaque origin, `default-src 'none'`, and only the network you allow.
 - Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data.

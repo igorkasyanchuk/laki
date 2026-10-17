@@ -97,7 +97,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `POST /pin`, the `remote` event); 62: workflows' `llm` and `webhook` blocks and `out:`, `shareStart`/`shareStop`, a tab's
 `share`; 63: `flowTest`, `shareStart` `hours` and `shareTick`, a tab's `share` as `{url, until}`, schedules'
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
-a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`. A
+a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1097,6 +1097,23 @@ as lines. `widgetRun` on a stream starts it again; `due` skips them; `checkOne` 
 ignored). `widgetPush` (`laki widget push <id> [json|-] [--ws] [--merge]`): `keep`, a `push` run, refused when off. The
 `stream` starter. The inspector's Runs shows `WidgetRuns.stream` (`WidgetStream`).
 
+Tools for agents (widgets.ts' tools section; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an
+action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPES`, `TOOL_ASKS`; `ask` unset: first).
+`widgetTools` lists the ones that are on (`tool` `<id>.<action>`, the input as a JSON Schema, `agents`: its folder's
+`AGENTS.md`, 4 KB). `widgetToolCall` (`id`, `action`, `input`, `from` `{ ws, tab, agent }`): `toolArgs` checks the input
+first, a scope workspace one takes the caller's; `first` without a grant (`state.widgetGrants[ws]`, `<id>.<action>`; '':
+no workspace) or `always` broadcasts `toolAsk` (`req`, the command, input, ws, tab, agent; refused with no client) and
+waits `LAKI_TOOL_WAIT` (2 min) for `widgetToolAnswer` (`once`, `always`, `deny`; the first counts), then `toolDone`;
+`always` keeps the grant. It runs as `widgetAction` would (`$WIDGET_INPUT_<NAME>`, the input as JSON on stdin, a run
+`tool:<action>` with who and how), its stdout back (`TOOL_OUT`, 16 KB). Grants go with the extension off, its commands
+changed (`cmdsOf` at scan) or a workspace gone; `widgetGrantRm` is Settings' Revoke. App's `toolAsk`: `choose` (Allow
+once, *Always in <ws>* for first, Deny; Esc and a newer dialog: deny) and a notification with the same actions
+(main's `tool` action calls `widgetToolAnswer`); `toolDone` closes the dialog (`unchoose`). The CLI's `laki widget
+tools|tool`; MCP's `laki_extension_tools`, `laki_extension_call` and an `ext_<id>_<action>` tool per one (listed only
+with a daemon up: `alive`); Laki AI has them as MCP's; `LAKI_NOTE` names them while one is on (`TOOLS_NOTE`).
+`manifestCheck` checks each tool and warns at `never` with an outward command; `checkOne` at a missing or long
+`AGENTS.md`. The `tool` starter. Tested in `test/widget-tools.test.ts`.
+
 ### Notifications
 
 The renderer posts them (`turn` events, App.tsx): off when `settings.notify === false`, per kind
@@ -1617,7 +1634,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/renderer/src/voice.ts` | Settings › Voice's cloud: recording, hold Fn, the text typed where the cursor was |
 | `src/shared/widget.ts` | widgets' template language, views, base CSS (the UI kit's too), `uiBehave`, a JS widget's page |
 | `src/shared/widgetUi.ts` | the UI kit: its elements, `uiHtml`, `uiCheck`, `UI_SAMPLES` |
-| `src/shared/widgetSchema.ts` | widget.json's keys: the JSON Schema (`docs/widget.schema.json`, by `scripts/widget-schema.ts`), `laki.d.ts`, `manifestCheck` |
+| `src/shared/widgetSchema.ts` | widget.json's keys: the JSON Schema (`docs/widget.schema.json`, by `scripts/widget-schema.ts`), `laki.d.ts`, `manifestCheck`, an action's tool (`toolOf`, `toolSchema`, `toolArgs`) |
 | `src/shared/widgetStarters.ts` | `laki widget new`'s starters: each kind's files |
 | `src/shared/icons.ts` | the line icons' paths: the app's `Icon` and the UI kit's `iconSvg` |
 | `src/renderer/src/UiKit.tsx` | Settings › Extensions › UI kit: every element with its sample, at each size, its JSON |

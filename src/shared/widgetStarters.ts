@@ -42,7 +42,7 @@ function kit(o: { spec: unknown; data: unknown; empty: unknown; real: string; si
 }
 const toast = (what: string) => `printf '{"toast": "${what}: %s"}' "$WIDGET_ARG"`
 
-export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'button', 'form', 'panel', 'workspace', 'stream', 'onefile'] as const
+export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'button', 'form', 'panel', 'workspace', 'stream', 'tool', 'onefile'] as const
 export type StarterKind = (typeof STARTER_KINDS)[number]
 
 export const STARTERS: Record<StarterKind, Starter> = {
@@ -145,6 +145,46 @@ done
       'fixtures/empty.json': json({ n: 0, time: '' }),
       'README.md': readme(id, name, ' It streams (`"stream": true`): `stream.sh` runs all along, each line of JSON it prints its data.'),
     }),
+  },
+  tool: {
+    title: 'A tool for agents',
+    blurb: 'Notes your agents add through a tool (laki tool, MCP), asked once per workspace',
+    files: (id, name) => {
+      const notes = { notes: [{ text: 'Ask Dana about the rate limit' }, { text: 'The login test is flaky on CI' }] }
+      return {
+        'widget.json': json({
+          $schema: WIDGET_SCHEMA_URL,
+          name,
+          description: 'Notes your agents add with its add tool',
+          every: 5,
+          size: [3, 2],
+          fetch: 'sh fetch.sh',
+          actions: {
+            add: { run: 'sh add.sh', tool: { description: 'Add a note to the Notes list the user sees in Laki', input: { text: { type: 'string', description: 'The note: one short line' } }, required: ['text'], ask: 'first' } },
+            clear: 'rm -f notes.txt',
+          },
+          ui: { type: 'stack', children: [{ type: 'list', each: 'notes', title: '{{text}}', empty: 'No notes yet: an agent adds them with its add tool' }, { type: 'button', label: 'Clear', run: 'clear', confirm: 'Clear every note?', if: 'notes.length' }] },
+          sample: notes,
+        }),
+        'fetch.sh': `#!/bin/sh
+# What this prints (JSON) is the extension's data: notes.txt, a note per line (add.sh writes it)
+[ -f notes.txt ] || : > notes.txt
+awk 'BEGIN { printf "{\\"notes\\": [" } { gsub(/\\\\/, "\\\\\\\\"); gsub(/"/, "\\\\\\""); printf "%s{\\"text\\": \\"%s\\"}", (NR > 1 ? ", " : ""), $0 } END { print "]}" }' notes.txt
+`,
+        'add.sh': `#!/bin/sh
+# The add tool: an agent runs it (laki tool ${id} add '{"text": "…"}', or its MCP tool), Laki asks you first. Its
+# input comes as $WIDGET_INPUT_<NAME>; what this prints goes back to the agent.
+{ printf '%s' "$WIDGET_INPUT_TEXT" | tr -d '\\000-\\037'; echo; } >> notes.txt
+echo "Added. $(wc -l < notes.txt | tr -d ' ') notes now."
+`,
+        'AGENTS.md': `Use **add** when the user asks you to note something for later, or when you finish a step they should look at:
+one short line each. Never put secrets in a note.
+`,
+        'fixtures/sample.json': json(notes),
+        'fixtures/empty.json': json({ notes: [] }),
+        'README.md': readme(id, name, ' Its `add` action is a tool for agents (`"tool"` in widget.json, `AGENTS.md` says when to use it): `laki tools` lists it, `laki tool ' + id + ' add \'{"text": "hi"}\'` runs it, after you allow it.'),
+      }
+    },
   },
   onefile: {
     title: 'One file',

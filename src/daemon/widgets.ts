@@ -9,14 +9,14 @@ import { homedir, tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { BUTTON_PLACES, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
+import { BUTTON_PLACES, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
 import { hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
-import { manifestCheck } from '../shared/widgetSchema.ts'
+import { actionCmd, manifestCheck, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
-import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, q, settingsSet, state, wsVars } from './core.ts'
+import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own, plainEnv, q, save, settingsSet, state, wsVars } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -26,7 +26,8 @@ import { broadcast, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, own
 // character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions).
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
 type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
-type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, string>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown }
+type ActionDef = string | { run?: string; tool?: unknown } // a command, or one an agent may call too (widgetSchema.ts' toolOf)
+type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
@@ -153,6 +154,7 @@ export function widgetsGone(ws: string) {
   for (const id of ids) rmSync(instPath(id, ws), { force: true })
   for (const w of widgets.values()) w.inst.delete(ws)
   for (const k of [...runs.keys()]) if (k.endsWith(`@${ws}`)) runs.delete(k)
+  if (state.widgetGrants?.[ws]) delete state.widgetGrants[ws] // its tools' Always (dropWs saves)
 }
 
 // widget.html, or none ('')
@@ -286,6 +288,7 @@ export function scanWidgets() {
   for (const k of [...devKeep]) if (k.startsWith('widget:')) devKeep.delete(k)
   for (const w of widgets.values()) if (w.dev) devKeep.add(`widget:${w.id}`) // a dev widget's log, dev mode or not
   watchDev(dev)
+  for (const [id, was] of before) if (cmdsOf(was) !== cmdsOf(widgets.get(id))) ungrant(id) // its commands changed (a rewrite, an update): asked again
   for (const id of [...streams.keys()]) stopStream(id) // reloaded: started again as they read now
   streamSync()
   changed()
@@ -434,6 +437,7 @@ export const widgetsView = (): WidgetView[] =>
     error: w.s.error,
     running: running.has(w.id) || undefined,
     ...(scoped(w) && { scope: 'workspace' as const, inst: instView(w) }),
+    ...(toolsOf(w).length && { tools: toolsOf(w).map(([action, t]): WidgetTool => ({ action, description: t.description, ask: t.ask, grants: Object.keys(state.widgetGrants ?? {}).filter(ws => state.widgetGrants![ws].includes(`${w.id}.${action}`)) })) }),
     byAi: w.s.by === 'ai' || undefined,
     dev: w.dev || undefined,
     devError: w.devError,
@@ -543,6 +547,7 @@ export function widgetSet(o: { id: string; on?: boolean; size?: [number, number]
     s.aiMay = Date.now()
   }
   if (o.on !== undefined) s.on = !!o.on
+  if (o.on === false) ungrant(w.id) // off: its tools' Always go
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
@@ -607,14 +612,14 @@ function envOf(w: Entry, extra: Record<string, string>) {
   return env
 }
 type Ran = { out: string; err: string }
-type Failed = Error & { stderr?: string; exit?: number }
+type Failed = Error & { stderr?: string; stdout?: string; exit?: number }
 // a widget's command, in its folder: stdout and stderr, or why it failed (with its stderr and exit code)
 // stdin: an event's JSON (a handler's); else nothing to read
 function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>, stdin = '') {
   return new Promise<Ran>((ok, no) => {
     const p = execFile(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: 120_000, maxBuffer: MAX_OUT }, (e, stdout, stderr) =>
       e
-        ? no(Object.assign(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message)), { stderr: String(stderr), exit: typeof e.code === 'number' ? e.code : undefined }))
+        ? no(Object.assign(new Error(lastLine(String(stderr)) || lastLine(String(stdout)) || (e.killed ? 'timed out after 2 minutes' : e.message)), { stderr: String(stderr), stdout: String(stdout), exit: typeof e.code === 'number' ? e.code : undefined }))
         : ok({ out: String(stdout), err: String(stderr) }),
     )
     p.stdin?.on('error', () => {}) // one that never reads it
@@ -656,7 +661,9 @@ try {
 // reason (RUN_REASONS: manual unless said; $LAKI_REFRESH_REASON), why: what changed (dev mode's file). Data put there by
 // hand (widgetMock) stays: only Fetch now (manual) runs then, and its data replaces it
 export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream'] // and action:<name>, event:<name>
-type Ev = { env: Record<string, string>; stdin: string } // an event handler's: $LAKI_EVENT, $LAKI_EVENT_FILE, the JSON
+// an event handler's ($LAKI_EVENT, $LAKI_EVENT_FILE, the JSON on stdin) or a tool call's ($WIDGET_INPUT_<NAME>; why: who
+// called it and how it was allowed, for its run; full: all its stdout back)
+type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boolean }
 const AT_ONCE = 4 // a scope workspace one's instances fetching at a time
 // force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote).
 // ws: a scope workspace one's instance (its workspace's env, its own data)
@@ -720,19 +727,19 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
 // fetches again, to show what it changed. What it prints as JSON with toast or modal (sayOf) is what the app shows
 // What it prints as JSON with data replaces the extension's data (its instance's), merge: true over it (shallow); no
 // fetch follows then. reason, ev: an event's handler (event:<name>, its JSON on stdin)
-export async function widgetAction(o: { id: string; action: string; arg?: string; ws?: string }, why?: string, ev?: Ev): Promise<{ ok: boolean; out?: string; error?: string } & WidgetSay> {
+export async function widgetAction(o: { id: string; action: string; arg?: string; ws?: string }, why?: string, ev?: Ev): Promise<{ ok: boolean; out?: string; error?: string; stdout?: string } & WidgetSay> {
   const w = find(o.id)
   const x = wsOf(w, o.ws) // a scope workspace one's: the workspace it was clicked in
   const k = keyOf(w.id, x?.id)
   if (!onOf(w)) return { ok: false, error: OFF(w) }
-  const cmd = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
+  const cmd = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? actionCmd(w.m.actions[o.action]) : undefined
   if (typeof cmd !== 'string') return { ok: false, error: `${w.m.name || w.id} has no action ${o.action}` }
   wLog(w, `action ${o.action}${o.arg ? ` (${String(o.arg).slice(0, 200)})` : ''}`)
   const reason = why ?? `action:${o.action}`
   const t0 = Date.now()
   try {
     const { out, err } = await exec(w, '/bin/sh', ['-c', cmd], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env }, ev?.stdin)
-    ran(k, { at: t0, ms: Date.now() - t0, reason, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 })
+    ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 })
     wLog(w, `action ${o.action} done: ${lastLine(out) ?? 'printed nothing'}`)
     let j: Record<string, unknown> | undefined
     for (const s of [out, lastLine(out)]) // all of it, or its last line after some log lines
@@ -750,12 +757,12 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
       changed()
     } else if (fetches(w) && live) soon({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? `action:${o.action}` : 'manual', ws: x?.id }) // fetching already: once more after it
     const say = j && sayOf(j)
-    return say ? { ok: true, ...say } : { ok: true, out: lastLine(out) }
+    return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }) }
   } catch (e) {
     const f = e as Failed
-    ran(k, { at: t0, ms: Date.now() - t0, reason, action: o.action, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit })
+    ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit })
     wLog(w, `action ${o.action} failed: ${f.message}`)
-    return { ok: false, error: f.message }
+    return { ok: false, error: f.message, ...(ev?.full && { stdout: f.stdout ?? '' }) }
   }
 }
 
@@ -959,6 +966,92 @@ function stopStream(id: string, park = false) {
 // Settings › Resources' Stop: until Fetch now, a switch or a reload
 export const widgetStreamStop = (id: string) => stopStream(find(id).id, true)
 const streamOf = (id: string): WidgetStream | undefined => (st => st && { running: !!st.p, since: st.p ? st.since : undefined, restarts: st.restarts, last: st.last, next: st.timer ? st.next : undefined, stopped: st.stopped })(streams.get(id))
+
+// ---------- tools (an action's tool, shared/widgetSchema.ts toolOf): agents call them (laki widget tool, MCP's
+// laki_extension_call and ext_<id>_<action>, Laki AI). Only an extension that's on has them; a scope workspace one's
+// runs in the caller's workspace. Before it runs, the input is checked (toolArgs), then the user asked in the app as its
+// tool says: always, first (once per workspace, Always kept in state.widgetGrants) or never; no window: refused, no
+// answer in LAKI_TOOL_WAIT (2 minutes): refused. Its stdout goes back (16 KB), with stderr's last line on a failure
+const TOOL_OUT = 16 << 10
+const toolWait = () => Number(process.env.LAKI_TOOL_WAIT) || 120_000
+const asking = new Map<string, (allow: string) => void>()
+const toolsOf = (w: Entry) => Object.entries(w.m.actions ?? {}).flatMap(([a, x]) => (t => (t ? [[a, t] as const] : []))(toolOf(x)))
+const cmdsOf = (w?: Entry) => JSON.stringify(Object.entries(w?.m.actions ?? {}).map(([a, x]) => [a, actionCmd(x)]))
+const agentsOf = (w: Entry) => {
+  if (w.file) return undefined
+  try {
+    return readFileSync(join(w.dir, 'AGENTS.md'), 'utf8').slice(0, 4096).trim() || undefined
+  } catch {
+    return undefined
+  }
+}
+// an extension's grants gone: off, its commands changed, Revoke (one action)
+function ungrant(id: string, action?: string, ws?: string) {
+  const g = state.widgetGrants
+  if (!g) return
+  let n = 0
+  for (const k of Object.keys(g)) {
+    if (ws !== undefined && k !== ws) continue
+    const keep = g[k].filter(x => !(action ? x === `${id}.${action}` : x.startsWith(`${id}.`)))
+    n += g[k].length - keep.length
+    if (keep.length) g[k] = keep
+    else delete g[k]
+  }
+  if (n) save(), changed()
+}
+export const widgetGrantRm = (o: { id: string; action: string; ws: string }) => (ungrant(find(o.id).id, String(o.action), String(o.ws ?? '')), { ok: true })
+// each tool of the extensions that are on: its name (id.action), what it does, its input as a JSON Schema, the
+// extension's AGENTS.md (when to use them)
+export function widgetTools() {
+  return [...widgets.values()].filter(onOf).flatMap(w => toolsOf(w).map(([action, t]) => ({ tool: `${w.id}.${action}`, id: w.id, action, name: w.m.name || w.id, description: t.description, input: toolSchema(t), ask: t.ask, ...(scoped(w) && { scope: 'workspace' }), ...(a => a && { agents: a })(agentsOf(w)) })))
+}
+export async function widgetToolCall(o: { id: string; action: string; input?: unknown; from?: { ws?: string; tab?: string; agent?: string } }): Promise<{ ok: boolean; output: string; error?: string }> {
+  const w = find(String(o.id))
+  if (!onOf(w)) throw new Error(OFF(w))
+  const a = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
+  const t = toolOf(a)
+  if (!t) throw new Error(`${w.m.name || w.id} has no tool ${o.action}`)
+  const input = toolArgs(t, o.input)
+  const from = o.from ?? {}
+  const x = wsOf(w, scoped(w) ? from.ws : undefined) // a scope workspace one's: the caller's, refused without one
+  const ws = x?.id ?? (state.workspaces.some(v => v.id === from.ws) ? from.ws! : '') // whose Always: '' for none (Laki AI)
+  const tab = from.tab ? state.tabs.find(v => v.id === from.tab) : undefined
+  const key = `${w.id}.${o.action}`
+  const cmd = actionCmd(a)!
+  let how = t.ask === 'never' ? 'never' : 'always' // 'always': granted before
+  if (t.ask === 'always' || (t.ask === 'first' && !state.widgetGrants?.[ws]?.includes(key))) {
+    if (!clients.size) throw new Error("Laki's window isn't open: nobody to approve it")
+    const req = randomBytes(8).toString('hex')
+    broadcast({ ev: 'toolAsk', req, widget: w.id, action: o.action, name: w.m.name || w.id, description: t.description, ask: t.ask, input, command: cmd, ws: ws || undefined, tab: tab?.id ?? from.tab, agent: from.agent ?? tab?.name })
+    how = await new Promise<string>(ok => {
+      const timer = setTimeout(() => (asking.delete(req), ok('none')), toolWait())
+      asking.set(req, allow => (clearTimeout(timer), asking.delete(req), ok(allow)))
+    })
+    broadcast({ ev: 'toolDone', req }) // the other windows' dialogs close
+    if (how === 'none') throw new Error(`${w.m.name || w.id} ${o.action}: no answer: not run`)
+    if (how === 'deny') throw new Error(`${w.m.name || w.id} ${o.action}: denied`)
+    if (how === 'always' && t.ask === 'first') {
+      const g = (state.widgetGrants ??= {})
+      if (!g[ws]?.includes(key)) (g[ws] ??= []).push(key)
+      save()
+      changed()
+    }
+  }
+  const env = Object.fromEntries(Object.entries(input).map(([k, v]) => [`WIDGET_INPUT_${k.toUpperCase()}`, Array.isArray(v) ? v.join(',') : typeof v === 'boolean' ? (v ? '1' : '') : String(v ?? '')]))
+  const why = `${ws || 'no workspace'}${from.tab ? `/${from.tab}` : ''}${from.agent ? ` (${from.agent})` : ''}, allowed ${how}`
+  if (ws) devLog(`ws:${ws}`, `${w.m.name || w.id}: tool ${o.action} (${why})`)
+  const r = await widgetAction({ id: w.id, action: o.action, arg: JSON.stringify(input), ws: x?.id }, `tool:${o.action}`, { env, stdin: '', why, full: true })
+  if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: w.id, ws: x?.id, toast: r.toast, modal: r.modal })
+  const output = (r.stdout ?? '').slice(0, TOOL_OUT)
+  return r.ok ? { ok: true, output } : { ok: false, output, error: r.error }
+}
+// the app's answer (its dialog, a notification's button): once, always, or deny
+export function widgetToolAnswer(o: { req: string; allow: string }) {
+  const f = asking.get(String(o.req))
+  if (!f) return { ok: false } // answered elsewhere, or timed out
+  f(['once', 'always', 'deny'].includes(o.allow) ? o.allow : 'deny')
+  return { ok: true }
+}
 
 // laki widget push (a cron job, a git hook, CI on this Mac, another app): data put there as a fetch would, none run;
 // merge: over its last data, shallow (both objects). An off one refuses it
@@ -1294,6 +1387,11 @@ async function checkOne(x: Source, run: boolean, ws?: string): Promise<UiProblem
   if (x.file && !existsSync(storePath(id))) {
     const lost = filesIn(join(dir, 'widget-data')).filter(n => n.endsWith('.json') && !widgets.has(n.slice(0, -5))).map(n => n.slice(0, -5))
     if (lost.length) say('warn', head, `no settings kept for ${id}; ${lost.join(', ')} ${lost.length > 1 ? 'have' : 'has'} some, and no extension: renamed? The old name brings them back`)
+  }
+  if (Object.values(isObj(m.actions) ? m.actions : {}).some(a => toolOf(a))) {
+    const agents = x.file ? undefined : join(x.d, 'AGENTS.md')
+    if (!agents || !existsSync(agents)) say('warn', 'AGENTS.md', 'none: a few lines on when to use its tools (and when not) help agents pick them')
+    else if (statSync(agents).size > 4096) say('warn', 'AGENTS.md', 'over 4 KB: agents get its first 4 KB')
   }
   if (m.scope === 'workspace') {
     const texts = [m.fetch, JSON.stringify(ui ?? ''), html, ...(x.file ? [readFileSync(join(x.d, x.file), 'utf8')] : filesIn(x.d).filter(n => /\.(sh|bash|zsh|py|rb|m?js|ts)$/.test(n)).map(n => (statSync(join(x.d, n)).size < 64 << 10 ? readFileSync(join(x.d, n), 'utf8') : '')))]

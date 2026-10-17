@@ -37,7 +37,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { ShownDialog, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, AskHost, choose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
+import { ask, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -59,6 +59,7 @@ const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.W
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
 const SCRIPT_ICONS: Record<RunScript, IconName> = { test: 'check', lint: 'search', format: 'code', deploy: 'ship' }
+const toolTitles = new Map<string, string>() // an extension tool's ask still on screen: its req and its dialog's title
 type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab } | { uikit: true; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
@@ -710,10 +711,13 @@ export function App() {
 
   // the daemon connection
   const widgetSay = useRef<WidgetApi['say']>(undefined) // an extension's event handler's toast or dialog (widget-say)
+  const toolAsk = useRef<(m: Msg) => void>(undefined) // an agent wants to run an extension's tool
   useEffect(() => {
     const off = api.on(m => {
       if (m.ev === 'state') setView(m.view)
       else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
+      else if (m.ev === 'toolAsk') toolAsk.current?.(m)
+      else if (m.ev === 'toolDone') toolTitles.has(m.req) && (unchoose(toolTitles.get(m.req)!), toolTitles.delete(m.req))
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
       else if (m.ev === 'remote') {
@@ -1227,6 +1231,20 @@ export function App() {
     key: view?.widgetKey,
   }
   widgetSay.current = widgetApi.say
+  // an extension's tool an agent calls (widgetToolCall): what would run, asked here and as a notification; the first
+  // answer counts (widgetToolAnswer), Esc denies. Always: in this workspace from now on, for a tool that asks first
+  toolAsk.current = m => {
+    const where = m.ws ? (view?.workspaces.find(w => w.id === m.ws)?.name ?? m.ws) : ''
+    const title = `${m.agent || 'An agent'} wants to run ${m.name}: ${m.action}`
+    const input = m.input && Object.keys(m.input).length ? `\n\nInput: ${JSON.stringify(m.input)}` : ''
+    type Pick = { label: string; allow: 'once' | 'always' | 'deny' }
+    const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, ...(m.ask === 'first' ? [{ label: where ? `Always in ${where}` : 'Always', allow: 'always' } as Pick] : []), { label: 'Deny', allow: 'deny' }]
+    const answer = (allow: string) => void api.call('widgetToolAnswer', { req: m.req, allow }).catch(() => {})
+    notify(title, `${m.description}${where ? ` · ${where}` : ''}`, m.tab ?? '', () => {}, settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+    toolTitles.set(m.req, title)
+    // ponytail: one dialog at a time; a newer one (another agent's ask) closes this as Deny: its agent may ask again
+    void choose(title, `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks.map((p, i) => ({ label: p.label, primary: i === 0, danger: p.allow === 'deny' }))).then(i => toolTitles.has(m.req) && (toolTitles.delete(m.req), answer(picks[i]?.allow ?? 'deny')))
+  }
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {
     list: view?.widgets ?? [],
@@ -1248,6 +1266,8 @@ export function App() {
     files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => Object.keys(r.files)),
     make: kind => api.call<{ id: string }>('widgetNew', { kind, name: `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog, tab: 'data' }), e => toast(String(e?.message ?? e))),
     check: (id, run, ws) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run, ws }),
+    revoke: (id, action, ws) => api.call('widgetGrantRm', { id, action, ws }),
+    wsName: ws => (ws ? (view?.workspaces.find(w => w.id === ws)?.name ?? ws) : 'no workspace'),
   }
   const fontSize = settings.fontSize ?? FONT_SIZE // Settings' size: every tab's, less its own zoom
   // ⌘± zoom the tab with the keyboard (laki.zoom: each tab's points over Settings' size; ⌘0 back to it), Settings and

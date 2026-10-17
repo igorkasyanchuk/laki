@@ -23,6 +23,10 @@ version it builds, with the date. -->
   turn ends or asks something, a PR's checks fail or pass, it merges, a workspace is made or archived, a scheduled task
   runs; the action gets the event as JSON and can set the data itself. `"stream": true` keeps its command running, each
   line of JSON shown as it comes. `laki widget push <id> '<json>'` puts data in one from a cron job, a git hook or CI.
+- **Extensions give your agents tools**: an action with a `"tool"` (what it does, its input) is one your agents can
+  call, through `laki widget tool` or MCP, Laki AI too; Laki shows you the command first (once per workspace, every
+  time, or never, as the tool says), and Settings › Extensions lists where you allowed it with *Revoke*. The *A tool for
+  agents* starter keeps notes your agents add.
 - **A tab in its own window**: a tab's right click › *Float in its own window* (or ⌘K): its terminal, live, in a window over
   every app, as big as you like; its ✕ (or *Bring it back* in its pane) puts it back.
 - **Headless**: `./Laki.AppImage --headless --tailscale` (or `laki serve`) runs Laki on a server with no screen, used

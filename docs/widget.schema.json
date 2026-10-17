@@ -190,9 +190,90 @@
     "actions": {
       "type": "object",
       "additionalProperties": {
-        "type": "string"
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "run"
+            ],
+            "properties": {
+              "run": {
+                "type": "string",
+                "description": "The command"
+              },
+              "tool": {
+                "type": "object",
+                "additionalProperties": false,
+                "description": "Agents may call it as a tool (laki widget tool, MCP, Laki AI)",
+                "properties": {
+                  "description": {
+                    "type": "string",
+                    "description": "What it does, for the agent"
+                  },
+                  "input": {
+                    "type": "object",
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "enum": [
+                            "string",
+                            "number",
+                            "boolean",
+                            "string[]"
+                          ]
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "enum": [
+                                "string",
+                                "number",
+                                "boolean",
+                                "string[]"
+                              ]
+                            },
+                            "description": {
+                              "type": "string"
+                            },
+                            "enum": {
+                              "type": "array"
+                            }
+                          },
+                          "required": [
+                            "type"
+                          ]
+                        }
+                      ]
+                    },
+                    "description": "Its fields: a type (string, number, boolean, string[]) or { type, description, enum }; each as $WIDGET_INPUT_<NAME>, all as $WIDGET_ARG (JSON)"
+                  },
+                  "required": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    },
+                    "description": "The fields it needs"
+                  },
+                  "ask": {
+                    "enum": [
+                      "always",
+                      "first",
+                      "never"
+                    ],
+                    "description": "first (the default): asked once per workspace; always: every call; never"
+                  }
+                }
+              }
+            }
+          }
+        ]
       },
-      "description": "Commands its buttons run by name, with $WIDGET_ARG; what one prints as JSON may say { \"toast\" } or { \"modal\" }"
+      "description": "Commands its buttons run by name, with $WIDGET_ARG: a command, or { \"run\", \"tool\" } (agents may call it); what one prints as JSON may say { \"toast\" }, { \"modal\" } or { \"data\" }"
     },
     "icon": {
       "type": "string",

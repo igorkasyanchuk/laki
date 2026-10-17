@@ -853,6 +853,11 @@ opening): the action gets the event as JSON on stdin. One can **stream** (`"stre
 each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
 (a cron job, a git hook, CI).
 
+An extension's action can be a **tool for your agents** (`"tool"` on it in widget.json: what it does, its input, when
+to ask): agents list them with `laki widget tools`, call one with `laki widget tool <id> <action> '<json>'` or through
+MCP, and Laki shows you the command first (once per workspace, every time, or never, as the tool says). Settings ›
+Extensions lists each tool and where you allowed it always, with *Revoke*.
+
 To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
 after you confirm. The ones that come with Laki only turn off.
 
@@ -1446,9 +1451,11 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, workspace, stream, onefile
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, button, form, panel, workspace, stream, tool, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
+laki widget tools [--json]                              # the extensions' tools for agents, their input and when to use them
+laki widget tool <id> <action> [json] [--ws <ws>]       # call one (asked first unless the tool says never)
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers
 laki ai --image prs.png "review each of these PRs"      # with a screenshot
 laki ai | ai log | ai new                               # the conversation | each call's tokens and cost | start over

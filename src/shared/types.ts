@@ -501,7 +501,7 @@ export type Schedule = { id: string; name?: string; project: string; preset: str
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
-export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[] }
+export type State = { projects: Project[]; workspaces: Workspace[]; tabs: Tab[]; layouts?: Record<string, Layout[]>; widgetGrants?: Record<string, string[]>; settings?: Settings; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; flows?: FlowRun[]; flowsByAgent?: string[] }
 
 export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
@@ -582,7 +582,9 @@ export type WidgetStream = { running: boolean; since?: number; restarts: number;
 // what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgets.ts widgetEvent)
 export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open'] as const
 export type WidgetEvent = (typeof WIDGET_EVENTS)[number]
-export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null }
+export type WidgetView = { id: string; name: string; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[] }
+// an action an agent may call (its tool): Always granted in these workspaces ('': calls from none, Laki AI's)
+export type WidgetTool = { action: string; description: string; ask: 'always' | 'first' | 'never'; grants: string[] }
 // here: the app's (Widgets.tsx inWs), the workspace whose instance a per-workspace one shows; null: none on screen
 // a scope workspace extension's instance in a workspace (WidgetView.inst, by its id): its last fetch and its button's words
 export type WidgetInst = { at?: number; error?: string; running?: boolean; mock?: string; label?: string; badge?: string; tip?: string }
@@ -616,5 +618,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 75
+export const API = 76
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

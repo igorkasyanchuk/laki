@@ -86,6 +86,9 @@ export const ask = (title: string, o: { text?: string; ok?: string; danger?: boo
     asker ? asker({ title, text: o.text, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
   )
 export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check) => new Promise<number>(done => (asker ? asker({ title, text, buttons, check, done }) : done(-1)))
+// unchoose: closes the dialog shown with that title, as none (-1): answered elsewhere (a tool's notification)
+let closer: ((title: string) => void) | null = null
+export const unchoose = (title: string) => closer?.(title)
 
 export function AskHost() {
   const [a, setA] = useState<Asking | null>(null)
@@ -124,10 +127,11 @@ export function AskHost() {
       setOn(!!next.check?.on)
       setA(next)
     }
+    closer = t => void (cur.current?.a.title === t && close(-1))
     const f = (e: KeyboardEvent) => onKey.current(e)
     window.addEventListener('keydown', f, true) // before the terminal and the page under it
     return () => {
-      asker = null
+      asker = closer = null
       window.removeEventListener('keydown', f, true)
     }
   }, [])

@@ -261,6 +261,9 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .chips-input .chip > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* a long one (a URL) cut, whole in its tooltip */
 .chips-input .chip button { flex: none; }
 .wc-opts > .wo:has(.chips-input) { grid-column: 1 / -1; } /* a list: the card's width */
+.wc-tools { display: grid; gap: 4px; }
+.wc-tool { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.wc-tool .tag-soft button.link { margin-left: 6px; }
 .chips-input .chip button { display: inline-flex; padding: 2px; border: none; background: none; color: var(--muted); border-radius: 50%; }
 .chips-input .chip button:hover { color: var(--fg); background: var(--hover); }
 .prompt-box { position: relative; }

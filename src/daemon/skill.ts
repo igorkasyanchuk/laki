@@ -103,7 +103,9 @@ Write prompts as for a new colleague: the goal, where to look, how to tell it's 
 workspace each, so they run in parallel.
 
 An extension (also called a widget: a small live page in Laki's sidebar) is made with the laki-widget skill (Settings ›
-Agent skill installs it); \`laki widget\` lists and checks them.
+Agent skill installs it); \`laki widget\` lists and checks them. The user's extensions may give you tools:
+\`laki widget tools\` lists them and when to use them, \`laki widget tool <id> <action> '<json>'\` runs one in your
+workspace (Laki may ask the user first; denied: don't try again unasked).
 
 Specs and brainstorms (when the user turned them on: Settings › General › Experimental) are the user's own pages,
 folders outside the repo, each with a README.md: a spec says what to build, a brainstorm what to explore. A prompt that
@@ -237,8 +239,9 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget ls                   # each one: on or off, size, schedule, last error
     laki widget kit [element]        # the UI kit's elements, or one's props and a sample
     laki widget check <id> --no-run  # what's wrong with it: fix every ✗ before you answer (after every change)
-    laki widget new <name> --kind <k> # a starter to begin from: number, list, table, chart, button, form, panel, workspace (per workspace), stream, onefile
+    laki widget new <name> --kind <k> # a starter to begin from: number, list, table, chart, button, form, panel, workspace (per workspace), stream, tool (a tool for agents), onefile
     laki widget push <id> '<json>'   # its data from outside (a hook, a cron job): no fetch; --merge over it, --ws <id> per workspace
+    laki widget tools                # its actions that are tools for agents; laki widget tool <id> <action> '<json>' calls one
 
 For the user working on an extension of their own (in their code, not Laki's folder): \`laki widget dev\` in its
 folder links it (on, first, reloaded on each save, the last good version kept over a broken file) and prints each run;

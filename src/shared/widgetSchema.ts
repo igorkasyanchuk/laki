@@ -35,6 +35,9 @@ const SPEC: J = {
 const PLACE = { enum: WIDGET_PLACES, description: 'side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk)' }
 
 // every key widget.json takes, read by daemon/widgets.ts (test/widget-check.test.ts holds the two in step)
+// an action's tool: its fields' types, how it asks (toolOf, below)
+export const TOOL_TYPES = ['string', 'number', 'boolean', 'string[]'] as const
+export const TOOL_ASKS = ['always', 'first', 'never'] as const
 export const MANIFEST: Record<string, J> = {
   $schema: str('This schema, for your editor'),
   name: str('Its name'),
@@ -49,7 +52,34 @@ export const MANIFEST: Record<string, J> = {
   fetch: str('A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON'),
   script: str('Or a JS file of its folder: its default export gets { config, last, workspace } and returns the data'),
   config: { type: 'object', additionalProperties: SPEC, description: 'Its settings, by name (a letter or _, then letters, digits, _)' },
-  actions: { type: 'object', additionalProperties: { type: 'string' }, description: 'Commands its buttons run by name, with $WIDGET_ARG; what one prints as JSON may say { "toast" } or { "modal" }' },
+  actions: {
+    type: 'object',
+    additionalProperties: {
+      anyOf: [
+        { type: 'string' },
+        {
+          type: 'object',
+          additionalProperties: false,
+          required: ['run'],
+          properties: {
+            run: str('The command'),
+            tool: {
+              type: 'object',
+              additionalProperties: false,
+              description: 'Agents may call it as a tool (laki widget tool, MCP, Laki AI)',
+              properties: {
+                description: str('What it does, for the agent'),
+                input: { type: 'object', additionalProperties: { anyOf: [{ enum: TOOL_TYPES }, { type: 'object', properties: { type: { enum: TOOL_TYPES }, description: { type: 'string' }, enum: { type: 'array' } }, required: ['type'] }] }, description: 'Its fields: a type (string, number, boolean, string[]) or { type, description, enum }; each as $WIDGET_INPUT_<NAME>, all as $WIDGET_ARG (JSON)' },
+                required: { type: 'array', items: { type: 'string' }, description: 'The fields it needs' },
+                ask: { enum: TOOL_ASKS, description: 'first (the default): asked once per workspace; always: every call; never' },
+              },
+            },
+          },
+        },
+      ],
+    },
+    description: 'Commands its buttons run by name, with $WIDGET_ARG: a command, or { "run", "tool" } (agents may call it); what one prints as JSON may say { "toast" }, { "modal" } or { "data" }',
+  },
   icon: str('As a button: an icon of Laki’s by name, or an emoji'),
   label: str('As a button: its words, a template over its data'),
   badge: str('As a button: a short count, a template ("{{#if n}}{{n}}{{/if}}")'),
@@ -146,6 +176,9 @@ interface Window {
 // the checker's widget.json part: unknown keys (did you mean), kinds, places, sizes, every, view, settings, click,
 // fetch or script. A one-file extension's (from its comment lines) too
 const kindOf = (v: unknown) => (Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v)
+const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+// a command that reaches past this Mac: a tool that never asks gets check's warning
+const OUTWARD = /\bgit\s+push\b|\bgh\s+(pr|release|issue|api)\b|\bcurl\b[^|;&]*-X\s*(POST|PUT|PATCH|DELETE)|\bdeploy|\bnpm\s+publish\b|\bkubectl\s+(apply|delete)\b/i
 const KEY = /^[A-Za-z_][A-Za-z0-9_]*$/
 export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   const out: UiProblem[] = []
@@ -169,7 +202,34 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   if (m.stream === true && m.every !== undefined) say('warn', 'widget.json every', 'ignored: a stream runs all along')
   const actions = m.actions && typeof m.actions === 'object' && !Array.isArray(m.actions) ? (m.actions as Record<string, unknown>) : undefined
   if (m.actions !== undefined && !actions) say('error', 'widget.json actions', 'an object: { "name": "a command" }')
-  for (const [n, c] of Object.entries(actions ?? {})) if (typeof c !== 'string') say('error', `widget.json actions.${n}`, `a command (text), not ${kindOf(c)}`)
+  for (const [n, c] of Object.entries(actions ?? {})) {
+    if (typeof c === 'string') continue
+    const where = `widget.json actions.${n}`
+    if (!isObj(c) || typeof c.run !== 'string') {
+      say('error', where, `a command (text), or { "run": a command, "tool": … }, not ${isObj(c) ? 'an object without run' : kindOf(c)}`)
+      continue
+    }
+    for (const k of Object.keys(c)) if (!['run', 'tool'].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, ['run', 'tool']))}`)
+    if (c.tool === undefined) continue
+    const t = c.tool
+    if (!isObj(t)) {
+      say('error', `${where}.tool`, 'an object: { "description", "input", "required", "ask" }')
+      continue
+    }
+    for (const k of Object.keys(t)) if (!['description', 'input', 'required', 'ask'].includes(k)) say('warn', `${where}.tool`, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, ['description', 'input', 'required', 'ask']))}`)
+    if (typeof t.description !== 'string' || !t.description.trim()) say('error', `${where}.tool`, 'a description: what it does, for the agent')
+    if (t.input !== undefined && !isObj(t.input)) say('error', `${where}.tool.input`, 'an object: { "name": a type or { "type", "description", "enum" } }')
+    for (const [f, v] of Object.entries(isObj(t.input) ? t.input : {})) {
+      const type = typeof v === 'string' ? v : isObj(v) ? v.type : v
+      if (!KEY.test(f)) say('error', `${where}.tool.input.${f}`, `a name: a letter or _, then letters, digits or _ (it becomes $WIDGET_INPUT_${f.toUpperCase()})`)
+      if (!(TOOL_TYPES as readonly unknown[]).includes(type)) say('error', `${where}.tool.input.${f}`, `string, number, boolean or string[], not ${JSON.stringify(type)}`)
+      if (isObj(v) && v.enum !== undefined && !(Array.isArray(v.enum) && v.enum.length)) say('error', `${where}.tool.input.${f}`, 'enum: a list of the values it takes')
+    }
+    if (t.required !== undefined && !(Array.isArray(t.required) && t.required.every(r => typeof r === 'string'))) say('error', `${where}.tool.required`, 'a list of its input’s names')
+    else for (const r of (t.required ?? []) as string[]) if (!isObj(t.input) || !Object.hasOwn(t.input, r)) say('error', `${where}.tool.required`, `${r} isn't one of its input`)
+    if (t.ask !== undefined && !(TOOL_ASKS as readonly unknown[]).includes(t.ask)) say('error', `${where}.tool.ask`, `always, first or never, not ${JSON.stringify(t.ask)}`)
+    if (t.ask === 'never' && OUTWARD.test(c.run)) say('warn', `${where}.tool`, 'ask never, but its command looks outward (a push, a PR, a POST, a deploy): "ask": "first"?')
+  }
   const on = m.on
   if (on !== undefined && (!on || typeof on !== 'object' || Array.isArray(on))) say('error', 'widget.json on', 'an object: { "turn.done": "an action" or "refresh" }')
   else
@@ -195,4 +255,47 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     }
   if (m.sampleConfig !== undefined && (typeof m.sampleConfig !== 'object' || m.sampleConfig === null || Array.isArray(m.sampleConfig))) say('error', 'widget.json sampleConfig', 'an object of settings')
   return out
+}
+
+// ---------- an action's tool (agents call it: laki widget tool, MCP, Laki AI). Its input: a type per field (string,
+// number, boolean, string[]) or { type, description, enum }; required; ask: always, first (the default: once per
+// workspace) or never
+export type ToolField = { type: (typeof TOOL_TYPES)[number]; description?: string; enum?: unknown[] }
+export type ToolSpec = { description: string; input: Record<string, ToolField>; required: string[]; ask: (typeof TOOL_ASKS)[number] }
+// an action's command: the string, or the object's run
+export const actionCmd = (a: unknown) => (typeof a === 'string' ? a : isObj(a) && typeof a.run === 'string' ? a.run : undefined)
+// an action's tool as the daemon takes it (what check flags left out); none: not one
+export function toolOf(a: unknown): ToolSpec | undefined {
+  if (!isObj(a) || typeof a.run !== 'string' || !isObj(a.tool)) return
+  const t = a.tool
+  const input: Record<string, ToolField> = {}
+  for (const [k, v] of Object.entries(isObj(t.input) ? t.input : {})) {
+    const f = typeof v === 'string' ? { type: v } : isObj(v) ? v : undefined
+    if (f && KEY.test(k) && (TOOL_TYPES as readonly unknown[]).includes(f.type)) input[k] = { type: f.type as ToolField['type'], ...(typeof f.description === 'string' && { description: f.description }), ...(Array.isArray(f.enum) && f.enum.length && { enum: f.enum }) }
+  }
+  const required = Array.isArray(t.required) ? t.required.filter((r): r is string => typeof r === 'string' && Object.hasOwn(input, r)) : []
+  return { description: typeof t.description === 'string' ? t.description.trim() : '', input, required, ask: (TOOL_ASKS as readonly unknown[]).includes(t.ask) ? (t.ask as ToolSpec['ask']) : 'first' }
+}
+// its input as a JSON Schema: MCP's inputSchema, a model's function parameters
+export const toolSchema = (t: ToolSpec) => ({
+  type: 'object',
+  properties: Object.fromEntries(Object.entries(t.input).map(([k, f]) => [k, { ...(f.type === 'string[]' ? { type: 'array', items: { type: 'string' } } : { type: f.type }), ...(f.description && { description: f.description }), ...(f.enum && { enum: f.enum }) }])),
+  required: t.required,
+})
+const KIND_WORDS: Record<ToolField['type'], string> = { string: 'text', number: 'a number', boolean: 'true or false', 'string[]': 'a list of text' }
+// the input a call gives, checked against its tool before anything runs or asks (throws why not)
+export function toolArgs(t: ToolSpec, input: unknown): Record<string, unknown> {
+  const a = input === undefined || input === null ? {} : input
+  if (!isObj(a)) throw new Error('input: an object of its fields')
+  const names = Object.keys(t.input)
+  for (const k of Object.keys(a)) if (!Object.hasOwn(t.input, k)) throw new Error(`no input ${k}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(k, names))}: ${names.join(', ') || 'it takes none'}`)
+  for (const r of t.required) if (a[r] === undefined || a[r] === null || a[r] === '') throw new Error(`${r} is required`)
+  for (const [k, v] of Object.entries(a)) {
+    if (v === undefined || v === null) continue
+    const f = t.input[k]
+    const ok = f.type === 'string' ? typeof v === 'string' : f.type === 'number' ? typeof v === 'number' && Number.isFinite(v) : f.type === 'boolean' ? typeof v === 'boolean' : Array.isArray(v) && v.every(x => typeof x === 'string')
+    if (!ok) throw new Error(`${k}: ${KIND_WORDS[f.type]}`)
+    if (f.enum && !(Array.isArray(v) ? v : [v]).every(x => f.enum!.includes(x))) throw new Error(`${k}: one of ${f.enum.join(', ')}`)
+  }
+  return a
 }

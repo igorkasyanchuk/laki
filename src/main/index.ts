@@ -265,19 +265,20 @@ ipcMain.handle('conn', async () => {
 // Options, all under Options with Banners): each answers its menu straight through the daemon (the window may be
 // closed by then), by its number and words, or Allow / Deny by first and last. Kept until used or closed: a
 // collected Notification's events never come
-type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last' }
+type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string } } // tool: an extension's tool call, answered (widgetToolAnswer)
 const notes = new Set<Notification>()
 ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
   if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
-  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last')).slice(0, 9)
+  const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string')).slice(0, 9)
   const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })) })
   const done = () => notes.delete(n)
   n.on('click', () => (done(), show(tab)))
   n.on('action', (_ev, i) => {
     done()
     const a = buttons[i]
-    if (a) rpc('answer', { tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) }).catch(() => show(tab)) // it moved on: look
+    if (a?.tool) rpc('widgetToolAnswer', { req: a.tool.req, allow: a.tool.allow }).catch(() => {})
+    else if (a) rpc('answer', { tab, ...(a.n ? { n: a.n, label: typeof a.label === 'string' ? a.label : undefined } : { pick: a.pick }) }).catch(() => show(tab)) // it moved on: look
   })
   n.on('close', done)
   notes.add(n)

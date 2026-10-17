@@ -3,7 +3,7 @@
 // http://127.0.0.1:5199/#port=…&token=… (dev), or the token alone in the query on the daemon's own page (remote
 // access: Cloudflare's email sign-in sends the browser back with the path and query, without the hash).
 // a notification's button: a waiting agent's choice (n, and its words: refused if the menu changed), or a pick
-export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last' }
+export type NotifyAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: 'once' | 'always' | 'deny' } } // tool: an extension's tool call's answer (widgetToolAnswer)
 type Bridge = {
   conn(): Promise<{ port: number; token: string }>
   notify(title: string, body: string, tab: string, sound?: string, actions?: NotifyAction[]): void
