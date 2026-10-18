@@ -9,7 +9,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { AI_SOURCE_EVERY, BUTTON_PLACES, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, WIDGET_PLACES } from '../shared/types.ts'
+import { AI_SOURCE_EVERY, BUTTON_PLACES, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
 import { actionCmd, aiActOf, manifestCheck, needsSample, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
@@ -32,7 +32,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string } // told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string } // told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
@@ -498,6 +498,7 @@ export const widgetsView = (): WidgetView[] =>
     place: placeOf(w),
     places: placesOf(w),
     net: (w.js && w.s.net) || undefined,
+    hide: w.s.hide,
     js: w.js || undefined,
     config: configOf(w),
     options: optionsOf(w).map(({ def: _, ...o }) => o),
@@ -569,7 +570,8 @@ export function widgetRender(o: { id: string; full?: boolean; vars?: Record<stri
     ? { data: made ?? typedData(w), config: { ...typedOf(w), ...sc }, at: Date.now() - 120_000, error: undefined, full: !!o.full, sample: true, workspace }
     : { data: s.data ?? typedData(w), config: typedOf(w), at: s.at, error: s.error, full: !!o.full, workspace }
   const cells = Array.isArray(o.cells) ? (o.cells.map(Number) as [number, number]) : undefined
-  const body = fromUi ? uiHtml(w.m.ui, ctx, { full: !!o.full, cells: cells ?? (o.full ? undefined : sizeOf(w)) }) : render(own!, ctx)
+  const hide = w.s.hide // the user's switches: a template's at gone too ({{ago at}} empty, {{#if at}} not)
+  const body = fromUi ? uiHtml(w.m.ui, ctx, { full: !!o.full, cells: cells ?? (o.full ? undefined : sizeOf(w)), hide }) : render(own!, hide?.at ? { ...ctx, at: undefined } : ctx)
   return hasScript(file) ? pageOf(body, ctx, o.vars) : body // as the app shows it (js): a script in either view makes both pages
 }
 
@@ -619,7 +621,7 @@ export function widgetsOff() {
 // the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
 // (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
 const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
-export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean }) {
+export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean }) {
   const w = find(o.id)
   const s = readStore(w.id)
   if (o.ai) {
@@ -636,6 +638,7 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
   if (o.place !== undefined) s.place = (l => (l.length > 1 ? l : l[0]))(placeList(o.place)) // none: widget.json's again
   if (o.net !== undefined) s.net = !!o.net || undefined
+  if (o.hide) s.hide = (h => (h.refresh || h.at ? h : undefined))({ refresh: (o.hide.refresh ?? s.hide?.refresh) || undefined, at: (o.hide.at ?? s.hide?.at) || undefined })
   if (o.source !== undefined) {
     // null: widget.json's again; a fetch of its own only when it has one
     const src = o.source === null ? undefined : sourceOk(o.source)

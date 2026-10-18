@@ -542,7 +542,8 @@ it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat in
 ## Managing them
 
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
-  size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, its folder, *Delete*
+  size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, *Refresh button* and
+  *When it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`), its folder, *Delete*
   (its folder and settings, for good, after a confirm; the ones that come with Laki only turn off), and Laki AI's chat
   to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Data), or with Laki AI, or gives you
   the prompt for any AI chat. Search

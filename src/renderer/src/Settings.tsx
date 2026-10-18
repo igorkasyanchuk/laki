@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, webhookUrl } from '../../shared/types'
+import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -1787,7 +1787,7 @@ function SkillSection({ api }: { api: SkillApi }) {
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from
+  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from
   desk?: boolean // Desk is on (experimental): a place too
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
@@ -2035,6 +2035,16 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
           <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its data gave it. Its own script always has the network" />
         </Switch>
+      )}
+      {!w.button && (
+        <>
+          <Switch className="switch-row" on={!w.hide?.refresh} onChange={on => void api.set(w.id, { hide: { refresh: !on } })}>
+            <Says title="Refresh button" hint="Its ↻ wherever it shows: the sidebar, the Desk, its full view. Its right click still has Fetch now" />
+          </Switch>
+          <Switch className="switch-row" on={!w.hide?.at} onChange={on => void api.set(w.id, { hide: { at: !on } })}>
+            <Says title="When it was fetched" hint={'Its "fetched 2 min ago" and "checked …" lines. Its own page still says'} />
+          </Switch>
+        </>
       )}
       {options.length > 0 && (
         <div className="wc-opts">

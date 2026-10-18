@@ -101,6 +101,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
   now.current = { w, full, api, sample, cells }
   const rootOf = (el: HTMLDivElement) => el.shadowRoot ?? el.attachShadow({ mode: 'open' })
   const none = w.here === null && !sample // per workspace, none on screen (a sample has a made-up one)
+  const hide = `${w.hide?.refresh ? 'r' : ''}${w.hide?.at ? 'a' : ''}`
   useEffect(() => {
     let live = true
     setErr('')
@@ -124,7 +125,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       e => live && setErr(String(e?.message ?? e)),
     )
     return () => void (live = false)
-  }, [w.id, w.js, w.at, w.rev, w.net, w.here, none, full, config, api.key, theme, sample, size]) // net: Network access's CSP needs the page loaded again
+  }, [w.id, w.js, w.at, w.rev, w.net, w.here, none, full, config, api.key, theme, sample, size, hide]) // net: Network access's CSP needs the page loaded again; hide: drawn without what it hides
   // a template widget's clicks: uiBehave in its shadow root; made-up data: nothing it shows does anything (a button
   // clicked is done at once: uiBehave waits on what this returns)
   useEffect(() => {
@@ -158,7 +159,8 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
   )
 }
 
-export const status = (w: WidgetView) => (w.running ? 'fetching…' : w.error ? `failed: ${w.error}` : w.at ? `fetched ${ago(w.at)}` : w.every ? 'not fetched yet' : '')
+// all: when it was fetched though the user hid it (its own page)
+export const status = (w: WidgetView, all = false) => (w.running ? 'fetching…' : w.error ? `failed: ${w.error}` : w.hide?.at && !all ? '' : w.at ? `fetched ${ago(w.at)}` : w.every ? 'not fetched yet' : '')
 
 // JS widgets stopped in Settings › Resources (laki-stop): unloaded until a click, wherever they show. Kept here, not in
 // a strip's state: the status bar's goes away on a Browsers page, and a stop meanwhile would be lost
@@ -284,7 +286,7 @@ export function WidgetDialog({ w, api, onClose }: { w: WidgetView; api: WidgetAp
           <b>{w.name}</b>
           <span className={`small ${w.error && !w.running ? 'warn' : 'muted'}`}>{status(w)}</span>
           <span className="spacer" />
-          {w.every !== undefined && <IconButton icon="refresh" title="Fetch now" onClick={() => void api.run(w.id, wsOf(w)).catch(() => {})} />}
+          {w.every !== undefined && !w.hide?.refresh && <IconButton icon="refresh" title="Fetch now" onClick={() => void api.run(w.id, wsOf(w)).catch(() => {})} />}
           <IconButton icon="settings" title="Its page: settings, preview, Laki AI" onClick={() => api.settings(w.id)} />
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
         </div>

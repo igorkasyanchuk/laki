@@ -155,7 +155,7 @@ export function DeskTile({ w, api, sample, note }: { w: WidgetView; api: WidgetA
     <div className="desk-tile ext-desk">
       <div className="desk-head">
         <b>{w.name}</b>
-        <span className="muted small">{note ?? (sample ? 'made-up data' : status(w) || (w.on ? 'live' : 'off'))}</span>
+        <span className="muted small">{note ?? (sample ? 'made-up data' : status(w, true) || (w.on ? 'live' : 'off'))}</span>
       </div>
       <div className="desk-body">{w.button && !w.full ? <CellButton w={w} api={api} /> : <WidgetBody key={`${sample}desk`} w={w} full={!!w.full} api={api} sample={sample} />}</div>
     </div>
@@ -204,7 +204,7 @@ function Preview({ w, api, cfg, spot = 0 }: { w: WidgetView; api: WidgetApi; cfg
       <section className="ext-card">
         <div className="ext-card-head">
           <b>Preview</b>
-          <span className={`small ${w.error && !w.running && !sample ? 'warn' : 'muted'}`}>{sample ? 'made-up data' : status(w) || (w.on ? 'live' : 'off')}</span>
+          <span className={`small ${w.error && !w.running && !sample ? 'warn' : 'muted'}`}>{sample ? 'made-up data' : status(w, true) || (w.on ? 'live' : 'off')}</span>
           <span className="grow" />
           {w.on && w.every !== undefined && !sample && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && w.here !== null && void api.run(w.id, w.here ?? undefined).catch(() => {})} />}
           <div className="seg" role="tablist" aria-label="Its data">

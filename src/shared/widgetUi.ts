@@ -188,7 +188,7 @@ export type UiSpec = UiElement | { preview?: UiElement; full?: UiElement }
 
 type El = Record<string, unknown> & { type?: string }
 type Scope = Record<string, unknown>
-type S = { scopes: Scope[]; full: boolean; single: boolean; cells: [number, number]; line: boolean; ids: { uid: string; n: number } } // ids: one counter for the whole tree (rows' copies of S share it)
+type S = { scopes: Scope[]; full: boolean; single: boolean; cells: [number, number]; line: boolean; ids: { uid: string; n: number }; hide?: { refresh?: boolean; at?: boolean } } // ids: one counter for the whole tree (rows' copies of S share it)
 const obj = (v: unknown): v is El => !!v && typeof v === 'object' && !Array.isArray(v)
 
 // a widget's ui: one tree (the preview and the full view, which shows every row) or { preview, full }
@@ -250,11 +250,14 @@ const timeOf = (t: string) => (/^\d{10,13}$/.test(t) ? Number(t.length === 10 ? 
 
 // if / unless: an element's, a button's, an accessory's, an item's
 const hidden = (x: El, s: S) => (x.if !== undefined && !holds(x.if, s)) || (x.unless !== undefined && holds(x.unless, s))
+// when it was fetched, hidden: a plain element (no rows, lists or children) of the top scope whose words name at, "checked {{ago at}}"
+const AT = /\{\{[^}]*(?<![.\w])at\b[^}]*\}\}/
+const namesAt = (e: El, s: S) => !!s.hide?.at && s.scopes.length === 1 && e.each === undefined && Object.values(e).every(v => !v || typeof v !== 'object') && Object.values(e).some(v => typeof v === 'string' && AT.test(v))
 
 function node(el: unknown, s: S): string {
   if (!obj(el)) return ''
   try {
-    if (hidden(el, s)) return ''
+    if (hidden(el, s) || namesAt(el, s)) return ''
     const def = (UI as Record<string, Def>)[String(el.type)]
     if (!def) return err(`no element ${el.type}`)
     if (el.each !== undefined && !def.rows) return listAt(el.each, s).map((item, i) => one(el, inner(s, item, i))).join('')
@@ -295,7 +298,7 @@ const doOf = (b: El, s: S): UiDo | undefined => {
 }
 // bare: its icon alone, its words the tooltip (a toolbar's)
 function button(b: unknown, s: S, small = false, bare = false): string {
-  if (!obj(b) || hidden(b, s)) return ''
+  if (!obj(b) || hidden(b, s) || (b.refresh === true && s.hide?.refresh)) return ''
   const label = txt(b.label, s)
   const style = ['primary', 'quiet', 'danger'].includes(String(b.style)) ? ` ${b.style}` : ''
   const iconOnly = bare && b.icon !== undefined && !!icon(b.icon, s, 12)
@@ -992,15 +995,16 @@ const R: Record<UiType, (e: El, s: S) => string> = {
 
 // a widget's ui as HTML for its preview or full view, over its context ({ data, config, at, error, full, sample,
 // workspace }, the same names as a template's: {{open}} as {{data.open}}); cells: where it shows (across, down; ½ down: a
-// bar's line). A failed fetch with no data: the error and Retry, instead of the tree
-export function uiHtml(spec: unknown, ctx: Record<string, unknown>, o: { full?: boolean; cells?: [number, number] } = {}) {
+// bar's line); hide: what the user hid (no refresh buttons; no at, nor what names it). A failed fetch with no data: the
+// error and Retry, instead of the tree
+export function uiHtml(spec: unknown, ctx: Record<string, unknown>, o: { full?: boolean; cells?: [number, number]; hide?: { refresh?: boolean; at?: boolean } } = {}) {
   const tree = uiTree(spec, !!o.full)
   if (!tree) return ''
   const data = ctx.data
-  const top = { ...(obj(data) ? data : {}), ...ctx, full: !!o.full }
+  const top = { ...(obj(data) ? data : {}), ...ctx, full: !!o.full, ...(o.hide?.at && { at: undefined }) }
   const cells: [number, number] = o.cells && o.cells.length === 2 ? [Number(o.cells[0]) || 1, Number(o.cells[1]) || 1] : o.full ? [3, 4] : [1, 1]
   const line = !o.full && cells[1] <= 0.5
-  const s: S = { scopes: [top], full: !!o.full, single: isElement(spec), cells, line, ids: { uid: Math.random().toString(36).slice(2, 7), n: 0 } }
+  const s: S = { scopes: [top], full: !!o.full, single: isElement(spec), cells, line, ids: { uid: Math.random().toString(36).slice(2, 7), n: 0 }, hide: o.hide }
   const failed = !!ctx.error && (data === undefined || data === null)
   const body = failed ? `<div class="k-error"><b>${line ? '⚠' : 'Couldn’t fetch it'}</b><div class="k-sub">${esc(ctx.error)}</div><button type="button" class="k-btn sm" data-laki="refresh">Retry</button></div>` : node(tree, s)
   return `<div class="k" data-kit="${o.full ? 'full' : 'preview'}"${line ? ' data-line' : ''}>${body}</div>`

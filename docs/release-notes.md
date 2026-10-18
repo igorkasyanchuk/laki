@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Hide an extension's refresh button and when it was fetched**: two switches on its page, for the sidebar, the
+  Desk and its full view alike.
 - **Two more dark themes**: Hallownest (Hollow Knight: a cavern's pale motes, carved small-caps headings, a soul's
   glow on what's picked) and Upside Down (Stranger Things: falling ash, a red title-card glow, Christmas lights over the
   status bar).
