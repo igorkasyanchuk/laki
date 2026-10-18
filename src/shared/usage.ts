@@ -83,9 +83,9 @@ Write the prompt as for a colleague who hasn't seen this conversation: the goal,
   laki new shop --pr 118 --prompt "Fix the failing test"
   laki new shop --link 118 --prompt "Review this PR"   about it, its branch not checked out
   laki new shop --fan claude,codex --prompt "…"        a race: one worktree each`,
-  send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id or name.
---when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). Refused while the agent asks
-something (a permission prompt): the user answers those.
+  send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id, name or
+number. --when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). While the agent asks
+something (status waiting: a permission prompt), the text would answer it: leave those to the user, or --when-idle.
 
   laki send a1b2 "Now add tests for it"
   laki send a1b2/codex --when-idle "Rebase on main when you're done"`,
@@ -155,7 +155,7 @@ what a PR, approve or merge would do instead of doing it.
 their tools; turning one on is the user's. To make one, use the laki-widget skill.
 
   laki widget tools                             what the user's extensions let you do, each tool's input
-  laki widget tool <id> <action> '{"query":"…"}' --ws .   Laki may ask the user first
+  laki widget tool <id> <action> '{"query":"…"}'   in a tab, for its workspace; Laki may ask the user first
   laki widget check <id>`,
   ai: `Asks Laki AI (Settings › AI) to work Laki for you, as the user would ask it in the app.
 
@@ -168,8 +168,9 @@ agent, a tab's screen, a diff, scheduled tasks and more; none that deletes, arch
 
 // laki help <command> [sub]: that command's lines of USAGE (with the lines under each) and its HELP; null: no such
 // command. A sub narrows them to its own lines (laki help widget new), else all of the command's
+const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 export function helpFor(cmd: string, sub?: string): string | null {
-  const w = cmd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const w = esc(cmd)
   const re = (at: string) => new RegExp(`${at}${w}([ |]|$)`)
   const blocks: string[][] = []
   for (const l of USAGE.split('\n').slice(2)) {
@@ -183,6 +184,6 @@ export function helpFor(cmd: string, sub?: string): string | null {
   const mine = own.length ? own : blocks.filter(b => re('\\| ').test(head(b)))
   const more = Object.hasOwn(HELP, cmd) ? HELP[cmd] : '' // not an inherited key (constructor)
   if (!mine.length && !more) return null
-  const narrow = sub && mine.filter(b => new RegExp(`^  laki ${w} (\\S*\\|)?${sub.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([ |]|$)`).test(head(b)))
+  const narrow = sub && mine.filter(b => new RegExp(`^  laki ${w} (\\S*\\|)?${esc(sub)}([ |]|$)`).test(head(b)))
   return [...(narrow && narrow.length ? narrow : mine).flat(), ...(more ? ['', more] : [])].join('\n')
 }
