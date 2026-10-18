@@ -1,6 +1,7 @@
 // the CLI's help; the agent skill (daemon/skill.ts) quotes it too
 export const USAGE = `laki: coding agents in parallel git worktrees
 
+  laki help [command]                         this, or one command's details and examples (laki <command> --help too)
   laki open                                   open the app
   laki ls [--json]                            projects, workspaces, tabs and their status
   laki project add <path|host:path> | ls | rm <id>   host:path: a folder over SSH (a ~/.ssh/config name or user@host)
@@ -62,3 +63,124 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               headless: the daemon and remote access, until stopped (docs/headless.md)
   laki remote [stop]                          remote access's link and PIN now | stop it
   --json prints machine-readable output`
+
+
+// each command's details and examples, after its lines of USAGE: laki help <command>, laki <command> --help. Written
+// for agents (the skill points here): what it prints, what to pass, what to run next
+const HELP: Record<string, string> = {
+  ls: `Prints every project, its workspaces and their tabs (✓ done, ● unseen, the status). --json is what to read in a
+script: projects (id, path), workspaces (id, branch, path, port, pr, tabs: a | b side by side, a / b stacked) and tabs
+(id, workspace, kind, status: running, waiting, idle, exited).
+
+  laki ls --json | jq -r '.tabs[] | select(.status == "waiting") | "\\(.workspace)/\\(.name)"'`,
+  new: `Makes a workspace: a git worktree on a new branch (or the folder itself with --local), set up by the project's setup
+script, with the agent started on the prompt. Prints the new workspace's id. In a Laki tab, . is this tab's project.
+Write the prompt as for a colleague who hasn't seen this conversation: the goal, where to look, how to tell it's done.
+
+  laki new . --prompt "Add CSV export to the reports page; npm test passes"
+  laki new shop --preset codex --name csv-export --prompt "…"
+  laki new shop --issue 42                     the issue's title and text as the prompt
+  laki new shop --pr 118 --prompt "Fix the failing test"
+  laki new shop --link 118 --prompt "Review this PR"   about it, its branch not checked out
+  laki new shop --fan claude,codex --prompt "…"        a race: one worktree each`,
+  send: `Types text into a tab and presses Enter. <ws> alone is its first agent tab; <ws>/<tab> by the tab's id or name.
+--when-idle queues it for when the agent's turn ends (it's sent at once if it's idle). Refused while the agent asks
+something (a permission prompt): the user answers those.
+
+  laki send a1b2 "Now add tests for it"
+  laki send a1b2/codex --when-idle "Rebase on main when you're done"`,
+  screen: `Prints the bottom of a tab's screen (30 lines unless --lines): what the agent shows now, its question too.
+laki screen shot|windows|tap|swipe|type|describe drive the iOS Simulator and apps' windows instead (shot prints a
+PNG's path: read it).
+
+  laki screen a1b2 --lines 80
+  laki screen shot Simulator`,
+  tab: `Opens a tab in a workspace: an agent (--preset), a command (--cmd) or a shell (neither).
+
+  laki tab a1b2 --preset codex
+  laki tab a1b2 --cmd "npm run storybook"`,
+  progress: `In an agent's tab: how far along the whole task is (0-100) and what you're on, shown on the tab until the turn
+ends. Every 20-30 seconds of work when $LAKI_PROGRESS is 1; never go back down; 100 when it's done.
+
+  laki progress 40 "Parser done, writing tests"`,
+  memory: `A project's memory: what every session in it is told (claude and codex get it at their start). . is this tab's
+project. Add something general and lasting (an approach that works or doesn't, a gotcha, how to run or test it),
+never task notes, progress or secrets. rm takes an id laki memory prints, a learned one only.
+
+  laki memory .
+  laki memory add . "Run the e2e tests with npm run e2e -- --headed; they need port 5173 free"
+  laki memory rm . m3k9`,
+  rename: `Names a workspace (the sidebar's row). . is this tab's.
+
+  laki rename . csv-export`,
+  pr: `Attaches a GitHub PR to a workspace, so its status and checks show on it: one opened on another branch or in
+another repo (a PR of the workspace's own branch shows by itself once pushed). Run it right after gh pr create.
+
+  laki pr . https://github.com/acme/shop/pull/118`,
+  browser: `A hidden browser on the workspace's localhost (the app must be open): open loads a path on its $PORT (laki run
+starts the dev server) or a localhost URL; screenshot prints a PNG's path; click and fill take a CSS selector; text
+prints the page's text. In a tab, <ws> is its own.
+
+  laki browser open /settings
+  laki browser fill "#email" "a@b.co"
+  laki browser click "button[type=submit]"
+  laki browser screenshot`,
+  diff: `Prints the workspace's changes against its base (what ship would put in a PR).`,
+  run: `Starts the project's run script (a dev server, on $PORT) in a tab of its own, or test, lint, format or deploy
+(the project's scripts) in theirs.
+
+  laki run a1b2
+  laki run a1b2 test`,
+  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh).
+
+  laki ship a1b2 -m "Add CSV export"`,
+  schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes
+late is skipped). --where: new (a worktree each run), folder, folder-new, or a workspace id (its agent gets it).
+{{DD-MM-YY}} in the name or prompt is the run's date.
+
+  laki schedule add shop --when "weekdays at 9am" "Triage the new issues"
+  laki schedule add shop --when "every 2 hours from 9am to 6pm" --where a1b2 "Check CI"
+  laki schedule log`,
+  remind: `A reminder for the user on Laki's calendar (Calendar, experimental), only when they ask for one. --ws . ties it to
+this workspace.
+
+  laki remind "tomorrow at 9am" Check the deploy --ws .`,
+  flow: `Workflows (experimental): graphs of blocks Laki runs for a task, each run in a workspace of its own. --dry says
+what a PR, approve or merge would do instead of doing it.
+
+  laki flow ls
+  laki flow run review-pr shop "Review PR #118" --dry`,
+  widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
+their tools; turning one on is the user's. To make one, use the laki-widget skill.
+
+  laki widget tools                             what the user's extensions let you do
+  laki widget tool my-prs refresh '{}' --ws .   Laki may ask the user first
+  laki widget check my-table`,
+  ai: `Asks Laki AI (Settings › AI) to work Laki for you, as the user would ask it in the app.
+
+  laki ai "what are my agents doing?"`,
+  mcp: `Laki as an MCP server over stdio (JSON-RPC, a message per line): the same tools as the CLI, none that deletes,
+archives or ships.
+
+  claude mcp add laki -- laki mcp`,
+}
+
+// laki help <command> [sub]: that command's lines of USAGE (with the lines under each) and its HELP; null: no such
+// command. A sub narrows them to its own lines (laki help widget new), else all of the command's
+export function helpFor(cmd: string, sub?: string): string | null {
+  const w = cmd.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const re = (at: string) => new RegExp(`${at}${w}([ |]|$)`)
+  const blocks: string[][] = []
+  for (const l of USAGE.split('\n').slice(2)) {
+    if (/^  laki /.test(l)) blocks.push([l])
+    else if (/^ {6,}\S/.test(l) && blocks.length) blocks.at(-1)!.push(l)
+    else blocks.push([l]) // --json: matches nothing
+  }
+  // its own lines (laki <cmd>), else the ones it's an alternative on (laki rm <ws> | archive <ws>)
+  const head = (b: string[]) => b[0].split(/(?<=\S) {2,}/)[0] // the command, not what it does (| stop it)
+  const own = blocks.filter(b => re('^  laki ').test(head(b)))
+  const mine = own.length ? own : blocks.filter(b => re('\\| ').test(head(b)))
+  if (!mine.length && !HELP[cmd]) return null
+  const narrow = sub && mine.filter(b => new RegExp(`^  laki ${w} (\\S*\\|)?${sub.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([ |]|$)`).test(head(b)))
+  return [...(narrow && narrow.length ? narrow : mine).flat(), ...(HELP[cmd] ? ['', HELP[cmd]] : [])].join('\n')
+}

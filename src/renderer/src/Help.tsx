@@ -87,6 +87,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
   const main = useRef<HTMLDivElement>(null)
   const find = useRef<HTMLInputElement>(null)
   const cmds: [string, string][] = [
+    [`${cli} help <command>`, "a command's options, what it prints and examples (or <command> --help; help alone: every command)"],
     [`${cli} ls`, 'projects, workspaces and tabs, with their status (--json for scripts)'],
     [`${cli} new <project> --prompt "fix the login"`, 'a workspace with an agent (--preset codex|shell, --model, --effort, --base, --name, --local)'],
     [`${cli} new . --preset codex --prompt "…"`, "in a Laki tab: a workspace in that tab's project (what an agent's /laki:new runs)"],

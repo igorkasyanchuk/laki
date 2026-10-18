@@ -1646,7 +1646,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
   )
 }
 
-export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's) or laki-widget
+export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; foreign?: boolean; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's) or laki-widget
 // how an app reads and writes its skill; app: its name, for the text
 // what Reset the interface keeps of this viewer's: what you made (timers, stopwatches, drafts). Get started shows again
 const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft']
@@ -1714,6 +1714,13 @@ function SkillSection({ api }: { api: SkillApi }) {
     setErr('')
     api.set(agent, on, skill).then(setRows, fail).finally(() => setBusy(false))
   }
+  // out of date for this one (not another's: foreign), every one at once
+  const old = rows?.filter(r => r.state === 'outdated' && !r.foreign) ?? []
+  const all = () => {
+    setBusy(true)
+    setErr('')
+    old.reduce((p, r) => p.then(() => api.set(r.agent, true, r.skill)), Promise.resolve<SkillInfo[]>([])).then(setRows, fail).finally(() => setBusy(false))
+  }
   return (
     <>
       <h2>Agent skill</h2>
@@ -1721,6 +1728,14 @@ function SkillSection({ api }: { api: SkillApi }) {
         Teaches your agents about {api.app}, each skill installed on its own. It goes in your home folder, so every session has it, in {api.app} or not.
       </p>
       {err && <div className="warn small">{err}</div>}
+      {old.length > 0 && (
+        <div className="row skill-old">
+          <Says title={`${old.length} out of date`} hint={`Installed from an older ${api.app}, or changed since: their agents read older commands and paths`} />
+          <button className="primary" disabled={busy} onClick={all}>
+            Update {old.length === 1 ? 'it' : 'all'}
+          </button>
+        </div>
+      )}
       {!rows && !err && <div className="muted small">Loading…</div>}
       {SKILL_KINDS.filter(([k]) => rows?.some(r => (r.skill ?? 'laki') === k)).map(([k, title, what]) => (
         <Group key={k} title={title} hint={`Teaches them to ${what}.`}>
@@ -1728,11 +1743,13 @@ function SkillSection({ api }: { api: SkillApi }) {
             <div key={r.agent} className="preset">
               <div className="row">
                 <b>{r.name}</b>
-                <span className={r.state === 'installed' ? 'small' : 'muted small'}>{r.state === 'installed' ? 'installed' : r.state === 'outdated' ? 'out of date' : 'not installed'}</span>
+                <span className={r.state === 'installed' ? 'small' : 'muted small'} data-tip={r.foreign ? `Its laki runs another ${api.app}'s daemon (another data folder): Use this one points it here` : undefined}>
+                  {r.state === 'installed' ? 'installed' : r.foreign ? `another ${api.app}'s` : r.state === 'outdated' ? 'out of date' : 'not installed'}
+                </span>
                 <span className="grow" />
                 {r.state !== 'installed' && (
-                  <button className={r.state === 'outdated' ? 'primary' : ''} disabled={busy} onClick={() => set(r.agent, true, r.skill)}>
-                    {r.state === 'missing' ? 'Install' : 'Update'}
+                  <button className={r.state === 'outdated' && !r.foreign ? 'primary' : ''} disabled={busy} onClick={() => set(r.agent, true, r.skill)}>
+                    {r.state === 'missing' ? 'Install' : r.foreign ? 'Use this one' : 'Update'}
                   </button>
                 )}
                 {r.state !== 'missing' && (

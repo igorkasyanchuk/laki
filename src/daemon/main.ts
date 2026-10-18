@@ -273,7 +273,7 @@ const api: Record<string, Handler> = {
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message),
-  screen: p => core.screen(p.target, p.lines, p.by),
+  screen: p => core.screen(p.target, p.lines, p.by, p.all === true),
   input: (p, c) => core.input(p.tab, p.data, c),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
   view: (p, c) => c && core.setView(c, p),

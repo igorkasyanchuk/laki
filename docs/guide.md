@@ -316,7 +316,8 @@ selected workspace's PR is in the status bar.
   *Approve PR #n…* (someone else's open PR), *Compare the race* (a race's
   workspace: the flag on its row), *Open in*, fork, archive and delete. While a workspace is archived or deleted its row
   shows a spinner, then a message says it's done (archive: with *Undo*). A tab's menu has *Mute notifications*,
-  *Mark as unread* (its ● again, until you look at it) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
+  *Mark as unread* (its ● again, until you look at it), *Copy contents* (its whole terminal as text, the scrollback
+  too; ⌘K's *Copy the tab's contents*) and *Copy link* (`laki://ws/<id>?tab=<tab>`).
 - Drag projects, and workspaces within a project, to reorder them; a project drops anywhere on another one (its top
   half: before it), and the list scrolls as you near its top or bottom.
 - Groups: a project's ⋯ › *Add a group* puts a named head over its workspaces, up to the next group; it shows how
@@ -1373,7 +1374,9 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   projects and workspaces, start a workspace with an agent and a prompt, message agents, read their screens).
   *Extension creator* (`skills/laki-widget`, installed on its own) teaches them to make extensions: the files, the
   template language, JS extensions, actions, and checking one with `laki widget`.
-  It holds the app's path: update it after moving the app. *Remove* takes only its own files. Below it, *MCP
+  It holds the app's path: update it after moving the app. A skill installed with other text than this Laki's (an
+  older Laki's, or edited) says *out of date*, with *Update* (*Update all* for several); the app shows a bar with
+  *Update* too, until *Not now*. One set up by another Laki (another data folder) says so, with *Use this one*. *Remove* takes only its own files. Below it, *MCP
   server*: the command that adds Laki to each agent as an MCP server (Copy, then run it in a terminal: it goes in
   the agent's own settings, which Laki never writes); OpenCode's `mcp add` only asks questions, so it gets the
   lines to merge into `~/.config/opencode/opencode.json`.
@@ -1456,6 +1459,9 @@ Env from the app and from `.laki.json` merge, key by key (the app's wins), then 
 Every workspace gets its own `$PORT` (3100, 3110, …).
 
 ## CLI
+
+`laki help` (or `laki --help`) lists every command; `laki help <command>` (or `laki <command> --help`) prints one's
+options, what it prints and examples, written for agents as much as for you.
 
 ```bash
 laki project add ~/code/app

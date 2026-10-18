@@ -4,6 +4,15 @@ version it builds, with the date. -->
 
 ## Next
 
+- **`laki help <command>`**: a command's options, what it prints and examples (`laki <command> --help` too, and
+  `laki --help`); the agent skill tells agents to ask it.
+- **Copy a tab's contents**: a tab's right click › *Copy contents* (⌘K too): its whole terminal as text, the
+  scrollback too.
+- **Skills out of date**: when the skill your agents have differs from this Laki's, a bar says so with *Update*;
+  Settings › Agent skill has *Update all*.
+- An extension's Settings card in sections (where it shows, updates, its settings), each field saying what it does.
+- Specs & Brainstorms, Workflows and the extension studio open without a flash of the workspace under them.
+
 - **Secret settings for extensions**: a token or a key is a `secret`: a password box in Settings, kept apart and given
   only to its fetch and actions, never to its page, the app, `laki ls` or MCP. A value saved as text moves over.
 - **Undo for deleting an extension**: Delete moves it to a trash, with Undo in the toast; `laki widget trash` and

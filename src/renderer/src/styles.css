@@ -1106,6 +1106,12 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .stale-bar button { flex: none; background: var(--waiting); color: var(--on-waiting); border: none; border-radius: var(--rs, 6px); padding: 4px 12px; font-weight: 600; cursor: pointer; white-space: nowrap; }
 .stale-bar button:hover:not(:disabled) { filter: brightness(1.1); }
 .stale-bar button:disabled { opacity: 0.7; cursor: default; }
+.skill-old { padding: 10px 12px; margin-bottom: 12px; border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line)); border-radius: calc(var(--rs, 8px) + 2px); background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.skill-old > .switch-text { flex: 1; }
+.stale-bar.soft { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); border-bottom-color: color-mix(in srgb, var(--accent) 45%, var(--line)); } /* a skill to update: news, not trouble */
+.stale-bar.soft > svg { color: var(--accent-ink); }
+.stale-bar.soft button { background: var(--accent); color: var(--accent-fg); }
+.stale-bar.soft button.ghost { background: none; color: var(--muted); }
 .tunnel-pop { position: fixed; width: 500px; max-width: calc(100vw - 16px); padding: 12px; display: flex; flex-direction: column; gap: 10px; background: var(--panel); border: 1px solid var(--line); border-radius: var(--rs, 10px); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45); font: 13px/1.4 var(--ui-font); color: var(--fg); white-space: normal; user-select: text; -webkit-user-select: text; }
 .tunnel-pop p { margin: 0; }
 .tunnel-pop a { color: var(--accent-ink); }

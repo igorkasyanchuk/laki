@@ -6,7 +6,7 @@ import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
 import { type AiCall, type AiMsg, type AiTotals, DEVICE_OPS, type Memory, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
-import { USAGE } from '../shared/usage.ts'
+import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { describe } from '../shared/when.ts'
@@ -156,16 +156,26 @@ async function serve(a: string[]) {
   const orphan = setInterval(() => parent && process.ppid !== parent && stop('Laki --headless ended'), 2000)
 }
 
+// laki, laki help [command [sub]], --help or -h first or after a command (laki new --help, laki widget new -h): no
+// daemon started for it
+const asks = (a?: string) => a === '--help' || a === '-h'
+function help(cmd: string | undefined, rest: string[]): boolean {
+  const topic = cmd === undefined ? [] : asks(cmd) || cmd === 'help' ? rest.filter(a => !asks(a)) : asks(rest[0]) ? [cmd] : asks(rest[1]) ? [cmd, rest[0]] : null
+  if (!topic) return false
+  const text = topic.length ? helpFor(topic[0], topic[1]) : USAGE
+  if (text === null) throw new Error(`no command ${topic[0]}: laki help lists them`)
+  console.log(text)
+  return true
+}
+
 async function main() {
   const [cmd, ...rest] = args
+  if (cmd !== 'hook' && help(cmd, rest)) return
   switch (cmd) {
     case 'hook':
       return hook(rest[0], rest[1])
     case 'daemon':
       return import(pathToFileURL(daemonScript()).href)
-    case undefined:
-    case 'help':
-      return console.log(USAGE)
     case 'open': {
       // the app this CLI ships in, else this checkout's build (dist/mac-arm64: Apple silicon, dist/mac: Intel), else
       // whatever LaunchServices knows as laki

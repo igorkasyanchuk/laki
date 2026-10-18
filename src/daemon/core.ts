@@ -4619,11 +4619,12 @@ export async function prThreads(ref: string) {
 }
 
 // by: 'ai', Laki AI looking (its tools, its chat's context): the app lights the tab (peek)
-export function screen(target: string, lines = 30, by?: string) {
+// all: the whole terminal, scrollback too (a tab's Copy contents)
+export function screen(target: string, lines = 30, by?: string, all?: boolean) {
   const tab = resolveTarget(target)
   if (by === 'ai') peek(tab.workspace, tab.id)
   const s = sessions.get(tab.id)
-  return s ? s.flushed().then(() => s.screenText(lines)) : ''
+  return s ? s.flushed().then(() => (all ? s.allText() : s.screenText(lines))) : ''
 }
 
 // ---------- scheduled tasks: a prompt to an agent at the times a line of English says (shared/when.ts)

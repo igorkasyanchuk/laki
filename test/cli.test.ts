@@ -96,11 +96,34 @@ test('cli: hook never fails, even without a daemon', async t => {
 
 test('cli: help, usage errors, open', async t => {
   const rig = await fresh(t)
-  for (const a of [[], ['help']]) {
+  for (const a of [[], ['help'], ['--help'], ['-h']]) {
     const r = await rig.cli(...a)
     assert.equal(r.code, 0)
     assert.match(r.out, /^laki: coding agents/)
   }
+  // one command's lines and its details: help <command>, <command> --help, <command> <sub> -h; no daemon for any
+  for (const a of [['help', 'new'], ['new', '--help']]) {
+    const r = await rig.cli(...a)
+    assert.equal(r.code, 0, r.err)
+    assert.match(r.out, /^  laki new <project\|\.>[\s\S]*--fan claude,codex[\s\S]*laki new \. --prompt/)
+    assert.doesNotMatch(r.out, /laki ai /) // not a command where new is an alternative
+  }
+  let h = await rig.cli('widget', 'new', '-h')
+  assert.match(h.out, /^  laki widget new <name>/)
+  assert.doesNotMatch(h.out, /laki widget dev/)
+  h = await rig.cli('help', 'archive') // an alternative on another command's line
+  assert.match(h.out, /^  laki rm <ws> \| archive <ws>/)
+  h = await rig.cli('help', 'stop')
+  assert.equal(h.out.trim().split('\n').length, 1, 'not the lines whose words say "stop it"')
+  h = await rig.cli('help', 'nope')
+  assert.equal(h.code, 1)
+  assert.match(h.err, /no command nope/)
+  const was = rig.env.LAKI_HOME
+  rig.env.LAKI_HOME = join(rig.home, 'none') // a data dir with no daemon: help doesn't start one
+  h = await rig.cli('send', '--help')
+  rig.env.LAKI_HOME = was
+  assert.match(h.out, /^  laki send /)
+  assert.ok(!existsSync(join(rig.home, 'none/daemon.json')), 'help starts no daemon')
   let r = await rig.cli('frob')
   assert.equal(r.code, 1)
   assert.match(r.err, /unknown command frob/)

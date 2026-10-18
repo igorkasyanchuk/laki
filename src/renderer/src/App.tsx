@@ -38,7 +38,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { ShownDialog, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, askText, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
+import { ask, askText, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -57,6 +57,12 @@ const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API 
 const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // experimental: loaded as it opens
 const WidgetStudio = lazy(() => import('./WidgetStudio').then(m => ({ default: m.WidgetStudio }))) // Laki AI's: loaded as it opens
+// what a lazy page shows while its code loads (the first open): its frame, not the workspace under it for a moment
+const Waiting = ({ title, onClose }: { title: string; onClose: () => void }) => (
+  <Page title={title} wide esc={false} onClose={onClose}>
+    {null}
+  </Page>
+)
 
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
@@ -1149,6 +1155,35 @@ export function App() {
   // the Artifacts in the side panel's Files (the strip's ⋯ › Open in Files)
   const artifactsInFiles = () => (setArtsIn(ws?.id ?? null), showPanel('files'), setGallery(null))
   const copy = (text: string) => navigator.clipboard.writeText(text).then(() => done('Copied'), fail)
+  // the agent skills installed with other text than this Laki's (Settings › Agent skill: an update of Laki changed
+  // it, an edit, half a folder): a bar with Update, read as it connects and on the window's focus (a minute apart);
+  // not one another Laki set up (foreign: Update there would point it here). Not now: until the app starts again
+  const [oldSkills, setOldSkills] = useState<SkillInfo[]>([])
+  const skillsAt = useRef(0)
+  const skillsLater = useRef(false)
+  const stale = (rows: SkillInfo[]) => setOldSkills(rows.filter(r => r.state === 'outdated' && !r.foreign))
+  useEffect(() => {
+    if (!connected) return
+    const check = () => {
+      if (skillsLater.current || Date.now() - skillsAt.current < 60_000) return
+      skillsAt.current = Date.now()
+      api.call<SkillInfo[]>('skills').then(stale, () => {})
+    }
+    check()
+    window.addEventListener('focus', check)
+    return () => window.removeEventListener('focus', check)
+  }, [connected])
+  const updateSkills = () => {
+    const names = [...new Set(oldSkills.map(r => r.name))].join(', ')
+    return Promise.all(oldSkills.map(r => api.call<SkillInfo[]>('skillSet', { agent: r.agent, on: true, skill: r.skill }))).then(rows => (stale(rows.at(-1) ?? []), done(`Updated Laki's skill in ${names}`)), fail)
+  }
+  // a tab's whole terminal as text, the scrollback too (an older daemon's: the bottom of its screen)
+  const copyTab = (t: TabView) =>
+    void api.call<string>('screen', { target: t.id, all: true }).then(text => {
+      if (!text.trim()) return toast(`Nothing in ${t.name} to copy`)
+      const n = text.split('\n').length
+      return navigator.clipboard.writeText(text).then(() => done(`Copied ${t.name}: ${n} line${n === 1 ? '' : 's'}`), fail)
+    }, fail)
   const tunnelApi = (w: WorkspaceView): TunnelApi => ({
     check: () => api.call<Cloudflared>('cloudflared', { ws: w.id }),
     start: (port, mails) => api.call('tunnelStart', { ws: w.id, port, mails }),
@@ -1630,6 +1665,7 @@ export function App() {
       { label: 'Mark as unread', icon: 'unread', key: 'u', run: () => ts.forEach(t => markUnread(t.id)) },
       ...(bridge?.floatTab && ts.length === 1 ? [floated.includes(ts[0].id) ? ({ label: 'Back from its own window', icon: 'popIn', run: () => floatTab(ts[0].id, false) } as MenuItem) : ({ label: 'Float in its own window', icon: 'popOut', sub: 'Over every app, so you can watch it from anywhere', run: () => floatTab(ts[0].id) } as MenuItem)] : []),
       ...(ts[0].kind === 'agent' && ts[0].status !== 'exited' ? [{ label: 'Send a message later…', icon: 'timer', run: () => setDialog({ sendLater: ts[0].workspace, to: ts[0].id }) } as MenuItem] : []),
+      ...(ts.length === 1 ? [{ label: 'Copy contents', icon: 'copy', sub: 'Its whole terminal as text, the scrollback too', run: () => copyTab(ts[0]) } as MenuItem] : []),
       ...(bridge ? [{ label: 'Copy link', icon: 'link', key: 'l', run: () => copy(wsLink(ts[0].workspace, ts[0].id)) } as MenuItem] : []),
       ts[0].share
         ? {
@@ -1924,6 +1960,7 @@ export function App() {
       if (git) a({ label: 'Changes', icon: 'changes', hint: '⌘D', run: () => showPanel('changes') })
       if (git) a({ label: 'Review: PR checks and comments', icon: 'review', run: () => showPanel('review') })
       a({ label: 'Workspace info', icon: 'info', hint: '⌘I', run: () => showInfo(true) })
+      if (tab) a({ label: "Copy the tab's contents: its whole terminal as text", icon: 'copy', run: () => copyTab(tab) })
       if (tab && bridge?.floatTab) a(floated.includes(tab.id) ? { label: 'Bring the tab back from its own window', icon: 'popIn', run: () => floatTab(tab.id, false) } : { label: 'Float the tab in its own window', icon: 'popOut', run: () => floatTab(tab.id) })
       a({ label: ws.run ? 'Run the run script' : 'Set a run script…', icon: 'run', run: ws.run ? run : editScripts })
       if (devRunning) a({ label: 'Stop the run script', icon: 'stop', run: () => api.send('input', { tab: devTab!.id, data: '\x03' }) })
@@ -2636,6 +2673,18 @@ export function App() {
           )}
         </div>
         {connected && staleDaemon(view) && <StaleDaemon restart={() => api.call('shutdown')} />}
+        {connected && !staleDaemon(view) && oldSkills.length > 0 && (
+          <div className="stale-bar soft" role="status">
+            <Icon name="import" size={16} />
+            <span>
+              <b>Laki's skill is out of date in {[...new Set(oldSkills.map(r => r.name))].join(', ')}.</b> Its agents read older commands and paths than this Laki's.
+            </span>
+            <button onClick={() => void updateSkills()}>Update</button>
+            <button className="ghost" onClick={() => ((skillsLater.current = true), setOldSkills([]))}>
+              Not now
+            </button>
+          </div>
+        )}
         {glow && <PeekGlow key={glow.n} tab={glow.tab} onDone={() => setGlow(null)} />}
         <div className="body">
           {tabsAt === 'left' && tabStrip}
@@ -2800,7 +2849,7 @@ export function App() {
             onSaveProject={(id, p) => call('projectSet', { id, ...p }).catch(() => {})}
             onMemory={id => setDialog({ project: id, tab: 'memory' })}
             renameProjects
-            skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills'), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }), doctor: () => api.call<Doctor>('doctor') }}
+            skill={{ app: 'Laki', load: () => api.call<SkillInfo[]>('skills').then(r => (stale(r), r)), set: (agent, on, skill) => api.call<SkillInfo[]>('skillSet', { agent, on, skill }).then(r => (stale(r), r)), doctor: () => api.call<Doctor>('doctor') }}
             accounts={layoutsOn ? accountsApi : undefined}
             ai={{ state: () => api.call('aiState'), key: key => api.call('aiKey', { key }), open: () => setDialog('ai') }}
             webhookTest={w => api.call('webhookTest', w)}
@@ -2862,7 +2911,7 @@ export function App() {
           />
         ))(extOf(dialog))}
         {(s => s && (
-          <Suspense fallback={null}>
+          <Suspense fallback={<Waiting title="Extension studio" onClose={() => setDialog(s.back ?? null)} />}>
             <WidgetStudio key={s.studio || 'new'} id={s.studio} widgets={view.widgets ?? []} cfg={extCfg} api={widgetApi} back={backWord(s.back)} onClose={() => setDialog(s.back ?? null)} />
           </Suspense>
         ))(settings.ai?.on ? studioOf(dialog) : undefined)}
@@ -2939,7 +2988,7 @@ export function App() {
         {(o =>
           o &&
           specsOn && (
-            <Suspense fallback={null}>
+            <Suspense fallback={<Waiting title="Specs & Brainstorms" onClose={() => setDialog(null)} />}>
               <SpecsPage
                 key={`${o.specs}/${o.kind}/${o.slug}`}
                 projects={view.projects.filter(p => !p.kind)}
@@ -2965,7 +3014,7 @@ export function App() {
         {(o =>
           o &&
           flowsOn && (
-            <Suspense fallback={null}>
+            <Suspense fallback={<Waiting title="Workflows" onClose={() => setDialog(null)} />}>
               <WorkflowsPage
                 key={o.run ?? ''}
                 view={view}

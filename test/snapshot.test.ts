@@ -55,6 +55,18 @@ test('normal screen: colors, scrollback, cursor, modes', async t => {
   assert.equal(again.snapshot(), s.snapshot())
 })
 
+test('allText: the scrollback too, a wrapped line joined again, its spaces kept', async t => {
+  const long = `${'a'.repeat(58)}  ${'b'.repeat(30)}` // 90 characters on a 60-column screen: two rows, one line
+  const s = session(`${Array.from({ length: 20 }, (_, i) => `row ${i}\\r\\n`).join('')}${long}\\r\\nend\\r\\n\\r\\n`)
+  t.after(() => s.kill())
+  await until(async () => (await s.flushed(), s.screenText(5).includes('end')), 'output')
+  const text = s.allText()
+  assert.ok(text.startsWith('row 0\n'), 'from the top of the scrollback')
+  assert.ok(text.includes(`\n${long}\nend`), 'the wrapped line whole')
+  assert.ok(text.endsWith('end'), 'no blank lines after')
+  assert.ok(s.screenText(5).includes('b'.repeat(30)) && !s.screenText(5).includes(long), 'screenText still gives rows')
+})
+
 // each link's text and URL, in order (OSC 8: xterm keeps the URL beside the cells)
 function links(t: Term) {
   const core = (t as any)._core

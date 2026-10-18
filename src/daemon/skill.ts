@@ -25,7 +25,9 @@ const SKILLS = ['laki', 'laki-widget'] as const
 export type SkillName = (typeof SKILLS)[number]
 // mcp: what adds Laki as the agent's MCP server (laki's rows), which the user runs or pastes (we never write the
 // agents' config): a command, or for opencode (its `mcp add` only asks questions) the lines for mcpIn, its config file
-export type SkillInfo = { agent: SkillAgent; skill: SkillName; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; mcp: string; mcpIn?: string }
+// foreign: an outdated one whose launcher drives another data dir's daemon (another Laki, LAKI_HOME=…): updating it
+// points it here
+export type SkillInfo = { agent: SkillAgent; skill: SkillName; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; foreign?: boolean; mcp: string; mcpIn?: string }
 
 const skillDir = (a: SkillAgent, k: SkillName) => join(homedir(), AGENTS[a].home, 'skills', k)
 const mcpArgv = () => ['/usr/bin/env', ...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv, 'mcp']
@@ -83,6 +85,8 @@ opened on another branch, or in another repo, doesn't: attach it right after \`g
 ${STORAGE_NOTE}
 
 ## Commands
+
+Unsure of one? \`laki help <command>\` (or \`laki <command> --help\`) prints its options, what it prints and examples.
 
 \`\`\`
 ${USAGE}
@@ -261,8 +265,10 @@ function info(a: SkillAgent, k: SkillName): SkillInfo {
   const want = Object.entries(files(at, k))
   const have = want.filter(([f]) => existsSync(join(at, f)))
   const state = !have.length ? 'missing' : have.length === want.length && want.every(([f, t]) => readFileSync(join(at, f), 'utf8') === t) ? 'installed' : 'outdated'
+  const launcher = existsSync(join(at, 'laki')) ? readFileSync(join(at, 'laki'), 'utf8') : ''
+  const foreign = state === 'outdated' && /\bLAKI_HOME=/.test(launcher) && !launcher.includes(` ${q(`LAKI_HOME=${dir}`)} `)
   const mcp = k === 'laki' ? mcpCmd(a) : ''
-  return { agent: a, skill: k, name: AGENTS[a].name, path: at, state, mcp, ...(mcp && !AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, 'opencode.json') }) }
+  return { agent: a, skill: k, name: AGENTS[a].name, path: at, state, ...(foreign && { foreign }), mcp, ...(mcp && !AGENTS[a].add && { mcpIn: join('~', AGENTS[a].home, 'opencode.json') }) }
 }
 
 // laki's rows first, one per agent, then laki-widget's

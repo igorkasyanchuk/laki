@@ -107,7 +107,7 @@ a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `fl
 `config` '' and its option's `set`), `widgetRm` to the trash, `widgetRestore`/`widgetTrash`, `from` on `widgetAction`/`widgetSet`/`widgetDev`/`widgetCheck` (an agent's: asked, refused, left off), a
 setting's `required` and the view's `missing`, the `panel` and `row` places (a row's instances fetched for every live
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
-`widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`. A
+`widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -228,7 +228,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   opencode, whose `mcp add` only asks questions, the JSON for `mcpIn`, its config file), `skillSet` with an `agent`
   (claude, codex, gemini, grok, opencode: `skill.ts` `AGENTS`, each one's home and `mcp add`), `on` and `skill`
   (`SKILLS`: laki, the default, or laki-widget: the widget creator's guide, its own folder and launcher, no MCP; it says
-  extension and widget are one thing); `refreshSkills` at the daemon's start writes an installed skill that's out of date again (only one whose launcher has this data dir's `LAKI_HOME`);
+  extension and widget are one thing); `refreshSkills` at the daemon's start writes an installed skill that's out of date again (only one whose launcher has this data dir's `LAKI_HOME`); an outdated one whose launcher has another's is `foreign`; App's `oldSkills` (the others outdated, `skills` as it connects and on the window's focus, a minute apart; Settings' rows too) is a bar under the tab bar (`.stale-bar.soft`: *Update*, `skillSet` each; *Not now*: until the app starts again), Settings' *Update all*, a foreign row's *Use this one*;
 - scheduled tasks: `scheduleSet` (makes one, or changes one by `id`: name, project, preset, ws, prompt, when, on;
   a new one without ws or preset gets `new`, or `local` without git, and the default agent), `scheduleRm`,
   `scheduleRun` (now), `scheduleTick` (`now`: tests move the clock); the CLI's `laki schedule`;
@@ -301,7 +301,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   relative link into the repo made again as a link: node_modules/.bin's, pnpm's);
 - plan limits: `usage`; remote access: `remoteStart` (`hours`, `mail`: resolves once there's a link),
   `remoteStop`, `remoteTick` (`now`: tests move the clock);
-- terminals: `screen`, `input`, `resize`, `view`, `detach`;
+- terminals: `screen` (`all`: the whole terminal, the scrollback too, each wrapped line joined, `Session.allText`: a
+  tab's *Copy contents*, App's `copyTab`), `input`, `resize`, `view`, `detach`;
 - the agent browser: `browse` (`ws`, `op`: open, screenshot, click, fill, text; `url` (a path: the workspace's
   `$PORT`; localhost only), `selector`, `text`) goes to the newest client whose `view` says `browse` as a `browse`
   event (`req`: its id; an `id` would make it a reply), and waits up to 30 s for its `browseDone` (`id`, `ok`, `result` or `error`); a screenshot's PNG is saved
@@ -782,7 +783,8 @@ none, empty); the page then loads README.md (`readmeBody`, `tryParseMarkdownToBl
 images; nothing out).
 
 The renderer's `Specs.tsx` (`SpecsPage`, App's `lazy` import with its `SpecEditor.tsx`, `diagram.tsx` and `plans.css`:
-BlockNote, Mantine and React Flow load only as it opens; dialog `{ specs: <project or ''>, kind?, slug? }`; the rail's
+BlockNote, Mantine and React Flow load only as it opens; meanwhile App's `Waiting`, the page's frame, as for Workflows and the studio:
+a `null` fallback showed the workspace under it; dialog `{ specs: <project or ''>, kind?, slug? }`; the rail's
 *Specs* after Schedule, the foot's without the rail, ⌘K, a project page's *Specs* tab (`ProjectApi.specs`)): two
 levels as breadcrumbs in `Page`'s header (`head`; its `tools`: the app's full screen, `toggleFull`): the list (both kinds
 in one, newest first, each row's kind a tag; a filter, a project, `only`: All / Specs / Brainstorms, *New* ▾ (`newMenu`:
@@ -1816,7 +1818,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |
-| `src/cli/main.ts` | the `laki` CLI and `laki hook` |
+| `src/cli/main.ts` | the `laki` CLI and `laki hook`; `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |
 | `bin/laki.js` | CLI entry: the built `out/main/cli.js`, else the TypeScript source |
 | `build/icon.icns` | the app icon (electron-builder), rendered from `src/renderer/src/icon.svg` by `scripts/icon.swift` |

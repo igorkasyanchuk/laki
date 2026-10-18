@@ -205,6 +205,20 @@ export class Session {
     return out.slice(-lines).join('\n')
   }
 
+  // all of it, the scrollback too, each wrapped line joined again: a tab's Copy contents
+  allText(): string {
+    const b = this.term.buffer.active
+    const out: string[] = []
+    for (let i = 0; i < b.length; i++) {
+      const l = b.getLine(i)
+      const t = l?.translateToString(!b.getLine(i + 1)?.isWrapped) ?? '' // a line that goes on keeps its last spaces
+      if (l?.isWrapped && out.length) out[out.length - 1] += t
+      else out.push(t)
+    }
+    while (out.length && !out.at(-1)!.trim()) out.pop()
+    return out.join('\n')
+  }
+
   // the keys arrows send now (a TUI may have asked for application cursor keys)
   get appCursor(): boolean {
     return !!this.term.modes.applicationCursorKeysMode

@@ -535,6 +535,12 @@ test('agent skill: installed in HOME for each agent, its launcher drives the dae
   await rig.start()
   assert.match(readFileSync(wsk, 'utf8'), /^---\nname: laki-widget/)
   assert.equal(readFileSync(join(other, 'SKILL.md'), 'utf8'), 'old')
+  // the app's bar leaves another Laki's out (foreign); one of this data dir's edited is only outdated
+  writeFileSync(wsk, 'edited')
+  const rows = await rig.rpc('skills')
+  const of = (agent: string, skill: string) => rows.find((x: { agent: string; skill: string }) => x.agent === agent && x.skill === skill)
+  assert.deepEqual([of('codex', 'laki').state, of('codex', 'laki').foreign], ['outdated', true])
+  assert.deepEqual([of('claude', 'laki-widget').state, of('claude', 'laki-widget').foreign], ['outdated', undefined])
 })
 
 test('ports of the workspace process tree, their names, stopping one; PR from gh, dev server', async t => {
