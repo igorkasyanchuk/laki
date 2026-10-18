@@ -18,10 +18,11 @@
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "node --experimental-strip-types --no-warnings --test --test-concurrency=4 test/*.test.ts",
-    "pack": "electron-vite build && electron-builder --dir",
-    "dmg": "npm version minor --no-git-tag-version && node --experimental-strip-types --no-warnings scripts/notes.ts && electron-vite build && electron-builder --mac dmg -c.directories.output=dist/release",
-    "pack:x64": "npm i --no-save --force @lydell/node-pty-darwin-x64@$(node -p \"require('./node_modules/@lydell/node-pty/package.json').version\") && electron-vite build && electron-builder --dir --x64",
+    "pack": "electron-vite build && electron-builder --dir --publish never",
+    "dmg": "npm version minor --no-git-tag-version && node --experimental-strip-types --no-warnings scripts/notes.ts && electron-vite build && electron-builder --mac dmg --publish never -c.directories.output=dist/release",
+    "pack:x64": "npm i --no-save --force @lydell/node-pty-darwin-x64@$(node -p \"require('./node_modules/@lydell/node-pty/package.json').version\") && electron-vite build && electron-builder --dir --x64 --publish never",
     "pack:linux": "bash scripts/linux.sh",
+    "release": "bash scripts/release.sh",
     "daemon": "node --experimental-strip-types --no-warnings src/daemon/main.ts",
     "dev:web": "vite src/renderer --port 5199 --strictPort --host 127.0.0.1",
     "demo": "node --experimental-strip-types --no-warnings scripts/demo.ts"
@@ -79,9 +80,15 @@
     "directories": {
       "output": "dist"
     },
+    "publish": {
+      "provider": "github",
+      "owner": "igorkasyanchuk",
+      "repo": "laki-releases"
+    },
     "mac": {
       "target": "dir",
       "category": "public.app-category.developer-tools",
+      "artifactName": "${productName}-${version}-${arch}.${ext}",
       "identity": "-",
       "hardenedRuntime": false,
       "extendInfo": {

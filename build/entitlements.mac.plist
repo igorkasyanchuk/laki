@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- The signed build's hardened runtime (scripts/release.sh). It replaces electron-builder's default, so it keeps
+     allow-jit. node-pty's binaries are signed with the same Team ID: no disable-library-validation. -->
+<plist version="1.0">
+<dict>
+  <!-- V8: the app, and the daemon, CLI and hooks on its binary (ELECTRON_RUN_AS_NODE) -->
+  <key>com.apple.security.cs.allow-jit</key>
+  <true/>
+  <!-- dictation and Settings › Voice (NSMicrophoneUsageDescription) -->
+  <key>com.apple.security.device.audio-input</key>
+  <true/>
+</dict>
+</plist>

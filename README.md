@@ -113,6 +113,7 @@ laki ship fix-the-login -m "Fix the login redirect"
 
 ## More
 
-[The guide](docs/guide.md) · [Requirements](requirements/README.md) · [AGENTS.md](AGENTS.md) (how the code works)
+[The guide](docs/guide.md) · [Requirements](requirements/README.md) · [AGENTS.md](AGENTS.md) (how the code works) ·
+[Releasing](docs/manual-release.md) (every platform from your Mac: `npm run release`)
 
 [MIT](LICENSE) © 2026 Igor Kasyanchuk

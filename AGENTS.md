@@ -16,6 +16,7 @@ npm run pack                      # electron-vite build + electron-builder --dir
 npm run pack:x64                  # the Intel app from an Apple silicon Mac → dist/mac/Laki.app
 npm run pack:linux                # in Docker: dist/linux/Laki-<version>-<arch>.AppImage, then the tests and pack-smoke.sh under Xvfb (ARCH=x64)
 npm run dmg                       # minor version +1, then dist/release/Laki-<version>-arm64.dmg (the user's ask: every dmg)
+npm run release                   # every platform from this Mac to a draft on the public releases repo (docs/manual-release.md)
 npm run dev                       # Electron + renderer dev server on :5199
 ```
 
@@ -42,7 +43,10 @@ npm run dev                       # Electron + renderer dev server on :5199
 - The user runs their own daemon with real agents in it, in `~/.laki-electron` (from when the app was called
   Laki Electron; `dataDir` in `src/shared/conn.ts` keeps an existing one). Never stop it and never point tests
   at it.
-- Releasing: `docs/release.md` (checks, both builds, `scripts/pack-smoke.sh` once before each release).
+- Releasing: `docs/release.md` (checks, both builds, `scripts/pack-smoke.sh` once before each release);
+  `scripts/release.sh` (`npm run release`, `docs/manual-release.md`) does all of it for macOS arm64/x64 and Linux
+  arm64/x64 (Docker), signed and notarized when a Developer ID is in the Keychain (`--adhoc` otherwise), into
+  `dist/release/<v>`, then a draft on `build.publish`'s repo (`upload`, `publish` subcommands). Run it only when the user asks: it uploads.
 - Release notes: `docs/release-notes.md`, Settings › Release notes (with `devMode` only, its ⌘K item too; `?raw`, comments stripped). Each user-visible
   addition gets a line under `## Next` (add that heading above the newest version when it isn't there); `npm run dmg`
   stamps it as the version it builds and the date (`scripts/notes.ts`).

@@ -18,8 +18,9 @@ docker run --rm --platform "$PLAT" -e TESTS -v "$ROOT":/src:ro -v "$ROOT/dist/li
 set -e
 mkdir /w && cd /src && tar --exclude=./node_modules --exclude=./out --exclude=./dist --exclude=./.git -cf - . | tar xf - -C /w
 cd /w && npm ci --no-audit --no-fund --loglevel=error > /dev/null && npx electron-vite build > /dev/null
-npx electron-builder --linux AppImage --'$ARCH' 2>&1 | grep -E "building|error" || true
+npx electron-builder --linux AppImage --'$ARCH' --publish never 2>&1 | grep -E "building|error" || true
 cp dist/*.AppImage /out/
+cp dist/*-linux*.yml /out/ 2> /dev/null || true # the updater feed (package.json build.publish): latest-linux.yml, latest-linux-arm64.yml
 echo "--- smoke test"; bash scripts/pack-smoke.sh /tmp/laki-pack; cp /tmp/laki-pack/shot.png /out/
 [ "$TESTS" = 0 ] && exit
 echo "--- tests (dist/linux/test.log)"; chown -R t /w; r=0; su t -c "npm test" > /out/test.log 2>&1 || r=$?

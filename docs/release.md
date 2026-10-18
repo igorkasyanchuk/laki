@@ -2,6 +2,9 @@
 
 The build is ad-hoc signed (`mac.identity: "-"`; unsigned, a download reads as "damaged"), not notarized, one architecture per build, with no auto-update (see the guide's limits).
 
+`npm run release` runs these steps for every platform, signed and notarized with your Developer ID, and uploads a
+draft to the public releases repo: [manual-release.md](manual-release.md).
+
 1. Start from a clean `main`: `git status` shows nothing to commit.
 2. Bump `version` in `package.json` (About shows it). Bump `API` in `src/shared/types.ts` if the renderer now relies
    on a new daemon method or behavior (AGENTS.md, API).
