@@ -303,7 +303,7 @@ export type MenuItem =
   | (ItemBase & { run: () => void; items?: never })
   | (ItemBase & { items: MenuItem[]; run?: never }) // a submenu: hover, a click, → or ⏎ opens it beside
   | { head: string }
-  | { filter: string }
+  | { filter: string; typed?: (q: string) => MenuItem } // typed: an item for what's typed itself, first (a Desk tab's emoji); null: none
   | { colors: string[]; value?: string; pick: (c: string) => void }
   | null
 type Act = Extract<MenuItem, { label: string }>
@@ -324,10 +324,11 @@ function menuKeys(acts: Act[]) {
 // beside: a submenu's, the item it opens from (no backdrop of its own; onBack: ← or Esc closes only it)
 function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClose }: { anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean; beside?: DOMRect; onBack?: () => void; onEnter?: () => void; onClose: () => void }) {
   const box = useRef<HTMLDivElement>(null)
-  const filter = all.find(it => !!it && 'filter' in it) as { filter: string } | undefined
+  const filter = all.find(it => !!it && 'filter' in it) as Extract<MenuItem, { filter: string }> | undefined
   const [q, setQ] = useState('')
   const words = q.toLowerCase().split(/\s+/).filter(Boolean)
-  const shown = all.filter(it => it !== filter && (!words.length || (isAct(it) && (it.foot || words.every(w => `${it.label} ${it.sub ?? ''}`.toLowerCase().includes(w))))))
+  const typed = (q.trim() && filter?.typed?.(q.trim())) || null
+  const shown = [...(typed ? [typed] : []), ...all.filter(it => it !== filter && (!words.length || (isAct(it) && (it.foot || words.every(w => `${it.label} ${it.sub ?? ''}`.toLowerCase().includes(w))))))]
   const items = shown.filter(it => !isAct(it) || !it.foot)
   const foot = shown.filter((it): it is Act => isAct(it) && !!it.foot)
   const main = items.filter(isAct)

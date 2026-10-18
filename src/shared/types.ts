@@ -497,8 +497,8 @@ export type Reminder = { id: string; at: number; text: string; made: number; ws?
 export const REMINDERS_MAX = 500 // past it the oldest rung ones go
 // a tile on the Desk (experimental): an extension's id and its size in the Desk's grid (DESK_COLS across, rows of DESK_ROW px)
 export type DeskTile = { id: string; w: number; h: number; tab?: string } // tab: a DeskTab's id (none, or one gone: the first tab)
-// a tab of the Desk: its tiles apart from the others' (none set: one tab, Desk)
-export type DeskTab = { id: string; name: string }
+// a tab of the Desk: its tiles apart from the others' (none set: one tab, Desk); icon: one of the app's by name or an emoji, before its name
+export type DeskTab = { id: string; name: string; icon?: string }
 export const DESK_COLS = 12
 export const DESK_ROW = 40
 export const DESK_TILE: Omit<DeskTile, 'id'> = { w: 4, h: 6 }

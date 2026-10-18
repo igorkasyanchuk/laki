@@ -1677,7 +1677,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   each item has a key: its own `key` or a free initial, `menuKeys`; `sub`: a line under the label, `pill`/`tone`: a tag at
   its end, `mono`, `foot`: under a line at the bottom, its icon at the end; `tip`: its tooltip (Run ▾'s actions: their text); `items`: a submenu beside it (a hover, a click, → or ⏎; ← or Esc back), as the ⋯ menus' *Open in*; a picked item (`hint` `ON`) is in the accent
   with a check; `{ filter }`: a box on top, letters go to it, ⏎ runs the first label match (else the picked one), Esc
-  clears it first; such menus are `.menu.rich`; one flipped above its button is held by its bottom),
+  clears it first, its `typed` an item for what's typed itself, first; such menus are `.menu.rich`; one flipped above its button is held by its bottom),
   tooltips (`Tips`: any element with `data-tip`; a pressed one shows none until the pointer leaves it, a menu it opens stays clear; `IconButton` `tip={false}`: an `aria-label` only), tab colors (`TAB_COLORS`, `colorVar`: CSS `--tc-<name>`),
   sidebar rows dragged into a new order (`useRowDrag`, `moveId`; rows carry `data-row="kind:id"`), `Page`
   (a page over the main area, like Settings: the new-workspace form), and `ask` (a yes/no in the app's own dialog,
@@ -1760,10 +1760,14 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
   `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;
   the tab bar (`.desk-tabs`, shown once there's a tile or a tab): + (`addTab`, its name typed at once), a double-click
-  renames, a right click (`tabMenu`) moves it or removes it (its tiles to the first of the others, in one `save`), a
+  renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, in one `save`) or gives it
+  an icon (`DeskTab.icon`, before its name: an `ICONS` name, or an emoji typed or pasted in the filter, `emojiOf`, its
+  `typed` item *Use 🚀*; *Icon…*, a submenu, `setIcon`; *No icon*), a
   head dropped on a tab moves the tile there (`moveTo`: last), a tile's ⋯ › *Move to tab* too (or *A new tab*); Add
   puts one on the tab shown; *Fetch* only that tab's. A head dragged onto another tile puts it
-  before it (HTML5 drag), the corner resizes it (pointer, snapped to cells); a tile shows the full view when there is
+  before it (HTML5 drag), the corner resizes it (pointer, snapped to cells; it ends at `lostpointercapture`, which a
+  release, a cancel and a release the page never got (outside the window, over its title bar: Chromium drops the
+  capture at the next move, no pointerup) all bring, or the window's blur or Esc: the size kept); a tile shows the full view when there is
   one (`WidgetBody` `full`), else the preview; Add: the others, turned on with `desk` added; *Take it off*: its only
   place goes to `side`, off. Laki AI's off ones placed here show too (`byAi`), dashed, with their sample and
   `.desk-off` (*Look*: its page, *Turn on*). *Build with AI* (`DeskApi.build`, App: the floating chat, or the AI page

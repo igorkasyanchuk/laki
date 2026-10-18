@@ -4,8 +4,9 @@
 // and tabs are settings.deskTiles and deskTabs (none: one tab, Desk; laki.deskTab: the one shown). Build with Laki AI asks the floating chat for one placed here: it shows as a tile with its sample
 // data, off until you turn it on. App.tsx passes a DeskApi.
 import { type DragEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
+import { ICONS, type IconName } from '../../shared/icons'
 import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
-import { Icon, IconButton, type MenuItem, Page, useMenu } from './ui'
+import { Icon, IconButton, isIconName, type MenuItem, ON, Page, useMenu } from './ui'
 import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export type DeskApi = WidgetApi & {
@@ -19,6 +20,9 @@ export const onDesk = (w: WidgetView) => placesOf(w).includes('desk') && (w.on |
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
 const MAIN: DeskTab = { id: 'main', name: 'Desk' } // the one tab while none are set
 const TAB_KEY = 'laki.deskTab'
+const ICON_NAMES = Object.keys(ICONS) as IconName[] // a tab's icon picker: each by its words (arrowLeft: arrow left), for the filter
+// a tab's icon may be an emoji instead, typed or pasted into the picker's box (a flag, a keycap, a ZWJ sequence)
+const emojiOf = (s?: string) => (t => (t && t.length <= 16 && !/[\p{L}\s]/u.test(t) && /\p{Extended_Pictographic}|\p{Regional_Indicator}|\u20e3/u.test(t) ? t : undefined))(s?.trim())
 const tabNow = () => {
   try {
     return localStorage.getItem(TAB_KEY) ?? ''
@@ -90,6 +94,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     setNaming(null)
     if (n && n !== tabList.find(t => t.id === id)?.name) saveTabs(tabList.map(t => (t.id === id ? { ...t, name: n } : t)))
   }
+  const setIcon = (id: string, icon?: string) => saveTabs(tabList.map(t => (t.id === id ? { ...t, icon } : t))) // none: undefined, which JSON leaves out
   // a tab gone: its tiles to the first of the others
   const removeTab = (id: string) => {
     const tabs = tabList.filter(t => t.id !== id)
@@ -118,6 +123,12 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
   const tabMenu = (e: React.MouseEvent, t: DeskTab) =>
     openMenu(e, [
       { label: 'Rename', icon: 'pencil', run: () => setNaming(t.id) },
+      {
+        label: 'Icon…',
+        icon: isIconName(t.icon) ? t.icon : 'star',
+        items: [{ filter: 'Find an icon, or type an emoji', typed: q => (e => (e ? { label: `Use ${e}`, run: () => setIcon(t.id, e) } : null))(emojiOf(q)) }, ...ICON_NAMES.map(n => ({ label: n.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase(), icon: n, hint: t.icon === n ? ON : undefined, run: () => setIcon(t.id, n) }))],
+      },
+      ...(t.icon ? [{ label: 'No icon', icon: 'x', run: () => setIcon(t.id) } as MenuItem] : []),
       ...(tabList[0].id !== t.id ? [{ label: 'Move left', icon: 'chevronLeft', run: () => shiftTab(t.id, -1) } as MenuItem] : []),
       ...(tabList.at(-1)!.id !== t.id ? [{ label: 'Move right', icon: 'chevronRight', run: () => shiftTab(t.id, 1) } as MenuItem] : []),
       null,
@@ -129,7 +140,8 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     if (!el || e.button !== 0) return
     const handle = e.currentTarget as HTMLElement
     const tile = handle.parentElement!
-    handle.setPointerCapture(e.pointerId) // the pointer stays its own over a widget's frame and outside the window
+    const id = e.pointerId
+    handle.setPointerCapture(id) // the pointer stays its own over a widget's frame and outside the window
     const cell = (el.clientWidth - GAP * (DESK_COLS - 1)) / DESK_COLS
     const box = tile.getBoundingClientRect()
     const [dx, dy] = [box.right - e.clientX, box.bottom - e.clientY] // where on its corner it was taken
@@ -158,21 +170,28 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     const move = (m: PointerEvent) => ((at = { x: m.clientX, y: m.clientY }), size(), raf || (raf = requestAnimationFrame(edge)))
     const off = (sizing.current = () => {
       handle.removeEventListener('pointermove', move)
-      handle.removeEventListener('pointerup', up)
-      handle.removeEventListener('pointercancel', up)
+      handle.removeEventListener('lostpointercapture', end)
+      window.removeEventListener('blur', end)
+      window.removeEventListener('keydown', key, true)
       page?.removeEventListener('scroll', size)
       cancelAnimationFrame(raf)
       el.style.minHeight = ''
+      if (handle.hasPointerCapture(id)) handle.releasePointerCapture(id)
       sizing.current = undefined
     })
-    const up = () => {
+    // every way it ends, once: the capture goes with a release, a cancel, and a release the page never got (outside
+    // the window, over its title bar or a frame: Chromium drops the capture at the next move, with no pointerup); the
+    // window's blur and Esc too. The size it has is kept
+    const end = () => {
       off()
       if (now.w !== t.w || now.h !== t.h) save(tiles.map(x => (x.id === t.id ? now : x)))
       setLive(null)
     }
+    const key = (k: KeyboardEvent) => k.key === 'Escape' && (k.preventDefault(), k.stopPropagation(), end())
     handle.addEventListener('pointermove', move)
-    handle.addEventListener('pointerup', up)
-    handle.addEventListener('pointercancel', up)
+    handle.addEventListener('lostpointercapture', end)
+    window.addEventListener('blur', end)
+    window.addEventListener('keydown', key, true)
     page?.addEventListener('scroll', size)
     setLive(t)
   }
@@ -262,6 +281,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
                 onDragLeave={() => setOver(o => (o === t.id ? null : o))}
                 onDrop={e => (e.preventDefault(), setOver(null), drag && moveTo(drag, t.id), setDrag(null))}
               >
+                {isIconName(t.icon) ? <Icon name={t.icon} size={13} /> : emojiOf(t.icon) && <span aria-hidden>{t.icon}</span>}
                 {t.name}
                 <span className="muted small">{tiles.filter(x => tabOf(x) === t.id).length}</span>
               </button>

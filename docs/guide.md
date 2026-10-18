@@ -1105,8 +1105,9 @@ ticks every place it shows in). Drag a tile's head onto another to move it, its 
 layout. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to stay on.
 
 **Tabs** keep tiles apart (Work, Team, Home): + beside them adds one (type its name), a double-click renames it, a
-right click moves or removes it (its tiles go to the first tab). Drag a tile's head onto a tab, or pick a tile's ⋯ ›
-*Move to tab*, to move it there; *Add* puts an extension on the tab you're on.
+right click moves or removes it (its tiles go to the first tab) or gives it an icon (*Icon…*: type to find one, or
+type or paste an emoji; *No icon*). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
+there; *Add* puts an extension on the tab you're on.
 
 **Build with AI** (with Laki AI on) asks what it should show, then hands it to Laki AI's floating chat: it asks a few
 questions and writes the extension for the Desk. It shows as a tile right away, dashed, with its made-up data and

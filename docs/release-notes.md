@@ -22,6 +22,10 @@ version it builds, with the date. -->
   ticked as you look at it.
 - **A *Pull main* starter**: Settings › Extensions › New ▾ › From a starter: a status bar button per workspace that
   merges the base branch in, through its agent, git (claude -p for conflicts) or claude -p; a template to make yours.
+- **Desk tabs with icons**: a tab's right click › *Icon…* puts one of Laki's icons, or an emoji you type or paste,
+  before its name.
+- Resizing a Desk tile always ends as you let go, even outside the window or over its title bar (Esc too); before,
+  it could stay in its resizing look.
 - **Workflows: an agent's question stops the run, not just its tab**: a permission prompt in an Agent block shows on
   the run with the agent's choices as buttons; a pick answers it in the tab.
 - **Workflows: no more agents that hang forever**: an Agent block's turn has a timeout (an hour unless set: then Esc
