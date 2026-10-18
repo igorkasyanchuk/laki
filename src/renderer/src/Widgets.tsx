@@ -111,7 +111,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       return
     }
     if (w.js) {
-      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? `&sample=${sample === true ? 1 : encodeURIComponent(sample)}` : ''}${size ? `&cells=${size}` : ''}${w.here ? `&ws=${encodeURIComponent(w.here)}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
+      if (api.key) daemonBase().then(b => live && setSrc(`${b}/widget/${encodeURIComponent(w.id)}?key=${api.key}${full ? '&full=1' : ''}${sample ? `&sample=${sample === true ? 1 : encodeURIComponent(sample)}` : ''}${size ? `&cells=${size}` : ''}${w.here ? `&ws=${encodeURIComponent(w.here)}` : ''}&at=${w.at ?? 0}&rev=${w.rev}&h=${hide}&net=${w.net ? 1 : 0}&c=${cfg}&theme=${encodeURIComponent(theme)}`))
       return () => void (live = false)
     }
     const root = rootOf(host.current!)

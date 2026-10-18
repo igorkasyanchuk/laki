@@ -245,7 +245,7 @@ test('scheduled tasks: an extension fetched, or one of its actions run; only one
   assert.deepEqual(was.actions, ['note'])
   const ran = await rig.rpc('scheduleRun', { id: fetch.id })
   assert.deepEqual([ran.ok, ran.what], [true, 'fetched Disk'])
-  assert.ok((await rig.rpc('state')).widgets.find((w: any) => w.id === 'disk').at >= was.at, 'fetched again')
+  assert.ok((await rig.rpc('state')).widgets.find((w: any) => w.id === 'disk').at > was.at, 'fetched again')
   const act = await rig.rpc('scheduleSet', { project: p.id, widget: 'disk', action: 'note', prompt: 'hello', when: 'weekdays at 9am' })
   const r = await rig.rpc('scheduleRun', { id: act.id })
   assert.deepEqual([r.ok, r.what], [true, "ran Disk's note: got hello"])

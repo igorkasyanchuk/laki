@@ -317,9 +317,9 @@ async function extension(r: FlowRun, b: Block) {
   const id = b.extension?.trim() ?? ''
   const got = await widgetUse({ id, ws: r.ws }, 'workflow', `${r.flow.name} · ${blockName(b)}`).catch(e => ({ ok: false, error: (e as Error).message, name: id, data: undefined }))
   if (!live(r) || r.cur !== b.id) return // stopped meanwhile
+  for (const k of Object.keys(r.vars)) if (k.startsWith(`steps.${b.id}.`)) delete r.vars[k] // a loop's earlier fetch: none of its fields stay, an error's way neither
   if (!got.ok) return leave(r, b, 'error', got.error ?? `${got.name} failed`)
   const text = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v) ?? '').slice(0, ANSWER_MAX)
-  for (const k of Object.keys(r.vars)) if (k.startsWith(`steps.${b.id}.`)) delete r.vars[k] // a loop's earlier fetch: none of its fields stay
   r.vars[`steps.${b.id}.data`] = text(got.data)
   if (got.data && typeof got.data === 'object' && !Array.isArray(got.data)) for (const [k, v] of Object.entries(got.data)) if (/^[\w-]{1,40}$/.test(k) && k !== 'data') r.vars[`steps.${b.id}.${k}`] = text(v)
   say(r, `${blockName(b)}: fetched ${got.name}`, r.vars[`steps.${b.id}.data`])
