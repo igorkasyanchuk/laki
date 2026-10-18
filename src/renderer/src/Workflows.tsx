@@ -1884,7 +1884,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete }: {
         </div>
       )}
       {win && <ShownDialog s={{ run: r.id, name: r.flow.name, title: win.title, body: win.body }} onClose={() => setWin(null)} />}
-      {r.status === 'queued' && <div className="wf-note">Queued: {ahead ? `${ahead} ${ahead === 1 ? 'run' : 'runs'} of ${r.flow.name} ahead of it` : 'next in line'}. It starts in a workspace of its own once a run of it ends (at once: {r.flow.runs ?? RUNS_AT_ONCE}).</div>}
+      {r.status === 'queued' && <div className="wf-note">Queued: {ahead ? `${ahead} ${ahead === 1 ? 'run' : 'runs'} of ${r.flow.name} ahead of it` : 'next in line'}. It starts {r.where === 'main' ? 'in the project’s folder' : 'in a worktree of its own'} once a run of it ends (at once: {r.flow.runs ?? RUNS_AT_ONCE}).</div>}
       {r.status === 'paused' && r.wait?.kind === 'limit' && <div className="wf-note">Paused at a usage limit: it goes on when the limit resets{r.wait.until ? `, at ${new Date(r.wait.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.</div>}
       {mode === 'log' ? (
         <RunLog log={r.log} />

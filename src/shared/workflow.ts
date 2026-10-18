@@ -552,9 +552,10 @@ Before you write it, ask me at least 2 questions, one at a time with laki_ask (e
 
 export type FlowVar = { name: string; what: string; from?: string } // from: the block that sets it
 export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, aren't here: the editor lists them apart
+  const start = wf.blocks.find(b => b.kind === 'start')
   const out: FlowVar[] = [
     { name: 'task', what: 'what the run works on (Run’s task, a schedule’s prompt)' },
-    ...(wf.blocks.find(b => b.kind === 'start')?.inputs ?? []).map(i => ({ name: `inputs.${i.name}`, what: `an input of the run's: ${i.kind === 'choice' ? (i.choices ?? []).join(', ') : i.kind}${i.optional ? ', optional' : ''}${i.default !== undefined ? `, ${i.default || "''"} unless given` : ''}`, from: 'start' })),
+    ...(start?.inputs ?? []).map(i => ({ name: `inputs.${i.name}`, what: `an input of the run's: ${i.kind === 'choice' ? (i.choices ?? []).join(', ') : i.kind}${i.optional ? ', optional' : ''}${i.default !== undefined ? `, ${i.default || "''"} unless given` : ''}`, from: start!.id })),
     { name: 'project', what: 'the project’s name' },
     { name: 'answer', what: 'what you typed with your last Ask you pick (else its label)' },
     { name: 'pr.url', what: 'the workspace’s PR, once there is one' },

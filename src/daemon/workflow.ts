@@ -214,7 +214,7 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   if (queue) {
     say(r, `queued: ${busy} going (at once: ${atOnce})${ahead ? `, ${ahead} ahead of it` : ''}`)
     touch()
-    next() // a slot may be free already
+    if (busy < atOnce) next() // a slot free: the oldest waiting goes first
     return r
   }
   touch()
@@ -938,17 +938,19 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
     }
     if (label === 'Skip it') return esc(r, b, tab, () => ((r.vars[`steps.${b.id}.answer`] = ''), leave(r, b, 'next', 'you skipped it', true))), r
     decide(r, b, 'again', `you: ${label}`, true)
-    say(r, `${blockName(b)}: again`)
-    return esc(r, b, tab, () => ((r.visits[b.id] = 0), enter(r, b))), r
+    return esc(r, b, tab, () => tryAgain(r, b)), r
   }
   decide(r, b, w.kind === 'confirm' ? 'yes' : 'again', `you: ${label}`, true)
   if (w.kind === 'confirm') return say(r, `${blockName(b)}: you said do it`), void act(r, b).catch(e => stuck(r, b, `${blockName(b)}: ${(e as Error).message}`)), r
-  // stuck: the block again, its count and the turns given back
+  tryAgain(r, b)
+  return r
+}
+// stuck's Try again: the block again, its count and the turns given back
+function tryAgain(r: FlowRun, b: Block) {
   if (r.turns >= (r.flow.turns ?? TURNS)) r.turns = 0
   r.visits[b.id] = 0
   say(r, `${blockName(b)}: again`)
   enter(r, b)
-  return r
 }
 
 function kill0(r: FlowRun) {
@@ -1008,7 +1010,7 @@ export function flowTick(now = Date.now()) {
     if (!b) continue
     if (r.wait?.kind === 'wait' && r.status === 'running') waitTick(r, b, now)
     else if (r.wait?.kind === 'retry' && now >= r.wait.until) again(r, b)
-    else if ((r.wait?.kind === 'agent' || r.wait?.kind === 'agent-ask') && !alive(r.wait.tab)) leave(r, b, 'error', `${tabOf(r.wait.tab)?.name ?? 'its tab'} stopped`)
+    else if ((r.wait?.kind === 'agent' || r.wait?.kind === 'agent-ask' || r.wait?.kind === 'limit') && !alive(r.wait.tab)) leave(r, b, 'error', `${tabOf(r.wait.tab)?.name ?? 'its tab'} stopped`)
     else if (r.wait?.kind === 'agent-ask' && tabStatus(r.wait.tab) !== 'waiting') {
       // answered in its tab: the turn goes on
       say(r, `${blockName(b)}: answered in its tab`)
@@ -1035,8 +1037,7 @@ export function flowResume() {
   const back = runs().filter(r => going(r) && !asks(r) && r.started < boot)
   const was = new Map(back.map(r => [r, r.cur]))
   for (const r of back) say(r, `Laki restarted: back at ${blockName(blockOf(r, r.cur) ?? ({ id: '?' } as Block))}`)
-  if (requeue.length) save()
-  if (!back.length) return
+  if (!back.length) return void (requeue.length && save())
   save()
   setTimeout(() => {
     for (const r of back) {
