@@ -39,8 +39,8 @@ export type PanelApi = {
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
-  undoHunk: (path: string, hunk: string, lines?: number[], then?: () => void) => Promise<unknown>
-  undoFile: (path: string, then?: () => void) => Promise<unknown>
+  undoHunk: (path: string, hunk: string, lines?: number[], then?: () => void) => Promise<boolean> // false: you said no
+  undoFile: (path: string, then?: () => void) => Promise<boolean>
   redo: (id: string) => Promise<unknown>
   // the workspace's Artifacts (its storage folder) as Files' other root: list, show one in the app, open it in its app,
   // its right click (Finder, copy path); none: no storage folder yet
@@ -417,10 +417,10 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   }
   const picked = (path: string, l: DiffLine) => !!picks && picks.path === path && picks.hunk === l.hunk && l.at !== undefined && picks.at.includes(l.at)
   const [busyRevert, setBusyRevert] = useState(false)
-  const revert = (f: () => Promise<unknown>) => {
+  const revert = (f: () => Promise<boolean>) => {
     if (busyRevert) return
     setBusyRevert(true)
-    f().then(() => setPicks(null), () => {}).finally(() => setBusyRevert(false))
+    f().then(done => done && setPicks(null), () => {}).finally(() => setBusyRevert(false)) // a no keeps the picks
   }
   const revertHunk = (path: string, hunk: number) => {
     const text = byFile.get(path)?.hunks[hunk]

@@ -3184,7 +3184,14 @@ export function remotePin(p: { token?: unknown; pin?: unknown }): { need: boolea
 
 // remote access past its time ends (main.ts asks every 15 s; tests move the clock)
 export function remoteTick(now = Date.now()) {
-  if (remote?.until && now >= remote.until) remoteStop()
+  if (remote?.until && now >= remote.until) return remoteStop()
+  // the tailnet's other devices online, again: a phone that came online clears Settings' "no other device" note
+  const r = remote
+  if (r?.via === 'tailscale' && !r.funnel)
+    tsReady().then(
+      ({ peers }) => r === remote && peers !== r.peers && ((r.peers = peers), changed()),
+      () => {},
+    )
 }
 
 // one check of statusCheckRollup: a CheckRun (name, status, conclusion) or a StatusContext (context, state)

@@ -335,7 +335,7 @@ agent)
   # laki send, not the UI kit's do: send: an action picks the way by its setting, and --when-idle waits for the
   # agent's turn to end (sent at once when it's idle). <ws> alone is the workspace's first agent tab
   out=$("$LAKI_CLI" send "$LAKI_WORKSPACE" --when-idle -- "$(prompt)" 2>&1) || modal "Couldn't ask the agent" "$out
-Open an agent in this workspace, or pick git or ai in its settings."
+Open an agent in this workspace (or answer the one that asks), or pick git or ai in its settings."
   case $out in queued*) toast "The agent merges $up after its turn" ;; esac
   toast "Asked the agent to merge $up"
   ;;

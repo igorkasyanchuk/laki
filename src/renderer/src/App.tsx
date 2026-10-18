@@ -1198,16 +1198,18 @@ export function App() {
     toPrompt: text => intoAgent(w.id, text),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     undoHunk: async (path, hunk, lines, then) => {
-      if (!(await revertOk(w))) return
+      if (!(await revertOk(w))) return false
       const { id } = await call<{ id: string }>('hunkUndo', { ws: w.id, path, hunk, lines })
       then?.()
       done(`Reverted ${lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : '1 hunk'} in ${path.split('/').pop()}`, () => void redo(w, id, then))
+      return true
     },
     undoFile: async (path, then) => {
-      if (!(await revertOk(w, path))) return
+      if (!(await revertOk(w, path))) return false
       const { id } = await call<{ id: string }>('fileUndo', { ws: w.id, path })
       then?.()
       done(`Reverted ${path.split('/').pop()}`, () => void redo(w, id, then))
+      return true
     },
     redo: id => redo(w, id),
     artifacts: w.storage

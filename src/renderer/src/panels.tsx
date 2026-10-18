@@ -545,7 +545,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, ins
   const submit = async () => {
     if (busy || saving) return
     setBusy(true)
-    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, perm: p.perm, fast: p.fast, place: p.place, tpl: tplName, agent } satisfies LastNew)
+    keep(LAST_NEW, { project: p.project, preset: p.preset, cmd: p.cmd, local: p.local, model: p.model, effort: p.effort, perm: p.perm === 'bypassPermissions' ? undefined : p.perm /* never by itself: picked each time */, fast: p.fast, place: p.place, tpl: tplName, agent } satisfies LastNew)
     const mine = load<Draft | null>(DRAFT, null)
     keep(DRAFT, undefined) // made: the next page starts empty; failed: back below, unless another page has one by then
     try {
