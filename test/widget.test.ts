@@ -413,8 +413,10 @@ test('extensions: a place (sidebar, top bar, status bar), network access for a J
   assert.equal((await find(rig, 'plain')).place, 'side', 'one it does not know: the sidebar')
   await rig.rpc('widgetSet', { id: 'plain', place: 'top' })
   assert.equal((await find(rig, 'plain')).place, 'top', "the user's wins")
-  await rig.rpc('widgetSet', { id: 'plain', place: 'bogus' })
-  assert.equal((await find(rig, 'plain')).place, 'side')
+  await assert.rejects(rig.rpc('widgetSet', { id: 'plain', place: 'bogus' }), /no place bogus/, 'a typo is said, not widget.json\'s again')
+  assert.equal((await find(rig, 'plain')).place, 'top')
+  await rig.rpc('widgetSet', { id: 'plain', place: [] })
+  assert.equal((await find(rig, 'plain')).place, 'side', "none: widget.json's (one it doesn't know: the sidebar)")
 
   // network: off until the user turns it on, and only a JS page's CSP opens, to https
   const { port } = rig.info()

@@ -5,7 +5,7 @@ import { createInterface } from 'node:readline'
 import { alive, ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from '../shared/layout.ts'
 import { BRAINSTORM_OUTPUT } from '../shared/plans.ts'
-import { AI_ACTS, API, DEVICE_OPS, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from '../shared/types.ts'
+import { AI_ACTS, API, DEVICE_OPS, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, cellsOf, mergeActions, placesOf, prRef, rowsOf, templated, templatesFor, type View, WIDGET_PLACES, type WidgetView } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { WORKFLOW_FORMAT } from '../shared/workflow.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
@@ -240,13 +240,13 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       ['id'],
     ),
     run: async a => {
-      const size = typeof a.size === 'string' && a.size ? /^\s*(\d)\s*[x×]\s*(\d(?:\.5)?|0?\.5)\s*$/i.exec(a.size) : undefined
+      const size = a.size ? cellsOf(String(a.size)) : undefined
       if (a.size && !size) throw new Error(`a size: across x down, e.g. 2x1 (not ${a.size})`)
       const places = Array.isArray(a.places) ? a.places.map(String) : undefined
       const settings = typeof a.settings === 'string' ? JSON.parse(a.settings) : a.settings // some models send the object as JSON text
-      const w: WidgetView = await rpc('widgetSet', { id: a.id, place: places, size: size ? [Number(size[1]), Number(size[2])] : undefined, every: a.every, view: a.view, hide: a.hide, config: settings, from: { ws: from, tab: from ? process.env.LAKI_TAB : undefined }, agent: true })
-      const v: View = await rpc('state')
-      const off = [!w.on && `it's off: the user turns it on`, placesOf(w).includes('desk') && !v.settings?.desk && 'the Desk is off: Settings › General › Experimental turns it on'].filter(Boolean)
+      const w: WidgetView = await rpc('widgetSet', { id: a.id, place: places, size, every: a.every, view: a.view, hide: a.hide, config: settings, from: { ws: from, tab: from ? process.env.LAKI_TAB : undefined }, agent: true })
+      const desk = placesOf(w).includes('desk') && !(await rpc<View>('state')).settings?.desk
+      const off = [!w.on && `it's off: the user turns it on`, desk && 'the Desk is off: Settings › General › Experimental turns it on'].filter(Boolean)
       return { id: w.id, on: w.on, places: placesOf(w), size: w.size.join('x'), every: w.every, view: w.full ? w.view : undefined, hide: w.hide, ...(off.length ? { note: off.join('; ') } : {}) }
     },
   },

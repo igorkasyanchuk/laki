@@ -105,6 +105,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
     [`${cli} archive <ws> · restore <ws> · fork <ws> · rm <ws>`, 'put a workspace away, bring it back, branch off it, delete it'],
     [`${cli} schedule add <project> --when "weekdays at 9am" "…"`, 'a prompt on repeat (--where new|folder|<ws>, --name "Nightly {{DD-MM}}"); schedule, schedule log, on|off|run|rm <id>'],
     [`${cli} widget · widget reload · widget run <id> · widget render <id> --full`, "the sidebar's extensions (widgets): list them, read their folders again, fetch one now, the HTML it shows"],
+    [`${cli} widget set <id> --place desk --size 3x2`, 'where an extension shows (side, top, status, rail, foot, desk, panel, row), its size; --every, --view, --hide and key=value settings too'],
     [`${cli} widget kit [element]`, "the UI kit's elements (widget.json's ui): each one's props and a sample; --json for all of it"],
     [`${cli} widget dev [folder]`, 'dev mode: your extension linked, on and watched (a save reloads it), its runs as they come; --off <id>, --list'],
     [`${cli} widget new "Deploys" --kind table`, 'an extension from a starter (number, list, table, chart, button, form, panel, workspace, stream, tool, onefile): on, on sample data'],

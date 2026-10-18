@@ -612,6 +612,8 @@ export type WidgetSize = 's' | 'm' | 'l'
 // beside Video, Meme and Timer) or the Desk (experimental: a page of tiles, each resized there). Any of them at once:
 // places (place is the first of them, for an older app)
 export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot', 'desk', 'panel', 'row'] as const // panel: a right-panel tab; row: a mark on each workspace's row (per workspace only)
+// a size typed as cells across x down (2x1, 3×0.5): the CLI's and MCP's; widgetSet clamps it
+export const cellsOf = (t: string): [number, number] | undefined => (m => (m ? [Number(m[1]), Number(m[2])] : undefined))(/^\s*(\d)\s*[x×]\s*(\d(?:\.5)?|0?\.5)\s*$/i.exec(t))
 export const placesOf = (w: { place?: WidgetPlace; places?: WidgetPlace[] }): WidgetPlace[] => (w.places?.length ? w.places : [w.place ?? 'side'])
 export const BUTTON_PLACES: readonly WidgetPlace[] = ['rail', 'foot']
 export type WidgetPlace = (typeof WIDGET_PLACES)[number]

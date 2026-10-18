@@ -698,7 +698,7 @@ export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct 
   if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
-  const text = act ? (on ? `Turn on ${act.label}? It ${on.runs}.` : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
+  const text = act ? (on ? turnOn(act, on.text) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
   const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : [`Yes, remove ${act.label}`, 'No, keep it']) : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
   if (options.length < 2) throw new Error('2 to 6 options')
@@ -733,6 +733,8 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : `Kept ${act.label}.`), { kept: true }
   try {
     if (on) {
+      // only what they were shown: its files may have changed since (an agent's write, a save)
+      if (turnOn(act, widgetWhat(act.id).text) !== m.text) throw new Error('it changed since you were asked: ask again')
       await rpc('widgetSet', { id: act.id, on: true }) // the user's pick: no agent's
       say(t, 'ai', `Turned on ${act.label}.`)
       return { on: true }
@@ -745,6 +747,7 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
     throw e
   }
 }
+const turnOn = (a: AiAct, what: string) => `Turn on ${a.label}? ${what}`
 // what a removal would take, in words, from Laki's own state
 function whatOf(a: AiAct) {
   const cut = (t: string) => `“${t.length > 80 ? `${t.slice(0, 79)}…` : t}”`

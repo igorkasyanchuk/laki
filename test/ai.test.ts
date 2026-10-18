@@ -322,7 +322,7 @@ test("ai: Laki's skill asks with options, writes memory, and removes only on the
 
 test("ai: an extension's places and settings change by a tool; it turns on only at the user's Yes", async t => {
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
-  const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' })])
+  const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' }), call('c3', 'laki_extension_on', { id: 'tick' })])
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
   await rig.rpc('settingsSet', { ai: { on: true } })
   await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
@@ -336,6 +336,7 @@ test("ai: an extension's places and settings change by a tool; it turns on only 
   const ls = (await tool('laki_extensions')({})).find((w: any) => w.id === 'my-prs')
   assert.deepEqual([ls.places, ls.settings.find((x: any) => x.key === 'author').value], [['desk', 'side'], 'bob'])
   await assert.rejects(tool('laki_extension_set')({ id: 'my-prs', size: 'big' }), /a size: across x down/)
+  await assert.rejects(tool('laki_extension_set')({ id: 'my-prs', places: ['desk', 'nowhere'] }), /no place nowhere/)
   // what's the user's alone: on, network access, its source
   await assert.rejects(rig.rpc('widgetSet', { id: 'my-prs', on: true, agent: true }), /only you can turn an extension on/)
   await assert.rejects(rig.rpc('widgetSet', { id: 'my-prs', net: true, agent: true }), /only you can change its network access/)
@@ -345,7 +346,7 @@ test("ai: an extension's places and settings change by a tool; it turns on only 
   // laki_extension_on asks, with what it runs; No leaves it off, Yes turns it on
   await rig.rpc('aiAsk', { text: 'turn on my prs' })
   const q = (await rig.rpc('aiState')).chat.at(-1)
-  assert.match(q.text, /^Turn on the extension “My PRs”\? It runs `sh fetch\.sh`\.$/)
+  assert.equal(q.text, 'Turn on the extension “My PRs”? It runs this:\n\n```\nsh fetch.sh\n```')
   assert.deepEqual(q.ask.options, ['Yes, turn it on', 'No, leave it off'])
   assert.equal((await mine()).on, false, 'not by the AI')
   assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 1 }), { kept: true })
@@ -355,6 +356,20 @@ test("ai: an extension's places and settings change by a tool; it turns on only 
   assert.deepEqual(await rig.rpc('aiAnswer', { id: q2.id, n: 0 }), { on: true })
   assert.equal((await mine()).on, true)
   assert.equal((await rig.rpc('aiState')).chat.at(-1).text, 'Turned on the extension “My PRs”.')
+
+  // its command whole, backticks and all, and its events; changed after the question: Yes turns nothing on
+  const dir = join(rig.data, 'widgets', 'tick')
+  mkdirSync(dir, { recursive: true })
+  const manifest = (fetch: string) => writeFileSync(join(dir, 'widget.json'), JSON.stringify({ name: 'Tick', fetch, on: { 'turn.done': 'refresh' }, sample: { n: 1 } }))
+  manifest('echo "{\\"n\\": `date +%s`}"')
+  await rig.rpc('widgetReload')
+  await rig.rpc('aiAsk', { text: 'turn on tick' })
+  const q3 = (await rig.rpc('aiState')).chat.at(-1)
+  assert.equal(q3.text, 'Turn on the extension “Tick”? It runs this:\n\n```\necho "{\\"n\\": `date +%s`}"\n```\n\nThese events run its actions too: `turn.done`.')
+  manifest('echo pwned')
+  await rig.rpc('widgetReload')
+  await assert.rejects(rig.rpc('aiAnswer', { id: q3.ask.id, n: 0 }), /changed since you were asked/)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'tick').on, false)
 })
 
 test("ai: prList, laki_prs's: a project's open PRs, yours or others', each with the workspace that has it", async t => {

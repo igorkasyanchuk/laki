@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -459,15 +459,16 @@ async function main() {
         const kv = [action, ...arg].filter(x => x !== undefined)
         const bad = kv.find(x => !/^[\w-]+=/.test(x))
         if (bad) throw new Error(`a setting as key=value, not ${bad}`)
-        const size = typeof flags.size === 'string' ? /^(\d)[x×](\d(?:\.5)?|0?\.5)$/i.exec(flags.size.trim()) : undefined
+        const size = typeof flags.size === 'string' ? cellsOf(flags.size) : undefined
         if (flags.size !== undefined && !size) throw new Error(`a size: across x down, e.g. 2x1 (not ${flags.size})`)
+        if (flags.view !== undefined && !['s', 'm', 'l'].includes(String(flags.view))) throw new Error(`--view: s, m or l (not ${flags.view})`)
         const every = flags.every === undefined ? undefined : Number(flags.every)
         if (every !== undefined && !(every > 0)) throw new Error(`--every: minutes (not ${flags.every})`)
         const hide = typeof flags.hide === 'string' ? flags.hide.split(',').map(x => x.trim()) : undefined
         const r: WidgetView = await rpc('widgetSet', {
           id,
           place: typeof flags.place === 'string' ? flags.place.split(',').map(x => x.trim()).filter(Boolean) : undefined, // '': its own again
-          size: size ? [Number(size[1]), Number(size[2])] : undefined,
+          size,
           every,
           view: typeof flags.view === 'string' ? flags.view : undefined,
           hide: hide && { refresh: hide.includes('refresh'), at: hide.includes('at') },

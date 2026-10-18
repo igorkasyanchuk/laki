@@ -222,7 +222,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `ai`: the Extension page's chat sets it before each ask, one of the user's in `widgetHome()` (else refused) gets the
   store's `aiMay` (an hour), which lets `widgetWrite` rewrite it; `agent`, or `from` an agent's tab: MCP's and Laki AI's
   `laki_extension_set`, `laki widget set` (`place`, `size`, `every`, `view`, `hide`, plain settings as `key=value`):
-  never `on: true`, `net: true`, `source`, `ai` or a secret setting), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on), `widgetRm` (Settings' trash can, no `ask`: App's toast with Undo, `widgetRestore`; the folder (a link: only it, `readlinkSync` kept), its
+  never `on: true`, `net: true`, `source`, `ai` or a secret setting; a place it doesn't know is refused), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on), `widgetRm` (Settings' trash can, no `ask`: App's toast with Undo, `widgetRestore`; the folder (a link: only it, `readlinkSync` kept), its
   store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; saved off with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on),
   `widgetCheck` (`id` or `dir`, `run`: its fetch once; below); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
@@ -266,7 +266,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - Laki AI's skill: `prList` (`project`, `who` mine/others/all: `gh pr list --state open` in the project, `ghLogin`
   for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
   `AI_ACTS` memory/schedule/tab/todo, a removal, or widget, turning an extension on (`laki_extension_on`; its words say
-  what it runs, `widgets.ts` `widgetWhat`; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
+  what it runs, `widgets.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
+  Yes only while it still says the same; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
   `busy`; a chat message with `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an
   `act`'s Yes is `remove` here, or `widgetSet` `on` (the user's, no `agent`), never the AI's own);
 - specs and brainstorms (experimental, `settings.specs`; below): `planList` (`project`?), `planNew` (`project`, `kind` spec

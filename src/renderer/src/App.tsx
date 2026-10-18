@@ -83,6 +83,7 @@ function AiFloat({ children }: { children: ReactNode }) {
   const down = (e: React.PointerEvent) => {
     if (e.button !== 0 || !head(e) || !box.current?.offsetParent) return
     e.preventDefault() // no text selected on the way
+    box.current.setPointerCapture(e.pointerId) // its moves and release come here even over a frame or outside the window
     const area = (box.current.offsetParent as HTMLElement).getBoundingClientRect()
     const r = box.current.getBoundingClientRect()
     const from = { x: e.clientX, y: e.clientY, right: area.right - r.right, bottom: area.bottom - r.bottom }

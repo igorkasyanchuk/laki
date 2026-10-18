@@ -707,6 +707,8 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
+  const badPlace = o.place === undefined ? undefined : (Array.isArray(o.place) ? o.place : [o.place]).find(x => !isPlace(x)) // a typo would put back widget.json's
+  if (badPlace !== undefined) throw new Error(`no place ${badPlace}: ${WIDGET_PLACES.join(', ')}`)
   if (o.place !== undefined && placeList(o.place).includes('row') && !scoped(w)) throw new Error(`${w.m.name || w.id} is one for the app: a row's mark is per workspace`)
   if (o.place !== undefined) s.place = (l => (l.length > 1 ? l : l[0]))(placeList(o.place)) // none: widget.json's again
   if (o.net !== undefined) s.net = !!o.net || undefined
@@ -752,20 +754,23 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   return widgetsView().find(x => x.id === w.id)
 }
 
-// what turning one on starts, in words: Laki AI's Yes / No (aiQuestion) says it before the user picks
+// what turning one on starts, in words, its command or prompt as a code block (a code span breaks on its backticks or
+// lines): Laki AI's Yes / No says it (aiQuestion), and a Yes turns it on only while it still says the same (aiAnswer)
 export function widgetWhat(id: string) {
   const w = find(id)
   const src = sourceOf(w)
-  const cut = (t = '') => (t.length > 160 ? `${t.slice(0, 159)}…` : t)
-  const runs =
-    src.kind === 'static' ? 'nothing: its data is typed in'
-    : src.kind === 'file' ? `reads ${src.path}`
-    : src.kind === 'url' ? `fetches ${src.url}`
-    : src.kind === 'ai' ? `asks an agent${src.tools ? ` (tools: ${src.tools})` : ''}: “${cut(src.prompt)}”`
-    : w.m.script ? `runs \`node ${w.m.script}\``
-    : w.m.fetch ? `runs \`${cut(w.m.fetch)}\``
-    : 'nothing (no fetch)'
-  return { name: w.m.name || w.id, on: onOf(w), runs: `${runs}${w.m.stream && src.kind === 'fetch' ? ', and keeps it running' : ''}` }
+  const fetch = w.m.script ? `node ${w.m.script}` : w.m.fetch
+  const [runs, code]: [string, string?] =
+    src.kind === 'static' ? ['runs nothing: its data is typed in']
+    : src.kind === 'file' ? ['reads this file', src.path]
+    : src.kind === 'url' ? ['fetches this URL', src.url]
+    : src.kind === 'ai' ? [`asks an agent this${src.tools ? `, with ${src.tools.replace(/[`*_[\]]/g, '')}` : ''}`, src.prompt && src.prompt.length > 1500 ? `${src.prompt.slice(0, 1500)}…` : src.prompt]
+    : fetch ? [`runs this${w.m.stream ? ' and keeps it running' : ''}`, fetch]
+    : ['runs nothing (no fetch)']
+  const fence = '`'.repeat(Math.max(3, ...[...(code ?? '').matchAll(/`+/g)].map(m => m[0].length + 1))) // longer than any run in it
+  const events = Object.keys(w.m.on ?? {}).map(e => `\`${e.replace(/`/g, '')}\``) // its actions run on these, unclicked
+  const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}`
+  return { name: w.m.name || w.id, on: onOf(w), text }
 }
 
 // what a failed command said last, past node's own trailer (an uncaught error ends with its version)
