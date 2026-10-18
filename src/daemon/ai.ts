@@ -490,7 +490,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   try {
     const out = await new Promise<string>((ok, no) => {
       // a group of its own: a stop or a timeout ends its MCP servers and tools too
-      const c = execGroup(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: agent ? 600_000 : 300_000, signal: o.signal }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`${backend}: ${e.code === 'ENOENT' ? 'not installed (not on PATH)' : o.signal?.aborted ? 'stopped' : e.killed ? 'took too long' : se.trim().split('\n').pop() || e.message}`)) : ok(so)))
+      const c = execGroup(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: agent ? 600_000 : 300_000, signal: o.signal }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`${backend}: ${e.code === 'ENOENT' ? 'not installed (not on PATH)' : o.signal?.aborted ? 'stopped' : e.message === 'maxBuffer exceeded' ? 'printed more than 16 MB' : e.killed ? 'took too long' : se.trim().split('\n').pop() || e.message}`)) : ok(so)))
       own(c, o.name ?? `Laki AI · ${backend}`, agent ? o.stop : 'ai') // an extension's: agent:<id>, its runs (widgets.ts stopAgents)
     })
     let text = ''

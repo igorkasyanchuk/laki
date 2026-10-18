@@ -1145,7 +1145,7 @@ Where you work (Part C; `test/widget-places.test.ts`): `WIDGET_PLACES` adds `pan
 workspace only: `manifestCheck` and `widgetSet` refuse a global one; `shownIn` fetches every `instOk` workspace's while
 a window is shown, `AT_ONCE` at a time). An object action's `MENU` fields (widgetSchema.ts: `ACTION_SHOWS` palette,
 workspace, tab, file, prompt; `match` globs, `globMatch`; `key`, `normKey`/`pressOf`, Alt or Ctrl in it, a plain ⌘ one
-warned and never taken; `menuCheck`) become the view's `menus` (`actionMenu`, `WidgetMenu`). `widgetAction` `ctx`
+warned and never taken, a ⌃ one without Alt or ⌘ warned (a terminal's); `menuCheck`) become the view's `menus` (`actionMenu`, `WidgetMenu`). `widgetAction` `ctx`
 (`WidgetCtx`, `ctxOf`: a live `instOk` workspace, a scoped one's own; a tab of it; a file `inside` it) adds `$LAKI_CTX`,
 `$LAKI_FILE`, `$LAKI_TAB`, the workspace's env for a global one (`infoEnv`, no `LAKI_WIDGET_FILE`) and an AI action's
 `{{file.path}}`/`{{tab.name}}`; none from an agent or an event. `insert` (the JSON's, else all of stdout with `insert:

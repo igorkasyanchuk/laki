@@ -24,12 +24,18 @@ test("an agent's source runs at most every its minutes, but on Run now", async t
   for (const reason of ['schedule', 'settings', 'event:turn.done', 'reload']) {
     const r = await rig.rpc('widgetRun', { id: 'sum', reason })
     assert.equal(r.ok, false, reason)
-    assert.match(r.error, /an agent's source runs at most every 60 minutes: Run now fetches anyway/)
+    assert.match(r.error, /an agent's source runs at most every 60 minutes: Run now on its page fetches anyway/)
   }
   await rig.rpc('widgetSet', { id: 'sum', config: {} }) // a setting: not the prompt
   await sleep(300)
   assert.equal(calls(), n, 'no agent ran')
   assert.equal((await rig.rpc('widgetRun', { id: 'sum' })).ok, true, 'Run now: anyway')
+  assert.equal(calls(), n + 1)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'one' })
+  const tab = await until(() => rig.tab(ws.id), 'its agent tab')
+  const r = await rig.rpc('widgetRun', { id: 'sum', from: { ws: ws.id, tab: (tab as any).id } })
+  assert.equal(r.ok, false, "an agent's laki widget run: not a Run now")
   assert.equal(calls(), n + 1)
 })
 

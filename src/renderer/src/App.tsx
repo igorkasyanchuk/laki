@@ -1752,8 +1752,9 @@ export function App() {
     // development mode's element picker, over anything (a dialog, a page): its hotkey (Settings › General › Development)
     if (settings.devMode === true && pickKey && !e.repeat && keyLabel(e) === pickKey) return void (e.preventDefault(), e.stopPropagation(), setPicking(p => !p))
     if (e.metaKey && e.altKey && !e.ctrlKey && e.code === 'KeyB') return void (e.preventDefault(), e.stopPropagation(), ws && togglePanel())
-    // an extension action's key (with Alt or Ctrl: ⌘ and ⌘⇧ alone are Laki's), with the workspace and tab you're in
-    const hit = (e.altKey || e.ctrlKey) && !e.repeat ? (p => extOn(ws).flatMap(w => (w.menus ?? []).filter(m => m.key === p).map(m => ({ w, m }))))(pressOf(e))[0] : undefined
+    // an extension action's key (with Alt or Ctrl: ⌘ and ⌘⇧ alone are Laki's), with the workspace and tab you're in;
+    // not under a yes/no (its run's own question would replace it: a Deny, a Cancel)
+    const hit = (e.altKey || e.ctrlKey) && !e.repeat && !document.querySelector('.ask-overlay') ? (p => extOn(ws).flatMap(w => (w.menus ?? []).filter(m => m.key === p).map(m => ({ w, m }))))(pressOf(e))[0] : undefined
     if (hit) return void (e.preventDefault(), e.stopPropagation(), void extRun(hit.w, hit.m, hereCtx()))
     if (!e.metaKey || e.altKey || e.ctrlKey) return
     const k = e.key.toLowerCase()

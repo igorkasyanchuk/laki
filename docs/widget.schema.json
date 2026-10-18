@@ -240,7 +240,7 @@
               },
               "key": {
                 "type": "string",
-                "description": "A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt or Ctrl: Cmd and Cmd+Shift alone are Laki’s)"
+                "description": "A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt: Cmd and Cmd+Shift alone are Laki’s, Ctrl alone a terminal’s)"
               },
               "ask": {
                 "type": "string",
@@ -369,7 +369,7 @@
               },
               "key": {
                 "type": "string",
-                "description": "A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt or Ctrl: Cmd and Cmd+Shift alone are Laki’s)"
+                "description": "A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt: Cmd and Cmd+Shift alone are Laki’s, Ctrl alone a terminal’s)"
               },
               "ask": {
                 "type": "string",

@@ -104,7 +104,7 @@ export const widgetFormat = () => `## widget.json
   "ask": "What should it focus on?", "confirm": "Run it?", "insert": true, "view": false }\`. \`show\`: \`palette\` (⌘K, as
   "<its name>: <title>", the workspace and tab you're in), \`workspace\` (a workspace's ⋯ and right click), \`tab\` (a
   tab's right click), \`file\` (a file's right click in Files; \`match\`: globs, one without / matches the name),
-  \`prompt\` (the new-workspace prompt's Insert menu). \`key\`: with Alt or Ctrl (⌘ and ⌘⇧ alone are Laki's). \`ask\`: its
+  \`prompt\` (the new-workspace prompt's Insert menu). \`key\`: with Alt (⌘ and ⌘⇧ alone are Laki's, ⌃ alone a terminal's). \`ask\`: its
   answer is \`$WIDGET_ARG\`; \`confirm\`: asked first. Where it was picked: \`$LAKI_CTX\` (JSON: \`ws\`, \`tab\`, \`file\`
   \`{ path, abs }\`), \`$LAKI_FILE\` (the file's absolute path), \`$LAKI_TAB\`, and the workspace's \`$LAKI_WORKSPACE\`,
   \`$LAKI_BRANCH\`, \`$LAKI_PATH\`…; an agent's prompt \`{{file.path}}\`, \`{{tab.name}}\`, \`{{workspace.branch}}\`.

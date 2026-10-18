@@ -44,7 +44,7 @@ const MENU: Record<string, J> = {
   title: str('Its label in menus and the palette (unset: its name in words)'),
   show: { type: 'array', items: { enum: ACTION_SHOWS }, description: 'Where it’s offered: palette (⌘K), workspace (a workspace’s ⋯ and right click), tab (a tab’s right click), file (a file’s right click in Files, by match), prompt (a prompt box’s Insert menu)' },
   match: { type: 'array', items: { type: 'string' }, description: 'With file: the files it’s for, as globs (*.ts, docs/**/*.md; one without / matches the name); unset: every file' },
-  key: str('A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt or Ctrl: Cmd and Cmd+Shift alone are Laki’s)'),
+  key: str('A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt: Cmd and Cmd+Shift alone are Laki’s, Ctrl alone a terminal’s)'),
   ask: str('A question asked first; the answer is its $WIDGET_ARG'),
   confirm: str('A yes or no asked first ("Run it on the whole workspace?")'),
   insert: { type: 'boolean', description: 'What it prints (its JSON’s "insert", else all of it) goes into the prompt: the box it was picked in, else the focused agent’s, unsent' },
@@ -269,6 +269,7 @@ function menuCheck(where: string, c: Record<string, unknown>, say: (level: UiPro
   const key = normKey(c.key)
   if (c.key !== undefined && !key) say('error', `${where}.key`, `${JSON.stringify(c.key)}: Cmd, Ctrl or Alt (Shift too) and one key, with + (Alt+Cmd+E)`)
   else if (key && !/Alt|Ctrl/.test(key)) say('warn', `${where}.key`, `${key}: Cmd and Cmd+Shift alone are Laki's own keys: add Alt or Ctrl`)
+  else if (key && !/Alt|Cmd/.test(key)) say('warn', `${where}.key`, `${key}: Ctrl alone is a terminal's (⌃C, ⌃E…): add Alt or Cmd`)
   if (c.view === true && !(Array.isArray(c.show) || c.key !== undefined)) say('warn', `${where}.view`, 'it opens the full view after a run from a menu: give it show or a key')
 }
 // a command that reaches past this Mac: a tool that never asks gets check's warning

@@ -225,7 +225,7 @@ function keep(w: Entry, ws: string | undefined, f: (s: Inst) => void) {
   if (said !== s.told && !s.mock && s.at !== at) {
     // told only once someone saw it: on, a window open (else said at its next fetch that has one); empty clears it
     if (!said) s.told = undefined
-    else if (onOf(widgets.get(w.id) ?? w) && clients.size) broadcast({ ev: 'widget-say', widget: w.id, ws, notify: said }), (s.told = said)
+    else if (onOf(widgets.get(w.id) ?? w) && shown()) broadcast({ ev: 'widget-say', widget: w.id, ws, notify: said }), (s.told = said)
   }
   if (ws) writeInst(w.id, ws, s)
   else writeStore(w.id, s as Store)
@@ -848,7 +848,7 @@ const INSERT_MAX = 16 << 10 // what an action puts in the prompt
 // force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote).
 // ws: a scope workspace one's instance (its workspace's env, its own data)
 // once: the studio's Try it live, the user's click on what will run: one fetch while it's off (an AI-written one too)
-export async function widgetRun(o: { id: string; reason?: string; why?: string; ws?: string; once?: boolean }, force = false, ev?: Ev): Promise<{ ok: boolean; error?: string }> {
+export async function widgetRun(o: { id: string; reason?: string; why?: string; ws?: string; once?: boolean; from?: { ws?: string; tab?: string } }, force = false, ev?: Ev): Promise<{ ok: boolean; error?: string }> {
   const w = find(o.id)
   const x = wsOf(w, o.ws)
   const k = keyOf(w.id, x?.id)
@@ -866,9 +866,9 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
     return streams.get(w.id)?.p ? { ok: true } : { ok: false, error: "a stream runs while Laki's window is open" }
   }
   // an agent's run costs: whatever asks for it (an event, a task, a workflow, a setting, a save), at most every everyOf
-  // minutes; Run now (manual) anyway
-  if (src.kind === 'ai' && reason !== 'manual' && meta.at && Date.now() - meta.at < everyOf(w) * 60_000) {
-    const why = `an agent's source runs at most every ${everyOf(w)} minutes: Run now fetches anyway`
+  // minutes; your Run now (manual) anyway, an agent's laki widget run not
+  if (src.kind === 'ai' && (reason !== 'manual' || agentCaller(o.from)) && meta.at && Date.now() - meta.at < everyOf(w) * 60_000) {
+    const why = `an agent's source runs at most every ${everyOf(w)} minutes: Run now on its page fetches anyway`
     return wLog(w, `not fetched (${reason}): ${why}`), { ok: false, error: why }
   }
   if (meta.mock && reason !== 'manual') return wLog(w, `not fetched (${reason}): showing sample data (${meta.mock})`), { ok: false, error: `showing sample data (${meta.mock}): Live in its inspector fetches again` }
@@ -1082,7 +1082,7 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
 // at a time (the rest at the next ticks)
 export function widgetTick(now = Date.now(), reason: 'schedule' | 'open' | 'select' = 'schedule') {
   streamSync(now)
-  if (![...clients].some(c => c.view?.shown !== false)) return
+  if (!shown()) return
   const hours = hoursOf()
   if (hours && !('error' in hours) && !inHours(hours, now)) {
     for (const w of widgets.values()) if (scoped(w) ? shownIn(w).some(ws => due(w, now, ws)) : due(w, now)) wLog(w, () => `not fetched: outside the working hours (${describeHours(hours)})`)
@@ -1097,9 +1097,10 @@ function refetch(w: Entry, reason: string, why?: string, gate: (w: Entry, ws?: s
   for (const ws of scoped(w) ? shownIn(w) : [undefined]) if (gate(w, ws)) soon({ id: w.id, reason, why, ws })
 }
 const soon = (o: { id: string; reason: string; why?: string; ws?: string }) => void widgetRun(o).catch(e => wLog(o, `not fetched: ${(e as Error).message}`)) // a workspace gone meanwhile
+const shown = () => [...clients].some(c => c.view?.shown !== false) // a window shown (closing one only hides it)
 // the workspaces on screen: each shown window's selected one (its view's ws, else the workspace of its tab)
 // the workspaces a scope workspace one shows in: on screen, or every live one's row (while a window is shown)
-const shownIn = (w: Entry) => (placesOf(w).includes('row') && [...clients].some(c => c.view?.shown !== false) ? state.workspaces.filter(instOk).map(x => x.id) : onScreen())
+const shownIn = (w: Entry) => (placesOf(w).includes('row') && shown() ? state.workspaces.filter(instOk).map(x => x.id) : onScreen())
 function onScreen() {
   const ids = new Set<string>()
   for (const c of clients) {
@@ -1190,7 +1191,7 @@ const STREAM_IDLE = 10 * 60_000
 let shownAt = 0 // the last time a window was shown
 const streaming = (w: Entry) => w.m.stream === true && !scoped(w) && sourceOf(w).kind === 'fetch' && ownFetch(w)
 function streamSync(now = Date.now()) {
-  if ([...clients].some(c => c.view?.shown !== false)) shownAt = now
+  if (shown()) shownAt = now
   const hours = hoursOf()
   const ok = now - shownAt < STREAM_IDLE && (!hours || 'error' in hours || inHours(hours, now))
   for (const [id, st] of streams) {

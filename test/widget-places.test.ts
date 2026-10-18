@@ -33,6 +33,8 @@ test('an action offered where you work: its fields read, checked, a key and a gl
   has('error', 'widget.json place', /row is a mark on each workspace’s row: it needs "scope": "workspace"/)
   assert.ok(!ps.some(p => p.where.startsWith('widget.json actions.b')), 'an AI action takes them too')
   assert.ok(manifestCheck({ name: 'K', actions: { a: { run: 'x', key: 'Cmd+E' } } }).some(p => p.level === 'warn' && /Cmd and Cmd\+Shift alone are Laki's own keys/.test(p.text)), "⌘E is Laki's")
+  assert.ok(manifestCheck({ name: 'K', actions: { a: { run: 'x', key: 'Ctrl+E' } } }).some(p => p.level === 'warn' && /Ctrl alone is a terminal's/.test(p.text)), "⌃E is the terminal's")
+  assert.ok(!manifestCheck({ name: 'K', actions: { a: { run: 'x', key: 'Ctrl+Alt+E' } } }).some(p => p.where.endsWith('.key')), 'with Alt: fine')
 })
 
 test("widgetAction's ctx: the workspace, tab and file it was picked on, checked; its insert; never an agent's", async t => {

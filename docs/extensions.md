@@ -427,7 +427,7 @@ a file's right click, a shortcut, or the new-workspace prompt. A command's or an
 | `title` | its label (unset: its name in words, `explain-file` is *Explain file*) |
 | `show` | where it's offered: `palette` (⌘K, as *<name>: <title>*), `workspace` (a workspace's ⋯ and right click), `tab` (a tab's right click), `file` (a file's right click in Files), `prompt` (the new-workspace prompt's Insert menu) |
 | `match` | with `file`: the files it's for, as globs (`*.ts`, `docs/**/*.md`; one without `/` matches the name); unset: every file |
-| `key` | a shortcut, with Alt or Ctrl (⌘ and ⌘⇧ alone are Laki's): it runs with the workspace and tab you're in |
+| `key` | a shortcut, with Alt (⌘ and ⌘⇧ alone are Laki's, ⌃ alone a terminal's: ⌃C, ⌃E): it runs with the workspace and tab you're in |
 | `ask` | a question first: the answer is its `$WIDGET_ARG` (Cancel: it doesn't run) |
 | `confirm` | a yes or no first |
 | `insert` | what it prints (its JSON's `"insert"`, else all of it) goes into the prompt: the box it was picked in, else the workspace's agent's prompt (typed, not sent), else the clipboard |
