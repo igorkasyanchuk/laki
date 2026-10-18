@@ -4,6 +4,16 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Stop an extension's agent**: an AI extension's run (its data, or a button an agent answers) has a Stop in its
+  page and in Settings › Resources; turning it off or deleting it stops it too. Its last data stays.
+- **Eleven more UI kit elements**: kbd (shortcuts), secret (a key behind dots, copied whole), rating (stars), calendar
+  (a month with its days dotted), people, inbox, chat (bubbles), prs (GitHub style), commits, segmented (pick one,
+  runs an action) and stepper (− and +).
+- **The UI kit's Typography and Colors**: every text style and color as an extension draws it, with its JSON a click
+  away; the tones, the palette and the theme's variables as swatches in this theme.
+- **252 more icons** for extensions: arrows, files, messages, people, media, devices, weather, money, time, places,
+  tools and shapes, grouped in Settings › Extensions › *Icons* (search finds a group too: *weather*).
+- An extension's Examples have *Copy*; its Data's first choice is now called *Own script*.
 - **AI as an extension's data**: an extension's Data can be *AI*: an agent (Settings › Extensions › *Agent profile*,
   claude or codex) finds it with your own MCP servers and sums it up, every hour: Slack's new messages, Linear's
   tickets, anything an MCP server reaches. It's told to change nothing; each run shows in Laki AI's Calls.
@@ -11,7 +21,7 @@ version it builds, with the date. -->
   *Explain this failure*), its answer in a dialog; `notify` posts a notification when an extension's data says
   something new (*3 new mentions*).
 - **New extension**: *With Laki AI*, or *From a starter*: every starter shown on its sample data. The UI kit is first
-  on Settings › Extensions (*Browse 49 elements*). The studio's preview has the Desk view too.
+  on Settings › Extensions (*Browse 60 elements*). The studio's preview has the Desk view too.
 - **Desk**: resizing a tile at the bottom of a scrolled Desk no longer jumps; dragging near the edge scrolls.
 - **Pick an element** (development mode) knows extensions: which one, its view, the UI kit's element, its data and folder.
 - **Ten more UI kit elements**: quote, diff, countdown, steps (a pipeline), meter (one bar in parts), board (cards in

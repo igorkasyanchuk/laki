@@ -832,7 +832,7 @@ sandboxed frame that can't reach the app, nor the network unless you turn on its
 fetch from and show images of https sites; its data otherwise comes from its fetch, which always has the network).
 Most draw with the **UI kit**: widget.json's `ui`, elements as JSON (stats, lists, tables, charts, forms, tabs…) that
 follow the theme and fit any size; Settings › Extensions › *UI kit* shows each with its sample and its JSON to copy
-(`laki widget kit` in a terminal). `laki widget` lists, reloads, fetches and renders them.
+(`laki widget kit` in a terminal), and its *Typography*, *Colors* and *Icons*. `laki widget` lists, reloads, fetches and renders them.
 
 Working on one of your own: `laki widget dev` in its folder links it (it's on, ahead of an installed one of the same
 id, and every save reloads it and fetches it again; a file that doesn't read keeps the last good version running and

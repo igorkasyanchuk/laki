@@ -413,7 +413,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
           )}
           {r.fetch && !ai && (
             <>
-              <b className="small">Its fetch{r.stream ? ' (a stream: runs all along once on)' : ''}</b>
+              <b className="small">Its own script{r.stream ? ' (a stream: runs all along once on)' : ''}</b>
               <pre className="mono">{r.fetch}</pre>
             </>
           )}

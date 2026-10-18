@@ -51,7 +51,7 @@ Each extension's card (Settings › Extensions, its page) has *Data*: pick where
 
 | source | what |
 |---|---|
-| *Its fetch* (`{ "kind": "fetch" }`) | its `fetch` command or `script`, every `every` minutes (the default, when it has one) |
+| *Own script* (`{ "kind": "fetch" }`) | its `fetch` command or `script`, every `every` minutes (the default, when it has one) |
 | *Static* (`{ "kind": "static", "text": "…" }`) | a text you type there (64 KB): JSON is its data, anything else `{ "text" }`; shown at once, never fetched |
 | *File* (`{ "kind": "file", "path": "~/notes/today.md" }`) | a file of this Mac, read every `every` minutes (16 MB); relative: the extension's folder |
 | *URL* (`{ "kind": "url", "url": "https://…" }`) | an http(s) address, read every `every` minutes (30 s, 16 MB): a public JSON API needs no fetch |
@@ -65,7 +65,8 @@ Bash(gh pr list:*)`) and is refused the rest; codex runs in its read-only sandbo
 workspace, like a path. The agent is told to change nothing and to end its answer with the data as a json block in the
 shape of `sample` (no sample: `{ "text" }` in Markdown, for a `markdown` element); its last json block is the data, an
 answer without one `{ "text" }`. Each run is in Laki AI's Calls (Settings › AI) with its cost; `laki widget check` doesn't
-run it.
+run it. A run at work has a Stop on its page (and in Settings › Resources); turning it off, a new source or deleting it
+stops it too, and a stopped run keeps the last data.
 
 A file's or URL's JSON is its data; anything else (Markdown, plain text) is `{ "text": "…" }`, which a `markdown`
 element shows (`{ "type": "markdown", "value": "{{text}}" }`: the *note* starter). A path or URL may name settings and
@@ -235,7 +236,9 @@ The *A tool for agents* starter (`laki widget new Notes --kind tool`) is one: an
 The quickest way to draw one: `widget.json`'s `"ui"`, elements as JSON that follow the app's theme and fit any size
 (1-3 cells across, the ½-high bars: a single line). Every element with its sample, at each size, and its JSON to
 copy: Settings › Extensions › *UI kit*, or `laki widget kit [element] [--json]` in a terminal. Every icon an
-`icon` can name, found by name, a click to copy it: Settings › Extensions › *Icons* (`laki widget kit icons`); any emoji works too.
+`icon` can name (Laki's own and 252 generic ones: arrows, files, messages, people, media, devices, weather, money,
+time, places, tools, shapes), found by name or group, a click to copy it: Settings › Extensions › *Icons* (`laki widget
+kit icons`); any emoji works too.
 
 `ui` is one element (the preview and the full view alike; the full view shows every row) or `{ "preview": …, "full": … }`.
 An element is `{ "type": "<name>", …props }`, and each also takes `if` / `unless` (a path or a template: shown when
@@ -245,14 +248,15 @@ truthy / falsy; an empty list is false), `each` (repeat it per item of a list), 
 | group | elements |
 |---|---|
 | Layout | `stack` (`children`, `gap` sm/md/lg), `row` (`align` start/center/end/between, `wrap`), `grid` (`columns` 1-6, fewer as it narrows), `section` (`title`, `subtitle`, `collapsed`), `tabs` (`tabs: [{ label, badge, children }]`), `header` (`icon`, `title`, `subtitle`, `href`, `actions`), `footer` (`text`, `actions`), `toolbar` (`items`: icon buttons, their words as tooltips; `labels`), `spacer` (pushes the rest of a `row` to its end), `divider` |
-| Text | `text` (`value`, `size` sm-xl, `weight`, `mono`, `muted`, `wrap`, `color`), `heading` (`level` 1-3), `markdown` (headings, lists, tasks, tables, code, links, https pictures), `code` (`copy`), `callout` (`title`, `text`, `icon`, `action`; its `tone`), `icon` (`name`, `size`, `color`), `quote` (`text`, `by`, `href`), `diff` (`value`: a unified diff, colored, its counts; `limit`), `countdown` (`to`, `label`, `soon` hours: warn, `past`) |
-| Data | `stat` (`value`, `label`, `delta`, `spark`, `icon`), `stats`, `kv`, `list`, `table`, `chart` (below), `spark`, `progress` (`style` bar/ring), `gauge` (`value`, `min`, `max`, `unit`), `heatmap` (`x`, `value`, `rows`: days of activity), `status` (`label`, `state`: up, degraded, down… colored by its word), `checklist` (`text`, `done`), `avatars` (GitHub logins), `tags`, `badge`, `timeline`, `image`, `card` (`title`, `text`, `image`, `icon`, `tag`, `href`), `steps` (`label`, `state`: done, running, failed, skipped, todo; `text`), `meter` (one bar in parts: `label`, `value`, `color`, `max`, `unit`, `title`), `board` (cards in columns: `column`, `columns`, `title`, `subtitle`, `tag`, `avatar`, `href`, `limit`), `tree` (nested rows that fold: `label`, `text`, `icon`, `nested`, `open`), `log` (`text`, `time`, `level`, or `value` a whole log; the newest lines, errors red), `json` (`value`: a path, folding; `open` levels) |
-| Actions | `button` (`run` + `arg`, `open`, `do`, `refresh`, `full` or `copy`; `confirm`; `style` primary/quiet/danger), `actions`, `links`, `form` (`fields`, `submit`: the action gets the fields' JSON as `$WIDGET_ARG`), `empty` (`text`, `icon`, `action`), `toggle` (a switch: `label`, `text`, `on`, `run`: its action gets `on` or `off` as `$WIDGET_ARG`, then it fetches again; `confirm`) |
+| Text | `text` (`value`, `size` sm-xl, `weight`, `mono`, `muted`, `wrap`, `color`), `heading` (`level` 1-3), `markdown` (headings, lists, tasks, tables, code, links, https pictures), `code` (`copy`), `callout` (`title`, `text`, `icon`, `action`; its `tone`), `icon` (`name`, `size`, `color`), `quote` (`text`, `by`, `href`), `diff` (`value`: a unified diff, colored, its counts; `limit`), `countdown` (`to`, `label`, `soon` hours: warn, `past`), `kbd` (`keys`: ⌘ K, Ctrl+Shift+P; `label`), `secret` (`value` behind dots, a click shows it; `label`, `copy`) |
+| Data | `stat` (`value`, `label`, `delta`, `spark`, `icon`), `stats`, `kv`, `list`, `table`, `chart` (below), `spark`, `progress` (`style` bar/ring), `gauge` (`value`, `min`, `max`, `unit`), `heatmap` (`x`, `value`, `rows`: days of activity), `status` (`label`, `state`: up, degraded, down… colored by its word), `checklist` (`text`, `done`), `avatars` (GitHub logins), `tags`, `badge`, `timeline`, `image`, `card` (`title`, `text`, `image`, `icon`, `tag`, `href`), `steps` (`label`, `state`: done, running, failed, skipped, todo; `text`), `meter` (one bar in parts: `label`, `value`, `color`, `max`, `unit`, `title`), `board` (cards in columns: `column`, `columns`, `title`, `subtitle`, `tag`, `avatar`, `href`, `limit`), `tree` (nested rows that fold: `label`, `text`, `icon`, `nested`, `open`), `log` (`text`, `time`, `level`, or `value` a whole log; the newest lines, errors red), `json` (`value`: a path, folding; `open` levels), `rating` (`value` stars of `max`, halves; `label`), `calendar` (a month, its days dotted: `date`, `title`, `color`, `href`, `month`, `list`), `people` (`name`, `login`, `text`, `state`: online, away, busy, offline), `inbox` (`from`, `login`, `subject`, `text`, `time`, `unread`), `chat` (bubbles, the newest last: `from`, `text`, `time`, `login`, `mine`), `prs` (`title`, `number`, `author`, `state` open/draft/merged/closed, `checks`, `review`, `time`, `href`), `commits` (`sha`, a click copies it; `message`, `author`, `time`, `href`) |
+| Actions | `button` (`run` + `arg`, `open`, `do`, `refresh`, `full` or `copy`; `confirm`; `style` primary/quiet/danger), `actions`, `links`, `form` (`fields`, `submit`: the action gets the fields' JSON as `$WIDGET_ARG`), `empty` (`text`, `icon`, `action`), `toggle` (a switch: `label`, `text`, `on`, `run`: its action gets `on` or `off` as `$WIDGET_ARG`, then it fetches again; `confirm`), `segmented` (`options`, `value`: the picked one, `run` gets the option clicked; `label`, `confirm`), `stepper` (`value`, `min`, `max`, `step`, `unit`, `run` gets the new number) |
 
 **Colors.** A `color` (text, heading, icon, badge, spark, progress, gauge, heatmap, a header's icon, a stat's and a
 tag's dot) is a tone (`good`, `bad`, `warn`, `accent`, `muted`), one of Laki's palette (`blue`, `green`, `red`,
 `orange`, `yellow`, `purple`, `pink`, `teal`, `lime`, `brown`, `gray`: each theme's own) or a hex (`d73a4a`), or a
-template that gives one (`"{{#if late}}bad{{else}}good{{/if}}"`). The UI kit page's *Colors* example shows them all.
+template that gives one (`"{{#if late}}bad{{else}}good{{/if}}"`). The UI kit page's *Colors* shows each as your theme
+paints it (and the theme's variables a JS page can use), *Typography* every text style with its JSON.
 
 **Charts.** `kind`: `line` (the default), `area`, `bars`, `stacked` (series on each other), `hbars` (a bar per row,
 its label beside it), `pie`, `donut` (its total in the middle) and `scatter` (`x` and `y` numbers). One number per row

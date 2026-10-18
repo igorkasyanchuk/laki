@@ -1792,6 +1792,7 @@ export type WidgetsApi = {
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
   run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
+  stop?: (id: string) => Promise<unknown> // its agents' runs (an AI source's, an AI action's) stopped: WidgetView.agent
   rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, for good (asked first here)
   reload: () => Promise<unknown>
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
@@ -1904,7 +1905,7 @@ function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string
 
 // where an extension's data comes from: its fetch, a text typed in, a file or a URL (each read as it fetches)
 const SOURCES: [WidgetSource['kind'], string, string][] = [
-  ['fetch', 'Its fetch', 'What its own command or script prints'],
+  ['fetch', 'Own script', 'What its own command or script (widget.json’s fetch or script) prints'],
   ['static', 'Static', 'Text you type: JSON, or words (a note)'],
   ['file', 'File', 'A file of this Mac, read each time it fetches: JSON, or words'],
   ['url', 'URL', 'An http(s) address, read each time it fetches: JSON, or words'],

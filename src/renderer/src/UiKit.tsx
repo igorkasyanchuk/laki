@@ -3,11 +3,11 @@
 // a click from the clipboard. Its samples are the AI guide's, the starters' and the tests'. Icons: every icon of Laki's
 // an extension can name (a button's, a list row's, the icon element's), found by name, a click copies it.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ICONS, type IconName } from '../../shared/icons'
+import { ICON_GROUPS, ICONS, type IconName } from '../../shared/icons'
 import { render, uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
 import { Modal } from './panels'
-import { CHARTS, COLORS, DO, TONES, UI_EXAMPLES, uiHtml, UI_SAMPLES, type UiSpec } from '../../shared/widgetUi'
+import { CHARTS, colorCss, COLORS, DO, TONES, UI_EXAMPLES, uiHtml, UI_SAMPLES, type UiElement, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
 import { clean } from './Widgets'
 
@@ -132,8 +132,12 @@ function KitCard({ it, pick, onPick, copy }: { it: Item; pick: string; onPick: (
 }
 
 const NAMES = Object.keys(ICONS) as IconName[]
-// its words for the filter: ciFail is "ci fail"
-const wordsOf = (n: string) => `${n} ${n.replace(/([a-z])([A-Z])/g, '$1 $2')}`.toLowerCase()
+// Laki's own first (the app's), then the generic ones by group
+const GROUPED = new Set(Object.values(ICON_GROUPS).flat())
+const GROUPS: [string, IconName[]][] = [['Laki', NAMES.filter(n => !GROUPED.has(n))], ...Object.entries(ICON_GROUPS).map(([g, l]) => [g, [...l]] as [string, IconName[]])]
+const GROUP_OF = new Map(GROUPS.flatMap(([g, l]) => l.map(n => [n, g] as const)))
+// its words for the filter: ciFail is "ci fail", and its group's (weather finds sun)
+const wordsOf = (n: string) => `${n} ${n.replace(/([a-z])([A-Z])/g, '$1 $2')} ${GROUP_OF.get(n as IconName) ?? ''}`.toLowerCase()
 
 // every icon: a tile each (a click picks it and copies its name), the picked one at each size and as it's used
 function IconGallery({ copy }: { copy: (text: string) => void }) {
@@ -141,6 +145,7 @@ function IconGallery({ copy }: { copy: (text: string) => void }) {
   const [pick, setPick] = useState<IconName>('check')
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const shown = NAMES.filter(n => words.every(w => wordsOf(n).includes(w)))
+  const has = new Set(shown)
   const uses: [string, string][] = [
     ['The icon element', JSON.stringify({ type: 'icon', name: pick, size: 'lg', color: 'accent' })],
     ['A button', JSON.stringify({ type: 'button', label: 'Refresh', icon: pick, refresh: true })],
@@ -150,17 +155,24 @@ function IconGallery({ copy }: { copy: (text: string) => void }) {
   return (
     <div className="kit-icons">
       <div className="kit-icons-head">
-        <input className="kit-find" value={q} onChange={e => setQ(e.target.value)} placeholder={`Find one of ${NAMES.length} icons: check, clock, github…`} spellCheck={false} autoFocus />
+        <input className="kit-find" value={q} onChange={e => setQ(e.target.value)} placeholder={`Find one of ${NAMES.length} icons: check, weather, arrow…`} spellCheck={false} autoFocus />
         <span className="muted small">A click copies its name. Any emoji works too: {'"icon": "🚀"'}.</span>
       </div>
       <div className="kit-icons-body">
-        <div className="kit-icon-grid" role="listbox" aria-label="Icons">
-          {shown.map(n => (
-            <button key={n} type="button" role="option" aria-selected={pick === n} className={`kit-icon${pick === n ? ' on' : ''}`} data-tip={`Copy “${n}”`} onClick={() => pickIt(n)}>
-              <Icon name={n} size={20} />
-              <span className="mono">{n}</span>
-            </button>
-          ))}
+        <div className="kit-icon-groups">
+          {GROUPS.map(([g, list]) => (l => l.length > 0 && (
+            <section key={g}>
+              <h3 className="kit-h">{g} · {l.length}</h3>
+              <div className="kit-icon-grid" role="listbox" aria-label={`${g} icons`}>
+                {l.map(n => (
+                  <button key={n} type="button" role="option" aria-selected={pick === n} className={`kit-icon${pick === n ? ' on' : ''}`} data-tip={`Copy “${n}”`} onClick={() => pickIt(n)}>
+                    <Icon name={n} size={20} />
+                    <span className="mono">{n}</span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          ))(list.filter(n => has.has(n))))}
           {!shown.length && <p className="muted">No icon has “{q}” in its name: an emoji works anywhere an icon does.</p>}
         </div>
         <aside className="ext-card kit-icon-pick">
@@ -200,8 +212,137 @@ function IconGallery({ copy }: { copy: (text: string) => void }) {
   )
 }
 
+// Typography, as Bootstrap's docs show theirs: each text style the kit draws, its JSON beside it (a click copies it)
+const TYPE: { head: string; blurb: string; rows: [string, UiElement, unknown?][] }[] = [
+  { head: 'Headings', blurb: 'heading, level 1 to 3: a title over what follows.', rows: [1, 2, 3].map(l => [`level ${l}`, { type: 'heading', value: 'Production is up', level: l }] as [string, UiElement]) },
+  { head: 'Sizes', blurb: 'text’s size: sm, md (the default), lg, xl. A big number: xl and semibold, or stat.', rows: (['xl', 'lg', 'md', 'sm'] as const).map(z => [`size ${z}`, { type: 'text', value: z === 'xl' ? '12,840 visits' : 'Last deploy 2 hours ago by octocat', size: z, ...(z === 'xl' && { weight: 'semibold' as const }) }] as [string, UiElement]) },
+  { head: 'Weights', blurb: 'text’s weight: normal, medium, semibold, bold.', rows: (['normal', 'medium', 'semibold', 'bold'] as const).map(w => [`weight ${w}`, { type: 'text', value: 'Move billing to the new API', weight: w }] as [string, UiElement]) },
+  {
+    head: 'Styles',
+    blurb: 'mono for code and ids, muted for what matters less, wrap for more than a line; a tone or a color for what it says.',
+    rows: [
+      ['mono', { type: 'text', value: 'feat/search-index', mono: true }],
+      ['muted', { type: 'text', value: 'Updated 3 minutes ago', muted: true }],
+      ['wrap', { type: 'text', value: 'A long line wraps onto more lines instead of being cut with an ellipsis, when wrap is true.', wrap: true }],
+      ['tone', { type: 'row', gap: 'lg', children: TONES.map(t => ({ type: 'text', value: t, tone: t })) }],
+      ['color', { type: 'row', gap: 'lg', wrap: true, children: COLORS.slice(0, 6).map(c => ({ type: 'text', value: c, color: c, weight: 'medium' })) }],
+    ],
+  },
+  {
+    head: 'Inline',
+    blurb: 'Small things in a line: keys, a count, labels, an icon.',
+    rows: [
+      ['kbd', { type: 'kbd', keys: '⌘ ⇧ P', label: 'Every command' }],
+      ['badge', { type: 'row', children: [{ type: 'badge', value: '3' }, { type: 'badge', value: '2 failing', tone: 'bad' }, { type: 'badge', value: 'new', color: 'teal' }] }],
+      ['tags', { type: 'tags', items: [{ tag: 'bug', color: 'd73a4a' }, { tag: 'ready', tone: 'good' }, 'docs'] }],
+      ['icon', { type: 'row', children: [{ type: 'icon', name: 'check', color: 'good' }, { type: 'text', value: 'All checks passed' }] }],
+    ],
+  },
+  {
+    head: 'Blocks',
+    blurb: 'Words that stand on their own: a quote, code, a callout, Markdown.',
+    rows: [
+      ['quote', { type: 'quote', text: 'Make it work, make it right, make it fast.', by: 'Kent Beck' }],
+      ['code', { type: 'code', value: 'gh pr checkout 412\nnpm test', copy: true }],
+      ['callout', { type: 'callout', tone: 'warn', title: 'Staging is slow', text: 'p95 over 2 s since 09:10' }],
+      ['markdown', { type: 'markdown', value: '### Release notes\n\n**Shipped** the new search, *30%* faster.\n\n- [x] Index orders\n- [ ] Index customers\n\n`npm run reindex` · [the PR](https://github.com/acme/web/pull/418)' }],
+    ],
+  },
+]
+function TypeView({ copy }: { copy: (text: string) => void }) {
+  return (
+    <div className="kit-type">
+      {TYPE.map(g => (
+        <section key={g.head} className="kit-type-g">
+          <h3 className="kit-h">{g.head}</h3>
+          <p className="muted small">{g.blurb}</p>
+          <div className="ext-card kit-type-rows">
+            {g.rows.map(([name, spec, data]) => (
+              <div key={name} className="kit-type-row">
+                <span className="mono small muted kit-type-n">{name}</span>
+                <div className="widget kit-type-s">
+                  <KitBody spec={spec} data={data} cells={null} />
+                </div>
+                <button type="button" className="mono small kit-type-j" data-tip="Copy" onClick={() => copy(JSON.stringify(spec))}>
+                  {JSON.stringify(spec)}
+                </button>
+              </div>
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  )
+}
+
+// Colors: the tones, Laki's palette (each theme its own) and the theme's own variables, as this theme paints them; a
+// click copies how an extension names it
+const THEME_VARS: [string, string][] = [
+  ['--bg', 'The background'],
+  ['--panel', 'Panels and cards'],
+  ['--hover', 'A row under the mouse, a box'],
+  ['--line', 'Borders and rules'],
+  ['--fg', 'Text'],
+  ['--muted', 'Quieter text'],
+  ['--accent', 'The accent: links, the picked one'],
+  ['--accent-fg', 'Text on the accent'],
+]
+function Swatch({ name, css, use, note, copy }: { name: string; css: string; use: string; note?: string; copy: (text: string) => void }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  const [hex, setHex] = useState('')
+  useEffect(() => {
+    // as this theme paints it: one pixel of it on a canvas (a theme may give a color() or a color-mix())
+    const c = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+    if (!c) return
+    c.fillStyle = getComputedStyle(ref.current!).backgroundColor
+    c.fillRect(0, 0, 1, 1)
+    setHex(`#${[...c.getImageData(0, 0, 1, 1).data.slice(0, 3)].map(x => x.toString(16).padStart(2, '0')).join('')}`)
+  }) // each render: a theme changed meanwhile paints the same var() anew (the same hex: no render more)
+  return (
+    <button type="button" className="kit-sw" data-tip={`Copy ${use}`} onClick={() => copy(use)}>
+      <span ref={ref} className="kit-sw-c" style={{ background: css }} />
+      <span className="kit-sw-t">
+        <b>{name}</b>
+        <span className="mono small muted">{hex}</span>
+        {note && <span className="small muted">{note}</span>}
+      </span>
+    </button>
+  )
+}
+const IN_USE: UiElement = { type: 'stack', children: [{ type: 'tags', items: [...TONES.map(t => ({ tag: t, tone: t })), ...COLORS.map(c => ({ tag: c, color: c }))] }, { type: 'row', wrap: true, children: COLORS.map(c => ({ type: 'badge', value: c, color: c })) }] }
+function ColorView({ copy }: { copy: (text: string) => void }) {
+  const groups: { head: string; blurb: string; items: { name: string; css: string; use: string; note?: string }[] }[] = [
+    { head: 'Tones', blurb: 'What a thing is. tone on any element (or a map from its words: { "failed": "bad" }), or a color.', items: TONES.map(t => ({ name: t, css: colorCss(t), use: `"tone": "${t}"`, note: { good: 'done, up, passing', bad: 'failed, down', warn: 'waiting, slow', accent: 'the theme’s accent', muted: 'less important' }[t] })) },
+    { head: 'Palette', blurb: 'Laki’s colors, each theme’s own shade: labels, a chart’s series, dots. Any hex works too: "color": "d73a4a".', items: COLORS.map(c => ({ name: c, css: colorCss(c), use: `"color": "${c}"` })) },
+    { head: 'Theme', blurb: 'What an extension sits on: a JS page and a widget.html’s own CSS can use these variables.', items: THEME_VARS.map(([v, note]) => ({ name: v, css: `var(${v})`, use: `var(${v})`, note })) },
+  ]
+  return (
+    <div className="kit-colors">
+      {groups.map(g => (
+        <section key={g.head}>
+          <h3 className="kit-h">{g.head}</h3>
+          <p className="muted small">{g.blurb}</p>
+          <div className="kit-sw-grid">
+            {g.items.map(x => (
+              <Swatch key={x.name} {...x} copy={copy} />
+            ))}
+          </div>
+        </section>
+      ))}
+      <section>
+        <h3 className="kit-h">In use</h3>
+        <div className="ext-card kit-type-rows">
+          <div className="widget kit-type-s">
+            <KitBody spec={IN_USE} data={undefined} cells={null} />
+          </div>
+        </div>
+      </section>
+    </div>
+  )
+}
+
 export function UiKitPage({ back, onClose, copy, icons }: { back: string; onClose: () => void; copy: (text: string) => void; icons?: boolean }) {
-  const [view, setView] = useState<'kit' | 'icons'>(icons ? 'icons' : 'kit')
+  const [view, setView] = useState<'kit' | 'type' | 'colors' | 'icons'>(icons ? 'icons' : 'kit')
   const [q, setQ] = useState('')
   const [size, setSize] = useState<Record<string, string>>({})
   const closeRef = useRef(onClose)
@@ -232,16 +373,16 @@ export function UiKitPage({ back, onClose, copy, icons }: { back: string; onClos
           <span className="muted">›</span>
           <b className="crumb here">UI kit</b>
           <div className="seg kit-view" role="tablist" aria-label="Show">
-            {(['kit', 'icons'] as const).map(v => (
+            {(['kit', 'type', 'colors', 'icons'] as const).map(v => (
               <button key={v} role="tab" aria-selected={view === v} className={view === v ? 'on' : ''} onClick={() => setView(v)}>
-                {v === 'kit' ? 'Elements' : `Icons · ${NAMES.length}`}
+                {{ kit: 'Elements', type: 'Typography', colors: 'Colors', icons: `Icons · ${NAMES.length}` }[v]}
               </button>
             ))}
           </div>
         </nav>
       }
     >
-      {view === 'icons' ? <IconGallery copy={copy} /> : <div className="kit">
+      {view === 'icons' ? <IconGallery copy={copy} /> : view === 'type' ? <TypeView copy={copy} /> : view === 'colors' ? <ColorView copy={copy} /> : <div className="kit">
         <div className="kit-head">
           <p className="muted">
             An extension's UI as JSON elements: widget.json's {m('"ui"')}, one element or {m('{ "preview", "full" }')}. Each element takes {m('if')}, {m('unless')}, {m('each')}, {m('tip')} and {m('tone')} too; its words are templates over the data ({m('{{field}}')}, {m('{{ago at}}')}, {m('{{num n}}')}). {m('laki widget kit')} prints the same.

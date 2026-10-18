@@ -9,7 +9,7 @@ import { fresh, until } from './helpers.ts'
 const at = Date.parse('2026-10-17T10:00:00Z')
 
 test('UI kit: every element has a sample, and every sample draws at a 1×1 preview, a bar and in full', () => {
-  assert.equal(UI_TYPES.length, 49)
+  assert.equal(UI_TYPES.length, 60)
   assert.deepEqual(UI_SAMPLES.map(s => s.type), UI_TYPES, 'a sample per element, in order')
   for (const s of UI_SAMPLES) {
     const ctx = { data: s.data, config: {}, at }
@@ -18,8 +18,55 @@ test('UI kit: every element has a sample, and every sample draws at a 1×1 previ
       assert.match(html, /^<div class="k" data-kit="(preview|full)"/, s.type)
       assert.doesNotMatch(html, /k-chip-err/, `${s.type}: no error chip`)
     }
-    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file', 'maintenance', 'deploys'] }), [], `${s.type}'s sample checks clean`)
+    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file', 'maintenance', 'deploys', 'env', 'scale'] }), [], `${s.type}'s sample checks clean`)
   }
+})
+
+test('UI kit: kbd, secret, rating, calendar, people, inbox, chat, prs, commits, segmented and stepper', () => {
+  const draw = (spec: object, data: object = {}, o: object = { full: true }) => uiHtml(spec, { data, config: {}, at }, o)
+  const count = (html: string, re: RegExp) => [...html.matchAll(re)].length
+  assert.equal(count(draw({ type: 'kbd', keys: '⌘+K' }), /<kbd>/g), 2)
+  assert.equal(count(draw({ type: 'kbd', keys: 'Ctrl + Shift + P' }), /<kbd>/g), 3, 'the + between keys dropped')
+  assert.match(draw({ type: 'kbd', keys: '⌘ +' }), /<kbd>\+<\/kbd>/, 'a + key kept')
+  assert.match(draw({ type: 'kbd', keys: '⌘+' }), /<kbd>⌘<\/kbd><kbd>\+<\/kbd>/, 'zoom in: ⌘ and +')
+  assert.match(draw({ type: 'kbd', keys: 'Ctrl++' }), /<kbd>Ctrl<\/kbd><kbd>\+<\/kbd>/)
+  // a secret: dots, a long one's last 4; its text there once opened, copied whole
+  const sec = draw({ type: 'secret', value: '{{k}}' }, { k: 'sk_live_0123456789abcdef' })
+  assert.match(sec, /••••••••cdef/)
+  assert.match(sec, /data-copy="sk_live_0123456789abcdef"/)
+  assert.doesNotMatch(draw({ type: 'secret', value: 'short' }), /••••••••s/, 'a short one: dots only')
+  assert.match(draw({ type: 'rating', value: '3.5' }), /--f:100%.*--f:100%.*--f:100%.*--f:50%.*--f:0%/)
+  // a calendar: the month asked for, Monday first; a day with rows dotted, their titles its tooltip; the list in full
+  const cal = draw({ type: 'calendar', each: 'ev', month: '2026-02', href: 'https://example.com/{{title}}' }, { ev: [{ date: '2026-02-10', title: 'Freeze' }, { date: '2026-02-10', title: 'Party' }, { date: '2026-03-01', title: 'Later' }] })
+  assert.equal(count(cal, /class="k-cd( today)?( has)?"/g), 28)
+  assert.equal(count(cal, /k-cd out/g), 6, '1 Feb 2026 is a Sunday')
+  assert.match(cal, /class="k-cd has" title="Freeze\nParty" data-open="https:\/\/example.com\/Freeze"><span>10</)
+  assert.match(cal, /k-cal-list.*Freeze.*Party/)
+  assert.doesNotMatch(cal, /Later/, 'another month’s rows: not in the list')
+  // people: a dot by their word, initials without a login
+  const pp = draw({ type: 'people', each: 'p', state: '{{s}}', login: '{{login}}' }, { p: [{ name: 'Ada Byron', s: 'offline' }, { name: 'Hu', login: 'hubot', s: 'busy' }] })
+  assert.match(pp, /k-ini" aria-hidden="true">AB</)
+  assert.match(pp, /k-pp-dot t-muted/)
+  assert.match(pp, /k-pp-dot t-bad/)
+  // a chat: the newest last, the rest behind +N more; yours on the right
+  const chat = draw({ type: 'chat', each: 'm', mine: 'me', limit: 1 }, { m: [{ from: 'A', text: 'one' }, { from: 'B', text: 'two', me: true }] }, { cells: [3, 1] })
+  assert.match(chat, /\+1 more.*k-msg me.*two/)
+  assert.doesNotMatch(chat, /one/)
+  assert.match(draw({ type: 'inbox', each: 'm', unread: 'u' }, { m: [{ from: 'A', subject: 'Hi', u: true }] }), /k-ib on.*k-ib-dot/)
+  // PRs: merged purple, its checks' icon, a review's tag; commits: the short hash, the whole copied
+  const prs = draw({ type: 'prs', each: 'p', checks: '{{ci}}', review: '{{r}}' }, { p: [{ number: 1, title: 'A', state: 'MERGED', ci: 'failing', r: 'CHANGES_REQUESTED', url: 'https://github.com/a/b/pull/1' }] })
+  assert.match(prs, /data-open="https:\/\/github.com\/a\/b\/pull\/1"/)
+  assert.match(prs, /tc-purple.*k-pr-ck t-bad.*k-tag t-bad">changes/)
+  assert.match(draw({ type: 'commits', each: 'c' }, { c: [{ sha: 'a3f9c2e81b4d', message: 'Fix it\n\nlong body' }] }), /data-copy="a3f9c2e81b4d" title="Copy a3f9c2e81b4d">a3f9c2e<\/code><span class="k-cm-m">Fix it</)
+  // segmented: the picked one runs nothing, the others their value; stepper: past max refused, a step's float rounded
+  const seg = draw({ type: 'segmented', options: ['dev', { value: 'prod', label: 'Production' }], value: '{{env}}', run: 'env' }, { env: 'dev' })
+  assert.match(seg, /class="k-seg-o on" aria-pressed="true">dev</)
+  assert.match(seg, /data-run="env" data-arg="prod">Production</)
+  const st = draw({ type: 'stepper', value: '{{n}}', max: 0.3, step: 0.1, run: 'scale' }, { n: 0.2 })
+  assert.match(st, /aria-label="Less" data-run="scale" data-arg="0.1"/)
+  assert.match(st, /aria-label="More" data-run="scale" data-arg="0.3"/)
+  assert.match(draw({ type: 'stepper', value: 3, max: 3, run: 'scale' }), /aria-label="More" disabled/)
+  assert.deepEqual(uiCheck({ type: 'segmented', options: ['a'], run: 'nope' }, undefined, { actions: ['env'] }).map(p => p.level), ['error'])
 })
 
 test('UI kit: diff, log, steps, board, tree, json, meter, countdown, toggle and quote', () => {

@@ -472,7 +472,7 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
 // through aiComplete, or claude -p / codex exec with nothing but the prompt (their preset's account and env, as the
 // chat's); logged among Laki AI's calls. agent: an extension's AI source, that agent with the user's own config (its
 // MCP servers; claude's tools: the ones it may use unasked, its other asks refused; codex's sandbox read-only), 10 minutes
-export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; name?: string }): Promise<string> {
+export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; name?: string; stop?: string; signal?: AbortSignal }): Promise<string> {
   const s = state.settings?.ai ?? {}
   const agent = !!o.preset // an extension's: the preset's model, effort, env and account; the user's own config
   const backend: AiBackend = o.preset?.agent ?? s.backend ?? 'openrouter'
@@ -489,8 +489,8 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)) }
   try {
     const out = await new Promise<string>((ok, no) => {
-      const c = execFile(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: agent ? 600_000 : 300_000 }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`${backend}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed (not on PATH)' : (e as { killed?: boolean }).killed ? 'took too long' : String(se).trim().split('\n').pop() || e.message}`)) : ok(so)))
-      own(c, o.name ?? `Laki AI · ${backend}`, agent ? undefined : 'ai')
+      const c = execFile(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: agent ? 600_000 : 300_000, signal: o.signal }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`${backend}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed (not on PATH)' : o.signal?.aborted ? 'stopped' : (e as { killed?: boolean }).killed ? 'took too long' : String(se).trim().split('\n').pop() || e.message}`)) : ok(so)))
+      own(c, o.name ?? `Laki AI · ${backend}`, agent ? o.stop : 'ai') // an extension's: agent:<id>, its runs (widgets.ts stopAgents)
     })
     let text = ''
     for (const l of backend === 'claude' ? [out] : out.split('\n')) { // claude: one JSON document; codex: a line each

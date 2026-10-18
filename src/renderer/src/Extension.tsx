@@ -339,6 +339,11 @@ function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg
             <Icon name="refresh" size={12} /> {w.running ? 'Fetching…' : 'Run now'}
           </button>
         )}
+        {w.agent && cfg.stop && (
+          <button className="sm" data-tip="Its agent's run ends now: its last data stays" onClick={() => void cfg.stop!(w.id).catch(() => {})}>
+            <Icon name="stop" size={12} /> Stop
+          </button>
+        )}
         <button className="sm" data-tip="Read every extension's folder again" onClick={() => void cfg.reload().catch(() => {})}>
           Reload
         </button>
@@ -513,6 +518,7 @@ export function Inspector({ w, cfg, tab, ...kept }: { w: WidgetView; cfg: Widget
 function Examples({ w, cfg, files, onShown }: { w: WidgetView; cfg: WidgetsApi; files: Record<string, string> | null; onShown: () => void }) {
   const [pick, setPick] = useState<string | null>(null)
   const [err, setErr] = useState('')
+  const [copied, setCopied] = useState(false)
   const all = useMemo(() => {
     const out: { key: string; label: string; text: string }[] = []
     try {
@@ -542,6 +548,9 @@ function Examples({ w, cfg, files, onShown }: { w: WidgetView; cfg: WidgetsApi; 
         <span className="grow" />
         {one && (
           <>
+            <button className="sm" data-tip="Copy this JSON" onClick={() => void navigator.clipboard.writeText(one.text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}>
+              <Icon name={copied ? 'check' : 'copy'} size={12} /> {copied ? 'Copied' : 'Copy'}
+            </button>
             <button className="sm" disabled={!cfg.mock} data-tip="Show it with this (made-up data, not fetched until Live)" onClick={show}>
               Show it with this
             </button>

@@ -1314,6 +1314,7 @@ export function App() {
     agents: (view?.presets ?? []).filter(p => !p.off && (p.agent === 'claude' || p.agent === 'codex')).map(p => ({ name: p.name, agent: p.agent })),
     agent: settings.widgetAgent,
     run: (id, ws) => call('widgetRun', { id, ws }),
+    stop: id => call('resourceStop', { key: `agent:${id}` }),
     rm: id => call('widgetRm', { id }).then(() => done('Deleted')),
     reload: () => call('widgetReload'),
     page: id => setDialog(!id && settings.ai?.on ? { studio: '', back: dialog } : { extension: id, back: dialog }), // a new one: the studio while Laki AI is on

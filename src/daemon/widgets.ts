@@ -51,6 +51,28 @@ const MAX_OUT = 16 << 20
 const widgets = new Map<string, Entry>()
 const running = new Set<string>()
 const again = new Set<string>() // asked to fetch while fetching (settings changed meanwhile): once more, after
+// an agent's runs (an AI source's fetch, an AI action) by extension: stopped by Resources' Stop (agent:<id>), the
+// inspector's, turning it off, a new source, deleting it, its folder gone, shutdown. A stopped fetch fails as stopped,
+// its last data kept
+const agents = new Map<string, Set<AbortController>>()
+async function agentRun<T>(id: string, f: (signal: AbortSignal, stop: string) => Promise<T>): Promise<T> {
+  const c = new AbortController()
+  const l = agents.get(id) ?? new Set()
+  agents.set(id, l.add(c))
+  changed()
+  try {
+    return await f(c.signal, `agent:${id}`)
+  } finally {
+    l.delete(c)
+    if (!l.size && agents.get(id) === l) agents.delete(id)
+    changed()
+  }
+}
+export function stopAgents(id: string) {
+  for (const k of [...again]) if (k === id || k.startsWith(`${id}@`)) again.delete(k) // not once more after it
+  for (const c of agents.get(id) ?? []) c.abort()
+  return { stopped: agents.get(id)?.size ?? 0 }
+}
 let rev = 0 // each reload: the app renders its widgets again
 // what a JS widget's page asks for (GET /widget/<id>?key=…): its data is the user's, so not for any page on this Mac
 export const widgetKey = randomBytes(16).toString('hex')
@@ -324,6 +346,7 @@ export function scanWidgets() {
   for (const [id, was] of before) if (cmdsOf(was) !== cmdsOf(widgets.get(id))) ungrant(id) // its commands changed (a rewrite, an update): asked again
   const runOf = (w?: Entry) => w && JSON.stringify([pathOf(w), w.m.fetch, w.m.script, w.m.stream, w.m.scope])
   for (const id of [...streams.keys()]) if (runOf(before.get(id)) !== runOf(widgets.get(id))) stopStream(id) // its command changed, or it went: started again as it reads now (the others run on)
+  for (const id of [...agents.keys()]) if (!widgets.has(id)) stopAgents(id) // its folder went
   streamSync()
   changed()
 }
@@ -369,6 +392,7 @@ export function widgetsStop() {
   for (const w of watchers.values()) w.close()
   watchers.clear()
   for (const id of [...streams.keys()]) stopStream(id)
+  for (const id of [...agents.keys()]) stopAgents(id)
 }
 
 // a button's words: widget.json's label, badge and tip filled from its data (as a preview is), plain text on a line
@@ -477,6 +501,7 @@ export const widgetsView = (): WidgetView[] =>
     at: w.s.at,
     error: w.s.error,
     running: running.has(w.id) || undefined,
+    agent: agents.has(w.id) || undefined,
     ...(scoped(w) && { scope: 'workspace' as const, inst: instView(w) }),
     ...(toolsOf(w).length && { tools: toolsOf(w).map(([action, t]): WidgetTool => ({ action, description: t.description, ask: t.ask, grants: Object.keys(state.widgetGrants ?? {}).filter(ws => state.widgetGrants![ws].includes(`${w.id}.${action}`)) })) }),
     byAi: w.s.by === 'ai' || undefined,
@@ -601,7 +626,8 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   }
   if (o.on === true && !s.on) s.mock = undefined // turned on: live, not the sample data put there while it was off (the studio's)
   if (o.on !== undefined) s.on = !!o.on
-  if (o.on === false) ungrant(w.id) // off: its tools' Always go
+  if (o.on === false) ungrant(w.id), stopAgents(w.id) // off: its tools' Always go, its agents stop
+  if (o.source !== undefined) stopAgents(w.id) // an answer for the source it had would land over the new one's
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
@@ -817,7 +843,8 @@ async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
   if (src.kind === 'ai') {
     const prompt = at(src.prompt ?? '')
     if (!prompt) throw new Error('no prompt: say what it should find')
-    const out = await aiOnce({ preset: agentOf(src), tools: src.tools, prompt, system: aiSystem(w), ask: `extension ${w.id}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (AI)` })
+    const preset = agentOf(src)
+    const out = await agentRun(w.id, (signal, stop) => aiOnce({ preset, tools: src.tools, prompt, system: aiSystem(w), ask: `extension ${w.id}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (AI)`, stop, signal }))
     return lastJson(out) // ponytail: no block, its words as { text }
   }
   if (src.kind === 'file') {
@@ -865,7 +892,8 @@ async function aiAnswer(w: Entry, action: string, a: { prompt: string; tools?: s
   const prompt = fill(a.prompt, [{ ...(isObj(data) ? data : {}), data, arg, config: typedOf(w), workspace: x ? wsInfo(x) : undefined }]).trim() // its data's fields, never over arg or config
   if (!prompt) throw new Error(`${action}: no prompt`)
   const system = `You answer "${action}", a button of "${w.m.name || w.id}", an extension (a small view) in Laki, the app the user runs coding agents in. Do what the prompt asks with the tools you have (their MCP servers among them); change nothing it doesn't ask you to. No one answers questions: decide yourself. Answer in a few short lines of plain text: the user reads it in a small dialog. Or end with a \`\`\`json block: { "toast": "…" }, { "modal": { "title", "text" } }, or { "data": … } (the extension's new data, in the shape of what it shows now).`
-  return aiOnce({ preset: agentOf(a as WidgetSource), tools: a.tools, prompt, system, ask: `extension ${w.id} · ${action}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (${action})` })
+  const preset = agentOf(a as WidgetSource)
+  return agentRun(w.id, (signal, stop) => aiOnce({ preset, tools: a.tools, prompt, system, ask: `extension ${w.id} · ${action}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (${action})`, stop, signal }))
 }
 // what an AI source's agent is told: find, change nothing, end with the data in the shape its views read (the sample's)
 const aiSystem = (w: Entry) => {
@@ -1467,10 +1495,14 @@ export const widgetChatFile = (chat: string) => {
 
 // Settings › Extensions' Delete (after the app's confirm): its folder and its storage, for good. Not one that comes with
 // Laki (turn it off), nor a folder that holds more than it (your home, Laki's own)
-export function widgetRm(o: { id: string }) {
+export async function widgetRm(o: { id: string }) {
   const w = find(o.id)
   if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: turn it off instead`)
   if (w.dev) throw new Error(`${w.m.name || w.id} is your code, linked by laki widget dev: unlink it instead (laki widget dev --off ${w.id})`)
+  if (agents.has(w.id)) {
+    stopAgents(w.id) // an agent at work: stopped, and its run ends before its files go
+    for (let i = 0; i < 50 && (agents.has(w.id) || fetching(w.id)); i++) await new Promise(r => setTimeout(r, 100))
+  }
   if (fetching(w.id)) throw new Error(`${w.m.name || w.id} is fetching: try again in a moment`)
   const d = resolve(pathOf(w))
   if (!w.file && [homedir(), dir, widgetHome(), '/'].includes(d)) throw new Error(`${d} isn't one extension's own folder`) // a widget.json put in one of those

@@ -138,6 +138,48 @@ test('an AI source: the agent of Settings › Extensions (or its own profile) an
   assert.match(check.out, /not run: an agent makes its data/)
 })
 
+test("an agent's run stops: Resources' Stop, turned off, deleted; a stopped fetch keeps its last data", async t => {
+  const rig = await fresh(t)
+  const dir = join(rig.data, 'widgets', 'slow')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify({ name: 'Slow', source: { kind: 'ai', prompt: 'quick' }, sample: { text: 'x' }, ui: { type: 'text', value: '{{text}}' }, actions: { wait: { ai: 'slow action' } } }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'slow', on: true })
+  await until(async () => /quick/.test(await rig.rpc('widgetRender', { id: 'slow' })), 'its first data')
+  await until(async () => !(await find(rig, 'slow')).running, 'done')
+  const working = (on: boolean) => until(async () => !!(await find(rig, 'slow')).agent === on, on ? 'its agent at work' : 'its agent stopped')
+  const row = async () => (await rig.rpc('resources')).others?.find((o: any) => o.stop === 'agent:slow')
+
+  // Resources' Stop (the inspector's too): the agent ends, the fetch fails as stopped, its data stays
+  await rig.rpc('widgetSet', { id: 'slow', source: { kind: 'ai', prompt: 'slow fetch' } })
+  await working(true)
+  assert.equal((await row())?.name, 'Extension · Slow (AI)', 'a row in Resources with a Stop')
+  await rig.rpc('resourceStop', { key: 'agent:slow' })
+  await working(false)
+  await until(async () => /claude: stopped/.test((await find(rig, 'slow')).error ?? ''), 'failed as stopped')
+  assert.match(await rig.rpc('widgetRender', { id: 'slow' }), /quick/, 'its last data kept')
+  await until(async () => !(await row()), 'its process gone')
+
+  // an AI action: stopped likewise
+  const act = rig.rpc('widgetAction', { id: 'slow', action: 'wait' })
+  await working(true)
+  await rig.rpc('resourceStop', { key: 'agent:slow' })
+  assert.match((await act).error, /stopped/)
+
+  // turned off: stopped; deleted while one runs: stopped first, then gone
+  void rig.rpc('widgetRun', { id: 'slow' })
+  await working(true)
+  await rig.rpc('widgetSet', { id: 'slow', on: false })
+  await working(false)
+  await rig.rpc('widgetSet', { id: 'slow', on: true })
+  await working(true)
+  const t0 = Date.now()
+  assert.deepEqual(await rig.rpc('widgetRm', { id: 'slow' }), { deleted: 'slow' })
+  assert.ok(Date.now() - t0 < 5000, 'not the agent’s ten minutes')
+  assert.equal(await find(rig, 'slow'), undefined)
+  await until(async () => !(await row()), 'its process gone')
+})
+
 test('AI actions answer in a dialog, a toast or new data; notify posts what its data says, once each time it reads anew', async t => {
   const rig = await fresh(t)
   const app = await rig.connect()

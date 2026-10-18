@@ -101,7 +101,7 @@ export const MANIFEST: Record<string, J> = {
     additionalProperties: false,
     required: ['kind'],
     properties: { kind: { enum: ['fetch', 'static', 'file', 'url', 'ai'], description: 'fetch: its own fetch or script; static: the text below; file: a file read each time (JSON, else { "text" }); url: an http(s) page read each time; ai: an agent (claude or codex, with the user’s own MCP servers) answers prompt, its last ```json block the data' }, text: str('With static: JSON, or words (its data: { "text" })'), path: str('With file: its path (~ is home; relative: the extension’s folder; {{config.x}}, {{workspace.path}})'), url: str('With url: the address ({{config.x}} too)'), prompt: str('With ai: what the agent finds and sums up ({{config.x}}, {{workspace.branch}} too); it answers in the shape of sample'), tools: str('With ai, claude: the tools it may use unasked, by name, comma-separated (mcp__slack, WebFetch, Bash(gh pr list:*)); others are refused'), profile: str('With ai: a claude or codex profile of Settings › Agents & profiles (unset: Settings › Extensions’ agent)') },
-    description: 'Where its data comes from at first: the user picks another on its card (Its fetch, Static, File, URL, AI)',
+    description: 'Where its data comes from at first: the user picks another on its card (Own script, Static, File, URL, AI)',
   },
   sample: { description: 'Made-up data in the shape its data takes, for its preview before it runs (needed with a fetch, a script, a file or a URL)' },
   sampleConfig: { type: 'object', description: 'Settings to show the sample with' },

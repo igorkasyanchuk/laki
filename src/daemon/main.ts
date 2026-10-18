@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, widgetRemix, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, stopAgents, widgetRemix, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -255,7 +255,7 @@ const api: Record<string, Handler> = {
   resources: () => core.resources(),
   shareStart: p => core.shareStart(p), // a tab's read-only page, for anyone with its link
   shareStop: p => core.stopShares({ tab: core.resolveTarget(String(p.tab ?? '')).id }),
-  // Resources' Stop for what the daemon runs (resources' others): Laki AI's ask, a tunnel, remote access
+  // Resources' Stop for what the daemon runs (resources' others): Laki AI's ask, a tunnel, remote access, an extension's stream or agent
   resourceStop: p => {
     const k = String(p.key ?? '')
     const t = k.match(/^tunnel:(.+):(\d+)$/)
@@ -263,6 +263,7 @@ const api: Record<string, Handler> = {
     if (k === 'remote') return core.remoteStop()
     if (k === 'share') return core.stopShares()
     if (k.startsWith('stream:')) return widgetStreamStop(k.slice(7))
+    if (k.startsWith('agent:')) return stopAgents(k.slice(6)) // an extension's agent runs
     if (t) return core.tunnelStop({ ws: t[1], port: Number(t[2]) })
     throw new Error(`nothing to stop called ${k}`)
   },
@@ -290,7 +291,7 @@ const api: Record<string, Handler> = {
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetRun: p => widgetRun(p),
-  widgetRm: p => (r => (aiForget(`widget:${p.id}`), r))(widgetRm(p)), // Settings' Delete, after its confirm: never MCP's nor Laki AI's; its studio chat with it, once it's gone
+  widgetRm: async p => (r => (aiForget(`widget:${p.id}`), r))(await widgetRm(p)), // Settings' Delete, after its confirm: never MCP's nor Laki AI's; its studio chat with it, once it's gone
   widgetUndo: p => widgetUndo(p), // the studio's Undo and Undo to here
   widgetRemix: p => widgetRemix(p), // Remix: a copy of any one, yours, Laki AI may change it
   widgetSlug: p => widgetSlug(p), // the studio's first ask: a new one's id

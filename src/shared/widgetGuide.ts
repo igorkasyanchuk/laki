@@ -132,6 +132,7 @@ its links, buttons and filters work. Use widget.html only for a look the kit can
   (none: the default); \`send\`: \`prompt\` to the selected workspace's agent; \`ai\`: \`prompt\` to Laki AI; \`terminal\`:
   \`command\` in a new terminal; \`browse\`: \`url\` in a Laki browser tab). A JS page: \`laki.do({ do, prompt… })\`.
   A \`toggle\` is a switch: its \`run\` gets \`on\` or \`off\` (what it's turned to) as \`$WIDGET_ARG\`, its \`on\` reads the state back.
+  A \`segmented\` runs its \`run\` with the option picked (\`value\` reads it back); a \`stepper\` with the new number (\`min\`, \`max\`, \`step\`).
 - **Layouts**: a \`header\` (icon, title, buttons), the body, a \`footer\` (muted words, buttons) in a \`stack\`; a
   \`toolbar\` of icon buttons; a \`spacer\` pushes what follows it in a \`row\` to the end.
 

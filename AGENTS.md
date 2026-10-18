@@ -99,7 +99,7 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
 a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`); 77: the studio (`widgetSlug`, `widgetUndo`, `widgetRemix`, `widgetRun` `once`, a widget's `history`, the `widget:<id>` chat); 78: a widget's `source` and `ownFetch`, `widgetSet`
 `source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts; 79: `widgetFileSave`, `widgetRender`
-`sample` as a fixture's name, a widget's `fixtures`; 80: an AI source (`widgetSet` `source` `ai`), settings' `widgetAgent`. A
+`sample` as a fixture's name, a widget's `fixtures`; 80: an AI source (`widgetSet` `source` `ai`), settings' `widgetAgent`; 81: a widget's `agent`, `resourceStop` `agent:<id>`, `widgetRm` waits. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -234,8 +234,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `laki-stop` event (the video closed, a widget unloaded until a click, the preview unloaded until
   *Load it again*); `daemon` with its heap; `tabs`, each live session's process
   tree, the program first; RSS in KB; `others`: what else the daemon runs, each child with what's under it, named by `own`
-  (Laki AI's agent, a tunnel, remote access, an SSH host's master, a widget's fetch; the rest, short git/gh/lsof, in `app` by name), `resourceStop`
-  (main.ts: `ai`, `remote`, `tunnel:<ws>:<port>`) for a row's Stop); `tabSleep` (now: `cantSleep`'s rules: claude or codex with a `resumeId`, idle, no queue or limit, not on a host),
+  (Laki AI's agent, a tunnel, remote access, an SSH host's master, a widget's fetch, an extension's agent; the rest, short git/gh/lsof, in `app` by name), `resourceStop`
+  (main.ts: `ai`, `remote`, `share`, `tunnel:<ws>:<port>`, `stream:<id>`, `agent:<id>`) for a row's Stop); `tabSleep` (now: `cantSleep`'s rules: claude or codex with a `resumeId`, idle, no queue or limit, not on a host),
   `tabWake`, `sleepTick` (`now`: tests move the clock; every 60 s);
 - development mode (`settings.devMode`): `logs` (`key`: `ws:<id>` or `widget:<id>`): `core.ts` `devLog`'s lines, the
   last 500 per key in memory, a line among the last 6 again counted (`n`) and moved to the end, all let go when dev mode
@@ -1014,8 +1014,12 @@ fields as JSON), `data-copy`, links, `data-open`, `data-laki`, `data-filter`, el
 `Widgets.tsx` `act` asks a confirm (`ask`) and copies through the app. A JS page's `laki.ui(spec, data)` /
 `laki.mount(el, …)` post `{ laki: 'ui', req }`, answered with `uiHtml` before the click checks (it only computes HTML).
 `UiKit.tsx` `UiKitPage` (App's dialog `{ uikit, icons, back }`, Settings › Extensions › *UI kit* and *Icons*): a card per sample at 1×1,
-3×1, 3×2 or full and as a status bar item, its JSON to copy; *Icons* (`IconGallery`): every `ICONS` name, a filter
-(`wordsOf`: ciFail is "ci fail"), a click picks it and copies its name, the picked one at four sizes, in each tone, and
+3×1, 3×2 or full and as a status bar item, its JSON to copy; *Typography* (`TypeView`, `TYPE`: headings, sizes, weights,
+styles, inline, blocks, each drawn by the kit beside its JSON, a click copies it) and *Colors* (`ColorView`: the tones,
+the palette and `THEME_VARS` as `Swatch`es, each as this theme paints it, read off a canvas pixel; a click copies how an
+extension names it; *In use*); *Icons* (`IconGallery`): every `ICONS` name in `GROUPS` (Laki's own, the app's, then
+`icons.ts` `ICON_GROUPS`: 252 generic ones for extensions, drawn on the same 16 grid), a filter (`wordsOf`: ciFail is
+"ci fail", a group's name too), a click picks it and copies its name, the picked one at four sizes, in each tone, and
 as JSON (the icon element, a button, the rail); the CLI's `laki widget kit icons`. Tested in `test/widget-ui.test.ts`.
 
 Dev mode (`laki widget dev`, the CLI's `dev`: `widgetDev` `folder`, then `widgetRuns` every 500 ms, a line per new run
@@ -1126,7 +1130,12 @@ preset's model, effort, env and account with the user's own config (claude `-p -
 <tools>`, no `--tools ''`; codex `exec` without `--ignore-user-config`, read-only), 10 minutes, its own `own` row, a line
 in `ai-calls.jsonl` (`extension <id>: …`); `aiSystem` tells it to change nothing and answer in `sample`'s shape; the last
 ```json block is the data (none: `{ text }`). `everyOf`: `AI_SOURCE_EVERY` (60) unless set, 15 at least; `widgetCheck`
-doesn't run one. The studio's Try/Turn on sheet shows its prompt and tools instead of the fetch.
+doesn't run one. The studio's Try/Turn on sheet shows its prompt and tools instead of the fetch. Its runs and an AI
+action's go through `agentRun` (`agents`: an `AbortController` per run by extension, `aiOnce`'s `signal`, `execFile`'s, and
+`stop` `agent:<id>`, its Resources row's Stop: main.ts `resourceStop` → `stopAgents`, which also drops its `again`); the
+view's `agent` (the inspector's *Stop*, `WidgetsApi.stop`); `widgetSet` `on: false` and a new `source` stop them,
+`widgetRm` stops them and waits (5 s) before its files go, `scanWidgets` when it went, `widgetsStop` at shutdown. A
+stopped fetch fails as `claude: stopped`, its last data kept.
 An AI action (`widgetSchema.ts` `aiActOf`: `{ ai, tools, profile }`, no `run`): `widgetAction`'s `aiAnswer` fills the
 prompt over `{ arg, config, data, …data, workspace }`, `aiOnce` as a source's, `lastJson` for its JSON (`toast`, `modal`,
 `data` as a command's), else its words as a `modal`; no `soon` after it; never an event's handler (`ev`: refused, and
@@ -1162,7 +1171,13 @@ render), steps (`STEP` words to done, now, fail, skip, todo; vertical in a narro
 sum, `legendOf`), board (columns by `column`, `columns` first even empty; `cap` per column), tree (`nested`, `open`
 levels, a node's own fields only), log (the newest `cap` lines, `levelTone` by its word or the line's, `clock`), json
 (`jsonHtml`: folding, 3000 nodes, one line in a bar) and toggle (`role="switch"`, `data-run` with `data-arg` on/off;
-`uiCheck` checks its run). `UI_EXAMPLES`: the UI kit
+`uiCheck` checks its run). Then kbd (`keysOf`: by spaces, else `+`), secret (dots in a `<details>`, a long one's last 4,
+copied whole), rating (stars as `--f` fills), calendar (a month, Monday first, `dayOf` in this Mac's zone; a preview the
+weeks that fit from today's; a bar's line the next one; `list` in full), people (`face`: a login's picture, else
+`initialsOf`; `PRESENCE` dots), inbox (`unread`), chat (the newest last, `mine` on the right), prs (`PR_STATE`, `CHECKS`,
+a review's tag), commits (the hash's `data-copy`), segmented (each option `data-run` with its value, the picked one none)
+and stepper (− and + `data-run` with the new number, `round6`, past `min`/`max` disabled); `rowsOf` is their rows' cap,
++N more and empty. `UI_EXAMPLES`: the UI kit
 page's Examples (`UiKit.tsx` `KitCard`), the guide's examples (`widgetGuide.ts` `examples`); `UI_SAMPLES` stays one
 per element. The app's CSP takes `img-src https:` (the kit's images, Markdown's pictures). The guide tool's `max`:
 40,000. Starters `note` (a static source) and `launcher` (`do` buttons).
