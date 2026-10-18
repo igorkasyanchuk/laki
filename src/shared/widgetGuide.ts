@@ -54,7 +54,8 @@ export const widgetFormat = () => `## widget.json
 - \`place\`: one or a list: \`side\` (the sidebar's grid, the default), \`top\` or \`status\` (a bar: a line high, design it
   ½ high), \`rail\` or \`foot\` (a button, below), \`desk\` (a Desk tile, its full view when it has one).
 - \`config\`: the settings the user fills in: a default (text, \`true\`/\`false\`, a number) or \`{ "type": text | number |
-  bool | choice | list, "label", "hint", "default", "choices" }\`. Never hard-code a repo, login or token: make it a setting.
+  bool | choice | list | secret, "label", "hint", "default", "choices" }\`. Never hard-code a repo, login or token: make it a
+  setting; a token, key or password is \`"type": "secret"\` (only its fetch and actions get it; its ui and page see it empty).
 - \`fetch\`: a shell command (\`/bin/sh -c\` in the widget's folder: \`sh fetch.sh\`, \`python3 fetch.py\`), or \`script\`: a
   JS file Laki's node runs, \`export default async ({ config, last }) => data\` (\`last\`: the previous data). What it prints
   must be JSON: its data. To fail, exit non-zero with a line on stderr ("Set Repo in Settings › Extensions"): the last

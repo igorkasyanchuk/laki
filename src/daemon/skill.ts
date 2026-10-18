@@ -7,6 +7,7 @@ import { join } from 'node:path'
 import { USAGE } from '../shared/usage.ts'
 import { cliArgv, cliEnv, dir, q, STORAGE_NOTE } from './core.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
+import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 import { BUILTIN } from './widgets.ts'
 
 // home: the agent's folder in ~ (its skills/ is where it looks); add: its `mcp add` for the user's scope, before the
@@ -235,13 +236,17 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget reload               # read the folders again (after any change) and fetch
     laki widget run <id>             # fetch now: "fetched" or the error
     laki widget render <id> [--full] # the HTML it shows now
-    laki widget action <id> <action> [arg] # a button's action: what the app would show (it really runs)
+    laki widget action <id> <action> [arg] # a button's action: what the app would show (it really runs; from an agent, the user is asked first)
     laki widget ls                   # each one: on or off, size, schedule, last error
     laki widget kit [element]        # the UI kit's elements, or one's props and a sample
     laki widget check <id> --no-run  # what's wrong with it: fix every ✗ before you answer (after every change)
-    laki widget new <name> --kind <k> # a starter to begin from: number, list, table, chart, button, form, panel, workspace (per workspace), stream, tool (a tool for agents), onefile
+    laki widget new <name> --kind <k> # a starter to begin from: ${STARTER_KINDS.join(', ')}
     laki widget push <id> '<json>'   # its data from outside (a hook, a cron job): no fetch; --merge over it, --ws <id> per workspace
     laki widget tools                # its actions that are tools for agents; laki widget tool <id> <action> '<json>' calls one
+
+An agent uses an extension's tools: \`laki widget tools\`, then \`laki widget tool\` (the user approves as the tool says).
+\`laki widget action\` from an agent asks the user each time; \`laki widget on\` from an agent is refused (only the user
+turns an extension on), and \`laki widget dev\` from one links the folder but leaves its extensions off.
 
 For the user working on an extension of their own (in their code, not Laki's folder): \`laki widget dev\` in its
 folder links it (on, first, reloaded on each save, the last good version kept over a broken file) and prints each run;

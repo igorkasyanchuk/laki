@@ -103,7 +103,8 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 `workflow`/`source`, workflows' `decide` and `popup` blocks (the `flow` event's `show`), case branches with numbers and JS; 64:
 a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`); 77: the studio (`widgetSlug`, `widgetUndo`, `widgetRemix`, `widgetRun` `once`, a widget's `history`, the `widget:<id>` chat); 78: a widget's `source` and `ownFetch`, `widgetSet`
 `source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts; 79: `widgetFileSave`, `widgetRender`
-`sample` as a fixture's name, a widget's `fixtures`; 80: an AI source (`widgetSet` `source` `ai`), settings' `widgetAgent`; 81: a widget's `agent`, `resourceStop` `agent:<id>`, `widgetRm` waits; 82: a widget's `hide` (`refresh`, `at`), `widgetSet` `hide`; 83: schedules' `widget`/`action`, workflows' `extension` block, a widget's `actions`. A
+`sample` as a fixture's name, a widget's `fixtures`; 80: an AI source (`widgetSet` `source` `ai`), settings' `widgetAgent`; 81: a widget's `agent`, `resourceStop` `agent:<id>`, `widgetRm` waits; 82: a widget's `hide` (`refresh`, `at`), `widgetSet` `hide`; 83: schedules' `widget`/`action`, workflows' `extension` block, a widget's `actions`; 84: a `secret` setting (the view's
+`config` '' and its option's `set`), `widgetRm` to the trash, `widgetRestore`/`widgetTrash`, `from` on `widgetAction`/`widgetSet`/`widgetDev`/`widgetCheck` (an agent's: asked, refused, left off). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -216,8 +217,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   view; `sample`: filled with widget.json's `sample` and `sampleConfig` over its settings, `at` two minutes ago,
   `sample: true`), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes;
   `ai`: the Extension page's chat sets it before each ask, one of the user's in `widgetHome()` (else refused) gets the
-  store's `aiMay` (an hour), which lets `widgetWrite` rewrite it), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on), `widgetRm` (Settings' trash can, after `ask`: the folder, `rmSync` (a link: only it), and its
-  store; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; saved off with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
+  store's `aiMay` (an hour), which lets `widgetWrite` rewrite it), `widgetRun` (fetch now; it and `widgetAction` refuse an off one: one Laki AI wrote runs nothing, a preview's clicks and scripts neither, until it's turned on), `widgetRm` (Settings' trash can, no `ask`: App's toast with Undo, `widgetRestore`; the folder (a link: only it, `readlinkSync` kept), its
+  store, instances, history, chat and secrets moved to `<data>/widget-trash/<id>-<ms>/` (`move`: rename, `cpSync` on EXDEV; `trash.json`: id, name, from, link, file, at), its grants gone; never a built-in, nor your home, the data dir or `widgetHome()` itself; not MCP's nor Laki AI's), `widgetRestore` (`trash`: back where it was, a link made again; refused when its id or its path is taken), `widgetTrash` (newest first; `widgetTrashTidy` at start and hourly: past `TRASH_DAYS` 30 or `TRASH_MAX` 20; the CLI's `laki widget trash|restore`), `widgetAction` (`action`, `arg`), `widgetReload`, `widgetFiles` (a widget's own files as text, 20 at most) and `widgetWrite` (`id`, `files`: Laki AI's and MCP's `laki_extension_write`; only `<data>/widgets/<id>`, never another root's id, the user's own there (no `by: 'ai'` nor `aiMay`) nor through a link, files left out kept; saved off with the store's `by: 'ai'` (a user's own keeps `aiMay` for its hour), the view's `byAi`, Settings' *by Laki AI* tag: its fetch is a model's shell command, so the user turns it on), `widgetTick` (`now`: tests move the
   clock; one asked for while it fetches runs once more after: `again`); `widgetNew` (`kind`, `name`, `dir`: a starter, on),
   `widgetCheck` (`id` or `dir`, `run`: its fetch once; below); `openIn` `widget` (its folder); `GET /widget/<id>?key=…`: a JS widget's page;
 - the agent skill (Settings): `skills` (each with `skill`, laki or laki-widget, and `mcp`: the agent's `mcp add` command, shown, never run; for
@@ -1040,7 +1041,7 @@ store), linking turns its widgets on and fetches them (`dev`, why `linked`). `wa
 view's; Settings' *dev* tag, the tooltip, the page's banner). `widgetsStop` at shutdown. `devKeep` (core.ts): `devLog`
 keys kept without dev mode (a dev widget's). Runs: `ran` per fetch and action (`RUNS`, 20, newest first, in memory:
 `WidgetRun`, reason `RUN_REASONS` or `action:<name>`, `why`, stderr's `tail`), `exec` keeps stderr and the exit code;
-`$LAKI_REFRESH_REASON` (`envOf`: one env for exec and `widgetRuns`' `env`, `SECRET` setting names masked, in
+`$LAKI_REFRESH_REASON` (`envOf`: one env for exec and `widgetRuns`' `env`, a secret and `SECRET` setting names masked, in
 `LAKI_WIDGET_CONFIG` too); `widgetTick`'s reason `schedule`, the first client's `open`. `widgetMock` (`data`, a
 `fixture`: `fixturesOf`, `fixtures/*.json`, or `off`: fetched now): the store's `mock` (the view's; Widgets.tsx'
 `.widget-mock` chip), `fetchable` false meanwhile and `widgetRun` skips all but `manual`, whose data clears it; a
@@ -1201,7 +1202,12 @@ action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPE
 first, a scope workspace one takes the caller's; `first` without a grant (`state.widgetGrants[ws]`, `<id>.<action>`; '':
 no workspace) or `always` broadcasts `toolAsk` (`req`, the command, input, ws, tab, agent; refused with no client) and
 waits `LAKI_TOOL_WAIT` (2 min) for `widgetToolAnswer` (`once`, `always`, `deny`; the first counts), then `toolDone`;
-`always` keeps the grant. It runs as `widgetAction` would (`$WIDGET_INPUT_<NAME>`, the input as JSON on stdin, a run
+`always` keeps the grant (`grantKey`: `<id>.<action>#<hash>`, sha256 of its command and the extension's own files, so an edit, one made while
+Laki was closed too, asks again; the view's from a size-and-time cache, a call's read fresh; grants without `#` dropped at `load`).
+`approve` (the ask) is shared with `widgetAction`'s `from`: core's `agentCaller` (`from.tab` an agent tab, or a shell tab in
+`shellAgents`; `laki new`'s `byCaller` too) makes a tool's action a `widgetToolCall` (its arg as JSON input) and any other
+ask each time (`ask: 'always'`: no Always); `widgetSet` `on: true` from one is refused, `widgetDev` from one links but leaves
+them off, `widgetCheck` from one runs no off one. ponytail: the same user can read daemon.json's token. It runs as `widgetAction` would (`$WIDGET_INPUT_<NAME>`, the input as JSON on stdin, a run
 `tool:<action>` with who and how), its stdout back (`TOOL_OUT`, 16 KB). Grants go with the extension off, its commands
 changed (`cmdsOf` at scan) or a workspace gone; `widgetGrantRm` is Settings' Revoke. App's `toolAsk`: `choose` (Allow
 once, *Always in <ws>* for first, Deny; Esc and a newer dialog: deny) and a notification with the same actions
@@ -1228,8 +1234,8 @@ the actions' commands, a JS page's `net`): `widgetRun` `once` (an off one, Laki 
 puts it back, drops it and newer, off; `gone` when it was the first. A user's own written in its `aiMay` hour keeps
 `aiMay` (a write, a check, a fix). `widgetRemix` (`newId`, else `<id>-copy`, `freeId`): the folder copied (a linked one's
 target, `realpathSync`; no `.git`, `node_modules`; not a one-file one), its name `(copy)`, the store `{ on: false, aiMay }`:
-yours. `widgetRm` (refused while it or an instance fetches; main.ts' `aiForget` once it's gone) deletes the history and
-the chat. Tested in `test/widget-studio.test.ts`.
+yours (no secrets: they're by id). `widgetRm` (refused while it or an instance fetches; main.ts' `aiForget` once it's gone) moves the history and
+the chat to the trash with it. Tested in `test/widget-studio.test.ts`.
 
 ### Notifications
 

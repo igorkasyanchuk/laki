@@ -179,7 +179,7 @@ test("an agent's run stops: Resources' Stop, turned off, deleted; a stopped fetc
   await rig.rpc('widgetSet', { id: 'slow', on: true })
   await working(true)
   const t0 = Date.now()
-  assert.deepEqual(await rig.rpc('widgetRm', { id: 'slow' }), { deleted: 'slow' })
+  assert.equal((await rig.rpc('widgetRm', { id: 'slow' })).deleted, 'slow')
   assert.ok(Date.now() - t0 < 5000, 'not the agent’s ten minutes')
   assert.equal(await find(rig, 'slow'), undefined)
   await until(async () => !(await row()), 'its process gone')

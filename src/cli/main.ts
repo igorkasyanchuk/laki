@@ -53,6 +53,8 @@ async function hook(state: string, extra?: string) {
 
 // laki widget dev [folder]: your extension's folder (this one by default) linked, on and watched; then its fetches and
 // actions as they run, a line each, until Ctrl-C (the link stays). --off <id|folder> unlinks, --list lists them
+// who runs this (the daemon's agentCaller tells an agent's tab from yours): laki widget's action, on, dev, run and check
+const caller = () => ({ ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB })
 async function dev(folder?: string) {
   type Link = { folder: string; widgets: { id: string; name: string; on: boolean; devError?: string }[] }
   if (flags.list) {
@@ -61,8 +63,9 @@ async function dev(folder?: string) {
   }
   if (typeof flags.off === 'string') return out(await rpc('widgetDev', { off: flags.off }), `unlinked ${flags.off}`)
   const t0 = Date.now()
-  const r = (await rpc('widgetDev', { folder: resolve(folder ?? '.') })) as { folder: string; widgets: { id: string; name: string; devError?: string }[]; broken: string[] }
+  const r = (await rpc('widgetDev', { folder: resolve(folder ?? '.'), from: caller() })) as { folder: string; widgets: { id: string; name: string; devError?: string }[]; broken: string[]; note?: string }
   if (json) return out(r)
+  if (r.note) console.log(r.note)
   for (const b of r.broken) console.log(`✗ ${b}`)
   for (const w of r.widgets) if (w.devError) console.log(`✗ ${w.id}: ${w.devError}`)
   console.log(`Watching ${r.folder} · open Settings › Extensions › ${r.widgets.map(w => w.name).join(', ') || '…'} › Inspect`)
@@ -220,7 +223,6 @@ async function main() {
       // .: the project of the workspace this tab is in (an agent's /laki:new)
       const v = process.env.LAKI_WORKSPACE ? ((await rpc('state')) as View) : undefined
       const here = rest[0] === '.' && v?.workspaces.find(w => w.id === process.env.LAKI_WORKSPACE)?.project
-      const tab = v?.tabs.find(t => t.id === process.env.LAKI_TAB)
       if (rest[0] === '.' && !here) throw new Error("laki new .: only in a Laki tab ($LAKI_WORKSPACE): name the project")
       const o = {
         project: here || rest[0],
@@ -235,7 +237,7 @@ async function main() {
         issue: flags.issue || undefined,
         pr: flags.pr || undefined,
         link: flags.link || undefined, // the PR it's about (a review), not checked out: its primary
-        from: tab && (tab.kind === 'agent' || tab.runs) ? tab.workspace : undefined, // an agent's (its tab, or typed in a shell): the prompt's PRs are only related; yours in a shell aren't
+        caller: { ws: process.env.LAKI_WORKSPACE, tab: process.env.LAKI_TAB }, // an agent's (its tab, or typed in a shell: the daemon's agentCaller): the prompt's PRs are only related; yours in a shell aren't
       }
       const line = (ws: Workspace) => `${ws.id}  ${ws.path}  (${ws.branch ? `branch ${ws.branch}` : 'folder'}, PORT ${ws.port})`
       // a race: the same prompt to each preset, a worktree each
@@ -433,13 +435,13 @@ async function main() {
       }
       if (sub === 'check') {
         const at = id === undefined ? resolve('.') : existsSync(id) ? resolve(id) : undefined
-        const r: { id?: string; problems: UiProblem[] } = await rpc('widgetCheck', { ...(at ? { dir: at } : { id }), run: !flags['no-run'], ws }, 130000)
+        const r: { id?: string; problems: UiProblem[] } = await rpc('widgetCheck', { ...(at ? { dir: at } : { id }), run: !flags['no-run'], ws, from: caller() }, 130000)
         const bad = r.problems.some(p => p.level === 'error')
         out(r, r.problems.map(p => `${{ ok: '✓', warn: '!', error: '✗' }[p.level]} ${p.where}: ${p.text}`).join('\n') || 'nothing to check')
         if (bad) process.exitCode = 1
         return
       }
-      if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on' }), `${id} ${sub}`)
+      if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on', from: caller() }), `${id} ${sub}`)
       if (sub === 'tools') {
         // what agents may call: each extension's actions with a tool, and its AGENTS.md
         type T = { tool: string; name: string; description: string; ask: string; scope?: string; agents?: string; input: { properties: Record<string, { type: string; enum?: unknown[]; description?: string }>; required: string[] } }
@@ -478,18 +480,27 @@ async function main() {
         return out(await rpc('widgetPush', { id, data, ws, merge: !!flags.merge }), `pushed to ${id}${ws ? ` (${ws})` : ''}`)
       }
       if (sub === 'run') {
-        const r = await rpc('widgetRun', { id, ws }, 130000)
+        const r = await rpc('widgetRun', { id, ws, from: caller() }, 130000)
         return out(r, r.ok ? 'fetched' : `✗ ${r.error}`)
       }
       if (sub === 'render') {
         const html: string | null = await rpc('widgetRender', { id, full: !!flags.full, ws })
         return out(html, html ?? `${id} has no ${flags.full ? 'full' : 'preview'} view`)
       }
+      if (sub === 'trash') {
+        const list: { trash: string; id: string; name: string; from: string; at: number }[] = await rpc('widgetTrash')
+        return out(list, list.map(x => `${x.trash}  ${x.name}  ${new Date(x.at).toLocaleString()}  ${x.from}`).join('\n') || 'the trash is empty')
+      }
+      if (sub === 'restore') {
+        if (!id) throw new Error('usage: laki widget restore <trash-id> (laki widget trash lists them)')
+        const w: WidgetView = await rpc('widgetRestore', { trash: id })
+        return out(w, `restored ${w.id}${w.dir ? ` in ${w.dir}` : ''}${w.on ? ', on' : ''}`)
+      }
       if (sub === 'action') {
-        const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws }, 130000)
+        const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws, from: caller() }, 300000) // an agent's: you may be asked first
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json]')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | trash | restore <trash-id>')
     }
     case 'ai': {
       const [sub] = rest

@@ -1315,7 +1315,7 @@ export function App() {
     agent: settings.widgetAgent,
     run: (id, ws) => call('widgetRun', { id, ws }),
     stop: id => call('resourceStop', { key: `agent:${id}` }),
-    rm: id => call('widgetRm', { id }).then(() => done('Deleted')),
+    rm: id => call<{ trash: string }>('widgetRm', { id }).then(r => r && done(`Deleted ${view?.widgets?.find(w => w.id === id)?.name ?? id}`, () => void call('widgetRestore', { trash: r.trash }))), // the trash: Undo puts it back
     reload: () => call('widgetReload'),
     page: id => setDialog(!id && settings.ai?.on ? { studio: '', back: dialog } : { extension: id, back: dialog }), // a new one: the studio while Laki AI is on
     ...(settings.ai?.on && {

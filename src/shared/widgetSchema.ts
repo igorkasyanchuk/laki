@@ -10,7 +10,9 @@ export const WIDGET_SCHEMA_URL = `${REPO.replace('https://github.com/', 'https:/
 export const SIZES_ACROSS = [1, 2, 3]
 export const SIZES_DOWN = [0.5, 1, 2, 3, 4]
 export const VIEWS = ['s', 'm', 'l']
-export const SPEC_TYPES = ['text', 'number', 'bool', 'choice', 'list']
+export const SPEC_TYPES = ['text', 'number', 'bool', 'choice', 'list', 'secret']
+// a setting's name that says it holds a key: the inspector's Env masks it, check says make it a secret
+export const SECRET = /token|secret|key|password/i
 
 type J = Record<string, unknown> // a schema
 const str = (description: string, more: J = {}): J => ({ type: 'string', description, ...more })
@@ -23,7 +25,7 @@ const SPEC: J = {
       type: 'object',
       additionalProperties: false,
       properties: {
-        type: { enum: SPEC_TYPES, description: 'text, number, bool (a switch), choice (one of choices) or list (chips)' },
+        type: { enum: SPEC_TYPES, description: 'text, number, bool (a switch), choice (one of choices), list (chips) or secret (a token: kept out of the app, given only to its fetch and actions)' },
         label: str('Its name in Settings'),
         hint: str('A line under it'),
         default: { description: 'Its value until set' },
@@ -273,7 +275,13 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     for (const [e, h] of Object.entries((on ?? {}) as Record<string, unknown>)) {
       const where = `widget.json on.${e}`
       if (!(WIDGET_EVENTS as readonly string[]).includes(e)) say('error', where, `no event ${e}${(n => (n ? ` (did you mean ${n}?)` : `: ${WIDGET_EVENTS.join(', ')}`))(near(e, WIDGET_EVENTS))}`)
-      if (h === 'refresh') !(m.fetch || m.script) && say('error', where, 'refresh: it has no fetch or script')
+      const src = String((m.source as { kind?: unknown } | undefined)?.kind ?? '')
+      if (h === 'refresh') {
+        // a fetch, a script, or a file or URL source: something to read again
+        if (src === 'ai') say('error', where, "refresh: an agent makes its data: those run on a schedule or a click, not on an event (each run costs)")
+        else if (src === 'static') say('error', where, 'refresh: a static text has nothing to fetch')
+        else if (!(m.fetch || m.script || src === 'file' || src === 'url')) say('error', where, 'refresh: it has no fetch, script, file or URL')
+      }
       else if (typeof h !== 'string' || !Object.hasOwn(actions ?? {}, h)) say('error', where, `refresh, or one of its actions${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(h), Object.keys(actions ?? {})))}`)
       else if (aiActOf(actions![h])) say('error', where, `${h} is an agent's action: those run on a click, not on an event (each run costs)`)
     }
@@ -291,6 +299,8 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
       if (s.type === 'choice' && !(Array.isArray(s.choices) && s.choices.length)) say('error', where, 'a choice needs choices: ["a", "b"]')
       if (s.type === 'choice' && Array.isArray(s.choices) && s.default !== undefined && !s.choices.map(String).includes(String(s.default))) say('warn', where, `default ${JSON.stringify(s.default)} isn't one of its choices`)
     }
+  for (const [n, v] of Object.entries(isObj(config) ? config : {}))
+    if (SECRET.test(n) && (typeof v === 'string' || (isObj(v) && (v.type === undefined ? typeof (v.default ?? '') === 'string' : v.type === 'text')))) say('warn', `widget.json config.${n}`, 'a key kept as text: make it "type": "secret"')
   if (m.sampleConfig !== undefined && (typeof m.sampleConfig !== 'object' || m.sampleConfig === null || Array.isArray(m.sampleConfig))) say('error', 'widget.json sampleConfig', 'an object of settings')
   return out
 }

@@ -1885,6 +1885,21 @@ function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string
         </Switch>
       </div>
     )
+  if (o.type === 'secret')
+    // a token: never shown nor sent back (the daemon keeps it), typed over to replace it, Clear to remove it
+    return (
+      <label className="wo">
+        <span data-tip={o.hint}>{name}</span>
+        <span className="wo-secret">
+          <input className="mono" type="password" autoComplete="off" placeholder={o.set ? 'Set: type to replace' : o.hint} spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value && (onSet(e.target.value), (e.target.value = ''))} />
+          {o.set && (
+            <button type="button" className="small" onClick={() => onSet('')}>
+              Clear
+            </button>
+          )}
+        </span>
+      </label>
+    )
   return (
     <label className="wo">
       <span data-tip={o.hint}>{name}</span>
@@ -2021,13 +2036,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
         {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
         {api.rm && !w.builtin && (
-          <IconButton
-            icon="trash"
-            title="Delete it: its folder and settings"
-            onClick={() =>
-              void ask(`Delete ${w.name}?`, { text: `Its folder (${w.dir}) and its settings go for good.`, ok: 'Delete', danger: true }).then(yes => yes && api.rm!(w.id))
-            }
-          />
+          <IconButton icon="trash" title="Delete it: its folder and settings (Undo brings them back)" onClick={() => void api.rm!(w.id)} />
         )}
       </div>
       {w.description && <div className="muted small">{w.description}</div>}

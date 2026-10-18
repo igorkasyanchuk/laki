@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, stopAgents, widgetRemix, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -158,12 +158,12 @@ const api: Record<string, Handler> = {
   memoryRm: p => core.memoryRm(p), // an agent's only
   projectFile: p => core.projectFileConfig(p.id),
   branches: p => core.branches(p.project),
-  wsNew: p => core.wsNew(p),
+  wsNew: p => core.wsNew(core.byCaller(p)),
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean }),
   doctor: () => core.doctor(),
-  wsFan: p => core.wsFan(p),
+  wsFan: p => core.wsFan(core.byCaller(p)),
   answer: p => core.answer(p),
   unread: p => core.unread(p.tab),
   browse: p => core.browse(p),
@@ -291,7 +291,9 @@ const api: Record<string, Handler> = {
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetRun: p => widgetRun(p),
-  widgetRm: async p => (r => (aiForget(`widget:${p.id}`), r))(await widgetRm(p)), // Settings' Delete, after its confirm: never MCP's nor Laki AI's; its studio chat with it, once it's gone
+  widgetRm: async p => (r => (aiForget(`widget:${p.id}`), r))(await widgetRm(p)), // Settings' Delete: to the trash (Undo: widgetRestore); never MCP's nor Laki AI's; its studio chat with it, once it's gone
+  widgetRestore: p => widgetRestore(p), // Undo of a delete, laki widget restore
+  widgetTrash: () => widgetTrash(), // laki widget trash
   widgetUndo: p => widgetUndo(p), // the studio's Undo and Undo to here
   widgetRemix: p => widgetRemix(p), // Remix: a copy of any one, yours, Laki AI may change it
   widgetSlug: p => widgetSlug(p), // the studio's first ask: a new one's id
@@ -301,6 +303,7 @@ const api: Record<string, Handler> = {
   widgetFileSave: p => widgetFileSave(p),
   widgetWrite: p => widgetWrite(p), // Laki AI's and MCP's: saved off
   widgetTick: p => widgetTick(p.now), // tests move the clock
+  widgetTrashTidy: p => widgetTrashTidy(p.now), // tests move the clock
   widgetPush: p => widgetPush(p),
   widgetTools: () => widgetTools(),
   widgetToolCall: p => widgetToolCall(p),
@@ -470,8 +473,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => widgetTick())
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
-  every(3600000, () => (core.imagesTidy(), core.archivedTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays
-  setTimeout(() => (core.archivedTidy(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
+  every(3600000, () => (core.imagesTidy(), core.archivedTidy(), widgetTrashTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays, deleted extensions past 30 days
+  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
 })
 
 function shutdown() {

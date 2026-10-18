@@ -255,6 +255,7 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .wo { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
 .wo > span:first-child { align-self: flex-start; white-space: nowrap; }
 .wo-bool { justify-content: center; }
+.wo-secret { display: flex; gap: 6px; } .wo-secret input { flex: 1; min-width: 0; }
 .chips-input { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; min-height: 32px; padding: 3px 6px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); cursor: text; }
 .chips-input:focus-within { border-color: var(--accent); }
 .chips-input input { flex: 1; min-width: 80px; width: auto; border: none; padding: 2px; background: transparent; }

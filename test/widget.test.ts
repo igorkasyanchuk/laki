@@ -401,7 +401,7 @@ test('extensions Laki AI writes: in its own folder only, saved off, read back; n
   await assert.rejects(rig.rpc('widgetWrite', { id: 'mine', files: { 'widget.html': 'again' } }), /the user's own/, 'the leave ran out')
 })
 
-test('extensions: a place (sidebar, top bar, status bar), network access for a JS page, deleted for good', async t => {
+test('extensions: a place (sidebar, top bar, status bar), network access for a JS page, deleted', async t => {
   const rig = await fresh(t)
   widget(rig, 'net', { name: 'Net', place: 'status' }, '<template preview><script>1</script></template>', {})
   widget(rig, 'plain', { name: 'Plain', place: 'nowhere' }, '<template preview>hi</template>', {})
@@ -429,7 +429,7 @@ test('extensions: a place (sidebar, top bar, status bar), network access for a J
   await assert.rejects(rig.rpc('widgetRm', { id: 'links' }), /comes with Laki/)
   const dir = join(rig.data, 'widgets', 'net')
   assert.ok(existsSync(join(rig.data, 'widget-data', 'net.json')))
-  assert.deepEqual(await rig.rpc('widgetRm', { id: 'net' }), { deleted: 'net' })
+  assert.equal((await rig.rpc('widgetRm', { id: 'net' })).deleted, 'net')
   assert.ok(!existsSync(dir) && !existsSync(join(rig.data, 'widget-data', 'net.json')))
   assert.equal(await find(rig, 'net'), undefined)
   await assert.rejects(rig.rpc('widgetRm', { id: 'net' }), /no widget net/)
@@ -467,4 +467,132 @@ test('Reset the interface: every setting at its default but what you set up, the
   assert.deepEqual((await rig.rpc('state')).settings, s, 'kept, and the view says so')
   const w = await find(rig, 'mine')
   assert.deepEqual([w.on, w.place], [false, 'top'], 'off, its other choices kept')
+})
+
+test('extensions: a secret setting reaches its fetch only, never the view, a render, a page, ls or the Env; an old value moves; a remix has none', async t => {
+  const rig = await fresh(t)
+  const SECRET = 'sk-live-very-secret-42'
+  widget(rig, 'sec', { name: 'Sec', config: { apiToken: { type: 'secret', label: 'API token' }, repo: 'o/r' }, fetch: 'printf \'%s|%s\' "$WIDGET_APITOKEN" "$LAKI_WIDGET_CONFIG" > seen.txt; echo \'{"n": 1}\'' }, '<template preview>[{{config.apiToken}}]<script>1</script></template>')
+  // an older version kept it as text: it moves to the secrets file at the scan, gone from the store
+  mkdirSync(join(rig.data, 'widget-data'), { recursive: true })
+  writeFileSync(join(rig.data, 'widget-data', 'sec.json'), JSON.stringify({ on: true, config: { apiToken: 'old-plain-value', repo: 'a/b' } }))
+  await rig.rpc('widgetReload')
+  const store = () => readFileSync(join(rig.data, 'widget-data', 'sec.json'), 'utf8')
+  const secrets = join(rig.data, 'widget-secrets.json')
+  assert.doesNotMatch(store(), /old-plain-value/)
+  assert.deepEqual(JSON.parse(readFileSync(secrets, 'utf8')), { sec: { apiToken: 'old-plain-value' } })
+  assert.equal(statSync(secrets).mode & 0o777, 0o600)
+  let w = await find(rig, 'sec')
+  assert.equal(w.config.apiToken, '')
+  assert.equal(w.config.repo, 'a/b', 'the others stay')
+  assert.deepEqual(w.options[0], { key: 'apiToken', type: 'secret', label: 'API token', set: true })
+
+  // set: replaced; the fetch sees it, in $WIDGET_<NAME> and $LAKI_WIDGET_CONFIG
+  await rig.rpc('widgetSet', { id: 'sec', config: { apiToken: SECRET } })
+  const seen = join(rig.data, 'widgets', 'sec', 'seen.txt')
+  await until(() => existsSync(seen) && readFileSync(seen, 'utf8').startsWith(SECRET), 'fetched with it')
+  assert.equal(JSON.parse(readFileSync(seen, 'utf8').split('|')[1]).apiToken, SECRET)
+  assert.doesNotMatch(store(), new RegExp(SECRET))
+  w = await find(rig, 'sec')
+  assert.equal(w.config.apiToken, '')
+  // never: the view, a render, a JS page's config, ls --json, the inspector's Env
+  const { port } = rig.info()
+  const v = await rig.rpc('state')
+  const never = (what: string, text: string) => assert.ok(!text.includes(SECRET) && !text.includes('old-plain-value'), `${what} has it`)
+  never('the view', JSON.stringify(v.widgets.find((x: any) => x.id === 'sec').config))
+  never('a render', String(await rig.rpc('widgetRender', { id: 'sec' })))
+  never('its page', await (await fetch(`http://127.0.0.1:${port}/widget/sec?key=${v.widgetKey}`)).text())
+  never('ls --json', (await rig.cli('ls', '--json')).out)
+  const env = (await rig.rpc('widgetRuns', { id: 'sec' })).env
+  never('Env', JSON.stringify(env))
+  assert.equal(env.WIDGET_APITOKEN, '••••')
+  // '' clears it
+  await rig.rpc('widgetSet', { id: 'sec', config: { apiToken: '' } })
+  assert.equal((await find(rig, 'sec')).options[0].set, undefined)
+  assert.deepEqual(JSON.parse(readFileSync(secrets, 'utf8')), {})
+
+  // a remix has no secret
+  await rig.rpc('widgetSet', { id: 'sec', config: { apiToken: SECRET } })
+  const { id } = await rig.rpc('widgetRemix', { id: 'sec' })
+  assert.equal((await find(rig, id)).options[0].set, undefined)
+  assert.deepEqual(Object.keys(JSON.parse(readFileSync(secrets, 'utf8'))), ['sec'])
+
+  // the checker: a key kept as text
+  widget(rig, 'plain-token', { name: 'P', config: { apiToken: '', other: { type: 'text', default: 'x' } } })
+  await rig.rpc('widgetReload')
+  const ps = (await rig.rpc('widgetCheck', { id: 'plain-token' })).problems
+  assert.ok(ps.some((p: any) => p.level === 'warn' && p.where === 'widget.json config.apiToken' && /make it "type": "secret"/.test(p.text)), JSON.stringify(ps))
+  assert.ok(!ps.some((p: any) => p.where === 'widget.json config.other'))
+})
+
+test('extensions: Delete moves to the trash, Undo puts back folder, link and one file with their store, instances, history, chat and secret', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  // a folder of Laki's, with a secret, an instance, a history and a chat
+  const d = widget(rig, 'del', { name: 'Del', scope: 'workspace', config: { token: { type: 'secret' } }, fetch: 'echo \'{"n": 2}\'' }, '{{n}} {{workspace.branch}}', { 'x.sh': 'echo x\n' })
+  // a linked folder (another root), and a one-file extension
+  const real = join(rig.home, 'real-ext')
+  mkdirSync(real)
+  writeFileSync(join(real, 'widget.json'), JSON.stringify({ name: 'Linked' }))
+  const roots = join(rig.home, 'exts')
+  mkdirSync(roots)
+  const { symlinkSync, lstatSync, readlinkSync, chmodSync } = await import('node:fs')
+  symlinkSync(real, join(roots, 'linked'))
+  writeFileSync(join(roots, 'one.5m.sh'), '#!/bin/sh\necho \'{"n": 1}\'\n')
+  chmodSync(join(roots, 'one.5m.sh'), 0o755)
+  await rig.rpc('settingsSet', { widgetDirs: [roots] })
+  for (const id of ['del', 'linked', 'one']) await rig.rpc('widgetSet', { id, on: id !== 'linked' })
+  await rig.rpc('widgetSet', { id: 'del', config: { token: 'sec-123' } })
+  await rig.rpc('widgetRun', { id: 'del', ws: ws.id })
+  await until(() => find(rig, 'del').then(w => !w.running), 'fetched')
+  mkdirSync(join(rig.data, 'widget-data', 'del.history', '1000'), { recursive: true })
+  writeFileSync(join(rig.data, 'widget-data', 'widget:del.chat.json'), '{"chat":[]}')
+  const snap = () => ({
+    files: readFileSync(join(d, 'x.sh'), 'utf8'),
+    store: JSON.parse(readFileSync(join(rig.data, 'widget-data', 'del.json'), 'utf8')),
+    inst: readFileSync(join(rig.data, 'widget-data', 'del', 'ws', `${ws.id}.json`), 'utf8'),
+    hist: existsSync(join(rig.data, 'widget-data', 'del.history', '1000')),
+    chat: readFileSync(join(rig.data, 'widget-data', 'widget:del.chat.json'), 'utf8'),
+    secret: JSON.parse(readFileSync(join(rig.data, 'widget-secrets.json'), 'utf8')).del,
+  })
+  const before = snap()
+
+  const del = await rig.rpc('widgetRm', { id: 'del' })
+  assert.match(del.trash, /^del-\d+$/)
+  for (const f of [d, join(rig.data, 'widget-data', 'del.json'), join(rig.data, 'widget-data', 'del'), join(rig.data, 'widget-data', 'del.history'), join(rig.data, 'widget-data', 'widget:del.chat.json')]) assert.ok(!existsSync(f), `${f} gone`)
+  assert.equal(JSON.parse(readFileSync(join(rig.data, 'widget-secrets.json'), 'utf8')).del, undefined)
+  const lnk = await rig.rpc('widgetRm', { id: 'linked' })
+  assert.ok(!existsSync(join(roots, 'linked')) && existsSync(join(real, 'widget.json')), 'only the link went')
+  await until(() => find(rig, 'one').then(w => w.at && !w.running), 'its first fetch over')
+  const one = await rig.rpc('widgetRm', { id: 'one' })
+  assert.ok(!existsSync(join(roots, 'one.5m.sh')))
+  const list = await rig.rpc('widgetTrash')
+  assert.deepEqual(list.map((x: any) => x.id).sort(), ['del', 'linked', 'one'])
+  assert.match((await rig.cli('widget', 'trash')).out, /del-\d+  Del/)
+
+  // Undo: back as it was, on or off as it was
+  const back = await rig.rpc('widgetRestore', { trash: del.trash })
+  assert.equal(back.on, true)
+  assert.deepEqual(snap(), before)
+  assert.equal((await find(rig, 'del')).options[0].set, true)
+  assert.match((await rig.cli('widget', 'restore', lnk.trash)).out, /restored linked/)
+  assert.equal(readlinkSync(join(roots, 'linked')), real)
+  assert.ok(lstatSync(join(roots, 'linked')).isSymbolicLink())
+  assert.equal((await find(rig, 'linked')).on, false)
+  await rig.rpc('widgetRestore', { trash: one.trash })
+  assert.ok(existsSync(join(roots, 'one.5m.sh')))
+  assert.equal((await find(rig, 'one')).on, true)
+  assert.deepEqual(await rig.rpc('widgetTrash'), [])
+
+  // refused when its id was taken meanwhile; tidy drops the old ones
+  const again = await rig.rpc('widgetRm', { id: 'del' })
+  widget(rig, 'del', { name: 'Another del' })
+  await rig.rpc('widgetReload')
+  await assert.rejects(rig.rpc('widgetRestore', { trash: again.trash }), /del is taken now/)
+  await assert.rejects(rig.rpc('widgetRestore', { trash: '../x-1' }), /no \.\.\/x-1 in the trash/)
+  await rig.rpc('widgetTrashTidy', { now: Date.now() + 29 * 86400e3 })
+  assert.equal((await rig.rpc('widgetTrash')).length, 1)
+  await rig.rpc('widgetTrashTidy', { now: Date.now() + 31 * 86400e3 })
+  assert.deepEqual(await rig.rpc('widgetTrash'), [])
 })

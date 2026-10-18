@@ -122,6 +122,11 @@ export function load() {
   state.todos ??= []
   state.reminders ??= []
   state.flows ??= []
+  for (const [ws, g] of Object.entries(state.widgetGrants ?? {})) {
+    const keep = g.filter(k => k.includes('#')) // an Always from before its hash (widgets.ts grantKey): asked again, once
+    if (keep.length) state.widgetGrants![ws] = keep
+    else delete state.widgetGrants![ws]
+  }
   for (const p of state.projects) if (p.kind === 'shells' && p.name === 'Shells') p.name = 'Terminals' // its first name (0.7)
   slugActions() // actions from before slugs
 }
@@ -1608,7 +1613,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1705,6 +1710,8 @@ async function synced(proj: Project, base: string, step: (text: string) => void)
 
 // development mode's log of what making a workspace runs (key new: Settings › General's *Creation log*), each line in
 // the workspace's own log too once it has an id; a failure's message last
+// the CLI's laki new: from, the workspace of the agent that ran it (agentCaller); yours in a shell isn't one
+export const byCaller = <T extends NewWs>({ caller, ...o }: T): T => ({ ...o, from: o.from ?? agentCaller(caller) }) as T
 export async function wsNew(o: NewWs): Promise<Workspace> {
   const said: string[] = []
   const step = (text: string | (() => string)) => {
@@ -3746,6 +3753,14 @@ export const agentRuns = (args: string): Agent | undefined => {
 // ponytail: no notifications or turn timers for it; start the agent in its own tab for those
 const busyShells = new Set<string>()
 const shellAgents = new Map<string, { agent: Agent; status: Status }>()
+// who runs a laki command ($LAKI_WORKSPACE, $LAKI_TAB, as the CLI passes them): an agent when its tab is an agent's, or a
+// shell tab running one (shellAgents: the view's runs); you typing in a shell tab, or outside Laki, aren't. Its
+// workspace, else nothing. ponytail: a process of the same user can read daemon.json's token and call the RPC without
+// saying who it is: this closes the CLI's paths (laki new's from, laki widget's), not a determined process
+export function agentCaller(from?: { ws?: unknown; tab?: unknown }) {
+  const t = typeof from?.tab === 'string' && from.tab ? state.tabs.find(x => x.id === from.tab) : undefined
+  return t && (t.kind === 'agent' || shellAgents.has(t.id)) ? t.workspace : undefined
+}
 let shellTicking = false // a tick waits on ps and screens: the next one doesn't start meanwhile
 export async function shellTick() {
   if (shellTicking) return
@@ -3829,6 +3844,59 @@ function trees(rows: PsRow[]) {
 }
 const use = ({ pid, rss, cpu, cmd }: PsRow): ProcUse => ({ pid, rss, cpu, cmd })
 const sum = (ps: PsRow[], k: 'rss' | 'cpu') => Math.round(ps.reduce((n, p) => n + p[k], 0) * 10) / 10
+
+// a command in a process group of its own (detached), so a timeout or a Stop ends what it started too (python3 fetch.py,
+// npm run…, a sleep holding its stdout): SIGTERM to the group, SIGKILL 3 s later if it's still there
+export function killGroup(c: ChildProcess) {
+  try {
+    process.kill(-c.pid!, 'SIGTERM')
+    setTimeout(() => {
+      try {
+        process.kill(-c.pid!, 'SIGKILL')
+      } catch {}
+    }, 3000).unref()
+  } catch {}
+}
+// execFile's shape (its callback's error has code, the exit code or an errno, and killed) for a command run as a group:
+// its timeout and signal end the group; stdin is ended with what's given; past maxBuffer it's stopped
+export type GroupError = Error & { code?: number | string; killed?: boolean }
+export function execGroup(cmd: string, args: string[], o: { cwd?: string; env?: NodeJS.ProcessEnv; timeout?: number; maxBuffer?: number; signal?: AbortSignal; stdin?: string }, cb: (e: GroupError | null, stdout: string, stderr: string) => void): ChildProcess {
+  const p = spawn(cmd, args, { cwd: o.cwd, env: o.env, detached: true, stdio: ['pipe', 'pipe', 'pipe'] })
+  const out: Buffer[] = []
+  const err: Buffer[] = []
+  let size = 0
+  let killed = false
+  let over = false
+  let done = false
+  const stop = () => {
+    if (killed) return
+    killed = true
+    killGroup(p)
+    setTimeout(() => (p.stdout?.destroy(), p.stderr?.destroy()), 5000).unref() // one that left the group keeps the pipe: close anyway
+  }
+  const take = (l: Buffer[]) => (b: Buffer) => {
+    size += b.length
+    if (size > (o.maxBuffer ?? 1 << 20)) return (over = true), stop()
+    l.push(b)
+  }
+  p.stdout!.on('data', take(out))
+  p.stderr!.on('data', take(err))
+  const timer = o.timeout ? setTimeout(stop, o.timeout) : undefined
+  o.signal?.addEventListener('abort', stop, { once: true })
+  if (o.signal?.aborted) stop()
+  const end = (e: GroupError | null) => {
+    if (done) return
+    done = true
+    clearTimeout(timer)
+    o.signal?.removeEventListener('abort', stop)
+    cb(e, Buffer.concat(out).toString(), Buffer.concat(err).toString())
+  }
+  p.on('error', e => !p.pid && end(Object.assign(e, { killed }))) // never started (ENOENT)
+  p.on('close', code => end(code === 0 && !killed ? null : Object.assign(new Error(over ? 'maxBuffer exceeded' : `Command failed: ${cmd} ${args.join(' ')}`), { code: code ?? undefined, killed })))
+  p.stdin!.on('error', () => {}) // one that never reads it
+  p.stdin!.end(o.stdin ?? '')
+  return p
+}
 
 // what this daemon runs besides tabs, by pid, for Resources: Laki AI's agent, a tunnel, remote access, an SSH host's
 // connection, a widget's fetch; stop: main.ts' resourceStop key. Dropped as it exits

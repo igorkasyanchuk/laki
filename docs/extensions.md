@@ -75,8 +75,17 @@ the workspace: `{{config.repo}}`, `{{workspace.path}}/TODO.md`. A failed read ke
 ### Settings (`config`)
 
 Each setting is a default or `{ "type", "label", "hint", "default", "choices" }`, `type` one of `text`, `number`,
-`bool`, `choice`, `list`. You fill them in Settings › Extensions; the fetch gets them as `$WIDGET_<NAME>` (text) and
+`bool`, `choice`, `list`, `secret`. You fill them in Settings › Extensions; the fetch gets them as `$WIDGET_<NAME>` (text) and
 `$LAKI_WIDGET_CONFIG` (all of them, typed, as JSON); a page or a script gets them typed as `config`.
+
+#### Secrets
+
+A token or a key is a `secret`: `"apiToken": { "type": "secret", "label": "API token" }`. Settings shows a password
+box (*Set: type to replace* once it has one, and *Clear*). Laki keeps it in `<data>/widget-secrets.json` (0600), not
+with the other settings: only its fetch and its actions get it (`$WIDGET_APITOKEN`, `$LAKI_WIDGET_CONFIG`), and a
+`script`'s `config`. Its page, templates, `ui`, the app, `laki ls --json` and MCP see it empty; the inspector's Env
+shows `••••`. A remix starts without it. A setting called `token`, `key`, `secret` or `password` kept as `text` gets
+the checker's warning; a value saved before it became a secret moves to the secrets file.
 
 ### The fetch's environment
 
@@ -88,7 +97,8 @@ Each setting is a default or `{ "type", "label", "hint", "default", "choices" }`
 | `$LAKI_CLI` | the `laki` command: `"$LAKI_CLI" ls --json` |
 | `$WIDGET_ARG` | an action's argument (`data-arg`), never pasted into the command |
 
-It runs in the extension's folder with your PATH (gh, jq, curl…), 2 minutes at most. A JS `script`'s default export
+It runs in the extension's folder with your PATH (gh, jq, curl…), 2 minutes at most, as a process group of its own: at
+the time limit, or a Stop, what it started goes too (a `sleep`, `npm run`, a server). A JS `script`'s default export
 gets `{ config, last }` (a per-workspace one's `workspace` too) and returns the data.
 
 ## Per workspace (`scope`)
@@ -221,12 +231,16 @@ its input; `run` is its command, as a plain action's string is:
   as JSON on stdin. What the command prints goes back to the agent; a failure gives its output and stderr's last line.
 - `ask`: `first` (the default) asks you once per workspace (*Always in …* in the dialog; Settings › Extensions lists
   each grant with *Revoke*), `always` every call, `never` not at all (the checker warns when its command looks outward:
-  a push, a merge, a deploy). Laki's window must be open to ask; no answer in 2 minutes refuses it. Turning the
+  a push, a merge, a deploy). Laki's window must be open to ask; no answer in 2 minutes refuses it. *Always* is for
+  that command and the extension's files as they are: an edit (even while Laki is closed) asks again. Turning the
   extension off, or changing its commands, takes the grants back.
 - `AGENTS.md` in its folder says when to use its tools (4 KB at most); agents see it with the list.
 - Agents get them through `laki widget tools` (the list) and `laki widget tool <id> <action> '<json>'` (a call, in
   their workspace), and in MCP as `ext_<id>_<action>` tools (with `laki_extension_tools` and `laki_extension_call`);
   Laki AI calls them too. A per-workspace one runs in the caller's workspace. Only extensions that are on have tools.
+- An agent can't go around the ask: `laki widget action` run in an agent's tab goes through the tool's ask (any other
+  action asks you each time, no *Always*), `laki widget on` from one is refused (only you turn an extension on), and
+  `laki widget dev` from one links the folder but leaves its extensions off.
 - Each call is a run (reason `tool:<action>`, who called it and how it was allowed) in its page's Runs.
 
 The *A tool for agents* starter (`laki widget new Notes --kind tool`) is one: an `add` tool that keeps notes you see.
@@ -544,7 +558,8 @@ it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat in
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
   size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, *Refresh button* and
   *When it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`), its folder, *Delete*
-  (its folder and settings, for good, after a confirm; the ones that come with Laki only turn off), and Laki AI's chat
+  (its folder, settings, data, history, chat and secrets go to the trash, with *Undo* in the toast; `laki widget trash`
+  lists the last 30 days', `laki widget restore <trash-id>` puts one back; the ones that come with Laki only turn off), and Laki AI's chat
   to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Data), or with Laki AI, or gives you
   the prompt for any AI chat. Search
   for *plugin* finds it too.
@@ -554,7 +569,8 @@ it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat in
   sample, off until you turn it on.
 - The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget render <id> [--full]`,
   `laki widget action <id> <action> [arg]`, `laki widget new <name> [--kind <k>] [--dir <folder>]`, `laki widget check
-  [id|folder] [--no-run]`, `laki widget kit [element]`, `laki widget dev [folder]`.
+  [id|folder] [--no-run]`, `laki widget kit [element]`, `laki widget dev [folder]`, `laki widget trash`, `laki widget
+  restore <trash-id>`.
 - Laki AI and `laki mcp` (`laki_extensions`, `laki_extension_guide`, `laki_extension_read`, `laki_extension_write`,
   `laki_extension_check`; `fixtures/<name>.json` is the one folder they may write):
   they make or change extensions in Laki's own folder, saved off: its fetch runs commands, so you look, then turn it on.
@@ -568,4 +584,7 @@ it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat in
   *Always* in that workspace.
 - A template extension is sanitized (no scripts, frames, forms, `on…` attributes, or links other than http(s) and
   mailto). A JS one runs in a sandboxed frame with an opaque origin, `default-src 'none'`, and only the network you allow.
-- Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data.
+- Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data; its secrets in
+  `<data>/widget-secrets.json` (0600), given only to its fetch and actions.
+- An agent's `laki widget action` asks you; `laki widget on` is yours only. ponytail: a process of yours can still read
+  the daemon's token and call its API directly: these close the CLI's paths, not a determined program.

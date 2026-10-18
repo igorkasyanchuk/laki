@@ -159,9 +159,10 @@
                   "number",
                   "bool",
                   "choice",
-                  "list"
+                  "list",
+                  "secret"
                 ],
-                "description": "text, number, bool (a switch), choice (one of choices) or list (chips)"
+                "description": "text, number, bool (a switch), choice (one of choices), list (chips) or secret (a token: kept out of the app, given only to its fetch and actions)"
               },
               "label": {
                 "type": "string",

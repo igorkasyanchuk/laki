@@ -5,7 +5,7 @@ import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from '
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
-import { WIDGET_SCHEMA } from '../src/shared/widgetSchema.ts'
+import { manifestCheck, WIDGET_SCHEMA } from '../src/shared/widgetSchema.ts'
 import { STARTER_KINDS } from '../src/shared/widgetStarters.ts'
 import { UI_TYPES } from '../src/shared/widgetUi.ts'
 import { fresh, until } from './helpers.ts'
@@ -174,4 +174,15 @@ test('widgetWrite: fixtures/<name>.json, never another folder, ../ or a link', a
   await rig.rpc('widgetWrite', { id: 'fx2', files: { 'widget.json': wj } })
   symlinkSync(rig.env.HOME, join(rig.data, 'widgets', 'fx2', 'fixtures'))
   await assert.rejects(rig.rpc('widgetWrite', { id: 'fx2', files: { 'fixtures/z.json': '{}' } }), /fixtures is a link or a file there/)
+})
+
+test('check: refresh on an event for every source that fetches; an agent source and a static text refused', () => {
+  const at = (source?: object, more: object = {}) => manifestCheck({ name: 'x', ...(source && { source }), on: { 'turn.done': 'refresh' }, sample: {}, ...more }).filter(p => p.where === 'widget.json on.turn.done')
+  assert.deepEqual(at({ kind: 'file', path: '~/x.json' }), [])
+  assert.deepEqual(at({ kind: 'url', url: 'https://example.com/x' }), [])
+  assert.deepEqual(at(undefined, { fetch: 'echo {}' }), [])
+  assert.deepEqual(at(undefined, { script: 'f.mjs' }), [])
+  assert.match(at({ kind: 'ai', prompt: 'find it' })[0].text, /each run costs/)
+  assert.match(at({ kind: 'static', text: '{}' })[0].text, /a static text has nothing to fetch/)
+  assert.match(at()[0].text, /it has no fetch, script, file or URL/)
 })

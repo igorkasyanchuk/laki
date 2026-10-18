@@ -2,7 +2,7 @@
 import { strict as assert } from 'node:assert'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
@@ -195,4 +195,126 @@ test('tools: laki mcp lists ext_ tools only with a daemon running, and routes ca
   assert.match(hits[1].messages.at(-1).content, /hi ai/)
   assert.match(hits[0].messages[0].content, /laki_extension_tools/, 'its instructions say so')
   await sleep(10)
+})
+
+test('an agent can’t get around the ask: laki widget action asks (a tool as its tool says), on is refused, dev links off, check runs no off one', async t => {
+  const rig = await fresh(t, { env: { LAKI_TOOL_WAIT: '1500' } })
+  tools(rig)
+  make(rig, 'mine', { name: 'Mine', fetch: 'echo \'{"n": 1}\'', sample: { n: 1 } })
+  await on(rig, 'g')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'agent' })
+  const agentTab = (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id).id
+  const shell = await rig.rpc('tabNew', { ws: ws.id, kind: 'shell' })
+  const as = async (tab: string | undefined, ...args: string[]) => {
+    const was = [rig.env.LAKI_WORKSPACE, rig.env.LAKI_TAB]
+    if (tab) Object.assign(rig.env, { LAKI_WORKSPACE: ws.id, LAKI_TAB: tab })
+    try {
+      return await rig.cli(...args)
+    } finally {
+      for (const [k, v] of [['LAKI_WORKSPACE', was[0]], ['LAKI_TAB', was[1]]] as const) v === undefined ? delete rig.env[k] : (rig.env[k] = v)
+    }
+  }
+
+  // no window: an agent's plain action has nobody to ask; yours (a shell tab, or outside Laki) runs
+  let r = await as(agentTab, 'widget', 'action', 'g', 'plain')
+  assert.equal(r.code, 0)
+  assert.match(r.out, /✗ Laki's window isn't open: nobody to approve it/)
+  assert.match((await as(shell.id, 'widget', 'action', 'g', 'plain')).out, /a button/)
+  assert.match((await as(undefined, 'widget', 'action', 'g', 'plain')).out, /a button/)
+
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  const ask = asks(app)
+  // a plain action: asked each time, no Always (ask: always)
+  let call = as(agentTab, 'widget', 'action', 'g', 'plain', 'x')
+  let q = await ask(0)
+  assert.deepEqual([q.action, q.ask, q.command, q.tab, q.input], ['plain', 'always', 'echo a button', agentTab, { arg: 'x' }])
+  await rig.rpc('widgetToolAnswer', { req: q.req, allow: 'once' })
+  assert.match((await call).out, /a button/)
+  call = as(agentTab, 'widget', 'action', 'g', 'plain')
+  await rig.rpc('widgetToolAnswer', { req: (await ask(1)).req, allow: 'deny' })
+  assert.match((await call).out, /✗ Greeter plain: denied/)
+  // a tool: through widgetToolCall, as its tool says (hi asks always); its input as JSON
+  call = as(agentTab, 'widget', 'action', 'g', 'hi', '{"who": "ann"}')
+  q = await ask(2)
+  assert.equal(q.description, 'Say hi')
+  await rig.rpc('widgetToolAnswer', { req: q.req, allow: 'once' })
+  assert.match((await call).out, /hi ann/)
+  assert.match((await as(agentTab, 'widget', 'action', 'g', 'echo', '{"text": "e"}')).out, /echo e/, 'ask never: no ask')
+  assert.match((await as(agentTab, 'widget', 'action', 'g', 'hi', 'not json')).out, /hi is a tool: its input as JSON/)
+  assert.equal(app.events.filter((e: any) => e.ev === 'toolAsk').length, 3)
+  // yours: no ask
+  assert.match((await as(shell.id, 'widget', 'action', 'g', 'hi')).out, /hi/)
+  assert.equal(app.events.filter((e: any) => e.ev === 'toolAsk').length, 3)
+
+  // on: refused for an agent, fine from a shell
+  await rig.rpc('widgetReload')
+  r = await as(agentTab, 'widget', 'on', 'mine')
+  assert.notEqual(r.code, 0)
+  assert.match(r.err, /only you can turn an extension on/)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'mine').on, false)
+  // check: an off one's fetch isn't run for an agent
+  assert.match((await as(agentTab, 'widget', 'check', 'mine')).out, /not run: it's off, and an agent asked/)
+  assert.equal((await as(shell.id, 'widget', 'on', 'mine')).code, 0)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'mine').on, true)
+
+  // dev: linked, its extensions left off
+  const d = join(rig.home, 'agent-code')
+  mkdirSync(d)
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Agent code', fetch: 'touch ran; echo {}', sample: {} }))
+  r = await as(agentTab, 'widget', 'dev', d, '--json')
+  assert.equal(r.code, 0, r.err)
+  assert.match(JSON.parse(r.out).note, /linked, off/)
+  const w = (await rig.rpc('state')).widgets.find((x: any) => x.id === 'agent-code')
+  assert.equal(w.on, false)
+  await sleep(300)
+  assert.ok(!existsSync(join(d, 'ran')), 'nothing of it ran')
+})
+
+test('Always is tied to the command and the files: one edited while Laki was closed asks again; an old grant is asked once more', async t => {
+  const rig = await fresh(t, { env: { LAKI_TOOL_WAIT: '1500' } })
+  make(rig, 'sh', { name: 'Sh', actions: { go: { run: 'sh do.sh', tool: { description: 'Go' } } } }, { 'do.sh': 'echo one\n' })
+  await on(rig, 'sh')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  let app = await rig.connect()
+  const call = (n: number, allow?: string) => {
+    const c = rig.rpc('widgetToolCall', { id: 'sh', action: 'go', from: { ws: ws.id } })
+    if (allow) void asks(app)(n).then(q => rig.rpc('widgetToolAnswer', { req: q.req, allow }))
+    return c
+  }
+  assert.equal((await call(0, 'always')).output, 'one\n')
+  const grant = (await rig.rpc('state')).widgets.find((w: any) => w.id === 'sh').tools[0].grants
+  assert.deepEqual(grant, [ws.id])
+  assert.match(JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).widgetGrants[ws.id][0], /^sh\.go#[0-9a-f]{12}$/)
+  assert.equal((await call(1)).output, 'one\n', 'granted: no ask')
+
+  // unchanged across a restart: still granted; a grant from before the hash (id.action) is dropped at load: asked once more
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'two' })
+  app.ws.close()
+  await rig.stop()
+  const st = JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8'))
+  st.widgetGrants[b.id] = ['sh.go']
+  writeFileSync(join(rig.data, 'state.json'), JSON.stringify(st))
+  await rig.start()
+  app = await rig.connect()
+  t.after(() => app.ws.close())
+  assert.equal((await call(0)).output, 'one\n')
+  assert.equal(app.events.filter((e: any) => e.ev === 'toolAsk').length, 0)
+  const fromB = rig.rpc('widgetToolCall', { id: 'sh', action: 'go', from: { ws: b.id } })
+  await rig.rpc('widgetToolAnswer', { req: (await asks(app)(0)).req, allow: 'once' })
+  assert.equal((await fromB).output, 'one\n')
+
+  // do.sh edited while Laki was closed: asked again
+  app.ws.close()
+  await rig.stop()
+  writeFileSync(join(rig.data, 'widgets', 'sh', 'do.sh'), 'echo two\n')
+  await rig.start()
+  app = await rig.connect()
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'sh').tools[0].grants.length, 0, 'the grant is for older files')
+  assert.equal((await call(0, 'once')).output, 'two\n')
+  assert.equal(app.events.filter((e: any) => e.ev === 'toolAsk').length, 1, 'asked')
+  await rig.rpc('widgetGrantRm', { id: 'sh', action: 'go', ws: ws.id })
+  assert.ok(!(await rig.rpc('state')).widgets.find((w: any) => w.id === 'sh').tools[0].grants.length)
 })

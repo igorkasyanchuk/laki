@@ -4,6 +4,16 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Secret settings for extensions**: a token or a key is a `secret`: a password box in Settings, kept apart and given
+  only to its fetch and actions, never to its page, the app, `laki ls` or MCP. A value saved as text moves over.
+- **Undo for deleting an extension**: Delete moves it to a trash, with Undo in the toast; `laki widget trash` and
+  `laki widget restore` for 30 days.
+- **Agents can't skip your OK**: `laki widget action` from an agent asks you first, `laki widget on` is yours only,
+  and `laki widget dev` from an agent leaves the extensions off. *Always* for a tool holds only while its command and
+  files stay as they were.
+- An extension's fetch that times out, or a stream you stop, ends what it started too.
+- The checker takes `refresh` on an event for a file or URL source.
+
 - **Extensions in scheduled tasks and workflows**: a task can fetch an extension or run one of its actions at its
   times; a workflow's Extension block fetches one and hands its data to the next blocks.
 - **Hide an extension's refresh button and when it was fetched**: two switches on its page, for the sidebar, the

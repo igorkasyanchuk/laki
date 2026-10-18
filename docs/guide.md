@@ -795,8 +795,10 @@ no restart. An extension fetches when it's turned on, when its settings change, 
 settings. A failed fetch keeps the last data and shows a red dot (its tooltip, and Settings › Extensions, say why:
 what the command printed last, or what the script threw).
 
-An extension's settings each have a kind: text, a number, an on/off, one of a few choices, or a list (logins, labels:
-typed as chips, Enter or a comma after each).
+An extension's settings each have a kind: text, a number, an on/off, one of a few choices, a list (logins, labels:
+typed as chips, Enter or a comma after each), or a secret (a token: a password box, *Set: type to replace* once it has
+one, *Clear*; kept apart, in `<data>/widget-secrets.json`, and given only to its fetch and actions, never to its page,
+the app or MCP).
 
 *Working hours* (Settings › Extensions › *Fetch only*): when extensions fetch on their own, in plain English: `9am-9pm
 weekdays`, `8:00 to 18:30 except fri`, `9am-6pm, no weekends`, `noon-6`, `10pm-6am` (overnight). Outside them nothing fetches until they start again;
@@ -843,6 +845,11 @@ says why), then prints each fetch as it runs. Its page has tabs beside Overview:
 or pick one of its `fixtures/*.json`, to see it with that data, *Sample data* on it until *Live*), **Runs** (the last
 20 fetches and actions, why each ran, a click for its stderr), **Env** (what its fetch gets, tokens masked) and
 **Files**, and **Check**. A right click on an extension opens it there (*Inspect*), and so does `laki://settings/widgets/<id>/inspect`.
+
+Delete (its row's trash can) moves an extension to a trash, its settings, data, history, chat and secrets with it:
+*Undo* in the toast puts it back, on or off as it was; `laki widget trash` lists the last 30 days' and `laki widget
+restore <trash-id>` puts one back. An agent can't turn an extension on (`laki widget on` from its tab is refused),
+`laki widget dev` from one leaves the folder's extensions off, and `laki widget action` from one asks you first.
 
 To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
 button, a form, a JS page or one file; it runs at once on sample data, and its page opens), or `laki widget new

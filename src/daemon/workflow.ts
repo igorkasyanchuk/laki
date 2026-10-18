@@ -12,7 +12,7 @@ import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, isLive, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
+import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { widgetUse } from './widgets.ts'
 
@@ -498,16 +498,7 @@ function command(r: FlowRun, b: Block) {
   say(r, `${blockName(b)}: ${clip(cmd, 120)}`)
   touch()
 }
-function kill(c: ChildProcess) {
-  try {
-    process.kill(-c.pid!, 'SIGTERM') // its group: npm and what it started
-    setTimeout(() => {
-      try {
-        process.kill(-c.pid!, 'SIGKILL')
-      } catch {}
-    }, 3000).unref()
-  } catch {}
-}
+const kill = killGroup // its group: npm and what it started
 
 // out: its names' values as {{steps.<id>.<name>}}, from its result (an answer's JSON, a command's, a response's)
 function outs(r: FlowRun, b: Block, text: string) {

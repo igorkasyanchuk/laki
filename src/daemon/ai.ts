@@ -5,14 +5,14 @@
 // has a chat of its own (the Specs page's side panel), kept in its folder (.chat.json), which ends after PLAN_CHAT_IDLE
 // unused: the next ask starts a new one, unless aiContinue takes it up again. One ask at a time, in any chat. Its `ai`
 // event says which chat as `of` ('' the AI page's): an `id` would make it a reply.
-import { type ChildProcess, execFile, spawn } from 'node:child_process'
+import { type ChildProcess, spawn } from 'node:child_process'
 import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
 import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
-import { broadcast, cliArgv, dir, own, presets, state } from './core.ts'
+import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
 import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetsView } from './widgets.ts'
@@ -489,7 +489,8 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)) }
   try {
     const out = await new Promise<string>((ok, no) => {
-      const c = execFile(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: agent ? 600_000 : 300_000, signal: o.signal }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`${backend}: ${(e as NodeJS.ErrnoException).code === 'ENOENT' ? 'not installed (not on PATH)' : o.signal?.aborted ? 'stopped' : (e as { killed?: boolean }).killed ? 'took too long' : String(se).trim().split('\n').pop() || e.message}`)) : ok(so)))
+      // a group of its own: a stop or a timeout ends its MCP servers and tools too
+      const c = execGroup(backend, args, { cwd: home, env, maxBuffer: 16 << 20, timeout: agent ? 600_000 : 300_000, signal: o.signal }, (e, so, se) => (e && !/"is_error"\s*:\s*true/.test(so) ? no(new Error(`${backend}: ${e.code === 'ENOENT' ? 'not installed (not on PATH)' : o.signal?.aborted ? 'stopped' : e.killed ? 'took too long' : se.trim().split('\n').pop() || e.message}`)) : ok(so)))
       own(c, o.name ?? `Laki AI · ${backend}`, agent ? o.stop : 'ai') // an extension's: agent:<id>, its runs (widgets.ts stopAgents)
     })
     let text = ''

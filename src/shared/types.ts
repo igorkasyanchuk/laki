@@ -571,8 +571,9 @@ export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?:
 // full view (a dialog); js: its page has scripts, so it runs in a sandboxed frame; config: its settings; at, error:
 // the last fetch; rev: changes on each reload
 // a widget's setting (widget.json config): its kind (text, number, bool: an on/off, choice: one of choices, list: words
-// or names, kept joined by commas), what Settings calls it and says under it
-export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'choice' | 'list'; label?: string; hint?: string; choices?: string[] }
+// or names, kept joined by commas; secret: a token, kept in <data>/widget-secrets.json and given only to its fetch and
+// actions), what Settings calls it and says under it
+export type WidgetOption = { key: string; type: 'text' | 'number' | 'bool' | 'choice' | 'list' | 'secret'; label?: string; hint?: string; choices?: string[]; set?: boolean } // secret: a token, never in the view (its config ''), set: it has one
 // view: the full view's dialog, small, medium or large; config: each setting as text (a bool's '1' or '')
 // button: it shows as a button (a rail or foot place, or no preview of its own): icon (one of the app's icons, or a
 // character or two), label, badge (a count on it) and tip, filled from its data; click: the action a click runs (none:
@@ -631,5 +632,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 83
+export const API = 84
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

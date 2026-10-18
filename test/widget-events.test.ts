@@ -2,6 +2,8 @@
 import { strict as assert } from 'node:assert'
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { createServer } from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
 
@@ -167,4 +169,55 @@ test('push: data put there by the CLI, merged, per workspace; refused when off',
   assert.equal((await rig.cli('widget', 'push', 'pw', '{"a": "hi"}', '--ws', ws.id)).code, 0)
   assert.match(await rig.rpc('widgetRender', { id: 'pw', ws: ws.id }), new RegExp(`hi on ${ws.branch}`))
   assert.match((await rig.cli('widget', 'push', 'pw', '{}')).err, /is per workspace: which one/)
+})
+
+test('a fetch that times out ends what it started; a stream stopped in Resources ends its children too', async t => {
+  const rig = await fresh(t, { env: { LAKI_WIDGET_TIMEOUT_MS: '800' } })
+  const d = join(rig.data, 'widgets')
+  make(rig, 'slow', { name: 'Slow', fetch: 'sleep 300 & echo $! > bg.pid; sleep 30; echo "{}"' })
+  make(rig, 'st', { name: 'St', stream: true, fetch: 'sleep 300 & echo $! > bg.pid; while true; do echo \'{"n": 1}\'; sleep 0.3; done' })
+  await on(rig, 'slow')
+  const pid = (id: string) => until(() => (existsSync(join(d, id, 'bg.pid')) ? Number(readFileSync(join(d, id, 'bg.pid'), 'utf8')) : 0), `${id}'s child`)
+  const alive = (p: number) => {
+    try {
+      process.kill(p, 0)
+      return true
+    } catch {
+      return false
+    }
+  }
+  const t0 = Date.now() // turned on: it fetches
+  const w = await until(() => rig.rpc('state').then((v: any) => v.widgets.find((x: any) => x.id === 'slow')).then((x: any) => !x.running && x.error && x), 'timed out', 6000)
+  assert.equal(w.error, 'timed out after 0.8 s')
+  assert.ok(Date.now() - t0 < 5000, 'not held by the child that keeps its stdout')
+  const bg = await pid('slow')
+  await until(() => !alive(bg), 'its background sleep gone', 6000)
+
+  const app = await rig.connect()
+  t.after(() => app.ws.close())
+  await app.call('view', { tab: null, focused: true, shown: true })
+  await rig.rpc('widgetSet', { id: 'st', on: true })
+  const child = await pid('st')
+  assert.ok(alive(child))
+  await rig.rpc('resourceStop', { key: 'stream:st' })
+  await until(() => !alive(child), "the stream's child gone", 6000)
+  assert.equal((await rig.rpc('widgetRuns', { id: 'st' })).stream.stopped, true)
+})
+
+test('refresh on an event fetches a url source too', async t => {
+  let hits = 0
+  const srv = createServer((_, r) => r.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ hits: ++hits })))
+  await new Promise<void>(r => srv.listen(0, '127.0.0.1', r))
+  t.after(() => (srv.closeAllConnections(), srv.close()))
+  const rig = await fresh(t)
+  make(rig, 'u', { name: 'U', source: { kind: 'url', url: `http://127.0.0.1:${(srv.address() as AddressInfo).port}/x` }, on: { 'turn.done': 'refresh' }, sample: { hits: 0 } })
+  await on(rig, 'u')
+  await until(() => dataOf(rig, 'u').then(d => d?.hits === 1), 'fetched as it was turned on')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'one' })
+  const ta = await until(() => rig.tab(a.id).then((t: any) => t?.last && t), 'its first turn over')
+  const n = (await dataOf(rig, 'u')).hits
+  await rig.rpc('hook', { tab: ta.id, state: 'idle', payload: { last_assistant_message: 'done' } })
+  await until(() => dataOf(rig, 'u').then(d => d?.hits > n), 'fetched again on turn.done')
+  assert.equal((await rig.rpc('widgetRuns', { id: 'u' })).runs[0].reason, 'event:turn.done')
 })
