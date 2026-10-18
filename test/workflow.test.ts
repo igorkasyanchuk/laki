@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { QUEUE_MAX, apiQuestions, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
+import { QUEUE_MAX, apiQuestions, inputVals, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
 
 // every kind of block, loops limited by a max and an ask
@@ -1090,4 +1090,70 @@ test('workflow queue: past at once a run is queued, no workspace; it starts as a
   assert.equal(ws.kind, 'worktree')
   assert.notEqual(r.ws, a.ws)
   assert.equal(ws.flow, b.id)
+})
+
+const INPUTS = `# Fix issue
+Fixes one.
+
+runs in: main · session: new
+
+## start
+input: task
+inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m
+next: r
+
+## r
+run: echo {{inputs.issue}} {{inputs.base}} {{inputs.size}} [{{inputs.reviewer}}]
+ok: e
+fail: e
+
+## e
+end: success
+`
+
+test('workflow inputs: the line reads back, check names a bad one, a run fills them; needed, numbers, choices; a schedule needs defaults', async t => {
+  const { workflow, problems } = parse(INPUTS, 'fix')
+  assert.deepEqual(problems, [])
+  assert.deepEqual(check(workflow), [])
+  assert.equal(toFile(workflow), INPUTS, 'round trip')
+  assert.deepEqual(workflow.blocks[0].inputs, [
+    { name: 'issue', kind: 'number' },
+    { name: 'base', kind: 'branch', default: 'main' },
+    { name: 'reviewer', kind: 'text', optional: true },
+    { name: 'size', kind: 'choice', choices: ['s', 'm', 'l'], default: 'm' },
+  ])
+  assert.deepEqual(inputVals(workflow.blocks[0].inputs, { issue: '7' }), { 'inputs.issue': '7', 'inputs.base': 'main', 'inputs.reviewer': '', 'inputs.size': 'm' })
+  const bad = parse(INPUTS.replace('inputs: issue:number,', 'inputs: issue:number, issue, n:float, c:choice(a|b)=z,').replace('[{{inputs.reviewer}}]', '{{inputs.who}}')).workflow
+  assert.deepEqual(check(bad), [
+    'Start: inputs: issue twice',
+    'Start: inputs: n:float? text, number, branch or choice(a|b)',
+    'Start: inputs: c=z? not one of its choices',
+    "r: {{inputs.who}} isn't one of Start's inputs",
+  ])
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'fix', text: INPUTS })
+  const start = (inputs?: Record<string, string>) => rig.rpc('flowStart', { workflow: 'fix', project: p.id, task: 'x', inputs })
+  await assert.rejects(start(), /what's issue\?/)
+  await assert.rejects(start({ issue: '14x' }), /issue: 14x\? a number/)
+  await assert.rejects(start({ issue: '1', size: 'xl' }), /size: xl\? one of s, m, l/)
+  await assert.rejects(start({ issue: '1', isue: '2' }), /isue\? its inputs are issue, base, reviewer, size/)
+  const run = await start({ issue: '1423', size: 'l' })
+  assert.equal(run.vars['inputs.issue'], '1423')
+  const r = await until(async () => {
+    const x = await rig.rpc('flowGet', { id: run.id })
+    return x.status === 'done' && x
+  }, 'done')
+  assert.equal(r.vars['steps.r.output'], '1423 main l []')
+
+  // the CLI's --set
+  const cli = await rig.cli('flow', 'run', 'fix', p.id, 'y', '--set', 'issue=9', '--set', 'reviewer=ann', '--json')
+  assert.equal(JSON.parse(cli.out).vars['inputs.reviewer'], 'ann')
+
+  // a schedule: its run gives no inputs, so each needed one needs a default
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, workflow: 'fix', prompt: 'x', when: 'every day at 9am' }), /Fix issue can't run on a schedule: what's issue\?/)
+  await rig.rpc('flowSave', { id: 'fix', text: INPUTS.replace('issue:number', 'issue:number=1') })
+  assert.ok((await rig.rpc('scheduleSet', { project: p.id, workflow: 'fix', prompt: 'x', when: 'every day at 9am' })).id)
 })

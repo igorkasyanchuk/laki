@@ -8,7 +8,7 @@
 import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
@@ -1016,6 +1016,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
           </span>
         )}
       </div>
+      {b.kind === 'start' && field('Inputs', text(b.inputs?.map(inputText).join(', '), (x, v) => (x.inputs = v.trim() ? inputsOf(v) : undefined), false, 'issue:number, base:branch=main, size:choice(s|m|l)=m'), 'Besides the task, what Run asks for: name, ? when optional, :number, :branch or :choice(a|b), =its default. Each is {{inputs.<name>}}; a scheduled run takes the defaults.')}
       {b.kind !== 'start' && field('Name', text(b.name, (x, v) => (x.name = v || undefined), false, b.id))}
       {b.kind !== 'start' && <IdField key={b.id} id={b.id} rename={to => (edit(w => void renameBlock(w, b.id, to)), onPick(to))} check={to => renameBlock(JSON.parse(JSON.stringify(wf)), b.id, to)} />}
       {b.kind === 'agent' && (
@@ -1697,10 +1698,19 @@ function StartRun({ item, projects, api, onClose, onStarted }: { item: WorkflowI
   const [dry, setDry] = useState(false)
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
+  // its Start's inputs: a field each, its default first; a branch picks from the project's
+  const inputs = item.blocks.find(b => b.kind === 'start')?.inputs ?? []
+  const [vals, setVals] = useState<Record<string, string>>(() => Object.fromEntries(inputs.map(i => [i.name, i.default ?? ''])))
+  const [branches, setBranches] = useState<string[]>([])
+  useEffect(() => {
+    if (!project || !inputs.some(i => i.kind === 'branch')) return
+    api.call<{ branches: string[] }>('branches', { project }).then(r => setBranches(r.branches), () => setBranches([]))
+  }, [project])
+  const missing = inputs.some(i => !i.optional && !vals[i.name]?.trim())
   const go = () => {
     setBusy(true)
     setErr('')
-    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, task, dry }).then(
+    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, task, dry, ...(inputs.length && { inputs: vals }) }).then(
       r => onStarted(r.id),
       e => (setBusy(false), setErr((e as Error).message)),
     )
@@ -1722,13 +1732,42 @@ function StartRun({ item, projects, api, onClose, onStarted }: { item: WorkflowI
           <span>Task</span>
           <textarea autoFocus rows={4} value={task} placeholder="What should it work on?" onChange={e => setTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), go())} />
         </label>
+        {inputs.map(i => {
+          const v = vals[i.name] ?? ''
+          const put = (x: string) => setVals(o => ({ ...o, [i.name]: x }))
+          return (
+            <label key={i.name} className="wf-field">
+              <span>
+                {i.name}
+                {!i.optional && <b className="wf-need" data-tip="Needed"> *</b>}
+              </span>
+              {i.kind === 'choice' ? (
+                <select value={v} onChange={e => put(e.target.value)}>
+                  {(i.optional || !i.choices?.includes(v)) && <option value="">{i.optional ? 'none' : 'pick one'}</option>}
+                  {(i.choices ?? []).map(c => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              ) : i.kind === 'branch' ? (
+                <select value={v} onChange={e => put(e.target.value)}>
+                  {(i.optional || !v) && <option value="">{i.optional ? 'none' : 'pick one'}</option>}
+                  {[...new Set([...(v ? [v] : []), ...branches])].map(c => (
+                    <option key={c}>{c}</option>
+                  ))}
+                </select>
+              ) : (
+                <input type={i.kind === 'number' ? 'number' : 'text'} value={v} placeholder={i.optional ? 'optional' : ''} onChange={e => put(e.target.value)} />
+              )}
+            </label>
+          )
+        })}
         <Switch className="switch-row" on={dry} onChange={setDry}>
           Dry run: opening a PR, approving, merging and archiving are said, not done
         </Switch>
         {err && <span className="wf-err">{err}</span>}
         <div className="wf-start-foot">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={busy || !project || !task.trim()}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
+          <button className="btn primary" disabled={busy || !project || !task.trim() || missing}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
         </div>
       </form>
     </div>

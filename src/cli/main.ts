@@ -17,6 +17,7 @@ import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
+const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
 const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'merge'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
@@ -25,6 +26,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
   const k = a.replace(/^-+/, '')
   if (!textOnly && a === '--') textOnly = true
+  else if (!textOnly && args[0] !== 'hook' && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '')
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
 }
@@ -400,7 +402,7 @@ async function main() {
     case 'flow':
     case 'flows':
     case 'workflow': {
-      // workflows (experimental): laki flow [ls] | run <workflow> <project> <task…> [--dry] | show|stop <run> | answer <run> <n> [words]
+      // workflows (experimental): laki flow [ls] | run <workflow> <project> <task…> [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]
       const [sub = 'ls', id, ...words] = rest
       const status = (r: FlowView | FlowRun) => `${r.status}${!FLOW_ENDED.includes(r.status) && r.cur ? ` at ${r.cur}` : ''}`
       if (sub === 'ls') {
@@ -413,9 +415,10 @@ async function main() {
       }
       if (sub === 'run') {
         const [project, ...task] = words
-        if (!id || !project) throw new Error('usage: laki flow run <workflow> <project> <task…> [--dry]')
-        const r: FlowRun = await rpc('flowStart', { workflow: id, project, task: task.join(' '), dry: !!flags.dry }, 180000)
-        return out(r, `${r.id}  ${status(r)}  in ${r.ws}`)
+        if (!id || !project) throw new Error('usage: laki flow run <workflow> <project> <task…> [--dry] [--set name=value…]')
+        const inputs = Object.fromEntries(sets.map(x => (x.includes('=') ? [x.slice(0, x.indexOf('=')).trim(), x.slice(x.indexOf('=') + 1)] : [x.trim(), ''])))
+        const r: FlowRun = await rpc('flowStart', { workflow: id, project, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }) }, 180000)
+        return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }
       if (sub === 'show') {
         const r: FlowRun = await rpc('flowGet', { id })
@@ -424,7 +427,7 @@ async function main() {
       }
       if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
       if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
-      throw new Error('usage: laki flow [ls] | run <workflow> <project> <task…> [--dry] | show|stop <run> | answer <run> <n> [words]')
+      throw new Error('usage: laki flow [ls] | run <workflow> <project> <task…> [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

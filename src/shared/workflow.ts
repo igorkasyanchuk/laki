@@ -63,6 +63,7 @@ export type Block = {
   max?: { n: number; to?: string } // at most n times, then to
   text?: string // popup: what it shows (HTML when it starts with <, else Markdown); end: its notification's words; decide: the state it judges (a JSON template; none: the block before's result); agent, llm: the prompt (after its action's, with use); action ship: the commit message; save: what's written; webhook: its body
   input?: 'task' // start
+  inputs?: FlowInput[] // start: what a run asks for besides the task, {{inputs.NAME}}
   agent?: string // a preset's name (claude, codex, one of Settings')
   use?: string // agent: an agent action's slug, or its name (Run ▾'s, Settings' or the project's: findAction): its prompt first
   model?: string // agent; llm: an OpenRouter model (unset: Settings › AI's); decide: a decision model (unset: Jev)
@@ -104,6 +105,31 @@ export type WorkflowSource = 'yours' | 'project'
 export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean } // the list's; byAgent: an agent wrote it (MCP), not saved by the user since
 
 export const ID = /^[a-z0-9][a-z0-9_?-]{0,40}$/i
+// a Start's inputs: line, name[?][:kind][=default], kind text (unset), number, branch or choice(a|b|…); kind stays as
+// written, so check() can name an unknown one
+export const INPUT_KINDS = ['text', 'number', 'branch', 'choice']
+export type FlowInput = { name: string; kind: string; choices?: string[]; optional?: boolean; default?: string }
+export function inputsOf(v: string): FlowInput[] {
+  return v.split(',').map(x => x.trim()).filter(Boolean).map(x => {
+    const m = /^([^?:=]*?)\s*(\?)?\s*(?::\s*([^=]*?))?\s*(?:=\s*(.*))?$/.exec(x)!
+    const c = /^choice\s*\((.*)\)$/i.exec(m[3] ?? '')
+    return { name: m[1], kind: c ? 'choice' : (m[3] || 'text').toLowerCase(), ...(c && { choices: c[1].split('|').map(o => o.trim()).filter(Boolean) }), ...(m[2] && { optional: true }), ...(m[4] !== undefined && { default: m[4] }) }
+  })
+}
+export const inputText = (i: FlowInput) => `${i.name}${i.optional ? '?' : ''}${i.kind === 'text' ? '' : `:${i.kind === 'choice' ? `choice(${(i.choices ?? []).join('|')})` : i.kind}`}${i.default !== undefined ? `=${i.default}` : ''}`
+// a run's inputs: what it was given over the defaults, each checked, as {{inputs.NAME}}; an optional one not given is ''
+export function inputVals(defs: FlowInput[] = [], given: Record<string, string> = {}): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const k of Object.keys(given)) if (!defs.some(i => i.name === k)) throw new Error(`${k}? ${defs.length ? `its inputs are ${defs.map(i => i.name).join(', ')}` : 'it takes no inputs'}`)
+  for (const i of defs) {
+    const v = String(given[i.name] ?? i.default ?? '').trim()
+    if (!v && !i.optional) throw new Error(`what's ${i.name}?`)
+    if (v && i.kind === 'number' && !Number.isFinite(Number(v))) throw new Error(`${i.name}: ${v}? a number`)
+    if (v && i.kind === 'choice' && !i.choices?.includes(v)) throw new Error(`${i.name}: ${v}? one of ${(i.choices ?? []).join(', ')}`)
+    out[`inputs.${i.name}`] = v
+  }
+  return out
+}
 export const VAR_NAME = /^[A-Za-z_][\w-]{0,40}$/ // a variable's: {{vars.NAME}}
 const VAR_LINE = /^var\s+([A-Za-z_][\w-]{0,40})\s*:\s?(.*)$/
 // {{vars.NAME}}: Settings' (every workflow's), then the workflow's own over them
@@ -154,7 +180,7 @@ export function exitsOf(b: Block): Exit[] {
 // are lines named after them (next:, ok:, fail:…), a choice's and an ask's options are - label → block; > lines are its
 // text; max: 3 → stuck limits it; at: x,y is where the canvas draws it.
 
-const WHOLE = new Set(['name', 'ask', 'show', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup', 'extension']) // the rest of the line is the value: no · split
+const WHOLE = new Set(['inputs', 'name', 'ask', 'show', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup', 'extension']) // the rest of the line is the value: no · split
 const KIND_KEY: Record<string, BlockKind> = { input: 'start', agent: 'agent', llm: 'llm', decide: 'decide', popup: 'popup', webhook: 'webhook', run: 'run', choice: 'choice', if: 'choice', case: 'case', ask: 'ask', action: 'action', wait: 'wait', save: 'save', extension: 'extension', end: 'end' }
 
 export function parse(text: string, id = ''): { workflow: Workflow; problems: string[] } {
@@ -247,6 +273,7 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
       return void (m && Number(m[1]) >= 1 ? (b.max = { n: Number(m[1]), ...(to(m[2] ?? '') && { to: m[2] }) }) : problems.push(`${at}: max: 3 → block`))
     }
     case 'input': return void (b.input = 'task')
+    case 'inputs': return void (b.inputs = v.trim() ? inputsOf(v) : undefined)
     case 'agent': return void (b.agent = v || 'claude')
     case 'use': return void (b.use = v || undefined)
     case 'model': return void (b.model = v || undefined)
@@ -333,7 +360,7 @@ export function toFile(wf: Workflow): string {
     L.push('', `## ${b.id}`)
     if (b.name && b.name !== b.id) L.push(`name: ${one(b.name)}`)
     switch (b.kind) {
-      case 'start': L.push(`input: ${b.input ?? 'task'}`); break
+      case 'start': L.push(`input: ${b.input ?? 'task'}`); if (b.inputs?.length) L.push(`inputs: ${b.inputs.map(inputText).join(', ')}`); break
       case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'llm': L.push(`llm: ${b.model ?? ''}`.trimEnd()); if (b.system) L.push(`system: ${one(b.system)}`); if (b.temperature !== undefined) L.push(`temperature: ${b.temperature}`); if (b.json !== undefined) L.push(`json: ${b.json ? 'yes' : 'no'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'decide':
@@ -403,6 +430,21 @@ export function check(wf: Workflow): string[] {
     if (b.kind === 'save' && b.from && b.link) out.push(`${blockName(b)}: a file or a link, not both`)
     if (b.kind === 'agent' && b.session && !['run', 'new'].includes(b.session) && by.get(b.session)?.kind !== 'agent') out.push(`${blockName(b)}: session ${b.session} isn't an agent block`)
     if (wf.where === 'main' && ((b.kind === 'action' && ['ship', 'approve', 'merge'].includes(b.action ?? '')) || b.kind === 'wait')) out.push(`${blockName(b)} needs a PR: runs in: worktree`) // a folder's own workspace has no PR of its own
+  }
+  // inputs: names, kinds, defaults; and every {{inputs.x}} (or a choice's or case's inputs.x) one of them
+  const inputs = start.inputs ?? []
+  for (const [n, i] of inputs.entries()) {
+    const at = `${blockName(start)}: inputs: ${i.name || '?'}`
+    if (!VAR_NAME.test(i.name)) out.push(`${blockName(start)}: inputs: ${i.name || '(empty)'} isn't a name (letters, digits, - _)`)
+    else if (inputs.findIndex(x => x.name === i.name) < n) out.push(`${at} twice`)
+    if (!INPUT_KINDS.includes(i.kind)) out.push(`${at}:${i.kind}? text, number, branch or choice(a|b)`)
+    if (i.kind === 'choice' && (i.choices?.length ?? 0) < 2) out.push(`${at}: a choice of two at least, choice(a|b)`)
+    if (i.default !== undefined && i.kind === 'choice' && !i.choices?.includes(i.default)) out.push(`${at}=${i.default}? not one of its choices`)
+    if (i.default && i.kind === 'number' && !Number.isFinite(Number(i.default))) out.push(`${at}=${i.default}? a number`)
+  }
+  for (const b of wf.blocks) {
+    const used = new Set([...JSON.stringify(b).matchAll(/(?:\{\{\s*|"(?:of|label)":")inputs\.([\w-]+)/g)].map(m => m[1]))
+    for (const n of used) if (!inputs.some(i => i.name === n)) out.push(`${blockName(b)}: {{inputs.${n}}} isn't one of Start's inputs`)
   }
   const seen = new Set<string>()
   const walk = (b?: Block) => {
@@ -512,6 +554,7 @@ export type FlowVar = { name: string; what: string; from?: string } // from: the
 export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, aren't here: the editor lists them apart
   const out: FlowVar[] = [
     { name: 'task', what: 'what the run works on (Run’s task, a schedule’s prompt)' },
+    ...(wf.blocks.find(b => b.kind === 'start')?.inputs ?? []).map(i => ({ name: `inputs.${i.name}`, what: `an input of the run's: ${i.kind === 'choice' ? (i.choices ?? []).join(', ') : i.kind}${i.optional ? ', optional' : ''}${i.default !== undefined ? `, ${i.default || "''"} unless given` : ''}`, from: 'start' })),
     { name: 'project', what: 'the project’s name' },
     { name: 'answer', what: 'what you typed with your last Ask you pick (else its label)' },
     { name: 'pr.url', what: 'the workspace’s PR, once there is one' },
@@ -715,7 +758,7 @@ runs in: worktree|main · session: new|shared · at once: 3 · turns: 30 (at onc
 var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:
-- ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked.
+- ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked. Its inputs, besides the task, on one line: "inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m" (name[?][:kind][=default]; kinds text (the default), number, branch, choice(a|b|…); ? optional): each is {{inputs.<name>}}, asked for as the run starts (laki_workflow_run's inputs); a scheduled run takes the defaults.
 - agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed).
 - run: <shell command> (in the run's folder; timeout: <minutes>). Exits ok (exit 0), fail. {{steps.<id>.output}}: its last lines.
 - ask: <question>, show: <text with {{vars}}>, then options "- <label> → <block>". Waits for the user; what they type is {{answer}}.

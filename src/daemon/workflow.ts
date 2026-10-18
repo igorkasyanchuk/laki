@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { widgetUse } from './widgets.ts'
@@ -189,7 +189,7 @@ function varsOf(r: FlowRun): Record<string, string> {
   return { ...varsFill(r.flow.vars, state.settings?.flowVars), ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
 }
 
-export async function flowStart(o: { workflow: string; source?: WorkflowSource; project: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent' }) {
+export async function flowStart(o: { workflow: string; source?: WorkflowSource; project: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string> }) {
   on()
   const wf = flowFind({ id: o.workflow, source: o.source, project: o.project })
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
@@ -198,7 +198,9 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   if (proj.kind) throw new Error('workflows run in a project: Terminals and Browsers have none')
   if (wf.where === 'worktree' && proj.git === false) throw new Error(`${proj.name} isn't a git repository: ${wf.name} runs in a worktree (runs in: main works there)`)
   const task = String(o.task ?? '').trim()
-  if (wf.blocks.find(b => b.kind === 'start')?.input === 'task' && !task) throw new Error('what should it work on? (a task)')
+  const start = wf.blocks.find(b => b.kind === 'start')
+  if (start?.input === 'task' && !task) throw new Error('what should it work on? (a task)')
+  const inputs = inputVals(start?.inputs, Object.fromEntries(Object.entries(o.inputs ?? {}).map(([k, v]) => [k, String(v ?? '')]))) // defaults, checked: {{inputs.NAME}}
   // past at once: queued, behind the others waiting (a slot that frees goes to the oldest: next)
   const atOnce = wf.runs ?? RUNS_AT_ONCE
   const busy = runs().filter(r => going(r) && runOf(r, wf)).length
@@ -206,7 +208,7 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
   const { source, project, path, text, problems, byAgent: _, ...flow } = wf
-  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   runs().push(r)
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}`)
   if (queue) {

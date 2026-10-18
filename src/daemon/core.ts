@@ -14,7 +14,7 @@ import { dataDir } from '../shared/conn.ts'
 import { actionSlug, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
-import { FLOW_ENDED, flowView } from '../shared/workflow.ts'
+import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, homeDir, loginCmd } from './accounts.ts'
 import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from './share.ts'
 import { limitReset } from './limits.ts'
@@ -4658,7 +4658,7 @@ const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again
 export const flowFiles = { at: 0 }
 // workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
-export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' } } = {} // what a client sets: the daemon works out the rest
+export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project'; blocks: FlowBlock[] } } = {} // what a client sets: the daemon works out the rest
 
 export function scheduleSet(o: ScheduleIn): Schedule {
   const old = o.id ? findSchedule(o.id) : undefined
@@ -4691,7 +4691,14 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     if (ext.scoped && ['new', 'local', 'local-new'].includes(s.ws)) throw new Error(`${ext.name} is per workspace: pick one of ${proj.name}'s`)
   } else if (s.workflow) {
     if (state.settings?.workflows !== true || !flowHooks.find) throw new Error('turn Workflows on first: Settings › General › Experimental')
-    s.source = flowHooks.find({ id: s.workflow, source: s.source, project: proj.id }).source // throws: no such workflow
+    const wf = flowHooks.find({ id: s.workflow, source: s.source, project: proj.id }) // throws: no such workflow
+    s.source = wf.source
+    // a scheduled run takes its inputs' defaults: each needed one must have one
+    try {
+      inputVals(wf.blocks.find(b => b.kind === 'start')?.inputs)
+    } catch (e) {
+      throw new Error(`${wf.name} can't run on a schedule: ${(e as Error).message} (a scheduled run takes its inputs' defaults: give it one in Start's inputs:, name=value)`)
+    }
   } else if (!(pr ? pr.agent !== 'command' : isAgent(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't an agent's preset`)
   if (s.workflow || (ext && !ext.scoped)) {
     // its runs go where the workflow says; an extension's: nowhere

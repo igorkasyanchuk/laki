@@ -1034,8 +1034,12 @@ merging and archiving ask you first unless the block says not to; *Dry run* says
 keeps the version it started with, so editing a workflow never moves one under way. Several run at once (*Runs at
 once*, 3 unless changed); one started past that waits its turn, *queued*, with no workspace yet, and starts by
 itself as one of them ends (20 can wait; the run's page says how many are ahead, and *Stop* takes it off). A run
-asks you before more agent turns than the workflow allows (30). A scheduled task
-(Schedule › New task › the agent picker's *Workflow*) starts one at its times, its prompt the run's task; while that
+asks you before more agent turns than the workflow allows (30). Start can ask for more than the task: its *Inputs*
+(`inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m` in the file: a name, `?` when it's
+optional, a kind (text unless said, a number, a branch of the project, or one of a few choices) and `=` a default) are
+fields in *Run*, `--set issue=1423` on `laki flow run`, and `{{inputs.issue}}` in any block. A scheduled task
+(Schedule › New task › the agent picker's *Workflow*) starts one at its times, its prompt the run's task and its
+inputs their defaults (one with a needed input without a default can't be scheduled); while that
 run goes on, the next time is skipped. An *Extension* block (under *Outside Laki*) fetches one of your extensions
 that's turned on, waits, and gives its data to the blocks after it: `{{steps.<id>.data}}` (JSON) and each field,
 `{{steps.<id>.free_gb}}`; an off one, or a fetch that fails, takes its *error* way.
@@ -1053,7 +1057,7 @@ again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
 
 ```bash
 laki flow                                      # workflows and runs
-laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done
+laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done; --set issue=1423: an input
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
@@ -1514,7 +1518,7 @@ laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the proj
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
-laki flow run my-flow app "add CSV export" [--dry]     # a workflow run (experimental: Workflows, below)
+laki flow run my-flow app "add CSV export" [--dry] [--set name=value]     # a workflow run (experimental: Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
 laki widget on|off|run <id> [--ws <ws>]                 # show or hide one | fetch now (--ws: a per-workspace one's instance)

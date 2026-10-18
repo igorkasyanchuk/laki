@@ -9,6 +9,8 @@ version it builds, with the date. -->
 - **Workflows: no more agents that hang forever**: an Agent block's turn has a timeout (an hour unless set: then Esc
   and its error way); one that prints nothing for 10 minutes gets a nudge, then the run asks you (Nudge again, Try
   again, Skip it, Stop the run).
+- **Workflows: inputs**: Start can ask for more than the task (`inputs: issue:number, base:branch=main`): a field
+  each in *Run*, `--set issue=1423` on `laki flow run`, `{{inputs.issue}}` in any block.
 - **Workflows: a queue past *Runs at once***: a run started (or scheduled) while the workflow has its runs going
   waits its turn instead of failing, and starts by itself as one ends.
 - **Workflows: tries again**: `retry: 2` on an Agent, Run command, AI call, AI decision or Extension block runs it again

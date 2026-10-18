@@ -108,7 +108,7 @@ a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `fl
 setting's `required` and the view's `missing`, the `panel` and `row` places (a row's instances fetched for every live
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
 `widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`; 86: workflows' `agent-ask` wait (`turnWaits`, `flowAnswer` through `answer`), a
-block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`). A
+block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -894,7 +894,13 @@ leaves the wait to `flowTick`. Past `at once` (`going`: live and not queued) `fl
 (no workspace, `QUEUE_MAX` 20 per workflow, then refused) and returns it; `begin` is the `wsNew` and the start;
 `next` (from `finish`, and `flowTick` in case) begins the oldest queued one of each workflow with a slot, its
 `at once` the run's own copy. `flowResume` leaves queued ones (one cut short before its workspace: queued again);
-`flowStop`/`flowForget` end one without a workspace; a schedule's run queues (core's skip while one is live stays). Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
+`flowStop`/`flowForget` end one without a workspace; a schedule's run queues (core's skip while one is live stays).
+A Start's `inputs` (`FlowInput`: `inputsOf` reads the line, `name[?][:kind][=default]`, `inputText` writes it; `kind` as
+written, `INPUT_KINDS` checked by `check`, with duplicates, a choice's default and every `{{inputs.x}}` or `of`/label
+`inputs.x` not declared): `flowStart` `inputs` through `inputVals` (defaults, a needed one, a number, a choice; a name it
+doesn't have refused) into `r.vars['inputs.<name>']` (an optional one not given: ''), `flowVars` lists them; StartRun a
+field each (a branch's from `branches`), the CLI's repeated `--set name=value` (`sets`), MCP's `laki_workflow_run`
+`inputs`; `scheduleSet` refuses a workflow whose `inputVals()` throws (flowHooks.find gives its blocks). Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
 already reported waits for a new one. An exit with no block: a bad one `stuck` (*Try again* resets the block's count
 and the turns), a good one ends the run. `flowAnswer` (`n`, `text`: `{{answer}}`). `flowForget` deletes a run (a live one finishes stopped first) and its row's mark. `flowResume` at start: each live run
 not waiting re-enters its block 8 s later (an agent's prompt sent again); with workflows off it waits for `flowTick`
