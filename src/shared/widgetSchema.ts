@@ -70,9 +70,10 @@ export function normKey(s: unknown): string | undefined {
   if (!key || !(mods.has('Cmd') || mods.has('Ctrl') || mods.has('Alt'))) return
   return [...['Ctrl', 'Alt', 'Shift', 'Cmd'].filter(m => mods.has(m)), key].join('+')
 }
-// a key press as normKey writes it (letters and digits by their place: Alt changes what they type on a Mac)
+const CODES: Record<string, string> = { Space: 'Space', Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'", BracketLeft: '[', BracketRight: ']', Backslash: '\\', Minus: '-', Equal: '=', Backquote: '`' }
+// a key press as normKey writes it (letters, digits and punctuation by their place: Alt changes what they type on a Mac)
 export function pressOf(e: { metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; key: string; code: string }) {
-  const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key
+  const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : (CODES[e.code] ?? (e.key.length === 1 ? e.key.toUpperCase() : e.key))
   return [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Cmd', k].filter(Boolean).join('+')
 }
 // a glob over a path in the workspace: * (not /), ** (any folders), ?; one without / matches the file's name

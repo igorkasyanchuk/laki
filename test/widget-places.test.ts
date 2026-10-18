@@ -20,6 +20,8 @@ test('an action offered where you work: its fields read, checked, a key and a gl
   assert.equal(normKey('Shift+E'), undefined, 'Cmd, Ctrl or Alt needed')
   assert.equal(normKey('Ctrl+Cmd+K+J'), undefined, 'one key')
   assert.equal(pressOf({ metaKey: true, ctrlKey: false, altKey: true, shiftKey: false, key: '´', code: 'KeyE' }), 'Alt+Cmd+E', 'Alt+E types ´ on a Mac: by its place')
+  assert.equal(pressOf({ metaKey: true, ctrlKey: false, altKey: true, shiftKey: false, key: '≤', code: 'Comma' }), normKey('Alt+Cmd+,'), 'punctuation by its place too')
+  assert.equal(pressOf({ metaKey: false, ctrlKey: true, altKey: true, shiftKey: false, key: '\u00a0', code: 'Space' }), normKey('Ctrl+Alt+Space'))
   assert.ok(globMatch('*.ts', 'src/a.ts') && !globMatch('*.ts', 'src/a.tsx') && globMatch('docs/**/*.md', 'docs/a/b.md') && globMatch('docs/**/*.md', 'docs/b.md') && !globMatch('src/*.ts', 'src/x/a.ts'))
   const ps = manifestCheck({ name: 'M', fetch: 'echo {}', sample: {}, place: 'row', actions: { a: { run: 'x', show: ['files'], key: 'E', match: '*.ts', insert: 'yes', tilte: 'A' }, b: { ai: 'Explain {{file.path}}', show: ['file'], match: ['*.md'], view: true } } })
   const has = (level: string, where: string, text: RegExp) => assert.ok(ps.some(p => p.level === level && p.where === where && text.test(p.text)), `${level} ${where} ${text} in ${JSON.stringify(ps, null, 1)}`)

@@ -270,7 +270,7 @@ export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: stri
         return (
           <span key={w.id} className={`ws-ext ${i.error ? 'bad' : ''}`} data-tip={`${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={w.click ? e => (e.stopPropagation(), void api.action(w.id, w.click!, '', w.name, ws).catch(() => {})) : undefined}>
             <Glyph w={w} size={10} />
-            {i.badge ?? i.label}
+            {i.badge || i.label}
           </span>
         )
       })}

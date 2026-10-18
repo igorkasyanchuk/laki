@@ -540,8 +540,9 @@ function typedOf(w: Entry, secrets = false) {
   return Object.fromEntries(optionsOf(w).map(o => [o.key, ((v: string) => (o.type === 'bool' ? v === '1' : o.type === 'number' ? (v === '' ? null : Number(v)) : o.type === 'list' ? (v ? v.split(',') : []) : v))(c[o.key])]))
 }
 
+// the secrets file read once, each one's settings once (k: its secrets, c: its settings as text)
 export const widgetsView = (): WidgetView[] =>
-  [...widgets.values()].map(w => ({
+  (sec => [...widgets.values()].map(w => [w, sec[w.id] ?? {}, configOf(w)] as const))(readSecrets()).map(([w, k, c]) => ({
     id: w.id,
     name: w.m.name || w.id,
     description: w.m.description,
@@ -561,9 +562,9 @@ export const widgetsView = (): WidgetView[] =>
     js: w.js || undefined,
     ...(w.m.actions && Object.keys(w.m.actions).length && { actions: Object.keys(w.m.actions) }), // a scheduled task's picks
     ...(m => m.length && { menus: m })(Object.entries(w.m.actions ?? {}).flatMap(([action, a]) => (m => (m ? [{ action, ...m }] : []))(actionMenu(action, a)))), // offered in the palette, menus, a key, the prompt
-    config: configOf(w),
-    options: (k => optionsOf(w).map(({ def: _, ...o }) => (o.type === 'secret' && k[o.key] ? { ...o, set: true } : o)))(secretsOf(w.id)),
-    ...((k, c) => (m => m.length && { missing: m })(optionsOf(w).filter(o => o.required && !(o.type === 'secret' ? k[o.key] : c[o.key]?.trim())).map(o => o.key)))(secretsOf(w.id), configOf(w)), // required ones still empty: Set <label>
+    config: c,
+    options: optionsOf(w).map(({ def: _, ...o }) => (o.type === 'secret' && k[o.key] ? { ...o, set: true } : o)),
+    ...(m => m.length && { missing: m })(optionsOf(w).filter(o => o.required && !(o.type === 'secret' ? k[o.key] : c[o.key]?.trim())).map(o => o.key)), // required ones still empty: Set <label>
     at: w.s.at,
     error: w.s.error,
     running: running.has(w.id) || undefined,
@@ -798,7 +799,7 @@ function exec(w: Entry, cmd: string, args: string[], extra: Record<string, strin
     const p = execGroup(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: t, maxBuffer: MAX_OUT, stdin }, (e, stdout, stderr) => {
       execs.delete(p)
       if (!e) return ok({ out: stdout, err: stderr })
-      const late = e.killed ? `timed out after ${t >= 60_000 ? `${t / 60_000} minutes` : `${t / 1000} s`}` : undefined
+      const late = e.message === 'maxBuffer exceeded' ? `printed more than ${MAX_OUT >> 20} MB` : e.killed ? `timed out after ${t >= 60_000 ? `${t / 60_000} minutes` : `${t / 1000} s`}` : undefined
       no(Object.assign(new Error(late ?? (lastLine(stderr) || lastLine(stdout) || e.message)), { stderr, stdout, exit: typeof e.code === 'number' ? e.code : undefined }))
     })
     execs.add(p)

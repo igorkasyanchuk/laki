@@ -1243,7 +1243,7 @@ export function App() {
     else if (r.insert === undefined && !m.view) done(r.out || `${m.title}: done`)
     if (m.view) setDialog(w.full ? { widget: w.id, back: dialog } : { extension: w.id, back: dialog })
   }
-  const extItems = (show: string, x: WorkspaceView | undefined | null, ctx: WidgetCtx, file?: string): MenuItem[] => (l => (l.length ? [null, { head: 'Extensions' }, ...l.map(({ w, m }): MenuItem => ({ label: m.title, sub: w.name, icon: 'panel', hint: m.key && keyText(m.key), run: () => void extRun(w, m, ctx) }))] : []))(extMenus(show, x, file))
+  const extItems = (show: string, x: WorkspaceView | undefined | null, ctx: WidgetCtx, file?: string): MenuItem[] => (l => (!extWs(x) ? [] : l.length ? [null, { head: 'Extensions' }, ...l.map(({ w, m }): MenuItem => ({ label: m.title, sub: w.name, icon: 'panel', hint: m.key && keyText(m.key), run: () => void extRun(w, m, ctx) }))] : []))(extMenus(show, x, file)) // none in a terminal's, a browser's, a host's or an archived one: ctxOf refuses those
   // the new-workspace page's prompt: an action's text at its cursor
   const extInserts = () => extMenus('prompt').map(({ w, m }) => ({ label: m.title, sub: w.name, run: () => new Promise<string | undefined>(res => void extRun(w, m, {}, res).then(() => res(undefined))) }))
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)

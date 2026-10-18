@@ -53,7 +53,7 @@ export function PromptInput(p: {
   // an extension's text at the cursor (over what's selected), the box focused after it
   const insertText = (t: string) => {
     const el = box.current
-    const v = p.value
+    const v = el?.value ?? p.value // the box as it is now: typed into while the action ran
     const [a, b] = el ? [el.selectionStart, el.selectionEnd] : [v.length, v.length]
     p.onChange(v.slice(0, a) + t + v.slice(b))
     requestAnimationFrame(() => el && (el.focus(), el.setSelectionRange(a + t.length, a + t.length)))
