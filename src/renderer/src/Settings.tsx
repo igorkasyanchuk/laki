@@ -1719,7 +1719,10 @@ function SkillSection({ api }: { api: SkillApi }) {
   const all = () => {
     setBusy(true)
     setErr('')
-    old.reduce((p, r) => p.then(() => api.set(r.agent, true, r.skill)), Promise.resolve<SkillInfo[]>([])).then(setRows, fail).finally(() => setBusy(false))
+    old
+      .reduce((p, r) => p.then(() => api.set(r.agent, true, r.skill)), Promise.resolve<SkillInfo[]>([]))
+      .then(setRows, e => (fail(e), api.load().then(setRows, () => {}))) // the ones written before it: their rows again
+      .finally(() => setBusy(false))
   }
   return (
     <>
@@ -2063,7 +2066,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         </WcRow>
         {places.some(p => BARS.includes(p)) && (
           <WcRow title="Size" hint={places.includes('side') ? 'Cells across × down in the sidebar. In a bar: its width, a line high' : 'Its width in the bar, in cells; a bar is a line high'}>
-            <select className="wc-size" value={w.size.join('x')} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
+            <select value={w.size.join('x')} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
               {SIZES.map(([a, d]) => (
                 <option key={`${a}x${d}`} value={`${a}x${d}`}>
                   {a} across × {d === 0.5 ? '½' : d} down

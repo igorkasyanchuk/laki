@@ -94,7 +94,8 @@ laki screen shot|windows|tap|swipe|type|describe drive the iOS Simulator and app
 PNG's path: read it).
 
   laki screen a1b2 --lines 80
-  laki screen shot Simulator`,
+  laki screen shot                              the booted simulator
+  laki screen shot Safari                       Safari's front window`,
   tab: `Opens a tab in a workspace: an agent (--preset), a command (--cmd) or a shell (neither).
 
   laki tab a1b2 --preset codex
@@ -153,14 +154,14 @@ what a PR, approve or merge would do instead of doing it.
   widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
 their tools; turning one on is the user's. To make one, use the laki-widget skill.
 
-  laki widget tools                             what the user's extensions let you do
-  laki widget tool my-prs refresh '{}' --ws .   Laki may ask the user first
-  laki widget check my-table`,
+  laki widget tools                             what the user's extensions let you do, each tool's input
+  laki widget tool <id> <action> '{"query":"…"}' --ws .   Laki may ask the user first
+  laki widget check <id>`,
   ai: `Asks Laki AI (Settings › AI) to work Laki for you, as the user would ask it in the app.
 
   laki ai "what are my agents doing?"`,
-  mcp: `Laki as an MCP server over stdio (JSON-RPC, a message per line): the same tools as the CLI, none that deletes,
-archives or ships.
+  mcp: `Laki as an MCP server over stdio (JSON-RPC, a message per line): its state, a new workspace, a message to an
+agent, a tab's screen, a diff, scheduled tasks and more; none that deletes, archives or ships.
 
   claude mcp add laki -- laki mcp`,
 }

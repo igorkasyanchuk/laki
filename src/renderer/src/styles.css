@@ -241,7 +241,6 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 /* an extension's page › Settings: a head (switch, name, its buttons), then titled blocks of rows, each its words on the
    left and its control on the right; its own settings in a grid; a list setting's chips; the AI prompt with its copy button */
 .widget-card.off > :not(.wc-head) { opacity: 0.7; }
-.modal .widget-card { padding: 0; border: none; background: none; } /* Settings › Extensions' dialog: the card is the dialog */
 .widget-card { display: flex; flex-direction: column; gap: 14px; }
 .wc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .wc-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }

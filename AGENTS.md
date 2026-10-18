@@ -993,8 +993,10 @@ action, else the full view, else a fetch), `WidgetGrid` (the sidebar's, `place` 
 non-http links; a JS one in an iframe `sandbox="allow-scripts"`, whose messages count only from its own window);
 Settings' `WidgetsSection` (the app's word is *Extensions*; the files, ids, CLI and skill keep *widget*; `WidgetList`:
 two `Group`s, *Yours* (its head's `act`: *New extension*, `WidgetsApi.page('')`) and *Built in*, of Scheduled tasks'
-`.sched-row`s, each with its switch, a click `page(id)`; `WidgetCard`: a head row, then `WidgetOptionField` per
-setting, a list's `ChipsInput`; its folder button is App's Open in menu with `widget`). `Extension.tsx`
+`.sched-row`s, each with its switch, a click `page(id)`; `WidgetCard`: a head (its switch, name, buttons), then `WcSec`s of `WcRow`s (a title and what it does, its control):
+Where it shows (places as pills, size, full view, the hide switches), Updates (every, network, the last fetch and Fetch
+now), Its settings (`WidgetOptionField` per
+setting, a list's `ChipsInput`), Tools for agents; its folder button is App's Open in menu with `widget`). `Extension.tsx`
 `ExtensionPage` (App's dialog `{ extension: id ('' a new one), back }`, `extOf`; closing, its crumb or Esc with nothing
 typed: `back`, so Settings › Extensions comes back; a widget's full view, `{ widget, back }`, and its logs do the same;
 `WidgetApi.settings(id)`: the page): `Preview` (its first place: a sidebar cell at its size, a bar, a button or a Desk
@@ -1178,7 +1180,7 @@ action's go through `agentRun` (`agents`: an `AbortController` per run by extens
 view's `agent` (the inspector's *Stop*, `WidgetsApi.stop`); `widgetSet` `on: false` and a new `source` stop them,
 `widgetRm` stops them and waits (5 s) before its files go, `scanWidgets` when it went, `widgetsStop` at shutdown. A
 stopped fetch fails as `claude: stopped`, its last data kept.
-The user's switches (`WidgetHide`, the store's `hide`, `widgetSet` merges each; Settings' *Refresh button* and *When it was
+The user's switches (`WidgetHide`, the store's `hide`, `widgetSet` merges each; Settings' *Show a refresh button* and *Show when it was
 fetched*): `widgetRender` gives `uiHtml` `hide` (`refresh`: no `refresh: true` button; `at`: `at` out of the scope and
 `namesAt`, a plain top-scope element whose words name it, dropped; Retry stays) and a template its ctx without `at`; the
 renderer's `status` says no *fetched … ago* (`all`: the extension's page still does), the full view no Fetch now. A JS

@@ -611,8 +611,8 @@ prompt* gives any AI chat the whole format with what you typed.
 ## Managing them
 
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
-  size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, *Refresh button* and
-  *When it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`), its folder, *Delete*
+  size, how often it fetches, its full view's size, its settings, *Network access* for a JS page, *Show a refresh button* and
+  *Show when it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`), its folder, *Delete*
   (its folder, settings, data, history, chat and secrets go to the trash, with *Undo* in the toast; `laki widget trash`
   lists the last 30 days', `laki widget restore <trash-id>` puts one back; the ones that come with Laki only turn off), and Laki AI's chat
   to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Overview), or with Laki AI (without

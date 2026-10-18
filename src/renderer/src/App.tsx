@@ -1173,9 +1173,15 @@ export function App() {
     window.addEventListener('focus', check)
     return () => window.removeEventListener('focus', check)
   }, [connected])
+  // one after another: each answer is the rows after its write (at once, the last could be read before another's);
+  // the bar goes as it starts (a second click does nothing), and comes back with what's left
   const updateSkills = () => {
-    const names = [...new Set(oldSkills.map(r => r.name))].join(', ')
-    return Promise.all(oldSkills.map(r => api.call<SkillInfo[]>('skillSet', { agent: r.agent, on: true, skill: r.skill }))).then(rows => (stale(rows.at(-1) ?? []), done(`Updated Laki's skill in ${names}`)), fail)
+    const todo = oldSkills
+    const names = [...new Set(todo.map(r => r.name))].join(', ')
+    setOldSkills([])
+    return todo
+      .reduce((p, r) => p.then(() => api.call<SkillInfo[]>('skillSet', { agent: r.agent, on: true, skill: r.skill })), Promise.resolve<SkillInfo[]>([]))
+      .then(rows => (stale(rows), done(`Updated Laki's skill in ${names}`)), e => (fail(e), api.call<SkillInfo[]>('skills').then(stale, () => {})))
   }
   // a tab's whole terminal as text, the scrollback too (an older daemon's: the bottom of its screen)
   const copyTab = (t: TabView) =>

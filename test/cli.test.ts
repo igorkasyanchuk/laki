@@ -115,6 +115,9 @@ test('cli: help, usage errors, open', async t => {
   assert.match(h.out, /^  laki rm <ws> \| archive <ws>/)
   h = await rig.cli('help', 'stop')
   assert.equal(h.out.trim().split('\n').length, 1, 'not the lines whose words say "stop it"')
+  h = await rig.cli('send', 'nope', '--', '--help') // after --: text to send, not a help request
+  assert.match(h.err, /no workspace nope|nope/)
+  assert.doesNotMatch(h.out, /laki send /)
   h = await rig.cli('help', 'nope')
   assert.equal(h.code, 1)
   assert.match(h.err, /no command nope/)
