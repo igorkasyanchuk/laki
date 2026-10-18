@@ -10,7 +10,8 @@
   "config": {
     "repo": {
       "label": "Repo",
-      "hint": "owner/name, or its GitHub link"
+      "hint": "owner/name, or its GitHub link",
+      "required": true
     },
     "author": {
       "label": "Author",

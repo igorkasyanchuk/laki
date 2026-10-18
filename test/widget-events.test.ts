@@ -36,6 +36,7 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
   const b = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: 'hi', name: 'two' })
   const ta = await until(() => rig.tab(a.id).then((t: any) => t?.last && t), "a's agent, its first turn over") // the fake's own hooks first
   await until(() => rig.tab(b.id).then((t: any) => t?.last), "b's too")
+  await sleep(500) // their first turns' own handlers, still running
   for (const f of ['got.json', 'file.json', `mark-${a.id}`, `mark-${b.id}`]) rmSync(join(home, f), { force: true })
 
   // turn.done: the handler gets it on stdin and in its file, says data and a toast

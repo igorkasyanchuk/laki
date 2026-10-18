@@ -1807,7 +1807,7 @@ export type WidgetsApi = {
   check?: (id: string, run: boolean, ws?: string) => Promise<{ problems: UiProblem[] }> // the inspector's Check (run: its fetch once)
   revoke?: (id: string, action: string, ws: string) => Promise<unknown> // a tool's Always in a workspace taken back (widgetGrantRm)
   studio?: (id: string) => void // the extension studio (Laki AI on): '' a new one
-  remix?: (id: string) => Promise<unknown> // a copy of any one, yours, opened in the studio
+  remix?: (id: string) => Promise<unknown> // a copy of any one, yours, opened in the studio (Laki AI on) or on its page
   undo?: (id: string, after?: number) => Promise<unknown> // the studio's Undo (after: Undo to here)
   tryOnce?: (id: string, ws?: string) => Promise<{ ok: boolean; error?: string }> // the studio's Try it live: its fetch once while off
   wsName?: (ws: string) => string // a grant's workspace, by name ('': no workspace, Laki AI's)
@@ -1879,7 +1879,7 @@ function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string
   const name = o.label || o.key
   if (o.type === 'bool')
     return (
-      <div className="wo wo-bool" data-tip={o.hint}>
+      <div className="wo wo-bool" data-key={o.key} data-tip={o.hint}>
         <Switch on={value === '1'} onChange={on => onSet(on ? '1' : '')}>
           <span>{name}</span>
         </Switch>
@@ -1888,7 +1888,7 @@ function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string
   if (o.type === 'secret')
     // a token: never shown nor sent back (the daemon keeps it), typed over to replace it, Clear to remove it
     return (
-      <label className="wo">
+      <label className="wo" data-key={o.key}>
         <span data-tip={o.hint}>{name}</span>
         <span className="wo-secret">
           <input className="mono" type="password" autoComplete="off" placeholder={o.set ? 'Set: type to replace' : o.hint} spellCheck={false} onKeyDown={enter} onBlur={e => e.target.value && (onSet(e.target.value), (e.target.value = ''))} />
@@ -1901,7 +1901,7 @@ function WidgetOptionField({ o, value, onSet }: { o: WidgetOption; value: string
       </label>
     )
   return (
-    <label className="wo">
+    <label className="wo" data-key={o.key}>
       <span data-tip={o.hint}>{name}</span>
       {o.type === 'choice' ? (
         <select value={value} onChange={e => onSet(e.target.value)}>
@@ -2135,7 +2135,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
                 {w.builtin && <span className="tag">built-in</span>}
                 {w.dev && <span className={`tag ${w.devError ? 'bad' : ''}`} data-tip={w.devError ? `Last good version kept: ${w.devError}` : 'Linked by laki widget dev: your folder, watched'}>dev</span>}
                 {w.mock && <span className="tag" data-tip="Its inspector put sample data there: Live fetches again">sample data</span>}
-                {(w.place ?? 'side') !== 'side' && <span className="tag">{PLACES.find(x => x[0] === w.place)?.[1]}</span>}
+                {(ps => (ps.length > 1 || ps[0] !== 'side') && <span className="tag">{ps.map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' · ')}</span>)(placesOf(w))}
                 {w.net && <span className="tag" data-tip="Its page may reach https sites">network</span>}
                 {w.byAi && <span className="tag" data-tip="Laki AI wrote it; it was saved off: look at what it runs (its folder) before turning it on">by Laki AI</span>}
                 <span className="tag">

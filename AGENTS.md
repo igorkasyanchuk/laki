@@ -104,7 +104,8 @@ event, the view's `layouts`, `tabNew` `beside`/`edge`, settings' `splitNew`), `s
 a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `flowFiles`; 65: `uiReset`, `screen`/`browse` `by`, the `peek` event; 66: the AI page's earlier chats (`aiChats`, `aiOpen`, `aiChatRm`, `aiNew` keeping the one it ends), `aiImage`, `widgetSet` `ai` (Edit with Laki AI), `GET /artifact/…` (the artifacts viewer), settings' `imageDays`, `memory` (global), `artifactsIn`; 67: reminders (`reminderAdd`/`reminderSet`/`reminderRm`/`reminderTick`, the view's `reminders`, the `reminder` event), `cliState`/`cliInstall`/`cliRemove`, `memoryCompact`/`memoryCompactLog`/`memoryTick`, a project's `compacted`, a widget's `places` and `widgetSet` `place` as a list, the `desk` place; 68: a widget's `sample` (the view's, `widgetRender` `sample`, `GET /widget/…` `sample=1`), `widgetWrite` refusing a fetch without one, `flowTest` `own`, a workflow's `vars` and `{{vars.NAME}}` (settings' `flowVars`); 69: `todoAdd` `images`; 70: `run` `script` (`RUN_SCRIPTS`), a workspace's `scripts`, `device` (laki screen's), `remoteStart` `via: 'tailscale'`, a remote's `via`, `doctor`'s `idb`, a workspace's `archivedAt`; 71: a widget's `ui` (the UI kit), `widgetRender` `cells`; 72: `widgetDev`, `widgetRuns`, `widgetMock`, a widget's `dev`, `devError` and `mock`; 73: `widgetNew`, `widgetCheck`, one-file extensions, `widgetFiles`/`widgetWrite` `fixtures/<name>.json`; 74: a widget's `scope` and `inst`, `ws` on `widgetRender`/`widgetRun`/`widgetAction`/`widgetMock`/`widgetRuns`/`widgetCheck` and `GET /widget/…`, `view` `ws`; 75: `widgetPush`, the `widget-say` event, `widgetRuns`' `stream`, widget.json's `on` and `stream`; 76: tools (`widgetTools`, `widgetToolCall`, `widgetToolAnswer`, `widgetGrantRm`, the `toolAsk` and `toolDone` events, a widget's `tools`, an action's `{ run, tool }`); 77: the studio (`widgetSlug`, `widgetUndo`, `widgetRemix`, `widgetRun` `once`, a widget's `history`, the `widget:<id>` chat); 78: a widget's `source` and `ownFetch`, `widgetSet`
 `source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts; 79: `widgetFileSave`, `widgetRender`
 `sample` as a fixture's name, a widget's `fixtures`; 80: an AI source (`widgetSet` `source` `ai`), settings' `widgetAgent`; 81: a widget's `agent`, `resourceStop` `agent:<id>`, `widgetRm` waits; 82: a widget's `hide` (`refresh`, `at`), `widgetSet` `hide`; 83: schedules' `widget`/`action`, workflows' `extension` block, a widget's `actions`; 84: a `secret` setting (the view's
-`config` '' and its option's `set`), `widgetRm` to the trash, `widgetRestore`/`widgetTrash`, `from` on `widgetAction`/`widgetSet`/`widgetDev`/`widgetCheck` (an agent's: asked, refused, left off). A
+`config` '' and its option's `set`), `widgetRm` to the trash, `widgetRestore`/`widgetTrash`, `from` on `widgetAction`/`widgetSet`/`widgetDev`/`widgetCheck` (an agent's: asked, refused, left off), a
+setting's `required` and the view's `missing`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1122,6 +1123,20 @@ as lines. `widgetRun` on a stream starts it again; `due` skips them; `checkOne` 
 `on`'s events (`near`) and handlers (an action or refresh with a fetch) and `stream` (global, with a fetch, `every`
 ignored). `widgetPush` (`laki widget push <id> [json|-] [--ws] [--merge]`): `keep`, a `push` run, refused when off. The
 `stream` starter. The inspector's Runs shows `WidgetRuns.stream` (`WidgetStream`).
+
+Fixes (`test/widget-fixes.test.ts`): `widgetRun` refuses an `ai` source for any reason but `manual` within
+`everyOf` of its last run (a new AI `source` from `widgetSet` is `manual`); `widgetEvent` sends `workspace.archived`
+and `workspace.removed` to a scoped one while the workspace is still in `state` (`going`: a `Job`'s `gone`, its `wsInfo`
+then; `handle` passes it as `Ev.gone`, `widgetAction` runs on `wsEnv(w, undefined, gone)`, no `LAKI_WIDGET_FILE`, keeps
+nothing; a refresh for one is logged, not run) and queues no `refresh` while one for that extension and workspace waits;
+`due` backs off `every × 2^min(fails, 3)` (`fails` in the store or instance, cleared by a good fetch); `keep` sets
+`told` only while it's on and a client is connected; `uiCheck`/`checkOne` warn at `RESERVED` top-level data names
+(`reservedIn`, with or without a `ui`); a config `Spec`'s `required` (`optionsOf`, the view's `missing`: App's `set`
+opens the page at that field, `ExtensionPage` `edit`, the field's `data-key`; `Cell` says *Set <label>*); MCP's
+`extNames` (a name the same as another's, or cut at 64, gets `_<6 hex>`; list and call build the same map). The
+renderer: tool asks wait in a `Line` (text.ts; `toolShow`, a notification's click is `front`), Remix is always there
+(`laki widget remix`), `AiPage` `chat` (the Extension page's `widget:<id>`), the Desk shows the selected workspace's
+instances (`covered` leaves it out; `DeskPage` `wsName`).
 
 Sources (`test/widget-source.test.ts`): `types.ts` `WIDGET_SOURCES`, `WidgetSource`; widget.json's `source` the
 default, the store's (`widgetSet` `source`, `sourceOk`: a static text 64 KB, a path, an http(s) URL; `fetch` only with

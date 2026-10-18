@@ -30,6 +30,7 @@ const SPEC: J = {
         hint: str('A line under it'),
         default: { description: 'Its value until set' },
         choices: { type: 'array', items: { type: 'string' }, description: "A choice's options" },
+        required: { type: 'boolean', description: 'It needs one: while it is empty its cell says Set <label> and opens its settings' },
       },
     },
   ],
@@ -294,7 +295,10 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
       if (!KEY.test(n)) say('error', where, 'a name: a letter or _, then letters, digits or _ (it becomes $WIDGET_' + n.toUpperCase() + ')')
       if (!v || typeof v !== 'object' || Array.isArray(v)) continue
       const s = v as Record<string, unknown>
-      for (const k of Object.keys(s)) if (!['type', 'label', 'hint', 'default', 'choices'].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, ['type', 'label', 'hint', 'default', 'choices']))}`)
+      const SPEC_KEYS = ['type', 'label', 'hint', 'default', 'choices', 'required']
+      for (const k of Object.keys(s)) if (!SPEC_KEYS.includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, SPEC_KEYS))}`)
+      if (s.required !== undefined && typeof s.required !== 'boolean') say('error', where, 'required: true or false')
+      if (s.required === true && s.type === 'bool') say('warn', where, 'a switch is never empty: required does nothing')
       if (s.type !== undefined && !SPEC_TYPES.includes(s.type as string)) say('error', where, `type ${JSON.stringify(s.type)}: one of ${SPEC_TYPES.join(', ')}`)
       if (s.type === 'choice' && !(Array.isArray(s.choices) && s.choices.length)) say('error', where, 'a choice needs choices: ["a", "b"]')
       if (s.type === 'choice' && Array.isArray(s.choices) && s.default !== undefined && !s.choices.map(String).includes(String(s.default))) say('warn', where, `default ${JSON.stringify(s.default)} isn't one of its choices`)

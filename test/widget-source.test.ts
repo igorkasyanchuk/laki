@@ -176,7 +176,8 @@ test("an agent's run stops: Resources' Stop, turned off, deleted; a stopped fetc
   await working(true)
   await rig.rpc('widgetSet', { id: 'slow', on: false })
   await working(false)
-  await rig.rpc('widgetSet', { id: 'slow', on: true })
+  await rig.rpc('widgetSet', { id: 'slow', on: true }) // ran a moment ago: waits out its every, so Run now
+  void rig.rpc('widgetRun', { id: 'slow' })
   await working(true)
   const t0 = Date.now()
   assert.equal((await rig.rpc('widgetRm', { id: 'slow' })).deleted, 'slow')

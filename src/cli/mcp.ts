@@ -1,5 +1,6 @@
 // `laki mcp`: Laki as an MCP server over stdio (JSON-RPC 2.0, a message per line), for Claude Code, Codex or
 // any MCP client. Its tools go through the daemon's API like the CLI's commands; none deletes, archives or ships.
+import { createHash } from 'node:crypto'
 import { createInterface } from 'node:readline'
 import { alive, ensureDaemon, rpc as conn } from '../shared/conn.ts'
 import { describe, type Edge, groupsOf, tabsOf } from '../shared/layout.ts'
@@ -217,7 +218,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   // extensions (the app's word; files, ids and the API say widget): read the guide, an example, then write one, saved off
   {
     name: 'laki_extensions',
-    description: "Laki's extensions (also called widgets or plugins: the same thing): small live pages in the sidebar, the top bar or the status bar (a clock, a count of PRs, a chart), or buttons on the rail or in the sidebar's foot (an icon, a label, a count, a click that runs one of its actions), each a folder with widget.json and widget.html fed by a fetch on a schedule. Each one's id, name, whether it's on, its last fetch's error.",
+    description: "Laki's extensions (also called widgets or plugins: the same thing): small live pages in the sidebar, the top bar, the status bar or on the Desk (a clock, a count of PRs, a chart), or buttons on the rail or in the sidebar's foot (an icon, a label, a count, a click that runs one of its actions), each a folder with widget.json and widget.html fed by a fetch on a schedule. Each one's id, name, whether it's on, its last fetch's error.",
     inputSchema: obj({}),
     run: async () => ((await rpc<View>('state')).widgets ?? []).map(w => ({ id: w.id, name: w.name, description: w.description, on: w.on, builtin: w.builtin, byAi: w.byAi, every: w.every, error: w.error })),
   },
@@ -577,7 +578,14 @@ async function extCall(rpc: Rpc, tool: string, input: unknown, from?: string, wh
 // MCP's ext_<id>_<action>: each tool as one of its own, while a daemon runs (tools/list never starts one: stdout is the
 // protocol's)
 type ExtTool = { tool: string; id: string; action: string; name: string; description: string; input: object; agents?: string }
-const extName = (t: { id: string; action: string }) => `ext_${t.id}_${t.action}`.replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 64)
+// each one's name: ext_<id>_<action>, made safe; one cut at 64 or the same as another's ends in 6 hex of its id.action.
+// ponytail: no listChanged: a name a new extension makes collide changes at the client's next tools/list
+export function extNames<T extends { id: string; action: string }>(ts: T[]): Map<string, T> {
+  const base = (t: T) => `ext_${t.id}_${t.action}`.replace(/[^a-zA-Z0-9_-]/g, '_')
+  const n = new Map<string, number>()
+  for (const t of ts) n.set(base(t), (n.get(base(t)) ?? 0) + 1)
+  return new Map(ts.map(t => [base(t).length > 64 || n.get(base(t))! > 1 ? `${base(t).slice(0, 57)}_${createHash('sha256').update(`${t.id}.${t.action}`).digest('hex').slice(0, 6)}` : base(t), t]))
+}
 const extTools = async (): Promise<ExtTool[]> => ((await alive()) ? conn<ExtTool[]>('widgetTools').catch(() => []) : [])
 
 // light what it looked at (Settings › General › Experimental › Laki AI's glow)
@@ -590,7 +598,7 @@ const TOOLS = [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.en
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool && name.startsWith('ext_')) {
-    const t = (await extTools()).find(x => extName(x) === name)
+    const t = extNames(await extTools()).get(name)
     if (!t) throw new Error(`no tool ${name}: its extension is off, or Laki isn't running`)
     return extCall(own, t.tool, args ?? {}, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined)
   }
@@ -612,7 +620,7 @@ async function answer(m: any): Promise<object | undefined> {
     case 'ping':
       return {}
     case 'tools/list':
-      return { tools: [...TOOLS.map(({ run, max, ...t }) => t), ...(await extTools()).map(t => ({ name: extName(t), description: `${t.name}: ${t.description}${t.agents ? `\n\n${t.agents}` : ''}`, inputSchema: t.input }))] }
+      return { tools: [...TOOLS.map(({ run, max, ...t }) => t), ...[...extNames(await extTools())].map(([name, t]) => ({ name, description: `${t.name}: ${t.description}${t.agents ? `\n\n${t.agents}` : ''}`, inputSchema: t.input }))] }
     case 'tools/call':
       try {
         return { content: [{ type: 'text', text: await call(m.params?.name, m.params?.arguments) }] }

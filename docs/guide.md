@@ -87,10 +87,11 @@ changing it: [AGENTS.md](../AGENTS.md).
   many as you like; each shows as a bar over the bottom buttons (⏸ pauses it) and then rings: a sound and a dialog,
   or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
-- **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar, in a grid 3 cells across: a count, a chart, a table,
-  each fed by a command or a script on a schedule, with a full view a click away (below: Extensions). Two come with
-  Laki: *Links* and *My PRs*; Laki AI (Settings › Extensions › *New extension*, or the Desk's *Build with AI*) or the
-  *Extension creator* agent skill makes more.
+- **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar (a grid 3 cells
+  across), in the top bar, the status bar or on the Desk, or buttons on the rail and the sidebar's foot: a count, a
+  chart, a table, each fed by a command, a script, a file, a URL or an agent, with a full view a click away (below:
+  Extensions). Two come with Laki: *Links* and *My PRs*; *Remix* copies any one to change, and Laki AI (Settings ›
+  Extensions › *New ▾*, or the Desk's *Build with AI*) or the *Extension creator* agent skill makes more.
 - **A video while you work**: the play button at the bottom of the sidebar asks for a YouTube link (a video, a
   short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
@@ -805,8 +806,8 @@ weekdays`, `8:00 to 18:30 except fri`, `9am-6pm, no weekends`, `noon-6`, `10pm-6
 *Fetch now* and a change of settings still do. Empty: any time the app is open.
 
 Every extension, yours too, starts off: turn it on in Settings › Extensions. Two come with Laki:
-- *My PRs*: your open PRs in a repo (*Repo*: `owner/name` or its GitHub link; *Author*: `@me`, or someone's login;
-  blank: you) counted: open, drafts, with conflicts, and with each of up to 3 labels (*Count label 1–3*); the full
+- *My PRs*: your open PRs in a repo (*Repo*, which it needs: turned on without one, its page opens at it, and its cell
+  says *Set Repo*: `owner/name` or its GitHub link; *Author*: `@me`, or someone's login; blank: you) counted: open, drafts, with conflicts, and with each of up to 3 labels (*Count label 1–3*); the full
   view (large) has the counts and the PRs grouped by what they need: conflicts, failing CI, changes asked, approved,
   in review, drafts, each with its labels, CI, review and date.
 - *Links*: sites you open often, a click away in your default browser (Linear, New Relic, lunch): each chip of
@@ -824,13 +825,13 @@ or Esc, goes back where you came from (Settings, the Desk).
 *Edit* at its top goes to its settings, lit. Its **Data** tab says where the data comes from (its fetch, a text, a
 file, a URL), shows the data, and its examples (its sample and each `fixtures/*.json`: *Show it with this*); the
 preview's *Sample* picks one. Its **Files** tab edits its files: *Edit*, then *Save* or ⌘S (JSON is checked first, it
-reloads at once, and the studio's *Undo* keeps the version before). One that comes with Laki: Remix it first.
+reloads at once, and the studio's *Undo* keeps the version before). One that comes with Laki: *Remix it…* there
+makes a copy that's yours to change (`laki widget remix <id> [new-id]` too), with Laki AI on or off.
 Settings › Extensions › *Icons* shows every icon an extension can name, with a search; a click copies the name.
 
-To make one: Settings › Extensions › *Yours* › **New extension** opens a new extension's page. Describe it in the chat
-there (with Laki AI on): it asks you at least two questions (what it shows, where it sits, what a click does), then
-writes it, and the page turns into its page, the preview with its sample data; ask for changes until you like it,
-then turn it on. Without Laki AI, *Copy the prompt* there gives any AI chat the whole format with what you typed;
+To make one: Settings › Extensions › *Yours* › **New ▾**: *From a starter…* makes one on sample data and opens its
+page; *With Laki AI…* opens the studio (below). Without Laki AI it opens a new extension's page, where *Copy the
+prompt* gives any AI chat the whole format with what you typed;
 save the files it gives you in `<data>/widgets/<id>/` and press *Reload extensions*. Or install the *Extension
 creator* skill (Settings › Agent skill) and ask your agent ("an extension with my open issues"). An extension without a script is drawn inside the app; one whose page has a `<script>` runs in a
 sandboxed frame that can't reach the app, nor the network unless you turn on its *Network access* (then its page may
@@ -882,13 +883,14 @@ to ask): agents list them with `laki widget tools`, call one with `laki widget t
 MCP, and Laki shows you the command first (once per workspace, every time, or never, as the tool says). Settings ›
 Extensions lists each tool and where you allowed it always, with *Revoke*.
 
-With Laki AI on, *New ▾ › Make with Laki AI* (⌘K *New extension…*) opens the **extension studio**: say what it
-should show and Laki AI writes it beside its preview on sample data; *Try it live* shows what it runs and runs it once,
-*Undo* takes a change back, *Turn on* turns it on. A row's ✨ opens one of yours there, and *Remix* makes a copy of any
-one to change.
+With Laki AI on, *New ▾ › With Laki AI…* (⌘K *New extension…*) opens the **extension studio**: say what it
+should show and Laki AI writes it beside its preview on sample data (it asks you a couple of questions first);
+*Try it live* shows what it runs and runs it once, *Undo* takes a change back, *Turn on* turns it on. A row's ✨ opens
+one of yours there. *Remix* (a row's, any one's) makes a copy that's yours to change and opens it: in the studio with
+Laki AI on, else on its page. An extension's page keeps its own chat with Laki AI, apart from the AI page's.
 
-To delete one, open it in Settings › Extensions and press the trash can: its folder and its settings go for good,
-after you confirm. The ones that come with Laki only turn off.
+To delete one, open it in Settings › Extensions and press the trash can: it goes to the trash for 30 days (above). The
+ones that come with Laki only turn off.
 
 ### Specs & Brainstorms (experimental)
 

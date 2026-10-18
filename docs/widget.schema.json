@@ -181,6 +181,10 @@
                   "type": "string"
                 },
                 "description": "A choice's options"
+              },
+              "required": {
+                "type": "boolean",
+                "description": "It needs one: while it is empty its cell says Set <label> and opens its settings"
               }
             }
           }

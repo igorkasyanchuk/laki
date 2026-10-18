@@ -30,11 +30,13 @@ const TABS: [ExtTab, string][] = [
 
 // spots, here: the workspaces a per-workspace one has an instance in (live, no terminal, browser or SSH host), the one on
 // screen (the picker's first)
-export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspaces, spots, here, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; spots: { id: string; name: string }[]; here: string | null; back: string; onAiSettings: () => void; onClose: () => void }) {
+export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, workspaces, spots, here, back, onAiSettings, onClose }: { id: string; tab?: ExtTab; edit?: string; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; ai?: AiSettings; workspaces: { id: string; name: string }[]; spots: { id: string; name: string }[]; here: string | null; back: string; onAiSettings: () => void; onClose: () => void }) {
   const [cur, setCur] = useState(id)
   const [tab, setTab] = useState<ExtTab>(first ?? 'overview')
   const [draft, setDraft] = useState<Draft | null>(null) // a file being edited in Files: kept across its tabs
   const [spot, setSpot] = useState(0) // Edit: the settings' card scrolled to and lit, once per click
+  // edit: a setting it needs (turned on with it empty, its cell's Set …): Overview, that field
+  useEffect(() => void (edit && (setTab('overview'), setSpot(s => s + 1))), [edit])
   // New extension: the first one that shows up meanwhile is the one Laki AI made
   const known = useRef(new Set(widgets.map(w => w.id)))
   const made = cur ? undefined : widgets.find(w => !known.current.has(w.id))
@@ -62,6 +64,7 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
     return widgetHere(w && { id: w.id, name: w.name, mine })
   }
   const name = w?.name ?? (cur ? cur : 'New extension')
+  const [chat] = useState(id ? `widget:${id}` : undefined) // its own chat, the studio's too; a new one's: the AI page's, as it was made there
   return (
     <Page
       title={name}
@@ -90,7 +93,7 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
           {w ? (
             <>
               <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} spots={spots} setAt={setAt} />
-              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} spot={spot} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
+              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} spot={spot} field={edit} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
             </>
           ) : cur ? (
             <p className="muted small">Reading…</p>
@@ -103,6 +106,7 @@ export function ExtensionPage({ id, tab: first, widgets, cfg, api, ai, workspace
             <AiPage
               compact
               embed
+              chat={chat}
               settings={ai}
               workspaces={workspaces}
               onClose={onClose}
@@ -162,7 +166,7 @@ export function DeskTile({ w, api, sample, note }: { w: WidgetView; api: WidgetA
   )
 }
 
-function Preview({ w, api, cfg, spot = 0 }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi; spot?: number }) {
+function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetApi; cfg: WidgetsApi; spot?: number; field?: string }) {
   const [pick, setPick] = useState<'live' | 'sample'>()
   // Edit: its settings scrolled to, lit (Settings' spot) and its first field focused
   const form = useRef<HTMLElement>(null)
@@ -173,7 +177,8 @@ function Preview({ w, api, cfg, spot = 0 }: { w: WidgetView; api: WidgetApi; cfg
     el.classList.remove('spot')
     void el.offsetWidth // the animation again on a second click
     el.classList.add('spot')
-    el.querySelector<HTMLElement>('input, select, textarea, button[role="tab"], button[role="switch"]')?.focus({ preventScroll: true })
+    const at = field ? el.querySelector(`[data-key="${CSS.escape(field)}"]`) : null
+    ;(at ?? el).querySelector<HTMLElement>('input, select, textarea, button[role="tab"], button[role="switch"]')?.focus({ preventScroll: true })
     const t = setTimeout(() => el.classList.remove('spot'), 2700)
     return () => clearTimeout(t)
   }, [spot])
@@ -640,6 +645,10 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
                 {busy ? 'Saving…' : 'Save'}
               </button>
             </>
+          ) : w.builtin && cfg.remix ? (
+            <button className="sm" data-tip="It comes with Laki: a copy of it to change, yours" onClick={() => void cfg.remix!(w.id).catch(e => setErr(String(e?.message ?? e)))}>
+              <Icon name="copy" size={12} /> Remix it…
+            </button>
           ) : (
             <button className="sm" disabled={!!why} data-tip={why || 'Edit it here: ⌘S saves'} onClick={() => (setDraft({ path: sel, text, was: text }), setErr(''))}>
               <Icon name="pencil" size={12} /> Edit

@@ -3,7 +3,7 @@
 # $WIDGET_HIDE: labels, comma-separated (only PRs with any of the first, none of the second)
 # owner/name from what was typed: a link to the repo (or a page of it) works too; a GitHub Enterprise host stays
 repo=$(printf %s "$WIDGET_REPO" | sed -E 's#^ +##; s# +$##; s#^https?://##; s#^(www\.)?github\.com/##; s#\.git$##; s#^(([^/]+\.[^/]+/)?[^/]+/[^/]+).*#\1#')
-[ -n "$repo" ] || { echo 'Set Repo (owner/name) in Settings › Extensions' >&2; exit 1; }
+[ -n "$repo" ] || { echo 'Set Repo (owner/name) in Settings › Extensions › My PRs' >&2; exit 1; }
 author=$(printf %s "$WIDGET_AUTHOR" | tr -d ' ')
 case "$author" in '' | @me) author=@me ;; @*) author=${author#@} ;; esac
 exec gh pr list --repo "$repo" --author "$author" --state open --limit 100 \

@@ -6,7 +6,7 @@ import { highlight } from '../src/renderer/src/highlight.ts'
 import { keep, move, resize, tabsOf, type Layout } from '../src/shared/layout.ts'
 import { parseLink, wsLink } from '../src/renderer/src/links.ts'
 import { inline, markdown } from '../src/shared/markdown.ts'
-import { actionsFor, importable, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
+import { actionsFor, importable, Line, splitRows, toCsv, youtubeEmbed } from '../src/renderer/src/text.ts'
 import { fillTemplate, isAgent, placesOf, prAllows, rowsOf, taskTitle } from '../src/shared/types.ts'
 import { planRef } from '../src/shared/plans.ts'
 import { describeHours, parseHours, parseWhen, stamp } from '../src/shared/when.ts'
@@ -235,4 +235,18 @@ test("placesOf: an extension's places, else its one place, else the sidebar; pla
   assert.deepEqual(placesOf({}), ['side'])
   assert.equal(planRef({ kind: 'spec', path: '/p/specs/login' }), 'Spec: /p/specs/login/README.md (read it, and the files beside it: attachments, diagrams)')
   assert.match(planRef({ kind: 'brainstorm', path: '/p/b/x' }), /^Brainstorm: \/p\/b\/x\/README\.md /)
+})
+
+test("Line: extension tools' asks one at a time; a newer one waits, a click brings one first, an answer elsewhere drops it", () => {
+  const l = new Line<{ req: string }>()
+  l.add({ req: 'a' })
+  l.add({ req: 'b' })
+  l.add({ req: 'c' })
+  assert.equal(l.first?.req, 'a', 'the first stays on screen: b waits, not closed as Deny')
+  assert.equal(l.drop('b'), false, 'b answered on the phone: out of line, a still on screen')
+  assert.equal(l.front('c'), true)
+  assert.deepEqual(l.items.map(x => x.req), ['c', 'a'], 'c clicked: first, a back to second')
+  assert.equal(l.front('c'), false, 'already first')
+  assert.equal(l.drop('c'), true, 'the one on screen')
+  assert.equal(l.first?.req, 'a')
 })

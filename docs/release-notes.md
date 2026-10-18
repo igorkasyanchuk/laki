@@ -13,6 +13,16 @@ version it builds, with the date. -->
   files stay as they were.
 - An extension's fetch that times out, or a stream you stop, ends what it started too.
 - The checker takes `refresh` on an event for a file or URL source.
+- **Remix without Laki AI**: any extension, a built-in too, copied to change, from its row, its Files (*Remix it…*) or
+  `laki widget remix <id> [new-id]`.
+- **Settings an extension needs**: `"required": true` on one; My PRs needs its Repo: turned on without it, its page
+  opens at that field, and its cell says *Set Repo*.
+- **Per-workspace extensions on the Desk** show the workspace you picked last, named on the tile.
+- Extensions fixed: an agent's source runs at most every few minutes whatever asks; a burst of events fetches once; a
+  fetch that keeps failing waits longer each time; a notice isn't lost while the app is closed; a workspace's archive
+  and removal reach its per-workspace extensions; agents' tool asks wait their turn instead of denying each other; the
+  extension page's chat is its own; Settings tags every place; *Check* warns at data fields Laki's own names hide;
+  MCP's extension tool names stay unique.
 
 - **Extensions in scheduled tasks and workflows**: a task can fetch an extension or run one of its actions at its
   times; a workflow's Extension block fetches one and hands its data to the next blocks.

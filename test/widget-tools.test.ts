@@ -6,6 +6,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, sleep, until } from './helpers.ts'
+import { extNames } from '../src/cli/mcp.ts'
 
 const make = (rig: any, id: string, m: object, files: Record<string, string> = {}) => {
   mkdirSync(join(rig.data, 'widgets', id), { recursive: true })
@@ -150,6 +151,16 @@ test('tools: listed and called, asked first per workspace or always, denied, tim
   const ps = (await rig.rpc('widgetCheck', { id: 'bad' })).problems.map((x: any) => `${x.level} ${x.where}: ${x.text}`).join('\n')
   for (const re of [/error widget\.json actions\.go\.tool: a description/, /error widget\.json actions\.go\.tool\.input\.n: string, number, boolean or string\[\]/, /error widget\.json actions\.go\.tool\.required: m isn't one of its input/, /error widget\.json actions\.go\.tool\.ask: always, first or never/, /warn widget\.json actions\.ship\.tool: ask never, but its command looks outward/, /warn AGENTS\.md: none/])
     assert.match(ps, re)
+})
+
+test("tools: MCP's names stay unique: one the same as another's, or past 64 characters, ends in its own hash", () => {
+  const ts = [{ id: 'a_b', action: 'c' }, { id: 'a', action: 'b_c' }, { id: 'x'.repeat(70), action: 'go' }, { id: 'g', action: 'echo' }]
+  const names = [...extNames(ts).keys()]
+  assert.equal(new Set(names).size, 4)
+  assert.ok(names.every(n => n.length <= 64 && /^[a-zA-Z0-9_-]+$/.test(n)), names.join())
+  assert.ok(names.includes('ext_g_echo'), 'a plain one keeps its name')
+  assert.deepEqual(names.filter(n => n.startsWith('ext_a_b_c_')).length, 2)
+  assert.equal(extNames(ts).get(names[1]), ts[1], 'the same map for a call')
 })
 
 test('tools: laki mcp lists ext_ tools only with a daemon running, and routes calls; Laki AI calls one, asked first', async t => {

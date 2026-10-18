@@ -11,7 +11,7 @@ import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
 import { AI_SOURCE_EVERY, BUTTON_PLACES, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
-import { uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
+import { reservedIn, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
 import { actionCmd, aiActOf, manifestCheck, needsSample, SECRET, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
@@ -26,19 +26,19 @@ import { agentCaller, broadcast, changed, cliArgv, cliEnv, clients, devKeep, dev
 // choice wins). As a button (a rail or foot place, or no preview in widget.html): icon (an icon of the app's, or a
 // character or two), label, badge and tip (templates over its data, as plain text), click (one of its actions).
 // ui: the UI kit's elements (widgetUi.ts), one tree or { preview, full }: widget.html's own view wins, ui fills the other
-type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[] }
+type Spec = { type?: string; label?: string; hint?: string; default?: unknown; choices?: unknown[]; required?: boolean }
 type ActionDef = string | { run?: string; tool?: unknown; ai?: string; tools?: string; profile?: string } // a command, or one an agent may call too (widgetSchema.ts' toolOf), or a prompt an agent answers (aiActOf)
 type Manifest = { name?: string; description?: string; size?: [number, number]; every?: number; view?: string; place?: string | string[]; scope?: string; on?: Record<string, string>; stream?: boolean; fetch?: string; script?: string; config?: Record<string, unknown>; actions?: Record<string, ActionDef>; icon?: string; label?: string; badge?: string; tip?: string; click?: string; notify?: string; sample?: unknown; sampleConfig?: Record<string, unknown>; ui?: unknown; source?: unknown }
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string } // told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { fails?: number; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string } // told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
 // scope workspace: an instance per live workspace, its data in <data>/widget-data/<id>/ws/<wsId>.json (the settings stay
 // the store's, shared); in memory its last fetch and its button's words
-type Inst = { data?: unknown; at?: number; error?: string; mock?: string; told?: string }
+type Inst = { data?: unknown; at?: number; error?: string; mock?: string; told?: string; fails?: number } // fails: fetches failed in a row (due backs off)
 type InstMeta = Omit<Inst, 'data'> & { face: Face }
 type Run = WidgetRun // what each fetch and action did (widgetRuns, the inspector's Runs, laki widget dev's lines): the last RUNS, newest first
 
@@ -106,7 +106,8 @@ const ownFetch = (w: Entry) => !!(w.m.fetch || w.m.script)
 const fetches = (w: Entry) => sourceOf(w).kind !== 'fetch' || ownFetch(w)
 const wLog = (w: { id: string }, text: string | (() => string)) => devLog(`widget:${w.id}`, text) // a function: only in dev mode
 const fetchable = (w: Entry, ws?: string) => onOf(w) && fetches(w) && !running.has(keyOf(w.id, ws)) && !metaOf(w, ws).mock // on, with a fetch, not fetching now, not showing data put there by hand
-const due = (w: Entry, now: number, ws?: string) => !streaming(w) && sourceOf(w).kind !== 'static' && fetchable(w, ws) && now - (metaOf(w, ws).at ?? 0) >= everyOf(w) * 60_000 // and its every minutes since the last try
+// and its every minutes since the last try, twice that after a failure, 4 times after two, 8 after three or more in a row
+const due = (w: Entry, now: number, ws?: string) => !streaming(w) && sourceOf(w).kind !== 'static' && fetchable(w, ws) && (m => now - (m.at ?? 0) >= everyOf(w) * 60_000 * 2 ** Math.min(m.fails ?? 0, 3))(metaOf(w, ws))
 
 const storePath = (id: string) => join(dir, 'widget-data', `${id}.json`)
 const home = (p: string) => (p.startsWith('~/') ? join(homedir(), p.slice(2)) : p)
@@ -184,11 +185,14 @@ function wsInfo(x: Workspace) {
   const v = wsVars(x)
   return { id: x.id, name: v.workspace ?? x.id, project: v.project, branch: v.branch, base: v.base, path: x.path, port: x.port, pr: v.pr, storage: x.storage }
 }
+type WsInfo = ReturnType<typeof wsInfo>
 const SAMPLE_WS = { id: 'sample', name: 'fix-login', project: 'web', branch: 'fix-login', base: 'main', path: '~/code/web', port: 5173, pr: 'https://github.com/acme/web/pull/412' } // a preview's made-up one
-function wsEnv(w: Entry, x?: Workspace): Record<string, string> {
-  if (!x) return {}
-  const i = wsInfo(x)
-  return { LAKI_WORKSPACE: i.id, LAKI_WORKSPACE_NAME: i.name, LAKI_PROJECT: i.project ?? '', LAKI_BRANCH: i.branch ?? '', LAKI_BASE: i.base ?? '', LAKI_PATH: i.path, PORT: String(i.port ?? ''), LAKI_PR: i.pr ?? '', ...(i.storage && { LAKI_STORAGE_FOLDER: i.storage }), LAKI_WIDGET_FILE: instPath(w.id, x.id), LAKI_WIDGET_WS: JSON.stringify(i) } // never makes a storage folder
+// gone: a workspace archived or removed (its event's info, taken then): no instance file to give
+function wsEnv(w: Entry, x?: Workspace, gone?: WsInfo): Record<string, string> {
+  if (!x && !gone) return {}
+  const i = gone ?? wsInfo(x!)
+  if (gone) return { LAKI_WORKSPACE: i.id, LAKI_WORKSPACE_NAME: i.name, LAKI_PROJECT: i.project ?? '', LAKI_BRANCH: i.branch ?? '', LAKI_BASE: i.base ?? '', LAKI_PATH: i.path, LAKI_PR: i.pr ?? '', LAKI_WIDGET_WS: JSON.stringify(i), LAKI_WIDGET_FILE: '' }
+  return { LAKI_WORKSPACE: i.id, LAKI_WORKSPACE_NAME: i.name, LAKI_PROJECT: i.project ?? '', LAKI_BRANCH: i.branch ?? '', LAKI_BASE: i.base ?? '', LAKI_PATH: i.path, PORT: String(i.port ?? ''), LAKI_PR: i.pr ?? '', ...(i.storage && { LAKI_STORAGE_FOLDER: i.storage }), LAKI_WIDGET_FILE: instPath(w.id, x!.id), LAKI_WIDGET_WS: JSON.stringify(i) } // never makes a storage folder
 }
 // an instance's (or a global one's) data, and its last fetch kept; the in-memory copy follows (a rescan's entry too)
 const dataOf = (w: Entry, ws?: string): Inst => (ws ? readInst(w.id, ws) : (st => (st?.data !== undefined ? { ...readStore(w.id), data: st.data, at: w.s.at, error: undefined } : readStore(w.id)))(streams.get(w.id))) // a stream's last line, kept every 5 s
@@ -199,16 +203,18 @@ function keep(w: Entry, ws: string | undefined, f: (s: Inst) => void) {
   f(s)
   // its notify, over data just kept (fetched, pushed, an action's: a new at; not sample data, nor a mock let go of):
   // said once each time it reads anew
+  if (!s.error) delete s.fails
   const said = s.mock || !w.m.notify ? undefined : faceOf(w, s.data, ws, s, w.m.notify)
   if (said !== s.told && !s.mock && s.at !== at) {
-    if (said && onOf(widgets.get(w.id) ?? w)) broadcast({ ev: 'widget-say', widget: w.id, ws, notify: said }) // as it is now: turned off meanwhile, nothing
-    s.told = said
+    // told only once someone saw it: on, a window open (else said at its next fetch that has one); empty clears it
+    if (!said) s.told = undefined
+    else if (onOf(widgets.get(w.id) ?? w) && clients.size) broadcast({ ev: 'widget-say', widget: w.id, ws, notify: said }), (s.told = said)
   }
   if (ws) writeInst(w.id, ws, s)
   else writeStore(w.id, s as Store)
   const cur = widgets.get(w.id) ?? w
-  if (ws) cur.inst.set(ws, { at: s.at, error: s.error, mock: s.mock, face: faceOf(cur, s.data, ws, s) })
-  else (cur.s = { ...cur.s, at: s.at, error: s.error, mock: s.mock }), (cur.face = faceOf(cur, s.data))
+  if (ws) cur.inst.set(ws, { at: s.at, error: s.error, mock: s.mock, fails: s.fails, face: faceOf(cur, s.data, ws, s) })
+  else (cur.s = { ...cur.s, at: s.at, error: s.error, mock: s.mock, fails: s.fails }), (cur.face = faceOf(cur, s.data))
 }
 function instsOf(id: string, w?: Entry): Map<string, InstMeta> {
   const m = new Map<string, InstMeta>()
@@ -501,7 +507,7 @@ function optionsOf(w: Entry): (WidgetOption & { def: string })[] {
       const sp: Spec = v && typeof v === 'object' && !Array.isArray(v) ? (v as Spec) : { default: v }
       const d = sp.default
       const type = TYPES.find(t => t === sp.type) ?? (typeof d === 'boolean' ? 'bool' : typeof d === 'number' ? 'number' : Array.isArray(d) ? 'list' : 'text')
-      const o: WidgetOption = { key, type, label: str(sp.label), hint: str(sp.hint), choices: type === 'choice' && Array.isArray(sp.choices) ? sp.choices.map(String) : undefined }
+      const o: WidgetOption = { key, type, label: str(sp.label), hint: str(sp.hint), choices: type === 'choice' && Array.isArray(sp.choices) ? sp.choices.map(String) : undefined, required: (sp.required === true && type !== 'bool') || undefined }
       return { ...o, def: textOf(o, d) }
     })
 }
@@ -539,6 +545,7 @@ export const widgetsView = (): WidgetView[] =>
     ...(w.m.actions && Object.keys(w.m.actions).length && { actions: Object.keys(w.m.actions) }), // a scheduled task's picks
     config: configOf(w),
     options: (k => optionsOf(w).map(({ def: _, ...o }) => (o.type === 'secret' && k[o.key] ? { ...o, set: true } : o)))(secretsOf(w.id)),
+    ...((k, c) => (m => m.length && { missing: m })(optionsOf(w).filter(o => o.required && !(o.type === 'secret' ? k[o.key] : c[o.key]?.trim())).map(o => o.key)))(secretsOf(w.id), configOf(w)), // required ones still empty: Set <label>
     at: w.s.at,
     error: w.s.error,
     running: running.has(w.id) || undefined,
@@ -710,7 +717,10 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
       st.error = p.error
       st.at = Date.now()
     })
-  if (onOf(w) && (o.on || o.config || o.source !== undefined)) refetch(w, 'settings', undefined, () => true) // its data for the new settings (fetching: once more after; a stream starts again)
+  // its data for the new settings (fetching: once more after; a stream starts again); a new agent's prompt is the user's
+  // ask, as Run now: else an agent's source waits out its every (widgetRun)
+  const asked = o.source !== undefined && sourceOf(w).kind === 'ai'
+  if (onOf(w) && (o.on || o.config || o.source !== undefined)) refetch(w, asked ? 'manual' : 'settings', asked ? 'its prompt changed' : undefined, () => true)
   streamSync() // off: a stream ends
   return widgetsView().find(x => x.id === w.id)
 }
@@ -812,7 +822,7 @@ try {
 export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream', 'workflow'] // and action:<name>, event:<name>
 // an event handler's ($LAKI_EVENT, $LAKI_EVENT_FILE, the JSON on stdin) or a tool call's ($WIDGET_INPUT_<NAME>; why: who
 // called it and how it was allowed, for its run; full: all its stdout back)
-type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boolean }
+type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boolean; gone?: WsInfo } // gone: an archived or removed workspace's event, its info then
 const AT_ONCE = 4 // a scope workspace one's instances fetching at a time
 // force: laki widget check's run, an explicit ask, so an off one of the user's runs too (never one Laki AI wrote).
 // ws: a scope workspace one's instance (its workspace's env, its own data)
@@ -833,6 +843,12 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
     stopStream(w.id)
     streamSync()
     return streams.get(w.id)?.p ? { ok: true } : { ok: false, error: "a stream runs while Laki's window is open" }
+  }
+  // an agent's run costs: whatever asks for it (an event, a task, a workflow, a setting, a save), at most every everyOf
+  // minutes; Run now (manual) anyway
+  if (src.kind === 'ai' && reason !== 'manual' && meta.at && Date.now() - meta.at < everyOf(w) * 60_000) {
+    const why = `an agent's source runs at most every ${everyOf(w)} minutes: Run now fetches anyway`
+    return wLog(w, `not fetched (${reason}): ${why}`), { ok: false, error: why }
   }
   if (meta.mock && reason !== 'manual') return wLog(w, `not fetched (${reason}): showing sample data (${meta.mock})`), { ok: false, error: `showing sample data (${meta.mock}): Live in its inspector fetches again` }
   if (running.has(k)) return again.add(k), { ok: false, error: 'already fetching: it fetches again after this one' }
@@ -875,6 +891,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   if (!gone)
     keep(w, x?.id, s => {
       if (!error) (s.data = data), (s.mock = undefined)
+      else s.fails = (s.fails ?? 0) + 1
       s.at = Date.now()
       s.error = error
     })
@@ -971,8 +988,9 @@ function parsed(out: string, kind: WidgetSource['kind']): { data?: unknown; erro
 // through widgetToolCall, its ask; of any other action, the user is asked each time (no Always)
 export async function widgetAction(o: { id: string; action: string; arg?: string; ws?: string; from?: { ws?: string; tab?: string } }, why?: string, ev?: Ev): Promise<{ ok: boolean; out?: string; error?: string; stdout?: string } & WidgetSay> {
   const w = find(o.id)
-  const x = wsOf(w, o.ws) // a scope workspace one's: the workspace it was clicked in
-  const k = keyOf(w.id, x?.id)
+  const gone = scoped(w) ? ev?.gone : undefined
+  const x = gone ? undefined : wsOf(w, o.ws) // a scope workspace one's: the workspace it was clicked in
+  const k = keyOf(w.id, gone?.id ?? x?.id)
   if (!onOf(w)) return { ok: false, error: OFF(w) }
   const def = w.m.actions && Object.hasOwn(w.m.actions, o.action) ? w.m.actions[o.action] : undefined
   const cmd = actionCmd(def)
@@ -1002,7 +1020,7 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
   const reason = why ?? `action:${o.action}`
   const t0 = Date.now()
   try {
-    const { out, err } = ai ? { out: await aiAnswer(w, o.action, ai, String(o.arg ?? ''), x), err: '' } : await exec(w, '/bin/sh', ['-c', cmd!], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), ...ev?.env }, ev?.stdin)
+    const { out, err } = ai ? { out: await aiAnswer(w, o.action, ai, String(o.arg ?? ''), x), err: '' } : await exec(w, '/bin/sh', ['-c', cmd!], { WIDGET_ARG: String(o.arg ?? ''), LAKI_REFRESH_REASON: reason, ...wsEnv(w, x, gone), ...ev?.env }, ev?.stdin)
     ran(k, { at: t0, ms: Date.now() - t0, reason, why: ev?.why, action: o.action, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 })
     wLog(w, `action ${o.action} done: ${lastLine(out) ?? 'printed nothing'}`)
     let j: Record<string, unknown> | undefined
@@ -1014,7 +1032,7 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
           break
         }
       } catch {}
-    const live = !x || state.workspaces.includes(x)
+    const live = !gone && (!x || state.workspaces.includes(x)) // a gone one's: nothing kept
     if (j && 'data' in j && live) {
       const d = j.data
       keep(w, x?.id, s => ((s.data = j!.merge === true && isObj(s.data) && isObj(d) ? { ...s.data, ...d } : d), (s.at = Date.now()), (s.error = s.mock = undefined)))
@@ -1076,7 +1094,7 @@ const hoursOf = () => (typeof state.settings?.widgetHours === 'string' && state.
 // (toast, modal) goes to the app's windows
 const QUEUE_MAX = 20
 const EVENT_MAX = 64 << 10
-type Job = { name: string; json: string; h: string; ws?: string }
+type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo }
 const queues = new Map<string, Job[]>()
 const draining = new Set<string>()
 export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = {}, ws?: string, tab?: { id: string; name: string; preset?: string }) {
@@ -1089,9 +1107,16 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   for (const w of widgets.values()) {
     const h = w.m.on && Object.hasOwn(w.m.on, name) ? w.m.on[name] : undefined
     if (typeof h !== 'string' || !onOf(w)) continue
-    if (scoped(w) && !(x && instOk(x))) continue // its workspace's only
+    // its workspace's only; as one is archived or removed, that one's too (its action runs on what it was, keeps nothing)
+    const going = (name === 'workspace.archived' || name === 'workspace.removed') && !!x && instOk({ ...x, archived: false })
+    if (scoped(w) && !(x && (instOk(x) || going))) continue
     const q = queues.get(w.id) ?? []
-    q.push({ name, json, h, ws: scoped(w) ? x!.id : undefined })
+    const at = scoped(w) ? x!.id : undefined
+    if (h === 'refresh' && q.some(j => j.h === 'refresh' && j.ws === at && !j.gone)) {
+      wLog(w, `event ${name}: a fetch for it waits already`) // one fetch after the burst, not one per event
+      continue
+    }
+    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined })
     if (q.length > QUEUE_MAX) wLog(w, `event ${q.shift()!.name}: dropped, ${QUEUE_MAX} more waiting`)
     queues.set(w.id, q)
     void drain(w.id)
@@ -1112,9 +1137,10 @@ async function handle(id: string, j: Job) {
   if (!w || !onOf(w)) return
   const file = join(tmpdir(), `laki-event-${randomBytes(8).toString('hex')}.json`)
   writeFileSync(file, j.json, { mode: 0o600 })
-  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file }, stdin: j.json }
+  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file }, stdin: j.json, gone: j.gone }
   try {
-    if (j.h === 'refresh') {
+    if (j.h === 'refresh' && j.gone) wLog(w, `event ${j.name}: not fetched: ${j.gone.name} is gone, nothing to keep (an action runs on it)`)
+    else if (j.h === 'refresh') {
       const r = await widgetRun({ id, reason: `event:${j.name}`, ws: j.ws }, false, ev)
       if (!r.ok) wLog(w, `event ${j.name}: not fetched: ${r.error}`)
     } else {
@@ -1916,16 +1942,17 @@ async function checkOne(x: Source, run: boolean, ws?: string, agent = false): Pr
   const key = (p: UiProblem) => `${p.level}|${p.where}|${p.text}`
   const alone = ui === undefined ? [] : uiCheck(ui, undefined, { actions })
   const seen = new Set(alone.map(key))
+  // with no ui, only the names Laki's own hide (widget.html's templates read them too)
   const against = (data: unknown, what: string) => {
-    const ps = uiCheck(ui, data, { actions }).filter(p => !seen.has(key(p)))
+    const ps = (ui === undefined ? reservedIn(data) : uiCheck(ui, data, { actions })).filter(p => !seen.has(key(p)))
     out.push(...ps.map(p => ({ ...p, where: `${what} · ${p.where}` })))
-    if (!ps.length) say('ok', what, 'fits the ui')
+    if (!ps.length) say('ok', what, ui === undefined ? 'reads' : 'fits the ui')
   }
   if (ui !== undefined) {
     out.push(...alone)
     if (!alone.length) say('ok', 'ui', 'its elements check out')
-    if (m.sample !== undefined) against(m.sample, 'sample')
   }
+  if (m.sample !== undefined) against(m.sample, 'sample')
   for (const n of x.file ? [] : fixtureNames(x.d)) {
     let data: unknown
     try {
@@ -1934,8 +1961,7 @@ async function checkOne(x: Source, run: boolean, ws?: string, agent = false): Pr
       say('error', `fixtures/${n}`, (e as Error).message)
       continue
     }
-    if (ui !== undefined) against(data, `fixtures/${n}`)
-    else say('ok', `fixtures/${n}`, 'reads')
+    against(data, `fixtures/${n}`)
   }
   // a one-file extension's id is its name's first part: renamed, its settings stay under the old one
   if (x.file && !existsSync(storePath(id))) {
@@ -1966,7 +1992,7 @@ async function checkOne(x: Source, run: boolean, ws?: string, agent = false): Pr
       else {
         const kind = sourceOf(w).kind
         say('ok', 'fetch', kind === 'fetch' ? `printed ${last?.bytes ?? 0} B of JSON in ${last?.ms ?? 0} ms` : `read ${last?.bytes ?? 0} B from its ${kind === 'static' ? 'text' : kind === 'ai' ? 'agent' : kind} in ${last?.ms ?? 0} ms`)
-        if (ui !== undefined) against(dataOf(w, scoped(w) ? ws : undefined).data, 'fetched')
+        against(dataOf(w, scoped(w) ? ws : undefined).data, 'fetched')
       }
     }
   }

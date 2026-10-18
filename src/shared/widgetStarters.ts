@@ -43,8 +43,6 @@ function kit(o: { spec: unknown; data: unknown; empty: unknown; more: Record<str
     'README.md': readme(id, name),
   })
 }
-// an API's token: a secret setting (Settings › Extensions keeps it out of the app; the fetch gets $WIDGET_APITOKEN)
-const TOKEN = { apiToken: { type: 'secret', label: 'API token', hint: 'Its fetch gets it as $WIDGET_APITOKEN' } }
 // made-up variants beside the sample: fixtures/<name>.json, each a case worth a look (busy, quiet, an odd one)
 const variants = (more: Record<string, unknown>): Files => Object.fromEntries(Object.entries(more).map(([n, v]) => [`fixtures/${n}.json`, json(v)]))
 const pr = (number: number, title: string, author: string, ci: string, state: string, updated: string, labels: string[] = []) => ({ number, title, url: `https://github.com/acme/web/pull/${number}`, author, ci, state, updated: `2026-10-${updated}Z`, labels })
@@ -88,7 +86,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
   number: {
     title: 'A number',
     blurb: 'A count with its label, a change and a sparkline',
-    files: kit({ spec: sample('stat').spec, data: sample('stat').data, empty: {}, more: { spike: { visits: 48210, change: '+276%', week: [8, 9, 7, 11, 10, 12, 48] }, drop: { visits: 3120, change: '-74%', week: [12, 13, 11, 12, 14, 12, 3] }, flat: { visits: 12000, change: '0%', week: [12, 12, 12, 12, 12, 12, 12] } }, size: [2, 1], extra: { config: TOKEN }, real: `curl -fsS -H "Authorization: Bearer $WIDGET_APITOKEN" "https://api.example.com/stats" | jq '{visits: .today, change: .delta, week: .last7}'` }),
+    files: kit({ spec: sample('stat').spec, data: sample('stat').data, empty: {}, more: { spike: { visits: 48210, change: '+276%', week: [8, 9, 7, 11, 10, 12, 48] }, drop: { visits: 3120, change: '-74%', week: [12, 13, 11, 12, 14, 12, 3] }, flat: { visits: 12000, change: '0%', week: [12, 12, 12, 12, 12, 12, 12] } }, size: [2, 1], real: `curl -fsS "https://api.example.com/stats" | jq '{visits: .today, change: .delta, week: .last7}'` }),
   },
   list: {
     title: 'A list',
@@ -103,7 +101,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
   chart: {
     title: 'A chart',
     blurb: 'Lines, areas, bars, stacked, horizontal, pie, donut or scatter',
-    files: kit({ spec: sample('chart').spec, data: sample('chart').data, empty: { days: [] }, more: { spike: { days: [{ day: 'Mon', ms: 310 }, { day: 'Tue', ms: 290 }, { day: 'Wed', ms: 1840 }, { day: 'Thu', ms: 420 }, { day: 'Fri', ms: 300 }] }, steady: { days: [{ day: 'Mon', ms: 250 }, { day: 'Tue', ms: 252 }, { day: 'Wed', ms: 248 }, { day: 'Thu', ms: 251 }, { day: 'Fri', ms: 249 }] }, week: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => ({ day, ms: [320, 280, 410, 300, 260, 120, 90][i] })) } }, extra: { config: TOKEN }, real: `curl -fsS -H "Authorization: Bearer $WIDGET_APITOKEN" "https://api.example.com/latency?days=5" | jq '{days: [.[] | {day: .label, ms: .p95}]}'` }),
+    files: kit({ spec: sample('chart').spec, data: sample('chart').data, empty: { days: [] }, more: { spike: { days: [{ day: 'Mon', ms: 310 }, { day: 'Tue', ms: 290 }, { day: 'Wed', ms: 1840 }, { day: 'Thu', ms: 420 }, { day: 'Fri', ms: 300 }] }, steady: { days: [{ day: 'Mon', ms: 250 }, { day: 'Tue', ms: 252 }, { day: 'Wed', ms: 248 }, { day: 'Thu', ms: 251 }, { day: 'Fri', ms: 249 }] }, week: { days: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'].map((day, i) => ({ day, ms: [320, 280, 410, 300, 260, 120, 90][i] })) } }, real: `curl -fsS "https://api.example.com/latency?days=5" | jq '{days: [.[] | {day: .label, ms: .p95}]}'` }),
   },
   note: {
     title: 'A note',
@@ -244,7 +242,7 @@ one short line each. Never put secrets in a note.
         'fixtures/sample.json': json(notes),
         'fixtures/empty.json': json({ notes: [] }),
         ...variants({ one: { notes: [{ text: 'Rotate the API keys' }] }, many: { notes: ['Ask Dana about the rate limit', 'The login test is flaky on CI', 'Staging cert renews on the 30th', 'Migrations need a backup first', 'Search v2 behind a flag', 'Billing webhooks retry 5 times', 'Docs: the new env vars', 'Bump Node to 22'].map(text => ({ text })) }, long: { notes: [{ text: 'The checkout test fails only when it runs after the cart tests: they share a user and leave an order behind, so the next run sees two' }] } }),
-        'README.md': readme(id, name, ' Its `add` action is a tool for agents (`"tool"` in widget.json, `AGENTS.md` says when to use it): `laki widget tools` lists it, `laki widget tool ' + id + ' add \'{"text": "hi"}\'` runs it, after you allow it.'),
+        'README.md': readme(id, name, ' Its `add` action is a tool for agents (`"tool"` in widget.json, `AGENTS.md` says when to use it): `laki widget tools` lists it, `laki widget tool ' + id + ' add \'{"text": "hi"}\'` runs it, after you allow it.\n\nA tool that calls an API takes its token as a secret setting: in widget.json, `"config": { "apiToken": { "type": "secret", "label": "API token" } }`; you fill it in Settings › Extensions, its command gets `$WIDGET_APITOKEN` (`curl -H "Authorization: Bearer $WIDGET_APITOKEN" …`), and nothing else sees it: not its page, the app or agents.'),
       }
     },
   },

@@ -23,7 +23,7 @@ export type WidgetApi = {
   action: (id: string, action: string, arg: string, label?: string, ws?: string) => Promise<void> // a button's data-run: one of widget.json's actions, done when it is
   say: (id: string, s: WidgetSay, ws?: string) => void // a toast, a dialog with buttons
   do: (w: WidgetView, cmd: UiDo, label?: string) => unknown // a Laki command (a button's do, laki.do): said and asked first
-  settings: (id?: string) => void // its page (Extension.tsx); none: Settings › Extensions
+  settings: (id?: string, key?: string) => void // its page (Extension.tsx), key: at that setting; none: Settings › Extensions
   menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page
   key?: string // the daemon's key for JS widgets' pages
 }
@@ -228,7 +228,12 @@ export function WidgetButtons({ widgets, api, places, look, words }: { widgets: 
 function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: WidgetApi; parked: boolean; load: () => void; style: CSSProperties; cells: [number, number] }) {
   return (
     <div className={`widget ${w.full ? 'opens' : ''} ${w.button ? 'is-button' : ''} ${w.here === null ? 'no-ws' : ''}`} style={style} data-tip={tipOf(w)} onContextMenu={api.menu && (e => api.menu!(w, e))}>
-      {w.button ? (
+      {w.missing?.length ? (
+        // a setting it needs is empty: say which, and open it there
+        <button className="widget-parked muted small" onClick={() => api.settings(w.id, w.missing![0])}>
+          Set {(o => o?.label || o?.key)(w.options.find(o => o.key === w.missing![0]))}
+        </button>
+      ) : w.button ? (
         <CellButton w={w} api={api} />
       ) : w.js && parked ? (
         <button className="widget-parked muted small" onClick={load}>
@@ -237,7 +242,7 @@ function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: Widg
       ) : (
         <WidgetBody w={w} full={false} api={api} cells={cells} />
       )}
-      {(w.error || w.running || w.devError) && <span className={`widget-dot ${(w.error || w.devError) && !w.running ? 'bad' : ''}`} />}
+      {!w.missing?.length && (w.error || w.running || w.devError) && <span className={`widget-dot ${(w.error || w.devError) && !w.running ? 'bad' : ''}`} />}
       {w.mock && <span className="widget-mock">Sample data</span>}
     </div>
   )

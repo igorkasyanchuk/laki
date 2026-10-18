@@ -57,6 +57,7 @@ export function AiPage({
   context,
   embed,
   hello,
+  chat,
 }: {
   settings: AiSettings
   workspaces?: { id: string; name: string }[]
@@ -67,7 +68,9 @@ export function AiPage({
   context?: () => Promise<string> // where the user is as they ask (the floating chat's): for the model, not the conversation
   embed?: boolean // compact, in a page of its own (the Extension page's): no close, Esc is the page's
   hello?: { title: string; text: string; examples: string[]; placeholder: string } // what an empty chat says, its examples and the box's hint
+  chat?: string // a chat of its own (the Extension page's widget:<id>, the studio's too); none: the AI page's
 }) {
+  const c = chat ? { chat } : {}
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
   const [text, setText] = useState('')
@@ -81,16 +84,16 @@ export function AiPage({
   // the answers' links: made again only as the workspaces' names change (the app's view comes every few ms meanwhile)
   const names = workspaces.map(w => `${w.id}\n${w.name}`).join('\n')
   const link = useMemo(() => linkWorkspaces(workspaces), [names])
-  const load = () => api.call<AiData>('aiState').then(setD, e => setErr(e.message))
+  const load = () => api.call<AiData>('aiState', c).then(setD, e => setErr(e.message))
   // the earlier chats (the page's sidebar; an older daemon: none)
   const [past, setPast] = useState<AiPast[]>([])
-  const loadPast = () => !compact && void api.call<AiPast[]>('aiChats').then(setPast, () => {})
+  const loadPast = () => !compact && !chat && void api.call<AiPast[]>('aiChats').then(setPast, () => {})
   useEffect(() => {
     load()
     loadPast()
     return api.on(m => {
       if (m.ev === 'open') return void (load(), loadPast()) // a daemon started again: its conversation, not the busy one we had
-      if (m.ev !== 'ai' || m.of) return // a spec's or brainstorm's chat (the Specs page's)
+      if (m.ev !== 'ai' || (m.of ?? '') !== (chat ?? '')) return // another chat's (a spec's, an extension's, the AI page's)
       setD(x => x && { ...x, chat: m.chat, busy: m.busy })
       if (!m.chat.length) loadPast() // New chat (here, the AI window, laki ai new): the one it ended is in the list
       if (!m.busy) load() // the call just logged
@@ -114,6 +117,7 @@ export function AiPage({
     ;(context ? context().catch(() => '') : Promise.resolve(''))
       .then(where =>
         api.call('aiAsk', {
+          ...c,
           text: sent.text,
           images: sent.images.map(i => i.path),
           ...(where && { context: where }),
@@ -131,7 +135,7 @@ export function AiPage({
   const cost = !settings.hideCost // Settings › AI's Show costs
   const skill = settings.skill !== false
   // a question's button: its pick goes on as the next ask (a removal: done on Yes, by Laki)
-  const pick = (id: string, n: number) => (setErr(''), api.call('aiAnswer', { id, n }).catch(e => setErr(e.message)))
+  const pick = (id: string, n: number) => (setErr(''), api.call('aiAnswer', { ...c, id, n }).catch(e => setErr(e.message)))
   // the questions still open: none of yours after them (an older one's moment has passed)
   const lastAsk = d ? d.chat.map(m => m.role).lastIndexOf('user') : -1
   const open = new Set(d?.chat.flatMap((m, i) => (m.ask && i > lastAsk ? [m.ask.id] : [])))
@@ -154,13 +158,13 @@ export function AiPage({
     </>
   ) : null
 
-  const newChat = () => api.call('aiNew').then(() => (load(), loadPast()), e => setErr(e.message))
+  const newChat = () => api.call('aiNew', c).then(() => (load(), loadPast()), e => setErr(e.message))
   // an earlier chat taken up again: the one here goes in the list
   const openPast = (id: string) => (setErr(''), setTab('chat'), api.call('aiOpen', { id }).then(() => (load(), loadPast()), e => setErr(e.message)))
   const rmPast = (c: AiPast) => void confirm('Delete this chat?', { text: c.title, ok: 'Delete', danger: true }).then(y => y && api.call('aiChatRm', { id: c.id }).then(loadPast, e => setErr(e.message)))
   const firstAsk = d?.chat.find(m => m.role === 'user')
   const groups = d ? turns(d.chat) : []
-  const chat = (
+  const thread = (
           <>
             <div className="ai-thread" aria-live="polite">
               <div className="ai-col">
@@ -192,7 +196,7 @@ export function AiPage({
                       <i />
                     </span>
                     <span className="ai-shimmer">Working…</span>
-                    <button className="ai-stop" onClick={() => api.call('aiStop', { chat: '' }).catch(e => setErr(e.message))}>
+                    <button className="ai-stop" onClick={() => api.call('aiStop', { chat: chat ?? '' }).catch(e => setErr(e.message))}>
                       <Icon name="stop" size={10} /> Stop
                     </button>
                   </div>
@@ -268,7 +272,7 @@ export function AiPage({
           </button>
           {!embed && <IconButton icon="x" title="Close (Esc)" className="nodrag" onClick={onClose} />}
         </div>
-        <div className="ai-page">{chat}</div>
+        <div className="ai-page">{thread}</div>
       </div>
     )
   return (
@@ -313,7 +317,7 @@ export function AiPage({
         </div>
 
         {tab === 'chat' ? (
-          chat
+          thread
         ) : tab === 'calls' ? (
           <div className="ai-thread">
             <div className="ai-col wide">

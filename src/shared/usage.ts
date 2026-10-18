@@ -51,6 +51,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget tools [--json]                  the extensions' tools for agents: each one's input and when to use it
   laki widget tool <id> <action> [json] [--ws <ws>]  call one: Laki asks you first, unless it says never; its output back
   laki widget check [id|folder] [--no-run] [--ws <ws>]  what's wrong with one: widget.json, its ui against its data, its fetch once
+  laki widget remix <id> [new-id]            a copy of one (a built-in too) to change: yours, off
   laki widget trash | restore <trash-id>      the extensions deleted in the last 30 days | put one back
   laki ai [--image png] <ask> | new | log     ask Laki's AI (Settings › AI) to work Laki: "what are my agents doing?",
                                               "review the 3 PRs in this screenshot" | a new conversation | its calls

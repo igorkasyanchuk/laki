@@ -8,8 +8,8 @@ UI kit and shows it where you put it.
 The quickest start: `laki widget new "Deploys" --kind list` (or Settings › Extensions › *New ▾*) makes one that runs at
 once on sample data; change its fetch and its `ui` from there (below: *Starters*).
 
-This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *New
-extension* (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), and in
+This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *New ▾ ›
+With Laki AI…* while Laki AI is off (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), and in
 [`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which both are made from. Two examples come with Laki,
 in [`widgets/`](../widgets): `links` (a JS page, no fetch) and `my-prs` (a shell fetch with gh and jq, its `ui`, its
 sample).
@@ -29,17 +29,21 @@ widget.html ──▶ <template preview> / <template full>, filled with data and
    then the ones it comes with. The first folder of an id wins. Each starts off: turn it on in Settings › Extensions.
 2. While the app is open (and within *Working hours*, if set), each extension that is on runs its `fetch` every
    `every` minutes, and when it's turned on, when its settings change, on *Reload extensions* and on `laki widget run`.
+   One that keeps failing waits longer each time: twice `every`, then 4 and 8 times, until a fetch works. An agent's
+   source runs at most every `every` minutes whatever asks (*Run now* anyway): each run costs.
 3. What the fetch prints must be JSON: it is kept as `data`. A failure keeps the last data and shows a red dot with why.
    Or its data comes from [somewhere else](#where-its-data-comes-from-source): a text you type, a file, a URL, or an
    agent with your MCP servers (Slack, Linear…) that sums it up.
 4. The page is filled from `data`, `config` (your settings), `at` (the last fetch) and `error`: `widget.html`'s view
-   when it has one, else `ui`'s.
+   when it has one, else `ui`'s. The data's own fields are at the top too (`{{count}}`), but for the names Laki's own
+   take: `at`, `error`, `config`, `full`, `data`, `workspace` and `sample`. A field of yours named so is hidden: name it
+   otherwise, or read it as `data.at`; *Check* warns at one in the sample, a fixture or what it fetched.
 
 ## The files
 
 | file | what |
 |---|---|
-| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)), `on` ([events](#events-on) it answers), `stream` ([a fetch that runs all along](#streams-stream)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
+| `widget.json` | `name`, `description`, `size` (cells across 1-3 × down ½-4), `every` (minutes), `view` (the full view: `s`, `m`, `l`), `place` (`side`, `top`, `status`, `rail`, `foot`, `desk`; a list for several), `config` (its settings), `fetch` (a shell command) or `script` (a JS file), `sample` (made-up data in the shape its fetch prints: needed with a fetch), `sampleConfig` (settings for that preview), `actions` (commands its buttons run), `ui` (what it shows, below), `scope` (`global`, the default, or `workspace`: [one per workspace](#per-workspace-scope)), `on` ([events](#events-on) it answers), `stream` ([a fetch that runs all along](#streams-stream)); as a button: `icon`, `label`, `badge`, `tip`, `click` |
 | `widget.html` | optional: `<template preview>` (where it sits), `<template full>` (the dialog a click opens), shared `<style>` outside both; a view it has wins over `ui`'s |
 | `fixtures/<name>.json` | sample data (`sample.json`, `empty.json`, and a few more: busy, all good, an odd one): its preview's *Sample* picks one, its Data tab lists them, and *Check* fits `ui` to each |
 | anything else | the scripts its fetch and actions run, in any language: `sh fetch.sh`, `python3 fetch.py`, `fetch.mjs` |
@@ -74,9 +78,12 @@ the workspace: `{{config.repo}}`, `{{workspace.path}}/TODO.md`. A failed read ke
 
 ### Settings (`config`)
 
-Each setting is a default or `{ "type", "label", "hint", "default", "choices" }`, `type` one of `text`, `number`,
+Each setting is a default or `{ "type", "label", "hint", "default", "choices", "required" }`, `type` one of `text`, `number`,
 `bool`, `choice`, `list`, `secret`. You fill them in Settings › Extensions; the fetch gets them as `$WIDGET_<NAME>` (text) and
 `$LAKI_WIDGET_CONFIG` (all of them, typed, as JSON); a page or a script gets them typed as `config`.
+`"required": true` is one it can't do without (My PRs' *Repo*): while it's empty its cell says *Set Repo*, and turning
+it on opens its page at that field. Its fetch should still fail with a line that says where (`Set Repo in Settings ›
+Extensions › My PRs`).
 
 #### Secrets
 
@@ -526,7 +533,7 @@ Its page's tabs show them:
 | Data | where its data comes from (its fetch, a text, a file, a URL); its last data as JSON: edit it and *Apply* to see it with that data, *Live* fetches again; its examples (widget.json's `sample`, each `fixtures/<name>.json`): *Show it with this*, or *Use as its data* |
 | Runs | the runs, newest first; a click shows one's stderr |
 | Env | what its fetch gets (`WIDGET_*`, `LAKI_*`, `PATH`); a setting named like a token, secret, key or password masked |
-| Files | its folder's files: *Edit*, then *Save* (⌘S); JSON is checked first, it reloads at once, and the studio's *Undo* has the version before. One that comes with Laki: Remix it first |
+| Files | its folder's files: *Edit*, then *Save* (⌘S); JSON is checked first, it reloads at once, and the studio's *Undo* has the version before. One that comes with Laki: *Remix it…* makes a copy to change |
 | Check | *Check* above: *Check again*, *Check with a fetch* |
 
 Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.
@@ -534,7 +541,7 @@ A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/in
 
 ## The studio
 
-With Laki AI on (Settings › AI), Settings › Extensions › *New ▾ › Make with Laki AI* (or ⌘K *New extension…*,
+With Laki AI on (Settings › AI), Settings › Extensions › *New ▾ › With Laki AI…* (or ⌘K *New extension…*,
 `laki://settings/widgets/new`) opens the studio: a chat with Laki AI on the left, the extension on the right.
 
 - Say what it should show ("Show my open PRs as a list with CI status"), or pick a starter or an example. Laki AI
@@ -547,11 +554,13 @@ With Laki AI on (Settings › AI), Settings › Extensions › *New ▾ › Make
   shows the same, then turns it on; turned on anywhere (Settings' switch too), it fetches its real data.
 - **Undo** puts the version before the last change back (the last 20 are kept); each turn's *Undo to here* goes back to
   how it was after that turn.
-- A row's ✨ (*Edit with Laki AI*, one of yours in Laki's folder) opens it in the studio; **Remix** (any one's, built-in
-  too) makes a copy of it that's yours, in Laki's folder, and opens that (`laki://settings/widgets/<id>/studio`).
+- A row's ✨ (*Edit with Laki AI*, one of yours in Laki's folder) opens it in the studio. **Remix** (a row's, or Files'
+  *Remix it…*; any one, built-in too; `laki widget remix <id> [new-id]`) makes a copy that's yours, in Laki's folder,
+  off, and opens it: the studio with Laki AI on, else its page. Laki AI isn't needed for it.
 
 Each extension's chat is kept beside its settings (`<data>/widget-data/widget:<id>.chat.json`) and goes when you delete
-it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat instead.
+it; an extension's page talks in the same chat. Without Laki AI, *New ▾ › With Laki AI…* opens a page whose *Copy the
+prompt* gives any AI chat the whole format with what you typed.
 
 ## Managing them
 
@@ -560,8 +569,8 @@ it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat in
   *When it was fetched* (off: no ↻ buttons, no "fetched … ago" and no UI kit line or template text that names `at`), its folder, *Delete*
   (its folder, settings, data, history, chat and secrets go to the trash, with *Undo* in the toast; `laki widget trash`
   lists the last 30 days', `laki widget restore <trash-id>` puts one back; the ones that come with Laki only turn off), and Laki AI's chat
-  to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Data), or with Laki AI, or gives you
-  the prompt for any AI chat. Search
+  to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Overview), or with Laki AI (without
+  it: a page with the prompt for any AI chat). Search
   for *plugin* finds it too.
 - Scheduled tasks (*New task* › the agent picker's *Extension*: fetch it, or run one of its actions) and workflows (an
   *Extension* block: fetched, its data as `{{steps.<id>.<field>}}`) use the ones that are turned on.

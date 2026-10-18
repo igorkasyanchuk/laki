@@ -7,7 +7,7 @@ import { test } from 'node:test'
 import { fileURLToPath } from 'node:url'
 import { manifestCheck, WIDGET_SCHEMA } from '../src/shared/widgetSchema.ts'
 import { STARTER_KINDS } from '../src/shared/widgetStarters.ts'
-import { UI_TYPES } from '../src/shared/widgetUi.ts'
+import { reservedIn, UI_EXAMPLES, UI_SAMPLES, UI_TYPES, uiCheck } from '../src/shared/widgetUi.ts'
 import { fresh, until } from './helpers.ts'
 
 const root = fileURLToPath(new URL('..', import.meta.url))
@@ -100,6 +100,29 @@ test('check: unknown keys, places, click, a row field, a fetch that prints no JS
   assert.ok(ai.problems.some((p: any) => p.where === 'fetch' && /Laki AI wrote it and it's off: turn it on first/.test(p.text)))
   assert.deepEqual((await rig.rpc('widgetRuns', { id: 'ai-one' })).runs, [])
   assert.equal(errors(ai.problems).length, 0)
+})
+
+test("check: a field of the data's named at, error, config… is hidden behind Laki's own: said, with or without a ui", async t => {
+  const ps = uiCheck({ type: 'text', value: 'deployed {{ago at}}' }, { at: '2026-10-17T09:00:00Z', n: 1 })
+  assert.ok(ps.some(p => p.level === 'warn' && p.where === 'data' && p.text === `"at" is Laki's: rename it or read it as data.at`), JSON.stringify(ps))
+  for (const x of [...UI_SAMPLES, ...UI_EXAMPLES]) assert.deepEqual(reservedIn(x.data), [], `the kit's own ${'type' in x ? x.type : x.title}`)
+  const rig = await fresh(t)
+  const d = join(rig.data, 'widgets', 'hid')
+  mkdirSync(join(d, 'fixtures'), { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Hid', fetch: 'echo {}', sample: { error: 'none', n: 1 } }))
+  writeFileSync(join(d, 'widget.html'), '<template preview>{{n}}</template>')
+  writeFileSync(join(d, 'fixtures', 'cfg.json'), '{"config": 1}')
+  await rig.rpc('widgetReload')
+  const { problems } = await rig.rpc('widgetCheck', { id: 'hid' })
+  assert.ok(problems.some((p: any) => p.level === 'warn' && p.where === 'sample · data' && /"error" is Laki's/.test(p.text)), JSON.stringify(problems))
+  assert.ok(problems.some((p: any) => p.level === 'warn' && p.where === 'fixtures/cfg.json · data' && /"config" is Laki's/.test(p.text)))
+})
+
+test('check: a setting marked required: true or false, never on a switch', () => {
+  const ps = manifestCheck({ name: 'R', fetch: 'echo {}', config: { repo: { label: 'Repo', required: true }, a: { required: 'yes' }, b: { type: 'bool', required: true } } })
+  assert.ok(!ps.some(p => p.where === 'widget.json config.repo'), JSON.stringify(ps))
+  assert.ok(ps.some(p => p.level === 'error' && p.where === 'widget.json config.a' && /required: true or false/.test(p.text)))
+  assert.ok(ps.some(p => p.level === 'warn' && p.where === 'widget.json config.b' && /never empty/.test(p.text)))
 })
 
 test('one-file extensions: found, their interval, settings, place and ui; seconds refused by check; they run', async t => {

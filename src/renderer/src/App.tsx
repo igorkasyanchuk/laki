@@ -32,7 +32,7 @@ import { parseLink, wsLink } from './links'
 import { PanelHandle, Panes, SideHandle, useTabDrag } from './Panes'
 import { actionMenu, type Changes, type Edit, edited, type FileContent, FileFinder, type FileList, FilePreview, type FilesRoot, type PanelApi, type PanelTab, PANEL_WIDTH, type PRFiles, RunButton, SidePanel, type Thread } from './SidePanel'
 import { SchedulesPage } from './Schedules'
-import { actionsFor, clock, initials, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, youtubeEmbed } from './text'
+import { actionsFor, clock, initials, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { ShownDialog, type ShownWin } from './Shown'
@@ -60,8 +60,23 @@ const WidgetStudio = lazy(() => import('./WidgetStudio').then(m => ({ default: m
 // Run ▾'s project scripts besides run (RUN_SCRIPTS)
 const SCRIPT_LABELS: Record<RunScript, string> = { test: 'Test', lint: 'Lint', format: 'Format', deploy: 'Deploy…' }
 const SCRIPT_ICONS: Record<RunScript, IconName> = { test: 'check', lint: 'search', format: 'code', deploy: 'ship' }
-const toolAsks = new Set<string>() // an extension tool's asks still on screen, by req (their dialogs' tag)
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
+// an extension tool's asks: one dialog at a time, the others in line (tagged by req); toolOn: the one on screen
+type ToolAsk = { req: string; title: string; text: string; picks: { label: string; allow: 'once' | 'always' | 'deny' }[]; answer: (allow: string) => void }
+const toolLine = new Line<ToolAsk>()
+let toolOn: string | undefined
+function toolShow() {
+  const t = toolLine.first
+  if (!t || toolOn === t.req) return
+  if (toolOn) return unchoose(toolOn) // another came first (a notification's click): this one back in line, its then shows it
+  toolOn = t.req
+  void choose(t.title, t.text, t.picks.map((p, i) => ({ label: p.label, primary: i === 0, danger: p.allow === 'deny' })), undefined, t.req).then(i => {
+    toolOn = undefined
+    // Esc or outside denies the one on screen only; one answered elsewhere (toolDone) or moved back: just the next
+    if (toolLine.first === t) toolLine.drop(t.req), t.answer(t.picks[i]?.allow ?? 'deny')
+    toolShow()
+  })
+}
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -725,7 +740,7 @@ export function App() {
         toast(`${w?.name ?? m.widget}: ${m.notify}`, open, 'Open')
       } else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
       else if (m.ev === 'toolAsk') toolAsk.current?.(m)
-      else if (m.ev === 'toolDone') toolAsks.delete(m.req) && unchoose(m.req)
+      else if (m.ev === 'toolDone') toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
       else if (m.ev === 'remote') {
@@ -868,9 +883,10 @@ export function App() {
   const shownTabs = useRef<string[]>([])
   shownTabs.current = visible
   // the workspace whose per-workspace extensions show (scope workspace: Widgets.tsx inWs), and fetch: none under a page
-  // over every workspace (Board, Schedule, the AI page…), nor a terminal's, a browser's or one on an SSH host
-  const covered = schedulesOf(dialog) !== undefined || dialog === 'board' || dialog === 'calendar' || dialog === 'desk' || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog)
-  const wsHere = !covered && ws && !ws.host && !project?.kind ? ws.id : null
+  // over every workspace (Board, Schedule, the AI page…), nor a terminal's, a browser's or one on an SSH host; the Desk's
+  // tiles: the one selected last (laki.ws), named on each
+  const covered = schedulesOf(dialog) !== undefined || dialog === 'board' || dialog === 'calendar' || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog)
+  const wsHere = !covered && ws && !ws.archived && !ws.host && !project?.kind ? ws.id : null
   useEffect(() => reportView(() => ({ tab: current.current, tabs: shownTabs.current, browse: !!bridge?.browse, ws: wsHere })), [tab?.id, visible.join(), wsHere])
 
   // a folder dropped on the window becomes a project (git or not), then a new workspace in it
@@ -1230,7 +1246,7 @@ export function App() {
         })
     },
     do: (w, c, label) => widgetDo(w, c, label),
-    settings: id => setDialog(id ? { extension: id, back: dialog } : { section: 'widgets' }),
+    settings: (id, key) => setDialog(id ? { extension: id, back: dialog, ...(key && { edit: key }) } : { section: 'widgets' }),
     menu: (w, e) =>
       openMenu(e, [
         { head: w.name },
@@ -1300,16 +1316,17 @@ export function App() {
     type Pick = { label: string; allow: 'once' | 'always' | 'deny' }
     const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, ...(m.ask === 'first' ? [{ label: where ? `Always in ${where}` : 'Always', allow: 'always' } as Pick] : []), { label: 'Deny', allow: 'deny' }]
     const answer = (allow: string) => void api.call('widgetToolAnswer', { req: m.req, allow }).catch(() => {})
-    notify(title, `${m.description}${where ? ` · ${where}` : ''}`, m.tab ?? '', () => {}, settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
-    toolAsks.add(m.req)
-    // ponytail: one dialog at a time; a newer one (another agent's ask) closes this as Deny: its agent may ask again
-    void choose(title, `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks.map((p, i) => ({ label: p.label, primary: i === 0, danger: p.allow === 'deny' })), undefined, m.req).then(i => toolAsks.delete(m.req) && answer(picks[i]?.allow ?? 'deny'))
+    // its click: the window, this ask on screen (the one there back in line)
+    notify(title, `${m.description}${where ? ` · ${where}` : ''}`, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+    toolLine.add({ req: m.req, title, text: `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks, answer })
+    toolShow()
   }
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {
     list: view?.widgets ?? [],
     home: view?.widgetHome,
-    set: (id, o) => call('widgetSet', { id, ...o }),
+    // turned on with a setting it needs still empty: its page, at that field
+    set: (id, o) => call<WidgetView>('widgetSet', { id, ...o }).then(r => (o.on && r?.missing?.length && setDialog({ extension: id, back: extOf(dialog)?.extension === id ? extOf(dialog)!.back : dialog, edit: r.missing[0] }), r)),
     desk: settings.desk === true,
     agents: (view?.presets ?? []).filter(p => !p.off && (p.agent === 'claude' || p.agent === 'codex')).map(p => ({ name: p.name, agent: p.agent })),
     agent: settings.widgetAgent,
@@ -1318,10 +1335,9 @@ export function App() {
     rm: id => call<{ trash: string }>('widgetRm', { id }).then(r => r && done(`Deleted ${view?.widgets?.find(w => w.id === id)?.name ?? id}`, () => void call('widgetRestore', { trash: r.trash }))), // the trash: Undo puts it back
     reload: () => call('widgetReload'),
     page: id => setDialog(!id && settings.ai?.on ? { studio: '', back: dialog } : { extension: id, back: dialog }), // a new one: the studio while Laki AI is on
-    ...(settings.ai?.on && {
-      studio: (id: string) => setDialog({ studio: id, back: dialog }),
-      remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog({ studio: r.id, back: dialog }), e => toast(String(e?.message ?? e))),
-    }),
+    ...(settings.ai?.on && { studio: (id: string) => setDialog({ studio: id, back: dialog }) }),
+    // a copy to change: in the studio while Laki AI is on, else its page (Files)
+    remix: (id: string) => api.call<{ id: string }>('widgetRemix', { id }).then(r => setDialog(settings.ai?.on ? { studio: r.id, back: dialog } : { extension: r.id, back: dialog }), e => toast(String(e?.message ?? e))),
     undo: (id, after) => api.call('widgetUndo', { id, after }),
     tryOnce: (id, ws) => api.call<{ ok: boolean; error?: string }>('widgetRun', { id, once: true, ws }),
     folder: (id, e) => {
@@ -1656,7 +1672,8 @@ export function App() {
     ...(view?.projects.some(p => !p.kind) ? ['project'] : []),
     ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
     ...(seenSecs.length ? ['settings'] : []),
-    ...['widgets', 'actions', 'templates'].filter(x => seenSecs.includes(x)),
+    ...['actions', 'templates'].filter(x => seenSecs.includes(x)),
+    ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
   ])
   const onboardKey = [...onboardDone].sort().join()
@@ -2791,6 +2808,7 @@ export function App() {
             key={e.extension}
             id={e.extension}
             tab={e.tab}
+            edit={e.edit}
             widgets={view.widgets ?? []}
             cfg={extCfg}
             api={widgetApi}
@@ -2815,6 +2833,7 @@ export function App() {
         {dialog === 'desk' && deskOn && (
           <DeskPage
             widgets={shownWidgets}
+            wsName={ws && wsHere ? wsName(ws) : undefined}
             tiles={settings.deskTiles}
             tabs={settings.deskTabs}
             api={{

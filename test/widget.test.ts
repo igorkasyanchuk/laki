@@ -299,8 +299,10 @@ test('widgets that come with Laki: My PRs, Links', async t => {
     ]),
   )
   // no repo: says so
-  await rig.rpc('widgetSet', { id: 'my-prs', on: true })
-  assert.match((await until(() => find(rig, 'my-prs').then(w => !w.running && w.error && w), 'no repo')).error, /Set Repo/)
+  const turned = await rig.rpc('widgetSet', { id: 'my-prs', on: true })
+  assert.deepEqual(turned.missing, ['repo'], 'Repo is required: the app opens it there, its cell says Set Repo')
+  assert.equal(turned.options.find((o: any) => o.key === 'repo').required, true)
+  assert.match((await until(() => find(rig, 'my-prs').then(w => !w.running && w.error && w), 'no repo')).error, /Set Repo \(owner\/name\) in Settings › Extensions › My PRs/)
   const mine = async (config: object) => {
     await rig.rpc('widgetSet', { id: 'my-prs', config })
     await until(() => find(rig, 'my-prs').then(w => !w.running), 'refetched')
@@ -310,6 +312,7 @@ test('widgets that come with Laki: My PRs, Links', async t => {
     return { stats: Object.fromEntries(d.stats.map((x: any) => [x.name, x.n])), groups: d.groups.map((g: any) => [g.name, g.prs.map((p: any) => p.number)]), d }
   }
   let my = await mine({ repo: 'https://github.com/o/r/' }) // a link works too
+  assert.equal((await find(rig, 'my-prs')).missing, undefined, 'set: nothing missing')
   assert.match(readFileSync(rig.env.FAKE_LOG, 'utf8'), /gh pr list --repo o\/r --author @me --state open/)
   // the counts, and each PR in the group of what it needs most
   assert.deepEqual(my.stats, { open: 3, drafts: 1, conflicts: 1 })

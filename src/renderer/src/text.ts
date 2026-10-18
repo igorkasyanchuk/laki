@@ -281,3 +281,25 @@ export function spinsUntil(tabs: TabView[], now = Date.now()) {
   const left = tabs.filter(t => t.status === 'running' && shellish(t) && t.runAt && !quiet(t, now)).map(t => t.runAt! + SHELL_SPIN - now)
   return left.length ? Math.max(0, Math.min(...left)) : undefined
 }
+
+// dialogs one at a time (extension tools' asks): the first is on screen; drop: answered or gone, true when it was the
+// one on screen; front: a notification's click brings one first, the one on screen back to second
+export class Line<T extends { req: string }> {
+  items: T[] = []
+  get first(): T | undefined {
+    return this.items[0]
+  }
+  add(t: T) {
+    this.items.push(t)
+  }
+  drop(req: string) {
+    const i = this.items.findIndex(x => x.req === req)
+    if (i >= 0) this.items.splice(i, 1)
+    return i === 0
+  }
+  front(req: string) {
+    const i = this.items.findIndex(x => x.req === req)
+    if (i > 0) this.items.unshift(...this.items.splice(i, 1))
+    return i > 0
+  }
+}

@@ -496,11 +496,16 @@ async function main() {
         const w: WidgetView = await rpc('widgetRestore', { trash: id })
         return out(w, `restored ${w.id}${w.dir ? ` in ${w.dir}` : ''}${w.on ? ', on' : ''}`)
       }
+      if (sub === 'remix') {
+        if (!id) throw new Error('usage: laki widget remix <id> [new-id]')
+        const r: { id: string } = await rpc('widgetRemix', { id, newId: action || undefined })
+        return out(r, `made ${r.id}, a copy of ${id}: yours, off (laki widget on ${r.id})`)
+      }
       if (sub === 'action') {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws, from: caller() }, 300000) // an agent's: you may be asked first
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | trash | restore <trash-id>')
+      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
     }
     case 'ai': {
       const [sub] = rest

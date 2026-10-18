@@ -196,7 +196,7 @@ export const STEPS: { id: string; title: string; hint: string; go: string }[] = 
   { id: 'project', title: 'Add a project', hint: "A git repository or any folder: + at the sidebar's top, ⌘O, or drop a folder on the window", go: 'Add one' },
   { id: 'workspace', title: 'Start a workspace', hint: 'An agent and a prompt, in a git worktree of its own, so agents never step on each other (⌘N)', go: 'New workspace' },
   { id: 'settings', title: 'Look around Settings', hint: 'Themes, fonts, notifications, your agents and how they start (⌘,)', go: 'Settings' },
-  { id: 'widgets', title: 'Turn on an extension', hint: "Small live pages in the sidebar: your PRs, your team's, your links", go: 'Extensions' },
+  { id: 'widgets', title: 'Turn on an extension', hint: 'Small live pages in the sidebar or on the Desk: your PRs, your links, or one you make', go: 'Extensions' },
   { id: 'actions', title: 'Set up actions', hint: 'Run ▾: the prompts and commands you send often, a click away', go: 'Actions' },
   { id: 'templates', title: 'Write a prompt template', hint: "A new workspace's prompt with your rules around it", go: 'Prompt templates' },
   { id: 'shell', title: 'Open a terminal or a browser', hint: "+ at the sidebar's top: a terminal in your home folder, or any website, without leaving Laki", go: 'New terminal' },

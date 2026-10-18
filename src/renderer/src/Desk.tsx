@@ -27,7 +27,8 @@ const tabNow = () => {
   }
 }
 
-export function DeskPage({ widgets, tiles: saved = [], tabs: savedTabs = [], api, onClose }: { widgets: WidgetView[]; tiles?: DeskTile[]; tabs?: DeskTab[]; api: DeskApi; onClose: () => void }) {
+// wsName: the workspace a per-workspace tile shows (the one selected last), named on its head
+export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs = [], api, onClose }: { widgets: WidgetView[]; wsName?: string; tiles?: DeskTile[]; tabs?: DeskTab[]; api: DeskApi; onClose: () => void }) {
   const [menu, openMenu] = useMenu()
   const grid = useRef<HTMLDivElement>(null)
   const [live, setLive] = useState<DeskTile | null>(null) // the tile being resized, as it is under the pointer
@@ -307,6 +308,7 @@ export function DeskPage({ widgets, tiles: saved = [], tabs: savedTabs = [], api
               <div key={t.id} className={`desk-tile ${drag === t.id ? 'dragging' : ''} ${live?.id === t.id ? 'sizing' : ''} ${w.on ? '' : 'off'}`} style={{ gridColumn: `span ${s.w}`, gridRow: `span ${s.h}` }} onDragOver={e => drag && e.preventDefault()} onDrop={e => drop(e, t.id)}>
                 <div className="desk-head" draggable onDragStart={e => (e.dataTransfer.setData('text/plain', t.id), (e.dataTransfer.effectAllowed = 'move'), setDrag(t.id))} onDragEnd={() => (setDrag(null), setOver(null))} data-tip="Drag to move it">
                   <b>{w.name}</b>
+                  {w.scope === 'workspace' && <span className="small muted" data-tip="Per workspace: the one you selected last">{wsName ?? 'no workspace'}</span>}
                   <span className={`small ${w.error && !w.running && w.on ? 'warn' : 'muted'}`}>{w.on ? status(w) : w.sample ? 'off · made-up data' : 'off'}</span>
                   <span className="grow" />
                   <IconButton icon="more" title={w.name} onClick={e => tileMenu(e, w)} />
