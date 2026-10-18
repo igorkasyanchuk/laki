@@ -287,17 +287,20 @@ const THEME_VARS: [string, string][] = [
   ['--accent', 'The accent: links, the picked one'],
   ['--accent-fg', 'Text on the accent'],
 ]
+let pixel: CanvasRenderingContext2D | null | undefined // one for every swatch
 function Swatch({ name, css, use, note, copy }: { name: string; css: string; use: string; note?: string; copy: (text: string) => void }) {
   const ref = useRef<HTMLSpanElement>(null)
   const [hex, setHex] = useState('')
+  const theme = document.documentElement.getAttribute('style') ?? '' // applyTheme's variables: read again when they change
   useEffect(() => {
     // as this theme paints it: one pixel of it on a canvas (a theme may give a color() or a color-mix())
-    const c = document.createElement('canvas').getContext('2d', { willReadFrequently: true })
-    if (!c) return
-    c.fillStyle = getComputedStyle(ref.current!).backgroundColor
-    c.fillRect(0, 0, 1, 1)
-    setHex(`#${[...c.getImageData(0, 0, 1, 1).data.slice(0, 3)].map(x => x.toString(16).padStart(2, '0')).join('')}`)
-  }) // each render: a theme changed meanwhile paints the same var() anew (the same hex: no render more)
+    pixel ??= document.createElement('canvas').getContext('2d', { willReadFrequently: true })
+    if (!pixel) return
+    pixel.clearRect(0, 0, 1, 1)
+    pixel.fillStyle = getComputedStyle(ref.current!).backgroundColor
+    pixel.fillRect(0, 0, 1, 1)
+    setHex(`#${[...pixel.getImageData(0, 0, 1, 1).data.slice(0, 3)].map(x => x.toString(16).padStart(2, '0')).join('')}`)
+  }, [css, theme])
   return (
     <button type="button" className="kit-sw" data-tip={`Copy ${use}`} onClick={() => copy(use)}>
       <span ref={ref} className="kit-sw-c" style={{ background: css }} />

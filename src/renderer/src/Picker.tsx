@@ -62,7 +62,7 @@ function extOf(el: Element, widgets: WidgetView[]): PickedExt | undefined {
   let kit: string | undefined
   for (let e: Element | null = el; e && e !== host && !kit; e = e.parentElement) kit = [...e.classList].map(kitOf).find(Boolean)
   const src = w.source
-  return { id: w.id, name: w.name, view: host.getAttribute('data-view') ?? 'preview', sample: host.hasAttribute('data-sample'), kit, js: !!w.js, places: placesOf(w).join(', '), size: w.size.join('×'), source: !src || src.kind === 'fetch' ? 'its fetch' : src.kind === 'ai' ? `AI: ${src.prompt?.slice(0, 120) ?? ''}` : `${src.kind} ${src.path ?? src.url ?? ''}`.trim(), dir: w.dir, on: w.on }
+  return { id: w.id, name: w.name, view: host.getAttribute('data-view') ?? 'preview', sample: host.hasAttribute('data-sample'), kit, js: !!w.js, places: placesOf(w).join(', '), size: w.size.join('×'), source: !src || src.kind === 'fetch' ? 'own script' : src.kind === 'ai' ? `AI: ${src.prompt?.slice(0, 120) ?? ''}` : `${src.kind} ${src.path ?? src.url ?? ''}`.trim(), dir: w.dir, on: w.on }
 }
 
 export function inspect(el: Element, widgets: WidgetView[] = []): Picked {

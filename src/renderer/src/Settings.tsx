@@ -2033,7 +2033,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
       {w.description && <div className="muted small">{w.description}</div>}
       {w.js && (
         <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
-          <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its fetch gave it. Its fetch command always has the network" />
+          <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its data gave it. Its own script always has the network" />
         </Switch>
       )}
       {options.length > 0 && (

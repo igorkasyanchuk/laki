@@ -160,11 +160,16 @@ test("an agent's run stops: Resources' Stop, turned off, deleted; a stopped fetc
   assert.match(await rig.rpc('widgetRender', { id: 'slow' }), /quick/, 'its last data kept')
   await until(async () => !(await row()), 'its process gone')
 
-  // an AI action: stopped likewise
+  // an AI action: a new source leaves it be (only the source's own run stops); Stop ends it
   const act = rig.rpc('widgetAction', { id: 'slow', action: 'wait' })
   await working(true)
+  await rig.rpc('widgetSet', { id: 'slow', source: { kind: 'static', text: '{"text": "typed"}' } })
+  await new Promise(r => setTimeout(r, 300))
+  assert.ok((await find(rig, 'slow')).agent, 'the action runs on')
+  await rig.rpc('widgetSet', { id: 'slow', source: { kind: 'ai', prompt: 'quick' } })
   await rig.rpc('resourceStop', { key: 'agent:slow' })
   assert.match((await act).error, /stopped/)
+  await working(false)
 
   // turned off: stopped; deleted while one runs: stopped first, then gone
   void rig.rpc('widgetRun', { id: 'slow' })

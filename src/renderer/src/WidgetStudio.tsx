@@ -400,7 +400,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
   const turnOn = () => void cfg.set(w.id, { on: true }).then(() => onOn(stay), e => setErr(String(e?.message ?? e)))
   return (
     <Modal title={on ? `Turn on ${w.name}?` : `Try ${w.name} live?`} onClose={onClose}>
-      <p className="muted small">{on ? 'From now on Laki runs this on its schedule, and its buttons run their commands, as you on this Mac.' : 'Its fetch runs once, now, as you on this Mac: the preview then shows what it really prints. Nothing else runs.'}</p>
+      <p className="muted small">{on ? 'From now on Laki runs this on its schedule, and its buttons run their commands, as you on this Mac.' : `${ai ? 'Its agent' : 'It'} runs once, now, as you on this Mac: the preview then shows what it really gets. Nothing else runs.`}</p>
       {!r ? (
         <p className="muted small">{err || 'Reading its files…'}</p>
       ) : (
@@ -454,9 +454,16 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
             Turn it on
           </button>
         ) : (
-          <button className="primary" disabled={!r || busy || r.stream || w.every === undefined} data-tip={r?.stream ? 'A stream runs only once it is on' : undefined} onClick={run}>
-            {busy ? 'Running…' : 'Run it once'}
-          </button>
+          <>
+            {busy && w.agent && cfg.stop && (
+              <button data-tip="Its agent's run ends now" onClick={() => void cfg.stop!(w.id).catch(() => {})}>
+                Stop
+              </button>
+            )}
+            <button className="primary" disabled={!r || busy || r.stream || w.every === undefined} data-tip={r?.stream ? 'A stream runs only once it is on' : undefined} onClick={run}>
+              {busy ? 'Running…' : 'Run it once'}
+            </button>
+          </>
         )}
       </div>
     </Modal>

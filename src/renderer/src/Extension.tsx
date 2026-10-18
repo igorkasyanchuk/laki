@@ -194,7 +194,7 @@ function Preview({ w, api, cfg, spot = 0 }: { w: WidgetView; api: WidgetApi; cfg
       {w.byAi && !w.on && (
         <div className="ext-note">
           <Icon name="ai" />
-          <span className="grow">Laki AI wrote it, so it's off: its fetch is a command a model wrote. Look at its folder, then turn it on.</span>
+          <span className="grow">Laki AI wrote it, so it's off: its own script is a command a model wrote. Look at its folder, then turn it on.</span>
           {cfg.folder && <button onClick={e => cfg.folder!(w.id, e)}>Its folder</button>}
           <button className="primary" onClick={() => void cfg.set(w.id, { on: true })}>
             Turn it on
@@ -480,7 +480,7 @@ export function Inspector({ w, cfg, tab, ...kept }: { w: WidgetView; cfg: Widget
       <section className="ext-card">
         <div className="ext-card-head">
           <b>Env</b>
-          <span className="muted small">what its fetch and actions are given; a setting named like a token, key or password masked</span>
+          <span className="muted small">what its own script and actions are given; a setting named like a token, key or password masked</span>
         </div>
         <dl className="ext-env mono">
           {Object.entries(x.env).map(([k, v]) => (
@@ -518,7 +518,7 @@ export function Inspector({ w, cfg, tab, ...kept }: { w: WidgetView; cfg: Widget
 function Examples({ w, cfg, files, onShown }: { w: WidgetView; cfg: WidgetsApi; files: Record<string, string> | null; onShown: () => void }) {
   const [pick, setPick] = useState<string | null>(null)
   const [err, setErr] = useState('')
-  const [copied, setCopied] = useState(false)
+  const [copied, setCopied] = useState('') // the example's key
   const all = useMemo(() => {
     const out: { key: string; label: string; text: string }[] = []
     try {
@@ -548,8 +548,8 @@ function Examples({ w, cfg, files, onShown }: { w: WidgetView; cfg: WidgetsApi; 
         <span className="grow" />
         {one && (
           <>
-            <button className="sm" data-tip="Copy this JSON" onClick={() => void navigator.clipboard.writeText(one.text).then(() => (setCopied(true), setTimeout(() => setCopied(false), 1500)))}>
-              <Icon name={copied ? 'check' : 'copy'} size={12} /> {copied ? 'Copied' : 'Copy'}
+            <button className="sm" data-tip="Copy this JSON" onClick={() => void navigator.clipboard.writeText(one.text).then(() => (setCopied(one.key), setTimeout(() => setCopied(''), 1500)))}>
+              <Icon name={copied === one.key ? 'check' : 'copy'} size={12} /> {copied === one.key ? 'Copied' : 'Copy'}
             </button>
             <button className="sm" disabled={!cfg.mock} data-tip="Show it with this (made-up data, not fetched until Live)" onClick={show}>
               Show it with this
@@ -717,12 +717,12 @@ export function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
     <section className="ext-card">
       <div className="ext-card-head">
         <b>Check</b>
-        <span className="muted small grow">{r ? `${n('error')} errors, ${n('warn')} hints${r.run ? ', its fetch run' : ''}` : 'Checking…'}</span>
+        <span className="muted small grow">{r ? `${n('error')} errors, ${n('warn')} hints${r.run ? ', run once' : ''}` : 'Checking…'}</span>
         <button className="sm" disabled={busy} onClick={() => go(false)}>
           Check again
         </button>
         {w.every !== undefined && (
-          <button className="sm" disabled={busy || aiOff} data-tip={aiOff ? 'Laki AI wrote it: turn it on first' : 'Run its fetch once and check its ui against what it prints'} onClick={() => go(true)}>
+          <button className="sm" disabled={busy || aiOff} data-tip={aiOff ? 'Laki AI wrote it: turn it on first' : 'Get its data once and check its ui against it'} onClick={() => go(true)}>
             <Icon name="refresh" size={12} /> Check with a fetch
           </button>
         )}
@@ -738,7 +738,7 @@ export function Check({ w, cfg }: { w: WidgetView; cfg: WidgetsApi }) {
         ))}
       </ul>
       <p className="muted small">
-        In a terminal: <span className="mono">laki widget check {w.id}</span> (<span className="mono">--no-run</span>: without its fetch)
+        In a terminal: <span className="mono">laki widget check {w.id}</span> (<span className="mono">--no-run</span>: without running it)
       </p>
     </section>
   )

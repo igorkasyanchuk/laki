@@ -54,24 +54,27 @@ const again = new Set<string>() // asked to fetch while fetching (settings chang
 // an agent's runs (an AI source's fetch, an AI action) by extension: stopped by Resources' Stop (agent:<id>), the
 // inspector's, turning it off, a new source, deleting it, its folder gone, shutdown. A stopped fetch fails as stopped,
 // its last data kept
-const agents = new Map<string, Set<AbortController>>()
-async function agentRun<T>(id: string, f: (signal: AbortSignal, stop: string) => Promise<T>): Promise<T> {
+type AgentRun = { c: AbortController; fetch: boolean } // fetch: its source's, else an action's
+const agents = new Map<string, Set<AgentRun>>()
+async function agentRun<T>(id: string, fetch: boolean, f: (signal: AbortSignal, stop: string) => Promise<T>): Promise<T> {
   const c = new AbortController()
   const l = agents.get(id) ?? new Set()
-  agents.set(id, l.add(c))
+  const run = { c, fetch }
+  agents.set(id, l.add(run))
   changed()
   try {
     return await f(c.signal, `agent:${id}`)
   } finally {
-    l.delete(c)
+    l.delete(run)
     if (!l.size && agents.get(id) === l) agents.delete(id)
     changed()
   }
 }
-export function stopAgents(id: string) {
+export function stopAgents(id: string, fetches = false) {
   for (const k of [...again]) if (k === id || k.startsWith(`${id}@`)) again.delete(k) // not once more after it
-  for (const c of agents.get(id) ?? []) c.abort()
-  return { stopped: agents.get(id)?.size ?? 0 }
+  const l = [...(agents.get(id) ?? [])].filter(r => !r.c.signal.aborted && (!fetches || r.fetch))
+  for (const r of l) r.c.abort()
+  return { stopped: l.length }
 }
 let rev = 0 // each reload: the app renders its widgets again
 // what a JS widget's page asks for (GET /widget/<id>?key=…): its data is the user's, so not for any page on this Mac
@@ -627,7 +630,7 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   if (o.on === true && !s.on) s.mock = undefined // turned on: live, not the sample data put there while it was off (the studio's)
   if (o.on !== undefined) s.on = !!o.on
   if (o.on === false) ungrant(w.id), stopAgents(w.id) // off: its tools' Always go, its agents stop
-  if (o.source !== undefined) stopAgents(w.id) // an answer for the source it had would land over the new one's
+  if (o.source !== undefined) stopAgents(w.id, true) // an answer for the source it had would land over the new one's (its actions run on)
   if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
@@ -844,7 +847,7 @@ async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
     const prompt = at(src.prompt ?? '')
     if (!prompt) throw new Error('no prompt: say what it should find')
     const preset = agentOf(src)
-    const out = await agentRun(w.id, (signal, stop) => aiOnce({ preset, tools: src.tools, prompt, system: aiSystem(w), ask: `extension ${w.id}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (AI)`, stop, signal }))
+    const out = await agentRun(w.id, true, (signal, stop) => aiOnce({ preset, tools: src.tools, prompt, system: aiSystem(w), ask: `extension ${w.id}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (AI)`, stop, signal }))
     return lastJson(out) // ponytail: no block, its words as { text }
   }
   if (src.kind === 'file') {
@@ -893,7 +896,7 @@ async function aiAnswer(w: Entry, action: string, a: { prompt: string; tools?: s
   if (!prompt) throw new Error(`${action}: no prompt`)
   const system = `You answer "${action}", a button of "${w.m.name || w.id}", an extension (a small view) in Laki, the app the user runs coding agents in. Do what the prompt asks with the tools you have (their MCP servers among them); change nothing it doesn't ask you to. No one answers questions: decide yourself. Answer in a few short lines of plain text: the user reads it in a small dialog. Or end with a \`\`\`json block: { "toast": "…" }, { "modal": { "title", "text" } }, or { "data": … } (the extension's new data, in the shape of what it shows now).`
   const preset = agentOf(a as WidgetSource)
-  return agentRun(w.id, (signal, stop) => aiOnce({ preset, tools: a.tools, prompt, system, ask: `extension ${w.id} · ${action}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (${action})`, stop, signal }))
+  return agentRun(w.id, false, (signal, stop) => aiOnce({ preset, tools: a.tools, prompt, system, ask: `extension ${w.id} · ${action}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (${action})`, stop, signal }))
 }
 // what an AI source's agent is told: find, change nothing, end with the data in the shape its views read (the sample's)
 const aiSystem = (w: Entry) => {

@@ -927,7 +927,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
       const author = txt(e.author ?? '{{author}}', r).trim()
       const ck = e.checks !== undefined ? (w => CHECKS.find(([re]) => re.test(w)))(txt(e.checks, r).trim()) : undefined
       const rv = e.review !== undefined ? txt(e.review, r).trim() : ''
-      const rt = /approved?/i.test(rv) ? ['approved', 't-good'] : /changes/i.test(rv) ? ['changes', 't-bad'] : rv ? [rv, ''] : undefined
+      const rt = /^approved?$/i.test(rv) ? ['approved', 't-good'] : /changes/i.test(rv) ? ['changes', 't-bad'] : rv ? [rv, ''] : undefined
       const tm = e.time !== undefined ? txt(e.time, r).trim() : ''
       const t = timeOf(tm)
       return `<div class="k-pr"${attrs}${opens(txt(e.href ?? '{{url}}', r))}><span class="k-pr-i" style="color:${c}" title="${esc(state || 'open')}">${iconSvg(ic, 14)}</span><div class="k-main"><span class="k-title">${h(e.title ?? '{{title}}', r)}</span><span class="k-sub">${[num && `#${esc(num)}`, author && esc(author), tm && esc(t !== undefined ? ago(t) : tm)].filter(Boolean).join(' · ')}</span></div>${ck ? `<span class="k-pr-ck ${ck[2]}" title="checks: ${esc(txt(e.checks, r).trim())}">${iconSvg(ck[1], 13)}</span>` : ''}${rt ? `<span class="k-tag ${rt[1]}">${esc(rt[0])}</span>` : ''}${avImg(author)}</div>`
@@ -949,7 +949,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     return `<button type="button" role="switch" aria-checked="${on}"${at(e, s, `k-toggle${on ? ' on' : ''}`, label)}${run ? ` data-run="${esc(run)}" data-arg="${on ? 'off' : 'on'}"` : ' disabled'}${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}><span class="k-main"><span class="k-tg-l">${esc(label)}</span>${text ? `<span class="k-sub">${esc(text)}</span>` : ''}</span><i class="k-tg-s"></i></button>`
   },
   segmented: (e, s) => {
-    const opts = (Array.isArray(e.options) ? e.options : []).filter(o => !obj(o) || !hidden(o, s)).map(o => (obj(o) ? { v: txt(o.value ?? o.label, s), l: txt(o.label ?? o.value, s) } : { v: txt(o, s), l: txt(o, s) })).filter(o => o.v).slice(0, 8)
+    const opts = (Array.isArray(e.options) ? e.options : []).filter(o => !obj(o) || !hidden(o, s)).map(o => (obj(o) ? { v: txt(o.value ?? o.label, s).trim(), l: txt(o.label ?? o.value, s) } : { v: txt(o, s).trim(), l: txt(o, s) })).filter(o => o.v).slice(0, 8)
     const cur = txt(e.value, s).trim()
     const run = e.run !== undefined ? txt(e.run, s) : ''
     const confirm = e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''
