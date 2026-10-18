@@ -500,6 +500,7 @@ export const widgetsView = (): WidgetView[] =>
     net: (w.js && w.s.net) || undefined,
     hide: w.s.hide,
     js: w.js || undefined,
+    ...(w.m.actions && Object.keys(w.m.actions).length && { actions: Object.keys(w.m.actions) }), // a scheduled task's picks
     config: configOf(w),
     options: optionsOf(w).map(({ def: _, ...o }) => o),
     at: w.s.at,
@@ -764,7 +765,7 @@ try {
 // run the widget's fetch now (exec); what it prints must be JSON. A failure keeps the last data and says why.
 // reason (RUN_REASONS: manual unless said; $LAKI_REFRESH_REASON), why: what changed (dev mode's file). Data put there by
 // hand (widgetMock) stays: only Fetch now (manual) runs then, and its data replaces it
-export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream'] // and action:<name>, event:<name>
+export const RUN_REASONS = ['schedule', 'open', 'settings', 'manual', 'reload', 'dev', 'select', 'push', 'stream', 'workflow'] // and action:<name>, event:<name>
 // an event handler's ($LAKI_EVENT, $LAKI_EVENT_FILE, the JSON on stdin) or a tool call's ($WIDGET_INPUT_<NAME>; why: who
 // called it and how it was allowed, for its run; full: all its stdout back)
 type Ev = { env: Record<string, string>; stdin: string; why?: string; full?: boolean }
@@ -1255,6 +1256,38 @@ export function widgetToolAnswer(o: { req: string; allow: string }) {
 
 // laki widget push (a cron job, a git hook, CI on this Mac, another app): data put there as a fetch would, none run;
 // merge: over its last data, shallow (both objects). An off one refuses it
+// a scheduled task's check as it's saved: the extension and its action are there (on or off: it may be on by its time)
+export function widgetUseCheck(id: string, action?: string) {
+  const w = find(id)
+  if (action && !(w.m.actions && Object.hasOwn(w.m.actions, action))) throw new Error(`${w.m.name || w.id} has no action ${action}`)
+  if (!action && !fetches(w)) throw new Error(`${w.m.name || w.id} has nothing to fetch: pick one of its actions`)
+  return { name: w.m.name || w.id, scoped: scoped(w) }
+}
+
+// a scheduled task's or a workflow's: one that's on (never an off one, Laki AI's either), fetched now and waited for (one
+// fetching already: that fetch), else one of its actions run; its data after. ws: the run's workspace, a scoped one's only
+export async function widgetUse(o: { id: string; action?: string; arg?: string; ws?: string }, reason: 'schedule' | 'workflow', why: string): Promise<{ ok: boolean; error?: string; name: string; data?: unknown; out?: string }> {
+  const w = find(o.id)
+  const name = w.m.name || w.id
+  if (!onOf(w)) return { ok: false, name, error: OFF(w) }
+  if (scoped(w) && !o.ws) return { ok: false, name, error: `${name} is per workspace: pick a workspace` }
+  const ws = scoped(w) ? wsOf(w, o.ws)?.id : undefined
+  if (o.action) {
+    const r = await widgetAction({ id: w.id, action: o.action, arg: o.arg, ws })
+    if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: w.id, ws, toast: r.toast, modal: r.modal })
+    return { ok: r.ok, error: r.error, name, out: r.out }
+  }
+  const k = keyOf(w.id, ws)
+  let r = running.has(k) ? { ok: false } : await widgetRun({ id: w.id, reason, why, ws })
+  if (!r.ok && running.has(k)) {
+    // ponytail: polled, a fetch has its own time limit
+    while (running.has(k)) await new Promise(f => setTimeout(f, 300))
+    const e = metaOf(w, ws).error
+    r = e ? { ok: false, error: e } : { ok: true }
+  }
+  return { ...r, name, data: r.ok ? dataOf(w, ws).data : undefined }
+}
+
 export function widgetPush(o: { id: string; data?: unknown; ws?: string; merge?: boolean }) {
   const w = find(o.id)
   if (!onOf(w)) throw new Error(OFF(w))

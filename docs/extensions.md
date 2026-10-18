@@ -548,6 +548,8 @@ it. Without Laki AI, *Make with Laki AI* gives you the prompt for any AI chat in
   to change it. *New ▾* (in *Yours*) makes one from a starter (its page opens on Data), or with Laki AI, or gives you
   the prompt for any AI chat. Search
   for *plugin* finds it too.
+- Scheduled tasks (*New task* › the agent picker's *Extension*: fetch it, or run one of its actions) and workflows (an
+  *Extension* block: fetched, its data as `{{steps.<id>.<field>}}`) use the ones that are turned on.
 - The Desk's *Build with AI*: Laki AI makes one for the Desk in its floating chat; it shows as a tile at once, with its
   sample, off until you turn it on.
 - The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget render <id> [--full]`,

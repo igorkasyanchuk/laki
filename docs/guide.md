@@ -521,7 +521,10 @@ are, how you name things, what it should know. It can't lift what Laki AI may no
 times you write in plain English. *New task* opens the form: the prompt, with the agent under it, then *When*, then
 the project, where it runs and a name as chips, the way the new-workspace page has them. A form you leave (Esc, a click elsewhere) is there when the page opens again;
 *Cancel* asks before it throws away what you changed, and ⌘⏎ saves it (Enter in a field doesn't). It's a page of
-its own: Esc doesn't close it (its ✕, or another page, does).
+its own: Esc doesn't close it (its ✕, or another page, does). The agent picker's *Extension* picks one of your
+extensions instead: *Fetch it* (its data now, on top of its own schedule) or one of its actions (the prompt, optional,
+is its `$WIDGET_ARG`); a per-workspace one runs in a workspace you pick. Only one that's turned on runs: an off one's
+run fails, saying so.
 - Pick the project (or *Another folder…*: it's added as a project), the agent (Claude Code, Codex, Gemini, Grok,
   OpenCode, or a preset of theirs), where it runs (*A new workspace each run*, a worktree; *In its folder, a new session each run*: the
   project's own checkout or folder, a new agent and sidebar row every run; *In its folder, one session*: the same
@@ -994,7 +997,9 @@ merging and archiving ask you first unless the block says not to; *Dry run* says
 keeps the version it started with, so editing a workflow never moves one under way. Several run at once (*Runs at
 once*, 3 unless changed), and a run asks you before more agent turns than the workflow allows (30). A scheduled task
 (Schedule › New task › the agent picker's *Workflow*) starts one at its times, its prompt the run's task; while that
-run goes on, the next time is skipped.
+run goes on, the next time is skipped. An *Extension* block (under *Outside Laki*) fetches one of your extensions
+that's turned on, waits, and gives its data to the blocks after it: `{{steps.<id>.data}}` (JSON) and each field,
+`{{steps.<id>.free_gb}}`; an off one, or a fetch that fails, takes its *error* way.
 
 A run opens on the same canvas, lit where it is and where it went: the working block's gear turns and the arrow it took
 flows, with what it asks you on top (also a notification),

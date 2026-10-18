@@ -14,6 +14,7 @@ import { stamp } from '../shared/when.ts'
 import { ACTIONS, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, isLive, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
+import { widgetUse } from './widgets.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -296,6 +297,8 @@ async function work(r: FlowRun, b: Block) {
       return waitTick(r, b, Date.now())
     case 'save':
       return keep(r, b, vars)
+    case 'extension':
+      return extension(r, b)
     case 'popup': {
       // a window in Laki, read and closed: the run goes on
       const title = fill(b.title ?? '', vars).trim() || blockName(b)
@@ -307,6 +310,19 @@ async function work(r: FlowRun, b: Block) {
       return leave(r, b, 'next', `showed you “${clip(title, 60)}”`)
     }
   }
+}
+
+// an extension: fetched now, waited for, then its data as steps.<id>.data and each field of it as steps.<id>.<field>
+async function extension(r: FlowRun, b: Block) {
+  const id = b.extension?.trim() ?? ''
+  const got = await widgetUse({ id, ws: r.ws }, 'workflow', `${r.flow.name} · ${blockName(b)}`).catch(e => ({ ok: false, error: (e as Error).message, name: id, data: undefined }))
+  if (!live(r) || r.cur !== b.id) return // stopped meanwhile
+  if (!got.ok) return leave(r, b, 'error', got.error ?? `${got.name} failed`)
+  const text = (v: unknown) => (typeof v === 'string' ? v : JSON.stringify(v) ?? '').slice(0, ANSWER_MAX)
+  r.vars[`steps.${b.id}.data`] = text(got.data)
+  if (got.data && typeof got.data === 'object' && !Array.isArray(got.data)) for (const [k, v] of Object.entries(got.data)) if (/^[\w-]{1,40}$/.test(k) && k !== 'data') r.vars[`steps.${b.id}.${k}`] = text(v)
+  say(r, `${blockName(b)}: fetched ${got.name}`, r.vars[`steps.${b.id}.data`])
+  leave(r, b, 'ok', `fetched ${got.name}`)
 }
 
 // what a choice or a case tests: a variable, else a block's answer, else its output (none: empty)

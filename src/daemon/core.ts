@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools } from './widgets.ts'
+import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetUse, widgetUseCheck } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -4572,8 +4572,8 @@ const findSchedule = (id: string) => {
   return s
 }
 
-type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source'>>
-const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source'] as const
+type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action'>>
+const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action'] as const
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again
 export const flowFiles = { at: 0 }
 // workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
@@ -4600,13 +4600,20 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     s.preset ||= agent && presetNamed(agent) && presetNamed(agent)!.agent !== 'command' ? agent : 'claude'
   }
   if (!s.workflow) delete s.workflow, delete s.source // '' clears it: a prompt again
+  if (!s.widget) delete s.widget, delete s.action
+  if (!s.action) delete s.action // none: a fetch
+  if (s.workflow && s.widget) throw new Error('a workflow or an extension, not both')
   const pr = presetNamed(s.preset) // an agent's: a command preset takes no prompt
-  if (s.workflow) {
+  const ext = s.widget ? widgetUseCheck(s.widget, s.action) : undefined // throws: no such extension or action
+  if (ext) {
+    // a fetch or an action: no agent, no prompt (an action's argument, if any); a per-workspace one: one of the project's
+    if (ext.scoped && ['new', 'local', 'local-new'].includes(s.ws)) throw new Error(`${ext.name} is per workspace: pick one of ${proj.name}'s`)
+  } else if (s.workflow) {
     if (state.settings?.workflows !== true || !flowHooks.find) throw new Error('turn Workflows on first: Settings › General › Experimental')
     s.source = flowHooks.find({ id: s.workflow, source: s.source, project: proj.id }).source // throws: no such workflow
   } else if (!(pr ? pr.agent !== 'command' : isAgent(s.preset))) throw new Error(`pick an agent: ${s.preset || 'none'} isn't an agent's preset`)
-  if (s.workflow) {
-    // its runs go where the workflow says
+  if (s.workflow || (ext && !ext.scoped)) {
+    // its runs go where the workflow says; an extension's: nowhere
   } else if (s.ws === 'new') {
     if (proj.git === false) throw new Error(`${proj.name} isn't a git repository: run it in its folder instead of a new workspace`)
   } else if (s.ws !== 'local' && s.ws !== 'local-new') {
@@ -4615,7 +4622,7 @@ export function scheduleSet(o: ScheduleIn): Schedule {
     s.ws = ws.id
   }
   s.prompt = s.prompt?.trim() ?? ''
-  if (!s.prompt) throw new Error(s.workflow ? 'what should the workflow work on? (its task)' : 'the prompt is empty')
+  if (!s.prompt && !ext) throw new Error(s.workflow ? 'what should the workflow work on? (its task)' : 'the prompt is empty')
   s.name = s.name?.trim() || undefined
   if (!old || o.when !== undefined) {
     const r = parseWhen(s.when ?? '')
@@ -4636,7 +4643,7 @@ export function scheduleRm(id: string) {
   changed()
 }
 
-const runName = (s: Schedule, at: number) => stamp(s.name || s.prompt.split(/\s+/).slice(0, 6).join(' '), at)
+const runName = (s: Schedule, at: number) => stamp(s.name || (s.widget && !s.prompt ? `${s.widget}: ${s.action ?? 'fetch'}` : s.prompt.split(/\s+/).slice(0, 6).join(' ')), at)
 
 const logRun = (r: ScheduleRun) => {
   state.runs = [r, ...(state.runs ?? [])].slice(0, RUNS_KEPT)
@@ -4652,7 +4659,13 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
   const prompt = stamp(s.prompt, now)
   s.last = now
   try {
-    if (s.workflow) {
+    if (s.widget) {
+      // an extension: fetched, or one of its actions run (on ones only)
+      const u = await widgetUse({ id: s.widget, action: s.action, arg: prompt || undefined, ws: ['new', 'local', 'local-new'].includes(s.ws) ? undefined : s.ws }, 'schedule', `scheduled task ${s.name ?? s.id}`)
+      if (!s.name && !s.prompt) r.name = `${u.name}: ${s.action ?? 'fetch'}` // its name, not its id
+      if (!u.ok) throw new Error(u.error ?? `${u.name} failed`)
+      r.what = s.action ? `ran ${u.name}'s ${s.action}${u.out?.trim() ? `: ${u.out.trim().split('\n').pop()!.slice(0, 120)}` : ''}` : `fetched ${u.name}`
+    } else if (s.workflow) {
       // a workflow's run, unless the last one this task started is still going
       const going = state.flows?.find(f => !FLOW_ENDED.includes(f.status) && f.workflow === s.workflow && f.source === (s.source ?? 'yours') && f.project === s.project && f.trigger === `schedule ${s.id}`)
       if (going) throw new Error(`skipped: its last run (${going.id}) is still going`)

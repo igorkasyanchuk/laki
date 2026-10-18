@@ -27,11 +27,12 @@ export type WorkflowsApi = {
   setGlobals?: (v: Record<string, string>) => Promise<unknown>
 }
 type Sel = { id: string; source: WorkflowSource; project?: string }
+type Ext = { id: string; name: string; on: boolean; every?: number } // what an extension block can fetch
 type At = { kind: 'index' } | { kind: 'wf'; sel: Sel } | { kind: 'run'; id: string }
 const W = 180
 const H = 58
 const RUNS_SHOWN = 12
-const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', llm: 'red', decide: 'yellow', popup: 'teal', webhook: 'brown', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', end: 'gray' }
+const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', llm: 'red', decide: 'yellow', popup: 'teal', webhook: 'brown', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', extension: 'teal', end: 'gray' }
 const STATUS_WORDS: Record<string, string> = { running: 'running', waiting: 'asks you', paused: 'paused', done: 'done', stopped: 'stopped', failed: 'failed' }
 const same = (a: Sel | null | undefined, w: { id: string; source: WorkflowSource; project?: string }) => !!a && a.id === w.id && a.source === w.source && (a.project ?? '') === (w.project ?? '')
 const ended = (r: { status: FlowRun['status'] }) => FLOW_ENDED.includes(r.status)
@@ -47,7 +48,7 @@ function agentActions(global: RunAction[] | undefined, projects: Project[], item
 }
 const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daemon's actions have no slug)
 
-export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string }; api: WorkflowsApi; onClose: () => void }) {
+export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string }; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
   const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : { kind: 'index' })
   const [starting, setStarting] = useState<WorkflowItem | null>(null)
@@ -300,6 +301,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
               projects={projects}
               presets={presets}
               actions={agentActions(actions, projects, cur)}
+              exts={view.widgets ?? []}
               api={api}
               runs={going.filter(r => runOf(r, cur))}
               onSaved={w => (refresh(), setAt({ kind: 'wf', sel: w }))}
@@ -576,7 +578,7 @@ function Canvas({ wf, sel, many = [], onPick, onMany, onMove, onMenu, onDrop, on
 
 // ---------- the editor: canvas and inspector, or the file
 
-function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove, onRun, onOpenRun, onCopy }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onOpenRun: (id: string) => void; onCopy: () => void }) {
+function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, onRemove, onRun, onOpenRun, onCopy }: { item: WorkflowItem; projects: Project[]; presets: Preset[]; actions: RunAction[]; exts: Ext[]; api: WorkflowsApi; runs: FlowView[]; onSaved: (w: WorkflowItem) => void; onRemove: () => void; onRun: () => void; onOpenRun: (id: string) => void; onCopy: () => void }) {
   const [text, setText] = useState(drafts.get(keyOf(item)) ?? item.text)
   const [mode, setMode] = useState<'canvas' | 'file'>('canvas')
   const [pick, setPick] = useState<string | null>(null)
@@ -780,7 +782,7 @@ function Editor({ item, projects, presets, actions, api, runs, onSaved, onRemove
               <p className="wf-hint">⌘Z brings back what you deleted; Discard goes back to the saved file.</p>
             </div>
           ) : (
-            <Inspector wf={wf} id={pick} presets={presets} actions={actions} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} />
+            <Inspector wf={wf} id={pick} presets={presets} actions={actions} exts={exts} edit={edit} onPick={setPick} api={api} project={item.project} onDoom={setDoomed} />
           )}
         </div>
       ) : (
@@ -811,6 +813,7 @@ const KIND_SAYS: Record<BlockKind, string> = {
   action: 'Open a PR, approve, merge, dev server, archive',
   wait: 'Until its PR’s checks pass or fail',
   save: 'Text, a file or a link, into the workspace’s Artifacts',
+  extension: 'Fetch one of your extensions now: its data as variables',
   end: 'Done, stopped or failed',
 }
 // an id no block has: the kind's name, else with a number (agent2)
@@ -849,6 +852,7 @@ const NEW_BLOCK: Record<BlockKind, Partial<Block>> = {
   action: { name: 'Open a PR', action: 'ship', text: '{{task}}' },
   wait: { name: 'CI checks', for: 'checks' },
   save: { name: 'Save', file: 'notes.md', text: '{{prev}}' },
+  extension: { name: 'Extension', extension: '' },
   end: { name: 'Done', result: 'success' },
 }
 // what a workflow can add, in groups: each kind, an agent action (Run ▾'s) as an agent block, and the three ways to keep
@@ -860,7 +864,7 @@ function picks(actions: RunAction[], presets: Preset[]): { head: string; items: 
   return [
     { head: 'Blocks', items: [one('agent'), ...(['run', 'choice', 'case', 'ask', 'popup', 'action', 'wait'] as const).map(one)] },
     { head: 'Agent actions', items: actions.map(a => ({ label: a.name, sub: a.slug, pill: a.target === 'any' ? undefined : a.target, kind: 'agent', more: { name: a.name, use: ref(a), text: undefined, ...(presetOf(a) && { agent: presetOf(a) }) } })) },
-    { head: 'Outside Laki', items: [one('llm'), one('decide'), one('webhook')] },
+    { head: 'Outside Laki', items: [one('llm'), one('decide'), one('webhook'), one('extension')] },
     {
       head: 'Into its Artifacts',
       items: [
@@ -945,7 +949,7 @@ A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`a
 
 Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
 
-function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoom }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void }) {
+function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project, onDoom }: { wf: Workflow; id: string | null; presets: Preset[]; actions: RunAction[]; exts: Ext[]; edit: (f: (w: Workflow) => void) => void; onPick: (id: string | null) => void; api: WorkflowsApi; project?: string; onDoom?: (id: string | null) => void }) {
   const b = wf.blocks.find(x => x.id === id)
   const used = b?.use ? findAction(actions, [], b.use) : undefined
   if (!b)
@@ -1191,6 +1195,20 @@ function Inspector({ wf, id, presets, actions, edit, onPick, api, project, onDoo
           {b.from === undefined && b.link === undefined && field('Text', text(b.text, (x, v) => (x.text = v), true), '{{steps.<id>.answer}}: an agent’s answer')}
         </>
       )}
+      {b.kind === 'extension' &&
+        field(
+          'Extension',
+          <select value={b.extension ?? ''} onChange={e => set(x => void (x.extension = e.target.value))}>
+            <option value="">Pick one…</option>
+            {[...exts.filter(x => x.every !== undefined || x.id === b.extension), ...(b.extension && !exts.some(x => x.id === b.extension) ? [{ id: b.extension, name: `${b.extension} (not here)`, on: false }] : [])].map(x => (
+              <option key={x.id} value={x.id}>
+                {x.name}
+                {x.on ? '' : ' (off: turn it on to run)'}
+              </option>
+            ))}
+          </select>,
+          `Fetched now, then {{steps.${b.id}.data}} and each field of it, {{steps.${b.id}.<field>}}. Only one that's turned on runs`,
+        )}
       {b.kind === 'end' && (
         <>
           {field(

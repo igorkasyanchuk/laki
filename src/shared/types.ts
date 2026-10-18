@@ -501,7 +501,7 @@ export type AgentUsage = { agent: string; plan?: string; windows: UsageWindow[];
 // agent (a preset's name): in a new workspace each time (ws 'new': a worktree), in the project's own folder (ws 'local':
 // no worktree, one session; 'local-new': a new session, a sidebar row, each run), or in that workspace (its running agent of the preset, queued while it works; else a new tab). next:
 // when it runs (none: off, or a once that ran)
-export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number; workflow?: string; source?: 'yours' | 'project' } // workflow: a run of that workflow (Workflows on) instead of a prompt, prompt its task
+export type Schedule = { id: string; name?: string; project: string; preset: string; ws: string; prompt: string; when: string; rule: Rule; on: boolean; next?: number; last?: number; workflow?: string; source?: 'yours' | 'project'; widget?: string; action?: string } // workflow: a run of that workflow (Workflows on) instead of a prompt, prompt its task; widget: an extension fetched (action: one of its actions run instead, prompt its argument), on ones only
 // one run of a task, for the log: what happened (a new workspace, sent, queued, why it failed or was missed)
 export type ScheduleRun = { id: string; schedule: string; project?: string; name: string; at: number; ok: boolean; what: string; ws?: string; tab?: string }
 
@@ -595,7 +595,7 @@ export type WidgetSource = { kind: (typeof WIDGET_SOURCES)[number]; text?: strin
 export const AI_SOURCE_EVERY = 60 // minutes between an AI source's runs unless set; 15 at least: each one costs
 // what the user hid of an extension (its switches): its refresh buttons, when it was fetched
 export type WidgetHide = { refresh?: boolean; at?: boolean }
-export type WidgetView = { id: string; name: string; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[] } // history: the studio's Undo, when each kept version was taken (ms), oldest first
+export type WidgetView = { id: string; name: string; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; actions?: string[]; config: Record<string, string>; options: WidgetOption[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[] } // history: the studio's Undo, when each kept version was taken (ms), oldest first
 // an action an agent may call (its tool): Always granted in these workspaces ('': calls from none, Laki AI's)
 export type WidgetTool = { action: string; description: string; ask: 'always' | 'first' | 'never'; grants: string[] }
 // here: the app's (Widgets.tsx inWs), the workspace whose instance a per-workspace one shows; null: none on screen
@@ -631,5 +631,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 82
+export const API = 83
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

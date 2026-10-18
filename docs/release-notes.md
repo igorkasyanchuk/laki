@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Extensions in scheduled tasks and workflows**: a task can fetch an extension or run one of its actions at its
+  times; a workflow's Extension block fetches one and hands its data to the next blocks.
 - **Hide an extension's refresh button and when it was fetched**: two switches on its page, for the sidebar, the
   Desk and its full view alike.
 - **Two more dark themes**: Hallownest (Hollow Knight: a cavern's pale motes, carved small-caps headings, a soul's

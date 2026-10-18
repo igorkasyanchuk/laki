@@ -1221,6 +1221,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .sched-failed { color: var(--error); }
 .sched-form { display: flex; flex-direction: column; gap: 10px; }
 .sched-form .nw-composer textarea { min-height: 76px; }
+.sched-ext-says { padding: 12px 14px 4px; } /* an extension fetch: nothing to type */
 .sched-when { width: 100%; box-sizing: border-box; height: 34px; }
 .sched-when .nw-chip-input { flex: 1; max-width: none; font-size: 13px; }
 .sched-when.bad { border-color: color-mix(in srgb, var(--error) 60%, var(--line)); }

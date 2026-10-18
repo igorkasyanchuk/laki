@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, realpathSync } from 'node:fs'
+import { existsSync, mkdirSync, realpathSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { describe, describeHours, inHours, nextRun, parseHours, parseWhen, type Rule, stamp, wsTitle } from '../src/shared/when.ts'
@@ -222,4 +222,33 @@ test('scheduled tasks: a new workspace each run, or the workspace’s agent; onc
   assert.ok(existsSync(plain) && !existsSync(join(plain, 'torn-down')))
   // the sessions left keep the project: delete them first
   await assert.rejects(rig.rpc('projectRm', { id: np.id }), new RegExp(`has workspaces: delete them first \\(${r2.ws}\\)`))
+})
+
+test('scheduled tasks: an extension fetched, or one of its actions run; only one that is on', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const d = join(rig.data, 'widgets', 'disk')
+  mkdirSync(d, { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Disk', every: 60, fetch: 'echo "{\\"n\\": $(date +%s)}"', actions: { note: 'echo "got $WIDGET_ARG"' } }))
+  await rig.rpc('widgetReload')
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, widget: 'nope', when: 'every day at 9am' }), /no widget nope/)
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, widget: 'disk', action: 'nope', when: 'every day at 9am' }), /has no action nope/)
+  await rig.rpc('settingsSet', { workflows: true })
+  await assert.rejects(rig.rpc('scheduleSet', { project: p.id, widget: 'disk', workflow: 'x', when: 'every day at 9am' }), /not both/)
+  const fetch = await rig.rpc('scheduleSet', { project: p.id, widget: 'disk', when: 'every day at 9am' })
+  assert.equal(fetch.prompt, '', 'no prompt needed')
+  const off = await rig.rpc('scheduleRun', { id: fetch.id })
+  assert.deepEqual([off.ok, off.what, off.name], [false, 'Disk is off: turn it on first', 'Disk: fetch'])
+  await rig.rpc('widgetSet', { id: 'disk', on: true })
+  await until(async () => (await rig.rpc('state')).widgets.find((w: any) => w.id === 'disk')?.at, 'its first fetch')
+  const was = (await rig.rpc('state')).widgets.find((w: any) => w.id === 'disk')
+  assert.deepEqual(was.actions, ['note'])
+  const ran = await rig.rpc('scheduleRun', { id: fetch.id })
+  assert.deepEqual([ran.ok, ran.what], [true, 'fetched Disk'])
+  assert.ok((await rig.rpc('state')).widgets.find((w: any) => w.id === 'disk').at >= was.at, 'fetched again')
+  const act = await rig.rpc('scheduleSet', { project: p.id, widget: 'disk', action: 'note', prompt: 'hello', when: 'weekdays at 9am' })
+  const r = await rig.rpc('scheduleRun', { id: act.id })
+  assert.deepEqual([r.ok, r.what], [true, "ran Disk's note: got hello"])
+  const back = await rig.rpc('scheduleSet', { id: act.id, widget: '', prompt: 'do it', preset: 'claude' })
+  assert.deepEqual([back.widget, back.action], [undefined, undefined], "'' makes it an agent's again")
 })

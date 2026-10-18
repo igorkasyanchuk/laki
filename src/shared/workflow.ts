@@ -3,13 +3,13 @@
 // after a restart. One Markdown file per workflow, none to start with: yours (<data>/workflows/<id>.md) or a project's
 // (.laki/workflows/<id>.md in its repo). This file is the format both sides share: parse, toFile, check.
 
-export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'end'] as const
+export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
 // each kind's exits; choice, case and ask have options instead (each its own exit)
-export const EXITS: Record<BlockKind, string[]> = { start: ['next'], agent: ['next', 'error'], llm: ['ok', 'error'], decide: ['ok', 'error'], popup: ['next'], webhook: ['ok', 'error'], run: ['ok', 'fail'], choice: [], case: [], ask: [], action: ['ok', 'error'], wait: ['pass', 'fail'], save: ['ok'], end: [] }
+export const EXITS: Record<BlockKind, string[]> = { start: ['next'], agent: ['next', 'error'], llm: ['ok', 'error'], decide: ['ok', 'error'], popup: ['next'], webhook: ['ok', 'error'], run: ['ok', 'fail'], choice: [], case: [], ask: [], action: ['ok', 'error'], wait: ['pass', 'fail'], save: ['ok'], extension: ['ok', 'error'], end: [] }
 export const BAD_EXITS = ['fail', 'error']
 export const optioned = (k: BlockKind) => k === 'choice' || k === 'case' || k === 'ask'
-export const BLOCK_NAMES: Record<BlockKind, string> = { start: 'Start', agent: 'Agent', llm: 'AI call', decide: 'AI decision', popup: 'Show you', webhook: 'Webhook', run: 'Run command', choice: 'If / else', case: 'Case', ask: 'Ask you', action: 'Laki action', wait: 'Wait', save: 'Save', end: 'End' }
+export const BLOCK_NAMES: Record<BlockKind, string> = { start: 'Start', agent: 'Agent', llm: 'AI call', decide: 'AI decision', popup: 'Show you', webhook: 'Webhook', run: 'Run command', choice: 'If / else', case: 'Case', ask: 'Ask you', action: 'Laki action', wait: 'Wait', save: 'Save', extension: 'Extension', end: 'End' }
 export const ACTIONS: Record<string, string> = { ship: 'Open a PR (commit, push, gh pr create)', approve: 'Approve its PR', merge: 'Merge its PR', dev: 'Run the dev server', archive: 'Archive the workspace' }
 export const OUTWARD = ['ship', 'approve', 'merge', 'archive'] // what others see: asks first unless the block says ask first: no
 export const WAITS: Record<string, string> = { checks: 'Its PR’s checks pass or fail' }
@@ -88,6 +88,7 @@ export type Block = {
   file?: string // save: a path in the workspace's storage folder
   from?: string // save: a file or folder of the workspace, copied there (instead of text); webhook: a file of it, sent as the body
   link?: string // save: a link, kept as <file>.url (the workspace's Artifacts list links first)
+  extension?: string // extension: its id, fetched now (an on one only), then its data as variables
   result?: (typeof RESULTS)[number] // end
   notify?: boolean // end, popup: a notification too
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
@@ -147,8 +148,8 @@ export function exitsOf(b: Block): Exit[] {
 // are lines named after them (next:, ok:, fail:…), a choice's and an ask's options are - label → block; > lines are its
 // text; max: 3 → stuck limits it; at: x,y is where the canvas draws it.
 
-const WHOLE = new Set(['name', 'ask', 'show', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup']) // the rest of the line is the value: no · split
-const KIND_KEY: Record<string, BlockKind> = { input: 'start', agent: 'agent', llm: 'llm', decide: 'decide', popup: 'popup', webhook: 'webhook', run: 'run', choice: 'choice', if: 'choice', case: 'case', ask: 'ask', action: 'action', wait: 'wait', save: 'save', end: 'end' }
+const WHOLE = new Set(['name', 'ask', 'show', 'run', 'choice', 'if', 'case', 'from', 'link', 'webhook', 'header', 'question', 'system', 'popup', 'extension']) // the rest of the line is the value: no · split
+const KIND_KEY: Record<string, BlockKind> = { input: 'start', agent: 'agent', llm: 'llm', decide: 'decide', popup: 'popup', webhook: 'webhook', run: 'run', choice: 'choice', if: 'choice', case: 'case', ask: 'ask', action: 'action', wait: 'wait', save: 'save', extension: 'extension', end: 'end' }
 
 export function parse(text: string, id = ''): { workflow: Workflow; problems: string[] } {
   const problems: string[] = []
@@ -272,6 +273,7 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
       return void (b.out = names.length ? names : undefined)
     }
     case 'webhook': return void (b.url = v)
+    case 'extension': return void (b.extension = v)
     case 'method': {
       const m = v.toUpperCase() as Block['method']
       if (!(METHODS as readonly string[]).includes(m!)) problems.push(`${at}: method: ${METHODS.join(', ')}`)
@@ -333,6 +335,7 @@ export function toFile(wf: Workflow): string {
         break
       case 'webhook': L.push(`webhook: ${one(b.url)}`); if (b.method && b.method !== 'POST') L.push(`method: ${b.method}`); for (const h of b.headers ?? []) L.push(`header: ${one(h)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'run': L.push(`run: ${one(b.cmd)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+      case 'extension': L.push(`extension: ${one(b.extension)}`.trimEnd()); break
       case 'ask': L.push(`ask: ${one(b.question)}`); if (b.show) L.push(`show: ${one(b.show)}`); break
       case 'popup': L.push(`popup: ${one(b.title)}`.trimEnd()); if (b.notify) L.push('notify: yes'); if (b.phone) L.push('phone: yes'); break
       case 'choice': L.push(`choice: ${branchLabel({ of: b.of || 'answer', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })}`); break
@@ -380,6 +383,7 @@ export function check(wf: Workflow): string[] {
     if (b.kind === 'ask' && !b.question?.trim()) out.push(`${blockName(b)} asks nothing`)
     if (b.kind === 'popup' && !b.text?.trim()) out.push(`${blockName(b)} shows nothing`)
     if (b.kind === 'save' && !b.file?.trim()) out.push(`${blockName(b)} has no file`)
+    if (b.kind === 'extension' && !/^[\w.-]{1,80}$/.test(b.extension?.trim() ?? '')) out.push(`${blockName(b)}: extension: which one (its id)`)
     if (b.kind === 'save' && b.from && b.link) out.push(`${blockName(b)}: a file or a link, not both`)
     if (b.kind === 'agent' && b.session && !['run', 'new'].includes(b.session) && by.get(b.session)?.kind !== 'agent') out.push(`${blockName(b)}: session ${b.session} isn't an agent block`)
     if (wf.where === 'main' && ((b.kind === 'action' && ['ship', 'approve', 'merge'].includes(b.action ?? '')) || b.kind === 'wait')) out.push(`${blockName(b)} needs a PR: runs in: worktree`) // a folder's own workspace has no PR of its own
@@ -507,6 +511,7 @@ export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, are
     if (b.kind === 'webhook') at('status', 'the HTTP status'), at('output', 'the response')
     if (b.kind === 'wait') at('output', 'the checks that failed')
     if (b.kind === 'save') at('output', 'the saved file’s path')
+    if (b.kind === 'extension') at('data', 'its data, fetched now, as JSON; each field of it: steps.<id>.<field>')
     for (const n of OUT_KINDS.includes(b.kind) ? (b.out ?? []) : []) at(n, 'an output it names (out:)')
     if (b.kind === 'decide') {
       for (const q of b.qs ?? []) {
@@ -703,6 +708,7 @@ Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind ke
 - llm: <an OpenRouter model, e.g. anthropic/claude-sonnet-4.5; empty: Settings › AI's> (system: <its system prompt> · temperature: 0 to 2 · json: yes|no · timeout: <minutes>), the prompt as "> " lines: one call to OpenRouter with the key in Settings › AI, no tools, no agent. json: yes is JSON mode (its answer one JSON object; on by itself with out:). Exits ok, error. {{steps.<id>.answer}}: its answer.
 - decide: <a decision model: typesafe/jev-1.13 (the default), openai/gpt-6-luna-decisions, microsoft/microsoft-decision-1, ~perplexity/pplx-decider-latest, cloudflare/clef> · sure: 0.7, the state it judges as "> " lines (JSON with {{vars}}, values escaped; none: the block before's answer or output), then "question: <name> · yes/no|choice|score · <what it asks>" lines (yes/no is the API's noul: how true), each with its lines indented under it: yes/no's "  yes: <what yes means>" and "  no: …", a choice's "  <option>: <what it means>", a score's "  - <level>" lowest first. One call to OpenRouter's Decisions API: no text, probabilities. Each answer is {{steps.<id>.<name>}} (yes or no; the option; the level's number), with .p (its probability), .confidence, .score, .level (a score's words); {{steps.<id>.answers}} all of it as JSON. Under sure (yes/no between 1-sure and sure; a choice or score less confident) it asks the user. Its ways out: "ok: <block>" and "error: <block>", then route with a case (numbers, JS); or "route: <a question's name>" and a line per answer of it: "- yes → <block>", "- no → <block>", "- <option> → <block>", "- <level number> → <block>" (and error:).
 - webhook: <http(s) URL> · method: POST|PUT|PATCH|GET|DELETE (POST unless said), "header: Name: value" lines ({{env.NAME}}: Settings' or the project's env, for a secret), the body as "> " lines (JSON when it starts with { or [: values go in escaped), or "from: <a file of the workspace>" sent as it is; no body: the run's variables as JSON. Exits ok (2xx), error. {{steps.<id>.status}}, {{steps.<id>.output}}: the response.
+- extension: <an extension's id: laki_extensions lists them>: fetches it now (one that's turned on; a per-workspace one for the run's workspace), waits, then its data: {{steps.<id>.data}} as JSON, and each field of it as {{steps.<id>.<field>}} (a list or an object as JSON). Exits ok, error (off, no fetch, the fetch failed).
 - out: <name>, <name>… on an agent, llm, run or webhook block: what it gives the blocks after it, {{steps.<id>.<name>}}. An agent or an llm is told to end its answer with a JSON object of them; a command's output or a webhook's response is one.
 - popup: <title> (the whole line), then "notify: yes" and "phone: yes" on lines of their own if wanted, its body as "> " lines: HTML when it starts with <, else Markdown ({{vars}} filled): a window in Laki the user reads and closes (scrollable; no buttons), and a notification with notify: yes. It doesn't wait; exit next. For a run's result: "Job done", then {{steps.report.answer}}.
 - end: success|stopped|failed · notify: yes · phone: yes, its notification's words as "> " lines ({{vars}}; none: the block's name). notify: a notification on the Mac (and the phone with phone: yes, when Settings › Phone pushes is set up) as the run ends there; a failed run always notifies.

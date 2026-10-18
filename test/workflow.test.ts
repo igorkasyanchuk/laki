@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { readFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
@@ -737,4 +737,59 @@ test('workflow variables: var lines read back, the workflow’s own over the glo
   const run = await rig.rpc('flowStart', { workflow: 'vars', source: 'yours', project: p.id, task: 'say it' })
   const r = await until(async () => (x => x.status === 'done' && x)(await rig.rpc('flowGet', { id: run.id })), 'the end', 15000)
   assert.equal(r.vars['steps.say.output'].trim(), 'acme/web mine #ops')
+})
+
+const EXT = `# Disk
+Its space, then said.
+
+runs in: main · session: new · at once: 3 · turns: 30
+
+## start
+input: task
+next: disk
+
+## disk
+extension: disk
+ok: say
+error: off
+
+## say
+run: echo {{steps.disk.free}} {{steps.disk.vol}}
+ok: done
+
+## done
+end: success
+
+## off
+end: failed
+`
+
+test('workflow extension block: fetched now, its data as variables; an off one is its error exit', async t => {
+  const { workflow, problems } = parse(EXT, 'disk')
+  assert.deepEqual(problems, [])
+  assert.deepEqual(check(workflow), [])
+  assert.equal(workflow.blocks.find(b => b.id === 'disk')?.extension, 'disk')
+  assert.match(toFile(workflow), /## disk\nextension: disk\n/, 'written back')
+  assert.match(check({ ...workflow, blocks: workflow.blocks.map(b => (b.id === 'disk' ? { ...b, extension: '' } : b)) }).join(), /extension: which one/)
+  assert.ok(flowVars(workflow).some(v => v.name === 'steps.disk.data'))
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const d = join(rig.data, 'widgets', 'disk')
+  mkdirSync(d, { recursive: true })
+  writeFileSync(join(d, 'widget.json'), JSON.stringify({ name: 'Disk', every: 60, fetch: 'echo \'{"free": 9, "vol": {"a": 1}}\'' }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'disk', text: EXT })
+  const first = await rig.rpc('flowStart', { workflow: 'disk', source: 'yours', project: p.id, task: 'check' })
+  const failed = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await rig.rpc('flowGet', { id: first.id })), 'the end', 15000)
+  assert.equal(failed.status, 'failed')
+  assert.match(failed.decisions.find((x: any) => x.block === 'disk').why, /Disk is off/)
+  await rig.rpc('widgetSet', { id: 'disk', on: true })
+  const run = await rig.rpc('flowStart', { workflow: 'disk', source: 'yours', project: p.id, task: 'check' })
+  const r = await until(async () => (x => x.status === 'done' && x)(await rig.rpc('flowGet', { id: run.id })), 'the end', 15000)
+  assert.equal(r.vars['steps.disk.free'], '9')
+  assert.equal(r.vars['steps.disk.vol'], '{"a":1}')
+  assert.equal(JSON.parse(r.vars['steps.disk.data']).free, 9)
+  assert.equal(r.vars['steps.say.output'].trim(), '9 {"a":1}')
 })
