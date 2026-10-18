@@ -13,6 +13,9 @@ version it builds, with the date. -->
 - An extension's Settings card in sections (where it shows, updates, its settings), each field saying what it does.
 - Specs & Brainstorms, Workflows and the extension studio open without a flash of the workspace under them.
 - The floating Laki AI chat moves: drag it by its head; it stays where you leave it (a double-click puts it back).
+- **Laki AI arranges your extensions**: ask it to put one on the Desk, resize it, fetch it less often or change a
+  setting; to turn one on it asks you, with what it runs, and a Yes turns it on. Agents get `laki widget set` for the same
+  (never on, a secret, its source or network access).
 
 - **Secret settings for extensions**: a token or a key is a `secret`: a password box in Settings, kept apart and given
   only to its fetch and actions, never to its page, the app, `laki ls` or MCP. A value saved as text moves over.

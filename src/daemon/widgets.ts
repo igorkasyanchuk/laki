@@ -684,9 +684,16 @@ export function widgetsOff() {
 // the user's choices: on, size, every (minutes), view (the full view's size), place (sidebar, top bar or status bar), net
 // (its page may reach https sites), config (each setting as text, made what its kind takes); a widget turned on fetches now
 const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
-export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; from?: { ws?: string; tab?: string } }) {
+// agent: an agent's change (MCP's laki_extension_set, Laki AI's too; laki widget set in an agent's tab): where it shows,
+// its size, every, view, hide and plain settings; never on, network access, its source or a secret: those are the user's
+export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; from?: { ws?: string; tab?: string }; agent?: boolean }) {
   const w = find(o.id)
-  if (o.on === true && agentCaller(o.from)) throw new Error('only you can turn an extension on (Settings › Extensions)') // an agent's laki widget on: its code would run unlooked at
+  if (o.agent === true || agentCaller(o.from)) {
+    if (o.on === true) throw new Error('only you can turn an extension on (Settings › Extensions)') // its code would run unlooked at
+    if (o.net === true || o.source !== undefined || o.ai) throw new Error(`only you can change ${o.net === true ? 'its network access' : o.ai ? 'who edits it' : 'its source'} (Settings › Extensions)`)
+    const secret = Object.keys(o.config ?? {}).find(k => optionsOf(w).some(x => x.key === k && x.type === 'secret'))
+    if (secret) throw new Error(`${secret} is a secret: only you set it (Settings › Extensions)`)
+  }
   const s = readStore(w.id)
   if (o.ai) {
     // Edit with Laki AI (Settings › Extensions): one of the user's in Laki's folder, which widgetWrite may then rewrite
@@ -743,6 +750,22 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   if (onOf(w) && (o.on || o.config || o.source !== undefined)) refetch(w, asked ? 'manual' : 'settings', asked ? 'its prompt changed' : undefined, () => true)
   streamSync() // off: a stream ends
   return widgetsView().find(x => x.id === w.id)
+}
+
+// what turning one on starts, in words: Laki AI's Yes / No (aiQuestion) says it before the user picks
+export function widgetWhat(id: string) {
+  const w = find(id)
+  const src = sourceOf(w)
+  const cut = (t = '') => (t.length > 160 ? `${t.slice(0, 159)}…` : t)
+  const runs =
+    src.kind === 'static' ? 'nothing: its data is typed in'
+    : src.kind === 'file' ? `reads ${src.path}`
+    : src.kind === 'url' ? `fetches ${src.url}`
+    : src.kind === 'ai' ? `asks an agent${src.tools ? ` (tools: ${src.tools})` : ''}: “${cut(src.prompt)}”`
+    : w.m.script ? `runs \`node ${w.m.script}\``
+    : w.m.fetch ? `runs \`${cut(w.m.fetch)}\``
+    : 'nothing (no fetch)'
+  return { name: w.m.name || w.id, on: onOf(w), runs: `${runs}${w.m.stream && src.kind === 'fetch' ? ', and keeps it running' : ''}` }
 }
 
 // what a failed command said last, past node's own trailer (an uncaught error ends with its version)

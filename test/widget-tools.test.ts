@@ -265,6 +265,10 @@ test('an agent can’t get around the ask: laki widget action asks (a tool as it
   assert.notEqual(r.code, 0)
   assert.match(r.err, /only you can turn an extension on/)
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'mine').on, false)
+  // set: where it shows and its size are an agent's to change, on stays off
+  r = await as(agentTab, 'widget', 'set', 'mine', '--place', 'desk', '--size', '2x2')
+  assert.equal(r.out, 'mine: desk · 2×2 · every 5m · off (only you turn it on)\n')
+  assert.match((await as(agentTab, 'widget', 'set', 'mine', 'oops')).err, /a setting as key=value, not oops/)
   // check: an off one's fetch isn't run for an agent
   assert.match((await as(agentTab, 'widget', 'check', 'mine')).out, /not run: it's off, and an agent asked/)
   assert.equal((await as(shell.id, 'widget', 'on', 'mine')).code, 0)

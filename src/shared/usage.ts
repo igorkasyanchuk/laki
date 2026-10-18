@@ -42,6 +42,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
+  laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value…]
+        where it shows, its size, how often it fetches, its full view, what it hides, its settings
   laki widget render <id> [--full] [--ws <ws>]  the HTML it shows now, filled from its data
   laki widget action <id> <action> [arg] [--ws <ws>]  run one of its widget.json actions: what the app would show (an agent's: you're asked)
   laki widget kit [element|icons] [--json]    the UI kit (widget.json's "ui"): its elements, one's props and a sample, or every icon
@@ -152,8 +154,12 @@ what a PR, approve or merge would do instead of doing it.
   laki flow ls
   laki flow run review-pr shop "Review PR #118" --dry`,
   widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
-their tools; turning one on is the user's. To make one, use the laki-widget skill.
+their tools, and change where one shows and its settings (laki widget set; not a secret, its source or network
+access); turning one on is the user's. Places: side, top, status, rail, foot, desk, panel, row (per workspace). To make
+one, use the laki-widget skill.
 
+  laki widget set my-prs --place desk --size 3x2   a tile on the Desk, 3 cells across, 2 down
+  laki widget set my-prs --every 10 repo=acme/api   fetch every 10 minutes, its repo setting
   laki widget tools                             what the user's extensions let you do, each tool's input
   laki widget tool <id> <action> '{"query":"…"}'   in a tab, for its workspace; Laki may ask the user first
   laki widget check <id>`,

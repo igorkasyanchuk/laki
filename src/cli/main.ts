@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, DEVICE_OPS, type Memory, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -17,7 +17,7 @@ import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'merge'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -453,6 +453,29 @@ async function main() {
         return
       }
       if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on', from: caller() }), `${id} ${sub}`)
+      if (sub === 'set') {
+        // where it shows, its size, every, view, what it hides and its settings (key=value): an agent's too, never on
+        if (!id) throw new Error('usage: laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value …]')
+        const kv = [action, ...arg].filter(x => x !== undefined)
+        const bad = kv.find(x => !/^[\w-]+=/.test(x))
+        if (bad) throw new Error(`a setting as key=value, not ${bad}`)
+        const size = typeof flags.size === 'string' ? /^(\d)[x×](\d(?:\.5)?|0?\.5)$/i.exec(flags.size.trim()) : undefined
+        if (flags.size !== undefined && !size) throw new Error(`a size: across x down, e.g. 2x1 (not ${flags.size})`)
+        const every = flags.every === undefined ? undefined : Number(flags.every)
+        if (every !== undefined && !(every > 0)) throw new Error(`--every: minutes (not ${flags.every})`)
+        const hide = typeof flags.hide === 'string' ? flags.hide.split(',').map(x => x.trim()) : undefined
+        const r: WidgetView = await rpc('widgetSet', {
+          id,
+          place: typeof flags.place === 'string' ? flags.place.split(',').map(x => x.trim()).filter(Boolean) : undefined, // '': its own again
+          size: size ? [Number(size[1]), Number(size[2])] : undefined,
+          every,
+          view: typeof flags.view === 'string' ? flags.view : undefined,
+          hide: hide && { refresh: hide.includes('refresh'), at: hide.includes('at') },
+          config: kv.length ? Object.fromEntries(kv.map(x => [x.slice(0, x.indexOf('=')), x.slice(x.indexOf('=') + 1)])) : undefined,
+          from: caller(),
+        })
+        return out(r, `${id}: ${placesOf(r).join(', ')} · ${r.size.join('×')}${r.every ? ` · every ${r.every}m` : ''}${r.on ? '' : ' · off (only you turn it on)'}`)
+      }
       if (sub === 'tools') {
         // what agents may call: each extension's actions with a tool, and its AGENTS.md
         type T = { tool: string; name: string; description: string; ask: string; scope?: string; agents?: string; input: { properties: Record<string, { type: string; enum?: unknown[]; description?: string }>; required: string[] } }

@@ -493,8 +493,9 @@ workspaces. When it isn't sure, it asks with a few options as buttons: a click a
 something else: then that question is closed). It removes a memory item, a scheduled task, a tab or a to-do only
 through such a question: *Yes, remove…* is yours to press, and Laki does it. Ask it for an extension
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
-so you look and turn it on in Settings › Extensions (*by Laki AI* on its row); the chat on an extension's page has it
-rewrite one of yours the same way. It never archives or deletes
+so you look and turn it on in Settings › Extensions (*by Laki AI* on its row), or it asks you in the chat, with what it
+runs, and *Yes, turn it on* does it; the chat on an extension's page has it rewrite one of yours the same way. It
+also arranges any extension for you: *put My PRs on the Desk*, a size, how often it fetches, a setting. It never archives or deletes
 workspaces, ships or merges, and it does nothing until you ask. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
 into one line you can open, a pasted image is a thumbnail (a click shows it big), *Stop* ends an ask, *New chat* starts
 over. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
@@ -857,7 +858,8 @@ or pick one of its `fixtures/*.json`, to see it with that data, *Sample data* on
 
 Delete (its row's trash can) moves an extension to a trash, its settings, data, history, chat and secrets with it:
 *Undo* in the toast puts it back, on or off as it was; `laki widget trash` lists the last 30 days' and `laki widget
-restore <trash-id>` puts one back. An agent can't turn an extension on (`laki widget on` from its tab is refused),
+restore <trash-id>` puts one back. An agent can't turn an extension on (`laki widget on` from its tab is refused; it
+may move one, resize it and change a plain setting with `laki widget set`, never a secret, its source or network access),
 `laki widget dev` from one leaves the folder's extensions off, and `laki widget action` from one asks you first.
 
 To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
@@ -1496,6 +1498,7 @@ laki flow run my-flow app "add CSV export" [--dry]     # a workflow run (experim
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
 laki widget on|off|run <id> [--ws <ws>]                 # show or hide one | fetch now (--ws: a per-workspace one's instance)
+laki widget set <id> --place desk,side --size 2x1 --every 10 key=value  # where it shows, its size, schedule, settings
 laki widget render <id> --full                          # the HTML its full view shows now
 laki widget action <id> <action> [arg]                  # run one of its buttons' actions: what the app would show
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample

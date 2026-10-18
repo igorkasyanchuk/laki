@@ -320,6 +320,43 @@ test("ai: Laki's skill asks with options, writes memory, and removes only on the
   assert.ok(!off.includes('laki_ask') && off.includes('laki_state'))
 })
 
+test("ai: an extension's places and settings change by a tool; it turns on only at the user's Yes", async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' })])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const tool = (name: string): ((a: object) => Promise<any>) => [...tools(rig.rpc), ...skillTools(rig.rpc)].find(x => x.name === name)!.run
+  const mine = async () => (await rig.rpc('state')).widgets.find((w: any) => w.id === 'my-prs')
+
+  // where it shows, its size, every and a setting: no OK needed; it says it's off, and the Desk too
+  const r = await tool('laki_extension_set')({ id: 'my-prs', places: ['desk', 'side'], size: '2x1', every: 7, settings: { author: 'bob' } })
+  assert.deepEqual([r.places, r.size, r.every, r.on], [['desk', 'side'], '2x1', 7, false])
+  assert.match(r.note, /it's off: the user turns it on; the Desk is off/)
+  const ls = (await tool('laki_extensions')({})).find((w: any) => w.id === 'my-prs')
+  assert.deepEqual([ls.places, ls.settings.find((x: any) => x.key === 'author').value], [['desk', 'side'], 'bob'])
+  await assert.rejects(tool('laki_extension_set')({ id: 'my-prs', size: 'big' }), /a size: across x down/)
+  // what's the user's alone: on, network access, its source
+  await assert.rejects(rig.rpc('widgetSet', { id: 'my-prs', on: true, agent: true }), /only you can turn an extension on/)
+  await assert.rejects(rig.rpc('widgetSet', { id: 'my-prs', net: true, agent: true }), /only you can change its network access/)
+  await assert.rejects(rig.rpc('widgetSet', { id: 'my-prs', source: { kind: 'static', text: '{}' }, agent: true }), /only you can change its source/)
+  await assert.rejects(tool('laki_remove')({ kind: 'widget', id: 'my-prs' }), /laki_extension_on/)
+
+  // laki_extension_on asks, with what it runs; No leaves it off, Yes turns it on
+  await rig.rpc('aiAsk', { text: 'turn on my prs' })
+  const q = (await rig.rpc('aiState')).chat.at(-1)
+  assert.match(q.text, /^Turn on the extension “My PRs”\? It runs `sh fetch\.sh`\.$/)
+  assert.deepEqual(q.ask.options, ['Yes, turn it on', 'No, leave it off'])
+  assert.equal((await mine()).on, false, 'not by the AI')
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: q.ask.id, n: 1 }), { kept: true })
+  assert.equal((await mine()).on, false)
+  await rig.rpc('aiAsk', { text: 'turn it on, really' })
+  const q2 = (await rig.rpc('aiState')).chat.at(-1).ask
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: q2.id, n: 0 }), { on: true })
+  assert.equal((await mine()).on, true)
+  assert.equal((await rig.rpc('aiState')).chat.at(-1).text, 'Turned on the extension “My PRs”.')
+})
+
 test("ai: prList, laki_prs's: a project's open PRs, yours or others', each with the workspace that has it", async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })

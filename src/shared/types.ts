@@ -438,7 +438,7 @@ export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: 
 // a question Laki AI asked (laki_ask, or before a removal): its options as buttons, picked: the answer given. act: what a
 // Yes removes: only the user's click does it (the daemon's aiAnswer), never the AI itself
 export type AiAsk = { id: string; options: string[]; picked?: string; act?: AiAct }
-export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo'] as const
+export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget'] as const // widget: turning an extension on, the rest a removal
 export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string }
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)

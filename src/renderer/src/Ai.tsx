@@ -532,7 +532,7 @@ export function Message({ m, link, busy, onPick }: { m: AiMsg; link: (text: stri
             {m.ask.options.map((o, n) => (
               <button
                 key={o}
-                className={m.ask!.picked === o ? 'picked' : m.ask!.act && n === 0 ? 'danger' : ''}
+                className={m.ask!.picked === o ? 'picked' : m.ask!.act && m.ask!.act.kind !== 'widget' && n === 0 ? 'danger' : ''}
                 disabled={busy || m.ask!.picked !== undefined}
                 aria-pressed={m.ask!.picked === o}
                 onClick={() => onPick(m.ask!.id, n)}

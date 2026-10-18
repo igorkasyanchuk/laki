@@ -15,7 +15,7 @@ import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
-import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetsView } from './widgets.ts'
+import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetsView, widgetWhat } from './widgets.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 
 const keyPath = join(dir, 'ai-key')
@@ -44,6 +44,7 @@ Link each workspace or tab you name, so the user opens it with a click: [its nam
 A screenshot may hold PR links or other work: act on each item.
 Workflows, when the user turned them on: blocks Laki runs for a task, one after another (agents, commands, questions for the user, a PR, its checks, files for its Artifacts). laki_workflows lists them and their runs, and with an id gives that one's whole file; laki_workflow_write writes one, the whole file in the format its description gives (an agent block's use: names one of the user's agent actions, Run ▾'s, by the slug laki_workflows lists); to change one, take its file from laki_workflows with its id, edit it and write it back with the same id and project (asked on the Workflows page, the ask says which workflow is open and gives its file as the editor has it, unsaved changes too: change that one). Blocks: agent (json: yes: its answer the JSON object or list it ends with), run, ask, choice, case (text, numbers, JS), action, wait, save, llm (an AI call; json: yes for JSON mode), decide (an AI decision: yes/no "how true", choice and score questions; route: <question> gives a line per answer), webhook, popup (Show you: a window with HTML or Markdown), end (notify: yes, phone: yes, its words as > lines). Before writing a new workflow, ask the user at least 2 questions, one at a time with laki_ask (options to tap): what starts it and what it works on, its steps, where it routes, what it keeps or posts, how it tells them it's done; for a change, ask when what they want isn't clear. The user reads and saves it in Laki before it runs; then laki_workflow_run starts it on a task.
 Make a Laki extension (also called a widget or a plugin, the same thing: a small live page in the sidebar, a clock, a count, a chart), or change one you made or the user let you edit (Edit with Laki AI), yourself (the rest of the user's own you can only read): laki_extension_guide first, an example with laki_extension_read, then laki_extension_write. Before writing a new one, ask the user at least 2 questions about it, one at a time with laki_ask (what it shows and from where, where it sits: sidebar, top bar, status bar, a rail or sidebar foot button, what a click does), even when the ask seems clear. It is saved off: tell the user what its fetch runs and to turn it on in [Settings › Extensions](laki://settings/widgets).
+Where any of the user's extensions shows (the Desk, the sidebar, a bar, a button), its size, how often it fetches and its settings: laki_extension_set changes them, no file to write; it never turns one on.
 Answer in a few plain sentences: what you did (workspace names) or what you found.`
 
 // Laki's skill for its AI (Settings › AI, unset: on): more tools, and what they're for in its instructions
@@ -685,25 +686,27 @@ async function codex(o: Opts) {
   if (failed) throw new Error(failed)
 }
 
-// ---------- asking the user (the skill's laki_ask and laki_remove)
+// ---------- asking the user (the skill's laki_ask, laki_remove and laki_extension_on)
 
 // a question in the conversation, its options as buttons on the AI page; only while an ask is at work (its tools'). act:
-// a removal the AI asked about, done here when the user picks Yes (the AI itself never removes anything)
+// a removal the AI asked about, or an extension to turn on, done here when the user picks Yes (the AI itself never does)
 export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct }) {
   if (!busy) throw new Error('only while Laki AI works on an ask')
   const t = thread(busy.id) // the chat whose ask is at work
   const act = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
-  if (act && !act.label) throw new Error(`no ${act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
-  const text = act ? `Remove ${act.label}?` : String(p.text ?? '').trim().slice(0, 2000)
+  if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
+  const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
+  if (on?.on) throw new Error(`${on.name} is on already`)
+  const text = act ? (on ? `Turn on ${act.label}? It ${on.runs}.` : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
-  const options = act ? [`Yes, remove ${act.label}`, 'No, keep it'] : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
+  const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : [`Yes, remove ${act.label}`, 'No, keep it']) : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
   if (options.length < 2) throw new Error('2 to 6 options')
   const id = randomBytes(6).toString('hex')
   t.chat.push({ role: 'ai', text, at: (t.at = Date.now()), ask: { id, options, act } })
   asked = true
   changed(t)
-  return { asked: id, note: act ? 'The user sees Yes / No buttons; a Yes removes it (you do not). End your turn now, without more words.' : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
+  return { asked: id, note: act ? `The user sees Yes / No buttons; a Yes ${on ? 'turns it on' : 'removes it'} (you do not). End your turn now, without more words.` : 'The user sees the options as buttons. End your turn now, without more words: their pick comes as the next message.' }
 }
 
 // the user's pick (the AI page's buttons): a removal is done here on Yes; any other pick goes on as the next ask
@@ -726,8 +729,14 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   }
   m.ask.picked = pick
   say(t, 'user', pick)
-  if (Number(p.n) !== 0) return say(t, 'ai', `Kept ${act.label}.`), { kept: true }
+  const on = act.kind === 'widget'
+  if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : `Kept ${act.label}.`), { kept: true }
   try {
+    if (on) {
+      await rpc('widgetSet', { id: act.id, on: true }) // the user's pick: no agent's
+      say(t, 'ai', `Turned on ${act.label}.`)
+      return { on: true }
+    }
     await remove(act, rpc)
     say(t, 'ai', `Removed ${act.label}.`)
     return { removed: true }
@@ -750,6 +759,10 @@ function whatOf(a: AiAct) {
   if (a.kind === 'todo') {
     const x = state.todos?.find(x => x.id === a.id)
     return x && `the to-do ${cut(x.text)}`
+  }
+  if (a.kind === 'widget') {
+    const x = widgetsView().find(x => x.id === a.id)
+    return x && `the extension ${cut(x.name)}`
   }
   const x = state.projects.find(x => x.id === a.project)?.memory?.find(m => m.id === a.id)
   return x && `the memory ${cut(x.text)}`

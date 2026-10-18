@@ -108,7 +108,9 @@ Write prompts as for a new colleague: the goal, where to look, how to tell it's 
 workspace each, so they run in parallel.
 
 An extension (also called a widget: a small live page in Laki's sidebar) is made with the laki-widget skill (Settings ›
-Agent skill installs it); \`laki widget\` lists and checks them. The user's extensions may give you tools:
+Agent skill installs it); \`laki widget\` lists and checks them, and \`laki widget set <id>\` changes where one shows
+(\`--place desk,side\`), its size, how often it fetches and its settings (\`key=value\`); only the user turns one on. The
+user's extensions may give you tools:
 \`laki widget tools\` lists them and when to use them, \`laki widget tool <id> <action> '<json>'\` runs one in your
 workspace (Laki may ask the user first; denied: don't try again unasked).
 
@@ -242,6 +244,7 @@ Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"$
     laki widget render <id> [--full] # the HTML it shows now
     laki widget action <id> <action> [arg] # a button's action: what the app would show (it really runs; from an agent, the user is asked first)
     laki widget ls                   # each one: on or off, size, schedule, last error
+    laki widget set <id> --place desk --size 3x2 --every 10 key=value  # where it shows (side, top, status, rail, foot, desk, panel, row), its size, schedule, settings
     laki widget kit [element]        # the UI kit's elements, or one's props and a sample
     laki widget check <id> --no-run  # what's wrong with it: fix every ✗ before you answer (after every change)
     laki widget new <name> --kind <k> # a starter to begin from: ${STARTER_KINDS.join(', ')}
@@ -257,7 +260,8 @@ folder links it (on, first, reloaded on each save, the last good version kept ov
 its page's Data, Runs, Env and Files tabs show the rest. It runs until Ctrl-C: suggest it, don't run it yourself.
 
 A new widget in Laki's folder is found at once and starts off: the user turns it on in Settings › Extensions. Tell the user which settings to fill in (Settings ›
-Extensions) and what it fetches how often: each fetch may call an API.
+Extensions) and what it fetches how often: each fetch may call an API. To show one somewhere else, resize it or change
+a plain setting of any extension, \`laki widget set\` (no file to write; never a secret, its source or network access).
 `
 
 function info(a: SkillAgent, k: SkillName): SkillInfo {
