@@ -829,6 +829,7 @@ test('workflow retries: tries again after a fail (10 s, then 60 s), only on its 
   assert.match(says(b => (b.retry = 9)), /Tests: retry: 9\? 1 to 5 tries again/)
   assert.match(says(b => (b.kind = 'save')), /retry: is for agent, run, AI call, AI decision and extension blocks/)
   assert.match(says(b => (b.retry = undefined)), /retry on: needs retry:/)
+  assert.match(says(b => (b.inputs = [{ name: 'n', kind: 'text' }])), /Tests: inputs: go on the start block/)
   assert.match(parse('## t\nrun: x\nretry: often\nretry on: 0\n', 'x').problems.join('\n'), /retry: how many times[\s\S]*retry on: exit codes, 1 to 255/)
 
   const rig = await fresh(t)
@@ -969,6 +970,24 @@ test('workflow agents: a turn whose working line only ticks is nudged 10 min aft
   await sleep(2500) // ticks meanwhile: the last output 2 s on, the screen the same
   await rig.rpc('flowTick', { now: t1 + 10 * 60000 + 1000 }) // 10 min since it changed, not since it last printed
   assert.ok((await get()).wait.nudged, 'nudged')
+})
+
+// a try again of a session: new agent block goes to its own tab, where it can see what went wrong
+test('workflow agents: a session new block tries again in the same tab', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'again', text: STALLS.replace('timeout: 1\n', 'timeout: 1\nsession: new\nretry: 1\n') })
+  const run = await rig.rpc('flowStart', { workflow: 'again', project: p.id, task: 'x' })
+  const get = () => rig.rpc('flowGet', { id: run.id })
+  const first = await until(async () => (x => x.wait?.kind === 'agent' && x)(await get()), 'its turn')
+  await until(async () => (await rig.screen(first.wait.tab)).includes('esc to interrupt'), 'at work')
+  await sleep(200)
+  await rig.rpc('flowTick', { now: Date.now() + 61000 }) // past its timeout: Esc, then a try again
+  await until(async () => (await get()).wait?.kind === 'retry', 'its try again', 10000)
+  await rig.rpc('flowTick', { now: Date.now() + 11000 })
+  const r = await until(async () => (x => x.wait?.kind === 'agent' && x.tries?.a === 1 && x)(await get()), 'tried again')
+  assert.equal(r.wait.tab, first.wait.tab, 'the same tab')
 })
 
 // an agent block's agent asks (the fake's permission menu): the run asks you with its choices, answers through core's

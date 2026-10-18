@@ -240,9 +240,14 @@ async function begin(r: FlowRun) {
 // the oldest queued run of each workflow with a slot free begins (finish's, and flowTick's in case)
 function next() {
   if (state.settings?.workflows !== true) return
+  const held = new Set<string>() // a workflow whose oldest waiting can't go: none after it goes either (each pins its at once)
   for (const r of runs().filter(x => x.status === 'queued').sort((a, b) => a.started - b.started)) {
     const of = { id: r.workflow, source: r.source, project: r.project }
-    if (runs().filter(x => going(x) && runOf(x, of)).length >= (r.flow.runs ?? RUNS_AT_ONCE)) continue
+    const k = `${r.source}/${r.source === 'project' ? r.project : ''}/${r.workflow}`
+    if (held.has(k) || runs().filter(x => going(x) && runOf(x, of)).length >= (r.flow.runs ?? RUNS_AT_ONCE)) {
+      held.add(k)
+      continue
+    }
     r.status = 'running' // going now: the next one counts it
     say(r, 'its turn: a slot freed')
     touch()
@@ -456,7 +461,7 @@ function agent(r: FlowRun, b: Block) {
   if (presets().find(p => p.name === preset)?.agent === 'command') throw new Error(`${preset} is a command, not an agent: it doesn't say when it's done`)
   // session: run (the run's tab of that agent), new (a tab of its own), or another block's tab
   const key = b.session === 'new' ? undefined : b.session && b.session !== 'run' ? b.session : `run:${preset}`
-  let tab = key ? alive(r.tabs[key]) : undefined
+  let tab = key ? alive(r.tabs[key]) : r.tries?.[b.id] ? alive(r.tabs[b.id]) : undefined // a try again: its own tab, session new too
   // a shared session: the last run's tab, when it's in this workspace (runs in: main), else a fork of its chat (claude)
   let forkOf: string | undefined
   if (!tab && key === `run:${preset}` && r.session === 'shared') {
@@ -579,11 +584,11 @@ turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) =
 turnWaits.add((tab: Tab, o: { question: string; options: { n: number; label: string }[] }) => {
   for (const r of runs()) {
     const w = r.wait
-    if (!live(r) || w?.kind !== 'agent' || w.tab !== tab.id) continue
-    if (w.queued !== undefined && tab.queue?.includes(w.queued)) continue // your turn asks, before ours: in its tab
+    if (!live(r) || !(w?.kind === 'agent' || (w?.kind === 'stuck' && w.tab)) || w.tab !== tab.id) continue // a stalled one too: it asks now
+    if (w.kind === 'agent' && w.queued !== undefined && tab.queue?.includes(w.queued)) continue // your turn asks, before ours: in its tab
     const b = blockOf(r, r.cur)!
     const question = o.question.trim() || `${tab.name} asks something`
-    Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind: 'agent-ask', tab: tab.id, question, options: [...o.options.map(x => x.label), 'Stop the run'], ns: o.options.map(x => x.n), used: (w.used ?? 0) + Date.now() - (w.since ?? Date.now()) } })
+    Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind: 'agent-ask', tab: tab.id, question, options: [...o.options.map(x => x.label), 'Stop the run'], ns: o.options.map(x => x.n), used: w.kind === 'agent' ? (w.used ?? 0) + Date.now() - (w.since ?? Date.now()) : (w.used ?? 0) } })
     say(r, `${blockName(b)}: ${tab.name} asks: ${clip(question, 120)}`, o.options.map(x => `${x.n}. ${x.label}`).join('\n'))
     touch()
   }
@@ -936,9 +941,9 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
   if (o.n === w.options.length - 1) return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
   if (w.kind === 'stuck' && w.tab) {
     // a stalled agent: checked in on again (its clock on, without the time you took), skipped (its turn stopped first),
-    // or tried again (the same)
+    // or tried again (the same; Nudge again too once it isn't working: a nudge would be a prompt of its own)
     const tab = w.tab
-    if (label === 'Nudge again') {
+    if (label === 'Nudge again' && tabStatus(tab) === 'running') {
       r.wait = { kind: 'agent', tab, since: Date.now(), used: w.used }
       return nudge(r, b, r.wait, Date.now()), r
     }

@@ -26,7 +26,7 @@ for (let i = 0; i < argv.length; i++) {
   const a = argv[i]
   const k = a.replace(/^-+/, '')
   if (!textOnly && a === '--') textOnly = true
-  else if (!textOnly && args[0] !== 'hook' && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '')
+  else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
 }

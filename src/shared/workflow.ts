@@ -107,7 +107,7 @@ export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string
 
 export const ID = /^[a-z0-9][a-z0-9_?-]{0,40}$/i
 // a Start's inputs: line, name[?][:kind][=default], kind text (unset), number, branch or choice(a|b|…); kind stays as
-// written, so check() can name an unknown one
+// written, so check() can name an unknown one. ponytail: split at every comma, so no default has one
 export const INPUT_KINDS = ['text', 'number', 'branch', 'choice']
 export type FlowInput = { name: string; kind: string; choices?: string[]; optional?: boolean; default?: string }
 export function inputsOf(v: string): FlowInput[] {
@@ -423,6 +423,7 @@ export function check(wf: Workflow): string[] {
     if (b.retry !== undefined && !RETRY_KINDS.includes(b.kind)) out.push(`${blockName(b)}: retry: is for agent, run, AI call, AI decision and extension blocks`)
     else if (b.retry !== undefined && !(Number.isInteger(b.retry) && b.retry >= 1 && b.retry <= RETRY_MAX)) out.push(`${blockName(b)}: retry: ${b.retry}? 1 to ${RETRY_MAX} tries again`)
     if (b.timeout !== undefined && !(Number.isInteger(b.timeout) && b.timeout >= 1 && b.timeout <= TIMEOUT_MAX)) out.push(`${blockName(b)}: timeout: ${b.timeout}? 1 to ${TIMEOUT_MAX} minutes`)
+    if (b.inputs && b.kind !== 'start') out.push(`${blockName(b)}: inputs: go on the start block`)
     if (b.retryOn?.length && b.kind !== 'run') out.push(`${blockName(b)}: retry on: is for run blocks (their exit codes)`)
     else if (b.retryOn?.length && !b.retry) out.push(`${blockName(b)}: retry on: needs retry: (how many times)`)
     if (b.kind === 'ask' && !b.question?.trim()) out.push(`${blockName(b)} asks nothing`)
