@@ -1157,3 +1157,146 @@ test('workflow inputs: the line reads back, check names a bad one, a run fills t
   await rig.rpc('flowSave', { id: 'fix', text: INPUTS.replace('issue:number', 'issue:number=1') })
   assert.ok((await rig.rpc('scheduleSet', { project: p.id, workflow: 'fix', prompt: 'x', when: 'every day at 9am' })).id)
 })
+
+// the paths a user hits first: a restart mid turn, a usage limit, real PR checks, an agent's tab closed
+const AGENT = (agent: string, prompt: string) => `# Agent
+One turn.
+
+runs in: worktree · session: new
+
+## start
+input: task
+next: work
+
+## work
+agent: ${agent}
+> ${prompt}
+next: done
+error: bad
+
+## done
+end: success
+
+## bad
+end: failed
+`
+
+test('workflow failures: a restart mid agent block asks again; a usage limit pauses, its continue goes on', async t => {
+  const rig = await fresh(t, { env: { FAKE_TURN_MS: '60000' } })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'agent', text: AGENT('claude', 'think {{task}}') })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const run = await rig.rpc('flowStart', { workflow: 'agent', project: p.id, task: 'hard' })
+  const tab = (await until(async () => {
+    const r = await get(run.id)
+    return r.wait?.kind === 'agent' && r.wait.tab
+  }, 'its turn')) as string
+  await until(async () => (await rig.screen(tab)).includes('think hard'), 'the prompt typed')
+  // its turn is cut short: Laki comes back to the block, and the agent gets the prompt again
+  await rig.stop()
+  rig.env.FAKE_TURN_MS = '300'
+  await rig.start()
+  let r = await until(async () => {
+    const x = await get(run.id)
+    return x.status === 'done' && x
+  }, 'done after the restart', 30000)
+  assert.ok(r.log.some((l: string) => / Laki restarted: back at work$/.test(l)))
+  assert.equal(r.vars['steps.work.answer'], 'answer: think hard')
+
+  // at its usage limit (StopFailure): paused, then on as the limit's continue ends a turn
+  await rig.rpc('flowSave', { id: 'limit', text: AGENT('claude', 'limit {{task}}') })
+  const lim = await rig.rpc('flowStart', { workflow: 'limit', project: p.id, task: 'x' })
+  r = await until(async () => {
+    const x = await get(lim.id)
+    return x.status === 'paused' && x
+  }, 'paused', 15000)
+  assert.equal(r.wait.kind, 'limit')
+  assert.ok(r.log.some((l: string) => /work: .* hit its usage limit; paused until/.test(l)))
+  await rig.rpc('watchLimits', { now: r.wait.until + 61_000 })
+  r = await until(async () => {
+    const x = await get(lim.id)
+    return x.status === 'done' && x
+  }, 'on after the limit', 15000)
+  assert.equal(r.vars['steps.work.answer'], 'answer: continue')
+})
+
+const CHECKS = `# Checks
+Waits for CI.
+
+runs in: worktree · session: new
+
+## start
+input: task
+next: wait
+
+## wait
+wait: checks
+pass: ok
+fail: fix
+max: 3
+
+## fix
+run: echo fixing
+ok: wait
+fail: bad
+
+## ok
+end: success
+
+## bad
+end: failed
+`
+
+test('workflow failures: a wait on real PR checks (fail with their names, not twice on one head, a new head passes); a closed agent tab', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  const pr = (head: string, conclusion: string) =>
+    writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 7, state: 'OPEN', url: 'https://example.invalid/pr/7', headRefOid: head, statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion, detailsUrl: 'https://ci.invalid/1' }, { __typename: 'CheckRun', name: 'lint', status: 'COMPLETED', conclusion: 'SUCCESS' }] }))
+  pr('h1', 'FAILURE')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'checks', text: CHECKS })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const run = await rig.rpc('flowStart', { workflow: 'checks', project: p.id, task: 'ci' })
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === run.ws)?.pr?.head === 'h1', 'PR scanned')
+  let r = await until(async () => {
+    await rig.rpc('flowTick', {})
+    const x = await get(run.id)
+    return x.visits.wait === 2 && x
+  }, 'fail, the fix, back at the wait')
+  assert.equal(r.vars['steps.wait.output'], 'test https://ci.invalid/1')
+  assert.deepEqual(r.decisions.map((d: any) => `${d.block}:${d.exit}`), ['start:next', 'wait:fail', 'fix:ok'])
+  // the same head failing: not again
+  for (let i = 0; i < 3; i++) await rig.rpc('flowTick', {}), await sleep(200)
+  r = await get(run.id)
+  assert.equal(r.cur, 'wait')
+  assert.equal(r.decisions.length, 3)
+  // a new head that passes
+  pr('h2', 'SUCCESS')
+  await until(async () => (await rig.rpc('state')).workspaces.find((w: any) => w.id === run.ws)?.pr?.head === 'h2', 'the new head scanned')
+  r = await until(async () => {
+    await rig.rpc('flowTick', {})
+    const x = await get(run.id)
+    return x.status === 'done' && x
+  }, 'pass')
+  assert.deepEqual(r.decisions.map((d: any) => `${d.block}:${d.exit}`), ['start:next', 'wait:fail', 'fix:ok', 'wait:pass'])
+
+  // an agent block whose tab is closed: its error way at the next tick
+  await rig.rpc('flowSave', { id: 'agent', text: AGENT('claude', 'slow {{task}}') })
+  const a = await rig.rpc('flowStart', { workflow: 'agent', project: p.id, task: 'x' })
+  const tab = (await until(async () => {
+    const x = await get(a.id)
+    return x.wait?.kind === 'agent' && x.wait.tab
+  }, 'its turn')) as string
+  await until(async () => (await rig.screen(tab)).includes('esc to interrupt'), 'working')
+  await rig.rpc('tabClose', { id: tab })
+  await rig.rpc('flowTick', {})
+  r = await until(async () => {
+    const x = await get(a.id)
+    return x.status === 'failed' && x
+  }, 'error')
+  assert.equal(r.decisions.at(-1).exit, 'error')
+  assert.match(r.decisions.at(-1).why, /stopped$/)
+})
