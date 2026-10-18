@@ -9,7 +9,7 @@ import { Folded, Markdown } from './MarkdownView'
 import type { MergeMethod } from '../../shared/types'
 import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, splitRows, toCsv } from './text'
-import { ask, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
+import { ask, escapes, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
 export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
@@ -369,20 +369,20 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
     let old = 0
     let now = 0
     let last = ''
+    let at = 0 // a line's index in its hunk's body
     const text = d?.diff ?? ''
     for (const l of (text.endsWith(CUT) ? text.slice(0, -CUT.length) : text).split('\n')) {
       const h = /^@@ -(\d+)(?:,\d+)? \+(\d+)/.exec(l)
       const hunk = cur ? cur.hunks.length - 1 : -1
       if (l.startsWith('diff --git ')) m.set((last = fileOf(l)), (cur = { lines: [], hunks: [] }))
       else if (!cur || (hunk < 0 && !h)) continue // its header: index, ---, +++, new file, rename… (a body line can start with --- too)
-      else if (h) (old = +h[1]), (now = +h[2]), cur.hunks.push(l), cur.lines.push({ text: l, hunk: hunk + 1 })
+      else if (h) (old = +h[1]), (now = +h[2]), (at = 0), cur.hunks.push(l), cur.lines.push({ text: l, hunk: hunk + 1 })
       else {
-        const at = cur.hunks[hunk].split('\n').length - 1
         cur.hunks[hunk] += '\n' + l
-        if (l[0] === '+') cur.lines.push({ text: l, new: now++, hunk, at })
-        else if (l[0] === '-') cur.lines.push({ text: l, old: old++, hunk, at })
-        else if (l[0] === ' ') cur.lines.push({ text: l, old: old++, new: now++, hunk, at })
-        else cur.lines.push({ text: l, hunk, at }) // \ No newline at end of file
+        if (l[0] === '+') cur.lines.push({ text: l, new: now++, hunk, at: at++ })
+        else if (l[0] === '-') cur.lines.push({ text: l, old: old++, hunk, at: at++ })
+        else if (l[0] === ' ') cur.lines.push({ text: l, old: old++, new: now++, hunk, at: at++ })
+        else cur.lines.push({ text: l, hunk, at: at++ }) // \ No newline at end of file
       }
     }
     const lastOne = m.get(last)
@@ -396,7 +396,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   useEffect(() => {
     if (!picks) return
     // Esc drops them, before a terminal with the keyboard gets it (its agent would stop)
-    const f = (e: KeyboardEvent) => e.key === 'Escape' && (e.stopPropagation(), e.preventDefault(), setPicks(null))
+    const f = (e: KeyboardEvent) => escapes(e) && (e.stopPropagation(), e.preventDefault(), setPicks(null)) // not a dialog's (Revert's ask): it keeps them
     window.addEventListener('keydown', f, true)
     return () => window.removeEventListener('keydown', f, true)
   }, [!!picks])

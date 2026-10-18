@@ -1691,7 +1691,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
   const race = randomUUID().slice(0, 8)
   const made: Workspace[] = []
   for (const p of presets) {
-    made.push(await wsNew({ ...base, preset: p, name: `${name.slice(0, Math.max(8, 31 - p.length)).replace(/-+$/, '')}-${p}` /* slug keeps 32 */, race, place: undefined }))
+    made.push(await wsNew({ ...base, preset: p, perm: undefined, fast: undefined, name: `${name.slice(0, Math.max(8, 31 - p.length)).replace(/-+$/, '')}-${p}` /* slug keeps 32 */, race, place: undefined }))
     for (const w of [...made].reverse()) placeWs(w, o.place) // each first, the last one first: in place as it comes, in the race's order
     save()
     changed()
