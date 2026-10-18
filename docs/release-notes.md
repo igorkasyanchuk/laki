@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Two more dark themes**: Hallownest (Hollow Knight: a cavern's pale motes, carved small-caps headings, a soul's
+  glow on what's picked) and Upside Down (Stranger Things: falling ash, a red title-card glow, Christmas lights over the
+  status bar).
 - **Stop an extension's agent**: an AI extension's run (its data, or a button an agent answers) has a Stop in its
   page and in Settings › Resources; turning it off or deleting it stops it too. Its last data stays.
 - **Eleven more UI kit elements**: kbd (shortcuts), secret (a key behind dots, copied whole), rating (stars), calendar

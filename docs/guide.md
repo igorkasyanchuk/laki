@@ -65,7 +65,7 @@ changing it: [AGENTS.md](../AGENTS.md).
 - **Scripts and ports**: setup, teardown, run, test, lint, format and deploy scripts per project (any number of
   lines); ▷ Run starts the run script in its tab, ■ stops it, Run ▾ runs the others, each in a tab of its own; listening ports you click to open, name (`.laki.json`), stop (✕), or expose to
   the world (a public trycloudflare.com link and its QR code, optionally only for some email addresses).
-- **Look**: 98 themes, including Warp-style gradients and eighty that also change shapes, borders and type;
+- **Look**: 100 themes, including Warp-style gradients and eighty-two that also change shapes, borders and type;
   glass (a see-through window, as see-through as you set, with a color glow); Inter and eleven terminal fonts
   built in (JetBrains Mono, Fira Code, Cascadia Code, Source Code Pro, IBM Plex Mono, Geist Mono, Hack, Iosevka,
   Inconsolata, Roboto Mono, Victor Mono); tab and

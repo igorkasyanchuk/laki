@@ -340,7 +340,7 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
   background: linear-gradient(90deg, #3a82e0, #a9d4ff 35%, #64b0f8 60%, #2f78d8); box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.6); }
 
 /* the looks that fill ▷ Run's wrapper: its buttons let it show (they paint var(--panel) by default) */
-:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
+:is([data-look='aqua'], [data-look='clay'], [data-look='starship'], [data-look='bauhaus'], [data-look='brass'], [data-look='circuit'], [data-look='denim'], [data-look='kraft'], [data-look='cathedral'], [data-look='comic'], [data-look='groovy'], [data-look='luna'], [data-look='quest'], [data-look='bricks'], [data-look='zeroday'], [data-look='glitch'], [data-look='greenbar'], [data-look='noir'], [data-look='circus'], [data-look='darkroom'], [data-look='transit'], [data-look='modular'], [data-look='topo'], [data-look='abyss'], [data-look='manuscript'], [data-look='cassette'], [data-look='workshop'], [data-look='receipt'], [data-look='aquarelle'], [data-look='cosmos'], [data-look='sakura'], [data-look='magma'], [data-look='azulejo'], [data-look='fieldops'], [data-look='diner'], [data-look='eink'], [data-look='vapor'], [data-look='shibuya'], [data-look='origami'], [data-look='tiki'], [data-look='lightcycle'], [data-look='phantom'], [data-look='chamber'], [data-look='monolith'], [data-look='macrodata'], [data-look='redline'], [data-look='mission'], [data-look='grimoire'], [data-look='cockpit'], [data-look='islander'], [data-look='amp'], [data-look='spartan'], [data-look='vault'], [data-look='overworld'], [data-look='riptear'], [data-look='warp'], [data-look='pellet'], [data-look='hyperspace'], [data-look='spice'], [data-look='outatime'], [data-look='grandhotel'], [data-look='replicant'], [data-look='hallownest'], [data-look='upsidedown']) .run-btn button:not(:hover, .running) { background: transparent; color: inherit; }
 
 /* Clay: soft UI. One color everywhere, shapes raised out of it or pressed into it by light from the top left */
 [data-look='clay'] { --radius: 12px;
@@ -2278,6 +2278,57 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='replicant'] :is(.board-col, .board-card) { border-color: rgba(255, 154, 58, 0.25); }
 [data-look='replicant'] .toggle.on .toggle-track { background: var(--amber); }
 [data-look='replicant'] .theme { border-color: #4a3220; }
+
+/* Hallownest: a fallen bug kingdom under the earth. Cavern blue-black with pale motes drifting down the sidebar, the
+   bone-white of a mask, a soul's pale blue glow on what's picked, headings in a carved serif between thin flourishes,
+   the dark closing in at the terminal's edges */
+[data-look='hallownest'] { --radius: 6px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --soul: #a8d8ff; --bone: #e9edf6;
+  --motes: radial-gradient(1.5px 1.5px at 30px 40px, rgba(233, 237, 246, 0.5), transparent), radial-gradient(1px 1px at 120px 150px, rgba(168, 216, 255, 0.45), transparent),
+    radial-gradient(1px 1px at 70px 230px, rgba(233, 237, 246, 0.35), transparent), radial-gradient(2px 2px at 160px 60px, rgba(168, 216, 255, 0.25), transparent); }
+[data-look='hallownest'] :is(.sidebar, .settings-nav) { border-right: 1px solid #1c2540; background: var(--motes), linear-gradient(180deg, #0b1020, var(--side) 60%); background-size: 190px 260px, 190px 260px, 190px 260px, 190px 260px, auto; }
+[data-look='hallownest'] :is(.settings-main h2, .tunnel-head b) { font-family: Cochin, Baskerville, 'Hoefler Text', serif; font-weight: 400; font-variant: small-caps; letter-spacing: 3px; color: var(--bone); text-shadow: 0 0 12px rgba(168, 216, 255, 0.35); }
+[data-look='hallownest'] .settings-main h2::before, [data-look='hallownest'] .settings-main h2::after { content: ''; display: inline-block; width: 18px; height: 1px; margin: 0 10px; vertical-align: 0.35em; background: linear-gradient(90deg, transparent, var(--bone)); }
+[data-look='hallownest'] .settings-main h2::after { background: linear-gradient(90deg, var(--bone), transparent); }
+[data-look='hallownest'] .project-head { font-family: Cochin, Baskerville, serif; font-variant: small-caps; letter-spacing: 1.5px; color: var(--bone); }
+[data-look='hallownest'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #2a3556; background: #0d1322; }
+[data-look='hallownest'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='hallownest'] .seg button.on { border-color: var(--soul); color: #fff; box-shadow: 0 0 10px rgba(168, 216, 255, 0.3); }
+[data-look='hallownest'] button.primary { border: none; background: var(--bone); color: #0a0e18; font-weight: 600; box-shadow: 0 0 14px rgba(233, 237, 246, 0.25); }
+[data-look='hallownest'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #25304c; background: #060910; }
+[data-look='hallownest'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #2a3556; background: #0c111e; box-shadow: 0 0 30px rgba(168, 216, 255, 0.08), 0 24px 60px rgba(0, 0, 0, 0.85); }
+[data-look='hallownest'] .menu-item:hover { background: rgba(168, 216, 255, 0.12); }
+[data-look='hallownest'] .ws.sel { background: radial-gradient(ellipse at 0% 50%, rgba(168, 216, 255, 0.22), transparent 75%); border-left-color: var(--bone); box-shadow: -2px 0 10px rgba(168, 216, 255, 0.5); }
+[data-look='hallownest'] .settings-nav button.on { background: rgba(168, 216, 255, 0.12); box-shadow: inset 2px 0 0 var(--bone); }
+[data-look='hallownest'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--bone)), 0 6px 14px -8px var(--soul); }
+[data-look='hallownest'] .status { border-top: 1px solid #1c2540; background: #070a12; }
+[data-look='hallownest'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 40%, transparent 55%, rgba(2, 4, 10, 0.45)); }
+[data-look='hallownest'] :is(.board-col, .board-card) { border-color: #25304c; }
+[data-look='hallownest'] .toggle.on .toggle-track { background: var(--soul); box-shadow: 0 0 10px rgba(168, 216, 255, 0.6); }
+[data-look='hallownest'] .theme { border-color: #25304c; }
+
+/* Upside Down: a small town's other side in the eighties. Near black with ash drifting down the sidebar and a red sky
+   low behind it, the title card's red glow on the headings between two red rules, a string of Christmas lights over the
+   status bar, the red of the gate for the main button */
+[data-look='upsidedown'] { --radius: 3px; --ui-font: 'Avenir Next', 'Helvetica Neue', sans-serif; --gate: #ff3b30;
+  --ash: radial-gradient(1.5px 1.5px at 24px 50px, rgba(244, 230, 227, 0.4), transparent), radial-gradient(1px 1px at 110px 140px, rgba(244, 230, 227, 0.3), transparent),
+    radial-gradient(2px 2px at 160px 30px, rgba(200, 180, 176, 0.22), transparent), radial-gradient(1px 1px at 60px 210px, rgba(244, 230, 227, 0.35), transparent); }
+[data-look='upsidedown'] :is(.sidebar, .settings-nav) { border-right: 1px solid #2a1215; background: var(--ash), linear-gradient(180deg, var(--side) 55%, #1f080a); background-size: 180px 240px, 180px 240px, 180px 240px, 180px 240px, auto; }
+[data-look='upsidedown'] :is(.settings-main h2, .tunnel-head b) { font-family: 'Big Caslon', Baskerville, 'Times New Roman', serif; font-weight: 700; text-transform: uppercase; letter-spacing: 2px; color: #ffd6d0; text-shadow: 0 0 2px #ff3b30, 0 0 10px rgba(255, 59, 48, 0.75), 0 0 22px rgba(255, 59, 48, 0.35); }
+[data-look='upsidedown'] .settings-main h2 { display: inline-block; padding: 3px 0; border-block: 1px solid rgba(255, 59, 48, 0.75); box-shadow: 0 -4px 8px -6px var(--gate), 0 4px 8px -6px var(--gate); }
+[data-look='upsidedown'] .project-head { font-family: 'Big Caslon', Baskerville, serif; text-transform: uppercase; letter-spacing: 1.5px; color: #ff8a80; }
+[data-look='upsidedown'] :is(.buttons button, .seg button, .scripts-tabs button, .run-btn) { border: 1px solid #3c1c20; background: #120b0d; }
+[data-look='upsidedown'] :is(.buttons button, .seg button, .scripts-tabs button):hover, [data-look='upsidedown'] .seg button.on { border-color: var(--gate); color: #fff; box-shadow: 0 0 8px rgba(255, 59, 48, 0.45); }
+[data-look='upsidedown'] button.primary { border: none; background: var(--gate); color: #1a0403; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; box-shadow: 0 0 14px rgba(255, 59, 48, 0.4); }
+[data-look='upsidedown'] :is(input:not([type='radio'], [type='checkbox'], [type='range']), select, textarea) { border-color: #3c1c20; background: #070405; }
+[data-look='upsidedown'] :is(.menu, .modal, .tunnel-pop, .toast) { border: 1px solid #4a2024; background: #110a0c; box-shadow: 0 0 26px rgba(255, 59, 48, 0.12), 0 24px 60px rgba(0, 0, 0, 0.9); }
+[data-look='upsidedown'] .menu-item:hover { background: rgba(255, 59, 48, 0.16); }
+[data-look='upsidedown'] .ws.sel { background: linear-gradient(90deg, rgba(255, 59, 48, 0.24), transparent); border-left-color: var(--gate); box-shadow: -2px 0 10px rgba(255, 59, 48, 0.6); }
+[data-look='upsidedown'] .settings-nav button.on { background: rgba(255, 59, 48, 0.14); box-shadow: inset 2px 0 0 var(--gate); }
+[data-look='upsidedown'] .tab.sel { box-shadow: inset 0 -2px 0 var(--tab-c, var(--gate)), 0 6px 14px -8px var(--gate); }
+[data-look='upsidedown'] .status { border-top: 3px solid transparent; border-image: repeating-linear-gradient(90deg, #ff3b30 0 6px, transparent 6px 16px, #ffd23a 16px 22px, transparent 22px 32px, #58c4ff 32px 38px, transparent 38px 48px, #5ee07e 48px 54px, transparent 54px 64px, #ff6ab0 64px 70px, transparent 70px 80px) 3; background: #090608; }
+[data-look='upsidedown'] .term-wrap::after { content: ''; position: absolute; inset: 0; z-index: 2; pointer-events: none; background: radial-gradient(ellipse at 50% 130%, rgba(255, 59, 48, 0.12), transparent 60%); }
+[data-look='upsidedown'] :is(.board-col, .board-card) { border-color: #3c1c20; }
+[data-look='upsidedown'] .toggle.on .toggle-track { background: var(--gate); box-shadow: 0 0 10px rgba(255, 59, 48, 0.6); }
+[data-look='upsidedown'] .theme { border-color: #3c1c20; }
 @media (prefers-reduced-motion: reduce) { [data-look='monolith'] .settings-main h2::before { animation: none; } }
 
 /* the looks whose buttons are rounded each: in a row (.seg, the new-workspace page's agents) they stand apart, never
@@ -2327,6 +2378,8 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 :is([data-look='monolith'], [data-look='islander']) { --ws-guide: none; --proj-divider: none; --ws-h: 30px; } /* bare, roomy */
 [data-look='pellet'] { --ws-guide: 2px solid #2121de; } /* the maze's wall */
 :is([data-look='spartan'], [data-look='vault']) { --ws-guide: 1px solid color-mix(in srgb, var(--accent) 45%, transparent); }
+[data-look='hallownest'] { --ws-guide: 1px solid #25304c; --proj-divider: 1px solid #1c2540; }
+[data-look='upsidedown'] { --ws-guide: 1px solid #3c1c20; --proj-divider: 1px solid color-mix(in srgb, var(--accent) 25%, transparent); }
 
 /* the right panels' edge (Files…, the info panel) as the look draws the sidebar's, mirrored: both are dragged the same way */
 [data-look='neon'] :is(.side-panel, .info) { border-left-color: color-mix(in srgb, var(--accent) 35%, transparent); }
@@ -2361,6 +2414,8 @@ html.glass { --glass-edge: color-mix(in srgb, var(--fg) 13%, transparent); --gla
 [data-look='magma'] :is(.side-panel, .info) { border-left: 1px solid #5a2414; box-shadow: inset 1px 0 0 rgba(255, 106, 31, 0.25); }
 [data-look='shibuya'] :is(.side-panel, .info) { box-shadow: inset 2px 0 0 #ff3d8b, inset 3px 0 10px rgba(255, 61, 139, 0.35); border-left: none; }
 [data-look='tiki'] :is(.side-panel, .info) { border-left: none; box-shadow: inset 6px 0 0 #6a4a20; }
+[data-look='hallownest'] :is(.side-panel, .info) { border-left-color: #1c2540; }
+[data-look='upsidedown'] :is(.side-panel, .info) { border-left-color: #2a1215; }
 
 /* a selected tab filled with a color: its status mark in the tab's own text color (green on orange doesn't read) */
 :is([data-look='cyber'], [data-look='pocket'], [data-look='starship'], [data-look='groovy'], [data-look='bricks'], [data-look='cassette'], [data-look='brass']) .tab.sel .glyph { color: inherit; --running: currentColor; }

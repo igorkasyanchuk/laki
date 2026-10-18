@@ -1007,6 +1007,24 @@ export const THEMES: Theme[] = [
     ansi: ['#2c2016', '#ff5a4a', '#8ae88a', '#ffc84a', '#4a9aff', '#ff6ac8', '#4ad8e8', '#e8d4c0',
       '#806a56', '#ff8070', '#aaf0aa', '#ffd87a', '#7ab8ff', '#ff9ad8', '#7ae6f0', '#fff4e8'],
   },
+  {
+    id: 'hallownest',
+    aka: 'hollow knight silksong',
+    name: 'Hallownest',
+    look: 'hallownest',
+    c: { bg: '#0a0e18', side: '#070a12', panel: '#0f1524', raised: '#172036', line: '#25304c', fg: '#e9edf6', muted: '#8f9bba', accent: '#a8d8ff', accentFg: '#06101c', sel: '#1a2744', running: '#7ac4ff', waiting: '#ffad5a', done: '#94e2ab', error: '#ff6b5c', orange: '#ff9a4a', pink: '#e86a7a', purple: '#a98cff' },
+    ansi: ['#172036', '#ff6b5c', '#94e2ab', '#ffcf7a', '#6aa8ff', '#c39aff', '#7ad8e8', '#d6dcea',
+      '#56617e', '#ff8f82', '#b4eec4', '#ffe0a0', '#94c2ff', '#d8baff', '#a0e6f0', '#f6f8fc'],
+  },
+  {
+    id: 'upsidedown',
+    aka: 'stranger things hawkins',
+    name: 'Upside Down',
+    look: 'upsidedown',
+    c: { bg: '#0d090b', side: '#090608', panel: '#140d10', raised: '#1f1418', line: '#3c1c20', fg: '#f4e6e3', muted: '#ad8c8a', accent: '#ff3b30', accentFg: '#1a0403', sel: '#3a1418', running: '#58c4ff', waiting: '#ffd23a', done: '#5ee07e', error: '#ff6a8a', orange: '#ff8a3a', pink: '#ff6ab0', purple: '#b08aff' },
+    ansi: ['#1f1418', '#ff4a3e', '#5ee07e', '#ffd23a', '#4a9aff', '#d07aff', '#58c4ff', '#e2d2d0',
+      '#6e5458', '#ff7a6e', '#8af0a2', '#ffe27a', '#7ab8ff', '#e0a2ff', '#8ad8ff', '#fff4f2'],
+  },
 ]
 
 export const css = (v: string) => getComputedStyle(document.documentElement).getPropertyValue(v).trim()
