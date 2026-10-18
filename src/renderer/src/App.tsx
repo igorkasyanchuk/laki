@@ -2030,7 +2030,7 @@ export function App() {
     a({ label: find ? 'Stop filtering the sidebar' : 'Filter the sidebar…', icon: 'filter', run: () => (setSideOpen(true), setFind(f => (f ? null : { q: '' }))) })
     if (!view?.remote) {
       // the way Settings has it: Laki's PIN, or the saved email
-      if (settings.remoteAuth === 'tailscale') a({ label: 'Start remote access on your tailnet, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, via: 'tailscale' }).catch(() => {}), setDialog({ section: 'remote' })) })
+      if (settings.remoteAuth === 'tailscale') a({ label: `Start remote access ${settings.remoteFunnel ? 'on the internet (Tailscale Funnel)' : 'on your tailnet'}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, via: 'tailscale', pin: !!(settings.remoteTsPin || settings.remoteFunnel), funnel: !!settings.remoteFunnel }).catch(() => {}), setDialog({ section: 'remote' })) })
       else if (settings.remoteAuth === 'pin') a({ label: 'Start remote access with a PIN, 1 hour', icon: 'link', run: () => (call('remoteStart', { hours: 1, pin: true }).catch(() => {}), setDialog({ section: 'remote' })) })
       else if (settings.remoteMail) a({ label: `Start remote access for ${settings.remoteMail}, 1 hour`, icon: 'link', run: () => (call('remoteStart', { hours: 1, mail: settings.remoteMail }).catch(() => {}), setDialog({ section: 'remote' })) })
       a({ label: 'Remote access…', icon: 'link', run: () => setDialog({ section: 'remote' }) })
@@ -2954,7 +2954,7 @@ export function App() {
               stop: what => (what === 'floater' || what.startsWith('browse:') ? bridge?.procStop?.(what) : window.dispatchEvent(new CustomEvent('laki-stop', { detail: what }))),
               widgetName: id => view.widgets?.find(w => w.id === id)?.name ?? id,
             }}
-            remote={{ state: view.remote, start: (hours, mail, open, pin, via) => api.call('remoteStart', { hours, mail, open, pin, via }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
+            remote={{ state: view.remote, start: (hours, mail, open, pin, via, funnel) => api.call('remoteStart', { hours, mail, open, pin, via, funnel }), stop: () => api.call('remoteStop'), copy, open: openExternal }}
             widgets={extCfg}
             logs={(key, title) => setDialog({ logs: key, title })}
             section={settingsFor ? `project:${settingsFor.id}` : section}

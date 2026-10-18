@@ -61,7 +61,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               and cost; laki ai alone: the conversation
   laki mcp                                    Laki as an MCP server (stdio): claude mcp add laki -- laki mcp
   laki daemon | stop                          run the daemon in the foreground | stop it
-  laki serve --tailscale [--pin] | --cloudflare --mail <you@x.com> | --cloudflare --pin  [--hours n]
+  laki serve --tailscale [--pin | --funnel] | --cloudflare --mail <you@x.com> | --cloudflare --pin  [--hours n]
                                               headless: the daemon and remote access, until stopped (docs/headless.md)
   laki remote [stop]                          remote access's link and PIN now | stop it
   --json prints machine-readable output`

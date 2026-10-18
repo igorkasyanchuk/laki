@@ -2893,18 +2893,20 @@ async function cfReady(mails: boolean) {
 const TAILSCALE_APP = process.env.LAKI_TAILSCALE_APP || '/Applications/Tailscale.app/Contents/MacOS/Tailscale' // tests': none
 const tailscaleBin = () => (onPath('tailscale') ? 'tailscale' : process.platform === 'darwin' && existsSync(TAILSCALE_APP) ? TAILSCALE_APP : undefined)
 const TAILNET_URL = /https:\/\/[a-z0-9-]+(?:\.[a-z0-9-]+)*\.ts\.net(?::\d+)?/i
-// this machine on its tailnet, or why not
+// this machine on its tailnet, or why not; peers: the tailnet's other devices online (none: nothing can open the link,
+// since this Mac can't reach its own tailnet address: macOS keeps it to itself, never through Tailscale)
 async function tsReady() {
   const bin = tailscaleBin()
   if (!bin) throw new Error("tailscale isn't installed: https://tailscale.com/download (on a Mac, the app; on Linux, its package)")
-  const st = await run(bin, ['status', '--json'], { timeout: 10000 }).then(r => JSON.parse(r.stdout) as { BackendState?: string }, e => ({ BackendState: firstLine(e) }))
+  const st = await run(bin, ['status', '--json'], { timeout: 10000 }).then(r => JSON.parse(r.stdout) as { BackendState?: string; Peer?: Record<string, { Online?: boolean }> }, e => ({ BackendState: firstLine(e), Peer: undefined }))
   if (st.BackendState !== 'Running') throw new Error(`Tailscale isn't connected (${st.BackendState ?? '?'}): tailscale up`)
-  return bin
+  return { bin, peers: Object.values(st.Peer ?? {}).filter(p => p.Online).length }
 }
-// tailscale serve in the foreground: https on this machine's tailnet name, for the tailnet's devices only (not
-// Funnel), until it's stopped. ponytail: port 443, its root; another serve of yours there is replaced while it runs
-const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string]) =>
-  publisher('tailscale serve', bin, ['serve', '--https=443', target], TAILNET_URL, ended, who)
+// tailscale serve in the foreground: https on this machine's tailnet name, for the tailnet's devices only, until it's
+// stopped; funnel: tailscale funnel, the same on the internet (the tailnet's policy must allow it: its output says
+// where to turn it on). ponytail: port 443, its root; another serve of yours there is replaced while it runs
+const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string], funnel = false) =>
+  publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who)
 
 // tunnelStart resolves once cloudflared prints the URL (or was stopped meanwhile), and fails with its output
 export async function tunnelStart(o: { ws: string; port: number; mails?: string[] }): Promise<Tunnel> {
@@ -3093,34 +3095,37 @@ async function shareServe(q: IncomingMessage, r: ServerResponse) {
 export const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0]
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/ // one address: no *@domain
 // pin: the PIN; access: the token it gives (token, the link's, is then good for remotePin only); left: wrong tries left
-type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access?: string; left?: number; via?: 'tailscale' }
+type RemoteRun = { mail: string; until?: number; token: string; url?: string; cf: Cf; pin?: string; access?: string; left?: number; via?: 'tailscale'; funnel?: boolean; peers?: number }
 let remote: RemoteRun | undefined
 let daemonPort = 0
 export const setDaemonPort = (p: number) => (daemonPort = p)
 export const remoteToken = () => (remote?.pin ? remote.access : remote?.token)
 export const remoteOrigin = () => remote?.url // the page's origin, once there's a URL
 export const remoteView = (): Remote | undefined =>
-  remote && { mail: remote.mail, ...(remote.via && { via: remote.via }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
+  remote && { mail: remote.mail, ...(remote.via && { via: remote.via, funnel: remote.funnel, peers: remote.peers }), ...(!remote.mail && !remote.pin && !remote.via && { open: true }), ...(remote.pin && { pin: remote.pin, tries: remote.left }), until: remote.until, url: remote.url, link: remote.url && `${remote.url}/?token=${remote.token}` }
 const triesOf = () => (n => (Number.isInteger(n) && n >= 1 && n <= 10 ? n : REMOTE_TRIES))(Number(state.settings?.remoteTries))
 
-// via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked)
-export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string }): Promise<Remote | undefined> {
+// via tailscale: tailscale serve instead of cloudflared, the tailnet's devices only, no email (a PIN as well, if asked);
+// funnel: tailscale funnel, on the internet, so with a PIN only
+export async function remoteStart(o: { hours: number; mail?: string; open?: boolean; pin?: boolean; via?: string; funnel?: boolean }): Promise<Remote | undefined> {
   const hours = o.hours // a number: null or '' would be 0, forever
   if (typeof hours !== 'number' || !REMOTE_HOURS.includes(hours)) throw new Error(`for how long: ${REMOTE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
   if (o.via !== undefined && o.via !== 'cloudflare' && o.via !== 'tailscale') throw new Error(`through cloudflare or tailscale, not ${o.via}`)
   const ts = o.via === 'tailscale'
   const pin = o.pin === true // Laki's PIN, no email
+  const funnel = ts && o.funnel === true
+  if (funnel && !pin) throw new Error('Funnel puts it on the internet: only with a PIN')
   const open = !ts && !pin && o.open === true && !o.mail?.trim() // no email: only when asked for (an email given wins)
   const mail = ts || open || pin ? '' : (o.mail ?? state.settings?.remoteMail ?? '').trim()
   if (!ts && !open && !pin && !ONE_MAIL.test(mail)) throw new Error(mail ? `not an email address: ${mail}` : 'the email that may open it: Settings › Remote access')
   if (mail && mail !== state.settings?.remoteMail) settingsSet({ remoteMail: mail }) // open and pin keep the saved one
   if (remote) return remoteView()
-  const bin = ts ? await tsReady() : (await cfReady(!!mail), '')
+  const { bin, peers } = ts ? await tsReady() : (await cfReady(!!mail), { bin: '', peers: 0 })
   if (remote) return remoteView() // started meanwhile
   const target = `http://127.0.0.1:${daemonPort}`
   const ended = (why: string) => (log(`remote access ended (${why})`), remoteStop())
-  const { cf, url } = ts ? tailscale(bin, target, ended, ['Remote access', 'remote']) : cloudflare(target, mail ? [mail] : [], ended, ['Remote access', 'remote'])
-  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf, ...(ts && { via: 'tailscale' as const }) }
+  const { cf, url } = ts ? tailscale(bin, target, ended, ['Remote access', 'remote'], funnel) : cloudflare(target, mail ? [mail] : [], ended, ['Remote access', 'remote'])
+  const r: RemoteRun = { mail, until: hours ? Date.now() + hours * 3600e3 : undefined, token: randomBytes(32).toString('hex'), cf, ...(ts && { via: 'tailscale' as const, funnel, peers }) }
   if (pin) Object.assign(r, { pin: String(randomInt(0, 1e6)).padStart(6, '0'), access: randomBytes(32).toString('hex'), left: triesOf() })
   remote = r
   changed()
@@ -3131,7 +3136,7 @@ export async function remoteStart(o: { hours: number; mail?: string; open?: bool
     throw e
   }
   if (remote !== r) return undefined // stopped meanwhile
-  log(`remote access at ${r.url} for ${ts ? `the tailnet's devices with the link${pin ? ' and its PIN' : ''}` : mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
+  log(`remote access at ${r.url} for ${ts ? `${funnel ? 'the internet (Tailscale Funnel)' : `the tailnet's devices (${peers} more online)`} with the link${pin ? ' and its PIN' : ''}` : mail || (pin ? `the link and its PIN (${r.left} wrong tries stop it)` : 'anyone with the link (no email)')}, ${r.until ? `until ${new Date(r.until).toISOString()}` : 'until stopped'}`)
   changed()
   return remoteView()
 }

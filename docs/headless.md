@@ -37,6 +37,7 @@ Pick one:
 |---|---|---|
 | `--tailscale` | devices in your tailnet, with the link | Tailscale on the server, connected (`tailscale up`); HTTPS on for the tailnet |
 | `--tailscale --pin` | the same, plus a 6-digit PIN the server prints | the same |
+| `--tailscale --funnel` | anyone on the internet with the link and the PIN (Tailscale Funnel; a PIN always) | the same, and Funnel on for the tailnet (its policy's `funnel` attribute) |
 | `--cloudflare --mail you@example.com` | that email only, after a one-time code from Cloudflare | `cloudflared` 2026.9.3+ |
 | `--cloudflare --pin` | anyone with the link and the PIN (2 wrong PINs stop it) | `cloudflared` |
 
@@ -45,14 +46,17 @@ Pick one:
 ### Tailscale
 
 `--tailscale` runs `tailscale serve` in the foreground: Laki is at `https://<machine>.<tailnet>.ts.net`, for your
-tailnet only, never the public internet (it never uses Funnel). Once per tailnet and machine:
+tailnet only; `--funnel` runs `tailscale funnel` instead, the same address on the public internet, and always with a
+PIN. Open the link on another device: a Mac can't open its own Tailscale address (macOS keeps it to itself, never
+through Tailscale), so a tailnet with no other device online can't use it (Laki says so). The first visit waits a
+few seconds for the HTTPS certificate. Once per tailnet and machine:
 
 1. In Tailscale's admin console › DNS: MagicDNS and HTTPS Certificates on.
 2. On Linux, let your user run `tailscale serve` without sudo: `sudo tailscale set --operator=$USER`.
 
 On the Mac, the Tailscale app's own command is used when `tailscale` isn't on your PATH. While Laki runs, it takes
 port 443 of `tailscale serve` (another serve of yours there is replaced, and gone when Laki stops). The app's
-Settings › Remote access has the same choice: *Sign in with* › *Tailscale*.
+Settings › Remote access has the same choice: *Sign in with* › *Tailscale*, with *Funnel* and *Ask for a PIN as well*.
 
 ### Cloudflare
 

@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Remote access: Tailscale with a PIN, and Funnel**: *Ask for a PIN as well* on the tailnet, or *Funnel* for the
+  public internet (always with a PIN; `laki serve --tailscale --funnel`). Laki now says when no other device is on
+  your tailnet: a Mac can't open its own Tailscale link.
 - **Changes: Revert**: take back the agent's edit in one click: a hunk (its header's *Revert*), a few lines of one
   (⌥-click, ⇧-click a range, then *Revert these*) or a whole file (its right click), with *Undo* in the toast.
 - **Workflows: an agent's question stops the run, not just its tab**: a permission prompt in an Agent block shows on

@@ -114,7 +114,7 @@ const glyph: Record<string, string> = { running: '◐', waiting: '◆', idle: '�
 // remote access in words: its link, who gets in, until when
 const remoteText = (r?: Remote) =>
   !r ? 'remote access is off: laki serve, or Settings › Remote access' : !r.link ? 'remote access is starting…' :
-  [r.link, r.via && "your tailnet's devices only", r.pin ? `PIN ${r.pin} (${r.tries} wrong tries stop it)` : !r.via && (r.mail ? `only ${r.mail} (Cloudflare's code)` : 'anyone with the link'), r.until ? `until ${new Date(r.until).toLocaleString()}` : 'until stopped'].filter(Boolean).join('\n')
+  [r.link, r.via && (r.funnel ? 'on the internet (Tailscale Funnel)' : `your tailnet's devices only${r.peers === 0 ? ": none online but this machine, which can't open its own link" : ''}`), r.pin ? `PIN ${r.pin} (${r.tries} wrong tries stop it)` : !r.via && (r.mail ? `only ${r.mail} (Cloudflare's code)` : 'anyone with the link'), r.until ? `until ${new Date(r.until).toLocaleString()}` : 'until stopped'].filter(Boolean).join('\n')
 
 // laki serve: headless, a server without the app (Linux too, or the AppImage's --headless): the daemon in this process
 // (or the one running), with remote access through tailscale or cloudflared for the browser, until stopped (Ctrl-C,
@@ -124,8 +124,8 @@ async function serve(a: string[]) {
   const has = (f: string) => a.includes(`--${f}`)
   const val = (f: string) => (i => (i >= 0 ? a[i + 1] : undefined))(a.indexOf(`--${f}`))
   const via = has('tailscale') ? 'tailscale' : 'cloudflare'
-  const o = { via, hours: Number(val('hours') ?? 0), pin: has('pin'), mail: val('mail'), open: has('open') }
-  if (via === 'cloudflare' && !o.pin && !o.mail && !o.open) throw new Error('how do you get in? laki serve --tailscale [--pin] | --cloudflare --mail you@example.com | --cloudflare --pin  [--hours n]')
+  const o = { via, hours: Number(val('hours') ?? 0), pin: has('pin') || has('funnel'), mail: val('mail'), open: has('open'), funnel: has('funnel') } // funnel: the internet, so a PIN always
+  if (via === 'cloudflare' && !o.pin && !o.mail && !o.open) throw new Error('how do you get in? laki serve --tailscale [--pin | --funnel] | --cloudflare --mail you@example.com | --cloudflare --pin  [--hours n]')
   // started by Laki --headless, which waits on this process (not passed on to the daemon's agents)
   const parent = Number(process.env.LAKI_HEADLESS_PARENT)
   delete process.env.LAKI_HEADLESS_PARENT

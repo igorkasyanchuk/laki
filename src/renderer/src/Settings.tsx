@@ -147,6 +147,8 @@ export type AppSettings = Paint & {
   remoteMail?: string // the one address remote access lets in
   remoteAuth?: 'email' | 'pin' | 'tailscale' // remote access by Cloudflare's email code (unset too), Laki's PIN, or your tailnet
   remoteTries?: number // wrong PINs that stop it (unset: REMOTE_TRIES)
+  remoteTsPin?: boolean // Tailscale: a PIN as well
+  remoteFunnel?: boolean // Tailscale: Funnel, the internet (a PIN always)
   prPrompts?: Partial<Record<FixWhat, string>> // what the PR switches tell the agent (unset: PR_PROMPTS)
   prScan?: number // minutes between PR checks
   bgRefresh?: boolean // PR checks on their own (unset: on)
@@ -1464,19 +1466,19 @@ function ResourcesSection({ api, sleepAfter, onSleepAfter }: { api: ResourcesApi
 // remote access: this app in a browser elsewhere, through cloudflared, for one email (open: none, anyone with the
 // link, after a typed confirm; pin: Laki's PIN instead, shown here, typed on the page), or through tailscale serve for
 // the tailnet's devices (via); no link yet: starting
-export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string; via?: 'tailscale' }
-export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale') => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
+export type Remote = { mail: string; open?: boolean; pin?: string; tries?: number; until?: number; url?: string; link?: string; via?: 'tailscale'; funnel?: boolean; peers?: number }
+export type RemoteApi = { state?: Remote; start: (hours: number, mail: string, open: boolean, pin: boolean, via?: 'tailscale', funnel?: boolean) => Promise<unknown>; stop: () => Promise<unknown>; copy: (text: string) => void; open: (url: string) => void }
 const REMOTE_HOURS = [1, 2, 4, 8, 12, 24, 48, 72, 0] // the daemon's too; 0: forever
 const ONE_MAIL = /^[^\s@*,]+@[^\s@*,]+\.[^\s@*,]+$/
 
 const TRIES = [1, 2, 3, 5, 10] // wrong PINs before it stops (the daemon takes 1-10)
 type RemoteAuth = 'email' | 'pin' | 'tailscale'
-type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number }
+type RemoteOpts = { mail: string; auth: RemoteAuth; tries: number; tsPin: boolean; funnel: boolean }
 const AUTHS: [RemoteAuth, string][] = [['email', 'Email (Cloudflare)'], ['pin', 'PIN (Laki)'], ['tailscale', 'Tailscale']]
 function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; set: (o: Partial<RemoteOpts>) => void }) {
-  const { mail, auth, tries } = opts
-  const pin = auth === 'pin'
+  const { mail, auth, tries, funnel } = opts
   const ts = auth === 'tailscale'
+  const pin = auth === 'pin' || (ts && (opts.tsPin || funnel)) // Funnel: on the internet, so a PIN always
   const [hours, setHours] = useState(1)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
@@ -1489,7 +1491,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
     if (busy || !ok) return
     setBusy(true)
     setErr('')
-    await api.start(hours, mail.trim(), open, pin, ts ? 'tailscale' : undefined).then(() => setSure(''), fail) // the next start without an email asks again
+    await api.start(hours, mail.trim(), open, pin, ts ? 'tailscale' : undefined, ts && funnel).then(() => setSure(''), fail) // the next start without an email asks again
     setBusy(false)
   }
   const stop = () => (setErr(''), api.stop().catch(fail))
@@ -1513,8 +1515,13 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
             <div className="tunnel-code">
               <code>{r.link}</code>
               <IconButton icon="copy" title="Copy the link" onClick={() => api.copy(r.link!)} />
-              <IconButton icon="link" title="Open" onClick={() => api.open(r.link!)} />
+              {!r.via && <IconButton icon="link" title="Open" onClick={() => api.open(r.link!)} />}
             </div>
+            {r.via === 'tailscale' && (
+              <p className={r.peers === 0 && !r.funnel ? 'warn-soft small' : 'muted small'}>
+                {r.peers === 0 && !r.funnel ? 'No other device is on your tailnet right now, and this Mac can’t open its own Tailscale link (macOS keeps its tailnet address to itself). Put Tailscale on your phone or another computer, sign in with the same account, then open the link there.' : `Open it on ${r.funnel ? 'any device' : 'another device in your tailnet'}: this Mac can’t open its own Tailscale link. The first visit can take a few seconds (its HTTPS certificate).`}
+              </p>
+            )}
             {r.pin ? (
               <div className="remote-pin-box">
                 <span className="small muted">PIN</span>
@@ -1525,7 +1532,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
               </div>
             ) : r.via === 'tailscale' ? (
               <p className="muted small">
-                Only devices in your tailnet reach it, with this link. Open it on your phone or laptop with Tailscale on. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
+                Only devices in your tailnet reach it, with this link{r.peers ? ` (${r.peers} online now)` : ''}. {r.until ? `Ends ${ends(r.until)}.` : 'Runs until you stop it.'}
               </p>
             ) : r.open ? (
               <div className="remote-risk" role="alert">
@@ -1567,13 +1574,24 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
               ))}
             </div>
           </div>
-          {ts ? (
+          {ts && (
             <p className="muted small">
-              tailscale serve publishes it at https://&lt;this Mac&gt;.&lt;your tailnet&gt;.ts.net, for your tailnet's devices only (never Funnel, the
-              public internet). It needs Tailscale here, connected, and HTTPS certificates on for the tailnet (its admin console › DNS). On Linux,
-              once: <code>sudo tailscale set --operator=$USER</code>.
+              tailscale serve publishes it at https://&lt;this Mac&gt;.&lt;your tailnet&gt;.ts.net, for your tailnet's devices only; open it on your
+              phone or another computer with Tailscale on (this Mac can't open its own). It needs Tailscale here, connected, and HTTPS certificates on
+              for the tailnet (its admin console › DNS). On Linux, once: <code>sudo tailscale set --operator=$USER</code>.
             </p>
-          ) : pin ? (
+          )}
+          {ts && (
+            <>
+              <Switch on={funnel} onChange={v => set({ funnel: v })} tip="tailscale funnel: anyone on the internet with the link reaches it, then the PIN">
+                Funnel: on the internet, not just your tailnet (needs Funnel on for your tailnet; a PIN always)
+              </Switch>
+              <Switch on={pin} onChange={v => set({ tsPin: v })} disabled={funnel} tip={funnel ? 'Funnel always asks for a PIN' : 'The page asks for a PIN Laki shows here'}>
+                Ask for a PIN as well
+              </Switch>
+            </>
+          )}
+          {pin ? (
             <div className="field">
               <span>
                 Wrong PINs before it stops <span className="muted">· a new PIN each start, shown here</span>
@@ -1586,7 +1604,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
                 ))}
               </div>
             </div>
-          ) : (
+          ) : ts ? null : (
           <>
           <label>
             <span>
@@ -1624,7 +1642,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
           </div>
           <div className="row">
             <button type="submit" className={open ? 'danger' : 'primary'} disabled={!ok || busy}>
-              {busy ? 'Starting…' : open ? 'Start without an email' : pin ? 'Start with a PIN' : ts ? 'Start on your tailnet' : 'Start remote access'}
+              {busy ? 'Starting…' : open ? 'Start without an email' : ts ? (funnel ? 'Start on the internet, with a PIN' : `Start on your tailnet${pin ? ', with a PIN' : ''}`) : pin ? 'Start with a PIN' : 'Start remote access'}
             </button>
           </div>
         </form>
@@ -3481,8 +3499,8 @@ export function SettingsPage(p: {
           {sec === 'remote' && p.remote && (
             <RemoteSection
               api={p.remote}
-              opts={{ mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES }}
-              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }) })}
+              opts={{ mail: s.remoteMail ?? '', auth: s.remoteAuth ?? 'email', tries: s.remoteTries ?? REMOTE_TRIES, tsPin: !!s.remoteTsPin, funnel: !!s.remoteFunnel }}
+              set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }) })}
             />
           )}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}

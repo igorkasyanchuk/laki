@@ -679,10 +679,10 @@ goes through the sign-in instead of loading from the cache with every other requ
 Origin: the files hold no secrets. Paths that leave the folder, or don't decode, are 404. The CSP's
 `connect-src 'self'` lets the page reach its own daemon over `wss://`.
 
-Through Tailscale (`via: 'tailscale'`, Settings' *Sign in with* › *Tailscale*, `remoteAuth`): `tailscale serve
---https=443 http://127.0.0.1:<port>` in the foreground (`publisher`, the same child-process shape as `cloudflare()`:
+Through Tailscale (`via: 'tailscale'`, Settings' *Sign in with* › *Tailscale*, `remoteAuth`; `remoteTsPin`, `remoteFunnel`): `tailscale serve
+--https=443 http://127.0.0.1:<port>` (`funnel`: `tailscale funnel`, the internet, refused without `pin`) in the foreground (`publisher`, the same child-process shape as `cloudflare()`:
 its URL, `TAILNET_URL`, from its output; stopping it unpublishes), after `tsReady` (`tailscaleBin`: PATH, else the
-Mac app's `TAILSCALE_APP`; `status --json` Running). No email; `open` never; a PIN if asked. The origin and token
+Mac app's `TAILSCALE_APP`; `status --json` Running; its online `Peer`s as the view's `peers`: 0 is Settings' warning, since a Mac can't reach its own tailnet address). No email; `open` never; a PIN if asked. The origin and token
 checks are as for cloudflared.
 
 Headless (`docs/headless.md`): the CLI's `serve` imports the daemon into its own process (or uses one running), then

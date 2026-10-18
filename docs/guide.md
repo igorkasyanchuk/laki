@@ -449,8 +449,10 @@ email address only, unless you leave the email out on purpose (below).
 - When the page can't reach Laki it says why: Cloudflare's sign-in ran out (it reloads, to sign in again), the
   link ended (remote access stopped or started again: open the newest one), or the Mac is out of reach.
 - With Tailscale instead (*Sign in with* › *Tailscale*): `tailscale serve` publishes it at
-  `https://<this Mac>.<your tailnet>.ts.net`, for your tailnet's devices only (never Funnel), with the link's key.
-  It needs Tailscale connected here and HTTPS certificates on for the tailnet (its admin console › DNS); the Mac app's
+  `https://<this Mac>.<your tailnet>.ts.net`, for your tailnet's devices only, with the link's key; *Ask for a PIN as
+  well* adds Laki's PIN, and *Funnel* (`tailscale funnel`) puts it on the public internet, always with a PIN (Funnel
+  must be on for your tailnet). Open the link on your phone or another computer: this Mac can't open its own Tailscale
+  address, and Laki warns when no other device of your tailnet is online. It needs Tailscale connected here and HTTPS certificates on for the tailnet (its admin console › DNS); the Mac app's
   own `tailscale` is used when none is on your PATH. On a server with no screen: [headless.md](headless.md).
 - On a phone the app has its own layout: the sidebar slides over, one pane at a time (split tabs show as
   separate tabs), the panels and Settings take the whole screen, and a row of keys a phone keyboard lacks

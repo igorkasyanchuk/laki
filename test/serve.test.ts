@@ -12,15 +12,16 @@ const script = (path: string, body: string) => (writeFileSync(path, body), chmod
 // a 1×1 PNG: what the fake simulator's screenshot writes
 const PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNgYGD4DwABBAEAwS2OUAAAAABJRU5ErkJggg=='
 
-// tailscale: up (or $HOME/ts-state's), serve prints its URL and waits, as the real one's foreground mode does
+// tailscale: up (or $HOME/ts-state's) with one other device online (none with $HOME/ts-alone), serve (and funnel)
+// prints its URL and waits, as the real one's foreground mode does
 function fakeTailscale(rig: Rig) {
   script(
     join(rig.home, 'bin/tailscale'),
     `#!/bin/sh
 echo "$*" >> "$HOME/ts.log"
 case "$1" in
-  status) echo "{\\"BackendState\\":\\"$(cat "$HOME/ts-state" 2>/dev/null || echo Running)\\"}" ;;
-  serve) echo "Available within your tailnet:"; echo; echo "https://box.tail1234.ts.net/"; echo "|-- proxy $3"; trap 'echo stopped >> "$HOME/ts.log"; exit 0' TERM; while :; do sleep 1; done ;;
+  status) [ -e "$HOME/ts-alone" ] && p='{}' || p='{"a":{"Online":true},"b":{"Online":false}}'; echo "{\\"BackendState\\":\\"$(cat "$HOME/ts-state" 2>/dev/null || echo Running)\\",\\"Peer\\":$p}" ;;
+  serve|funnel) echo "Available within your tailnet:"; echo; echo "https://box.tail1234.ts.net/"; echo "|-- proxy $3"; trap 'echo stopped >> "$HOME/ts.log"; exit 0' TERM; while :; do sleep 1; done ;;
 esac
 `,
   )
@@ -38,7 +39,7 @@ test('remote access through tailscale: the tailnet only, its token from its orig
 
   const on = await rig.rpc('remoteStart', { hours: 0, via: 'tailscale' })
   const url = 'https://box.tail1234.ts.net'
-  assert.deepEqual([on.url, on.via, on.mail, on.open, on.until], [url, 'tailscale', '', undefined, undefined]) // no email, never "open"
+  assert.deepEqual([on.url, on.via, on.mail, on.open, on.until, on.peers, on.funnel], [url, 'tailscale', '', undefined, undefined, 1, false]) // no email, never "open"; the other device online
   assert.match(on.link, /^https:\/\/box\.tail1234\.ts\.net\/\?token=[0-9a-f]{64}$/)
   assert.match(readFileSync(join(rig.home, 'ts.log'), 'utf8'), new RegExp(`serve --https=443 http://127\\.0\\.0\\.1:${port}\n`))
   const key = on.link.split('?token=')[1]
@@ -62,6 +63,20 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   assert.equal(await ping(url), 403) // its origin went with it
   assert.match((await rig.cli('remote')).out, /remote access is off/)
 
+  // Funnel: the internet, with a PIN only; alone on the tailnet: said
+  await assert.rejects(rig.rpc('remoteStart', { hours: 1, via: 'tailscale', funnel: true }), /Funnel puts it on the internet: only with a PIN/)
+  writeFileSync(join(rig.home, 'ts-alone'), '')
+  const f = await rig.rpc('remoteStart', { hours: 1, via: 'tailscale', funnel: true, pin: true })
+  assert.deepEqual([f.funnel, f.peers, typeof f.pin], [true, 0, 'string'])
+  assert.match(readFileSync(join(rig.home, 'ts.log'), 'utf8'), new RegExp(`funnel --https=443 http://127\\.0\\.0\\.1:${port}\n`))
+  assert.match((await rig.cli('remote')).out, /on the internet \(Tailscale Funnel\)\nPIN \d{6}/)
+  await rig.rpc('remoteStop')
+  const lone = await rig.rpc('remoteStart', { hours: 1, via: 'tailscale' })
+  assert.equal(lone.peers, 0)
+  assert.match((await rig.cli('remote')).out, /none online but this machine, which can't open its own link/)
+  await rig.rpc('remoteStop')
+  await until(() => readFileSync(join(rig.home, 'ts.log'), 'utf8').match(/stopped/g)?.length === 3, 'both stopped')
+
   // laki serve with no daemon: its own, in this process; started by Laki --headless, it ends with it (here: a parent
   // that isn't its own, as after a kill)
   await rig.stop()
@@ -70,7 +85,7 @@ test('remote access through tailscale: the tailnet only, its token from its orig
   delete rig.env.LAKI_HEADLESS_PARENT
   assert.equal(alone.code, 0, alone.err)
   assert.match(alone.out, /laki: remote access\nhttps:\/\/box\.tail1234\.ts\.net\/\?token=[0-9a-f]{64}\n[^]*laki: Laki --headless ended: stopping/)
-  await until(() => readFileSync(join(rig.home, 'ts.log'), 'utf8').match(/stopped/g)?.length === 2, 'its tailscale serve went with it')
+  await until(() => readFileSync(join(rig.home, 'ts.log'), 'utf8').match(/stopped/g)?.length === 4, 'its tailscale serve went with it')
 })
 
 test("Run ▾'s scripts: a tab each, named as it, replaced when run again; Enter runs an ended one again; refusals", async t => {
