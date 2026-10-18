@@ -2,8 +2,8 @@
 // closed (Esc, Close). HTML goes in a sandboxed frame: no scripts, nothing it loads but pictures, links open in the
 // browser (main's window-open handler); anything else is Markdown.
 import { useEffect, useMemo } from 'react'
-import { Markdown } from './MarkdownView'
-import { IconButton } from './ui'
+import { Folded, Markdown } from './MarkdownView'
+import { Icon, IconButton } from './ui'
 
 export type ShownWin = { run: string; name: string; title: string; body: string }
 
@@ -51,6 +51,45 @@ export function ShownDialog({ s, left, onOpenRun, onClose }: { s: ShownWin; left
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// a Show you's or an end's popover: a card in the window's corner, the run going on. HTML shows as its words (DOMParser
+// runs nothing); Show opens it as the window
+export type ShownPop = ShownWin & { key: number }
+const words = (html: string) => new DOMParser().parseFromString(html, 'text/html').body.textContent?.trim() ?? ''
+export function ShownPops({ pops, onShow, onOpenRun, onClose }: { pops: ShownPop[]; onShow: (p: ShownPop) => void; onOpenRun: (p: ShownPop) => void; onClose: (key: number) => void }) {
+  if (!pops.length) return null
+  return (
+    <div className="shown-pops" role="status">
+      {pops.map(p => (
+        <div key={p.key} className="shown-pop">
+          <div className="shown-pop-head">
+            <Icon name="flow" />
+            <b className="shown-title">{p.title}</b>
+            <span className="spacer" />
+            <IconButton icon="x" title="Close" onClick={() => onClose(p.key)} />
+          </div>
+          {p.body && (
+            <div className="shown-pop-body">
+              <Folded text={/^\s*</.test(p.body) ? words(p.body) : p.body} lines={4} />
+            </div>
+          )}
+          <div className="shown-pop-foot">
+            <span className="muted small">{p.name}</span>
+            <span className="spacer" />
+            {p.body && (
+              <button className="link" onClick={() => onShow(p)}>
+                Show
+              </button>
+            )}
+            <button className="link" onClick={() => onOpenRun(p)}>
+              Open the run
+            </button>
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

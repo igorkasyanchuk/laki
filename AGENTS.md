@@ -864,8 +864,10 @@ a score's level index with `.level`), `.p`/`.confidence`, `steps.<id>.answers` t
 `''` and `unsure` waits (`wait.kind` decide, one question at a time; `flowAnswer` sets it and `.you`). Case branches:
 `NUM_TESTS` compare numbers (`''` never holds), `js` runs `node:vm` (200 ms; `vars`, `num`, `json`; not a sandbox: a
 workflow runs commands anyway, and runs only once saved). Popup blocks (`popup`): title and body filled (body capped
-`SHOWN_MAX`), kept in `r.shown` (last 20, not in `flowView`), `broadcast` `flow` `show`: App's `ShownDialog`
-(`Shown.tsx`: HTML in a sandboxed frame without scripts, else Markdown), a queue of 10. `flowTest` (Test it) runs an
+`SHOWN_MAX`), kept in `r.shown` (last 20, not in `flowView`), `broadcast` `flow` `show` with `modal` (unless `modal: no`),
+`popover` and `notify`: App's `ShownDialog` (`Shown.tsx`: HTML in a sandboxed frame without scripts, else Markdown), a
+queue of 10, and `ShownPops` (cards at the bottom right, the newest 3, under dialogs; HTML as its words). An end's
+`modal`/`popover` (off unless yes) go with its `end` broadcast (`finish`'s `shows`), its window kept in `r.shown` too. `flowTest` (Test it) runs an
 llm, decide or webhook block alone with typed vars: exit, why, vars, missing, unsure, log. A decide's `route: <question>`
 (`routesOf`: yes/no, a choice's labels, a score's level index) makes its exit that answer (`decideSend`, `routeOf` after
 you settle one), each answer's block an option `- <answer> → id` (only those with one written), plus `error`. An llm's

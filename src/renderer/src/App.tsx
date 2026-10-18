@@ -36,7 +36,7 @@ import { SchedulesPage } from './Schedules'
 import { actionsFor, clock, initials, Line, mergeActions, nameOf, parseDuration, type RunAction, shortPath, shownStatus, spins, spinsUntil, templatesFor, youtubeEmbed } from './text'
 import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintKey, paintOf, transparent } from './themes'
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
-import { ShownDialog, type ShownWin } from './Shown'
+import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, askText, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
 
@@ -374,6 +374,7 @@ export function App() {
   })
   const [dropping, setDropping] = useState(false) // a folder dragged over the window
   const [shown, setShown] = useState<ShownWin[]>([]) // what workflows' Show you blocks show, in turn
+  const [pops, setPops] = useState<ShownPop[]>([]) // and their popovers (an end's too), the newest 3
   const [sharing, setSharing] = useState<string | null>(null) // the tab whose Share popover is open
   const [note, setNote] = useState<{ text: string; undo?: () => void; label?: string; ok?: boolean; busy?: boolean } | null>(null) // the toast, maybe with Undo (or another action: label); ok: done, not a failure; busy: under way, until the next one
   const [menu, showMenu] = useMenu()
@@ -836,8 +837,11 @@ export function App() {
         // a workflow run asks you, shows you something (a window, maybe a notification), or ended (a notify end, a failure)
         const s = viewRef.current?.settings
         const open = () => setDialog({ workflows: '', run: m.id })
+        // a window (a Show you's unless modal: no; an end's with modal: yes) and a popover, each as the block says
+        const win = m.kind === 'show' ? { run: m.id, name: m.name, title: m.text, body: m.body ?? '' } : { run: m.id, name: m.name, title: `${m.name}: ${m.status}`, body: m.text ?? '' }
+        if (m.kind === 'show' ? m.modal !== false : m.kind === 'end' && m.modal) setShown(q => [...q, win].slice(-10))
+        if ((m.kind === 'show' || m.kind === 'end') && m.popover) setPops(q => [...q, { ...win, key: Date.now() + Math.random() }].slice(-3))
         if (m.kind === 'show') {
-          setShown(q => [...q, { run: m.id, name: m.name, title: m.text, body: m.body ?? '' }].slice(-10))
           if (m.notify && s?.notify !== false) notify(`Workflow · ${m.name}`, String(m.text).slice(0, 200), '', open, s?.notifySound)
           return
         }
@@ -2963,6 +2967,7 @@ export function App() {
           />
         )}
         {shown[0] && <ShownDialog s={shown[0]} left={shown.length - 1} onOpenRun={() => (setDialog({ workflows: '', run: shown[0].run }), setShown([]))} onClose={() => setShown(q => q.slice(1))} />}
+        <ShownPops pops={pops} onShow={p => (setShown(q => [...q, p]), setPops(q => q.filter(x => x !== p)))} onOpenRun={p => (setDialog({ workflows: '', run: p.run }), setPops(q => q.filter(x => x !== p)))} onClose={k => setPops(q => q.filter(x => x.key !== k))} />
         {(t =>
           t && (
             <SharePop

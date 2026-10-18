@@ -1013,8 +1013,11 @@ its options) and *Score* (graded with a rubric: one of its levels). Its *Ways ou
 it), or *A line per answer of* one question: yes and no, each option of a choice, each level of a score (by its
 number), each to its own block, and *error*. An AI call's *JSON mode* asks the model for one JSON object (on by itself
 when it names outputs); an agent's tells it to end with one JSON object or list, and its answer is that JSON (bare in
-an AI decision's state, `json('steps.<id>.answer')` in a Case's JS; none: its words, said in the log). *Notify me* on a Show you or an End: a notification on this Mac with the workflow's name, how
-the run ended and what the End says (*What it says*, with variables; else its name); a click opens the run. A failed
+an AI decision's state, `json('steps.<id>.answer')` in a Case's JS; none: its words, said in the log). A Show you or an End tells you in any of three ways, each a switch: *A window* (over the app; on by default for a Show
+you, off for an End, whose window says how the run ended and what it says), *A popover in the corner* (a card at the
+window's bottom right until you close it: *Show* opens it as the window, *Open the run*) and *A macOS notification*
+(the workflow's name, how the run ended and what the End says (*What it says*, with variables; else its name); a click
+opens the run). In the file: `modal: no` (a Show you) or `modal: yes` (an End), `popover: yes`, `notify: yes`. A failed
 run notifies anyway, and Settings › General › *macOS notifications* turns them all off. *And on my phone* sends it to
 your phone pushes too (Settings › Phone pushes: ntfy, Telegram, Slack or a webhook).
 

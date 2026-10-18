@@ -98,7 +98,9 @@ export type Block = {
   link?: string // save: a link, kept as <file>.url (the workspace's Artifacts list links first)
   extension?: string // extension: its id, fetched now (an on one only), then its data as variables
   result?: (typeof RESULTS)[number] // end
-  notify?: boolean // end, popup: a notification too
+  notify?: boolean // end, popup: a macOS notification too
+  popover?: boolean // end, popup: a card in the window's corner (Open, ✕), the run going on
+  modal?: boolean // popup: false, no window (its notification or card only); end: true, a window with its words
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
 }
 export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main'; session: 'new' | 'shared'; runs?: number; turns?: number; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars
@@ -347,6 +349,8 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
       if (!(RESULTS as readonly string[]).includes(v)) problems.push(`${at}: end: ${RESULTS.join(', ')}`)
       return void (b.result = v as Block['result'])
     case 'notify': return void (b.notify = yes(v))
+    case 'popover': return void (b.popover = yes(v))
+    case 'modal': return void (b.modal = yes(v))
   }
   problems.push(`${at}: ${k}? not a key ${b.kind ? `of a ${b.kind} block` : 'here'}`)
 }
@@ -376,13 +380,13 @@ export function toFile(wf: Workflow): string {
       case 'run': L.push(`run: ${one(b.cmd)}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'extension': L.push(`extension: ${one(b.extension)}`.trimEnd()); break
       case 'ask': L.push(`ask: ${one(b.question)}`); if (b.show) L.push(`show: ${one(b.show)}`); break
-      case 'popup': L.push(`popup: ${one(b.title)}`.trimEnd()); if (b.notify) L.push('notify: yes'); if (b.phone) L.push('phone: yes'); break
+      case 'popup': L.push(`popup: ${one(b.title)}`.trimEnd()); if (b.modal === false) L.push('modal: no'); if (b.popover) L.push('popover: yes'); if (b.notify) L.push('notify: yes'); if (b.phone) L.push('phone: yes'); break
       case 'choice': L.push(`choice: ${branchLabel({ of: b.of || 'answer', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })}`); break
       case 'case': L.push(`case: ${b.of ?? ''}`.trimEnd()); break
       case 'action': L.push([`action: ${b.action || 'ship'}`, b.confirm === false && 'ask first: no'].filter(Boolean).join(' · ')); break
       case 'wait': L.push(`wait: ${b.for || 'checks'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'save': L.push(`save: ${one(b.file)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.link) L.push(`link: ${one(b.link)}`); break
-      case 'end': L.push([`end: ${b.result || 'success'}`, b.notify && 'notify: yes', b.phone && 'phone: yes'].filter(Boolean).join(' · ')); break
+      case 'end': L.push([`end: ${b.result || 'success'}`, b.notify && 'notify: yes', b.phone && 'phone: yes', b.popover && 'popover: yes', b.modal && 'modal: yes'].filter(Boolean).join(' · ')); break
     }
     if (b.retry !== undefined || b.retryOn?.length) L.push([b.retry !== undefined && `retry: ${b.retry}`, b.retryOn?.length && `retry on: ${b.retryOn.join(', ')}`].filter(Boolean).join(' · '))
     if (b.out?.length && OUT_KINDS.includes(b.kind)) L.push(`out: ${b.out.join(', ')}`)
@@ -428,6 +432,7 @@ export function check(wf: Workflow): string[] {
     else if (b.retryOn?.length && !b.retry) out.push(`${blockName(b)}: retry on: needs retry: (how many times)`)
     if (b.kind === 'ask' && !b.question?.trim()) out.push(`${blockName(b)} asks nothing`)
     if (b.kind === 'popup' && !b.text?.trim()) out.push(`${blockName(b)} shows nothing`)
+    if (b.kind === 'popup' && b.modal === false && !b.popover && !b.notify) out.push(`${blockName(b)}: shown nowhere (a window, a card or a notification)`)
     if (b.kind === 'save' && !b.file?.trim()) out.push(`${blockName(b)} has no file`)
     if (b.kind === 'extension' && !/^[\w.-]{1,80}$/.test(b.extension?.trim() ?? '')) out.push(`${blockName(b)}: extension: which one (its id)`)
     if (b.kind === 'save' && b.from && b.link) out.push(`${blockName(b)}: a file or a link, not both`)
@@ -777,6 +782,6 @@ Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind ke
 - extension: <an extension's id: laki_extensions lists them>: fetches it now (one that's turned on; a per-workspace one for the run's workspace), waits, then its data: {{steps.<id>.data}} as JSON, and each field of it as {{steps.<id>.<field>}} (a list or an object as JSON). Exits ok, error (off, no fetch, the fetch failed).
 - retry: <1 to 5> on an agent, run, llm, decide or extension block: a bad exit (fail, error) tries the block again that many times, 10 s after the first and 60 s after each later one, before it takes that way ("retry: 2 · retry on: 1, 75" on a run block: only those exit codes are tried again; unset: any but 0). An agent's next try goes to the same tab.
 - out: <name>, <name>… on an agent, llm, run or webhook block: what it gives the blocks after it, {{steps.<id>.<name>}}. An agent or an llm is told to end its answer with a JSON object of them; a command's output or a webhook's response is one.
-- popup: <title> (the whole line), then "notify: yes" and "phone: yes" on lines of their own if wanted, its body as "> " lines: HTML when it starts with <, else Markdown ({{vars}} filled): a window in Laki the user reads and closes (scrollable; no buttons), and a notification with notify: yes. It doesn't wait; exit next. For a run's result: "Job done", then {{steps.report.answer}}.
-- end: success|stopped|failed · notify: yes · phone: yes, its notification's words as "> " lines ({{vars}}; none: the block's name). notify: a notification on the Mac (and the phone with phone: yes, when Settings › Phone pushes is set up) as the run ends there; a failed run always notifies.
+- popup: <title> (the whole line), then "notify: yes", "popover: yes", "modal: no" and "phone: yes" on lines of their own if wanted, its body as "> " lines: HTML when it starts with <, else Markdown ({{vars}} filled): a window in Laki the user reads and closes (scrollable; no buttons; modal: no, none), a card in the window's corner with popover: yes, and a macOS notification with notify: yes. It doesn't wait; exit next. For a run's result: "Job done", then {{steps.report.answer}}.
+- end: success|stopped|failed · notify: yes · phone: yes · popover: yes · modal: yes, its words as "> " lines ({{vars}}; none: the block's name). notify: a notification on the Mac (and the phone with phone: yes, when Settings › Phone pushes is set up) as the run ends there; popover: a card in the window's corner; modal: a window with them; a failed run always notifies.
 A workflow has ${MAX_BLOCKS} blocks at most. Exits are lines: "next: <block>", "ok: <block>", "fail: <block>"… "max: 3 → <block>" limits a block to 3 times, then goes there: every loop needs a max or an ask in it. Other variables: {{answer}}, {{pr.url}}, {{pr.number}}, {{ws.branch}}, {{base}}, {{project}}. "at: x,y" places a block on the canvas (optional).`

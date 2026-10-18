@@ -1350,3 +1350,43 @@ test('workflow failures: a wait on real PR checks (fail with their names, not tw
   assert.equal(r.decisions.at(-1).exit, 'error')
   assert.match(r.decisions.at(-1).why, /stopped$/)
 })
+
+test('a Show you and an end tell you as they say: a window, a popover in the corner, a macOS notification', async t => {
+  const SHOWS = `# Shows
+## start
+input: task
+next: show
+## show
+popup: Hi {{task}}
+modal: no
+popover: yes
+> body of {{task}}
+next: done
+## done
+end: success · notify: yes · popover: yes · modal: yes
+> all done
+`
+  const { workflow, problems } = parse(SHOWS, 'shows')
+  assert.deepEqual([problems, check(workflow)], [[], []])
+  const [show, done] = [workflow.blocks[1], workflow.blocks[2]]
+  assert.deepEqual([show.modal, show.popover, done.modal, done.popover, done.notify], [false, true, true, true, true])
+  assert.deepEqual(parse(toFile(workflow), 'shows').workflow, workflow, 'written back as it was read')
+  const nowhere = parse(SHOWS.replace('popover: yes\n', ''), 'shows').workflow
+  assert.match(check(nowhere).join(), /show: shown nowhere/)
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'shows', text: SHOWS })
+  const c = await rig.connect()
+  t.after(() => c.close())
+  const run = await rig.rpc('flowStart', { workflow: 'shows', project: p.id, task: 'x' })
+  const r = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await rig.rpc('flowGet', { id: run.id })), 'the end', 15000)
+  assert.equal(r.status, 'done', r.log.join('\n'))
+  const ev = (kind: string) => until(() => c.events.find(e => e.ev === 'flow' && e.kind === kind), kind)
+  const s = await ev('show')
+  assert.deepEqual([s.text, s.body, s.modal, s.popover, s.notify], ['Hi x', 'body of x', false, true, false])
+  const e = await ev('end')
+  assert.deepEqual([e.text, e.modal, e.popover, e.notify], ['all done', true, true, true])
+  assert.deepEqual(r.shown.map((x: any) => x.title), ['Hi x', 'Shows: done'], 'the end’s window kept with the run too')
+})

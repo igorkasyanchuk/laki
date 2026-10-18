@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Workflows: tell me your way**: an End or a Show you block shows in a window, a popover in the corner, a macOS
+  notification, or any of them together.
 - **A new New workspace page**: where it goes in a row over the prompt, and the agent's model, effort,
   permission mode (*Auto mode*, *Accept edits*, *Plan mode*, *Bypass permissions*) and ⚡ fast mode in the prompt's
   toolbar, with a round button that creates it. Kept for its restarts and forks.

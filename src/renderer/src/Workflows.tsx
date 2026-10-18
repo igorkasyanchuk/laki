@@ -424,14 +424,14 @@ function subOf(b: Block) {
     case 'llm': return [b.model || 'Settings › AI’s model', b.out?.length && `→ ${b.out.join(', ')}`].filter(Boolean).join(' · ')
     case 'webhook': return `${b.method ?? 'POST'} ${(b.url ?? '').replace(/^https?:\/\//, '')}`
     case 'decide': return [DECIDE_MODELS.find(m => m.id === (b.model || DECIDE_MODELS[0].id))?.name.replace(/ \(.*\)$/, '') ?? b.model, (b.qs ?? []).map(q => `${q.name}?`).join(' '), b.route && `routes on ${b.route}`].filter(Boolean).join(' · ')
-    case 'popup': return `${b.title || 'a window'}${b.notify ? ` · notify${b.phone ? ' + phone' : ''}` : ''}`
+    case 'popup': return `${b.title || 'a window'}${shows(b, b.modal !== false)}`
     case 'ask': return b.question ?? ''
     case 'choice': return branchLabel({ of: b.of ?? '', test: b.test && b.test !== 'js' ? b.test : 'contains', value: b.value ?? '' })
     case 'case': return [b.of, `${b.options?.length ?? 0} ways`].filter(Boolean).join(' · ')
     case 'action': return (ACTIONS[b.action ?? ''] ?? b.action ?? '') + (b.confirm === false ? '' : ['ship', 'approve', 'merge', 'archive'].includes(b.action ?? '') ? ' · asks first' : '')
     case 'wait': return WAITS[b.for ?? ''] ?? b.for ?? ''
     case 'save': return b.link !== undefined ? `link: ${b.link}` : b.from !== undefined ? `${b.from} → ${b.file ?? ''}` : b.file ?? ''
-    case 'end': return `${b.result ?? 'success'}${b.notify ? ` · notify${b.phone ? ' + phone' : ''}` : ''}`
+    case 'end': return `${b.result ?? 'success'}${shows(b, !!b.modal)}`
   }
 }
 
@@ -977,7 +977,7 @@ function FileEdit({ text, onText }: { text: string; onText: (t: string) => void 
 
 const FORMAT_HELP =`\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30\`.
 
-A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · session: run|new|<block> · json: yes\` (JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown), \`end: success|stopped|failed · notify: yes · phone: yes\` (its \`>\` lines: the notification's words; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
+A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · session: run|new|<block> · json: yes\` (JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`popover: yes\`, \`modal: no\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown; a corner card; a macOS notification), \`end: success|stopped|failed · notify: yes · popover: yes · modal: yes · phone: yes\` (its \`>\` lines: what they say; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
 
 \`> lines\` are its prompt (or text). Exits: \`next: id\`, \`ok:\`, \`fail:\`, \`error:\`, \`pass:\`; a choice's and an ask's options: \`- Label → id\`. \`max: 3 → id\` limits a block (every loop needs one, or an ask). \`retry: 2\` on an agent, run, llm, decide or extension block tries it again after a fail or an error (10 s, then 60 s), before it goes that way; a run block's \`retry on: 1, 75\`: only those exit codes. \`at: x,y\`: where it's drawn.
 
@@ -1270,7 +1270,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
             </select>,
           )}
           <NotifyFields b={b} set={set} api={api} what="as the run ends here" />
-          {b.notify && field('What it says', text(b.text, (x, v) => (x.text = v || undefined), false, blockName(b)), `{{vars}} too, e.g. {{pr.url}}; empty: “${blockName(b)}”. ${varsHint(wf, b)}`)}
+          {(b.notify || b.popover || b.modal) && field('What it says', text(b.text, (x, v) => (x.text = v || undefined), false, blockName(b)), `{{vars}} too, e.g. {{pr.url}}; empty: “${blockName(b)}”. ${varsHint(wf, b)}`)}
         </>
       )}
       {b.kind !== 'end' && <div className="wf-sub">Where it goes</div>}
@@ -1477,12 +1477,23 @@ function IdField({ id, rename, check }: { id: string; rename: (to: string) => vo
   )
 }
 
+// where a Show you or an end shows itself, in a block's line: window, card, notify (+ phone)
+const shows = (b: Block, win: boolean) => [win && b.kind === 'end' && 'window', b.popover && 'card', b.notify && `notify${b.phone ? ' + phone' : ''}`].filter(Boolean).map(x => ` · ${x}`).join('')
+
 // a Show you's or an end's notification: what it is, where it goes (the Mac; the phone with phone pushes set up)
 function NotifyFields({ b, set, api, what }: { b: Block; set: (f: (x: Block) => void) => void; api: WorkflowsApi; what: string }) {
   return (
     <>
+      <Switch className="switch-row" on={b.kind === 'popup' ? b.modal !== false : !!b.modal} onChange={v => set(x => void (x.modal = b.kind === 'popup' ? (v ? undefined : false) : v || undefined))}>
+        A window
+      </Switch>
+      <span className="wf-hint">{b.kind === 'popup' ? 'Over the app, read and closed (Esc).' : 'Over the app, with how the run ended and what it says (below).'}</span>
+      <Switch className="switch-row" on={!!b.popover} onChange={v => set(x => void (x.popover = v || undefined))}>
+        A popover in the corner
+      </Switch>
+      <span className="wf-hint">A card at the window’s bottom right, until you close it: Show, Open the run.</span>
       <Switch className="switch-row" on={!!b.notify} onChange={v => set(x => void ((x.notify = v || undefined), v || (x.phone = undefined)))}>
-        Notify me {what}
+        A macOS notification {what}
       </Switch>
       <span className="wf-hint">
         {b.kind === 'end' ? 'A notification on this Mac with the workflow’s name, how the run ended and what it says (below); a click opens the run. A failed run always notifies. ' : 'A notification on this Mac with its title; a click opens the run. '}

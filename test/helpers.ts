@@ -158,7 +158,7 @@ export async function connect(rig: { info(): { port: number; token: string } }, 
   const events: any[] = []
   ws.on('message', raw => {
     const m = JSON.parse(String(raw))
-    if (m.id !== undefined) waiting.get(m.id)?.(m)
+    if (m.id !== undefined && !m.ev) waiting.get(m.id)?.(m) // an event with an id (a workflow run's) is still an event, as api.ts reads it
     else events.push(m)
   })
   return {

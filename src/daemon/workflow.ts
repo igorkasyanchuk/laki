@@ -312,7 +312,7 @@ async function work(r: FlowRun, b: Block) {
       return leave(r, b, 'next', r.dry ? 'started (dry run: outward actions are said, not done)' : 'started')
     case 'end':
       // its words (none: its name) end the log, and the notification it asks for
-      return finish(r, b.result === 'stopped' ? 'stopped' : b.result === 'failed' ? 'failed' : 'done', fill(b.text ?? '', vars).trim().slice(0, 500) || blockName(b), b.notify, b.notify && b.phone)
+      return finish(r, b.result === 'stopped' ? 'stopped' : b.result === 'failed' ? 'failed' : 'done', fill(b.text ?? '', vars).trim().slice(0, 500) || blockName(b), b.notify, b.notify && b.phone, b)
     case 'agent':
       return agent(r, b)
     case 'run':
@@ -370,7 +370,7 @@ async function work(r: FlowRun, b: Block) {
       const body = fill(b.text ?? '', vars).slice(0, SHOWN_MAX)
       r.shown = [...(r.shown ?? []), { at: Date.now(), block: b.id, title, body }].slice(-20)
       say(r, `${blockName(b)}: shows you “${clip(title, 80)}”`, body)
-      broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'show', name: r.flow.name, text: title, body, notify: !!b.notify })
+      broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'show', name: r.flow.name, text: title, body, notify: !!b.notify, popover: !!b.popover, modal: b.modal !== false })
       if (b.notify && b.phone) flowPhone(r.flow.name, wsOf(r)?.name, 'shows you', title)
       return leave(r, b, 'next', `showed you “${clip(title, 60)}”`)
     }
@@ -973,7 +973,8 @@ function kill0(r: FlowRun) {
   calls.delete(r.id)
 }
 
-function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, phone?: boolean) {
+// shows: an end block's popover and window (its words)
+function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, phone?: boolean, shows?: Pick<Block, 'popover' | 'modal' | 'id'>) {
   if (!live(r)) return
   kill0(r)
   Object.assign(r, { status, ended: Date.now(), wait: undefined })
@@ -983,7 +984,8 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   if (ended.length > FLOWS_KEPT) state.flows = runs().filter(x => live(x) || ended.indexOf(x) >= ended.length - FLOWS_KEPT)
   for (const x of [...ended].sort((a, b) => (a.ended ?? 0) - (b.ended ?? 0)).slice(0, -DETAILED)) if (x.log.some(l => l.includes('\n'))) x.log = x.log.map(bare) // the ones that ended before: their lines
   touch()
-  broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed' })
+  if (shows?.modal) r.shown = [...(r.shown ?? []), { at: Date.now(), block: shows.id, title: `${r.flow.name}: ${status}`, body: why }].slice(-20)
+  broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
   next() // its slot
 }

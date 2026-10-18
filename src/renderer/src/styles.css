@@ -1895,6 +1895,14 @@ button.board-name:hover { background: none; }
 .shown-frame { flex: 1; min-height: 0; width: 100%; border: none; background: var(--panel); }
 .shown-md { flex: 1; min-height: 0; overflow: auto; padding: 14px 18px; }
 .shown-foot { flex: none; display: flex; justify-content: flex-end; padding: 8px 10px; border-top: 1px solid var(--line); }
+/* its popover (ShownPops): cards in the window's corner, over where a toast goes, under a dialog (its buttons stay reachable) */
+.shown-pops { position: fixed; right: 16px; bottom: 84px; z-index: 9; display: flex; flex-direction: column; gap: 8px; width: min(360px, calc(100vw - 32px)); }
+.shown-pop { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: calc(var(--radius) + 2px); background: var(--panel); box-shadow: 0 12px 32px -12px rgba(0, 0, 0, 0.45); animation: toast-in 0.2s ease-out; }
+.shown-pop-head { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.shown-pop-head > .icon-svg { flex: none; color: var(--accent-ink); }
+.shown-pop-body { max-height: 160px; overflow: auto; font-size: 12.5px; }
+.shown-pop-foot { display: flex; align-items: center; gap: 12px; }
+@media (prefers-reduced-motion: reduce) { .shown-pop { animation: none; } }
 .share-pop { top: 64px; left: 50%; transform: translateX(-50%); width: 420px; }
 .prompt-peek > summary { cursor: pointer; margin: 4px 0; }
 .prompt-peek[open] > summary { margin-bottom: 6px; }
