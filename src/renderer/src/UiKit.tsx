@@ -31,7 +31,7 @@ function KitBody({ spec, data, cells, ws }: { spec: UiSpec; data: unknown; cells
   return <div ref={host} className="widget-body" />
 }
 
-// New ▾ › From a starter: each starter drawn on its sample data (its ui; a rail button as one; a JS page or one file
+// New ▾ › From a starter: each starter drawn on its sample data (its ui; a button, rail or no look of its own, as one; a JS page or one file
 // as what it is), a click makes it (laki widget new: yours, on, its page opened)
 const SAMPLE_WS = { id: 'sample', name: 'fix-login', project: 'web', branch: 'fix-login', base: 'main', path: '~/code/web', port: 5173, pr: 'https://github.com/acme/web/pull/412' } // as the daemon's
 type Look = { ui?: UiSpec; data: unknown; size: [number, number]; ws?: boolean; button?: { icon: string; label: string; badge: string }; code?: string; js?: boolean }
@@ -48,7 +48,7 @@ function lookOf(k: StarterKind): Look {
   const size: [number, number] = [Math.min(3, m.size?.[0] ?? 3), Math.min(3, m.size?.[1] ?? 2)]
   const one = !f['widget.json'] ? Object.values(f)[0] : undefined
   if (one) return { data, size, code: one.split('\n').slice(0, 9).join('\n') }
-  if (m.place === 'rail' || m.place === 'foot') return { data, size, button: { icon: m.icon ?? 'panel', label: render(m.label ?? '', data as Record<string, unknown>), badge: render(m.badge ?? '', data as Record<string, unknown>) } }
+  if (m.place === 'rail' || m.place === 'foot' || (!m.ui && !f['widget.html'])) return { data, size, button: { icon: m.icon ?? 'panel', label: render(m.label ?? '', data as Record<string, unknown>), badge: render(m.badge ?? '', data as Record<string, unknown>) } }
   return m.ui ? { ui: m.ui, data, size, ws: m.scope === 'workspace' } : { data, size, js: true }
 }
 export function StarterPicker({ onPick, onClose }: { onPick: (k: StarterKind) => void; onClose: () => void }) {

@@ -108,7 +108,7 @@ export function HelpPage({ cli, ship, zoom = 1, onClose }: { cli: string; ship?:
     [`${cli} widget set <id> --place desk --size 3x2`, 'where an extension shows (side, top, status, rail, foot, desk, panel, row), its size; --every, --view, --hide and key=value settings too'],
     [`${cli} widget kit [element]`, "the UI kit's elements (widget.json's ui): each one's props and a sample; --json for all of it"],
     [`${cli} widget dev [folder]`, 'dev mode: your extension linked, on and watched (a save reloads it), its runs as they come; --off <id>, --list'],
-    [`${cli} widget new "Deploys" --kind table`, 'an extension from a starter (number, list, table, chart, button, form, panel, workspace, stream, tool, onefile): on, on sample data'],
+    [`${cli} widget new "Deploys" --kind table`, 'an extension from a starter (number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, onefile): on, on sample data'],
     [`${cli} widget push <id> '{"n": 3}'`, "an extension's data from a cron job, a git hook or CI, no fetch (--merge: over what it has)"],
     [`${cli} widget tools · widget tool <id> <action> '{…}'`, "extensions' tools for agents: the list, and a call (Laki asks you first, once per workspace by default)"],
     [`${cli} widget render <id> --ws <workspace>`, "a per-workspace extension's instance (run, action and check take --ws too)"],

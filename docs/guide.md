@@ -167,8 +167,9 @@ npm link
    git, whether `gh` is signed in (for PRs), whether `cloudflared` is there (optional: its ? says what for, public
    links and remote access) and which agents are on your PATH.
 2. *Get started* opens once (everyone sees it once, after an update too): the first steps (add a project, start a
-   workspace, Settings, an extension, actions, a prompt template, a terminal or a browser), each with a button that does it,
-   and a theme to pick from a dropdown (painted as you pick).
+   workspace, Settings, an extension, actions, a prompt template, a terminal or a browser, Settings' Experimental,
+   Agents & profiles, remote access, Scheduled tasks, Workflows), each with a button that does it, and a theme to pick
+   from a dropdown (painted as you pick). Workflows' button opens Experimental while they're off.
    A step ticks itself as you do it, or click its circle to tick it yourself. *Skip for now* closes it: what's left
    stays as a bar at the sidebar's bottom (a click opens it again, ✕ hides it; *Get started* in ⌘K or the Help menu's *Get Started Again…* brings it back);
    *Don't show again* hides both.
@@ -876,7 +877,7 @@ may move one, resize it and change a plain setting with `laki widget set`, never
 `laki widget dev` from one leaves the folder's extensions off, and `laki widget action` from one asks you first.
 
 To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
-button, a form, a JS page or one file; it runs at once on sample data, and its page opens), or `laki widget new
+button, a form, a JS page, *Pull main* or one file; it runs at once on sample data, and its page opens), or `laki widget new
 "Deploys" --kind table`. Its card's *Data* says where its data comes from: its fetch, a text you type (JSON, or a
 Markdown note), a file, a URL, or *AI*: an agent finds it with your own MCP servers and sums it up, every hour (a
 prompt such as *"What's new in #eng on Slack since yesterday: decisions, questions for me"*, the tools it may use
@@ -889,7 +890,8 @@ something new. *New ▾* makes one *With Laki AI* or *From a starter* (each show
 `ui` against its sample and fixtures, and its fetch run once. One file is an extension too: `prs.5m.sh`, run every
 5 minutes, its name, place and settings in comment lines (`# <laki.place>status</laki.place>`).
 
-An extension can be **per workspace** (`"scope": "workspace"` in its widget.json; the *This branch* starter is one):
+An extension can be **per workspace** (`"scope": "workspace"` in its widget.json; the *This branch* and *Pull main*
+starters are):
 what it shows is about the selected workspace (its branch, PR, port, path), each workspace with its own data, fetched
 while it's selected. With none selected (the Board, Scheduled tasks) it says *Select a workspace*. Its data goes when
 the workspace is deleted and stays while it's archived. `--ws <workspace>` picks the instance for `laki widget run`,
@@ -1544,7 +1546,7 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, onefile
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
 laki widget tools [--json]                              # the extensions' tools for agents, their input and when to use them

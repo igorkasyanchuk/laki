@@ -18,6 +18,10 @@ version it builds, with the date. -->
   (⌥-click, ⇧-click a range, then *Revert these*) or a whole file (its right click), with *Undo* in the toast.
 - **Workflows: a colored File view**: the file is colored as you type it (headings, keys, prompts, options,
   `{{variables}}`).
+- **Get started has 5 more steps**: Experimental, Agents & profiles, remote access, Scheduled tasks and Workflows, each
+  ticked as you look at it.
+- **A *Pull main* starter**: Settings › Extensions › New ▾ › From a starter: a status bar button per workspace that
+  merges the base branch in, through its agent, git (claude -p for conflicts) or claude -p; a template to make yours.
 - **Workflows: an agent's question stops the run, not just its tab**: a permission prompt in an Agent block shows on
   the run with the agent's choices as buttons; a pick answers it in the tab.
 - **Workflows: no more agents that hang forever**: an Agent block's turn has a timeout (an hour unless set: then Esc

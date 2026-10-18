@@ -137,7 +137,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -1507,7 +1507,7 @@ export function App() {
     mock: (id, o) => call('widgetMock', { id, ...o }),
     files: id => api.call<{ files: Record<string, string> }>('widgetFiles', { id }).then(r => r.files),
     save: (id, path, text, was, force) => api.call('widgetFileSave', { id, path, text, was, force }),
-    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog }), e => toast(String(e?.message ?? e))),
+    make: kind => api.call<{ id: string }>('widgetNew', { kind, name: kind === 'pullmain' ? 'Pull main' : `My ${kind === 'onefile' ? 'script' : kind}` }).then(r => setDialog({ extension: r.id, back: dialog }), e => toast(String(e?.message ?? e))),
     check: (id, run, ws) => api.call<{ problems: UiProblem[] }>('widgetCheck', { id, run, ws }),
     revoke: (id, action, ws) => api.call('widgetGrantRm', { id, action, ws }),
     wsName: ws => (ws ? (view?.workspaces.find(w => w.id === ws)?.name ?? ws) : 'no workspace'),
@@ -1832,7 +1832,8 @@ export function App() {
     ...(view?.projects.some(p => !p.kind) ? ['project'] : []),
     ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
     ...(seenSecs.length ? ['settings'] : []),
-    ...['actions', 'templates'].filter(x => seenSecs.includes(x)),
+    ...['actions', 'templates', 'presets', 'remote'].filter(x => seenSecs.includes(x)),
+    ...(settings.specs || settings.workflows || settings.calendar || settings.desk || settings.birdView || settings.aiGlow || settings.ai?.on || settings.voice?.on ? ['experimental'] : []), // one turned on; else seen through Go (below)
     ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
   ])
@@ -1845,12 +1846,20 @@ export function App() {
     setOnboard(o => ({ ...o, seen: true }))
     setDialog('onboard') // once, as it opens: everyone, this update's users too
   }, [!!view, !dialog])
+  // a page seen ticks its step: Scheduled tasks, Workflows, Settings opened at Experimental
+  useEffect(() => {
+    const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Experimental' ? 'experimental' : undefined
+    if (id) setOnboard(o => (o.done.includes(id) ? o : { ...o, done: [...o.done, id] }))
+  }, [dialog])
   const onboardGo = (id: string) => {
     setDialog(null)
     if (id === 'project') openProject()
     else if (id === 'workspace') view?.projects.some(p => !p.kind) ? newWs() : openProject()
     else if (id === 'settings') setDialog('settings')
     else if (id === 'shell') quickNew('shells')
+    else if (id === 'experimental' || (id === 'workflows' && settings.workflows !== true)) setDialog({ section: 'general', spot: 'Experimental' }) // Workflows off: where it's turned on
+    else if (id === 'schedules') setDialog('schedules')
+    else if (id === 'workflows') setDialog({ workflows: '' })
     else setDialog({ section: id })
   }
   // the sidebar's + › Terminal or Browser: a new one in the Terminals or Browsers project (the first makes it), selected

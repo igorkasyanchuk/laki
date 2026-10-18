@@ -18,6 +18,12 @@ if (args[0] === '-p' && args[args.indexOf('--output-format') + 1] === 'json') {
   if (prompt.startsWith('toast')) return done('```json\n{"toast": "sent"}\n```')
   return done(`Found it.\n\n\`\`\`json\n{"text": "draft"}\n\`\`\`\n\nThe data:\n\n\`\`\`json\n${JSON.stringify({ text: prompt, tools, account: process.env.TEST_ACCOUNT ?? '' })}\n\`\`\`\n`)
 }
+// -p with neither (a script's own headless run, the Pull main starter's): a merge stopped on conflicts takes theirs and
+// commits; its words as text
+if (args[0] === '-p' && !args.includes('--mcp-config')) {
+  if (args[args.length - 1].startsWith('git merge')) execSync('git checkout --theirs -- . && git add -A && git commit -q --no-edit')
+  return process.stdout.write('Resolved them; the tests pass\n')
+}
 if (args[0] === '-p') {
   const out = o => process.stdout.write(JSON.stringify(o) + '\n')
   const prompt = args[args.length - 1]

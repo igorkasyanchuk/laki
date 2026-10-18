@@ -79,7 +79,7 @@ const LAUNCH = {
   ],
 }
 
-export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'note', 'launcher', 'button', 'form', 'panel', 'workspace', 'stream', 'tool', 'onefile'] as const
+export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'note', 'launcher', 'button', 'form', 'panel', 'workspace', 'stream', 'tool', 'pullmain', 'onefile'] as const
 export type StarterKind = (typeof STARTER_KINDS)[number]
 
 export const STARTERS: Record<StarterKind, Starter> = {
@@ -243,6 +243,151 @@ one short line each. Never put secrets in a note.
         'fixtures/empty.json': json({ notes: [] }),
         ...variants({ one: { notes: [{ text: 'Rotate the API keys' }] }, many: { notes: ['Ask Dana about the rate limit', 'The login test is flaky on CI', 'Staging cert renews on the 30th', 'Migrations need a backup first', 'Search v2 behind a flag', 'Billing webhooks retry 5 times', 'Docs: the new env vars', 'Bump Node to 22'].map(text => ({ text })) }, long: { notes: [{ text: 'The checkout test fails only when it runs after the cart tests: they share a user and leave an order behind, so the next run sees two' }] } }),
         'README.md': readme(id, name, ' Its `add` action is a tool for agents (`"tool"` in widget.json, `AGENTS.md` says when to use it): `laki widget tools` lists it, `laki widget tool ' + id + ' add \'{"text": "hi"}\'` runs it, after you allow it.\n\nA tool that calls an API takes its token as a secret setting: in widget.json, `"config": { "apiToken": { "type": "secret", "label": "API token" } }`; you fill it in Settings › Extensions, its command gets `$WIDGET_APITOKEN` (`curl -H "Authorization: Bearer $WIDGET_APITOKEN" …`), and nothing else sees it: not its page, the app or agents.'),
+      }
+    },
+  },
+  pullmain: {
+    title: 'Pull main',
+    blurb: 'Per workspace: a button that merges the base branch in, through its agent, git or claude -p',
+    files: (id, name) => {
+      const at = { behind: 3, base: 'main' }
+      return {
+        'widget.json': json({
+          $schema: WIDGET_SCHEMA_URL,
+          name,
+          description: "A status bar button per workspace: the base branch's latest merged in, by its agent, git, or claude -p (How)",
+          scope: 'workspace',
+          place: 'status',
+          size: [2, 1],
+          icon: 'gitMerge',
+          label: 'Pull {{#if base}}{{base}}{{else}}main{{/if}}',
+          badge: '{{#if behind}}{{behind}}{{/if}}',
+          tip: '{{#if behind}}{{behind}} new on {{base}}{{else}}Up to date with {{base}}{{/if}} as of the last fetch · a click merges it in ({{config.how}})',
+          every: 5,
+          fetch: 'sh fetch.sh',
+          click: 'pull',
+          config: {
+            how: { type: 'choice', label: 'How', choices: ['agent', 'git', 'ai'], default: 'agent', hint: "agent: the workspace's agent does it all · git: git merges, claude -p only for conflicts · ai: claude -p does it all" },
+            branch: { type: 'text', label: 'Branch', hint: "The one to pull in; empty: the workspace's base", default: '' },
+          },
+          actions: { pull: 'sh pull.sh' },
+          notify: '{{last}}',
+          sample: at,
+        }),
+        'fetch.sh': `#!/bin/sh
+# What this prints (JSON) is the button's data: how many commits of the base branch this one doesn't have yet, as of
+# the last git fetch (no network: it runs every few minutes). Per workspace: $LAKI_PATH and $LAKI_BASE are its.
+base=\${WIDGET_BRANCH:-\${LAKI_BASE:-main}}
+base=\${base#origin/}
+cd "$LAKI_PATH" || exit 1
+up=$base
+git rev-parse -q --verify "origin/$base" >/dev/null && up=origin/$base
+printf '{"behind": %s, "base": "%s"}\\n' "$(git rev-list --count "HEAD..$up" 2>/dev/null || echo 0)" "$(printf %s "$base" | tr -d '"\\\\')"
+`,
+        'pull.sh': `#!/bin/sh
+# Pull main: the button's action. It brings the latest of the base branch (origin's) into this workspace's branch.
+# Laki runs it in the workspace it was clicked in: $LAKI_PATH (its folder), $LAKI_BASE (the branch it came off),
+# $LAKI_WORKSPACE (its id). Its How setting ($WIDGET_HOW) picks the way:
+#   agent  the workspace's agent does it all, after its turn: you see it work, and answer it if it asks
+#   git    git fetch and git merge here; claude -p only when they conflict, to resolve them and commit
+#   ai     claude -p does it all, headless
+# What it prints as JSON, {"toast": …} or {"modal": …}, Laki shows.
+
+# The prompt (agent and ai): change it to your team's way (a rebase, your test command, a changelog line…)
+prompt() {
+  echo "Bring the latest of $up into this branch: fetch it, then git merge $up (no rebase, no push). Resolve any conflicts keeping what both sides meant, run the project's tests and fix what the merge broke, then commit. End with one short line: what you merged and whether the tests pass."
+}
+# What claude -p may do unasked (git and ai): read and edit files, git, the tests; it's refused anything else. Add your
+# own test command: Bash(bin/rails test:*), Bash(make check:*)…
+TOOLS='Read,Edit,Write,Glob,Grep,Bash(git:*),Bash(npm test:*),Bash(npm run test:*),Bash(pnpm test:*),Bash(yarn test:*),Bash(go test:*),Bash(cargo test:*),Bash(pytest:*)'
+
+# a text as a JSON string
+json() { printf '%s' "$1" | tr '\\t' ' ' | tr -d '\\000-\\010\\013-\\037' | awk 'BEGIN { printf "\\"" } { gsub(/\\\\/, "\\\\\\\\"); gsub(/"/, "\\\\\\""); printf "%s%s", (NR > 1 ? "\\\\n" : ""), $0 } END { printf "\\"" }'; }
+toast() { printf '{"toast": %s}\\n' "$(json "$1")"; exit 0; }
+modal() { printf '{"modal": {"title": %s, "text": %s}}\\n' "$(json "$1")" "$(json "$2")"; exit 0; } # exit 0: a failed action's output isn't read
+
+cd "$LAKI_PATH" || modal 'Pull main' 'No workspace folder'
+base=\${WIDGET_BRANCH:-\${LAKI_BASE:-main}} # the setting, else the branch it came off
+base=\${base#origin/}                      # one made off origin/main: main
+up=$base
+git remote get-url origin >/dev/null 2>&1 && up=origin/$base
+dir=$(git rev-parse --absolute-git-dir) || modal 'Pull main' "$LAKI_PATH isn't a git repository"
+log=$dir/laki-pull.log # this worktree's own, never committed
+pid=$dir/laki-pull.pid
+
+# claude -p in the background: it may take longer than the 2 minutes an action has. As it ends it tells Laki with
+# laki widget push, its data's "last", which widget.json's notify shows as a notification and a toast.
+# ponytail: Laki quit meanwhile, the push starts its daemon again
+later() {
+  (
+    if claude -p --allowedTools "$TOOLS" -- "$1" >"$log" 2>&1; then said=$(tail -n 1 "$log")
+    else said="claude -p failed: $(tail -n 1 "$log") (its log: $log)"; fi
+    rm -f "$pid" # done: a click now starts again
+    "$LAKI_CLI" widget push "$LAKI_WIDGET" --ws "$LAKI_WORKSPACE" --merge "{\\"behind\\": $(git rev-list --count "HEAD..$up" 2>/dev/null || echo 0), \\"last\\": $(json "$said")}"
+  ) </dev/null >/dev/null 2>&1 &
+  echo $! >"$pid"
+  toast "$2: claude -p is on it; a notification when it's done"
+}
+[ -f "$pid" ] && kill -0 "$(cat "$pid")" 2>/dev/null && toast "claude -p is still at it (its log: $log)"
+
+case \${WIDGET_HOW:-agent} in
+agent)
+  # laki send, not the UI kit's do: send: an action picks the way by its setting, and --when-idle waits for the
+  # agent's turn to end (sent at once when it's idle). <ws> alone is the workspace's first agent tab
+  out=$("$LAKI_CLI" send "$LAKI_WORKSPACE" --when-idle -- "$(prompt)" 2>&1) || modal "Couldn't ask the agent" "$out
+Open an agent in this workspace, or pick git or ai in its settings."
+  case $out in queued*) toast "The agent merges $up after its turn" ;; esac
+  toast "Asked the agent to merge $up"
+  ;;
+git)
+  [ -z "$(git status --porcelain --untracked-files=no)" ] || modal "Couldn't merge $up" 'Uncommitted changes: commit or stash them first.'
+  [ "$up" = "$base" ] || out=$(git fetch -q origin "$base" 2>&1) || modal "Couldn't fetch $base" "$out"
+  n=$(git rev-list --count "HEAD..$up") || modal "Couldn't merge $up" "No branch $up"
+  [ "$n" = 0 ] && toast "Up to date with $up"
+  out=$(git merge --no-edit "$up" 2>&1) && toast "Merged $up ($n new)"
+  files=$(git diff --name-only --diff-filter=U)
+  if [ -z "$files" ]; then
+    git merge --abort 2>/dev/null
+    modal "Couldn't merge $up" "$out"
+  fi
+  later "git merge $up stopped on conflicts in: $(echo $files). Resolve each, keeping what both sides meant (no conflict markers left), run the project's tests and fix what the merge broke, then git add them and git commit --no-edit. End with one short line: what you resolved and whether the tests pass." "Conflicts in $(echo $files)"
+  ;;
+ai)
+  [ -z "$(git status --porcelain --untracked-files=no)" ] || modal "Couldn't merge $up" 'Uncommitted changes: commit or stash them first.'
+  later "$(prompt)" "Merging $up"
+  ;;
+*) modal 'Pull main' "How: agent, git or ai, not $WIDGET_HOW" ;;
+esac
+`,
+        'fixtures/sample.json': json(at),
+        'fixtures/empty.json': json({}),
+        ...variants({ uptodate: { behind: 0, base: 'main' }, far: { behind: 142, base: 'main' }, develop: { behind: 7, base: 'develop' } }),
+        'README.md': `# ${name}
+
+A Laki extension: a button in the status bar, one per workspace, that merges the latest of the workspace's base branch
+(origin's \`main\`, or the branch it came off) into its branch. Its badge: how many commits that branch has that this
+one doesn't yet, as of the last git fetch (\`fetch.sh\`: no network).
+
+A click runs \`pull.sh\`; Settings › Extensions › ${name} › *How* picks the way:
+
+- **agent** (the default): the workspace's agent gets a prompt (\`laki send --when-idle\`: after its turn) to fetch,
+  merge, fix the conflicts, run the tests and commit. You see it work, and answer it if it asks.
+- **git**: \`git fetch\` and \`git merge\` right there: *Up to date*, or *Merged origin/main (3 new)*. Only when they
+  conflict, \`claude -p\` resolves them, runs the tests and commits.
+- **ai**: \`claude -p\` does all of it.
+
+\`claude -p\` may take longer than the 2 minutes an action has, so it runs on in the background (its log:
+\`laki-pull.log\` in the worktree's git folder) and, as it ends, pushes its last line (\`laki widget push\`), which
+widget.json's \`notify\` shows as a notification and a toast. Uncommitted changes stop git and ai: commit or stash them
+first. *Branch* pulls another branch in instead of the base.
+
+To change it:
+
+- The prompt: \`prompt()\` at the top of \`pull.sh\` (a rebase instead, your test command, a changelog line).
+- What \`claude -p\` may do unasked: \`TOOLS\` beside it; add your test command (\`Bash(bin/rails test:*)\`).
+- Another way: a case of its own in \`pull.sh\`, and its name in widget.json's \`how\` choices.
+- \`laki widget check ${id} --ws <workspace>\`: what's wrong with it, its fetch run in that workspace.
+`,
       }
     },
   },

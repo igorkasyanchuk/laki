@@ -1154,7 +1154,12 @@ The renderer: App's `wsHere` (none under a page over every workspace: `covered`,
 host's) is the view's `ws` and `Widgets.tsx` `inWs` (an instance over the widget, `here`: null is *Select a workspace*,
 `NO_WS`, dimmed `.no-ws`); `WidgetApi`'s render, run, action and say and `WidgetsApi`'s run, runs, mock and check take
 `ws` (`w.here`); `ExtensionPage`'s `spots` and `here`, the inspector's picker (`.ext-ws`); Settings' row says *per
-workspace*. The `workspace` starter (*This branch*).
+workspace*. The `workspace` starter (*This branch*). The `pullmain` starter (*Pull main*): a status bar button per
+workspace (no `ui`: a button), its badge the base's commits not in the branch (`fetch.sh`, local refs), its `pull`
+action by `how`: `agent` (`laki send <ws> --when-idle`: an action picks by its setting, which the kit's `do: send`
+can't), `git` (fetch, merge; conflicts to `claude -p`), `ai` (`claude -p`); `claude -p` runs in the background (an
+action has 2 minutes), its last line pushed back as `last` (`laki widget push --merge`), which `notify` says; tested in
+`test/widget-check.test.ts` with the fake claude's plain `-p`.
 
 Events, streams, push (Part 5; `test/widget-events.test.ts`): `types.ts` `WIDGET_EVENTS`; core calls `widgetEvent(name,
 fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.failed` on a failure or limit, `turn.waiting`
@@ -1243,7 +1248,7 @@ prompt over `{ arg, config, data, …data, workspace }`, `aiOnce` as a source's,
 broadcast as `widget-say` `notify` (App: a notification, its click the full view or the page, and a toast), `told` kept
 (empty clears it). Tested in `test/widget-source.test.ts`.
 Settings › Extensions: the UI kit first (`.kit-hero`), New ▾ *With Laki AI…* or *From a starter…* (UiKit.tsx'
-`StarterPicker`: each starter's `files` drawn by `KitBody` on its sample, a rail button as one, one file's head, a JS
+`StarterPicker`: each starter's `files` drawn by `KitBody` on its sample, a button (rail, foot, or no look of its own) as one, one file's head, a JS
 page's note). Desk's resize (`resize`): the size from the pointer over the tile now (`dx`, `dy`: where on its corner),
 the grid's `minHeight` held meanwhile (a shrinking bottom tile would scroll the page up under the pointer), its scroller's
 `scroll` counted, its edges scroll it (`edge`, rAF). The Picker: `data-widget`/`data-view`/`data-sample` on an

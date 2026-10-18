@@ -1,6 +1,7 @@
 // Extensions' starters (laki widget new), the JSON Schema (docs/widget.schema.json), the checker (laki widget check),
 // one-file extensions (prs.5m.sh) and fixtures through widgetWrite
 import assert from 'node:assert/strict'
+import { execFileSync } from 'node:child_process'
 import { chmodSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -16,7 +17,7 @@ const errors = (ps: any[]) => ps.filter(p => p.level === 'error')
 
 test('starters: each kind made through the CLI is on, checks out with its fetch, and shows its fixture', async t => {
   const rig = await fresh(t)
-  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'stream' && k !== 'launcher' /* per workspace, a stream: widget-ws and widget-events tests; the launcher: no data, below */)) {
+  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'stream' && k !== 'launcher' && k !== 'pullmain' /* per workspace, a stream: widget-ws and widget-events tests (Pull main: below); the launcher: no data, below */)) {
     const made = await rig.cli('widget', 'new', `My ${kind}`, '--kind', kind)
     assert.equal(made.code, 0, made.err)
     const id = `my-${kind}`
@@ -49,6 +50,51 @@ test('starters: each kind made through the CLI is on, checks out with its fetch,
   assert.match((await rig.cli('widget', 'new', 'Mine', '--dir', mine)).out, /made mine in .*mine\nnext:\n.*laki widget dev .*mine/)
   assert.match((await rig.cli('widget', 'new', 'Mine', '--dir', mine)).err, /isn't an empty folder/)
   assert.match((await rig.cli('widget', 'new', 'X', '--kind', 'nope')).err, /a kind: number, list/)
+})
+
+test('the Pull main starter: per workspace, a button; git merges the base in, conflicts go to claude -p in the background; agent asks the agent', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const a = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'one' })
+  assert.match((await rig.cli('widget', 'new', 'Pull main', '--kind', 'pullmain')).out, /made pull-main in /)
+  const w = await find(rig, 'pull-main')
+  assert.ok(w.on && w.button && w.scope === 'workspace' && w.click === 'pull', JSON.stringify(w))
+  const check = await rig.cli('widget', 'check', 'pull-main', '--ws', a.id)
+  assert.equal(check.code, 0, check.out + check.err)
+  assert.doesNotMatch(check.out, /✗|use nothing/)
+  assert.match(check.out, /✓ fetch: printed \d+ B of JSON/)
+  const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, env: rig.env, encoding: 'utf8' }).trim()
+  const commit = (cwd: string, file: string, text: string) => (writeFileSync(join(cwd, file), text), git(cwd, 'add', '-A'), git(cwd, 'commit', '-qm', `${file}: ${text}`))
+  const pull = (ws = a.id) => rig.rpc('widgetAction', { id: 'pull-main', action: 'pull', ws })
+
+  // git: up to date, then the base moves on: merged here; the badge counts what's new
+  await rig.rpc('widgetSet', { id: 'pull-main', config: { how: 'git' } })
+  assert.equal((await pull()).toast, 'Up to date with main')
+  commit(rig.repo, 'new.txt', 'from main')
+  await rig.rpc('widgetRun', { id: 'pull-main', ws: a.id })
+  await until(() => find(rig, 'pull-main').then(w => w.inst[a.id]?.badge === '1'), 'its badge: 1 new') // one fetching already runs again after
+  assert.equal((await pull()).toast, 'Merged main (1 new)')
+  assert.equal(git(a.path, 'rev-list', '--count', 'HEAD..main'), '0')
+  // a conflict: claude -p resolves it in the background, then pushes its last line (notify's "last")
+  commit(a.path, 'README.md', 'mine\n')
+  commit(rig.repo, 'README.md', 'theirs\n')
+  assert.match((await pull()).toast ?? '', /^Conflicts in README\.md: claude -p is on it/)
+  const inst = join(rig.data, 'widget-data', 'pull-main', 'ws', `${a.id}.json`)
+  const last = await until(() => JSON.parse(readFileSync(inst, 'utf8')).data?.last, 'its result pushed')
+  assert.equal(last, 'Resolved them; the tests pass')
+  assert.equal(readFileSync(join(a.path, 'README.md'), 'utf8'), 'theirs\n')
+  assert.ok(rig.fakeLog().some(l => l.bin === 'claude' && l.args[0] === '-p' && l.args.includes('--allowedTools')), 'claude -p, its tools limited')
+  // dirty: refused
+  writeFileSync(join(a.path, 'README.md'), 'edited')
+  assert.match((await pull()).modal?.text ?? '', /Uncommitted changes/)
+
+  // agent: to the workspace's agent tab; none there: says so
+  await rig.rpc('widgetSet', { id: 'pull-main', config: { how: 'agent' } })
+  assert.equal((await pull()).modal?.title, "Couldn't ask the agent")
+  const b = await rig.rpc('wsNew', { project: p.id, preset: 'claude', name: 'two' })
+  await until(() => rig.tab(b.id), 'its agent')
+  assert.match((await pull(b.id)).toast ?? '', /^(Asked the agent to merge main|The agent merges main after its turn)$/)
+  await until(async () => (await rig.screen(b.id)).includes('Bring the latest of main'), 'the prompt typed into the agent')
 })
 
 test('the schema: docs/widget.schema.json in step, every manifest key and UI element in it', () => {

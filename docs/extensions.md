@@ -504,6 +504,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `workspace` | *This branch*: per workspace, its branch, PR, port and path, a link to its server |
 | `stream` | a command that runs all along: a line of JSON every 2 s, shown as it comes |
 | `tool` | *A tool for agents*: notes your agents add with its `add` tool (asked once per workspace), a Clear button |
+| `pullmain` | *Pull main*: per workspace, a status bar button that merges the base branch in (below) |
 | `onefile` | one script, `<id>.5m.sh` (below) |
 
 Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its
@@ -511,6 +512,22 @@ comments to swap in; `fixtures/empty.json` and three more made-up variants besid
 with the next steps, and `"$schema"`, so VS Code and Cursor complete and check its `widget.json`
 ([`docs/widget.schema.json`](widget.schema.json), written from `src/shared/widgetSchema.ts` by
 `node --experimental-strip-types scripts/widget-schema.ts`). The id comes from the name, made unique. It's yours: on.
+
+### Pull main
+
+`laki widget new "Pull main" --kind pullmain` is a template to copy: a button in the status bar, one per workspace, its
+badge how many commits the base branch (origin's, or `$LAKI_BASE`) has that the branch doesn't yet. A click runs
+`pull.sh`, its *How* setting the way:
+
+| how | what |
+|---|---|
+| `agent` (default) | the workspace's agent gets the prompt after its turn (`$LAKI_CLI send <ws> --when-idle`): fetch, merge, fix conflicts, run the tests, commit |
+| `git` | `git fetch` and `git merge` in the action: *Up to date* or *Merged main (3 new)*; only on a conflict, `claude -p` resolves it and commits |
+| `ai` | `claude -p` does it all |
+
+`claude -p` gets only the tools `TOOLS` names (read and edit files, git, the usual test commands), and runs in the
+background: an action has 2 minutes. As it ends it pushes its last line (`laki widget push --merge '{"last": …}'`), which
+`"notify": "{{last}}"` shows as a notification and a toast. Its prompt is `prompt()` at the top of `pull.sh`.
 
 ## Check
 
