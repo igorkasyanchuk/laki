@@ -526,8 +526,9 @@ test('an SSH host: hostSync follows the branch, sleep refused, diff and stats, a
   assert.deepEqual((await rig.rpc('diff', { ws: ws.id })).files, [])
   writeFileSync(join(ws.path, 'new.txt'), 'one\ntwo\n')
   assert.deepEqual((await rig.rpc('diff', { ws: ws.id })).files, [{ path: 'new.txt', add: 2, del: 0, status: 'A' }])
-  const st = await until(async () => (await wsOf(rig, ws.id)).stat?.files && (await wsOf(rig, ws.id)).stat, 'stat scanned')
-  assert.deepEqual(st, { add: 0, del: 0, files: 1, dirty: 1 })
+  // a scan under way as the file came may see it in ls-files, not yet in status: the next one has both
+  const want = JSON.stringify({ add: 0, del: 0, files: 1, dirty: 1 })
+  await until(async () => JSON.stringify((await wsOf(rig, ws.id)).stat) === want, `stat scanned as ${want}`)
 
   // the PR scan reads its branch there: the same, then another one
   await until(() => fakeLog(rig).includes(`gh pr view ${ws.branch}`), 'a PR scan there')
