@@ -1980,109 +1980,169 @@ export function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   )
 }
 
+// an extension's settings in titled blocks (Where it shows, Updates, its own, Tools for agents), a row each: what it is
+// and what it does on the left, its control on the right
+const WcSec = ({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) => (
+  <section className="wc-sec">
+    <div className="wc-sec-head">
+      <b>{title}</b>
+      {hint && <span className="muted small">{hint}</span>}
+    </div>
+    {children}
+  </section>
+)
+const WcRow = ({ title, hint, children }: { title: ReactNode; hint?: ReactNode; children: ReactNode }) => (
+  <div className="wc-row">
+    <Says title={title} hint={hint} />
+    <div className="wc-ctl">{children}</div>
+  </div>
+)
+const BARS: WidgetPlace[] = ['side', 'top', 'status']
+
 export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   const options = w.options ?? Object.keys(w.config).map(key => ({ key, type: 'text' as const })) // an older daemon's: text only
-  const [menu, openMenu] = useMenu() // where it shows: a place each pick turns on or off
+  const places = placesOf(w)
+  const offered = PLACES.filter(([v]) => (v !== 'desk' || api.desk || places.includes('desk')) && (v !== 'row' || w.scope === 'workspace'))
+  // a place each click turns on or off; the last one stays
+  const flip = (v: WidgetPlace) => (next => next.length && void api.set(w.id, { place: next }))(places.includes(v) ? places.filter(x => x !== v) : [...places, v])
+  const fetches = w.every !== undefined
+  const status = w.running ? 'Fetching…' : w.error ? `Last fetch failed: ${w.error}` : w.at ? `Fetched ${ago(w.at)}` : 'Not fetched yet'
   return (
-    <div className={`preset widget-card ${w.on ? '' : 'off'}`}>
-      {menu}
-      <div className="row wc-head">
-        <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? `${w.name}: on` : `${w.name}: off`} />
-        <b>{w.name}</b>
-        {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
-        <span className="grow" />
-        <button type="button" className="wc-place" data-tip="Where it shows: one place or several" aria-label="Where it shows" onClick={e => openMenu(e, PLACES.filter(([v]) => (v !== 'desk' || api.desk || placesOf(w).includes('desk')) && (v !== 'row' || w.scope === 'workspace')).map(([v, n, tip]) => ({ label: n, tip, hint: placesOf(w).includes(v) ? ON : undefined, run: () => {
-          const now = placesOf(w)
-          const next = now.includes(v) ? now.filter(x => x !== v) : [...now, v]
-          if (next.length) void api.set(w.id, { place: next })
-        } })))}>
-          {placesOf(w).map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' + ')} <Icon name="chevron" size={10} />
-        </button>
-        {placesOf(w).some(p => ['side', 'top', 'status'].includes(p)) && <select className="wc-size" value={w.size.join('x')} data-tip={placesOf(w).includes('side') ? 'Size in the sidebar: cells across × down (a bar: its cells across)' : 'Its width: cells across (a bar is a line high)'} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
-          {SIZES.map(([a, d]) => (
-            <option key={`${a}x${d}`} value={`${a}x${d}`}>
-              {a}×{d === 0.5 ? '½' : d}
-            </option>
-          ))}
-        </select>}
-        {w.every !== undefined && (
-          <label className="wc-every" data-tip="Fetches every this many minutes, while the app is open">
-            <input
-              key={w.every}
-              type="number"
-              min={1}
-              max={1440}
-              defaultValue={w.every}
-              onKeyDown={enter}
-              onBlur={e => {
-                const n = e.target.value.trim() ? Number(e.target.value) : NaN
-                if (!(n >= 1)) e.target.value = String(w.every) // empty or below 1: as it was, not every minute
-                else if (n !== w.every) void api.set(w.id, { every: n })
-              }}
-            />
-            <span className="muted small">min</span>
-          </label>
+    <div className={`widget-card ${w.on ? '' : 'off'}`}>
+      <div className="wc-head">
+        <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? 'On: turn it off' : 'Off: turn it on'} />
+        <div className="wc-title">
+          <span className="wc-name">
+            <b>{w.name}</b>
+            {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
+            {w.scope === 'workspace' && <span className="tag-soft" data-tip="An instance per workspace, its own data">per workspace</span>}
+          </span>
+          <span className="muted small">{w.on ? 'On' : 'Off: nothing of it runs until you turn it on'}</span>
+        </div>
+        <div className="wc-acts">
+          {api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` && <IconButton icon="ai" title="Edit with Laki AI: the studio" onClick={() => api.studio!(w.id)} />}
+          {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
+          {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
+          {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
+          {api.rm && !w.builtin && (
+            <>
+              <span className="wc-sep" />
+              <IconButton icon="trash" title="Delete it: its folder and settings (Undo brings them back)" onClick={() => void api.rm!(w.id)} />
+            </>
+          )}
+        </div>
+      </div>
+      {w.description && <div className="muted small wc-desc">{w.description}</div>}
+      <WcSec title="Where it shows">
+        <WcRow title="Places" hint="Pick one or more: each shows the same data">
+          <div className="wc-places" role="group" aria-label="Where it shows">
+            {offered.map(([v, n, tip]) => (
+              <button key={v} type="button" aria-pressed={places.includes(v)} className={places.includes(v) ? 'on' : ''} data-tip={places.includes(v) && places.length === 1 ? `${tip}. Its only place: pick another first` : tip} onClick={() => flip(v)}>
+                {places.includes(v) && <Icon name="check" size={11} />}
+                {n}
+              </button>
+            ))}
+          </div>
+        </WcRow>
+        {places.some(p => BARS.includes(p)) && (
+          <WcRow title="Size" hint={places.includes('side') ? 'Cells across × down in the sidebar. In a bar: its width, a line high' : 'Its width in the bar, in cells; a bar is a line high'}>
+            <select className="wc-size" value={w.size.join('x')} onChange={e => void api.set(w.id, { size: e.target.value.split('x').map(Number) as [number, number] })}>
+              {SIZES.map(([a, d]) => (
+                <option key={`${a}x${d}`} value={`${a}x${d}`}>
+                  {a} across × {d === 0.5 ? '½' : d} down
+                </option>
+              ))}
+            </select>
+          </WcRow>
         )}
         {w.full && (
-          <select className="wc-view" value={w.view ?? 'm'} data-tip="The full view's size" onChange={e => void api.set(w.id, { view: e.target.value as WidgetSize })}>
-            {VIEWS.map(([v, n]) => (
-              <option key={v} value={v}>
-                {n} view
-              </option>
-            ))}
-          </select>
-        )}
-        {w.on && w.every !== undefined && (!w.scope || w.here) && <IconButton icon="refresh" title={w.running ? 'Fetching…' : 'Fetch now'} className={w.running ? 'spin' : ''} onClick={() => !w.running && void api.run(w.id, w.here ?? undefined)} />}
-        {api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` && <IconButton icon="ai" title="Edit with Laki AI: the studio" onClick={() => api.studio!(w.id)} />}
-        {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
-        {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
-        {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
-        {api.rm && !w.builtin && (
-          <IconButton icon="trash" title="Delete it: its folder and settings (Undo brings them back)" onClick={() => void api.rm!(w.id)} />
-        )}
-      </div>
-      {w.description && <div className="muted small">{w.description}</div>}
-      {w.js && (
-        <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
-          <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its data gave it. Its own script always has the network" />
-        </Switch>
-      )}
-      {w.every !== undefined && (
-        <>
-          <Switch className="switch-row" on={!w.hide?.refresh} onChange={on => void api.set(w.id, { hide: { refresh: !on } })}>
-            <Says title="Refresh button" hint="Its ↻ wherever it shows: the sidebar, the Desk, its full view. Its right click still has Fetch now" />
-          </Switch>
-          <Switch className="switch-row" on={!w.hide?.at} onChange={on => void api.set(w.id, { hide: { at: !on } })}>
-            <Says title="When it was fetched" hint={'Its "fetched 2 min ago" and "checked …" lines. Its own page still says'} />
-          </Switch>
-        </>
-      )}
-      {options.length > 0 && (
-        <div className="wc-opts">
-          {options.map(o => (
-            <WidgetOptionField key={o.key} o={o} value={w.config[o.key] ?? ''} onSet={v => void api.set(w.id, { config: { [o.key]: v } })} />
-          ))}
-        </div>
-      )}
-      {!!w.tools?.length && (
-        <div className="wc-tools">
-          <div className="small">
-            <b>Tools for agents</b> <span className="muted">· agents run these through laki widget tool and MCP</span>
-          </div>
-          {w.tools.map(t => (
-            <div key={t.action} className="wc-tool small">
-              <code>{t.action}</code> <span className="muted">{t.description} · {ASK_SAYS[t.ask]}</span>
-              {t.grants.map(g => (
-                <span key={g} className="tag-soft">
-                  always in {api.wsName?.(g) ?? (g || 'no workspace')}
-                  {api.revoke && <button type="button" className="link" data-tip="Ask again there" onClick={() => void api.revoke!(w.id, t.action, g)}>Revoke</button>}
-                </span>
+          <WcRow title="Full view" hint="The window that opens when you click it">
+            <div className="seg" role="radiogroup" aria-label="Full view size">
+              {VIEWS.map(([v, n]) => (
+                <button key={v} type="button" role="radio" aria-checked={(w.view ?? 'm') === v} className={(w.view ?? 'm') === v ? 'on' : ''} onClick={() => void api.set(w.id, { view: v })}>
+                  {n}
+                </button>
               ))}
             </div>
-          ))}
-        </div>
+          </WcRow>
+        )}
+        {fetches && (
+          <>
+            <Switch className="switch-row" on={!w.hide?.refresh} onChange={on => void api.set(w.id, { hide: { refresh: !on } })}>
+              <Says title="Show a refresh button" hint="Its ↻ in the sidebar, on the Desk and in its full view. Its right click has Fetch now either way" />
+            </Switch>
+            <Switch className="switch-row" on={!w.hide?.at} onChange={on => void api.set(w.id, { hide: { at: !on } })}>
+              <Says title="Show when it was fetched" hint={'Its "fetched 2 min ago" and "checked …" lines. This page shows it either way'} />
+            </Switch>
+          </>
+        )}
+      </WcSec>
+      {(fetches || w.js) && (
+        <WcSec title="Updates">
+          {fetches && (
+            <WcRow title="Fetch every" hint="How often it gets new data, while Laki's window is open">
+              <label className="wc-every">
+                <input
+                  key={w.every}
+                  type="number"
+                  min={1}
+                  max={1440}
+                  aria-label="Minutes between fetches"
+                  defaultValue={w.every}
+                  onKeyDown={enter}
+                  onBlur={e => {
+                    const n = e.target.value.trim() ? Number(e.target.value) : NaN
+                    if (!(n >= 1)) e.target.value = String(w.every) // empty or below 1: as it was, not every minute
+                    else if (n !== w.every) void api.set(w.id, { every: n })
+                  }}
+                />
+                <span className="muted small">minutes</span>
+              </label>
+            </WcRow>
+          )}
+          {w.js && (
+            <Switch className="switch-row" on={!!w.net} onChange={net => void api.set(w.id, { net })}>
+              <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its data gave it. Its own script always has the network" />
+            </Switch>
+          )}
+          {fetches && (
+            <div className={`wc-row wc-status ${w.error && !w.running ? 'bad' : ''}`}>
+              <span className="small">{status}</span>
+              {w.on && (!w.scope || w.here) && (
+                <button type="button" className="sm" disabled={w.running} onClick={() => void api.run(w.id, w.here ?? undefined)}>
+                  <Icon name="refresh" size={12} /> {w.running ? 'Fetching…' : 'Fetch now'}
+                </button>
+              )}
+            </div>
+          )}
+        </WcSec>
       )}
-      {w.every !== undefined && <div className={`small ${w.error && !w.running ? 'warn' : 'muted'}`}>{w.running ? 'Fetching…' : w.error ? `Last fetch failed: ${w.error}` : w.at ? `Fetched ${ago(w.at)}` : 'Not fetched yet'}</div>}
+      {options.length > 0 && (
+        <WcSec title="Its settings" hint="What its widget.json asks for; each change fetches again">
+          <div className="wc-opts">
+            {options.map(o => (
+              <WidgetOptionField key={o.key} o={o} value={w.config[o.key] ?? ''} onSet={v => void api.set(w.id, { config: { [o.key]: v } })} />
+            ))}
+          </div>
+        </WcSec>
+      )}
+      {!!w.tools?.length && (
+        <WcSec title="Tools for agents" hint="Agents run these through laki widget tool and MCP">
+          <div className="wc-tools">
+            {w.tools.map(t => (
+              <div key={t.action} className="wc-tool small">
+                <code>{t.action}</code> <span className="muted">{t.description} · {ASK_SAYS[t.ask]}</span>
+                {t.grants.map(g => (
+                  <span key={g} className="tag-soft">
+                    always in {api.wsName?.(g) ?? (g || 'no workspace')}
+                    {api.revoke && <button type="button" className="link" data-tip="Ask again there" onClick={() => void api.revoke!(w.id, t.action, g)}>Revoke</button>}
+                  </span>
+                ))}
+              </div>
+            ))}
+          </div>
+        </WcSec>
+      )}
     </div>
   )
 }

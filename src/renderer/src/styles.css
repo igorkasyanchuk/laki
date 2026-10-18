@@ -238,16 +238,33 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .overlay:has(> .widget-modal.l) { padding-top: 4vh; } /* not the overlay's 12vh: it fits */
 .narrow .overlay:has(> .widget-modal) { padding-top: 8px; }
 .narrow .modal.widget-modal { height: calc(100dvh - 16px); max-height: none; }
-/* Settings › Widgets: a card per widget, its head one row (switch, name, size, minutes, view, buttons), its settings in a
-   grid under it; a list setting's chips; the AI prompt with its copy button */
+/* an extension's page › Settings: a head (switch, name, its buttons), then titled blocks of rows, each its words on the
+   left and its control on the right; its own settings in a grid; a list setting's chips; the AI prompt with its copy button */
 .widget-card.off > :not(.wc-head) { opacity: 0.7; }
 .modal .widget-card { padding: 0; border: none; background: none; } /* Settings › Extensions' dialog: the card is the dialog */
-.preset .row.wc-head { align-items: center; flex-wrap: wrap; gap: 6px; }
-.preset .row.wc-head > * { flex: none; white-space: nowrap; }
-.preset .row.wc-head > .grow { flex: 1; min-width: 0; }
-.preset .row.wc-head select { width: auto; padding: 4px 24px 4px 6px; }
-.preset .row.wc-head .wc-every { display: inline-flex; flex-direction: row; align-items: center; gap: 4px; }
-.wc-every input { width: 52px; padding: 4px 6px; }
+.widget-card { display: flex; flex-direction: column; gap: 14px; }
+.wc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.wc-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
+.wc-name { display: flex; align-items: center; gap: 8px; min-width: 0; } .wc-name b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.wc-acts { display: flex; align-items: center; gap: 2px; margin-left: auto; }
+.wc-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--line); }
+.wc-desc { margin-top: -6px; }
+.wc-sec { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: calc(var(--rs, 8px) + 2px); background: var(--bg); }
+.wc-sec-head { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 8px; padding: 9px 12px 8px; }
+.wc-sec-head b { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.wc-sec > :is(.wc-row, .switch-row, .wc-opts, .wc-tools) { padding: 10px 12px; border-top: 1px solid color-mix(in srgb, var(--line) 70%, transparent); }
+.wc-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; flex-wrap: wrap; font-size: 13px; }
+.wc-row > .switch-text { flex: 1 1 200px; }
+.wc-ctl { display: flex; align-items: center; justify-content: flex-end; gap: 6px; flex-wrap: wrap; max-width: 100%; }
+.wc-ctl select { width: auto; }
+.wc-places { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+.wc-places button { display: inline-flex; align-items: center; gap: 4px; padding: 3px 10px; border-radius: 999px; font-size: 12px; }
+.wc-places button.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.wc-ctl .seg button { padding: 3px 12px; font-size: 12px; }
+.wc-every { display: inline-flex; align-items: center; gap: 6px; }
+.wc-every input { width: 64px; padding: 4px 6px; }
+.wc-status .small { color: var(--muted); } .wc-status.bad .small { color: var(--error); }
+.wc-status button { display: inline-flex; align-items: center; gap: 5px; }
 .ib.spin svg { animation: spin 0.8s linear infinite; } /* fetching */
 .tag-soft { padding: 1px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11px; font-weight: 400; }
 .wc-src { display: flex; flex-direction: column; gap: 6px; } .wc-src > .row { align-items: center; justify-content: flex-start; gap: 10px; } .wc-src :is(textarea, input) { width: 100%; font-size: 11.5px; } .wc-src textarea { resize: vertical; } .wc-src .wc-ai { flex-wrap: wrap; } .wc-ai > label { display: flex; align-items: center; gap: 6px; flex: none; } .wc-ai > input { flex: 1; min-width: 200px; width: auto; }
