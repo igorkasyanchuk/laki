@@ -1666,8 +1666,9 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   capture-phase listeners (`html.picking`), a box over the element under the pointer with its component and size;
   a click: `inspect` (`selectorOf`, `componentsOf`: React's fiber on the node, classes, attributes, text, box, styles,
   HTML), main's `capture-rect` (the app window's pixels there, after two frames without the box) saved by `imageSave`;
-  the dialog's *Copy the context* (`pickedText`, Markdown) and *Copy the screenshot* (`copyFile`). Esc or a right click
-  stops.
+  the dialog (`.overlay:has(.picked)`: over a page too, the Desk's, Settings') with *Copy the context* (`pickedText`,
+  Markdown) and *Copy the screenshot* (`copyFile`); the press's own mouseup and click are swallowed too (`swallow`: they'd
+  click what was picked). Esc or a right click stops.
 - **`Bird.tsx`**: Bird view (experimental, `settings.birdView`; the side head's eye beside Help, ⌘K; dialog `'bird'`):
   every live tab (not exited) of each live workspace, Browsers' left out, by workspace in project order, a card each
   with the daemon's `screen` (40 lines, every 2.5 s while open and the page is visible; a `<pre>` whose newest lines

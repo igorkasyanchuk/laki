@@ -141,6 +141,11 @@ export function Picker({ onClose, copy, widgets = [] }: { onClose: () => void; c
       const el = at(e)
       if (e.button !== 0 || el?.closest('.picker-toggle, [data-rail="picker"]')) return onClose() // a right click or the crosshair again: stop picking
       if (!el) return
+      // this press's mouseup and click too, after these listeners go: else they'd click what was picked (a link, a button)
+      const swallow = (x: Event) => (stop(x), x.type === 'click' && off())
+      const off = () => ['mouseup', 'click'].forEach(t => window.removeEventListener(t, swallow, true))
+      ;['mouseup', 'click'].forEach(t => window.addEventListener(t, swallow, true))
+      setTimeout(off, 1500)
       const p = inspect(el, widgets)
       setOver(null)
       setBusy(true)

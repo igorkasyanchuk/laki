@@ -1841,6 +1841,7 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .key-field > button { min-width: 96px; }
 .key-field > button.on { border-color: var(--accent); color: var(--accent-ink); }
 .picker-shield { position: fixed; inset: 0; z-index: 9997; }
+.overlay:has(.picked) { z-index: 9997; } /* what was picked, over a page too (the Desk, Settings: z-index 30) */
 .picker-bar { position: fixed; z-index: 9999; left: 50%; bottom: 36px; transform: translateX(-50%); pointer-events: none; display: flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; background: var(--panel); border: 1px solid var(--accent); box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35); font-size: 12px; }
 .picked { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
 .picked-shot { align-self: flex-start; max-width: 100%; max-height: 220px; object-fit: contain; border: 1px solid var(--line); border-radius: var(--rs, 6px); background: repeating-conic-gradient(var(--hover) 0 25%, transparent 0 50%) 0 0 / 12px 12px; }
