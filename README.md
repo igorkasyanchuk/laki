@@ -4,7 +4,8 @@ Run Claude Code, Codex, Gemini, Grok, OpenCode or any command side by side on ma
 worktree. Agents keep running when the window is closed.
 
 - **Workspaces**: a worktree, branch and `$PORT` per task, with setup and teardown scripts and your `.env` copied in;
-  worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR. Plain folders work too.
+  worktrees in a folder you pick, for all projects or one. Start one from a prompt, a GitHub issue or a PR, with the
+  agent's model, effort, permission mode (auto, accept edits, plan, bypass) and fast mode picked under the prompt. Plain folders work too.
 - **Status**: running, needs you, done (and how far along, by the agent's own estimate), on every tab and row; notifications with a button per choice an agent asks you to make,
   a Dock and menu bar count, floating bubbles over other apps (agents working or waiting, recent ones too; click one to jump there, or say a prompt to one), pushes to your phone (ntfy, Slack, Telegram; answer from them with Telegram's or ntfy's buttons), a follow-up queue and
   messages sent later (in 2h, at 3pm; to Laki AI too). Agents resume after a
@@ -18,7 +19,7 @@ worktree. Agents keep running when the window is closed.
 - **Workflows** (experimental): blocks Laki runs for a task, drawn on a canvas or written as Markdown (say, a plan you
   approve, the build, tests until they pass, a PR, CI until green). Blocks can call a model on OpenRouter or a webhook,
   ask a decision model yes/no, choice or score questions (a way out per answer, or asking you when it isn't sure),
-show you a window with what a run made, and name outputs (`{{steps.sum.title}}`) the next blocks use; your own
+show you what a run made (a window, a popover in the corner, a macOS notification), and name outputs (`{{steps.sum.title}}`) the next blocks use; your own
 variables (`{{vars.REPO}}`), a workflow's or global. A schedule can start one, and Laki AI makes or changes one with
 you. Each run keeps its decisions and log.
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
@@ -29,7 +30,7 @@ you. Each run keeps its decisions and log.
   what an agent listens on itself, like its browser bridge or a browser it tests in); a spinner while a shell runs a command (an agent
   started there shows its own status); an agent you quit keeps its tab, ⏎ resumes it. After a daemon restart or an
   update, shells come back in their folder with what ran there: an agent resumes its chat, a dev server is typed back for ⏎. Terminals in
-  your home folder and a browser (any website, sign-ins kept) live in the sidebar too, from + at its top. A tab floats
+  your home folder and a browser (any website, sign-ins kept, Google's too) live in the sidebar too, from + at its top. A tab floats
   out in a window of its own, over every app (its right click › *Float in its own window*). Run ▾ runs the project's
   test, lint, format and deploy scripts, each in a tab.
 - **SSH hosts**: a project on another machine (`devbox:~/code/app`): its worktrees, git, gh and agents run there over
@@ -42,7 +43,7 @@ you. Each run keeps its decisions and log.
   merged, if you like. Each shows its author's picture (yours too); ⌘K and the sidebar's filter find a workspace by its PR's
   number, and a right click on the PR in the status bar copies its link or `#number`.
 - **Side panel**: files (Markdown rendered, Mermaid diagrams too; CSV as a table you can edit), the diff (one column or two side by side; comment on a line; images before and after;
-  a Viewed box per file, the same as GitHub's), review threads, and a preview of the dev
+  a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`).
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in
@@ -55,7 +56,7 @@ you. Each run keeps its decisions and log.
 - **Remote access**: the whole app from your phone, through a Cloudflare tunnel for your email only; or with Laki's own
   PIN instead (shown on your Mac, a new one each time; a wrong one, twice unless you pick otherwise, stops it); or for
   anyone with the link, if you type *confirm* (a red warning says what that risks); or through Tailscale, for your
-  tailnet's devices only.
+  tailnet's devices only (a PIN too if you like), or with Funnel and a PIN for the internet.
 - **Headless**: on a server with no screen, `./Laki.AppImage --headless --tailscale`, and Laki in your browser
   ([docs/headless.md](docs/headless.md)).
 - **Resources**: memory and CPU for Laki and each agent, a graph of the last minutes; put an idle agent to sleep (now, or after a while) and it wakes as you
