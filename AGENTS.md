@@ -108,7 +108,7 @@ a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `fl
 setting's `required` and the view's `missing`, the `panel` and `row` places (a row's instances fetched for every live
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
 `widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`; 86: workflows' `agent-ask` wait (`turnWaits`, `flowAnswer` through `answer`), a
-block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`). A
+block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -201,7 +201,15 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - expose to the world: `cloudflared` (its version, none when missing; the default emails; with `ws`, its project's
   `expose`: what the popup starts from), `tunnelStart`
   (`ws`, `port`, `mails`: resolves with the URL), `tunnelStop`;
-- worktree actions: `diff`, `run`, `ship`; the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads`, `prComment` (`path`,
+- worktree actions: `diff` (git's text but its last newline: a hunk to revert must match), `run`, `ship`; Changes'
+  Revert (not a `git: false` project): `hunkUndo` (`path`, `hunk`: the @@ line and its body as `diff` gave it, refused
+  as "changed since you looked" when the diff read again hasn't it, or the file runs into the 4 MB cut; `lines`:
+  indexes into its body; a forward patch from the worktree to the base, `git apply --check` then `git apply`: a temp
+  file here, stdin over `sshIn` on a host; a new file taken whole goes, a deleted one comes back whole only),
+  `fileUndo` (`path`: its status from `--name-status -M`, untracked as A; its content first kept by `hash-object -w`;
+  `git restore --source=<base> --worktree`, an A removed, an R's old path restored and the new removed), `hunkRedo`
+  (`id`: `git apply -R`, or the blobs written back; `undos`, the last 20 per workspace in memory); nothing staged;
+  the side panel's: `files`, `fileNew`, `fileRead` (text up to 512 KB, an image as a data URL, or binary: size only; `lossy`: not UTF-8; `base`: an image as `git show <diffBase>:<path>`, for Changes' before), `fileWrite` (`text`, `was`: the text the edit started from, refused as "changed since you opened it" when the file isn't that any more, unless `force`; only a whole UTF-8 text file; written in place, its mode kept; on a host, `cat >` over `sshIn`), `prThreads`, `prComment` (`path`,
   `line`, `side` LEFT/RIGHT, `body`: `gh api …/pulls/<n>/comments` at the PR's head commit; a 422 is "not in the
   PR's diff"), `prAct` (`act` approve, close or merge, each only where the project's `prAllows` says (`config.pr`:
   approve, close, merge on unless false, `land` off unless true; the daemon refuses, the app hides); merge: `method`

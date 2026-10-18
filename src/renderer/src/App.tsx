@@ -1163,6 +1163,20 @@ export function App() {
     if (typeof how === 'object') panelApi(w).preview(how.rel)
     else if (how === 'missing') toast(`Not there: ${path}`)
   }
+  // Changes' Revert while an agent works there: asked once (yes holds until no agent runs there); a whole file: asked
+  // always, the agent in the same question
+  const revertYes = useRef(new Set<string>())
+  const revertOk = async (w: WorkspaceView, file?: string) => {
+    const busy = view?.tabs.find(t => t.workspace === w.id && t.kind === 'agent' && t.status === 'running')
+    if (!busy) revertYes.current.delete(w.id)
+    const warn = busy && `${busy.preset ?? busy.name} is working here: it may write ${file ? 'it' : 'this file'} again.`
+    if (file) return ask(`Revert ${file.split('/').pop()}?`, { text: [`Back to how it is on ${w.base ?? 'the base'}: every change in it goes. Undo is in the toast.`, warn].filter(Boolean).join(' '), ok: 'Revert', danger: true })
+    if (!busy || revertYes.current.has(w.id)) return true
+    const yes = await ask(`${warn} Revert anyway?`, { ok: 'Revert' })
+    if (yes) revertYes.current.add(w.id)
+    return yes
+  }
+  const redo = (w: WorkspaceView, id: string, then?: () => void) => call('hunkRedo', { ws: w.id, id }).then(() => (then?.(), done('Back as it was')), () => {})
   const panelApi = (w: WorkspaceView): PanelApi => ({
     files: () => api.call<FileList>('files', { ws: w.id }),
     newFile: (path, dir) => api.call<{ path: string }>('fileNew', { ws: w.id, path, dir }).then(r => r.path),
@@ -1179,6 +1193,19 @@ export function App() {
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
     toPrompt: text => intoAgent(w.id, text),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
+    undoHunk: async (path, hunk, lines, then) => {
+      if (!(await revertOk(w))) return
+      const { id } = await call<{ id: string }>('hunkUndo', { ws: w.id, path, hunk, lines })
+      then?.()
+      done(`Reverted ${lines ? `${lines.length} line${lines.length === 1 ? '' : 's'}` : '1 hunk'} in ${path.split('/').pop()}`, () => void redo(w, id, then))
+    },
+    undoFile: async (path, then) => {
+      if (!(await revertOk(w, path))) return
+      const { id } = await call<{ id: string }>('fileUndo', { ws: w.id, path })
+      then?.()
+      done(`Reverted ${path.split('/').pop()}`, () => void redo(w, id, then))
+    },
+    redo: id => redo(w, id),
     artifacts: w.storage
       ? {
           files: () => api.call<{ path: string }[]>('artifactList', { ws: w.id }).then(l => ({ files: l.map(f => f.path), changed: {} })),

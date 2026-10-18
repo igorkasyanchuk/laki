@@ -5,7 +5,7 @@ import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 
 import { chmod, copyFile, readdir, readFile, rm, stat, symlink } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
 import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { homedir, hostname, userInfo } from 'node:os'
+import { homedir, hostname, tmpdir, userInfo } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
@@ -4119,11 +4119,13 @@ export async function accountLogin(p: { id: string; agent: string }) {
 // what a workspace's changes are against: a worktree's merge base with its base branch, else HEAD
 const diffBase = (ws: Workspace) => (ws.kind === 'worktree' ? git(ws, 'merge-base', ws.base, 'HEAD').catch(() => 'HEAD') : Promise.resolve('HEAD'))
 
+// the text as git wrote it but its last newline (git() trims: a last line's trailing spaces would go, and a hunk to
+// revert would no longer match the file)
 export async function diff(ref: string) {
   const ws = findWs(ref)
   const from = await diffBase(ws)
   const [text, numstat, untracked] = await Promise.all([
-    git(ws, 'diff', '--no-color', '--no-ext-diff', '-M', from),
+    exec(ws, 'git', ['diff', '--no-color', '--no-ext-diff', '-M', from]).then(r => r.stdout.replace(/\n$/, '')),
     git(ws, 'diff', '--numstat', '-M', from),
     git(ws, 'ls-files', '--others', '--exclude-standard'),
   ])
@@ -4152,11 +4154,163 @@ export async function diff(ref: string) {
       : []
   for (const [i, f] of newFiles.entries()) {
     const d = diffs[i] ?? ''
-    out += (out ? '\n' : '') + d.trimEnd()
+    out += (out ? '\n' : '') + d.replace(/\n$/, '')
     files.push({ path: f, add: d.split('\n').filter(l => l.startsWith('+') && !l.startsWith('+++')).length, del: 0, status: 'A' })
   }
   const MAX = 4 << 20
-  return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + '\n… (cut)' : out }
+  return { base: ws.base, from, files, diff: out.length > MAX ? out.slice(0, MAX) + CUT : out }
+}
+const CUT = '\n… (cut)'
+
+// ---------- revert: Changes' hunks, a few lines of one, or a whole file back to the base, each with an Undo
+
+// a patch to take back (git apply -R), or files as they were (a blob's id, none: there was no file)
+type Undo = { id: string; at: number; patch?: string; files?: { path: string; blob?: string }[] }
+const undos = new Map<string, Undo[]>() // ponytail: in memory, a daemon restart loses them
+const UNDOS = 20 // per workspace
+function keepUndo(ws: Workspace, u: Omit<Undo, 'id' | 'at'>) {
+  const id = randomBytes(6).toString('hex')
+  undos.set(ws.id, [...(undos.get(ws.id) ?? []), { ...u, id, at: Date.now() }].slice(-UNDOS))
+  return { id }
+}
+const gitWs = (ref: string) => {
+  const ws = findWs(ref)
+  if (state.projects.find(p => p.id === ws.project)?.git === false) throw new Error(`${ws.name}: not a git repo, no changes to revert`)
+  return ws
+}
+// git apply of a patch in the workspace (-R: taken back), --check first: a failure is git's first line
+async function apply(ws: Workspace, patch: string, reverse = false) {
+  const args = ['apply', ...(reverse ? ['-R'] : [])]
+  if (ws.host) {
+    const h = await hostUp(ws.host)
+    const cmd = (more: string) => `export PATH=${q(h.path)}; cd ${q(ws.path)} && git ${[...args, ...(more ? [more] : []), '-'].join(' ')}`
+    for (const more of ['--check', '']) await sshIn(ws.host, cmd(more), patch).catch(e => { throw new Error(firstLine(e)) })
+    return
+  }
+  const f = join(tmpdir(), `laki-${randomBytes(6).toString('hex')}.patch`)
+  writeFileSync(f, patch, { mode: 0o600 })
+  try {
+    for (const more of [['--check'], []]) await run('git', [...args, ...more, f], { cwd: ws.path }).catch(e => { throw new Error(firstLine(e)) })
+  } finally {
+    rmSync(f, { force: true })
+  }
+}
+
+// hunkUndo: one hunk of Changes back to the base: the diff read again (diff's own: a pathspec would break -M's renames,
+// and the hunk wouldn't be what Changes showed), the hunk found by its text (the @@ line and its body, \r kept), then a
+// forward patch from the worktree to the base. lines: indexes into its body (0: the line after @@), none: all of it
+export async function hunkUndo(o: { ws: string; path: string; hunk: string; lines?: number[] }) {
+  const ws = gitWs(o.ws)
+  inside(ws, String(o.path ?? ''))
+  if (typeof o.hunk !== 'string' || !o.hunk.startsWith('@@')) throw new Error('which hunk?')
+  const changed = new Error(`${o.path} changed since you looked: refresh Changes`)
+  const { diff: text } = await diff(ws.id)
+  const all = text.split('\n')
+  const start = all.findIndex(l => l.startsWith('diff --git a/') && l.endsWith(` b/${o.path}`))
+  if (start < 0) throw changed
+  let end = all.findIndex((l, i) => i > start && l.startsWith('diff --git '))
+  if (end < 0) {
+    if (text.endsWith(CUT)) throw changed // the file runs into the 4 MB cut: its hunks may be whole only in part
+    end = all.length
+  }
+  const head = all.slice(start, end)
+  const at = head.findIndex(l => l.startsWith('@@'))
+  if (at < 0) throw changed // binary, or only a rename
+  const meta = head.slice(0, at)
+  const hunks: string[][] = []
+  for (const l of head.slice(at)) l.startsWith('@@') ? hunks.push([l]) : hunks.at(-1)!.push(l)
+  const hunk = hunks.find(h => h.join('\n') === o.hunk)
+  if (!hunk) throw changed
+  const mode = (k: string) => meta.find(l => l.startsWith(`${k} file mode `))?.slice(k.length + 11)
+  const [added, deleted] = [mode('new'), mode('deleted')]
+  const body = hunk.slice(1)
+  if (o.lines !== undefined && (!Array.isArray(o.lines) || !o.lines.every(i => Number.isInteger(i) && i >= 0 && i < body.length))) throw new Error('lines: indexes into the hunk')
+  const lines = o.lines && new Set(o.lines)
+  if (lines && deleted) throw new Error(`${o.path} was deleted: it comes back whole or not at all`)
+  // each line as the undo patch has it: what the agent added goes, what it took out comes back, the rest stays;
+  // \ No newline at end of file follows the line before it
+  const out: string[] = []
+  let kept = false
+  for (const [i, l] of body.entries()) {
+    const picked = !lines || lines.has(i)
+    if (l[0] === '\\') kept && out.push(l)
+    else if (l[0] === '+') (kept = true), out.push((picked ? '-' : ' ') + l.slice(1))
+    else if (l[0] === '-') (kept = picked) && out.push('+' + l.slice(1))
+    else (kept = true), out.push(l)
+  }
+  if (!out.some(l => l[0] === '+' || l[0] === '-')) throw new Error('pick a line the agent added or took out')
+  const h = /^@@ -\d+(?:,\d+)? \+(\d+)(?:,(\d+))? @@/.exec(hunk[0])
+  if (!h) throw changed
+  const first = Number(h[2] ?? 1) ? Number(h[1]) : Number(h[1]) + 1 // the hunk's first line in the worktree (a count of 0: the line before it)
+  const a = out.filter(l => l[0] === ' ' || l[0] === '-').length
+  const b = out.filter(l => l[0] === ' ' || l[0] === '+').length
+  const s = (n: number) => `${n ? first : first - 1},${n}` // git's: with no lines, the start is the line before
+  const p = o.path
+  const gone = added && !lines // a new file taken whole: it goes
+  const fileHead = [`diff --git a/${p} b/${p}`, ...(gone ? [`deleted file mode ${added}`] : deleted ? [`new file mode ${deleted}`] : []), deleted ? '--- /dev/null' : `--- a/${p}`, gone ? '+++ /dev/null' : `+++ b/${p}`]
+  const patch = [...fileHead, `@@ -${s(a)} +${s(b)} @@`, ...out, ''].join('\n')
+  await apply(ws, patch)
+  return keepUndo(ws, { patch })
+}
+
+// each changed file's status against the base (M, A, D, R: R's old path too); an untracked one is A
+async function statusOf(ws: Workspace, from: string, path: string): Promise<{ status: string; old?: string }> {
+  const z = (await exec(ws, 'git', ['diff', '--name-status', '-z', '-M', from])).stdout.split('\0')
+  for (let i = 0; i < z.length - 1; ) {
+    const st = z[i]
+    const two = st[0] === 'R' || st[0] === 'C'
+    const [old, now] = two ? [z[i + 1], z[i + 2]] : [undefined, z[i + 1]]
+    if (now === path) return { status: st[0] === 'C' ? 'A' : st[0], old: st[0] === 'R' ? old : undefined }
+    i += two ? 3 : 2
+  }
+  const untracked = await git(ws, 'ls-files', '--others', '--exclude-standard', '--', path)
+  if (untracked.split('\n').includes(path)) return { status: 'A' }
+  throw new Error(`${path} has no changes to revert: refresh Changes`)
+}
+// a file's content kept in git's object store (binaries too), none when there's no file
+async function blobOf(ws: Workspace, path: string) {
+  const there = await exec(ws, 'test', ['-e', path]).then(() => true, () => false)
+  return there ? git(ws, 'hash-object', '-w', '--', path) : undefined
+}
+async function rmFile(ws: Workspace, path: string) {
+  const abs = inside(ws, path)
+  if (ws.host) await exec(ws, 'rm', ['-f', '--', path])
+  else rmSync(abs, { force: true })
+}
+
+// fileUndo: a whole file back to the base (binaries and images too); what it was kept for Undo. Nothing is staged:
+// git restore --worktree, never checkout. ponytail: Undo doesn't put back mode bits
+export async function fileUndo(o: { ws: string; path: string }) {
+  const ws = gitWs(o.ws)
+  const path = String(o.path ?? '')
+  inside(ws, path)
+  const from = await diffBase(ws)
+  const { status, old } = await statusOf(ws, from, path)
+  if (old) inside(ws, old)
+  const touched = [path, ...(old ? [old] : [])]
+  const files = await Promise.all(touched.map(async p => ({ path: p, blob: await blobOf(ws, p) })))
+  const restore = (p: string) => git(ws, 'restore', `--source=${from}`, '--worktree', '--', p)
+  if (status === 'A') await rmFile(ws, path)
+  else if (status === 'R') await restore(old!), await rmFile(ws, path)
+  else await restore(path) // M, D (T: a type change, as M)
+  return keepUndo(ws, { files })
+}
+
+// hunkRedo: an Undo of a revert: a patch taken back, or files written as they were (a blob back, a file it brought back
+// removed); then it's gone
+export async function hunkRedo(o: { ws: string; id: string }) {
+  const ws = gitWs(o.ws)
+  const list = undos.get(ws.id) ?? []
+  const u = list.find(x => x.id === o.id)
+  if (!u) throw new Error('nothing to undo')
+  if (u.patch) await apply(ws, u.patch, true)
+  for (const f of u.files ?? []) {
+    inside(ws, f.path)
+    if (!f.blob) await rmFile(ws, f.path)
+    else await exec(ws, 'sh', ['-c', 'mkdir -p "$(dirname "$2")" && git cat-file blob "$1" > "$2"', 'sh', f.blob, f.path])
+  }
+  undos.set(ws.id, list.filter(x => x !== u))
+  return {}
 }
 
 // the sidebar's +/-: diff's numbers without its text, for each live git workspace; one scan at a time

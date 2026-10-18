@@ -931,6 +931,16 @@ button.fold-more { padding: 0; min-height: 20px; font-size: 12px; }
 .sp-diff .dl-add { color: var(--add); background: var(--add-bg); }
 .sp-diff .dl-del { color: var(--del); background: var(--del-bg); }
 .sp-diff .dl-hunk { color: var(--hunk); }
+.sp-diff .dl-hunk { display: flex; align-items: center; gap: 8px; }
+/* Revert at a hunk header's end, in sight however wide the lines are; on hover (always on a touch screen) */
+.sp-diff .dl-revert { position: sticky; right: 6px; margin-left: auto; padding: 0 8px; height: 18px; font-size: 11px; font-family: var(--ui-font, inherit); color: var(--fg); background: var(--panel, var(--bg)); border: 1px solid var(--line); border-radius: var(--rs, 6px); opacity: 0; }
+.sp-diff .dl-hunk:hover .dl-revert, .sp-diff .dl-revert:focus-visible { opacity: 1; }
+@media (pointer: coarse) { .sp-diff .dl-revert { opacity: 1; } }
+.sp-diff .dl-revert:hover { border-color: var(--del); color: var(--del); }
+.sp-diff .dl.picked { box-shadow: inset 3px 0 var(--accent); background: color-mix(in srgb, var(--accent) 18%, transparent); }
+/* Revert's picked lines: a bar over the diff */
+.dl-picks { position: sticky; bottom: 8px; z-index: 2; display: flex; align-items: center; gap: 10px; width: max-content; max-width: calc(100% - 16px); margin: 8px auto 0; padding: 6px 8px 6px 12px; font-size: 12px; border: 1px solid var(--line); border-radius: var(--rs, 10px); background: var(--panel, var(--bg)); box-shadow: 0 6px 20px color-mix(in srgb, #000 30%, transparent); }
+.dl-picks button.primary { height: 24px; padding: 0 10px; }
 .sp-diff > button { margin: 4px 6px 0; }
 .sp-diff .dl-line { cursor: pointer; }
 .sp-diff .dl-line:hover { box-shadow: inset 2px 0 var(--accent); }

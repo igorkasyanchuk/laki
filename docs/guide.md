@@ -582,7 +582,11 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
   so commit and push first), *Send to the agent* gives it to the workspace's agent with the file and line
   (when its turn ends). ⌘⏎ does the first that applies, Esc closes it. A changed image (PNG, JPEG, GIF, WebP, SVG)
   shows before and after side by side, each with its size in pixels and bytes (one side when it's new or deleted);
-  click one for full size.
+  click one for full size. *Revert* (in *Here* only): a hunk's header shows it on hover, and it takes that hunk back
+  to the base; ⌥-click a + or − line to pick it, ⇧-click to pick a range in the same hunk, then *Revert these* in the bar
+  (Esc drops the picks); a file's right click has *Revert this file…* (binaries and images too). Each revert's toast
+  has *Undo*; nothing is staged, and a file that changed since you looked is refused (refresh Changes). With an agent at
+  work in the workspace, Laki asks first: it may write the file again.
 - *Review*: the PR: its title, state, author and size; *Merge* ▾, *Approve*, GitHub and ⋯; its description,
   rendered, a few lines of it until *Show more*; its checks, failing first, each with how long it ran and a click to its
   log; *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
