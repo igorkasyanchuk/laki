@@ -954,6 +954,23 @@ test('workflow agents: a timeout Escs the turn and takes error; a silent one is 
   assert.equal(r.log.filter((l: string) => / a: nothing printed for 10 min: Laki checked in/.test(l)).length, 3)
 })
 
+// a working line that ticks (claude's and codex's seconds) isn't output: the stall clock runs from the screen's last change
+test('workflow agents: a turn whose working line only ticks is nudged 10 min after its screen last changed', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'ticks', text: STALLS.replace('timeout: 1\n', '').replace('> slow', '> tick') })
+  const run = await rig.rpc('flowStart', { workflow: 'ticks', project: p.id, task: 'on' })
+  const get = () => rig.rpc('flowGet', { id: run.id })
+  const r = await until(async () => (x => x.wait?.kind === 'agent' && x)(await get()), 'its turn')
+  await until(async () => /\d+s · esc to interrupt/.test(await rig.screen(r.wait.tab)), 'its line ticking')
+  const t1 = Date.now()
+  await rig.rpc('flowTick', { now: t1 + 1000 }) // its screen seen
+  await sleep(2500) // ticks meanwhile: the last output 2 s on, the screen the same
+  await rig.rpc('flowTick', { now: t1 + 10 * 60000 + 1000 }) // 10 min since it changed, not since it last printed
+  assert.ok((await get()).wait.nudged, 'nudged')
+})
+
 // an agent block's agent asks (the fake's permission menu): the run asks you with its choices, answers through core's
 // answer; answered in its tab, the run goes on; one notification (the tab's), none of the run's own
 const ASKS = `# Asks
