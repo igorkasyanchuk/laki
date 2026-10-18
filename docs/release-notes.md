@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Browsers: Google sign-in**: Google accounts sign in inside Laki's browser (Gmail, Docs, YouTube); if Google turns
+  it down anyway, the sign-in opens in your own browser.
 - **Remote access: Tailscale with a PIN, and Funnel**: *Ask for a PIN as well* on the tailnet, or *Funnel* for the
   public internet (always with a PIN; `laki serve --tailscale --funnel`). Laki now says when no other device is on
   your tailnet: a Mac can't open its own Tailscale link.

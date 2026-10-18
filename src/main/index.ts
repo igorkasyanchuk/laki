@@ -57,7 +57,27 @@ ipcMain.on('deep-link-ready', () => {
 const PREVIEW = 'persist:preview'
 const BROWSER = 'persist:browser' // the sidebar's Browsers: any site, its sign-ins kept between runs
 const local = (u: string) => /^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?(\/|$)/.test(u)
+// Google turns away sign-in in an app's web view ("This browser or app may not be secure"): on its sign-in pages a
+// Browsers page says it's Firefox (its user agent, without Chrome's client hints), which Google lets in. Turned
+// down anyway (its rejected page), the sign-in opens in your own browser. ponytail: navigator.userAgentData still
+// says Chromium; Google may look there one day
+const GOOGLE_SIGNIN = /^https:\/\/accounts\.google\.com\//
+const GOOGLE_NO = /^https:\/\/accounts\.google\.com\/(v\d\/)?signin\/rejected/
+const FIREFOX = (v => `Mozilla/5.0 (${process.platform === 'darwin' ? 'Macintosh; Intel Mac OS X 10.15' : 'X11; Linux x86_64'}; rv:${v}.0) Gecko/20100101 Firefox/${v}.0`)(120 + Math.floor((Date.now() - Date.UTC(2023, 10, 21)) / (31 * 864e5))) // a current Firefox: 120 came out Nov 2023, one every 4-5 weeks
+let chromeUA = '' // the Browsers session's own (Chrome's, without Laki's and Electron's names)
+function googleSignIn(wc: Electron.WebContents) {
+  const ua = (url: string) => wc.setUserAgent(GOOGLE_SIGNIN.test(url) ? FIREFOX : chromeUA)
+  wc.on('did-start-navigation', d => d.isMainFrame && !d.isSameDocument && ua(d.url))
+  wc.on('will-redirect', d => d.isMainFrame && ua(d.url))
+  wc.on('did-navigate', (_e, url) => {
+    if (!GOOGLE_NO.test(url)) return
+    const to = new URL(url).searchParams.get('continue')
+    void shell.openExternal(to && /^https:\/\//.test(to) ? `https://accounts.google.com/ServiceLogin?continue=${encodeURIComponent(to)}` : 'https://accounts.google.com/')
+    if (wc.getType() === 'window') BrowserWindow.fromWebContents(wc)?.close() // a sign-in popup: the page that opened it says why (BrowserPane)
+  })
+}
 app.on('web-contents-created', (_e, wc) => {
+  if (wc.session === session.fromPartition(BROWSER)) googleSignIn(wc)
   wc.on('will-attach-webview', (e, prefs, params) => {
     delete prefs.preload
     Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true })
@@ -124,7 +144,11 @@ app.whenReady().then(() => {
   }
   // Browsers: Chrome's user agent without Laki's and Electron's names (sites that turn away an app's web view)
   const b = session.fromPartition(BROWSER)
-  b.setUserAgent(b.getUserAgent().replace(/ (laki|Laki|Electron)\/\S+/g, ''))
+  b.setUserAgent((chromeUA = b.getUserAgent().replace(/ (laki|Laki|Electron)\/\S+/g, '')))
+  // Google's sign-in: Firefox's user agent in the requests too, and none of Chrome's client hints (googleSignIn)
+  b.webRequest.onBeforeSendHeaders({ urls: ['https://accounts.google.com/*'] }, (d, cb) =>
+    cb({ requestHeaders: { ...Object.fromEntries(Object.entries(d.requestHeaders).filter(([k]) => !/^sec-ch-ua/i.test(k))), 'User-Agent': FIREFOX } }),
+  )
   // the sidebar's video: YouTube's embed plays only with a Referer, and a file:// page sends none (its Error 153);
   // the app's id, as YouTube asks of apps
   session.defaultSession.webRequest.onBeforeSendHeaders({ urls: ['https://www.youtube-nocookie.com/embed/*'] }, (d, cb) =>

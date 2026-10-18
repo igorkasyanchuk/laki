@@ -15,6 +15,7 @@ const shown = (u: string) => (u === 'about:blank' ? '' : u)
 export function BrowserPane({ url, hidden, onPage, onOpen }: { url: string; hidden: boolean; onPage: (url: string, title: string) => void; onOpen: (url: string) => void }) {
   const [addr, setAddr] = useState(shown(url))
   const [err, setErr] = useState('')
+  const [google, setGoogle] = useState(false) // Google turned down its sign-in here: main opened it in your browser
   const host = useRef<HTMLDivElement>(null)
   const view = useRef<any>(null) // the webview element
   const input = useRef<HTMLInputElement>(null)
@@ -36,6 +37,7 @@ export function BrowserPane({ url, hidden, onPage, onOpen }: { url: string; hidd
     let title = ''
     const at = (e: any) => {
       setErr('')
+      setGoogle(/^https:\/\/accounts\.google\.com\/(v\d\/)?signin\/rejected/.test(e.url))
       setAddr(shown(e.url))
       if (/^https?:\/\//.test(e.url)) page.current(e.url, title)
     }
@@ -72,6 +74,7 @@ export function BrowserPane({ url, hidden, onPage, onOpen }: { url: string; hidd
         {bridge && <IconButton icon="code" title="Developer tools (or right click › Inspect Element)" onClick={() => on(v => (v.isDevToolsOpened() ? v.closeDevTools() : v.openDevTools()))} />}
       </div>
       {err && <div className="warn small pad">{err}</div>}
+      {google && <div className="warn small pad">Google won’t sign in inside Laki’s browser: it opened in your own browser instead.</div>}
       {!bridge && <div className="muted small pad">The browser runs in the app. <button className="small" onClick={() => addr && onOpen(browserUrl(addr))}>Open it in this browser</button></div>}
       <div className="web-body" ref={host} />
     </div>

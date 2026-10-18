@@ -242,7 +242,9 @@ selected workspace's PR is in the status bar.
   2…). *Browser* opens any website in Laki: a workspace of the *Browsers* project, with back, forward, reload and an
   address bar (a site, a URL, or words to search); the page's title names its row, and it opens on the same page after
   a restart. Sign-ins are kept between runs (its own cookies, apart from the preview's), and a sign-in's popup (Google,
-  GitHub) gets a small window of its own. A page you opened stays loaded as you move to other workspaces.
+  GitHub) gets a small window of its own. Google accounts sign in too: on Google's sign-in pages the browser says it's
+  Firefox, which Google lets in; if Google turns it down anyway, the sign-in opens in your own browser and the page says
+  so. A page you opened stays loaded as you move to other workspaces.
   - Tabs are rows too: a middle click or ⌘-click on a link (or its right click › *Open Link in New Tab*) adds one
     under *Browsers* in the background, named after the site until you open it; a link that opens a new tab adds one
     and goes there; ⌘T or + in its tab bar opens an empty one, and ⌘W closes the page (its row goes, the next one

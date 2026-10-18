@@ -985,7 +985,7 @@ with its `url`: a Browsers workspace of its own, named by its host until its tit
 empty one; ⌘W: App's `closePage`, `wsRm` at once, the next one of the project selected, Undo a `quickNew` of its URL;
 from inside the page, main's `before-input-event` takes ⌘W and ⌘T from it and sends `browser-key`, preload's
 `onBrowserKey`, App's keys as if typed there); a right click is main's `pageMenu` (link, image, selection or field, back, forward, reload, Inspect Element: `inspectElement`; the toolbar's `</>`: the webview's `openDevTools`), its session gets `PREVIEW_OK` permissions only and Chrome's user
-agent without Laki's and Electron's names. `text.ts` `browserUrl` reads the address bar (a URL, a site, else a
+agent without Laki's and Electron's names; on accounts.google.com (main's `googleSignIn`, every webContents of the session: the page and a sign-in popup) Firefox's (`FIREFOX`, the request's header too, no `sec-ch-ua*`), which Google lets sign in; its rejected page opens the sign-in in your browser (`shell.openExternal`, its `continue`), a popup closed, and `BrowserPane` says so. `text.ts` `browserUrl` reads the address bar (a URL, a site, else a
 DuckDuckGo search).
 
 The agent browser (`browse` above) is main's: a hidden `BrowserWindow` per workspace (1280×800, the preview's
