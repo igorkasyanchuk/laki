@@ -4,6 +4,13 @@ version it builds, with the date. -->
 
 ## Next
 
+- **Workflows: an agent's question stops the run, not just its tab**: a permission prompt in an Agent block shows on
+  the run with the agent's choices as buttons; a pick answers it in the tab.
+- **Workflows: no more agents that hang forever**: an Agent block's turn has a timeout (an hour unless set: then Esc
+  and its error way); one that prints nothing for 10 minutes gets a nudge, then the run asks you (Nudge again, Try
+  again, Skip it, Stop the run).
+- **Workflows: tries again**: `retry: 2` on an Agent, Run command, AI call, AI decision or Extension block runs it again
+  after a failure (10 s, then a minute) before its error way; a command can retry only some exit codes.
 - **`laki help <command>`**: a command's options, what it prints and examples (`laki <command> --help` too, and
   `laki --help`); the agent skill tells agents to ask it.
 - **Copy a tab's contents**: a tab's right click › *Copy contents* (⌘K too): its whole terminal as text, the

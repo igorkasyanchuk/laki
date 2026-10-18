@@ -12,7 +12,7 @@ import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, within, wsArchive, wsNew } from './core.ts'
+import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { widgetUse } from './widgets.ts'
 
@@ -515,7 +515,7 @@ const send = (tab: string, text: string) => coreSend({ target: tab, text, whenId
 turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => {
   for (const r of runs()) {
     const w = r.wait // its turn: an agent's, one at a limit, a stalled one you're asked about (it answered after all)
-    if (!live(r) || !w || !(w.kind === 'agent' || w.kind === 'limit' || w.kind === 'stuck') || !w.tab || w.tab !== tab.id) continue
+    if (!live(r) || !w || !(w.kind === 'agent' || w.kind === 'agent-ask' || w.kind === 'limit' || w.kind === 'stuck') || !w.tab || w.tab !== tab.id) continue
     const b = blockOf(r, r.cur)!
     if (w.kind === 'agent' && w.queued !== undefined && tab.queue?.includes(w.queued)) continue // a turn before ours: ours is still queued
     if (o.limit) {
@@ -534,6 +534,21 @@ turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) =
     Object.assign(r, { status: 'running' as FlowStatus, wait: undefined })
     // on after core's deliver (800 ms: the agent redraws its prompt after the hook), so what was queued goes first
     setTimeout(() => leave(r, b, o.failed ? 'error' : 'next', o.failed ? `${tab.name} failed: ${clip(o.last ?? '')}` : o.last ? `${tab.name}: “${clip(o.last, 80)}”` : `${tab.name} is done`), AFTER_TURN)
+  }
+})
+
+// its agent asks (a permission prompt, a question with a menu): the run waits too, with the agent's choices as its
+// buttons and Stop the run last. Core posts the tab's notification: the run posts none of its own
+turnWaits.add((tab: Tab, o: { question: string; options: { n: number; label: string }[] }) => {
+  for (const r of runs()) {
+    const w = r.wait
+    if (!live(r) || w?.kind !== 'agent' || w.tab !== tab.id) continue
+    if (w.queued !== undefined && tab.queue?.includes(w.queued)) continue // your turn asks, before ours: in its tab
+    const b = blockOf(r, r.cur)!
+    const question = o.question.trim() || `${tab.name} asks something`
+    Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind: 'agent-ask', tab: tab.id, question, options: [...o.options.map(x => x.label), 'Stop the run'], ns: o.options.map(x => x.n), used: (w.used ?? 0) + Date.now() - (w.since ?? Date.now()) } })
+    say(r, `${blockName(b)}: ${tab.name} asks: ${clip(question, 120)}`, o.options.map(x => `${x.n}. ${x.label}`).join('\n'))
+    touch()
   }
 })
 
@@ -850,13 +865,21 @@ function stuck(r: FlowRun, b: Block, why: string, options = ['Try again', 'Stop 
   ask(r, 'stuck', why, undefined, options, more)
 }
 
-export function flowAnswer(o: { id: string; n: number; text?: string }) {
+export async function flowAnswer(o: { id: string; n: number; text?: string }) {
   const r = flowGet(o)
   const w = r.wait
   if (r.status !== 'waiting' || !w || !('options' in w)) throw new Error('that run isn’t asking anything')
   const label = w.options[o.n]
   if (label === undefined) throw new Error(`choice ${o.n}? 0 to ${w.options.length - 1}`)
   const b = blockOf(r, r.cur)!
+  if (w.kind === 'agent-ask' && o.n < w.options.length - 1) {
+    // the agent's menu, as its keys would pick it (core reads it again: a changed menu is refused, the run still asks)
+    await coreAnswer({ tab: w.tab, n: w.ns[o.n], label })
+    say(r, `${blockName(b)}: you answered ${label}`)
+    if (r.wait === w) Object.assign(r, { status: 'running' as FlowStatus, wait: { kind: 'agent', tab: w.tab, since: Date.now(), used: w.used } }) // unless its turn ended meanwhile
+    touch()
+    return r
+  }
   const typed = String(o.text ?? '').trim()
   if (w.kind === 'ask') r.vars.answer = typed || label // yours: a confirm's or a retry's button isn't words for a prompt
   r.wait = undefined
@@ -953,7 +976,13 @@ export function flowTick(now = Date.now()) {
     if (!b) continue
     if (r.wait?.kind === 'wait' && r.status === 'running') waitTick(r, b, now)
     else if (r.wait?.kind === 'retry' && now >= r.wait.until) again(r, b)
-    else if (r.wait?.kind === 'agent' && !alive(r.wait.tab)) leave(r, b, 'error', `${tabOf(r.wait.tab)?.name ?? 'its tab'} stopped`)
+    else if ((r.wait?.kind === 'agent' || r.wait?.kind === 'agent-ask') && !alive(r.wait.tab)) leave(r, b, 'error', `${tabOf(r.wait.tab)?.name ?? 'its tab'} stopped`)
+    else if (r.wait?.kind === 'agent-ask' && tabStatus(r.wait.tab) !== 'waiting') {
+      // answered in its tab: the turn goes on
+      say(r, `${blockName(b)}: answered in its tab`)
+      Object.assign(r, { status: 'running' as FlowStatus, wait: { kind: 'agent', tab: r.wait.tab, since: now, used: r.wait.used } })
+      touch()
+    }
     else if (r.wait?.kind === 'agent' && r.status === 'running') agentTick(r, b, r.wait, now)
   }
 }
@@ -966,7 +995,8 @@ const boot = Date.now() // runs started since were never cut short
 export function flowResume() {
   resumeLater = state.settings?.workflows !== true
   if (resumeLater) return // off: they wait until it's on again
-  const back = runs().filter(r => live(r) && r.status !== 'waiting' && r.started < boot)
+  const asks = (r: FlowRun) => r.status === 'waiting' && r.wait?.kind !== 'agent-ask' // yours wait on; an agent's ask was cut short with its turn
+  const back = runs().filter(r => live(r) && !asks(r) && r.started < boot)
   const was = new Map(back.map(r => [r, r.cur]))
   for (const r of back) say(r, `Laki restarted: back at ${blockName(blockOf(r, r.cur) ?? ({ id: '?' } as Block))}`)
   if (!back.length) return
@@ -974,7 +1004,7 @@ export function flowResume() {
   setTimeout(() => {
     for (const r of back) {
       const b = blockOf(r, r.cur)
-      if (!live(r) || !b || r.status === 'waiting' || r.cur !== was.get(r)) continue // moved on meanwhile: that block is under way
+      if (!live(r) || !b || asks(r) || r.cur !== was.get(r)) continue // moved on meanwhile: that block is under way
       if (r.wait?.kind === 'wait' || r.wait?.kind === 'retry') continue // flowTick
       enter(r, b, true)
     }

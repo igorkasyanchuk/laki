@@ -1766,6 +1766,7 @@ function RunView({ id, entry, api, pname, ws, tabs, onGone, onDelete }: { id: st
   const picked = pick ? r.flow.blocks.find(b => b.id === pick) : undefined
   const vars = Object.entries(r.vars).filter(([k]) => !pick || k === 'task' || k === 'answer' || k.startsWith(`steps.${pick}.`))
   const decisions = [...r.decisions].reverse().filter(d => !pick || d.block === pick)
+  const asking = r.status === 'waiting' && r.wait && 'options' in r.wait ? r.wait : undefined // what it asks you
   return (
     <div className="wf-runview">
       <div className="wf-head">
@@ -1791,24 +1792,38 @@ function RunView({ id, entry, api, pname, ws, tabs, onGone, onDelete }: { id: st
         {!over && <button className="btn" onClick={stop}><Icon name="stop" size={11} /> Stop</button>}
         <IconButton icon="trash" title="Delete this run" className="danger" onClick={() => onDelete(entry ?? flowView(r))} />
       </div>
-      {r.status === 'waiting' && r.wait && 'options' in r.wait && (
-        <div className="wf-ask">
+      {asking && (
+        <div className={`wf-ask ${asking.kind === 'agent-ask' ? 'agent' : ''}`}>
           <div className="wf-ask-q">
             <Icon name="help" size={14} />
-            <b>{r.wait.question}</b>
-            <span className="wf-hint">{r.wait.kind === 'confirm' ? 'before it does something others see' : r.wait.kind === 'stuck' ? 'it can’t go on by itself' : r.wait.kind === 'decide' ? 'the model isn’t sure' : ''}</span>
+            <b>{asking.kind === 'agent-ask' ? `${blockName(r.flow.blocks.find(b => b.id === r.cur) ?? { id: r.cur ?? '', kind: 'agent' })} asks: ${asking.question}` : asking.question}</b>
+            <span className="wf-hint">{asking.kind === 'confirm' ? 'before it does something others see' : asking.kind === 'stuck' ? 'it can’t go on by itself' : asking.kind === 'decide' ? 'the model isn’t sure' : asking.kind === 'agent-ask' ? (asking.ns.length ? 'its agent waits: a pick here answers in its tab' : 'its agent waits: answer it in its tab') : ''}</span>
           </div>
-          {r.wait.show && (
+          {'show' in asking && asking.show && (
             <div className="wf-ask-show">
-              <Markdown src={r.wait.show} />
+              <Markdown src={asking.show} />
             </div>
           )}
-          {r.wait.kind === 'ask' && <input className="wf-ask-text" value={typed} placeholder="Add words, if any: they're {{answer}}" onChange={e => setTyped(e.target.value)} />}
-          <div className="wf-ask-btns">
-            {r.wait.options.map((o, n) => (
-              <button key={n} className={`btn ${n === 0 ? 'primary' : ''}`} onClick={() => answer(n)}>{o}</button>
-            ))}
-          </div>
+          {asking.kind === 'ask' && <input className="wf-ask-text" value={typed} placeholder="Add words, if any: they're {{answer}}" onChange={e => setTyped(e.target.value)} />}
+          {asking.kind === 'agent-ask' ? (
+            <div className="wf-ask-btns">
+              {asking.ns.map((k, n) => (
+                <button key={n} className={`btn ${n === 0 ? 'primary' : ''}`} onClick={() => answer(n)}>{`${k}. ${asking.options[n]}`}</button>
+              ))}
+              {tabs.includes(asking.tab) && r.ws && api.openTab && (
+                <button className="btn" onClick={() => api.openTab!(r.ws!, asking.tab)}>
+                  Open its tab
+                </button>
+              )}
+              <button className="btn danger" onClick={() => answer(asking.options.length - 1)}>Stop the run</button>
+            </div>
+          ) : (
+            <div className="wf-ask-btns">
+              {asking.options.map((o, n) => (
+                <button key={n} className={`btn ${n === 0 ? 'primary' : ''}`} onClick={() => answer(n)}>{o}</button>
+              ))}
+            </div>
+          )}
         </div>
       )}
       {(r.shown?.length ?? 0) > 0 && (

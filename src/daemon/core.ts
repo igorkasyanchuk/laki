@@ -79,6 +79,8 @@ const prs = new Map<string, PR>()
 export const prOf = (ws: string) => prs.get(ws)
 // what follows agents' turns (workflows): each turn's end, its last answer, a usage limit's reset, a failure
 export const turnEnds = new Set<(tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => void>()
+// and each turn that stops to ask (a moment after its hook: the menu it draws, askOf's options; none read: none)
+export const turnWaits = new Set<(tab: Tab, o: { question: string; options: { n: number; label: string }[] }) => void>()
 export type Conn = Client & { view?: { tab: string | null; tabs?: string[]; focused: boolean; browse?: boolean; shown?: boolean; ws?: string | null } } // browse: the app's window, which has the agent browser; shown: its page is visible (a closed window is only hidden); ws: its selected workspace (null: a page over them, the Board's)
 export const clients = new Set<Conn>()
 let lastSize = { cols: 120, rows: 32 } // the newest client size: new tabs start at it
@@ -2269,9 +2271,17 @@ function turn(p: { tab: string; state: string; payload?: any }) {
       broadcast({ ev: 'turn', tab: tab.id, ws: tab.workspace, kind: 'waiting', text: pl.message ?? '' })
       phone(tab, 'waiting', pl.message ?? '')
       setTimeout(() => {
-        // the extensions' turn.waiting, a moment later: its menu is often drawn after the hook
+        // the extensions' turn.waiting and workflows' turnWaits, a moment later: its menu is often drawn after the hook
         const s = sessions.get(tab.id)
-        if (r.status === 'waiting') widgetEvent('turn.waiting', { question: String(pl.message ?? '').slice(0, 2000), options: s && !s.exited ? askOf(s.screenText(16))?.options : undefined }, tab.workspace, tab)
+        if (r.status !== 'waiting') return
+        const options = s && !s.exited ? askOf(s.screenText(16))?.options : undefined
+        widgetEvent('turn.waiting', { question: String(pl.message ?? '').slice(0, 2000), options }, tab.workspace, tab)
+        for (const f of turnWaits)
+          try {
+            f(tab, { question: String(pl.message ?? '').slice(0, 2000), options: options ?? [] })
+          } catch (e) {
+            log(`waits ${tab.id}: ${(e as Error).message}`)
+          }
       }, 800)
       break
     case 'idle':

@@ -666,6 +666,7 @@ export type FlowWait =
   | { kind: 'run' | 'wait' }
   | { kind: 'retry'; until: number } // a bad exit's try again, at until
   | { kind: 'limit'; tab: string; until?: number }
+  | { kind: 'agent-ask'; tab: string; question: string; options: string[]; ns: number[]; used?: number } // its agent asks (a permission prompt): options its menu's choices (ns: their numbers), then Stop the run
 export type FlowRun = {
   id: string
   workflow: string // its id

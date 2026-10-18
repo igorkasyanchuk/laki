@@ -984,6 +984,11 @@ only on some exit codes (*Only on exit codes*, `retry on: 1, 75`). An agent's ne
 what went wrong. The log says each one (*Tests: tries again (2 of 3) in 10 s: exit 1*); a try again isn't counted
 against the block's *at most*, but an agent's is a turn.
 
+When the agent in an Agent block stops to ask (a permission prompt), the run asks you too: its page shows the agent's
+question with its choices as buttons (*1. Yes*, *2. Yes, and don't ask again*, *3. No*), *Open its tab* and *Stop
+the run*; a pick answers it in the tab, and the run goes on. Answered in the tab instead, the run goes on by itself.
+The tab's notification is the only one.
+
 An Agent block gives its turn an hour (*Timeout*, `timeout: 30` in minutes): past it, Laki presses Esc in its tab and
 the block takes its *error* way. Time the run waits for you or for a usage limit doesn't count. An agent that prints
 nothing for 10 minutes while it works gets one line typed into its tab (*Laki here: nothing printed for 10 minutes.

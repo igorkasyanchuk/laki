@@ -107,7 +107,8 @@ a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `fl
 `config` '' and its option's `set`), `widgetRm` to the trash, `widgetRestore`/`widgetTrash`, `from` on `widgetAction`/`widgetSet`/`widgetDev`/`widgetCheck` (an agent's: asked, refused, left off), a
 setting's `required` and the view's `missing`, the `panel` and `row` places (a row's instances fetched for every live
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
-`widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`. A
+`widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`; 86: workflows' `agent-ask` wait (`turnWaits`, `flowAnswer` through `answer`), a
+block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -870,7 +871,14 @@ the list's keys then, `awaiting`, and opens the first new one as it's written); 
 `pageNow.workflow` (its id, source, unsaved changes, the file), App's `whereNow` sends it with the floating chat's asks.
 `out:` (`OUT_KINDS`: agent, llm, run, webhook; names `OUT_NAME`, not `OUT_TAKEN`): an agent's or llm's prompt gets
 `outAsk`, its result (answer, output, response) `outsOf` (the last ```json block, all of it, else the last `{…}` that
-parses; non-strings as JSON, a missing name `''` and said) into `steps.<id>.<name>`. Agent blocks' clock (`agentTick`, from `flowTick`):
+parses; non-strings as JSON, a missing name `''` and said) into `steps.<id>.<name>`. An agent's ask (core's `turnWaits`, beside `turnEnds`,
+called with `turn()`'s waiting case 800 ms on, `askOf`'s options or none): a run waiting on that tab's turn (not one
+queued behind yours) is `waiting` with `{ kind: 'agent-ask', tab, question, options, ns, used }`, the agent's choices
+then Stop the run; no `flow` broadcast (core's notification is the one). `flowAnswer` (async) calls core's `answer`
+with `n` and `label` (a changed menu throws, the wait stays), then the wait goes back to `agent`; `flowTick` does the same
+when `tabStatus` isn't waiting (answered in the tab); `turnEnds` takes its turn's end (No); `flowResume` re-enters it
+like a running one (`asks`). RunView's banner: the choices numbered, *Open its tab*, Stop the run.
+Agent blocks' clock (`agentTick`, from `flowTick`):
 `timeout` (`AGENT_TIMEOUT`, 60 min) counts the wait's `used` plus since `since` (an ask or a stalled stuck carries `used`,
 so time it waits for you doesn't count; a limit pauses it), then `esc` (core's `input` Esc, the next step once
 `tabStatus` isn't running, 5 s at most) and error; a prompt still queued behind your turn is taken off the queue

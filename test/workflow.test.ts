@@ -951,3 +951,72 @@ test('workflow agents: a timeout Escs the turn and takes error; a silent one is 
   assert.deepEqual([r.decisions.at(-1).exit, r.decisions.at(-1).why, r.decisions.at(-1).you, r.vars['steps.a.answer']], ['next', 'you skipped it', true, ''])
   assert.equal(r.log.filter((l: string) => / a: nothing printed for 10 min: Laki checked in/.test(l)).length, 3)
 })
+
+// an agent block's agent asks (the fake's permission menu): the run asks you with its choices, answers through core's
+// answer; answered in its tab, the run goes on; one notification (the tab's), none of the run's own
+const ASKS = `# Asks
+
+runs in: main · session: new
+
+## start
+input: task
+next: a
+
+## a
+agent: claude
+> {{task}} the build
+next: e
+
+## e
+end: success
+`
+test('workflow agents: a permission prompt makes the run ask you with its choices; answered here or in its tab, it goes on', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'asks', text: ASKS })
+  const c = await rig.connect()
+  t.after(() => c.close())
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const asked = (id: string) => until(async () => (x => x.wait?.kind === 'agent-ask' && x)(await get(id)), 'it asks', 10000)
+  const ended = (id: string) => until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(id)), 'the end', 15000)
+
+  // answered here: core's answer picks it in the tab; its turn's end moves the run on
+  const run = await rig.rpc('flowStart', { workflow: 'asks', project: p.id, task: 'menu' })
+  let r = await asked(run.id)
+  assert.equal(r.status, 'waiting')
+  assert.deepEqual(r.wait.options, ['Yes', "Yes, and don't ask again for rm commands", 'No, and tell Claude what to do differently (esc)', 'Stop the run'])
+  assert.deepEqual(r.wait.ns, [1, 2, 3])
+  assert.equal(r.wait.question, 'Claude needs your permission to use Bash')
+  assert.equal((await rig.rpc('state')).flows.find((f: any) => f.id === run.id).status, 'waiting', 'the view says so')
+  r = await rig.rpc('flowAnswer', { id: run.id, n: 0 })
+  assert.deepEqual([r.status, r.wait?.kind], ['running', 'agent'])
+  r = await ended(run.id)
+  assert.equal(r.status, 'done', r.log.join('\n'))
+  assert.equal(r.vars['steps.a.answer'], 'picked: Yes')
+  assert.ok(r.log.some((l: string) => / a: you answered Yes$/.test(l)), r.log.join('\n'))
+  assert.ok(c.events.some(e => e.ev === 'turn' && e.kind === 'waiting'), 'the tab’s notification')
+  assert.ok(!c.events.some(e => e.ev === 'flow' && e.kind === 'waiting'), 'none of the run’s own')
+
+  // answered in the tab: back to running as the agent goes on, then on as its turn ends
+  const two = await rig.rpc('flowStart', { workflow: 'asks', project: p.id, task: 'menu' })
+  r = await asked(two.id)
+  const tab = r.wait.tab
+  await rig.rpc('hook', { tab, state: 'running' })
+  await rig.rpc('flowTick')
+  r = await get(two.id)
+  assert.deepEqual([r.status, r.wait.kind, r.wait.tab], ['running', 'agent', tab])
+  await rig.rpc('hook', { tab, state: 'waiting', payload: { message: 'Claude needs your permission to use Bash' } })
+  r = await asked(two.id)
+  await rig.rpc('answer', { tab, n: 3 }) // in the tab: No
+  r = await ended(two.id)
+  assert.equal(r.vars['steps.a.answer'], 'picked: No, and tell Claude what to do differently (esc)')
+
+  // no menu read: only Stop the run
+  const three = await rig.rpc('flowStart', { workflow: 'asks', project: p.id, task: 'ask' })
+  r = await asked(three.id)
+  assert.deepEqual([r.wait.options, r.wait.ns], [['Stop the run'], []])
+  await assert.rejects(rig.rpc('flowAnswer', { id: three.id, n: 1 }), /choice 1\? 0 to 0/)
+  r = await rig.rpc('flowAnswer', { id: three.id, n: 0 })
+  assert.equal(r.status, 'stopped')
+})
