@@ -47,6 +47,8 @@ export const SURE = 0.7 // yes from this probability, no below 1 - it; a choice 
 export const RUNS_AT_ONCE = 3 // a workflow's runs going at the same time (its at once:)
 export const TURNS = 30 // agent turns in one run before it asks you (its turns:)
 export const MAX_BLOCKS = 100 // a workflow's blocks: past it, it won't run (and + Block stops)
+export const RETRY_KINDS: BlockKind[] = ['agent', 'run', 'llm', 'decide', 'extension'] // what retry: takes
+export const RETRY_MAX = 5
 
 export type Option = { label: string; to?: string }
 export type Block = {
@@ -76,6 +78,8 @@ export type Block = {
   session?: string // agent: run (the run's agent tab, the default), new, or a block's id (its tab)
   cmd?: string // run
   timeout?: number // run, wait, llm, decide, webhook: minutes
+  retry?: number // agent, run, llm, decide, extension: tries again after a bad exit (fail, error), 1 to RETRY_MAX times
+  retryOn?: number[] // run: only these exit codes are tried again (unset: any but 0)
   question?: string // ask
   title?: string // popup: its title ({{vars}})
   show?: string // ask: what goes with the question ({{vars}})
@@ -284,6 +288,11 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
     case 'session': return void (b.session = v || undefined)
     case 'run': return void (b.cmd = v)
     case 'timeout': return void (b.timeout = num(v.replace(/\s*min(utes)?$/, ''), at, problems))
+    case 'retry': return void (Number.isInteger(Number(v)) && v !== '' ? (b.retry = Number(v)) : problems.push(`${at}: retry: how many times it tries again, 1 to ${RETRY_MAX}`)) // check() says what's out of range
+    case 'retry on': {
+      const codes = v.split(/[\s,]+/).filter(Boolean).map(Number)
+      return void (codes.length && codes.every(c => Number.isInteger(c) && c >= 1 && c <= 255) ? (b.retryOn = codes) : problems.push(`${at}: retry on: exit codes, 1 to 255 (retry on: 1, 75)`))
+    }
     case 'ask': return void (b.question = v)
     case 'show': return void (b.show = v || undefined)
     case 'if':
@@ -345,6 +354,7 @@ export function toFile(wf: Workflow): string {
       case 'save': L.push(`save: ${one(b.file)}`); if (b.from) L.push(`from: ${one(b.from)}`); if (b.link) L.push(`link: ${one(b.link)}`); break
       case 'end': L.push([`end: ${b.result || 'success'}`, b.notify && 'notify: yes', b.phone && 'phone: yes'].filter(Boolean).join(' · ')); break
     }
+    if (b.retry !== undefined || b.retryOn?.length) L.push([b.retry !== undefined && `retry: ${b.retry}`, b.retryOn?.length && `retry on: ${b.retryOn.join(', ')}`].filter(Boolean).join(' · '))
     if (b.out?.length && OUT_KINDS.includes(b.kind)) L.push(`out: ${b.out.join(', ')}`)
     if (b.text !== undefined && b.text !== '') for (const l of b.text.split('\n')) L.push(l ? `> ${l}` : '>')
     const routed = b.kind === 'decide' && !!b.route
@@ -380,6 +390,10 @@ export function check(wf: Workflow): string[] {
     if (b.kind === 'webhook' && b.from && b.text?.trim()) out.push(`${blockName(b)}: a body or a file (from:), not both`)
     if (b.out?.length && !OUT_KINDS.includes(b.kind)) out.push(`${blockName(b)}: out: is for agent, AI call, run and webhook blocks`)
     if (b.json !== undefined && b.kind !== 'agent' && b.kind !== 'llm') out.push(`${blockName(b)}: json: is for agent and AI call blocks`)
+    if (b.retry !== undefined && !RETRY_KINDS.includes(b.kind)) out.push(`${blockName(b)}: retry: is for agent, run, AI call, AI decision and extension blocks`)
+    else if (b.retry !== undefined && !(Number.isInteger(b.retry) && b.retry >= 1 && b.retry <= RETRY_MAX)) out.push(`${blockName(b)}: retry: ${b.retry}? 1 to ${RETRY_MAX} tries again`)
+    if (b.retryOn?.length && b.kind !== 'run') out.push(`${blockName(b)}: retry on: is for run blocks (their exit codes)`)
+    else if (b.retryOn?.length && !b.retry) out.push(`${blockName(b)}: retry on: needs retry: (how many times)`)
     if (b.kind === 'ask' && !b.question?.trim()) out.push(`${blockName(b)} asks nothing`)
     if (b.kind === 'popup' && !b.text?.trim()) out.push(`${blockName(b)} shows nothing`)
     if (b.kind === 'save' && !b.file?.trim()) out.push(`${blockName(b)} has no file`)
@@ -649,6 +663,7 @@ export type FlowWait =
   | { kind: 'decide'; question: string; show?: string; options: string[]; key: string; rest: string[] } // an AI decision it isn't sure of: key's answer is yours, then rest's
   | { kind: 'agent'; tab: string; queued?: string } // queued: the prompt, while it waits in the tab's queue
   | { kind: 'run' | 'wait' }
+  | { kind: 'retry'; until: number } // a bad exit's try again, at until
   | { kind: 'limit'; tab: string; until?: number }
 export type FlowRun = {
   id: string
@@ -667,6 +682,7 @@ export type FlowRun = {
   at?: number // since when
   wait?: FlowWait
   visits: Record<string, number>
+  tries?: Record<string, number> // each block's tries again since it was entered (retry:)
   vars: Record<string, string>
   tabs: Record<string, string> // run:<agent> and each agent block's id → its tab
   resume?: Record<string, string> // run:<agent> → its chat's id, for the next run's shared session
@@ -709,6 +725,7 @@ Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind ke
 - decide: <a decision model: typesafe/jev-1.13 (the default), openai/gpt-6-luna-decisions, microsoft/microsoft-decision-1, ~perplexity/pplx-decider-latest, cloudflare/clef> · sure: 0.7, the state it judges as "> " lines (JSON with {{vars}}, values escaped; none: the block before's answer or output), then "question: <name> · yes/no|choice|score · <what it asks>" lines (yes/no is the API's noul: how true), each with its lines indented under it: yes/no's "  yes: <what yes means>" and "  no: …", a choice's "  <option>: <what it means>", a score's "  - <level>" lowest first. One call to OpenRouter's Decisions API: no text, probabilities. Each answer is {{steps.<id>.<name>}} (yes or no; the option; the level's number), with .p (its probability), .confidence, .score, .level (a score's words); {{steps.<id>.answers}} all of it as JSON. Under sure (yes/no between 1-sure and sure; a choice or score less confident) it asks the user. Its ways out: "ok: <block>" and "error: <block>", then route with a case (numbers, JS); or "route: <a question's name>" and a line per answer of it: "- yes → <block>", "- no → <block>", "- <option> → <block>", "- <level number> → <block>" (and error:).
 - webhook: <http(s) URL> · method: POST|PUT|PATCH|GET|DELETE (POST unless said), "header: Name: value" lines ({{env.NAME}}: Settings' or the project's env, for a secret), the body as "> " lines (JSON when it starts with { or [: values go in escaped), or "from: <a file of the workspace>" sent as it is; no body: the run's variables as JSON. Exits ok (2xx), error. {{steps.<id>.status}}, {{steps.<id>.output}}: the response.
 - extension: <an extension's id: laki_extensions lists them>: fetches it now (one that's turned on; a per-workspace one for the run's workspace), waits, then its data: {{steps.<id>.data}} as JSON, and each field of it as {{steps.<id>.<field>}} (a list or an object as JSON). Exits ok, error (off, no fetch, the fetch failed).
+- retry: <1 to 5> on an agent, run, llm, decide or extension block: a bad exit (fail, error) tries the block again that many times, 10 s after the first and 60 s after each later one, before it takes that way ("retry: 2 · retry on: 1, 75" on a run block: only those exit codes are tried again; unset: any but 0). An agent's next try goes to the same tab.
 - out: <name>, <name>… on an agent, llm, run or webhook block: what it gives the blocks after it, {{steps.<id>.<name>}}. An agent or an llm is told to end its answer with a JSON object of them; a command's output or a webhook's response is one.
 - popup: <title> (the whole line), then "notify: yes" and "phone: yes" on lines of their own if wanted, its body as "> " lines: HTML when it starts with <, else Markdown ({{vars}} filled): a window in Laki the user reads and closes (scrollable; no buttons), and a notification with notify: yes. It doesn't wait; exit next. For a run's result: "Job done", then {{steps.report.answer}}.
 - end: success|stopped|failed · notify: yes · phone: yes, its notification's words as "> " lines ({{vars}}; none: the block's name). notify: a notification on the Mac (and the phone with phone: yes, when Settings › Phone pushes is set up) as the run ends there; a failed run always notifies.

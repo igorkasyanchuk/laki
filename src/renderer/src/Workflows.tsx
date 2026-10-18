@@ -8,7 +8,7 @@
 import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { ACTIONS, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
@@ -945,7 +945,7 @@ const FORMAT_HELP = `\`# Name\`, a line saying what it does, then \`runs in: wor
 
 A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · session: run|new|<block> · json: yes\` (JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown), \`end: success|stopped|failed · notify: yes · phone: yes\` (its \`>\` lines: the notification's words; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
 
-\`> lines\` are its prompt (or text). Exits: \`next: id\`, \`ok:\`, \`fail:\`, \`error:\`, \`pass:\`; a choice's and an ask's options: \`- Label → id\`. \`max: 3 → id\` limits a block (every loop needs one, or an ask). \`at: x,y\`: where it's drawn.
+\`> lines\` are its prompt (or text). Exits: \`next: id\`, \`ok:\`, \`fail:\`, \`error:\`, \`pass:\`; a choice's and an ask's options: \`- Label → id\`. \`max: 3 → id\` limits a block (every loop needs one, or an ask). \`retry: 2\` on an agent, run, llm, decide or extension block tries it again after a fail or an error (10 s, then 60 s), before it goes that way; a run block's \`retry on: 1, 75\`: only those exit codes. \`at: x,y\`: where it's drawn.
 
 Variables: \`{{task}}\`, \`{{answer}}\` (your last), \`{{steps.<id>.answer}}\` (an agent's), \`{{steps.<id>.output}}\` (a command's last lines, a wait's failed checks, a webhook's response), \`{{steps.<id>.status}}\` (a webhook's HTTP status), \`{{steps.<id>.<name>}}\` (its \`out:\`), \`{{env.NAME}}\` (a webhook's only), \`{{pr.url}}\`, \`{{ws.branch}}\`, \`{{base}}\`, \`{{project}}\`.`
 
@@ -1124,6 +1124,20 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
         </>
       )}
       {(b.kind === 'llm' || b.kind === 'decide' || b.kind === 'webhook') && <TestBlock key={`t:${b.id}`} b={b} api={api} project={project} own={wf.vars} />}
+      {RETRY_KINDS.includes(b.kind) && (
+        <div className="wf-row2">
+          {field(
+            'Tries again',
+            <Typed type="number" min={0} max={RETRY_MAX} value={b.retry ?? 0} onText={v => set(x => {
+              const n = Math.round(Number(v))
+              x.retry = n > 0 ? Math.min(RETRY_MAX, n) : undefined
+              if (!x.retry) x.retryOn = undefined
+            })} />,
+            b.retry ? `On ${b.kind === 'run' ? 'fail' : 'error'}: again after 10 s, then 60 s; then that way` : `0: ${b.kind === 'run' ? 'fail' : 'error'} goes its way at once`,
+          )}
+          {b.kind === 'run' && !!b.retry && field('Only on exit codes', <Typed value={(b.retryOn ?? []).join(', ')} placeholder="any but 0" onText={v => set(x => void (x.retryOn = (c => (c.length ? c : undefined))(v.split(/[\s,]+/).filter(Boolean).map(Number).filter(n => Number.isInteger(n) && n >= 1 && n <= 255))))} />, 'e.g. 1, 75')}
+        </div>
+      )}
       {OUT_KINDS.includes(b.kind) && field('Outputs', <Typed value={(b.out ?? []).join(', ')} placeholder="title, summary, files" onText={v => set(x => void (x.out = (n => (n.length ? n : undefined))(v.split(/[\s,]+/).filter(Boolean))))} />, outHint(b))}
       {b.kind === 'ask' && (
         <>

@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { widgetUse } from './widgets.ts'
@@ -30,6 +30,7 @@ const LOG_BYTES = 256 << 10 // a run's log, details and all (state.json keeps it
 const DETAILED = 10 // the newest ended runs keep their details; older ones keep only their lines
 const RESUME_AFTER = 8000 // after a restart: the agents' tabs come back first
 const AFTER_TURN = 900 // a turn's end to the next block: core types what was queued at 800 ms
+const RETRY_WAIT = [10, 60] // seconds before a block's first try again, then before each later one
 
 export const on = () => {
   if (state.settings?.workflows !== true) throw new Error('Workflows are off: turn them on in Settings › General › Experimental')
@@ -225,6 +226,7 @@ function enter(r: FlowRun, b: Block, again = false): void {
       return b.max.to ? enter(r, blockOf(r, b.max.to)!) : stuck(r, b, `${blockName(b)} ran ${b.max.n} times`)
     }
     r.visits[b.id] = n
+    if (r.tries?.[b.id]) delete r.tries[b.id] // entered anew: its tries again are its own
   }
   Object.assign(r, { cur: b.id, at: Date.now(), wait: undefined, status: 'running' })
   touch()
@@ -233,11 +235,35 @@ function enter(r: FlowRun, b: Block, again = false): void {
 
 function leave(r: FlowRun, b: Block, exit: string, why: string, you = false): void {
   if (!live(r) || r.cur !== b.id) return // a late event: the run moved on, or ended
+  if (!you && BAD_EXITS.includes(exit) && retry(r, b, why)) return
   decide(r, b, exit, why, you)
   say(r, `${blockName(b)} → ${exit}: ${why}`)
   const e = exitsOf(b).find(x => x.name === exit)
   if (!e?.to) return BAD_EXITS.includes(exit) ? stuck(r, b, `${blockName(b)}: ${why}`) : finish(r, 'done', `${blockName(b)}'s ${exit} leads nowhere: the end`)
   enter(r, blockOf(r, e.to)!)
+}
+
+// retry: a bad exit with tries left enters the block again after a wait (RETRY_WAIT), not counted as a visit (an agent's
+// try is a turn, though); a run block's retry on: only those exit codes. The wait is r.wait's, so flowTick (and a
+// restart) takes it up too
+function retry(r: FlowRun, b: Block, why: string) {
+  const n = r.tries?.[b.id] ?? 0
+  if (!b.retry || !RETRY_KINDS.includes(b.kind) || n >= b.retry) return false
+  if (b.kind === 'run' && b.retryOn?.length && !b.retryOn.includes(Number(r.vars[`steps.${b.id}.code`]))) return false
+  const secs = RETRY_WAIT[Math.min(n, RETRY_WAIT.length - 1)]
+  ;(r.tries ??= {})[b.id] = n + 1
+  const until = Date.now() + secs * 1000
+  Object.assign(r, { status: 'running' as FlowStatus, wait: { kind: 'retry', until } })
+  decide(r, b, 'retry', `${why}: tries again (${n + 2} of ${b.retry + 1})`)
+  say(r, `${blockName(b)}: tries again (${n + 2} of ${b.retry + 1}) in ${secs} s: ${why}`)
+  touch()
+  setTimeout(() => again(r, b, until), secs * 1000)
+  return true
+}
+// the try again it waited for, unless the run stopped or moved on meanwhile (or an earlier timer finds a later wait)
+function again(r: FlowRun, b: Block, until?: number) {
+  if (!live(r) || r.cur !== b.id || r.wait?.kind !== 'retry' || (until !== undefined && r.wait.until !== until)) return
+  enter(r, b, true)
 }
 
 async function work(r: FlowRun, b: Block) {
@@ -864,6 +890,7 @@ export function flowTick(now = Date.now()) {
     }
     if (!b) continue
     if (r.wait?.kind === 'wait' && r.status === 'running') waitTick(r, b, now)
+    else if (r.wait?.kind === 'retry' && now >= r.wait.until) again(r, b)
     else if (r.wait?.kind === 'agent' && !alive(r.wait.tab)) leave(r, b, 'error', `${tabOf(r.wait.tab)?.name ?? 'its tab'} stopped`)
   }
 }
@@ -885,7 +912,7 @@ export function flowResume() {
     for (const r of back) {
       const b = blockOf(r, r.cur)
       if (!live(r) || !b || r.status === 'waiting' || r.cur !== was.get(r)) continue // moved on meanwhile: that block is under way
-      if (r.wait?.kind === 'wait') continue // flowTick
+      if (r.wait?.kind === 'wait' || r.wait?.kind === 'retry') continue // flowTick
       enter(r, b, true)
     }
   }, RESUME_AFTER).unref()

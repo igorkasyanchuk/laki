@@ -870,7 +870,12 @@ the list's keys then, `awaiting`, and opens the first new one as it's written); 
 `pageNow.workflow` (its id, source, unsaved changes, the file), App's `whereNow` sends it with the floating chat's asks.
 `out:` (`OUT_KINDS`: agent, llm, run, webhook; names `OUT_NAME`, not `OUT_TAKEN`): an agent's or llm's prompt gets
 `outAsk`, its result (answer, output, response) `outsOf` (the last ```json block, all of it, else the last `{…}` that
-parses; non-strings as JSON, a missing name `''` and said) into `steps.<id>.<name>`. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
+parses; non-strings as JSON, a missing name `''` and said) into `steps.<id>.<name>`. Retries (`retry` 1-`RETRY_MAX`
+on `RETRY_KINDS`, a run block's `retryOn` exit codes): `leave` hands a bad exit with tries left to `retry`, which keeps the count
+in `r.tries` (cleared when the block is entered anew, not on a try), decides `retry`, says it, and waits
+(`RETRY_WAIT`: 10 s, then 60 s) as `wait` `{ kind: 'retry', until }`: a timer and `flowTick` (tests move the clock) both
+call `again` (`until` must match: an earlier timer never takes a later wait), `enter(r, b, true)` (no visit); `flowResume`
+leaves the wait to `flowTick`. Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
 already reported waits for a new one. An exit with no block: a bad one `stuck` (*Try again* resets the block's count
 and the turns), a good one ends the run. `flowAnswer` (`n`, `text`: `{{answer}}`). `flowForget` deletes a run (a live one finishes stopped first) and its row's mark. `flowResume` at start: each live run
 not waiting re-enters its block 8 s later (an agent's prompt sent again); with workflows off it waits for `flowTick`

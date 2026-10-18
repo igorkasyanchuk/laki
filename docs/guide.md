@@ -977,6 +977,13 @@ JSON object with those keys (a command or a response that prints one works too),
 `{{steps.<block>.<name>}}` for the blocks after it (a list stays JSON). Every loop needs a limit (*at most 3 times,
 then…*) or an *Ask you* in it.
 
+*Tries again* (`retry: 2` in the file) on an Agent, Run command, AI call, AI decision or Extension block runs it again
+when it fails, before it takes its *fail* or *error* way: 10 seconds after the first failure, a minute after each
+later one. A flaky `npm test` or a 502 from OpenRouter then costs a wait, not the run. A Run command can try again
+only on some exit codes (*Only on exit codes*, `retry on: 1, 75`). An agent's next try goes to the same tab, so it sees
+what went wrong. The log says each one (*Tests: tries again (2 of 3) in 10 s: exit 1*); a try again isn't counted
+against the block's *at most*, but an agent's is a turn.
+
 An AI decision's questions come in Jev's three kinds: *How true* (`noul`: yes or no, by how sure), *Choice* (one of
 its options) and *Score* (graded with a rubric: one of its levels). Its *Ways out*: one line (*ok*, for a Case after
 it), or *A line per answer of* one question: yes and no, each option of a choice, each level of a score (by its

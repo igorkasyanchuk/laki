@@ -5,7 +5,7 @@ import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { apiQuestions, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
-import { fresh, until } from './helpers.ts'
+import { fresh, sleep, until } from './helpers.ts'
 
 // every kind of block, loops limited by a max and an ask
 const LOOPS = `# Loops
@@ -792,4 +792,75 @@ test('workflow extension block: fetched now, its data as variables; an off one i
   assert.equal(r.vars['steps.disk.vol'], '{"a":1}')
   assert.equal(JSON.parse(r.vars['steps.disk.data']).free, 9)
   assert.equal(r.vars['steps.say.output'].trim(), '9 {"a":1}')
+})
+
+// retry: a bad exit tries the block again (10 s, then 60 s), its tries kept apart from its visits; a run block's
+// retry on: only those exit codes
+const RETRY = `# Retry
+Tests until they pass, twice more.
+
+runs in: main · session: new
+
+## start
+input: task
+next: t
+
+## t
+name: Tests
+run: echo try; exit 1
+retry: 2 · retry on: 1, 75
+ok: e
+fail: bad
+
+## e
+end: success
+
+## bad
+end: failed
+`
+test('workflow retries: tries again after a fail (10 s, then 60 s), only on its exit codes; a stop while it waits', async t => {
+  const { workflow, problems } = parse(RETRY, 'retry')
+  assert.deepEqual([problems, check(workflow)], [[], []])
+  assert.equal(toFile(workflow), RETRY, 'round trip')
+  assert.deepEqual([workflow.blocks[1].retry, workflow.blocks[1].retryOn], [2, [1, 75]])
+  const says = (f: (b: any) => void) => check({ ...workflow, blocks: workflow.blocks.map(b => (b.id === 't' ? (x => (f(x), x))({ ...b }) : b)) }).join('\n')
+  assert.match(says(b => (b.retry = 9)), /Tests: retry: 9\? 1 to 5 tries again/)
+  assert.match(says(b => (b.kind = 'save')), /retry: is for agent, run, AI call, AI decision and extension blocks/)
+  assert.match(says(b => (b.retry = undefined)), /retry on: needs retry:/)
+  assert.match(parse('## t\nrun: x\nretry: often\nretry on: 0\n', 'x').problems.join('\n'), /retry: how many times[\s\S]*retry on: exit codes, 1 to 255/)
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'retry', text: RETRY })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const run = await rig.rpc('flowStart', { workflow: 'retry', project: p.id, task: 'x' })
+  const waits = (n: number) => until(async () => (x => x.wait?.kind === 'retry' && x.decisions.length === n && x)(await get(run.id)), `try ${n}`)
+  let r = await waits(2)
+  assert.ok(r.wait.until - Date.now() > 8000 && r.wait.until - Date.now() <= 10000, '10 s first')
+  assert.ok(r.log.some((l: string) => / Tests: tries again \(2 of 3\) in 10 s: exit 1: try$/.test(l)), r.log.join('\n'))
+  await rig.rpc('flowTick', { now: Date.now() + 11000 })
+  r = await waits(3)
+  assert.ok(r.wait.until - Date.now() > 55000, '60 s after that')
+  await rig.rpc('flowTick', { now: Date.now() + 61000 })
+  r = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(run.id)), 'the end')
+  assert.equal(r.status, 'failed')
+  assert.deepEqual(r.decisions.map((d: any) => `${d.block}:${d.exit}`), ['start:next', 't:retry', 't:retry', 't:fail'])
+  assert.deepEqual([r.visits.t, r.tries.t], [1, 2], 'a try again is no visit')
+
+  // exit 1 isn't one of retry on's: its way at once
+  await rig.rpc('flowSave', { id: 'retry', text: RETRY.replace('retry on: 1, 75', 'retry on: 75') })
+  const once = await rig.rpc('flowStart', { workflow: 'retry', project: p.id, task: 'y' })
+  r = await until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(once.id)), 'the end')
+  assert.deepEqual(r.decisions.map((d: any) => d.exit), ['next', 'fail'])
+
+  // stopped while it waits: no try after
+  await rig.rpc('flowSave', { id: 'retry', text: RETRY })
+  const stop = await rig.rpc('flowStart', { workflow: 'retry', project: p.id, task: 'z' })
+  await until(async () => (await get(stop.id)).wait?.kind === 'retry', 'its wait')
+  await rig.rpc('flowStop', { id: stop.id })
+  await rig.rpc('flowTick', { now: Date.now() + 61000 })
+  await sleep(500)
+  r = await get(stop.id)
+  assert.deepEqual([r.status, r.decisions.map((d: any) => d.exit), r.visits.t], ['stopped', ['next', 'retry'], 1])
 })
