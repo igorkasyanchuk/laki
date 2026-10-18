@@ -391,9 +391,55 @@ the daemon either way.
 | `rail` | a button among the rail's icons (no rail: the sidebar's foot) | a button |
 | `foot` | a button in the sidebar's foot, beside Video, Meme and Timer | a button |
 | `desk` | a tile on the Desk page (experimental), sized there | its full view, else its preview |
+| `panel` | a tab of the right panel (⌥⌘B), after Info, Files, Changes, Review and Preview | its full view, else its preview, the panel's width |
+| `row` | a mark on each workspace's row in the sidebar (per workspace only) | its `badge` (else `label`), its `tip` on hover |
 
 `widget.json`'s `place` is where it starts; the user moves it in its settings (Settings › Extensions › the extension ›
-*Sidebar / Top bar / Status bar / Rail / Sidebar foot / Desk*, one or several). For the bars, design it ½ high: a number and a word, a few links.
+*Sidebar / Top bar / Status bar / Rail / Sidebar foot / Desk / Right panel / Workspace rows*, one or several). For the
+bars, design it ½ high: a number and a word, a few links.
+
+A `row` extension is fetched for every live workspace, not only the one on screen (4 at a time; the rest at the next
+ticks): keep its fetch cheap and its `every` long. A click on its mark runs its `click` action in that workspace, else
+selects the workspace. A `panel` one per workspace shows the workspace the panel is for.
+
+## Actions where you work (`show`, `key`)
+
+An action in its object form can be offered where you work, not only on its buttons: in ⌘K, a workspace's, a tab's or
+a file's right click, a shortcut, or the new-workspace prompt. A command's or an agent's (`ai`) alike:
+
+```json
+"actions": {
+  "explain": {
+    "run": "./explain.sh",
+    "title": "Explain this file",
+    "show": ["file", "palette"],
+    "match": ["*.ts", "*.tsx"],
+    "key": "Alt+Cmd+E",
+    "ask": "What should it focus on?",
+    "confirm": "Run it on the whole workspace?",
+    "insert": true
+  }
+}
+```
+
+| field | what |
+|---|---|
+| `title` | its label (unset: its name in words, `explain-file` is *Explain file*) |
+| `show` | where it's offered: `palette` (⌘K, as *<name>: <title>*), `workspace` (a workspace's ⋯ and right click), `tab` (a tab's right click), `file` (a file's right click in Files), `prompt` (the new-workspace prompt's Insert menu) |
+| `match` | with `file`: the files it's for, as globs (`*.ts`, `docs/**/*.md`; one without `/` matches the name); unset: every file |
+| `key` | a shortcut, with Alt or Ctrl (⌘ and ⌘⇧ alone are Laki's): it runs with the workspace and tab you're in |
+| `ask` | a question first: the answer is its `$WIDGET_ARG` (Cancel: it doesn't run) |
+| `confirm` | a yes or no first |
+| `insert` | what it prints (its JSON's `"insert"`, else all of it) goes into the prompt: the box it was picked in, else the workspace's agent's prompt (typed, not sent), else the clipboard |
+| `view` | its full view opens after it runs: a **file opener** prints `{"data": …}` about `$LAKI_FILE`, and its full view shows it |
+
+Where it was picked comes with it: `$LAKI_CTX` (JSON: `ws`, the workspace as `$LAKI_WIDGET_WS` has it; `tab`, `{ id,
+name, agent }`; `file`, `{ path, abs }`), `$LAKI_FILE` (the file's absolute path), `$LAKI_TAB` and `$LAKI_TAB_NAME`, and
+the workspace's `$LAKI_WORKSPACE`, `$LAKI_BRANCH`, `$LAKI_PATH`, `$PORT`… An agent's prompt fills `{{file.path}}`,
+`{{tab.name}}` and `{{workspace.branch}}`. Laki checks it first: the workspace live (not a terminal's, a browser's or an
+SSH host's), the tab its own, the file inside it (links followed). A per-workspace extension's action runs in its own
+workspace only. An agent's `laki widget action` gets no ctx (it has its own `$LAKI_WORKSPACE`), and is asked first as
+before.
 
 ## Its preview with made-up data (`sample`)
 

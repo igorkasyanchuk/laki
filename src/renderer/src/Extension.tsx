@@ -13,9 +13,9 @@ import { highlight } from './highlight'
 import { Markdown } from './MarkdownView'
 import { SourceField, WidgetCard, type WidgetsApi } from './Settings'
 import { ask, escapes, Icon, IconButton, Page } from './ui'
-import { CellButton, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
+import { CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
-export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk' }
+export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
 export const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
 export type ExtTab = 'overview' | 'data' | 'runs' | 'env' | 'files' | 'check'
@@ -192,7 +192,8 @@ function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetA
   const made: boolean | string = sample && (v || true)
   const place = placesOf(w)[0] ?? 'side'
   const bar = place === 'top' || place === 'status'
-  const desk = place === 'desk' // a tile there: its full view when it has one, sized on the Desk
+  const desk = place === 'desk' || place === 'panel' // a tile there (a right panel's tab: as wide): its full view when it has one
+  const row = place === 'row' // its mark on a row: its instance's badge
   const button = w.button || place === 'rail' || place === 'foot'
   return (
     <>
@@ -234,14 +235,22 @@ function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetA
         <div className="ext-stage">
           <span className="ext-where muted small">
             {WHERE[place] ?? place}
-            {!button && !desk && ` · ${w.size[0]}×${half(w.size[1])}`}
+            {!button && !desk && !row && ` · ${w.size[0]}×${half(w.size[1])}`}
           </span>
-          {button ? (
+          {row ? (
+            <div className="ext-row">
+              <span className="ws-ext">
+                <Glyph w={w} size={10} />
+                {(i => i?.badge ?? i?.label ?? w.badge ?? w.label ?? '—')(w.here ? w.inst?.[w.here] : undefined)}
+              </span>
+              <span className="muted small">{w.badge || w.label ? 'its badge, filled from each workspace’s data' : 'no badge or label in widget.json: nothing shows'}</span>
+            </div>
+          ) : button ? (
             <div className="ext-button">
               <CellButton w={w} api={api} />
             </div>
           ) : (
-            <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : desk ? { width: 400, height: 260 } : { width: w.size[0] * 92, height: w.size[1] * 64 }}>
+            <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : place === 'panel' ? { width: 320, height: 300 } : desk ? { width: 400, height: 260 } : { width: w.size[0] * 92, height: w.size[1] * 64 }}>
               <WidgetBody key={`${made}`} w={w} full={desk && !!w.full} api={api} sample={made} cells={bar ? [w.size[0], 0.5] : desk ? [3, 4] : w.size} />
             </div>
           )}

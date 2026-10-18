@@ -596,9 +596,13 @@ export type WidgetSource = { kind: (typeof WIDGET_SOURCES)[number]; text?: strin
 export const AI_SOURCE_EVERY = 60 // minutes between an AI source's runs unless set; 15 at least: each one costs
 // what the user hid of an extension (its switches): its refresh buttons, when it was fetched
 export type WidgetHide = { refresh?: boolean; at?: boolean }
-export type WidgetView = { id: string; name: string; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; actions?: string[]; config: Record<string, string>; options: WidgetOption[]; missing?: string[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[] } // history: the studio's Undo, when each kept version was taken (ms), oldest first
+export type WidgetView = { id: string; name: string; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; actions?: string[]; menus?: WidgetMenu[]; config: Record<string, string>; options: WidgetOption[]; missing?: string[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[] } // history: the studio's Undo, when each kept version was taken (ms), oldest first
 // an action an agent may call (its tool): Always granted in these workspaces ('': calls from none, Laki AI's)
 export type WidgetTool = { action: string; description: string; ask: 'always' | 'first' | 'never'; grants: string[] }
+// an action offered where you work (widget.json's title, show, match, key, ask, confirm, insert, view: widgetSchema.ts actionMenu)
+export type WidgetMenu = { action: string; title: string; show: string[]; match?: string[]; key?: string; ask?: string; confirm?: string; insert?: boolean; view?: boolean }
+// where an action was picked (widgetAction ctx): a workspace, its tab, a file of it (relative)
+export type WidgetCtx = { ws?: string; tab?: string; file?: string }
 // here: the app's (Widgets.tsx inWs), the workspace whose instance a per-workspace one shows; null: none on screen
 // a scope workspace extension's instance in a workspace (WidgetView.inst, by its id): its last fetch and its button's words
 export type WidgetInst = { at?: number; error?: string; running?: boolean; mock?: string; label?: string; badge?: string; tip?: string }
@@ -607,7 +611,7 @@ export type WidgetSize = 's' | 'm' | 'l'
 // right end), the rail (a button among its icons; without the rail, the sidebar's foot), the sidebar's foot (a button
 // beside Video, Meme and Timer) or the Desk (experimental: a page of tiles, each resized there). Any of them at once:
 // places (place is the first of them, for an older app)
-export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot', 'desk'] as const
+export const WIDGET_PLACES = ['side', 'top', 'status', 'rail', 'foot', 'desk', 'panel', 'row'] as const // panel: a right-panel tab; row: a mark on each workspace's row (per workspace only)
 export const placesOf = (w: { place?: WidgetPlace; places?: WidgetPlace[] }): WidgetPlace[] => (w.places?.length ? w.places : [w.place ?? 'side'])
 export const BUTTON_PLACES: readonly WidgetPlace[] = ['rail', 'foot']
 export type WidgetPlace = (typeof WIDGET_PLACES)[number]

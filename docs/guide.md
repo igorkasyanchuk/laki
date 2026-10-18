@@ -770,8 +770,10 @@ mark, its author's picture and the other marks to one size.
 Extensions (also called widgets or plugins: one and the same) are small live pages. The SDK, in one page:
 [extensions.md](extensions.md).
 
-Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar*, *Status bar*, *Rail* or
-*Sidebar foot*): the sidebar's grid (the default), the top bar left of its buttons, or the status bar's right end; the
+Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar*, *Status bar*, *Rail*,
+*Sidebar foot*, *Desk*, *Right panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
+bar left of its buttons, the status bar's right end, a tab of the right panel (⌥⌘B), or a mark on each workspace's row
+(a per-workspace one: its count for that workspace, its tip on hover); the
 bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, in the sidebar's foot)
 or in the sidebar's foot (beside Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
 a badge with a count and a tooltip, which its fetch keeps up to date in the background, and a click that runs one of
@@ -779,7 +781,12 @@ its actions (none: its full view, or a fetch now). One with no preview of its ow
 half that: ½, a thin line, like *Links*, its sites as plain words with a rule between them, wrapping when they don't fit),
 plain values on the sidebar (no tiles; Settings › Extensions turns them on and off). A click on one opens its full view in a dialog, small, medium or large (its *view* in
 Settings › Extensions: large for wide tables; ↻ fetches now, the sliders its settings).
-Links open in the browser; an extension's buttons can run commands its `widget.json` names (*Review in Laki*). While one
+Links open in the browser; an extension's buttons can run commands its `widget.json` names (*Review in Laki*). Its
+actions can also show up where you work: in ⌘K (*<its name>: <action>*), a workspace's ⋯ and right click, a tab's
+right click, a file's right click in Files (by its kinds of file: *Explain this file*, or an opener that shows the
+file in its full view), a shortcut of its own (with ⌥ or ⌃), and the new-workspace prompt's *Insert* menu (its text at
+the cursor). One may ask you something first, or ask you to confirm; what it prints can go into the prompt (the box,
+else the workspace's agent's, not sent). While one
 runs, a toast in the bottom right says so (and the button waits); what it prints decides what shows after: a line as
 a toast, or JSON with `toast` and `modal` (a dialog with a title, text and up to 4 buttons, each running another of
 its actions, opening a link or closing it; none: OK). An extension's page can do the same from its script:

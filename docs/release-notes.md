@@ -18,6 +18,11 @@ version it builds, with the date. -->
 - **Settings an extension needs**: `"required": true` on one; My PRs needs its Repo: turned on without it, its page
   opens at that field, and its cell says *Set Repo*.
 - **Per-workspace extensions on the Desk** show the workspace you picked last, named on the tile.
+- **Extensions where you work**: an extension's actions can show up in ⌘K, a workspace's, tab's or file's right
+  click, a shortcut of their own, and the new-workspace prompt's *Insert* menu; they can ask first, confirm, put their
+  text in the prompt, or open their full view (a file opener).
+- **Two more places for extensions**: a tab of the right panel, and a mark on each workspace's row (a per-workspace
+  one's count for that workspace).
 - Extensions fixed: an agent's source runs at most every few minutes whatever asks; a burst of events fetches once; a
   fetch that keeps failing waits longer each time; a notice isn't lost while the app is closed; a workspace's archive
   and removal reach its per-workspace extensions; agents' tool asks wait their turn instead of denying each other; the

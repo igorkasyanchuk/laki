@@ -1822,6 +1822,8 @@ const PLACES: [WidgetPlace, string, string][] = [
   ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
   ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside Video, Meme and Timer'],
   ['desk', 'Desk', 'A tile on the Desk page (experimental), sized there'],
+  ['panel', 'Right panel', 'A tab of the right panel (⌥⌘B), beside Info and Files'],
+  ['row', 'Workspace rows', 'A mark on each workspace’s row in the sidebar: its badge (per workspace only)'],
 ]
 const VIEWS: [WidgetSize, string][] = [
   ['s', 'Small'],
@@ -1989,7 +1991,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         <b>{w.name}</b>
         {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
         <span className="grow" />
-        <button type="button" className="wc-place" data-tip="Where it shows: one place or several" aria-label="Where it shows" onClick={e => openMenu(e, PLACES.filter(([v]) => v !== 'desk' || api.desk || placesOf(w).includes('desk')).map(([v, n, tip]) => ({ label: n, tip, hint: placesOf(w).includes(v) ? ON : undefined, run: () => {
+        <button type="button" className="wc-place" data-tip="Where it shows: one place or several" aria-label="Where it shows" onClick={e => openMenu(e, PLACES.filter(([v]) => (v !== 'desk' || api.desk || placesOf(w).includes('desk')) && (v !== 'row' || w.scope === 'workspace')).map(([v, n, tip]) => ({ label: n, tip, hint: placesOf(w).includes(v) ? ON : undefined, run: () => {
           const now = placesOf(w)
           const next = now.includes(v) ? now.filter(x => x !== v) : [...now, v]
           if (next.length) void api.set(w.id, { place: next })

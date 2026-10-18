@@ -105,7 +105,9 @@ a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `fl
 `source` (null: widget.json's), the inspector's Files from `widgetFiles`' texts; 79: `widgetFileSave`, `widgetRender`
 `sample` as a fixture's name, a widget's `fixtures`; 80: an AI source (`widgetSet` `source` `ai`), settings' `widgetAgent`; 81: a widget's `agent`, `resourceStop` `agent:<id>`, `widgetRm` waits; 82: a widget's `hide` (`refresh`, `at`), `widgetSet` `hide`; 83: schedules' `widget`/`action`, workflows' `extension` block, a widget's `actions`; 84: a `secret` setting (the view's
 `config` '' and its option's `set`), `widgetRm` to the trash, `widgetRestore`/`widgetTrash`, `from` on `widgetAction`/`widgetSet`/`widgetDev`/`widgetCheck` (an agent's: asked, refused, left off), a
-setting's `required` and the view's `missing`. A
+setting's `required` and the view's `missing`, the `panel` and `row` places (a row's instances fetched for every live
+workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
+`widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1137,6 +1139,20 @@ opens the page at that field, `ExtensionPage` `edit`, the field's `data-key`; `C
 renderer: tool asks wait in a `Line` (text.ts; `toolShow`, a notification's click is `front`), Remix is always there
 (`laki widget remix`), `AiPage` `chat` (the Extension page's `widget:<id>`), the Desk shows the selected workspace's
 instances (`covered` leaves it out; `DeskPage` `wsName`).
+
+Where you work (Part C; `test/widget-places.test.ts`): `WIDGET_PLACES` adds `panel` (SidePanel's `ext` tabs, `PanelTab`
+`ext:<id>`, Widgets.tsx' `WidgetPanel`) and `row` (`RowMarks` on App's `wsRow`, an instance's `badge` else `label`; scope
+workspace only: `manifestCheck` and `widgetSet` refuse a global one; `shownIn` fetches every `instOk` workspace's while
+a window is shown, `AT_ONCE` at a time). An object action's `MENU` fields (widgetSchema.ts: `ACTION_SHOWS` palette,
+workspace, tab, file, prompt; `match` globs, `globMatch`; `key`, `normKey`/`pressOf`, Alt or Ctrl in it, a plain ⌘ one
+warned and never taken; `menuCheck`) become the view's `menus` (`actionMenu`, `WidgetMenu`). `widgetAction` `ctx`
+(`WidgetCtx`, `ctxOf`: a live `instOk` workspace, a scoped one's own; a tab of it; a file `inside` it) adds `$LAKI_CTX`,
+`$LAKI_FILE`, `$LAKI_TAB`, the workspace's env for a global one (`infoEnv`, no `LAKI_WIDGET_FILE`) and an AI action's
+`{{file.path}}`/`{{tab.name}}`; none from an agent or an event. `insert` (the JSON's, else all of stdout with `insert:
+true`, `INSERT_MAX`) comes back for the prompt. The renderer: App's `extMenus`/`extItems`/`extRun` (confirm (`ask`),
+ask (ui.tsx `askText`, AskHost's `field`), `widgetAction`, then insert: the box's `into` (PromptInput `inserts`, the
+new-workspace page's), else `intoAgent` (the Preview's `toPrompt` too), else the clipboard; `view`: its full view), in
+the palette, `wsMenu`, `tabMenu`, `fileMenu` and the capture keys (before `act`, Alt or Ctrl only).
 
 Sources (`test/widget-source.test.ts`): `types.ts` `WIDGET_SOURCES`, `WidgetSource`; widget.json's `source` the
 default, the store's (`widgetSet` `source`, `sourceOk`: a static text 64 KB, a path, an http(s) URL; `fetch` only with

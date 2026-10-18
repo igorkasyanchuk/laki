@@ -79,13 +79,21 @@ export function Switch({ on, onChange, tip, className = '', disabled, children }
 // buttons (a widget's modal), the index picked, -1 for none; check: a checkbox under the text, its on as it was left.
 type Choice = { label: string; primary?: boolean; danger?: boolean }
 type Check = { label: string; on: boolean }
-type Asking = { title: string; text?: string; buttons: Choice[]; check?: Check; done: (i: number) => void; tag?: string }
+type Field = { value: string; placeholder?: string }
+type Asking = { title: string; text?: string; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
 export const ask = (title: string, o: { text?: string; ok?: string; danger?: boolean } = {}) =>
   new Promise<boolean>(done =>
     asker ? asker({ title, text: o.text, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
   )
 export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string) => new Promise<number>(done => (asker ? asker({ title, text, buttons, check, done, tag }) : done(-1)))
+// a line typed in the app's own dialog (an extension action's ask): the text, or null for Cancel, Esc or outside
+export const askText = (title: string, o: { text?: string; ok?: string; placeholder?: string } = {}) =>
+  new Promise<string | null>(done => {
+    const field: Field = { value: '', placeholder: o.placeholder }
+    if (!asker) return done(null)
+    asker({ title, text: o.text, field, buttons: [{ label: o.ok ?? 'OK', primary: true }, { label: 'Cancel' }], done: i => done(i === 0 ? field.value : null) })
+  })
 // unchoose: closes the dialog choose showed with that tag, as none (-1): answered elsewhere (a tool's notification)
 let closer: ((tag: string) => void) | null = null
 export const unchoose = (tag: string) => closer?.(tag)
@@ -106,8 +114,9 @@ export function AskHost() {
   const onKey = useRef<(e: KeyboardEvent) => void>(() => {})
   onKey.current = e => {
     if (!cur.current || e.metaKey || e.ctrlKey || e.altKey) return
-    e.preventDefault()
     e.stopPropagation()
+    if (document.activeElement?.matches('.ask-field input') && !['Escape', 'Enter', 'Tab'].includes(e.key)) return // typing in it
+    e.preventDefault()
     const btns = [...(box.current?.querySelectorAll('button') ?? [])]
     const at = btns.indexOf(document.activeElement as HTMLButtonElement)
     const n = btns.length
@@ -115,7 +124,7 @@ export function AskHost() {
     else if (e.key === ' ' && document.activeElement?.matches('.ask-check input')) (document.activeElement as HTMLInputElement).click()
     else if (e.key === 'Enter') close(at >= 0 ? at : cur.current.a.buttons.findIndex(b => b.primary))
     else if (e.key === 'Tab') {
-      const all = [...(box.current?.querySelectorAll<HTMLElement>('.ask-check input, button') ?? [])] // the checkbox too (Space toggles it)
+      const all = [...(box.current?.querySelectorAll<HTMLElement>('.ask-field input, .ask-check input, button') ?? [])] // the checkbox too (Space toggles it)
       const i = all.indexOf(document.activeElement as HTMLElement)
       all[(i + (e.shiftKey ? all.length - 1 : 1)) % all.length]?.focus()
     } else if (['ArrowLeft', 'ArrowRight'].includes(e.key)) btns[(at + (e.key === 'ArrowLeft' ? n - 1 : 1)) % n]?.focus()
@@ -135,13 +144,18 @@ export function AskHost() {
       window.removeEventListener('keydown', f, true)
     }
   }, [])
-  useEffect(() => box.current?.querySelector<HTMLButtonElement>('button.primary')?.focus(), [a])
+  useEffect(() => box.current?.querySelector<HTMLElement>('.ask-field input, button.primary')?.focus(), [a])
   if (!a) return null
   return (
     <div className="overlay ask-overlay" onMouseDown={e => e.target === e.currentTarget && close(-1)}>
       <div className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
         <div className="ask-title">{a.title}</div>
         {a.text && <p className="ask-text">{a.text}</p>}
+        {a.field && (
+          <label className="ask-field">
+            <input defaultValue={a.field.value} placeholder={a.field.placeholder} spellCheck={false} onChange={e => (a.field!.value = e.target.value)} />
+          </label>
+        )}
         {a.check && (
           <label className="ask-check">
             <input type="checkbox" checked={on} onChange={e => setOn((a.check!.on = e.target.checked))} /> {a.check.label}

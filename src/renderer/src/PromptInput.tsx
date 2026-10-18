@@ -38,6 +38,7 @@ export function PromptInput(p: {
   rows?: number
   tools?: ReactNode // the toolbar's right end
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
+  inserts?: { label: string; sub?: string; run: () => Promise<string | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const [err, setErr] = useState('')
@@ -49,6 +50,14 @@ export function PromptInput(p: {
   const voice = useVoice()
   const cloud = cloudVoice()
   const talk = () => (voice.phase === 'listening' ? voiceStop() : (box.current?.focus(), void voiceStart()))
+  // an extension's text at the cursor (over what's selected), the box focused after it
+  const insertText = (t: string) => {
+    const el = box.current
+    const v = p.value
+    const [a, b] = el ? [el.selectionStart, el.selectionEnd] : [v.length, v.length]
+    p.onChange(v.slice(0, a) + t + v.slice(b))
+    requestAnimationFrame(() => el && (el.focus(), el.setSelectionRange(a + t.length, a + t.length)))
+  }
   const saving = useRef(0)
   const add = async (files: File[]) => {
     setErr('')
@@ -157,6 +166,11 @@ export function PromptInput(p: {
               </button>
             )}
           </span>
+        )}
+        {!!p.inserts?.length && (
+          <button type="button" className="ib" aria-label="Insert from an extension" aria-haspopup="menu" data-tip="Insert from an extension" onMouseDown={e => e.preventDefault()} onClick={e => openMenu(e, [{ head: 'Insert' }, ...p.inserts!.map(x => ({ label: x.label, sub: x.sub, icon: 'panel' as const, run: () => void x.run().then(t => t && insertText(t), er => setErr(String(er?.message ?? er))) }))])}>
+            <Icon name="panel" />
+          </button>
         )}
         {err && <span className="warn small">{err}</span>}
         {p.tools && <span className="prompt-tools-end">{p.tools}</span>}

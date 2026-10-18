@@ -35,7 +35,60 @@ const SPEC: J = {
     },
   ],
 }
-const PLACE = { enum: WIDGET_PLACES, description: 'side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk)' }
+const PLACE = { enum: WIDGET_PLACES, description: 'side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk), panel (a tab in the right panel), row (a mark on each workspace’s row: per workspace only)' }
+
+// an action offered where you work (its object form's menu fields; actionMenu reads them, manifestCheck checks them)
+export const ACTION_SHOWS = ['palette', 'workspace', 'tab', 'file', 'prompt'] as const
+export const MENU_KEYS = ['title', 'show', 'match', 'key', 'ask', 'confirm', 'insert', 'view']
+const MENU: Record<string, J> = {
+  title: str('Its label in menus and the palette (unset: its name in words)'),
+  show: { type: 'array', items: { enum: ACTION_SHOWS }, description: 'Where it’s offered: palette (⌘K), workspace (a workspace’s ⋯ and right click), tab (a tab’s right click), file (a file’s right click in Files, by match), prompt (a prompt box’s Insert menu)' },
+  match: { type: 'array', items: { type: 'string' }, description: 'With file: the files it’s for, as globs (*.ts, docs/**/*.md; one without / matches the name); unset: every file' },
+  key: str('A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt or Ctrl: Cmd and Cmd+Shift alone are Laki’s)'),
+  ask: str('A question asked first; the answer is its $WIDGET_ARG'),
+  confirm: str('A yes or no asked first ("Run it on the whole workspace?")'),
+  insert: { type: 'boolean', description: 'What it prints (its JSON’s "insert", else all of it) goes into the prompt: the box it was picked in, else the focused agent’s, unsent' },
+  view: { type: 'boolean', description: 'Its full view opens after it runs: a file opener (show file, its data from what it prints as { "data" })' },
+}
+// a name in words: explain-file, explainFile: Explain file
+export const words = (n: string) => (s => s.charAt(0).toUpperCase() + s.slice(1))(n.replace(/[-_.]+/g, ' ').replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().trim())
+// a shortcut as Laki writes it: Ctrl, Alt, Shift, Cmd in that order, then the key (a letter or digit upper case, F1-F12,
+// a named key); undefined: not one (no Cmd, Ctrl or Alt, or not one key)
+const MOD: Record<string, string> = { cmd: 'Cmd', command: 'Cmd', meta: 'Cmd', super: 'Cmd', '⌘': 'Cmd', ctrl: 'Ctrl', control: 'Ctrl', '⌃': 'Ctrl', alt: 'Alt', option: 'Alt', opt: 'Alt', '⌥': 'Alt', shift: 'Shift', '⇧': 'Shift' }
+const NAMED = ['Enter', 'Space', 'Tab', 'Backspace', 'Delete', 'Escape', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Home', 'End', 'PageUp', 'PageDown', ',', '.', '/', ';', "'", '[', ']', '\\', '-', '=', '`']
+export function normKey(s: unknown): string | undefined {
+  if (typeof s !== 'string') return
+  const parts = s.split('+').map(x => x.trim()).filter(Boolean)
+  const mods = new Set<string>()
+  let key: string | undefined
+  for (const p of parts) {
+    const m = MOD[p.toLowerCase()]
+    if (m) mods.add(m)
+    else if (key) return
+    else key = /^[a-z0-9]$/i.test(p) ? p.toUpperCase() : /^f([1-9]|1[0-2])$/i.test(p) ? p.toUpperCase() : NAMED.find(n => n.toLowerCase() === p.toLowerCase())
+  }
+  if (!key || !(mods.has('Cmd') || mods.has('Ctrl') || mods.has('Alt'))) return
+  return [...['Ctrl', 'Alt', 'Shift', 'Cmd'].filter(m => mods.has(m)), key].join('+')
+}
+// a key press as normKey writes it (letters and digits by their place: Alt changes what they type on a Mac)
+export function pressOf(e: { metaKey: boolean; ctrlKey: boolean; altKey: boolean; shiftKey: boolean; key: string; code: string }) {
+  const k = /^Key[A-Z]$/.test(e.code) ? e.code.slice(3) : /^Digit\d$/.test(e.code) ? e.code.slice(5) : e.key === ' ' ? 'Space' : e.key.length === 1 ? e.key.toUpperCase() : e.key
+  return [e.ctrlKey && 'Ctrl', e.altKey && 'Alt', e.shiftKey && 'Shift', e.metaKey && 'Cmd', k].filter(Boolean).join('+')
+}
+// a glob over a path in the workspace: * (not /), ** (any folders), ?; one without / matches the file's name
+export function globMatch(glob: string, path: string) {
+  const re = glob.replace(/[.+^${}()|[\]\\]/g, '\\$&').replace(/\*\*\//g, '\0').replace(/\*\*/g, '\x01').replace(/\*/g, '[^/]*').replace(/\?/g, '[^/]').replace(/\0/g, '(?:.*/)?').replace(/\x01/g, '.*')
+  return new RegExp(`^${re}$`).test(glob.includes('/') ? path : (path.split('/').pop() ?? path))
+}
+export type ActionMenu = { title: string; show: string[]; match?: string[]; key?: string; ask?: string; confirm?: string; insert?: boolean; view?: boolean }
+// where an action is offered: one with show or a key (an object action's menu fields)
+export function actionMenu(name: string, a: unknown): ActionMenu | undefined {
+  if (!isObj(a) || !(Array.isArray(a.show) || typeof a.key === 'string')) return
+  const show = Array.isArray(a.show) ? a.show.filter(s => (ACTION_SHOWS as readonly unknown[]).includes(s)).map(String) : []
+  const key = normKey(a.key)
+  if (!show.length && !key) return
+  return { title: typeof a.title === 'string' && a.title.trim() ? a.title.trim() : words(name), show, ...(Array.isArray(a.match) && { match: a.match.filter(m => typeof m === 'string') }), ...(key && { key }), ...(typeof a.ask === 'string' && a.ask.trim() && { ask: a.ask }), ...(typeof a.confirm === 'string' && a.confirm.trim() && { confirm: a.confirm }), ...(a.insert === true && { insert: true }), ...(a.view === true && { view: true }) }
+}
 
 // every key widget.json takes, read by daemon/widgets.ts (test/widget-check.test.ts holds the two in step)
 // an action's tool: its fields' types, how it asks (toolOf, below)
@@ -66,6 +119,7 @@ export const MANIFEST: Record<string, J> = {
           required: ['run'],
           properties: {
             run: str('The command'),
+            ...MENU,
             tool: {
               type: 'object',
               additionalProperties: false,
@@ -87,11 +141,12 @@ export const MANIFEST: Record<string, J> = {
             ai: str('An agent answers this prompt ({{arg}}, {{config.x}}, {{data.x}}, {{workspace.branch}} filled in), with the user’s own MCP servers; its answer shows in a dialog, or its json block’s { "toast" }, { "modal" } or { "data" }'),
             tools: str('Claude’s tools it may use unasked, by name, comma-separated (mcp__slack__post_message); others are refused'),
             profile: str('A claude or codex profile (unset: Settings › Extensions’ agent)'),
+            ...MENU,
           },
         },
       ],
     },
-    description: 'Commands its buttons run by name, with $WIDGET_ARG: a command, { "run", "tool" } (agents may call it), or { "ai": a prompt } (an agent answers it); what one prints as JSON may say { "toast" }, { "modal" } or { "data" }',
+    description: 'Commands its buttons run by name, with $WIDGET_ARG: a command, { "run", "tool" } (agents may call it), or { "ai": a prompt } (an agent answers it); what one prints as JSON may say { "toast" }, { "modal" }, { "data" } or { "insert" }. title, show, match, key, ask, confirm, insert and view offer it in the palette, menus, a shortcut and the prompt, with $LAKI_CTX (the workspace, tab or file it was picked on)',
   },
   notify: str('A notification, a template over its data ("{{#if mentions}}{{mentions}} new mentions{{/if}}"): posted when it reads as something new after a fetch, not empty and not what it last said'),
   icon: str('As a button: an icon of Laki’s by name, or an emoji'),
@@ -202,6 +257,19 @@ interface Window {
 // fetch or script. A one-file extension's (from its comment lines) too
 const kindOf = (v: unknown) => (Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v)
 const isObj = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
+// an action's menu fields (title, show, match, key, ask, confirm, insert, view)
+function menuCheck(where: string, c: Record<string, unknown>, say: (level: UiProblem['level'], where: string, text: string) => void) {
+  for (const k of ['title', 'ask', 'confirm']) if (c[k] !== undefined && (typeof c[k] !== 'string' || !String(c[k]).trim())) say('error', `${where}.${k}`, 'a text')
+  for (const k of ['insert', 'view']) if (c[k] !== undefined && typeof c[k] !== 'boolean') say('error', `${where}.${k}`, 'true or false')
+  if (c.show !== undefined && !Array.isArray(c.show)) say('error', `${where}.show`, `a list: ${ACTION_SHOWS.join(', ')}`)
+  for (const v of Array.isArray(c.show) ? c.show : []) if (!(ACTION_SHOWS as readonly unknown[]).includes(v)) say('error', `${where}.show`, `${JSON.stringify(v)}: one of ${ACTION_SHOWS.join(', ')}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(v), ACTION_SHOWS))}`)
+  if (c.match !== undefined && !(Array.isArray(c.match) && c.match.length && c.match.every(m => typeof m === 'string' && m))) say('error', `${where}.match`, 'a list of globs: ["*.ts", "docs/**/*.md"]')
+  else if (c.match !== undefined && !(Array.isArray(c.show) && c.show.includes('file'))) say('warn', `${where}.match`, 'only a file menu reads it: add "file" to show')
+  const key = normKey(c.key)
+  if (c.key !== undefined && !key) say('error', `${where}.key`, `${JSON.stringify(c.key)}: Cmd, Ctrl or Alt (Shift too) and one key, with + (Alt+Cmd+E)`)
+  else if (key && !/Alt|Ctrl/.test(key)) say('warn', `${where}.key`, `${key}: Cmd and Cmd+Shift alone are Laki's own keys: add Alt or Ctrl`)
+  if (c.view === true && !(Array.isArray(c.show) || c.key !== undefined)) say('warn', `${where}.view`, 'it opens the full view after a run from a menu: give it show or a key')
+}
 // a command that reaches past this Mac: a tool that never asks gets check's warning
 const OUTWARD = /\bgit\s+push\b|\bgh\s+(pr|release|issue|api)\b|\bcurl\b[^|;&]*-X\s*(POST|PUT|PATCH|DELETE)|\bdeploy|\bnpm\s+publish\b|\bkubectl\s+(apply|delete)\b/i
 const KEY = /^[A-Za-z_][A-Za-z0-9_]*$/
@@ -216,6 +284,7 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     say('error', 'widget.json size', `[across, down]: across 1-3, down ½ (0.5) or 1-4, not ${JSON.stringify(m.size)}`)
   if (m.every !== undefined && !(Number.isInteger(m.every) && (m.every as number) >= 1 && (m.every as number) <= 1440)) say('error', 'widget.json every', `minutes, 1 to 1440, not ${JSON.stringify(m.every)}`)
   if (m.view !== undefined && !VIEWS.includes(m.view as string)) say('error', 'widget.json view', `s, m or l, not ${JSON.stringify(m.view)}`)
+  if ((Array.isArray(m.place) ? m.place : [m.place]).includes('row') && m.scope !== 'workspace') say('error', 'widget.json place', 'row is a mark on each workspace’s row: it needs "scope": "workspace"')
   for (const p of m.place === undefined ? [] : Array.isArray(m.place) ? m.place : [m.place])
     if (!(WIDGET_PLACES as readonly string[]).includes(p as string)) say('error', 'widget.json place', `${JSON.stringify(p)} isn't a place: ${WIDGET_PLACES.join(', ')}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(p), WIDGET_PLACES))}`)
   if (m.fetch && m.script) say('error', 'widget.json', 'fetch or script, not both')
@@ -242,14 +311,16 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     if (isObj(c) && 'ai' in c && !('run' in c)) {
       if (typeof c.ai !== 'string' || !c.ai.trim()) say('error', where, 'ai: a prompt, what the agent answers')
       if (c.tools !== undefined && (typeof c.tools !== 'string' || /[\n\r]|^\s*-/.test(c.tools))) say('error', `${where}.tools`, 'tools by name, comma-separated (mcp__slack__post_message), no options')
-      for (const k of Object.keys(c)) if (!['ai', 'tools', 'profile'].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, ['ai', 'tools', 'profile']))}`)
+      for (const k of Object.keys(c)) if (![...['ai', 'tools', 'profile'], ...MENU_KEYS].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, [...['ai', 'tools', 'profile'], ...MENU_KEYS]))}`)
+      menuCheck(where, c, say)
       continue
     }
     if (!isObj(c) || typeof c.run !== 'string') {
       say('error', where, `a command (text), { "run": a command, "tool": … } or { "ai": a prompt }, not ${isObj(c) ? 'an object without run' : kindOf(c)}`)
       continue
     }
-    for (const k of Object.keys(c)) if (!['run', 'tool'].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, ['run', 'tool']))}`)
+    for (const k of Object.keys(c)) if (![...['run', 'tool'], ...MENU_KEYS].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, [...['run', 'tool'], ...MENU_KEYS]))}`)
+    menuCheck(where, c, say)
     if (c.tool === undefined) continue
     const t = c.tool
     if (!isObj(t)) {

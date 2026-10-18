@@ -4308,7 +4308,7 @@ export function ship(ref: string, message: string) {
 
 // a path in the workspace, links followed: a tracked link (or a linked folder) may point anywhere. A new file's
 // nearest folder there already is what's checked; a dangling link is out. ponytail: on an SSH host by name only
-function inside(ws: Workspace, rel: string) {
+export function inside(ws: Workspace, rel: string) {
   const abs = resolve(ws.path, rel)
   if (rel.trim() && abs.startsWith(ws.path + '/'))
     try {

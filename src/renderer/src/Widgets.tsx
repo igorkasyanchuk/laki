@@ -185,7 +185,7 @@ const click = (w: WidgetView, api: WidgetApi) =>
   w.here === null ? undefined : w.click ? void api.action(w.id, w.click, '', w.name, wsOf(w)).catch(() => {}) : w.full ? api.full(w.id) : w.every !== undefined ? void api.run(w.id, wsOf(w)).catch(() => {}) : api.settings(w.id)
 const tipOf = (w: WidgetView) => `${w.tip ?? w.name}${w.here === null ? ' · per workspace: select one' : status(w) ? ` · ${status(w)}` : ''}${w.dev ? ' · dev' : ''}${w.devError ? ` · last good version kept: ${w.devError}` : ''}${w.mock ? ' · sample data' : ''}`
 // its icon: one of the app's by name, an emoji as it is, else its name's first letter
-function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
+export function Glyph({ w, size = 14 }: { w: WidgetView; size?: number }) {
   if (isIconName(w.icon)) return <Icon name={w.icon} size={size} />
   return <span className="widget-glyph" style={{ fontSize: size - 1 }}>{w.icon && !/^[a-z]/i.test(w.icon) ? w.icon : ([...w.name.trim()][0] ?? '?').toUpperCase()}</span>
 }
@@ -245,6 +245,36 @@ function Cell({ w, api, parked, load, style, cells }: { w: WidgetView; api: Widg
       {!w.missing?.length && (w.error || w.running || w.devError) && <span className={`widget-dot ${(w.error || w.devError) && !w.running ? 'bad' : ''}`} />}
       {w.mock && <span className="widget-mock">Sample data</span>}
     </div>
+  )
+}
+
+// place panel: a tab of the right panel, its full view (else its preview) the panel's width; a per-workspace one's
+// instance in the workspace the panel is for
+export function WidgetPanel({ w, api }: { w: WidgetView; api: WidgetApi }) {
+  return (
+    <div className="widget-panel" onContextMenu={api.menu && (e => api.menu!(w, e))}>
+      <WidgetBody w={w} full={w.full} api={api} cells={[3, 4]} />
+      {(w.error || w.mock) && <p className={`small ${w.error ? 'warn' : 'muted'}`}>{w.error ?? 'Sample data'}</p>}
+    </div>
+  )
+}
+
+// place row: a per-workspace one's mark on each workspace's row, its instance's badge (else label) and tip; a click
+// runs its click action there, else goes on to the row (it selects the workspace)
+export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: string; api: WidgetApi }) {
+  const on = widgets.filter(w => w.on && w.scope === 'workspace' && placesOf(w).includes('row') && (w.inst?.[ws]?.badge || w.inst?.[ws]?.label))
+  return (
+    <>
+      {on.map(w => {
+        const i = w.inst![ws]
+        return (
+          <span key={w.id} className={`ws-ext ${i.error ? 'bad' : ''}`} data-tip={`${i.tip ?? w.name}${i.error ? ` · ${i.error}` : ''}`} onClick={w.click ? e => (e.stopPropagation(), void api.action(w.id, w.click!, '', w.name, ws).catch(() => {})) : undefined}>
+            <Glyph w={w} size={10} />
+            {i.badge ?? i.label}
+          </span>
+        )
+      })}
+    </>
   )
 }
 

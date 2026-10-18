@@ -52,13 +52,18 @@ export const widgetFormat = () => `## widget.json
 - \`size\`: cells [across 1–3, down 0.5 or 1–4]; a cell is about 70×64 px, 0.5 a line 29 px tall. \`every\`: minutes
   between fetches (default ${WIDGET_EVERY}). \`view\`: the full view's size, \`s\`, \`m\` (default) or \`l\`. The user can change them.
 - \`place\`: one or a list: \`side\` (the sidebar's grid, the default), \`top\` or \`status\` (a bar: a line high, design it
-  ½ high), \`rail\` or \`foot\` (a button, below), \`desk\` (a Desk tile, its full view when it has one).
+  ½ high), \`rail\` or \`foot\` (a button, below), \`desk\` (a Desk tile, its full view when it has one), \`panel\` (a
+  tab of the right panel, its full view as wide as the panel), \`row\` (per workspace only: a mark on each workspace's
+  row in the sidebar, its \`badge\` (else \`label\`) filled from that workspace's data, its \`tip\` on hover, \`click\`
+  runs there; every live workspace's is fetched, so keep it cheap).
 - \`config\`: the settings the user fills in: a default (text, \`true\`/\`false\`, a number) or \`{ "type": text | number |
-  bool | choice | list | secret, "label", "hint", "default", "choices" }\`. Never hard-code a repo, login or token: make it a
+  bool | choice | list | secret, "label", "hint", "default", "choices", "required" }\`. Never hard-code a repo, login or token: make it a
   setting; a token, key or password is \`"type": "secret"\` (only its fetch and actions get it; its ui and page see it empty).
+  \`"required": true\`: it can't work without it (its cell says *Set <label>* until it's filled).
 - \`fetch\`: a shell command (\`/bin/sh -c\` in the widget's folder: \`sh fetch.sh\`, \`python3 fetch.py\`), or \`script\`: a
   JS file Laki's node runs, \`export default async ({ config, last }) => data\` (\`last\`: the previous data). What it prints
-  must be JSON: its data. To fail, exit non-zero with a line on stderr ("Set Repo in Settings › Extensions"): the last
+  must be JSON: its data; never name a top-level field \`at\`, \`error\`, \`config\`, \`full\`, \`data\`, \`workspace\` or
+  \`sample\` (Laki's own hide them). To fail, exit non-zero with a line on stderr ("Set Repo in Settings › Extensions"): the last
   data stays. 2 minutes at most. Prefer what every Mac has (sh with curl, gh, jq; python3's standard library; a JS
   script) and shape the data there: small, with ready fields (\`"ci": "failing"\`): templates have no comparisons.
 - Its env: \`$WIDGET_<NAME>\` per setting (\`repo\`: \`$WIDGET_REPO\`; an on/off \`1\` or empty, a list comma-joined; quote
@@ -94,6 +99,18 @@ export const widgetFormat = () => `## widget.json
   input as \`$WIDGET_INPUT_<NAME>\` and JSON on stdin, what it prints goes back to the agent. \`AGENTS.md\` in its folder
   says when to use them. Agents call it with \`laki widget tool <id> <action> '<json>'\` or MCP; Laki asks the user
   (first: once per workspace). Never \`never\` for a command that changes things outside this Mac.
+- An action offered where the user works (any object action, a command's or an agent's): \`"explain": { "run":
+  "./explain.sh", "title": "Explain this file", "show": ["file", "palette"], "match": ["*.ts"], "key": "Alt+Cmd+E",
+  "ask": "What should it focus on?", "confirm": "Run it?", "insert": true, "view": false }\`. \`show\`: \`palette\` (⌘K, as
+  "<its name>: <title>", the workspace and tab you're in), \`workspace\` (a workspace's ⋯ and right click), \`tab\` (a
+  tab's right click), \`file\` (a file's right click in Files; \`match\`: globs, one without / matches the name),
+  \`prompt\` (the new-workspace prompt's Insert menu). \`key\`: with Alt or Ctrl (⌘ and ⌘⇧ alone are Laki's). \`ask\`: its
+  answer is \`$WIDGET_ARG\`; \`confirm\`: asked first. Where it was picked: \`$LAKI_CTX\` (JSON: \`ws\`, \`tab\`, \`file\`
+  \`{ path, abs }\`), \`$LAKI_FILE\` (the file's absolute path), \`$LAKI_TAB\`, and the workspace's \`$LAKI_WORKSPACE\`,
+  \`$LAKI_BRANCH\`, \`$LAKI_PATH\`…; an agent's prompt \`{{file.path}}\`, \`{{tab.name}}\`, \`{{workspace.branch}}\`.
+  \`insert\`: what it prints (its JSON's \`"insert"\`, else all of it) goes into the prompt: the box it was picked in, else
+  the workspace's agent's prompt, unsent. \`view\`: its full view opens after it runs: a file opener prints \`{"data": …}\`
+  about \`$LAKI_FILE\` and shows it.
 
 ## Fixtures and the check
 

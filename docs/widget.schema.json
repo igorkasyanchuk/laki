@@ -65,9 +65,11 @@
             "status",
             "rail",
             "foot",
-            "desk"
+            "desk",
+            "panel",
+            "row"
           ],
-          "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk)"
+          "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk), panel (a tab in the right panel), row (a mark on each workspace’s row: per workspace only)"
         },
         {
           "type": "array",
@@ -78,9 +80,11 @@
               "status",
               "rail",
               "foot",
-              "desk"
+              "desk",
+              "panel",
+              "row"
             ],
-            "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk)"
+            "description": "side (the sidebar), top or status (a bar, a line high), rail or foot (a button), desk (the Desk), panel (a tab in the right panel), row (a mark on each workspace’s row: per workspace only)"
           }
         }
       ],
@@ -210,6 +214,50 @@
                 "type": "string",
                 "description": "The command"
               },
+              "title": {
+                "type": "string",
+                "description": "Its label in menus and the palette (unset: its name in words)"
+              },
+              "show": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "palette",
+                    "workspace",
+                    "tab",
+                    "file",
+                    "prompt"
+                  ]
+                },
+                "description": "Where it’s offered: palette (⌘K), workspace (a workspace’s ⋯ and right click), tab (a tab’s right click), file (a file’s right click in Files, by match), prompt (a prompt box’s Insert menu)"
+              },
+              "match": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "With file: the files it’s for, as globs (*.ts, docs/**/*.md; one without / matches the name); unset: every file"
+              },
+              "key": {
+                "type": "string",
+                "description": "A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt or Ctrl: Cmd and Cmd+Shift alone are Laki’s)"
+              },
+              "ask": {
+                "type": "string",
+                "description": "A question asked first; the answer is its $WIDGET_ARG"
+              },
+              "confirm": {
+                "type": "string",
+                "description": "A yes or no asked first (\"Run it on the whole workspace?\")"
+              },
+              "insert": {
+                "type": "boolean",
+                "description": "What it prints (its JSON’s \"insert\", else all of it) goes into the prompt: the box it was picked in, else the focused agent’s, unsent"
+              },
+              "view": {
+                "type": "boolean",
+                "description": "Its full view opens after it runs: a file opener (show file, its data from what it prints as { \"data\" })"
+              },
               "tool": {
                 "type": "object",
                 "additionalProperties": false,
@@ -294,12 +342,56 @@
               "profile": {
                 "type": "string",
                 "description": "A claude or codex profile (unset: Settings › Extensions’ agent)"
+              },
+              "title": {
+                "type": "string",
+                "description": "Its label in menus and the palette (unset: its name in words)"
+              },
+              "show": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "palette",
+                    "workspace",
+                    "tab",
+                    "file",
+                    "prompt"
+                  ]
+                },
+                "description": "Where it’s offered: palette (⌘K), workspace (a workspace’s ⋯ and right click), tab (a tab’s right click), file (a file’s right click in Files, by match), prompt (a prompt box’s Insert menu)"
+              },
+              "match": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "With file: the files it’s for, as globs (*.ts, docs/**/*.md; one without / matches the name); unset: every file"
+              },
+              "key": {
+                "type": "string",
+                "description": "A shortcut that runs it with the workspace and tab you’re in: Alt+Cmd+E (with Alt or Ctrl: Cmd and Cmd+Shift alone are Laki’s)"
+              },
+              "ask": {
+                "type": "string",
+                "description": "A question asked first; the answer is its $WIDGET_ARG"
+              },
+              "confirm": {
+                "type": "string",
+                "description": "A yes or no asked first (\"Run it on the whole workspace?\")"
+              },
+              "insert": {
+                "type": "boolean",
+                "description": "What it prints (its JSON’s \"insert\", else all of it) goes into the prompt: the box it was picked in, else the focused agent’s, unsent"
+              },
+              "view": {
+                "type": "boolean",
+                "description": "Its full view opens after it runs: a file opener (show file, its data from what it prints as { \"data\" })"
               }
             }
           }
         ]
       },
-      "description": "Commands its buttons run by name, with $WIDGET_ARG: a command, { \"run\", \"tool\" } (agents may call it), or { \"ai\": a prompt } (an agent answers it); what one prints as JSON may say { \"toast\" }, { \"modal\" } or { \"data\" }"
+      "description": "Commands its buttons run by name, with $WIDGET_ARG: a command, { \"run\", \"tool\" } (agents may call it), or { \"ai\": a prompt } (an agent answers it); what one prints as JSON may say { \"toast\" }, { \"modal\" }, { \"data\" } or { \"insert\" }. title, show, match, key, ask, confirm, insert and view offer it in the palette, menus, a shortcut and the prompt, with $LAKI_CTX (the workspace, tab or file it was picked on)"
     },
     "notify": {
       "type": "string",

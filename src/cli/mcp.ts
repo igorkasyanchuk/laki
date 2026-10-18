@@ -218,7 +218,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   // extensions (the app's word; files, ids and the API say widget): read the guide, an example, then write one, saved off
   {
     name: 'laki_extensions',
-    description: "Laki's extensions (also called widgets or plugins: the same thing): small live pages in the sidebar, the top bar, the status bar or on the Desk (a clock, a count of PRs, a chart), or buttons on the rail or in the sidebar's foot (an icon, a label, a count, a click that runs one of its actions), each a folder with widget.json and widget.html fed by a fetch on a schedule. Each one's id, name, whether it's on, its last fetch's error.",
+    description: "Laki's extensions (also called widgets or plugins: the same thing): small live pages in the sidebar, the top bar, the status bar, on the Desk or as a tab of the right panel (a clock, a count of PRs, a chart), a mark on each workspace's row, or buttons on the rail or in the sidebar's foot, and actions in the palette, menus, a key and the prompt (an icon, a label, a count, a click that runs one of its actions), each a folder with widget.json and widget.html fed by a fetch on a schedule. Each one's id, name, whether it's on, its last fetch's error.",
     inputSchema: obj({}),
     run: async () => ((await rpc<View>('state')).widgets ?? []).map(w => ({ id: w.id, name: w.name, description: w.description, on: w.on, builtin: w.builtin, byAi: w.byAi, every: w.every, error: w.error })),
   },

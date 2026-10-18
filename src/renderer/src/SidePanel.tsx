@@ -11,7 +11,7 @@ import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type Ws
 import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, splitRows, toCsv } from './text'
 import { ask, Icon, IconButton, type IconName, type MenuItem } from './ui'
 
-export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview'
+export type PanelTab = 'info' | 'files' | 'changes' | 'review' | 'preview' | `ext:${string}` // ext: an extension placed in panel
 export type FileList = { files: string[]; changed: Record<string, string>; cut?: boolean } // changed: M, A, D, R
 export type Changes = { base: string; files: { path: string; status: string; add?: number; del?: number }[]; diff: string }
 export type Thread = { path: string; line?: number; resolved: boolean; outdated: boolean; comments: { author: string; body: string; at?: string }[] } // at: an older daemon gives none
@@ -588,9 +588,11 @@ export function SidePanel(p: {
   root: FilesRoot // Files': the worktree, or the Artifacts
   onRoot: (r: FilesRoot) => void
   info: ReactNode // the Info tab (Info.tsx InfoTab): the workspace's facts and PR
+  ext?: { id: `ext:${string}`; label: string; icon: ReactNode; body: ReactNode }[] // extensions placed in panel, a tab each after the others
 }) {
   const tabs = TABS.filter(t => p.git || t.id === 'info' || t.id === 'files' || t.id === 'preview')
-  const tab = tabs.some(t => t.id === p.tab) ? p.tab : 'files'
+  const ext = p.ext?.find(x => x.id === p.tab)
+  const tab = ext || tabs.some(t => t.id === p.tab) ? p.tab : 'files'
   return (
     <div className="side-panel" style={{ width: p.width }}>
       <PanelHandle onWidth={p.onWidth} init={PANEL_WIDTH} />
@@ -598,6 +600,11 @@ export function SidePanel(p: {
         {tabs.map(t => (
           <button key={t.id} className={t.id === tab ? 'on' : ''} data-tip={t.label} onClick={() => p.onTab(t.id)}>
             <Icon name={t.icon} /> <span className="sp-tab-label">{t.label}</span>
+          </button>
+        ))}
+        {p.ext?.map(x => (
+          <button key={x.id} className={x.id === tab ? 'on' : ''} data-tip={x.label} onClick={() => p.onTab(x.id)}>
+            {x.icon} <span className="sp-tab-label">{x.label}</span>
           </button>
         ))}
         <span className="grow" />
@@ -608,6 +615,7 @@ export function SidePanel(p: {
       {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
+      {ext && <div className="sp-ext">{ext.body}</div>}
     </div>
   )
 }

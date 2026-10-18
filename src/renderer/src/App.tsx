@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type Account, type WidgetRuns, againOnEnter, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { type Account, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -17,10 +17,11 @@ import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
 import { UiKitPage } from './UiKit'
-import { inWs, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetStrip } from './Widgets'
+import { Glyph as ExtGlyph, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetPanel, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { widgetAsk } from '../../shared/widgetGuide'
+import { globMatch, pressOf } from '../../shared/widgetSchema'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
 import { Glyph, rollup } from './Glyph'
@@ -37,7 +38,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { ShownDialog, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
+import { ask, askText, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -1116,13 +1117,7 @@ export function App() {
     comment: c => api.call('prComment', { ws: w.id, ...c }).then(() => toast(`Commented on PR #${w.pr?.number}`)),
     toAgent: text => api.call('send', { target: w.id, text, whenIdle: true }).then(() => toast('Sent to the agent')),
     saveImage: data => api.call<string>('imageSave', { data, ext: 'png' }),
-    // the focused agent if it's this workspace's, else its first live one; then its pane gets the keys
-    toPrompt: text => {
-      const live = view?.tabs.filter(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited') ?? []
-      const to = live.find(t => t.id === tab?.id) ?? live[0]
-      if (!to) return Promise.reject(new Error('No agent runs here: start one (＋ in the tab bar)'))
-      return api.call('send', { target: to.id, text, enter: false }).then(() => (selectTab(to.id), xterms.get(to.id)?.focus(), toast(`In ${to.name}'s prompt: say what to do with it`)))
-    },
+    toPrompt: text => intoAgent(w.id, text),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     artifacts: w.storage
       ? {
@@ -1214,7 +1209,43 @@ export function App() {
     ...openInItems({ ws: w.id, file }),
     null,
     { label: 'Copy path', icon: 'copy', key: 'c', run: () => copy(`${w.path}/${file}`) },
+    ...(dir ? [] : extItems('file', w, { ws: w.id, file }, file)),
   ]
+  // typed into an agent's prompt, unsent: the focused one if it's this workspace's, else its first live one; then its
+  // pane gets the keys
+  const intoAgent = (wsId: string, text: string) => {
+    const live = view?.tabs.filter(t => t.workspace === wsId && t.kind === 'agent' && t.status !== 'exited') ?? []
+    const to = live.find(t => t.id === tab?.id) ?? live[0]
+    if (!to) return Promise.reject(new Error('No agent runs here: start one (＋ in the tab bar)'))
+    return api.call('send', { target: to.id, text, enter: false }).then(() => (selectTab(to.id), xterms.get(to.id)?.focus(), toast(`In ${to.name}'s prompt: say what to do with it`)))
+  }
+  // extensions' actions offered where you work (widget.json's show and key: WidgetMenu), of the ones on: a place's, a
+  // workspace's (not a terminal's, a browser's or a host's: no extensions there), a file's by match
+  const extWs = (x?: WorkspaceView | null) => (x && !x.archived && !x.host && !view?.projects.find(p => p.id === x.project)?.kind ? x : undefined)
+  const extOn = (x?: WorkspaceView | null) => (view?.widgets ?? []).filter(w => w.on && (w.scope !== 'workspace' || extWs(x)))
+  const extMenus = (show: string, x?: WorkspaceView | null, file?: string) => extOn(x).flatMap(w => (w.menus ?? []).filter(m => m.show.includes(show) && (!file || !m.match?.length || m.match.some(g => globMatch(g, file)))).map(m => ({ w, m })))
+  const keyText = (k: string) => k.replace('Ctrl+', '⌃').replace('Alt+', '⌥').replace('Shift+', '⇧').replace('Cmd+', '⌘')
+  const hereCtx = (): WidgetCtx => (x => ({ ws: x?.id, tab: x && tab?.workspace === x.id ? tab.id : undefined }))(extWs(ws))
+  // a run: its confirm and ask first, then widgetAction with where it was picked (ctx); insert: into the box it was
+  // picked in (into), else the workspace's agent's prompt, else the clipboard; view: its full view after
+  const extRun = async (w: WidgetView, m: WidgetMenu, ctx: WidgetCtx, into?: (text: string) => void) => {
+    if (m.confirm && !(await ask(m.confirm, { text: `${w.name} · ${m.title}`, ok: m.title }))) return
+    const arg = m.ask ? await askText(m.ask, { text: `${w.name} · ${m.title}`, ok: m.title }) : ''
+    if (arg === null) return
+    clearTimeout(noteTimer.current)
+    setNote({ text: `${m.title}…`, busy: true })
+    type R = { ok: boolean; out?: string; error?: string; insert?: string } & WidgetSay
+    const r = await api.call<R>('widgetAction', { id: w.id, action: m.action, arg, ws: w.scope === 'workspace' ? ctx.ws : undefined, ctx }).catch((e): R => ({ ok: false, error: String(e?.message ?? e) }))
+    if (!r.ok) return toast(`${m.title} failed: ${r.error}`)
+    setNote(null)
+    if (r.insert !== undefined) into ? into(r.insert) : ctx.ws ? await intoAgent(ctx.ws, r.insert).catch(e => toast(String(e.message))) : copy(r.insert)
+    if (r.toast || r.modal) widgetApi.say(w.id, r, ctx.ws)
+    else if (r.insert === undefined && !m.view) done(r.out || `${m.title}: done`)
+    if (m.view) setDialog(w.full ? { widget: w.id, back: dialog } : { extension: w.id, back: dialog })
+  }
+  const extItems = (show: string, x: WorkspaceView | undefined | null, ctx: WidgetCtx, file?: string): MenuItem[] => (l => (l.length ? [null, { head: 'Extensions' }, ...l.map(({ w, m }): MenuItem => ({ label: m.title, sub: w.name, icon: 'panel', hint: m.key && keyText(m.key), run: () => void extRun(w, m, ctx) }))] : []))(extMenus(show, x, file))
+  // the new-workspace page's prompt: an action's text at its cursor
+  const extInserts = () => extMenus('prompt').map(({ w, m }) => ({ label: m.title, sub: w.name, run: () => new Promise<string | undefined>(res => void extRun(w, m, {}, res).then(() => res(undefined))) }))
   const openPort = (port: number) => openExternal(`http://localhost:${port}`)
   // widgets: the sidebar's grid and a widget's dialog (Widgets.tsx)
   const widgetApi: WidgetApi = {
@@ -1493,6 +1524,7 @@ export function App() {
         ]
       : []),
     { label: 'Delete workspace', icon: 'trash', key: 'd', danger: true, run: () => rmWs(w) },
+    ...extItems('workspace', w, { ws: w.id }),
   ]
 
   // Move to group ›, a submenu: a workspace into one of its project's groups (first in it, as a drop on its head), or out
@@ -1625,6 +1657,7 @@ export function App() {
       null,
       { label: ids.length > 1 ? 'Close tab' : 'Close', icon: 'x', hint: '⌘W', run: () => closeTabs(ts) },
       ...(ids.length > 1 || !g || tabsOf(g).length === 1 ? (others.length ? [{ label: 'Close other tabs', icon: 'x', danger: true, run: () => closeTabs(others) } as MenuItem] : []) : []),
+      ...(ts.length === 1 ? extItems('tab', view?.workspaces.find(x => x.id === ts[0].workspace), { ws: ts[0].workspace, tab: ts[0].id }) : []),
     ]
   }
   const restore = (id: string) => call('wsRestore', { id }).then(() => showNew(id))
@@ -1719,6 +1752,9 @@ export function App() {
     // development mode's element picker, over anything (a dialog, a page): its hotkey (Settings › General › Development)
     if (settings.devMode === true && pickKey && !e.repeat && keyLabel(e) === pickKey) return void (e.preventDefault(), e.stopPropagation(), setPicking(p => !p))
     if (e.metaKey && e.altKey && !e.ctrlKey && e.code === 'KeyB') return void (e.preventDefault(), e.stopPropagation(), ws && togglePanel())
+    // an extension action's key (with Alt or Ctrl: ⌘ and ⌘⇧ alone are Laki's), with the workspace and tab you're in
+    const hit = (e.altKey || e.ctrlKey) && !e.repeat ? (p => extOn(ws).flatMap(w => (w.menus ?? []).filter(m => m.key === p).map(m => ({ w, m }))))(pressOf(e))[0] : undefined
+    if (hit) return void (e.preventDefault(), e.stopPropagation(), void extRun(hit.w, hit.m, hereCtx()))
     if (!e.metaKey || e.altKey || e.ctrlKey) return
     const k = e.key.toLowerCase()
     // ⌘⇧N: the tab bar's +, its menu (shell, each agent, command) to pick from with the keys
@@ -1828,6 +1864,7 @@ export function App() {
       if (w) items.push({ label: `${wsName(w)} / ${t.name}`, hint: t.last ? t.last.slice(0, 80) : 'tab', glyph: tabGlyph(t), run: () => selectTab(t.id) })
     }
     a({ label: 'Next tab that needs you', icon: 'bell', hint: '⌘J', run: nextNeed })
+    for (const { w, m } of extMenus('palette', ws)) a({ label: `${w.name}: ${m.title}`, icon: 'panel', hint: m.key ? keyText(m.key) : 'extension', run: () => void extRun(w, m, hereCtx()) })
     a({ label: full ? 'Exit full screen' : 'Full screen: just this tab', icon: full ? 'minimize' : 'maximize', hint: '⌘⇧⏎', run: () => toggleFull() })
     if (settings.ai?.on) a({ label: 'Ask Laki AI later…', icon: 'timer', run: () => sendLater('ai') })
     if (ws?.storage) a({ label: gallery === ws.id ? 'Hide artifacts' : 'Show artifacts', icon: 'image', hint: '⌘⇧A', run: toggleArtifacts })
@@ -2006,6 +2043,7 @@ export function App() {
             <span className="del">−{short(w.stat.del)}</span>
           </span>
         )}
+        <RowMarks widgets={view.widgets ?? []} ws={w.id} api={widgetApi} />
         {w.muted && (
           <span className="ws-mark">
             <Icon name="bellOff" size={11} />
@@ -2711,6 +2749,7 @@ export function App() {
               onAct={(act, method) => prAct(ws, act, method)}
               root={artsIn === ws.id ? 'artifacts' : 'ws'}
               onRoot={(r: FilesRoot) => setArtsIn(r === 'artifacts' ? ws.id : null)}
+              ext={shownWidgets.filter(w => w.on && placesOf(w).includes('panel')).map(w => ({ id: `ext:${w.id}` as const, label: w.name, icon: <ExtGlyph w={w} size={14} />, body: <WidgetPanel w={w} api={widgetApi} /> }))}
               info={
                 <InfoTab
                 w={infoOf(ws)}
@@ -3034,6 +3073,7 @@ export function App() {
             agent={settings.agent}
             initial={newInit}
             images={newImages}
+            inserts={extInserts()}
             onClose={() => {
               made.current.page++
               setDialog(null)

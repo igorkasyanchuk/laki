@@ -1,4 +1,4 @@
-import { type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
+import { type ComponentProps, type CSSProperties, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
 import { version } from '../../../package.json'
 import { REPO, AGENT_NAMES, type Doctor, HOME_ACCOUNT, EFFORTS, isAgent, type LogLine, MODELS, prIn, type View } from '../../shared/types'
 import { api, bridge, fileOf, openExternal, openKeptLink } from './api'
@@ -432,7 +432,7 @@ const MODEL_SAYS: Record<string, [string, string, 'good' | 'warn' | undefined]> 
 // bar's screenshots
 const notesOf = (s?: Shot[]) => (s ?? []).flatMap(x => (x.note ? [x.note] : []))
 export type Shot = Img & { note?: string } // the menu bar's screenshot, and what to do with it (the editor's note)
-export function NewWorkspace({ view, project, agent, initial, images: shots, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Shot[]; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
+export function NewWorkspace({ view, project, agent, initial, images: shots, inserts, onClose, onCreate }: { view: View; project?: string; agent?: string; initial?: Partial<NewWsParams>; images?: Shot[]; inserts?: ComponentProps<typeof PromptInput>['inserts']; onClose: () => void; onCreate: (p: NewWsParams) => Promise<void> }) {
   const last = useMemo(() => load<LastNew>(LAST_NEW, {}), [])
   // opened for another project than the draft's (its + or a group's New workspace here, ⌘N on one of its workspaces): the
   // draft goes, prompt and all, and the page starts empty there
@@ -676,6 +676,7 @@ export function NewWorkspace({ view, project, agent, initial, images: shots, onC
               onBusy={setSaving}
               rows={8}
               tools={pickers}
+              inserts={inserts}
             />
           ) : (
             <>
