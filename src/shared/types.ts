@@ -12,6 +12,25 @@ export const isAgent = (s?: string): s is Agent => (AGENTS as readonly string[])
 // suggest (any other goes too: a full name, provider/model for opencode)
 export const EFFORTS: Partial<Record<Agent, string[]>> = { claude: ['low', 'medium', 'high', 'xhigh', 'max'], codex: ['minimal', 'low', 'medium', 'high', 'xhigh'] }
 export const MODELS: Partial<Record<Agent, string[]>> = { claude: ['fable', 'opus', 'sonnet', 'haiku'] }
+// how freely an agent acts (unset: its own default, which asks): claude's --permission-mode; codex's sandbox and
+// approvals in the same spirit. Each with what the new-workspace page says of it
+export const PERMS: Partial<Record<Agent, [id: string, label: string, sub: string, args: string[]][]>> = {
+  claude: [
+    ['auto', 'Auto mode', 'Acts on what looks safe, asks about the rest', ['--permission-mode', 'auto']],
+    ['acceptEdits', 'Accept edits', 'Edits files without asking; asks before commands', ['--permission-mode', 'acceptEdits']],
+    ['plan', 'Plan mode', 'Reads and plans; changes nothing', ['--permission-mode', 'plan']],
+    ['bypassPermissions', 'Bypass permissions', 'Never asks: anything goes', ['--permission-mode', 'bypassPermissions']],
+  ],
+  codex: [
+    ['auto', 'Auto mode', 'An automatic review answers its approvals', ['--approve-for-me']],
+    ['acceptEdits', 'Accept edits', 'Writes in the workspace, never asks', ['-s', 'workspace-write', '-a', 'never']],
+    ['plan', 'Read only', 'Reads; changes nothing', ['-s', 'read-only']],
+    ['bypassPermissions', 'Bypass permissions', 'No sandbox, never asks: anything goes', ['--dangerously-bypass-approvals-and-sandbox']],
+  ],
+}
+export const permArgs = (agent?: string, perm?: string) => (perm && PERMS[agent as Agent]?.find(p => p[0] === perm)?.[3]) || []
+// fast mode: claude's fastMode setting, codex's fast service tier (more speed, more usage)
+export const FAST: Partial<Record<Agent, true>> = { claude: true, codex: true }
 
 // setup runs in a new worktree, teardown when one goes, run is the dev server, env goes to every tab;
 // each field overrides .laki.json's (env key by key)
@@ -256,6 +275,8 @@ export type Tab = {
   muted?: boolean // no notifications from it
   model?: string // the agent's --model (unset: its own default), kept for restarts
   effort?: string // and its effort (EFFORTS)
+  perm?: string // how freely it acts (PERMS' id; unset: its own default), kept for restarts
+  fast?: boolean // fast mode (FAST), kept for restarts
   account?: string // the account it started on (claude, codex: an Account's id or HOME_ACCOUNT), kept for restarts and resumes
   again?: { cwd?: string; cmd?: string; run?: boolean } // what a shell ran as the daemon stopped (keepShells), back at its next start; a Run tab's: start it again
   titled?: boolean // its name says what it's for (given, renamed, or its first prompt's words): no prompt renames it

@@ -108,7 +108,7 @@ a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `fl
 setting's `required` and the view's `missing`, the `panel` and `row` places (a row's instances fetched for every live
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
 `widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`; 86: workflows' `agent-ask` wait (`turnWaits`, `flowAnswer` through `answer`), a
-block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`. A
+block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -527,7 +527,10 @@ preset < Laki's own vars.
 
 A tab's `model` and `effort` (`wsNew`, `tabNew`, kept by `wsFork`; `modelCheck` before a worktree is made: a name, an
 effort of `EFFORTS`) become flags at every start (`agentCmd`): claude `--model`/`--effort`, codex `-m` and `-c
-model_reasoning_effort="…"`, the others `-m`. `view` gives a running or waiting tab `runAt`, its turn's start (set
+model_reasoning_effort="…"`, the others `-m`. Likewise `perm` (`PERMS`: claude's `--permission-mode`; codex's
+`--approve-for-me`, `-s workspace-write -a never`, `-s read-only`, `--dangerously-bypass-approvals-and-sandbox`) and
+`fast` (`FAST`: claude's `--settings` is `claude-settings-fast.json`, the same with `fastMode`; codex `-c
+service_tier="fast"`); the new-workspace page sets them (a race's agents keep their own). `view` gives a running or waiting tab `runAt`, its turn's start (set
 there: each change of status comes with `changed()`), for the turn timers (`settings.timers`).
 
 ### Interrupts
@@ -1801,12 +1804,15 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   recipes.
 - **`qr.ts`**: a QR encoder (byte mode, level M, versions 1–40, best mask), for the tunnel's link. Its test
   compares a code with macOS CoreImage's (`test/qr.test.ts`).
-- **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings): the prompt's card
-  (`PromptInput` `tools`: template, agent (`OTHER_AGENTS` after the presets; each preset's line `presetSays`, Settings'
-  default agent as a pill, *Make … the default* in the foot: `settingsSet` `agent`), model (`MODEL_SAYS`: claude's words
-  and a cost pill) and effort as `.nw-pick` menus, with a filter),
-  then a row of `.nw-chip`s: project and `place` in one menu (each sep indented under its project: `MenuItem`
-  `indent`), base with *worktree* (unticked: `local`), name, and *More* (a race, and a typed model only after the model menu's *Another model…* or while one it doesn't list is set: one picker, not two);
+- **`panels.tsx`**: the new-workspace page (ui.tsx's `Page`: over the main area, like Settings), laid out as paseo's:
+  `.nw-top`, a row of `.nw-pick` menus over the prompt: project and `place` in one menu (each sep indented under its
+  project: `MenuItem` `indent`), *New worktree* / *Local* (`whereMenu`: `local`), base (`.nw-base`, typed or picked), name,
+  and *More* (a race, and a typed model only after the model menu's *Another model…* or while one it doesn't list is set:
+  one picker, not two); at its end (`.nw-top-end`) template and agent (`OTHER_AGENTS` after the presets; each preset's
+  line `presetSays`, Settings' default agent as a pill, *Make … the default* in the foot: `settingsSet` `agent`). Then
+  the prompt's card (`PromptInput` `lead`: model (`MODEL_SAYS`: claude's words and a cost pill), effort and permission
+  mode (`PERMS`) menus; `tools`: ⚡ `.nw-fast` (`FAST`); then the mic and `send`, the round `.nw-send` (a race's count
+  on it)); `.nw-foot` under it (the keys, *Clear*);
   the last choices, `laki.newWs`; `images`: the menu bar's screenshots; while it's made, `.busy` fades the cards and
   `.nw-making` says what's happening and the seconds so far), the palette,
   prompt and add-project dialogs (the last only for the web dev renderer, which has no folder picker), and About

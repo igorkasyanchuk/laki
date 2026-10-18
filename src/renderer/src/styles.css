@@ -638,6 +638,30 @@ html.away .voice-bar { animation-play-state: running !important; } /* paused at 
 .nw-pick:hover, .nw-pick:focus-visible, .nw-pick[aria-expanded='true'] { background: var(--hover); color: var(--fg); }
 .nw-pick:hover > svg:last-child { opacity: 1; }
 .nw-chips { display: flex; flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; padding: 0; border: none; background: none; }
+/* the new-workspace page as paseo has it: a row of quiet menus over the prompt (project, worktree or local, base, name;
+   the template and the agent at its end), then the prompt with its own toolbar (+, model, effort, permission mode; fast,
+   the mic and a round send) */
+.nw-top { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 4px; margin: 0 -2px -6px; }
+.nw-top .nw-pick { height: 28px; padding: 0 8px; font-size: 12.5px; max-width: 280px; }
+.nw-top .nw-pick > .icon-svg:first-child { color: var(--muted); }
+.nw-top .nw-pick.quiet { cursor: default; }
+.nw-top .nw-pick.quiet:hover { background: none; color: var(--muted); }
+.nw-top .nw-pick.on { background: var(--hover); color: var(--fg); }
+.nw-top-end { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.nw-base { cursor: text; }
+.form label.nw-pick { flex-direction: row; gap: 4px; color: var(--muted); font-size: 12.5px; }
+.nw-base:focus-within { background: var(--hover); color: var(--fg); }
+.form .nw-base .nw-chip-input { field-sizing: content; width: auto; min-width: 4ch; max-width: 26ch; height: 100%; padding: 0; border: none; border-radius: 0; background: transparent; box-shadow: none; color: inherit; font: inherit; }
+.nw-base .ib.nw-chip-more { width: 18px; height: 22px; margin: 0 -4px 0 -2px; color: var(--muted); }
+.nw-composer .prompt-tools .nw-pick { height: 28px; font-size: 12.5px; }
+.nw-pick.warn { color: var(--waiting); }
+.ib.nw-fast.on { color: var(--waiting); background: color-mix(in srgb, var(--waiting) 14%, transparent); }
+.nw-send { position: relative; display: inline-grid; place-items: center; flex: none; width: 30px; height: 30px; margin-left: 4px; padding: 0; border: none; border-radius: 50%; background: var(--accent); color: var(--accent-fg); box-shadow: none; }
+.nw-send:hover:not(:disabled) { filter: brightness(1.08); }
+.nw-send:disabled { opacity: 0.45; }
+.nw-send .btn-spin { margin: 0; }
+.nw-send-n { position: absolute; top: -5px; right: -5px; min-width: 15px; height: 15px; padding: 0 3px; border-radius: 999px; background: var(--fg); color: var(--bg); font-size: 9.5px; font-weight: 600; line-height: 15px; }
+.nw-foot { display: flex; align-items: center; gap: 10px; margin: -4px 4px 0; font-size: 12px; }
 .nw-chip { display: inline-flex; align-items: center; gap: 6px; height: 30px; max-width: 100%; padding: 0 10px; border: 1px solid var(--line); border-radius: var(--rs, 8px); background: var(--panel); color: var(--fg); font-size: 12.5px; white-space: nowrap; }
 .nw-chip > svg, .nw-chip > .icon { flex: none; color: var(--muted); }
 button.nw-chip:hover, .nw-chip.on { background: var(--hover); }
@@ -1197,7 +1221,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 /* 16px: iOS zooms into a smaller field it focuses */
 .narrow input, .narrow select, .narrow textarea, .narrow .xterm-helper-textarea { font-size: 16px !important; }
 .narrow .page-body > .new-ws { margin-top: 0; } /* a phone: the keyboard takes the bottom half */
-.narrow .nw-chip { height: 38px; font-size: 16px; } /* its input is 16px (no zoom): the label matches, and a finger fits */
+.narrow :is(.nw-chip, .nw-top .nw-pick) { height: 38px; font-size: 16px; } /* its input is 16px (no zoom): the label matches, and a finger fits */
 /* a touch screen: no hover to find buttons, fingers to hit them */
 @media (pointer: coarse) {
   .project-head .ib { opacity: 1; }
@@ -1238,7 +1262,7 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .new-window .page-body { padding: 12px 14px 14px; }
 .new-window .page-body > .new-ws { max-width: none; margin: 0; gap: 10px; }
 .new-window .nw-composer textarea { min-height: 64px; height: 92px; resize: vertical; }
-.new-window .new-ws .buttons { margin-top: 0; }
+.new-window .new-ws .nw-foot { margin-top: 0; }
 .schedules { display: flex; flex-direction: column; gap: 20px; }
 .schedules p { margin: 0; }
 .schedules section { display: flex; flex-direction: column; gap: 8px; }

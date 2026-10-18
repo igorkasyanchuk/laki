@@ -37,6 +37,8 @@ export function PromptInput(p: {
   placeholder?: string
   rows?: number
   tools?: ReactNode // the toolbar's right end
+  lead?: ReactNode // pickers right after +: then the mic goes to the right end, before send
+  send?: ReactNode // the toolbar's last button
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
   inserts?: { label: string; sub?: string; run: () => Promise<string | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor
 }) {
@@ -95,6 +97,49 @@ export function PromptInput(p: {
     e.preventDefault()
     add(fs)
   }
+  const mic = (cloud || p.dictate) && (
+    <span className="mic-split">
+      <button
+        type="button"
+        className={`ib${cloud && voice.phase !== 'idle' ? ` voice-${voice.phase}` : ''}`}
+        aria-label={cloud && voice.phase === 'listening' ? 'Stop and insert' : 'Dictate'}
+        data-tip={cloud ? (voice.phase === 'listening' ? 'Stop and insert (or let go of Fn); Esc drops it' : 'Dictate: click, talk, click again; or hold Fn') : 'Dictate (macOS dictation; or press Fn twice)'}
+        disabled={cloud && voice.phase === 'writing'}
+        onMouseDown={e => e.preventDefault() /* the text box keeps the focus */}
+        onClick={cloud ? talk : dictate}
+      >
+        <Icon name="mic" />
+      </button>
+      {(cloud || p.dictationSettings) && (
+        <button
+          type="button"
+          className="ib caret"
+          aria-label="Dictation options"
+          aria-haspopup="menu"
+          data-tip={cloud ? 'Voice: cloud' : 'Dictation: microphone and language'}
+          onMouseDown={e => e.preventDefault()}
+          onClick={e =>
+            openMenu(
+              e,
+              cloud
+                ? [
+                    { head: 'Voice · cloud' },
+                    { label: voice.phase === 'listening' ? 'Stop and insert' : 'Start dictating', icon: 'mic', hint: 'hold Fn', run: talk },
+                    { label: 'Voice settings…', icon: 'settings', hint: 'Settings › Voice', run: () => openExternal('laki://settings/voice') },
+                  ]
+                : [
+                    { head: 'Dictation · macOS' },
+                    { label: 'Start dictating', icon: 'mic', hint: 'Fn Fn', run: dictate },
+                    { label: 'Microphone and language…', icon: 'settings', hint: 'System Settings › Keyboard', run: p.dictationSettings! },
+                  ],
+            )
+          }
+        >
+          <Icon name="chevron" size={11} />
+        </button>
+      )}
+    </span>
+  )
   return (
     <div className="prompt-input" onDragOver={e => e.dataTransfer.types.includes('Files') && e.preventDefault()} onDrop={drop}>
       <textarea
@@ -124,56 +169,21 @@ export function PromptInput(p: {
           <Icon name="plus" />
           <input type="file" accept="image/*" multiple hidden onChange={e => (add(images(e.target.files!)), (e.target.value = ''))} />
         </label>
-        {(cloud || p.dictate) && (
-          <span className="mic-split">
-            <button
-              type="button"
-              className={`ib${cloud && voice.phase !== 'idle' ? ` voice-${voice.phase}` : ''}`}
-              aria-label={cloud && voice.phase === 'listening' ? 'Stop and insert' : 'Dictate'}
-              data-tip={cloud ? (voice.phase === 'listening' ? 'Stop and insert (or let go of Fn); Esc drops it' : 'Dictate: click, talk, click again; or hold Fn') : 'Dictate (macOS dictation; or press Fn twice)'}
-              disabled={cloud && voice.phase === 'writing'}
-              onMouseDown={e => e.preventDefault() /* the text box keeps the focus */}
-              onClick={cloud ? talk : dictate}
-            >
-              <Icon name="mic" />
-            </button>
-            {(cloud || p.dictationSettings) && (
-              <button
-                type="button"
-                className="ib caret"
-                aria-label="Dictation options"
-                aria-haspopup="menu"
-                data-tip={cloud ? 'Voice: cloud' : 'Dictation: microphone and language'}
-                onMouseDown={e => e.preventDefault()}
-                onClick={e =>
-                  openMenu(
-                    e,
-                    cloud
-                      ? [
-                          { head: 'Voice · cloud' },
-                          { label: voice.phase === 'listening' ? 'Stop and insert' : 'Start dictating', icon: 'mic', hint: 'hold Fn', run: talk },
-                          { label: 'Voice settings…', icon: 'settings', hint: 'Settings › Voice', run: () => openExternal('laki://settings/voice') },
-                        ]
-                      : [
-                          { head: 'Dictation · macOS' },
-                          { label: 'Start dictating', icon: 'mic', hint: 'Fn Fn', run: dictate },
-                          { label: 'Microphone and language…', icon: 'settings', hint: 'System Settings › Keyboard', run: p.dictationSettings! },
-                        ],
-                  )
-                }
-              >
-                <Icon name="chevron" size={11} />
-              </button>
-            )}
-          </span>
-        )}
+        {p.lead}
+        {!p.lead && mic}
         {!!p.inserts?.length && (
           <button type="button" className="ib" aria-label="Insert from an extension" aria-haspopup="menu" data-tip="Insert from an extension" onMouseDown={e => e.preventDefault()} onClick={e => openMenu(e, [{ head: 'Insert' }, ...p.inserts!.map(x => ({ label: x.label, sub: x.sub, icon: 'panel' as const, run: () => void x.run().then(t => t && insertText(t), er => setErr(String(er?.message ?? er))) }))])}>
             <Icon name="panel" />
           </button>
         )}
         {err && <span className="warn small">{err}</span>}
-        {p.tools && <span className="prompt-tools-end">{p.tools}</span>}
+        {(p.tools || p.lead) && (
+          <span className="prompt-tools-end">
+            {p.tools}
+            {p.lead && mic}
+            {p.send}
+          </span>
+        )}
       </div>
       {menu}
     </div>

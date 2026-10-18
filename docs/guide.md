@@ -683,20 +683,25 @@ its link, `{{base}}` its base branch; the failing checks or the review threads g
 back. *Send now* beside each switch (*Review*, *Info*) sends the same prompt once, switch or not; it shows
 only when there's something to send: failing checks, open review threads, merge conflicts.
 
-**New workspace** (a page, like Settings; Esc closes it): write the prompt; the agent and its model are picked
-under it, where the work goes in the row below.
+**New workspace** (a page, like Settings; Esc closes it): where the work goes in a row over the prompt, how the agent
+works in the prompt's own toolbar, and a round button that creates it.
 Closing it (Esc, ✕, a click in the sidebar) keeps what you typed as a draft: it's there when the page opens again,
-until you create it or *Clear* it. Enter in a field never creates it; ⌘⏎ or *Create* does.
-It starts from your last choices (project, its group, agent, model, template, worktree), never the last prompt.
-- Under the prompt: ＋ (images), the mic and its ⌄, then *Template*, the agent (a preset, *Shell*, *Custom command…* or
-  *No agent*) and the model, as words with a ⌄ (a hover shows they're menus) (the agent's default, one of its models or *Another model by name…*; for Claude Code and Codex
-  the effort too; both kept for its restarts and forks). Their menus have a filter box (type, ↑↓, ⏎), a line about each
-  choice, the picked one in the accent with a check; the agent menu marks your default and, for another agent, offers
-  *Make … the default for new workspaces*; Claude's models show how they compare in cost ($ to $$$$).
-- The row below: the project and its group in one menu (with a filter past six projects; a group puts it first in that group; the project alone, first
-  in the project), the base branch (the repo's main one; its ⌄ lists every branch, with a filter) with the *worktree*
-  switch (off: work in the repo itself, on its current branch),
-  the name (from the prompt when blank) and *More*: *Race*, and a box for a model typed by hand (like a full name) once you pick *Another model…*.
+until you create it or *Clear* it. Enter in a field never creates it; ⌘⏎ or the round ↑ does.
+It starts from your last choices (project, its group, agent, model, effort, permission mode, fast, template, worktree),
+never the last prompt.
+- The row over the prompt, as words with a ⌄ (a hover shows they're menus): the project and its group in one menu (with
+  a filter past six projects; a group puts it first in that group; the project alone, first in the project), *New
+  worktree* or *Local* (in the repo itself, on its current branch), the base branch (the repo's main one; its ⌄ lists
+  every branch, with a filter), the name (from the prompt when blank) and *More*: *Race*, and a box for a model typed by
+  hand (like a full name) once you pick *Another model…*. At its right end: *Template* and the agent (a preset, *Shell*,
+  *Custom command…* or *No agent*); the agent menu marks your default and, for another agent, offers *Make … the
+  default for new workspaces*.
+- The prompt's toolbar: ＋ (images), then the model (the agent's default, one of its models or *Another model by
+  name…*; Claude's show how they compare in cost, $ to $$$$), for Claude Code and Codex the effort and the permission
+  mode (*Ask first*, the agent's own; *Auto mode*; *Accept edits*; *Plan mode*, read only for Codex; *Bypass
+  permissions*, in yellow), then ⚡ fast mode (quicker answers at a higher price: Claude Code's fast mode, Codex's fast
+  tier), the mic and its ⌄, and ↑. All of them are kept for its restarts and forks. Their menus have a filter box
+  (type, ↑↓, ⏎), a line about each choice, the picked one in the accent with a check.
 In a plain folder (or without a worktree), whose own workspace is there already, an agent or a prompt makes another
 session beside it, in the same folder, named after the prompt; *No agent* gives the folder's own back. A new
 workspace is never hidden: a folded project or group holding it, or the one you were on, opens. The prompt:

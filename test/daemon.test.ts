@@ -954,3 +954,31 @@ test('worktrees go to Settings’ folder (~: home), a folder per project, or the
   const ws = (await rig.rpc('state')).workspaces
   assert.deepEqual(ws.map((w: any) => w.path), [a.path, b.path, c.path])
 })
+
+test("a permission mode and fast mode go into the agent's flags, kept for restarts and forks", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'claude', perm: 'yolo' }), /permission mode yolo\? auto, acceptEdits, plan, bypassPermissions/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'gemini', perm: 'auto' }), /gemini has no permission modes/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, name: 'm', preset: 'gemini', fast: true }), /gemini has no fast mode/)
+  assert.equal(execFileSync('git', ['branch', '--list', 'laki/m'], { cwd: rig.repo, encoding: 'utf8' }), '')
+
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', perm: 'plan', fast: true })
+  const tab = await rig.tab(ws.id)
+  assert.deepEqual([tab.perm, tab.fast], ['plan', true])
+  await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().some(l => l.bin === 'claude'), 'claude')
+  const args = rig.fakeLog().find(l => l.bin === 'claude').args
+  assert.deepEqual(args.slice(-2), ['--permission-mode', 'plan'])
+  const settings = args[args.indexOf('--settings') + 1]
+  assert.match(settings, /claude-settings-fast\.json$/)
+  assert.equal(JSON.parse(readFileSync(settings, 'utf8')).fastMode, true)
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'prompt')
+  await until(async () => (await rig.tab(ws.id)).status === 'idle', 'settled') // its chat's id: a fork resumes it
+  const fork = await rig.rpc('wsFork', { id: ws.id })
+  assert.deepEqual([(await rig.tab(fork.id)).perm, (await rig.tab(fork.id)).fast], ['plan', true])
+
+  const cx = await rig.rpc('wsNew', { project: p.id, preset: 'codex', perm: 'acceptEdits', fast: true })
+  await until(() => rig.fakeLog().some(l => l.bin === 'codex'), 'codex')
+  assert.deepEqual(rig.fakeLog().find(l => l.bin === 'codex').args.slice(-6), ['-s', 'workspace-write', '-a', 'never', '-c', 'service_tier="fast"'])
+  assert.equal((await rig.tab(cx.id)).perm, 'acceptEdits')
+})

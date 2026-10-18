@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- **A new New workspace page**: where it goes in a row over the prompt, and the agent's model, effort,
+  permission mode (*Auto mode*, *Accept edits*, *Plan mode*, *Bypass permissions*) and ⚡ fast mode in the prompt's
+  toolbar, with a round button that creates it. Kept for its restarts and forks.
 - **Browsers: Google sign-in**: Google accounts sign in inside Laki's browser (Gmail, Docs, YouTube); if Google turns
   it down anyway, the sign-in opens in your own browser.
 - **Remote access: Tailscale with a PIN, and Funnel**: *Ask for a PIN as well* on the tailnet, or *Funnel* for the

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
@@ -183,6 +183,7 @@ function hookFiles(h: Hooks): Record<string, string> {
   const gemini = { hooks: { SessionStart: g('start'), BeforeAgent: g('running'), AfterTool: g('running'), Notification: g('waiting'), AfterAgent: g('idle') } }
   return {
     'claude-settings.json': JSON.stringify(settings, null, 2),
+    'claude-settings-fast.json': JSON.stringify({ ...settings, fastMode: true }, null, 2), // a fast tab's (one --settings only)
     'gemini-settings.json': JSON.stringify(gemini, null, 2),
     'opencode/plugin/laki.js': OPENCODE_PLUGIN.replace('HOOK', () => JSON.stringify(h.argv)),
   }
@@ -1194,7 +1195,7 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   // what it's told at the start: Laki (its preset's switch) and progress; a host has no laki CLI
   const told = h === localHooks ? [pr?.laki !== false && LAKI_NOTE(), pr?.laki !== false && memoryNote(state.projects.find(p => p.id === state.workspaces.find(w => w.id === tab.workspace)?.project)), state.settings?.progress && PROGRESS_NOTE()].filter(Boolean).join('\n\n') : ''
   if (tab.preset === 'claude') {
-    argv = ['claude', '--settings', join(h.dir, 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
+    argv = ['claude', '--settings', join(h.dir, tab.fast ? 'claude-settings-fast.json' : 'claude-settings.json'), ...(h === localHooks ? ['--plugin-dir', join(dir, 'claude-plugin')] : [])] // /laki:new
     if (again) argv.push('--resume', again)
     else if (tab.forkOf && !tab.resumeId) argv.push('--resume', tab.forkOf, '--fork-session')
     if (told && !pr?.args?.includes('--append-system-prompt')) argv.push('--append-system-prompt', told) // a preset's own wins
@@ -1221,7 +1222,7 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   // a profile's model and effort when the workspace picked none
   const model = tab.model || pr?.model?.trim()
   const effort = tab.effort || (EFFORTS[tab.preset as Agent]?.includes(pr?.effort ?? '') ? pr!.effort : undefined)
-  const flags = [...(model ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : [])]
+  const flags = [...(model ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, tab.perm), ...(tab.fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : [])] // claude's fast: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
   return [argv.map(q).join(' '), pr?.args?.trim(), flags.map(q).join(' '), ask.map(q).join(' ')].filter(Boolean).join(' ')
 }
@@ -1311,13 +1312,17 @@ function presetCheck(preset?: string, cmd?: string) {
     throw new Error(`unknown preset ${preset} (see Settings › Agents & profiles)`)
 }
 
-// a model and effort for an agent's flags: a name (it goes on the command line, quoted), an effort it takes
-function modelCheck(agent: string, model?: string, effort?: string) {
+// a model and effort for an agent's flags: a name (it goes on the command line, quoted), an effort it takes; a
+// permission mode it has (PERMS), fast mode where there is one
+function modelCheck(agent: string, model?: string, effort?: string, perm?: string, fast?: boolean) {
+  const perms = PERMS[agent as Agent]
+  if (perm && !perms?.some(p => p[0] === perm)) throw new Error(perms ? `permission mode ${perm}? ${perms.map(p => p[0]).join(', ')}` : `${agent} has no permission modes here`)
+  if (fast && !FAST[agent as Agent]) throw new Error(`${agent} has no fast mode`)
   if (model && !/^(?!-)[\w.:/@[\]-]{1,120}$/.test(model)) throw new Error(`model ${model}? a name like opus, or provider/model`) // not a flag either
   if (effort && !EFFORTS[agent as Agent]?.includes(effort)) throw new Error(EFFORTS[agent as Agent] ? `effort ${effort}? ${EFFORTS[agent as Agent]!.join(', ')}` : `${agent} takes no effort`)
 }
 
-export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; vars?: boolean }): Tab {
+export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; cmd?: string; name?: string; prompt?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; vars?: boolean }): Tab {
   const ws = findWs(wsRef)
   if (ws.browser !== undefined) throw new Error(`${ws.name ?? ws.id} is a browser page: it has no tabs`) // its page covers the terminals' place
   if (!o.kind) presetCheck(o.preset, o.cmd)
@@ -1327,7 +1332,9 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const kind = o.kind ?? (preset === 'shell' && !o.cmd ? 'shell' : 'agent')
   const model = isAgent(preset) && kind === 'agent' ? o.model?.trim() || undefined : undefined // a shell or a command has no model
   const effort = isAgent(preset) && kind === 'agent' ? o.effort || undefined : undefined
-  modelCheck(preset, model, effort)
+  const perm = isAgent(preset) && kind === 'agent' ? o.perm || undefined : undefined
+  const fast = isAgent(preset) && kind === 'agent' && o.fast === true ? true : undefined
+  modelCheck(preset, model, effort, perm, fast)
   // a name with its task: an agent's prompt's words (not the workspace's first agent's: the workspace's name says it, and
   // it's titled as it is), a command's first words (npm run dev)
   const given = typeof o.name === 'string' ? o.name.trim().slice(0, 40) : ''
@@ -1337,7 +1344,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
   const agentName = pr?.name || (kind === 'agent' ? (preset === 'custom' ? cmdName(o.cmd!) : preset) : kind)
   const name = freeName(ws.id, given || (task ? `${agentName}: ${task}` : agentName))
   const titled = !!(given || task || (kind === 'agent' && o.prompt && first))
-  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }) }
+  const tab: Tab = { id: randomUUID().slice(0, 8), workspace: ws.id, name, kind, ...(titled && { titled }), ...(kind === 'agent' ? { preset } : {}), ...(pr ? { profile: pr.name } : {}), ...(o.cmd ? { cmd: o.cmd } : {}), ...(o.forkOf ? { forkOf: o.forkOf } : {}), ...(model && { model }), ...(effort && { effort }), ...(perm && { perm }), ...(fast && { fast }) }
   state.tabs.push(tab)
   save()
   try {
@@ -1617,7 +1624,7 @@ export function closeTab(id: string) {
 
 // another: a local workspace beside the one the folder has (a scheduled task's new session each run: a row of its own)
 // place: where the sidebar shows it, 'top' (first in its project) or a sep's id (first under it); none: last
-export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one
+export type NewWs = { caller?: { ws?: string; tab?: string }; project: string; base?: string; preset?: string; cmd?: string; prompt?: string; name?: string; local?: boolean; another?: boolean; browser?: string; forkOf?: string; model?: string; effort?: string; perm?: string; fast?: boolean; race?: string; issue?: string; issued?: Workspace['issue']; pr?: string; fork?: boolean; place?: string; linked?: string; guessed?: boolean; link?: string; from?: string; vars?: boolean } // vars: its prompt's agent variables ({{branch}}…) filled: a template's, an action's, a scheduled one
 
 // gh's failure as a line you can act on: not installed, not signed in, not found
 function ghSays(e: any, what: string) {
@@ -1677,7 +1684,7 @@ export async function wsFan(o: NewWs & { presets: string[] }): Promise<Workspace
     if (p === 'none' || p === 'shell') throw new Error(`${p} isn't an agent`)
     presetCheck(p)
     const agent = presetNamed(p)?.agent ?? p
-    if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree
+    if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // all of them before any worktree (a race's agents keep their own permission mode and speed)
   }
   const base = await fromPRLink(proj, await fromIssue(proj, o))
   const name = slug(base.name || (base.prompt ?? '').split(/\s+/).slice(0, 4).join(' ')) || 'race'
@@ -1739,7 +1746,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
-  if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort) // before the worktree: a wrong one makes nothing
+  if (isAgent(agent)) modelCheck(agent, o.model?.trim(), o.effort, o.perm, o.fast) // before the worktree: a wrong one makes nothing
   o = await fromIssue(proj, o) // after the checks: they're instant, gh isn't
   // the folder's own workspace (not a scheduled run's session): Local again is that one, as it is (asked again below:
   // another wsNew may make it meanwhile)
@@ -1821,7 +1828,7 @@ async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace
     addTab(ws.id, { kind: 'setup', name: 'setup', cmd: cfg.setup })
   }
   try {
-    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, vars: o.vars }).name} (its command: the workspace's Logs)`)
+    if (preset !== 'none') step(`agent: ${addTab(ws.id, { preset, cmd: o.cmd, prompt: o.prompt, forkOf: o.forkOf, model: o.model, effort: o.effort, perm: o.perm, fast: o.fast, vars: o.vars }).name} (its command: the workspace's Logs)`)
     else step('no agent (none)')
   } finally {
     changed() // the workspace is made, even when its agent didn't start
@@ -2123,7 +2130,7 @@ export function reminderTick(now = Date.now()) {
 export async function wsFork(ref: string) {
   const src = findWs(ref)
   const agent = tabsOf(src.id).find(t => t.preset === 'claude' && t.resumeId)
-  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort, fork: src.fork })
+  return wsNew({ project: src.project, base: src.branch, name: `${src.id}-fork`, preset: agent ? (presetNamed(agent.profile) ? agent.profile : 'claude') : 'shell', forkOf: agent?.resumeId, model: agent?.model, effort: agent?.effort, perm: agent?.perm, fast: agent?.fast, fork: src.fork })
 }
 
 // restoreAll starts every tab of every live workspace after a daemon restart: agents resume their chat, shells come
