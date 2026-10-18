@@ -52,6 +52,59 @@ function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
   const on = !!r?.width && !!r.height && [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]].some(([fx, fy]) => at(r.left + r.width * fx, r.top + r.height * fy))
   return <div className={`ai-peek ${on ? '' : 'whole'}`} style={on ? { left: r!.left, top: r!.top, width: r!.width, height: r!.height } : undefined} onAnimationEnd={e => e.animationName === 'ai-peek' && onDone()} aria-hidden />
 }
+// the floating Laki AI chat, dragged by its head (not its buttons) anywhere over the main area; where it was left is
+// laki.aiFloatAt (right and bottom, px), held inside the area as it changes size; a double-click on the head puts it back
+type FloatAt = { right: number; bottom: number }
+function AiFloat({ children }: { children: ReactNode }) {
+  const box = useRef<HTMLDivElement>(null)
+  const [at, setAt] = useState<FloatAt | null>(() => load<FloatAt | null>('laki.aiFloatAt', null))
+  const atRef = useRef(at)
+  atRef.current = at
+  const [moving, setMoving] = useState(false)
+  // 8px inside its area at least, so its head stays in reach
+  const fit = (p: FloatAt): FloatAt => {
+    const el = box.current
+    const area = el?.offsetParent as HTMLElement | null
+    if (!el || !area) return p
+    const keep = (v: number, max: number) => Math.round(Math.max(8, Math.min(v, max - 8)))
+    return { right: keep(p.right, area.clientWidth - el.offsetWidth), bottom: keep(p.bottom, area.clientHeight - el.offsetHeight) }
+  }
+  useLayoutEffect(() => {
+    const area = box.current?.offsetParent
+    if (!area) return
+    const ro = new ResizeObserver(() => setAt(a => (a ? fit(a) : a)))
+    ro.observe(area)
+    return () => ro.disconnect()
+  }, [])
+  const head = (e: { target: EventTarget }) => {
+    const t = e.target as Element
+    return !!t.closest('.ai-win-head') && !t.closest('button, a, input, select, textarea')
+  }
+  const down = (e: React.PointerEvent) => {
+    if (e.button !== 0 || !head(e) || !box.current?.offsetParent) return
+    e.preventDefault() // no text selected on the way
+    const area = (box.current.offsetParent as HTMLElement).getBoundingClientRect()
+    const r = box.current.getBoundingClientRect()
+    const from = { x: e.clientX, y: e.clientY, right: area.right - r.right, bottom: area.bottom - r.bottom }
+    const move = (m: PointerEvent) => (setMoving(true), setAt(fit({ right: from.right - (m.clientX - from.x), bottom: from.bottom - (m.clientY - from.y) })))
+    const up = () => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+      window.removeEventListener('pointercancel', up)
+      setMoving(false)
+      if (atRef.current) store('laki.aiFloatAt', atRef.current)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up)
+    window.addEventListener('pointercancel', up)
+  }
+  const reset = (e: React.MouseEvent) => head(e) && (setAt(null), store('laki.aiFloatAt', undefined))
+  return (
+    <div ref={box} className={`ai-float ${moving ? 'moving' : ''}`} style={at ?? undefined} onPointerDown={down} onDoubleClick={reset}>
+      {children}
+    </div>
+  )
+}
 const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API || (typeof __BUILT__ === 'string' && !!v.built && v.built < __BUILT__)
 
 const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
@@ -3289,9 +3342,9 @@ export function App() {
         {aiFab && (
           <>
             {aiFloat && (
-              <div className="ai-float">
+              <AiFloat>
                 <AiPage compact settings={settings.ai ?? {}} workspaces={view.workspaces.filter(w => !w.archived).map(w => ({ id: w.id, name: wsName(w) }))} onClose={() => setAiFloat(false)} context={whereNow} />
-              </div>
+              </AiFloat>
             )}
             <button type="button" className={`ai-fab ${aiFloat ? 'on' : ''}`} aria-label={aiFloat ? 'Close Laki AI' : 'Ask Laki AI'} data-tip={aiFloat ? 'Close (Esc)' : 'Ask Laki AI about what is on screen'} onClick={() => setAiFloat(o => !o)}>
               <Icon name={aiFloat ? 'x' : 'ai'} size={17} />

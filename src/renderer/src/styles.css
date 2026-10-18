@@ -1413,6 +1413,9 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .main:has(> .settings-page) > .ai-float { bottom: 66px; height: min(620px, calc(100% - 90px)); }
 .ai-float .ai-window { position: relative; flex: 1; min-width: 0; background: var(--bg); }
 .ai-float .ai-win-head, .ai-float .ai-win-head * { -webkit-app-region: no-drag; } /* in the main window a drag region would move the window */
+.ai-float .ai-win-head { cursor: grab; } /* App's AiFloat: dragged by its head */
+.ai-float .ai-win-head :is(button, a) { cursor: pointer; }
+.ai-float.moving, .ai-float.moving * { cursor: grabbing !important; user-select: none; }
 @media (prefers-reduced-motion: reduce) { .ai-fab, .ai-window::before { transition: none; } .ai-float, .ai-shimmer, .ai-window .ai-mark::after { animation: none; } }
 /* Laki AI's glow (experimental): what it looked at, lit once by a turning rainbow edge and a soft inner light */
 @property --peek-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }

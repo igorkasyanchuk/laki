@@ -12,6 +12,7 @@ version it builds, with the date. -->
   Settings › Agent skill has *Update all*.
 - An extension's Settings card in sections (where it shows, updates, its settings), each field saying what it does.
 - Specs & Brainstorms, Workflows and the extension studio open without a flash of the workspace under them.
+- The floating Laki AI chat moves: drag it by its head; it stays where you leave it (a double-click puts it back).
 
 - **Secret settings for extensions**: a token or a key is a `secret`: a password box in Settings, kept apart and given
   only to its fetch and actions, never to its page, the app, `laki ls` or MCP. A value saved as text moves over.

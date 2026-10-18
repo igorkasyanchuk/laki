@@ -1356,6 +1356,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       A reminder (a workspace's *Remind me…*, `RemindDialog`) is one with `then: 'remind'` and `ws`: it notifies about
       the workspace (the click: its first tab) and toasts *Open*; one due while the app was closed rings as it opens.
     - `laki.previewSize`: Preview's size (`{ w, h }`, null: the panel's).
+    - `laki.aiFloatAt`: where the floating Laki AI chat was dragged (App's `AiFloat`: `right` and `bottom` in px, held
+      8px inside the main area as it changes size; a double-click on its head drops it).
     - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
     - `laki.newDraft`: the new-workspace page's draft (`Draft`: the form, images, race, template), saved as it changes
       while something's typed, dropped as it's made (back if that fails) or *Clear*ed; `laki.scheduleDraft`: Scheduled
