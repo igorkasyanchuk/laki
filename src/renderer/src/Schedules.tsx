@@ -115,7 +115,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
   const nameOf = (id: string) => view.projects.find(p => p.id === id)?.name ?? id
   const pickProject = async (id: string) => {
     const p = id === '+' ? await api.pick().catch(e => (fail(e), null)) : { id }
-    if (p && p.id !== form?.project) set({ project: p.id, ws: where0(p.id) }) // the same one keeps its Where
+    if (p && p.id !== form?.project) set({ project: p.id, ws: scopedExt ? (wsOf(p.id)[0]?.id ?? '') : where0(p.id) }) // the same one keeps its Where; a per-workspace extension's: one of the new project's
   }
   const nextOf = (r: Exclude<typeof rule, null>) => {
     if ('error' in r) return []
@@ -326,7 +326,7 @@ export function SchedulesPage({ view, api, project: start = '', onSeen, onClose 
                       {s.workflow ? (
                         <span className="tag">workflow: {flowName(s.workflow)}</span>
                       ) : s.widget ? (
-                        <span className="tag">extension: {extName(s.widget, s.action)}</span>
+                        <span className="tag">{s.name ? `extension: ${extName(s.widget, s.action)}` : 'extension'}</span>
                       ) : (
                         <>
                           <span className="tag">{s.preset}</span>

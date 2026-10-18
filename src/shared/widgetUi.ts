@@ -250,9 +250,11 @@ const timeOf = (t: string) => (/^\d{10,13}$/.test(t) ? Number(t.length === 10 ? 
 
 // if / unless: an element's, a button's, an accessory's, an item's
 const hidden = (x: El, s: S) => (x.if !== undefined && !holds(x.if, s)) || (x.unless !== undefined && holds(x.unless, s))
-// when it was fetched, hidden: a plain element (no rows, lists or children) of the top scope whose words name at, "checked {{ago at}}"
+// when it was fetched, hidden: a plain element (no rows, lists or children) of the top scope whose words name at, "checked
+// {{ago at}}" (its words only: a tone or an if over at isn't a line about it)
 const AT = /\{\{[^}]*(?<![.\w])at\b[^}]*\}\}/
-const namesAt = (e: El, s: S) => !!s.hide?.at && s.scopes.length === 1 && e.each === undefined && Object.values(e).every(v => !v || typeof v !== 'object') && Object.values(e).some(v => typeof v === 'string' && AT.test(v))
+const SAYS = ['value', 'text', 'label', 'title', 'subtitle', 'caption']
+const namesAt = (e: El, s: S) => !!s.hide?.at && s.scopes.length === 1 && e.each === undefined && Object.values(e).every(v => !v || typeof v !== 'object') && SAYS.some(k => typeof e[k] === 'string' && AT.test(e[k] as string))
 
 function node(el: unknown, s: S): string {
   if (!obj(el)) return ''

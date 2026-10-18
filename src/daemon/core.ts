@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetUse, widgetUseCheck } from './widgets.ts'
+import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -4643,7 +4643,7 @@ export function scheduleRm(id: string) {
   changed()
 }
 
-const runName = (s: Schedule, at: number) => stamp(s.name || (s.widget && !s.prompt ? `${s.widget}: ${s.action ?? 'fetch'}` : s.prompt.split(/\s+/).slice(0, 6).join(' ')), at)
+const runName = (s: Schedule, at: number) => stamp(s.name || (s.widget && !s.prompt ? `${widgetName(s.widget)}: ${s.action ?? 'fetch'}` : s.prompt.split(/\s+/).slice(0, 6).join(' ')), at)
 
 const logRun = (r: ScheduleRun) => {
   state.runs = [r, ...(state.runs ?? [])].slice(0, RUNS_KEPT)
@@ -4662,7 +4662,6 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
     if (s.widget) {
       // an extension: fetched, or one of its actions run (on ones only)
       const u = await widgetUse({ id: s.widget, action: s.action, arg: prompt || undefined, ws: ['new', 'local', 'local-new'].includes(s.ws) ? undefined : s.ws }, 'schedule', `scheduled task ${s.name ?? s.id}`)
-      if (!s.name && !s.prompt) r.name = `${u.name}: ${s.action ?? 'fetch'}` // its name, not its id
       if (!u.ok) throw new Error(u.error ?? `${u.name} failed`)
       r.what = s.action ? `ran ${u.name}'s ${s.action}${u.out?.trim() ? `: ${u.out.trim().split('\n').pop()!.slice(0, 120)}` : ''}` : `fetched ${u.name}`
     } else if (s.workflow) {
@@ -4730,6 +4729,7 @@ export async function scheduleTick(now = Date.now()) {
   for (const { s, at } of due) {
     if (!state.schedules?.some(x => x.id === s.id)) continue // deleted while an earlier one started
     if (now - at > MISSED_AFTER) logRun({ id: randomUUID().slice(0, 8), schedule: s.id, project: s.project, name: runName(s, at), at, ok: false, what: "missed: the Mac was asleep or Laki wasn't running" })
+    else if (s.widget) void runSchedule(s, now) // a fetch may take minutes (an AI source's): the rest don't wait for it
     else await runSchedule(s, now)
   }
 }

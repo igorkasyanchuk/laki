@@ -639,7 +639,8 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
   if (o.place !== undefined) s.place = (l => (l.length > 1 ? l : l[0]))(placeList(o.place)) // none: widget.json's again
   if (o.net !== undefined) s.net = !!o.net || undefined
-  if (o.hide) s.hide = (h => (h.refresh || h.at ? h : undefined))({ refresh: (o.hide.refresh ?? s.hide?.refresh) || undefined, at: (o.hide.at ?? s.hide?.at) || undefined })
+  const yes = (v: unknown, was?: boolean) => (v === undefined ? was : v === true) || undefined // only true hides
+  if (o.hide) s.hide = (h => (h.refresh || h.at ? h : undefined))({ refresh: yes(o.hide.refresh, s.hide?.refresh), at: yes(o.hide.at, s.hide?.at) })
   if (o.source !== undefined) {
     // null: widget.json's again; a fetch of its own only when it has one
     const src = o.source === null ? undefined : sourceOk(o.source)
@@ -1256,6 +1257,8 @@ export function widgetToolAnswer(o: { req: string; allow: string }) {
 
 // laki widget push (a cron job, a git hook, CI on this Mac, another app): data put there as a fetch would, none run;
 // merge: over its last data, shallow (both objects). An off one refuses it
+export const widgetName = (id: string) => (w => w?.m.name || id)(widgets.get(id))
+
 // a scheduled task's check as it's saved: the extension and its action are there (on or off: it may be on by its time)
 export function widgetUseCheck(id: string, action?: string) {
   const w = find(id)
@@ -1277,6 +1280,7 @@ export async function widgetUse(o: { id: string; action?: string; arg?: string; 
     if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: w.id, ws, toast: r.toast, modal: r.modal })
     return { ok: r.ok, error: r.error, name, out: r.out }
   }
+  if (streaming(w)) return { ok: true, name, data: dataOf(w).data } // its live line: a run would restart it
   const k = keyOf(w.id, ws)
   let r = running.has(k) ? { ok: false } : await widgetRun({ id: w.id, reason, why, ws })
   if (!r.ok && running.has(k)) {

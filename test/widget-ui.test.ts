@@ -389,7 +389,7 @@ test('UI kit: a click on a do button asks the app, with the command', () => {
 })
 
 test('UI kit: an extension with its refresh button and when it was fetched hidden', async t => {
-  const spec = { type: 'stack', children: [{ type: 'row', children: [{ type: 'text', value: 'Disk' }, { type: 'toolbar', items: [{ icon: 'refresh', label: 'Refresh', refresh: true }, { icon: 'copy', label: 'Copy', copy: 'x' }] }] }, { type: 'text', value: 'checked {{ago at}}' }, { type: 'text', value: 'at {{data.at}}' }, { type: 'list', each: 'rows', title: '{{name}}', subtitle: '{{ago at}}' }, { type: 'text', value: 'live now', if: 'at' }] }
+  const spec = { type: 'stack', children: [{ type: 'row', children: [{ type: 'text', value: 'Disk' }, { type: 'toolbar', items: [{ icon: 'refresh', label: 'Refresh', refresh: true }, { icon: 'copy', label: 'Copy', copy: 'x' }] }] }, { type: 'text', value: 'checked {{ago at}}' }, { type: 'text', value: 'at {{data.at}}' }, { type: 'list', each: 'rows', title: '{{name}}', subtitle: '{{ago at}}' }, { type: 'text', value: 'live now', if: 'at' }, { type: 'text', value: 'toned', tone: '{{#if at}}good{{/if}}' }] }
   const ctx = { data: { at: 'noon', rows: [{ name: 'a', at: at - 60_000 }] }, config: {}, at }
   const shown = uiHtml(spec, ctx, { full: true })
   assert.match(shown, /data-laki="refresh"/)
@@ -401,6 +401,7 @@ test('UI kit: an extension with its refresh button and when it was fetched hidde
   assert.doesNotMatch(hid, /checked/, 'a line that names at goes')
   assert.doesNotMatch(hid, /live now/, 'if: at no longer holds')
   assert.match(hid, /at noon/, "its data's own at stays")
+  assert.match(hid, /toned/, 'a tone over at is no line about it')
   assert.match(hid, />a</, 'a list of rows stays, their own at too')
   assert.match(uiHtml(spec, { ...ctx, data: null, error: 'boom' }, { hide: { refresh: true } }), /Retry/, 'a failure still has Retry')
 

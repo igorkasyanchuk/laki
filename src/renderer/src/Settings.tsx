@@ -2036,7 +2036,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           <Says title="Network access" hint="Its page may fetch() from and show images of https sites. Off: it sees only what its data gave it. Its own script always has the network" />
         </Switch>
       )}
-      {!w.button && (
+      {w.every !== undefined && (
         <>
           <Switch className="switch-row" on={!w.hide?.refresh} onChange={on => void api.set(w.id, { hide: { refresh: !on } })}>
             <Says title="Refresh button" hint="Its ↻ wherever it shows: the sidebar, the Desk, its full view. Its right click still has Fetch now" />

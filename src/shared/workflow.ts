@@ -511,7 +511,7 @@ export function flowVars(wf: Workflow): FlowVar[] { // yours, {{vars.NAME}}, are
     if (b.kind === 'webhook') at('status', 'the HTTP status'), at('output', 'the response')
     if (b.kind === 'wait') at('output', 'the checks that failed')
     if (b.kind === 'save') at('output', 'the saved file’s path')
-    if (b.kind === 'extension') at('data', 'its data, fetched now, as JSON; each field of it: steps.<id>.<field>')
+    if (b.kind === 'extension') at('data', `its data, fetched now, as JSON; each field of it: steps.${b.id}.<field>`)
     for (const n of OUT_KINDS.includes(b.kind) ? (b.out ?? []) : []) at(n, 'an output it names (out:)')
     if (b.kind === 'decide') {
       for (const q of b.qs ?? []) {
