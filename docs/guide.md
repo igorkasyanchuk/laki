@@ -984,6 +984,12 @@ only on some exit codes (*Only on exit codes*, `retry on: 1, 75`). An agent's ne
 what went wrong. The log says each one (*Tests: tries again (2 of 3) in 10 s: exit 1*); a try again isn't counted
 against the block's *at most*, but an agent's is a turn.
 
+An Agent block gives its turn an hour (*Timeout*, `timeout: 30` in minutes): past it, Laki presses Esc in its tab and
+the block takes its *error* way. Time the run waits for you or for a usage limit doesn't count. An agent that prints
+nothing for 10 minutes while it works gets one line typed into its tab (*Laki here: nothing printed for 10 minutes.
+Finish this step, or say what is blocking you.*); silent 10 more, the run asks you: *Nudge again*, *Try again* (Esc,
+then its prompt again), *Skip it* (on to its *next* with no answer) or *Stop the run*.
+
 An AI decision's questions come in Jev's three kinds: *How true* (`noul`: yes or no, by how sure), *Choice* (one of
 its options) and *Score* (graded with a rubric: one of its levels). Its *Ways out*: one line (*ok*, for a Case after
 it), or *A line per answer of* one question: yes and no, each option of a choice, each level of a score (by its

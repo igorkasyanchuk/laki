@@ -448,6 +448,8 @@ const rtOf = (id: string) => {
   if (!r) rt.set(id, (r = { status: 'idle', done: false }))
   return r
 }
+// a tab's turn as its hooks (or screen) last said: workflows' agent blocks read it
+export const tabStatus = (id: string): Status => rt.get(id)?.status ?? 'idle'
 
 // an agent whose turns Laki follows: by its hooks (HOOKED), or by its screen (sweepRunning)
 export const tracked = (t: Tab) => t.kind === 'agent' && isAgent(t.preset)

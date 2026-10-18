@@ -49,6 +49,7 @@ export const TURNS = 30 // agent turns in one run before it asks you (its turns:
 export const MAX_BLOCKS = 100 // a workflow's blocks: past it, it won't run (and + Block stops)
 export const RETRY_KINDS: BlockKind[] = ['agent', 'run', 'llm', 'decide', 'extension'] // what retry: takes
 export const RETRY_MAX = 5
+export const AGENT_TIMEOUT = 60 // an agent block's minutes for its turn, unless it says (time it waits for you doesn't count)
 
 export type Option = { label: string; to?: string }
 export type Block = {
@@ -77,7 +78,7 @@ export type Block = {
   effort?: string
   session?: string // agent: run (the run's agent tab, the default), new, or a block's id (its tab)
   cmd?: string // run
-  timeout?: number // run, wait, llm, decide, webhook: minutes
+  timeout?: number // agent, run, wait, llm, decide, webhook: minutes
   retry?: number // agent, run, llm, decide, extension: tries again after a bad exit (fail, error), 1 to RETRY_MAX times
   retryOn?: number[] // run: only these exit codes are tried again (unset: any but 0)
   question?: string // ask
@@ -332,7 +333,7 @@ export function toFile(wf: Workflow): string {
     if (b.name && b.name !== b.id) L.push(`name: ${one(b.name)}`)
     switch (b.kind) {
       case 'start': L.push(`input: ${b.input ?? 'task'}`); break
-      case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); break
+      case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'llm': L.push(`llm: ${b.model ?? ''}`.trimEnd()); if (b.system) L.push(`system: ${one(b.system)}`); if (b.temperature !== undefined) L.push(`temperature: ${b.temperature}`); if (b.json !== undefined) L.push(`json: ${b.json ? 'yes' : 'no'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'decide':
         L.push([`decide: ${b.model ?? ''}`.trimEnd(), b.sure !== undefined && `sure: ${b.sure}`, b.timeout && `timeout: ${b.timeout}`].filter(Boolean).join(' · '))
@@ -659,9 +660,9 @@ export type Decision = { at: number; block: string; exit: string; why: string; m
 // what a run waits on: an ask (yours, a confirm before an outward action, a stuck block), an agent's turn, a command,
 // a wait block, a usage limit
 export type FlowWait =
-  | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[] }
+  | { kind: 'ask' | 'confirm' | 'stuck'; question: string; show?: string; options: string[]; tab?: string; used?: number } // tab, used: a stalled agent's (stuck), what its block's turn has had of its timeout
   | { kind: 'decide'; question: string; show?: string; options: string[]; key: string; rest: string[] } // an AI decision it isn't sure of: key's answer is yours, then rest's
-  | { kind: 'agent'; tab: string; queued?: string } // queued: the prompt, while it waits in the tab's queue
+  | { kind: 'agent'; tab: string; queued?: string; since?: number; used?: number; nudged?: number } // queued: the prompt, while it waits in the tab's queue; since: when its timeout's clock last started, used: what it had before (time it waited for you or a limit doesn't count); nudged: when Laki checked in on it, silent
   | { kind: 'run' | 'wait' }
   | { kind: 'retry'; until: number } // a bad exit's try again, at until
   | { kind: 'limit'; tab: string; until?: number }
@@ -713,7 +714,7 @@ var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; th
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:
 - ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked.
-- agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines. Waits for the agent's turn to end; exits next, error. Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed).
+- agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed).
 - run: <shell command> (in the run's folder; timeout: <minutes>). Exits ok (exit 0), fail. {{steps.<id>.output}}: its last lines.
 - ask: <question>, show: <text with {{vars}}>, then options "- <label> → <block>". Waits for the user; what they type is {{answer}}.
 - choice: <variable or block id> contains|matches|equals "<text>", or <variable> >=|<=|>|< <number> (if/else; "if:" is the same), then two options: the first when it holds, the second when not.

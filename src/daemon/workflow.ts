@@ -11,8 +11,8 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, turnEnds, within, wsArchive, wsNew } from './core.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { addTab, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { widgetUse } from './widgets.ts'
 
@@ -31,6 +31,9 @@ const DETAILED = 10 // the newest ended runs keep their details; older ones keep
 const RESUME_AFTER = 8000 // after a restart: the agents' tabs come back first
 const AFTER_TURN = 900 // a turn's end to the next block: core types what was queued at 800 ms
 const RETRY_WAIT = [10, 60] // seconds before a block's first try again, then before each later one
+const STALL = 10 * 60000 // an agent block's tab printing nothing this long while it works: a nudge, then you
+const NUDGE = `Laki here: nothing printed for ${STALL / 60000} minutes. Finish this step, or say what is blocking you.`
+const STALLED = ['Nudge again', 'Try again', 'Skip it', 'Stop the run'] // a stalled agent's stuck: Stop the run last (flowAnswer's)
 
 export const on = () => {
   if (state.settings?.workflows !== true) throw new Error('Workflows are off: turn them on in Settings › General › Experimental')
@@ -447,8 +450,53 @@ function agent(r: FlowRun, b: Block) {
   if (key) r.tabs[key] = tab.id
   tab.flow = r.id // the session links back to the run
   r.turns++
-  r.wait = { kind: 'agent', tab: tab.id, ...(queued && { queued: prompt }) }
+  r.wait = { kind: 'agent', tab: tab.id, ...(queued && { queued: prompt }), since: Date.now(), used: 0 }
   touch()
+}
+// an agent block's turn, at each tick: past its timeout, Esc and the error way; silent STALL while it works (its prompt
+// typed in, not queued), Laki checks in once, then asks you
+type AgentWait = Extract<FlowWait, { kind: 'agent' }>
+function agentTick(r: FlowRun, b: Block, w: AgentWait, now: number) {
+  const min = b.timeout ?? AGENT_TIMEOUT
+  const used = (w.used ?? 0) + now - (w.since ?? r.at ?? now)
+  const t = tabOf(w.tab)
+  const queued = w.queued !== undefined && !!t?.queue?.includes(w.queued)
+  if (used > min * 60000) {
+    const no = () => leave(r, b, 'error', `no answer after ${min} min`)
+    if (!queued) return esc(r, b, w.tab, no)
+    t!.queue = t!.queue!.filter(x => x !== w.queued) // still behind your turn: ours goes, yours goes on
+    if (!t!.queue.length) delete t!.queue
+    return no()
+  }
+  const s = sessions.get(w.tab)
+  if (queued || !s || s.exited || tabStatus(w.tab) !== 'running' || now - Math.max(s.lastOutput, w.since ?? 0, w.nudged ?? 0) < STALL) return
+  if (!w.nudged) return nudge(r, b, w, now)
+  stuck(r, b, `${blockName(b)}: its agent printed nothing for ${STALL / 60000} minutes, even after Laki checked in`, STALLED, { tab: w.tab, used })
+}
+// typed into the agent while it works (not whenIdle: that would wait for the turn that doesn't end)
+function nudge(r: FlowRun, b: Block, w: AgentWait, now: number) {
+  try {
+    coreSend({ target: w.tab, text: NUDGE })
+  } catch (e) {
+    return leave(r, b, 'error', (e as Error).message)
+  }
+  w.nudged = now
+  say(r, `${blockName(b)}: nothing printed for ${STALL / 60000} min: Laki checked in`, NUDGE)
+  touch()
+}
+// Esc to a tab's turn (as its key: core's input), then what comes next once it's idle (5 s at most): a prompt sent
+// sooner would queue behind the turn it stopped
+function esc(r: FlowRun, b: Block, tab: string, then: () => void) {
+  coreInput(tab, '\x1b')
+  r.wait = { kind: 'run' }
+  touch()
+  const t0 = Date.now()
+  const poll = setInterval(() => {
+    if (!live(r) || r.cur !== b.id || r.wait?.kind !== 'run') return clearInterval(poll)
+    if (tabStatus(tab) === 'running' && Date.now() - t0 < 5000) return
+    clearInterval(poll)
+    then()
+  }, 250)
 }
 // the block again in half a second (a tab still drawing, a setup script still running)
 function later(r: FlowRun, b: Block, f: (r: FlowRun, b: Block) => void) {
@@ -466,9 +514,10 @@ const send = (tab: string, text: string) => coreSend({ target: tab, text, whenId
 
 turnEnds.add((tab: Tab, o: { last?: string; limit?: number; failed: boolean }) => {
   for (const r of runs()) {
-    if (!live(r) || (r.wait?.kind !== 'agent' && r.wait?.kind !== 'limit') || r.wait.tab !== tab.id) continue
+    const w = r.wait // its turn: an agent's, one at a limit, a stalled one you're asked about (it answered after all)
+    if (!live(r) || !w || !(w.kind === 'agent' || w.kind === 'limit' || w.kind === 'stuck') || !w.tab || w.tab !== tab.id) continue
     const b = blockOf(r, r.cur)!
-    if (r.wait.kind === 'agent' && r.wait.queued !== undefined && tab.queue?.includes(r.wait.queued)) continue // a turn before ours: ours is still queued
+    if (w.kind === 'agent' && w.queued !== undefined && tab.queue?.includes(w.queued)) continue // a turn before ours: ours is still queued
     if (o.limit) {
       Object.assign(r, { status: 'paused' as FlowStatus, wait: { kind: 'limit', tab: tab.id, until: o.limit } })
       say(r, `${blockName(b)}: ${tab.name} hit its usage limit; paused until ${new Date(o.limit).toTimeString().slice(0, 5)}`)
@@ -788,17 +837,17 @@ function waitTick(r: FlowRun, b: Block, now: number) {
   }
 }
 
-function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, show: string | undefined, options: string[]) {
-  Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind, question, ...(show && { show }), options } })
+function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, show: string | undefined, options: string[], more?: { tab: string; used: number }) {
+  Object.assign(r, { status: 'waiting' as FlowStatus, wait: { kind, question, ...(show && { show }), options, ...more } })
   say(r, `asks you: ${question}`, show)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: question })
 }
-function stuck(r: FlowRun, b: Block, why: string, options = ['Try again', 'Stop the run']) {
+function stuck(r: FlowRun, b: Block, why: string, options = ['Try again', 'Stop the run'], more?: { tab: string; used: number }) {
   if (!live(r)) return
   kill0(r)
   r.cur = b.id
-  ask(r, 'stuck', why, undefined, options)
+  ask(r, 'stuck', why, undefined, options, more)
 }
 
 export function flowAnswer(o: { id: string; n: number; text?: string }) {
@@ -825,6 +874,19 @@ export function flowAnswer(o: { id: string; n: number; text?: string }) {
   }
   if (w.kind === 'ask') return leave(r, b, label, `you: ${label}${typed ? ` · “${clip(typed, 80)}”` : ''}`, true), r
   if (o.n === w.options.length - 1) return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
+  if (w.kind === 'stuck' && w.tab) {
+    // a stalled agent: checked in on again (its clock on, without the time you took), skipped (its turn stopped first),
+    // or tried again (the same)
+    const tab = w.tab
+    if (label === 'Nudge again') {
+      r.wait = { kind: 'agent', tab, since: Date.now(), used: w.used }
+      return nudge(r, b, r.wait, Date.now()), r
+    }
+    if (label === 'Skip it') return esc(r, b, tab, () => ((r.vars[`steps.${b.id}.answer`] = ''), leave(r, b, 'next', 'you skipped it', true))), r
+    decide(r, b, 'again', `you: ${label}`, true)
+    say(r, `${blockName(b)}: again`)
+    return esc(r, b, tab, () => ((r.visits[b.id] = 0), enter(r, b))), r
+  }
   decide(r, b, w.kind === 'confirm' ? 'yes' : 'again', `you: ${label}`, true)
   if (w.kind === 'confirm') return say(r, `${blockName(b)}: you said do it`), void act(r, b).catch(e => stuck(r, b, `${blockName(b)}: ${(e as Error).message}`)), r
   // stuck: the block again, its count and the turns given back
@@ -892,6 +954,7 @@ export function flowTick(now = Date.now()) {
     if (r.wait?.kind === 'wait' && r.status === 'running') waitTick(r, b, now)
     else if (r.wait?.kind === 'retry' && now >= r.wait.until) again(r, b)
     else if (r.wait?.kind === 'agent' && !alive(r.wait.tab)) leave(r, b, 'error', `${tabOf(r.wait.tab)?.name ?? 'its tab'} stopped`)
+    else if (r.wait?.kind === 'agent' && r.status === 'running') agentTick(r, b, r.wait, now)
   }
 }
 

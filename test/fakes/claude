@@ -51,6 +51,7 @@ process.stdout.write('\x1b[?2004h') // bracketed paste on, like the real one
 process.stdout.write(`fake claude ${args.filter(a => !a.includes('/')).join(' ')}\r\n`)
 hook('SessionStart', { session_id: session })
 let busy = false // a turn under way: Esc interrupts it (no Stop hook, like the real one)
+let slow = false // a slow turn: a line typed meanwhile waits in it (the real one reads it then), no turn of its own
 // "menu": a permission prompt like the real one's, ↑↓ move its ❯, Enter picks
 const MENU = ['Yes', "Yes, and don't ask again for rm commands", 'No, and tell Claude what to do differently (esc)']
 let menu = 0
@@ -60,7 +61,7 @@ const turn = text => {
   if (text.startsWith('menu')) { process.stdout.write('Bash command\r\n\r\n  rm -rf build\r\n\r\nDo you want to proceed?\r\n'); menu = 1; drawMenu(); hook('Notification', { message: 'Claude needs your permission to use Bash' }); return }
   if (text.startsWith('ask')) { process.stdout.write('allow? (y/n)\r\n'); hook('Notification', { message: 'needs permission' }); return }
   busy = true
-  if (text.startsWith('slow')) return void process.stdout.write('✻ Working… (esc to interrupt)\r\n') // until Esc
+  if (text.startsWith('slow')) return void ((slow = true), process.stdout.write('✻ Working… (esc to interrupt)\r\n')) // until Esc
   if (text.startsWith('mute')) return // a turn that ends without a hook or a word (a resumed chat's recap)
   setTimeout(() => {
     if (!busy) return
@@ -92,9 +93,9 @@ process.stdin.on('data', d => {
     return drawMenu()
   }
   for (const ch of s) {
-    if (ch === '\r') { process.stdout.write('\r\n'); const t = line; line = ''; if (t === 'exit') process.exit(0); turn(t) }
+    if (ch === '\r') { process.stdout.write('\r\n'); const t = line; line = ''; if (t === 'exit') process.exit(0); if (!(busy && slow)) turn(t) }
     else if (ch === '\x03') process.exit(130)
-    else if (ch === '\x1b' && busy) { busy = false; process.stdout.write('\r\n  ⎿  Interrupted · What should Claude do instead?\r\n> ') }
+    else if (ch === '\x1b' && busy) { busy = slow = false; process.stdout.write('\r\n  ⎿  Interrupted · What should Claude do instead?\r\n> ') }
     else { line += ch; process.stdout.write(ch) }
   }
 })

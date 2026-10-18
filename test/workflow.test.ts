@@ -864,3 +864,90 @@ test('workflow retries: tries again after a fail (10 s, then 60 s), only on its 
   r = await get(stop.id)
   assert.deepEqual([r.status, r.decisions.map((d: any) => d.exit), r.visits.t], ['stopped', ['next', 'retry'], 1])
 })
+
+// an agent block's turn that never ends: its timeout (Esc, error); silent while it works: a nudge, then you
+const STALLS = `# Stalls
+
+runs in: main · session: new
+
+## start
+input: task
+next: a
+
+## a
+agent: claude
+timeout: 1
+> slow {{task}}
+next: e
+error: bad
+
+## e
+end: success
+
+## bad
+end: failed
+`
+test('workflow agents: a timeout Escs the turn and takes error; a silent one is nudged, then asks (Nudge again, Try again, Skip it)', async t => {
+  const { workflow, problems } = parse(STALLS, 'stalls')
+  assert.deepEqual([problems, check(workflow)], [[], []])
+  assert.equal(toFile(workflow), STALLS, 'round trip')
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'stalls', text: STALLS })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  // its turn under way: the fake says so (n turns on its screen, wrapped lines joined)
+  const working = async (id: string, n = 1) => {
+    const r = await until(async () => (x => x.wait?.kind === 'agent' && !x.wait.nudged && x)(await get(id)), 'its turn')
+    await until(async () => (await rig.screen(r.wait.tab)).replace(/\n/g, '').split('esc to interrupt').length > n, 'at work')
+    await sleep(200) // its keys read (raw mode)
+    return r
+  }
+  const ended = (id: string) => until(async () => (x => FLOW_ENDED.includes(x.status) && x)(await get(id)), 'the end', 15000)
+
+  // timeout: 1, a minute on: Esc, then error
+  const late = await rig.rpc('flowStart', { workflow: 'stalls', project: p.id, task: 'late' })
+  let r = await working(late.id)
+  await rig.rpc('flowTick', { now: Date.now() + 30000 })
+  assert.equal((await get(late.id)).wait.kind, 'agent', 'not yet')
+  await rig.rpc('flowTick', { now: Date.now() + 61000 })
+  r = await ended(late.id)
+  assert.deepEqual([r.status, r.decisions.at(-1).exit, r.decisions.at(-1).why], ['failed', 'error', 'no answer after 1 min'])
+  assert.match(await rig.screen(r.tabs.a), /Interrupted/, 'the agent was stopped')
+
+  // no timeout of its own (60): silent 10 min, a nudge typed in; 10 more, it asks you
+  await rig.rpc('flowSave', { id: 'stalls', text: STALLS.replace('timeout: 1\n', '') })
+  const run = await rig.rpc('flowStart', { workflow: 'stalls', project: p.id, task: 'quiet' })
+  r = await working(run.id)
+  const tab = r.wait.tab
+  const min = 60000
+  await rig.rpc('flowTick', { now: Date.now() + 9 * min })
+  assert.equal((await get(run.id)).wait.nudged, undefined, 'not silent long enough')
+  await rig.rpc('flowTick', { now: Date.now() + 11 * min })
+  assert.ok((await get(run.id)).wait.nudged)
+  await until(async () => (await rig.screen(tab)).includes('Laki here: nothing printed for 10 minutes. Finish this step, or say what is blocking you.'), 'the nudge typed in')
+  await rig.rpc('flowTick', { now: Date.now() + 22 * min })
+  r = await get(run.id)
+  assert.deepEqual([r.status, r.wait.kind, r.wait.options, r.wait.tab], ['waiting', 'stuck', ['Nudge again', 'Try again', 'Skip it', 'Stop the run'], tab])
+  assert.match(r.wait.question, /^a: its agent printed nothing for 10 minutes, even after Laki checked in$/)
+  assert.ok(r.wait.used >= 22 * min, 'what its timeout has had')
+  // Nudge again: on again, nudged; silent again: asks again
+  await rig.rpc('flowAnswer', { id: run.id, n: 0 })
+  r = await get(run.id)
+  assert.deepEqual([r.status, r.wait.kind, !!r.wait.nudged], ['running', 'agent', true])
+  await rig.rpc('flowTick', { now: Date.now() + 11 * min })
+  assert.equal((await get(run.id)).wait.kind, 'stuck')
+  // Try again: its turn stopped (Esc), the prompt again
+  await rig.rpc('flowAnswer', { id: run.id, n: 1 })
+  r = await working(run.id, 2)
+  assert.equal(r.wait.tab, tab, 'the same tab')
+  assert.match(await rig.screen(tab), /Interrupted/)
+  // Skip it: next, with no answer
+  await rig.rpc('flowTick', { now: Date.now() + 11 * min })
+  await rig.rpc('flowTick', { now: Date.now() + 22 * min })
+  await rig.rpc('flowAnswer', { id: run.id, n: 2 })
+  r = await ended(run.id)
+  assert.equal(r.status, 'done', r.log.join('\n'))
+  assert.deepEqual([r.decisions.at(-1).exit, r.decisions.at(-1).why, r.decisions.at(-1).you, r.vars['steps.a.answer']], ['next', 'you skipped it', true, ''])
+  assert.equal(r.log.filter((l: string) => / a: nothing printed for 10 min: Laki checked in/.test(l)).length, 3)
+})

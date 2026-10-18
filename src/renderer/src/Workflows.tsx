@@ -8,7 +8,7 @@
 import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
@@ -1036,6 +1036,7 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
             {field('Model', text(b.model, (x, v) => (x.model = v.trim() || undefined), false, 'its default'))}
             {field('Effort', text(b.effort, (x, v) => (x.effort = v.trim() || undefined), false, 'its default'))}
           </div>
+          {field('Timeout (minutes)', <Typed type="number" min={1} value={b.timeout ?? AGENT_TIMEOUT} onText={v => set(x => void (x.timeout = Number(v) && Number(v) !== AGENT_TIMEOUT ? Number(v) : undefined))} />, 'No answer by then: Esc, and its error way. Time it waits for you doesn’t count; silent 10 min, Laki checks in once, then asks you')}
           {field(
             'Agent action',
             <select

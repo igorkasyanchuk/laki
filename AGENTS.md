@@ -870,7 +870,14 @@ the list's keys then, `awaiting`, and opens the first new one as it's written); 
 `pageNow.workflow` (its id, source, unsaved changes, the file), App's `whereNow` sends it with the floating chat's asks.
 `out:` (`OUT_KINDS`: agent, llm, run, webhook; names `OUT_NAME`, not `OUT_TAKEN`): an agent's or llm's prompt gets
 `outAsk`, its result (answer, output, response) `outsOf` (the last ```json block, all of it, else the last `{…}` that
-parses; non-strings as JSON, a missing name `''` and said) into `steps.<id>.<name>`. Retries (`retry` 1-`RETRY_MAX`
+parses; non-strings as JSON, a missing name `''` and said) into `steps.<id>.<name>`. Agent blocks' clock (`agentTick`, from `flowTick`):
+`timeout` (`AGENT_TIMEOUT`, 60 min) counts the wait's `used` plus since `since` (an ask or a stalled stuck carries `used`,
+so time it waits for you doesn't count; a limit pauses it), then `esc` (core's `input` Esc, the next step once
+`tabStatus` isn't running, 5 s at most) and error; a prompt still queued behind your turn is taken off the queue
+instead. `STALL` (10 min) of no `Session.lastOutput` while `tabStatus` says running: `nudge` (core's `send`, not
+`whenIdle`, `NUDGE`'s words, `nudged`), then a stuck with `STALLED` (Nudge again, Try again: Esc then the block anew,
+Skip it: next with an empty answer, Stop the run last) and the wait's `tab`, whose turn's end `turnEnds` still takes.
+Retries (`retry` 1-`RETRY_MAX`
 on `RETRY_KINDS`, a run block's `retryOn` exit codes): `leave` hands a bad exit with tries left to `retry`, which keeps the count
 in `r.tries` (cleared when the block is entered anew, not on a try), decides `retry`, says it, and waits
 (`RETRY_WAIT`: 10 s, then 60 s) as `wait` `{ kind: 'retry', until }`: a timer and `flowTick` (tests move the clock) both
