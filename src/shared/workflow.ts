@@ -50,6 +50,7 @@ export const TURNS = 30 // agent turns in one run before it asks you (its turns:
 export const MAX_BLOCKS = 100 // a workflow's blocks: past it, it won't run (and + Block stops)
 export const RETRY_KINDS: BlockKind[] = ['agent', 'run', 'llm', 'decide', 'extension'] // what retry: takes
 export const RETRY_MAX = 5
+export const TIMEOUT_MAX = 1440 // a block's timeout: a day at most
 export const AGENT_TIMEOUT = 60 // an agent block's minutes for its turn, unless it says (time it waits for you doesn't count)
 
 export type Option = { label: string; to?: string }
@@ -249,9 +250,9 @@ function pairs(line: string): [string, string][] {
   }
   return out
 }
-function num(v: string, at: string, problems: string[]) {
+function num(v: string, at: string, problems: string[], max = 99) {
   const n = Number(v)
-  if (!Number.isInteger(n) || n < 1 || n > 99) return void problems.push(`${at}: ${v}? a number from 1 to 99`)
+  if (!Number.isInteger(n) || n < 1 || n > max) return void problems.push(`${at}: ${v}? a number from 1 to ${max}`)
   return n
 }
 
@@ -316,7 +317,7 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
     case 'effort': return void (b.effort = v || undefined)
     case 'session': return void (b.session = v || undefined)
     case 'run': return void (b.cmd = v)
-    case 'timeout': return void (b.timeout = num(v.replace(/\s*min(utes)?$/, ''), at, problems))
+    case 'timeout': return void (b.timeout = num(v.replace(/\s*min(utes)?$/, ''), at, problems, TIMEOUT_MAX))
     case 'retry': return void (Number.isInteger(Number(v)) && v !== '' ? (b.retry = Number(v)) : problems.push(`${at}: retry: how many times it tries again, 1 to ${RETRY_MAX}`)) // check() says what's out of range
     case 'retry on': {
       const codes = v.split(/[\s,]+/).filter(Boolean).map(Number)
@@ -421,6 +422,7 @@ export function check(wf: Workflow): string[] {
     if (b.json !== undefined && b.kind !== 'agent' && b.kind !== 'llm') out.push(`${blockName(b)}: json: is for agent and AI call blocks`)
     if (b.retry !== undefined && !RETRY_KINDS.includes(b.kind)) out.push(`${blockName(b)}: retry: is for agent, run, AI call, AI decision and extension blocks`)
     else if (b.retry !== undefined && !(Number.isInteger(b.retry) && b.retry >= 1 && b.retry <= RETRY_MAX)) out.push(`${blockName(b)}: retry: ${b.retry}? 1 to ${RETRY_MAX} tries again`)
+    if (b.timeout !== undefined && !(Number.isInteger(b.timeout) && b.timeout >= 1 && b.timeout <= TIMEOUT_MAX)) out.push(`${blockName(b)}: timeout: ${b.timeout}? 1 to ${TIMEOUT_MAX} minutes`)
     if (b.retryOn?.length && b.kind !== 'run') out.push(`${blockName(b)}: retry on: is for run blocks (their exit codes)`)
     else if (b.retryOn?.length && !b.retry) out.push(`${blockName(b)}: retry on: needs retry: (how many times)`)
     if (b.kind === 'ask' && !b.question?.trim()) out.push(`${blockName(b)} asks nothing`)

@@ -487,6 +487,7 @@ function agent(r: FlowRun, b: Block) {
 // an agent block's turn, at each tick: past its timeout, Esc and the error way; silent STALL while it works (its prompt
 // typed in, not queued), Laki checks in once, then asks you
 type AgentWait = Extract<FlowWait, { kind: 'agent' }>
+const quiet = new Map<string, { sig: string; at: number }>() // by run: its agent's screen as the stall check last saw it, and since when
 function agentTick(r: FlowRun, b: Block, w: AgentWait, now: number) {
   const min = b.timeout ?? AGENT_TIMEOUT
   const used = (w.used ?? 0) + now - (w.since ?? r.at ?? now)
@@ -500,7 +501,12 @@ function agentTick(r: FlowRun, b: Block, w: AgentWait, now: number) {
     return no()
   }
   const s = sessions.get(w.tab)
-  if (queued || !s || s.exited || tabStatus(w.tab) !== 'running' || now - Math.max(s.lastOutput, w.since ?? 0, w.nudged ?? 0) < STALL) return
+  if (queued || !s || s.exited || tabStatus(w.tab) !== 'running') return void quiet.delete(r.id)
+  // silent: its screen, less the working line (claude's and codex's tick every second) and numbers, the same since
+  const sig = s.screenText(40).split('\n').filter(l => !/esc to interrupt/i.test(l)).join('\n').replace(/\d+/g, '')
+  const q = quiet.get(r.id)
+  if (!q || q.sig !== sig) quiet.set(r.id, { sig, at: s.lastOutput }) // changed: by its last print, near enough
+  if (now - Math.max(quiet.get(r.id)!.at, w.since ?? 0, w.nudged ?? 0) < STALL) return
   if (!w.nudged) return nudge(r, b, w, now)
   stuck(r, b, `${blockName(b)}: its agent printed nothing for ${STALL / 60000} minutes, even after Laki checked in`, STALLED, { tab: w.tab, used })
 }
@@ -954,6 +960,7 @@ function tryAgain(r: FlowRun, b: Block) {
 }
 
 function kill0(r: FlowRun) {
+  quiet.delete(r.id)
   const c = procs.get(r.id)
   procs.delete(r.id)
   if (c) kill(c)

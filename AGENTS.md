@@ -882,7 +882,8 @@ Agent blocks' clock (`agentTick`, from `flowTick`):
 `timeout` (`AGENT_TIMEOUT`, 60 min) counts the wait's `used` plus since `since` (an ask or a stalled stuck carries `used`,
 so time it waits for you doesn't count; a limit pauses it), then `esc` (core's `input` Esc, the next step once
 `tabStatus` isn't running, 5 s at most) and error; a prompt still queued behind your turn is taken off the queue
-instead. `STALL` (10 min) of no `Session.lastOutput` while `tabStatus` says running: `nudge` (core's `send`, not
+instead. `STALL` (10 min) of the same screen (`quiet`: its last 40 lines less the `esc to interrupt` line and digits, which
+claude and codex tick every second; a change dated by `Session.lastOutput`) while `tabStatus` says running: `nudge` (core's `send`, not
 `whenIdle`, `NUDGE`'s words, `nudged`), then a stuck with `STALLED` (Nudge again, Try again: Esc then the block anew,
 Skip it: next with an empty answer, Stop the run last) and the wait's `tab`, whose turn's end `turnEnds` still takes.
 Retries (`retry` 1-`RETRY_MAX`

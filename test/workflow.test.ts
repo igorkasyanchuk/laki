@@ -1219,6 +1219,20 @@ test('workflow failures: a restart mid agent block asks again; a usage limit pau
     return x.status === 'done' && x
   }, 'on after the limit', 15000)
   assert.equal(r.vars['steps.work.answer'], 'answer: continue')
+
+  // paused at a limit, its tab closed: its error way at the next tick, not paused for good
+  const gone = await rig.rpc('flowStart', { workflow: 'limit', project: p.id, task: 'y' })
+  r = await until(async () => {
+    const x = await get(gone.id)
+    return x.status === 'paused' && x
+  }, 'paused again', 15000)
+  await rig.rpc('tabClose', { id: r.wait.tab })
+  await rig.rpc('flowTick', {})
+  r = await until(async () => {
+    const x = await get(gone.id)
+    return x.status === 'failed' && x
+  }, 'its error way')
+  assert.equal(r.decisions.at(-1).exit, 'error')
 })
 
 const CHECKS = `# Checks
