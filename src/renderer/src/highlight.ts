@@ -2,6 +2,8 @@
 // keywords, calls, types, keys and tags. It never builds HTML: tokens become React text (look.css colors
 // the classes). Text over HL_MAX, or of an unknown kind, stays plain.
 
+import { EXITS, WHOLE } from '../../shared/workflow.ts'
+
 export type Tok = [cls: string, text: string] // cls '': plain
 export const HL_MAX = 50 * 1024
 
@@ -77,10 +79,12 @@ function langOf(path: string): Lang | undefined {
 
 const compiled = new Map<Lang, RegExp>()
 
+const plain = (text: string): Tok[][] => text.split('\n').map(l => (l ? [['', l]] : []))
+
 // the text's tokens, by line
 export function highlight(path: string, text: string): Tok[][] {
   const lang = text.length <= HL_MAX ? langOf(path) : undefined
-  if (!lang) return text.split('\n').map(l => (l ? [['', l]] : []))
+  if (!lang) return plain(text)
   let re = compiled.get(lang)
   if (!re) compiled.set(lang, (re = new RegExp(lang.rules.map(([src]) => `(${src})`).join('|'), 'gm')))
   const lines: Tok[][] = [[]]
@@ -106,4 +110,51 @@ export function highlight(path: string, text: string): Tok[][] {
   }
   if (at < text.length) push('', text.slice(at))
   return lines
+}
+
+// a workflow's file, as shared/workflow.ts parse reads it: # and ## headings, the key before a value (· between pairs;
+// a WHOLE key's value is the rest of its line), > prompt lines, - label → id options, {{vars}}, "text", numbers,
+// yes/no, and the block an exit (next:, ok:…) or an arrow goes to. Over HL_MAX: plain.
+const EXIT_KEYS = new Set(Object.values(EXITS).flat())
+const WF_VAL = /(\{\{[^}\n]*\}\})|("(?:[^"\\]|\\.)*")|(→|->)(\s*)([^\s·]*)|(?<![\w.-])(-?\d+(?:\.\d+)?)(?![\w.-])|(·)/g
+const WF_KEY = /^(\s*)([a-z][\w ]*?)(:\s?)(.*)$/i
+
+export function highlightWorkflow(text: string): Tok[][] {
+  return text.length > HL_MAX ? plain(text) : text.split('\n').map(wfLine)
+}
+
+function wfLine(line: string): Tok[] {
+  const out: Tok[] = []
+  const put = (cls: string, s = '') => void (s && out.push([cls, s]))
+  const value = (s: string) => {
+    let at = 0
+    for (const m of s.matchAll(WF_VAL)) {
+      put('', s.slice(at, m.index))
+      if (m[3]) put('hl-k', m[3]), put('', m[4]), put('hl-f', m[5])
+      else put(m[1] ? 'hl-v' : m[2] ? 'hl-s' : m[6] ? 'hl-n' : 'hl-c', m[0])
+      at = m.index + m[0].length
+    }
+    put('', s.slice(at))
+  }
+  if (/^#+\s/.test(line)) return put('hl-h', line), out
+  if (line.startsWith('>')) {
+    put('hl-c', '>')
+    line.slice(1).split(/(\{\{[^}\n]*\}\})/).forEach((s, i) => put(i % 2 ? 'hl-v' : 'hl-s', s))
+    return out
+  }
+  const opt = /^(\s*)(-)(\s.*)$/.exec(line) // - label → id, or a score's level under its question
+  if (opt) return put('', opt[1]), put('hl-a', opt[2]), value(opt[3]), out
+  const v = /^(var)(\s+)([\w-]+)(.*)$/.exec(line) // var NAME: value
+  if (v) return put('hl-k', v[1]), put('', v[2]), put('hl-v', v[3]), value(v[4]), out
+  const first = WF_KEY.exec(line)
+  const parts = first && WHOLE.has(first[2].toLowerCase()) ? [line] : line.split(/(\s+·\s+)/)
+  parts.forEach((p, i) => {
+    const m = i % 2 ? null : WF_KEY.exec(p)
+    if (!m) return value(p)
+    put('', m[1]), put('hl-p', m[2]), put('', m[3])
+    if (/^(yes|no|true|false|on|off)$/i.test(m[4].trim())) put('hl-k', m[4])
+    else if (EXIT_KEYS.has(m[2].toLowerCase()) && m[4].trim() !== '?') put('hl-f', m[4])
+    else value(m[4])
+  })
+  return out
 }

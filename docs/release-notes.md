@@ -11,6 +11,8 @@ version it builds, with the date. -->
   your tailnet: a Mac can't open its own Tailscale link.
 - **Changes: Revert**: take back the agent's edit in one click: a hunk (its header's *Revert*), a few lines of one
   (⌥-click, ⇧-click a range, then *Revert these*) or a whole file (its right click), with *Undo* in the toast.
+- **Workflows: a colored File view**: the file is colored as you type it (headings, keys, prompts, options,
+  `{{variables}}`).
 - **Workflows: an agent's question stops the run, not just its tab**: a permission prompt in an Agent block shows on
   the run with the agent's choices as buttons; a pick answers it in the tab.
 - **Workflows: no more agents that hang forever**: an Agent block's turn has a timeout (an hour unless set: then Esc

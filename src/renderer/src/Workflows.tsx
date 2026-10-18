@@ -5,11 +5,12 @@
 // where it is and where it went, with what it asks you, its decisions, its variables, and its whole log. Esc doesn't
 // close the page: it stays open while runs go. The engine is the daemon's (daemon/workflow.ts). Loaded as the page
 // opens (App's lazy import).
-import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
+import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
+import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
 import { ask, Icon, IconButton, type MenuItem, Page, Switch, useMenu } from './ui'
@@ -795,7 +796,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
         </div>
       ) : (
         <div className="wf-file">
-          <textarea value={text} spellCheck={false} onChange={e => setText(e.target.value)} />
+          <FileEdit text={text} onText={setText} />
           <details className="wf-format">
             <summary>The format</summary>
             <Markdown src={FORMAT_HELP} />
@@ -949,7 +950,32 @@ function Palette({ wf, actions, presets, full, pick, onAdd, toast, edit, api }: 
     </aside>
   )
 }
-const FORMAT_HELP = `\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30\`.
+
+// the File view: the file colored (highlight.ts' highlightWorkflow) in a pre laid under the textarea, whose own text is
+// clear: the same box, font and wrapping (workflows.css' .wf-code), the pre following its scroll
+function FileEdit({ text, onText }: { text: string; onText: (t: string) => void }) {
+  const area = useRef<HTMLTextAreaElement>(null)
+  const pre = useRef<HTMLPreElement>(null)
+  const lines = useMemo(() => highlightWorkflow(text), [text])
+  const follow = () => void (pre.current && area.current && (pre.current.scrollTop = area.current.scrollTop))
+  useLayoutEffect(follow)
+  return (
+    <div className="wf-code">
+      <pre ref={pre} aria-hidden>
+        {lines.map((l, i) => (
+          <Fragment key={i}>
+            {i > 0 && '\n'}
+            {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
+          </Fragment>
+        ))}
+        {' ' /* a last empty line takes its room, as in the textarea */}
+      </pre>
+      <textarea ref={area} value={text} spellCheck={false} aria-label="The workflow's file" onChange={e => onText(e.target.value)} onScroll={follow} />
+    </div>
+  )
+}
+
+const FORMAT_HELP =`\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30\`.
 
 A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · session: run|new|<block> · json: yes\` (JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown), \`end: success|stopped|failed · notify: yes · phone: yes\` (its \`>\` lines: the notification's words; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
 

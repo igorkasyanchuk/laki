@@ -927,7 +927,9 @@ else the last; an HTML5 drag, `DRAG`, onto the canvas drops one there, snapped, 
 empty canvas, `band`) moved as one (`from`) and the Editor's `remove` (Delete or ⌫ while the canvas, `tabIndex` 0, has
 the keyboard; the right click's *Delete these n*; never the start), ⌘A all, Esc none; `past` (50 files) is ⌘Z outside a
 field; the head's ⋯ (and a row's on the index): *Make a copy*, *Delete…*;
-`Inspector`, a case's branches as `.wf-branch` cards; File: the Markdown), `StartRun`, `RunView` (the canvas' `Lit`: `taken` arrows, `live`
+`Inspector`, a case's branches as `.wf-branch` cards; File: the Markdown, `FileEdit`: highlight.ts' `highlightWorkflow`
+(the keys of `parse`, its `WHOLE` ones' values left whole; plain past `HL_MAX`) in a pre under a clear-text textarea,
+`.wf-code` holding both to one box), `StartRun`, `RunView` (the canvas' `Lit`: `taken` arrows, `live`
 the one into the working block while it runs (`.wf-e.live` flowing, an `animateMotion` dot), the working block's gear badge
 (`.wf-gear`) and shimmer; reduced motion: none; the ask, decisions, state; `RunLog`: the whole log, details folded, a filter; `flowGet` again as the view's
 entry moves, every 3 s while the log shows). The CLI's `laki flow`. Tested in `test/workflow.test.ts`.
@@ -1602,7 +1604,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   flicker, stale tooltips, rectangles around menus); the window's own blur is native
   (`setVibrancy` over IPC, App's `glassed`; `themes.ts` `LESS_CLEAR`: macOS's Reduce transparency turns glass and `sideClear` off in `applyTheme` and `blurred`, Settings notes it under Glass; `MORE_CONTRAST`, Increase contrast: `--muted` and `--line` halfway to `--fg`; App repaints as either changes). `main.tsx` loads the fonts
   before the first render: a terminal measures its cells once.
-- **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB);
+- **`highlight.ts`**: the file preview's syntax colors, a regex per language family, up to `HL_MAX` (50 KB), and a
+  workflow file's (`highlightWorkflow`, a line at a time: the Workflows editor's File view);
   tokens become React text, never HTML.
 - **Sidebar styles** (`settings.sideStyle`, `SIDE_STYLES` in Settings.tsx): `.sidebar[data-style]`; status: `wsRow`'s
   `data-state` (its rollup) colors the row's bar, `.ws-line` fills to `--p` (its agents' highest `progress`); App's `wsRow` adds
