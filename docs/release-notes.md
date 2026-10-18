@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.18.0 · Oct 19, 2026
 
 - **Workflows: tell me your way**: an End or a Show you block shows in a window, a popover in the corner, a macOS
   notification, or any of them together.
