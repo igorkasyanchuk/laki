@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import { apiQuestions, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
+import { QUEUE_MAX, apiQuestions, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
 
 // every kind of block, loops limited by a max and an ask
@@ -226,7 +226,9 @@ test('workflow runs: a block past its max asks you, Try again or Stop; at once; 
   await rig.rpc('flowSave', { id: 'fails', text: '# Fails\nruns in: main · at once: 1\n\n## start\ninput: task\nnext: t\n\n## t\nrun: echo nope; exit 3\nok: end\nfail: t\nmax: 2\n\n## end\nend: success\n' })
   const run = await rig.rpc('flowStart', { workflow: 'fails', project: p.id, task: 'x' })
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === run.ws).kind, 'local', 'runs in: main')
-  await assert.rejects(rig.rpc('flowStart', { workflow: 'fails', project: p.id, task: 'y' }), /Fails has 1 runs going \(at once: 1\)/)
+  const second = await rig.rpc('flowStart', { workflow: 'fails', project: p.id, task: 'y' })
+  assert.equal(second.status, 'queued', 'past at once: queued')
+  await rig.rpc('flowForget', { id: second.id })
   let r = await until(async () => {
     const x = await rig.rpc('flowGet', { id: run.id })
     return x.status === 'waiting' && x
@@ -1019,4 +1021,73 @@ test('workflow agents: a permission prompt makes the run ask you with its choice
   await assert.rejects(rig.rpc('flowAnswer', { id: three.id, n: 1 }), /choice 1\? 0 to 0/)
   r = await rig.rpc('flowAnswer', { id: three.id, n: 0 })
   assert.equal(r.status, 'stopped')
+})
+
+const QUEUE = `# Queue
+One at a time.
+
+runs in: worktree · session: new · at once: 1
+
+## start
+input: task
+next: gate
+
+## gate
+ask: Go on?
+- Done → end
+- Stop → stop
+
+## end
+end: success
+
+## stop
+end: failed
+`
+
+test('workflow queue: past at once a run is queued, no workspace; it starts as a slot frees; a stop; a restart keeps it', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'queue', text: QUEUE })
+  const get = (id: string) => rig.rpc('flowGet', { id })
+  const a = await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'first' })
+  assert.ok(a.ws)
+  await until(async () => (await get(a.id)).status === 'waiting', 'a asks')
+  const b = await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'second' })
+  assert.equal(b.status, 'queued')
+  assert.equal(b.ws, undefined, 'no workspace yet')
+  assert.ok(b.log.some((l: string) => / queued: 1 going \(at once: 1\)$/.test(l)))
+  assert.equal((await rig.rpc('state')).flows.find((r: any) => r.id === b.id).status, 'queued')
+
+  // a stop ends a queued one, no workspace made
+  const c = await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'third' })
+  assert.ok(c.log.some((l: string) => /1 ahead of it$/.test(l)))
+  assert.equal((await rig.rpc('flowStop', { id: c.id })).status, 'stopped')
+  assert.equal((await get(c.id)).ws, undefined)
+
+  // QUEUE_MAX waiting their turn, then refused
+  const more = []
+  for (let i = 1; i < QUEUE_MAX; i++) more.push(await rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: `more ${i}` }))
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'queue', project: p.id, task: 'one too many' }), new RegExp(`Queue has ${QUEUE_MAX} runs waiting their turn already \\(at once: 1\\): stop one, or wait`))
+  for (const r of more) await rig.rpc('flowForget', { id: r.id })
+
+  // a restart: still queued, a still asks
+  await rig.stop()
+  await rig.start()
+  await sleep(300)
+  assert.equal((await get(b.id)).status, 'queued')
+  assert.equal((await get(a.id)).status, 'waiting')
+
+  // a ends: b starts in its own worktree
+  await rig.rpc('flowAnswer', { id: a.id, n: 0 })
+  assert.equal((await get(a.id)).status, 'done')
+  const r = await until(async () => {
+    const x = await get(b.id)
+    return x.status === 'waiting' && x
+  }, 'b asks', 15000)
+  assert.ok(r.log.some((l: string) => / its turn: a slot freed$/.test(l)))
+  const ws = (await rig.rpc('state')).workspaces.find((w: any) => w.id === r.ws)
+  assert.equal(ws.kind, 'worktree')
+  assert.notEqual(r.ws, a.ws)
+  assert.equal(ws.flow, b.id)
 })

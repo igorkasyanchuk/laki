@@ -4658,7 +4658,7 @@ const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again
 export const flowFiles = { at: 0 }
 // workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
-export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' } } = {} // what a client sets: the daemon works out the rest
+export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' } } = {} // what a client sets: the daemon works out the rest
 
 export function scheduleSet(o: ScheduleIn): Schedule {
   const old = o.id ? findSchedule(o.id) : undefined
@@ -4752,7 +4752,7 @@ export async function runSchedule(s: Schedule, now = Date.now()): Promise<Schedu
       if (!flowHooks.start || state.settings?.workflows !== true) throw new Error('Workflows are off: Settings › General › Experimental')
       const run = await flowHooks.start({ workflow: s.workflow, source: s.source, project: s.project, task: prompt, trigger: `schedule ${s.id}` })
       r.ws = run.ws
-      r.what = `started a run of ${s.workflow} (${run.id})`
+      r.what = `${run.status === 'queued' ? 'queued' : 'started'} a run of ${s.workflow} (${run.id})` // past its at once: it waits its turn
     } else if (s.ws === 'new' || s.ws === 'local-new') {
       // a new worktree, or a new session in the folder: either way a row of its own in the sidebar
       const title = wsTitle(s, now)

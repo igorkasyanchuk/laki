@@ -1032,7 +1032,9 @@ same workflow as Markdown, the way agents write one (`laki_workflow_write`).
 project's folder, with a new AI session or one shared with the workflow's earlier runs. Opening a PR, approving,
 merging and archiving ask you first unless the block says not to; *Dry run* says them instead of doing them. A run
 keeps the version it started with, so editing a workflow never moves one under way. Several run at once (*Runs at
-once*, 3 unless changed), and a run asks you before more agent turns than the workflow allows (30). A scheduled task
+once*, 3 unless changed); one started past that waits its turn, *queued*, with no workspace yet, and starts by
+itself as one of them ends (20 can wait; the run's page says how many are ahead, and *Stop* takes it off). A run
+asks you before more agent turns than the workflow allows (30). A scheduled task
 (Schedule › New task › the agent picker's *Workflow*) starts one at its times, its prompt the run's task; while that
 run goes on, the next time is skipped. An *Extension* block (under *Outside Laki*) fetches one of your extensions
 that's turned on, waits, and gives its data to the blocks after it: `{{steps.<id>.data}}` (JSON) and each field,

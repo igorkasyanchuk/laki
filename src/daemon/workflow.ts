@@ -11,7 +11,7 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { widgetUse } from './widgets.ts'
@@ -142,6 +142,7 @@ export function flowRm(o: Ref) {
 
 const runs = () => (state.flows ??= [])
 const live = (r: FlowRun) => !FLOW_ENDED.includes(r.status)
+const going = (r: FlowRun) => live(r) && r.status !== 'queued' // what at once: counts
 const procs = new Map<string, ChildProcess>() // a run block's command, by run
 const calls = new Map<string, AbortController>() // an AI call's or a webhook's request, by run
 const blockOf = (r: FlowRun, id?: string) => r.flow.blocks.find(b => b.id === id)
@@ -198,25 +199,53 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   if (wf.where === 'worktree' && proj.git === false) throw new Error(`${proj.name} isn't a git repository: ${wf.name} runs in a worktree (runs in: main works there)`)
   const task = String(o.task ?? '').trim()
   if (wf.blocks.find(b => b.kind === 'start')?.input === 'task' && !task) throw new Error('what should it work on? (a task)')
-  const going = runs().filter(r => live(r) && runOf(r, wf)).length
-  if (going >= (wf.runs ?? RUNS_AT_ONCE)) throw new Error(`${wf.name} has ${going} runs going (at once: ${wf.runs ?? RUNS_AT_ONCE}): stop one or wait`)
+  // past at once: queued, behind the others waiting (a slot that frees goes to the oldest: next)
+  const atOnce = wf.runs ?? RUNS_AT_ONCE
+  const busy = runs().filter(r => going(r) && runOf(r, wf)).length
+  const ahead = runs().filter(r => r.status === 'queued' && runOf(r, wf)).length
+  const queue = busy >= atOnce || ahead > 0
+  if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
   const { source, project, path, text, problems, byAgent: _, ...flow } = wf
-  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: 'running', visits: {}, vars: { task, project: proj.name }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   runs().push(r)
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}`)
+  if (queue) {
+    say(r, `queued: ${busy} going (at once: ${atOnce})${ahead ? `, ${ahead} ahead of it` : ''}`)
+    touch()
+    next() // a slot may be free already
+    return r
+  }
   touch()
+  return begin(r)
+}
+
+// a run gets its workspace and enters its start
+async function begin(r: FlowRun) {
   let ws: Workspace
   try {
-    ws = wf.where === 'worktree' ? await wsNew({ project: proj.id, preset: 'none', name: taskTitle(task, 5) || wf.id }) : await wsNew({ project: proj.id, local: true, preset: 'none' })
+    ws = r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow }) : await wsNew({ project: r.project, local: true, preset: 'none' })
   } catch (e) {
     finish(r, 'failed', `no workspace: ${(e as Error).message}`)
     throw e
   }
   r.ws = ws.id
-  if (wf.where === 'worktree') ws.flow = r.id // its row's mark
+  if (r.where === 'worktree') ws.flow = r.id // its row's mark
   say(r, `in ${ws.name ?? ws.id} (${ws.kind === 'worktree' ? `worktree, branch ${ws.branch}` : 'the project folder'})`)
   enter(r, r.flow.blocks.find(b => b.kind === 'start')!)
   return r
+}
+
+// the oldest queued run of each workflow with a slot free begins (finish's, and flowTick's in case)
+function next() {
+  if (state.settings?.workflows !== true) return
+  for (const r of runs().filter(x => x.status === 'queued').sort((a, b) => a.started - b.started)) {
+    const of = { id: r.workflow, source: r.source, project: r.project }
+    if (runs().filter(x => going(x) && runOf(x, of)).length >= (r.flow.runs ?? RUNS_AT_ONCE)) continue
+    r.status = 'running' // going now: the next one counts it
+    say(r, 'its turn: a slot freed')
+    touch()
+    begin(r).catch(() => {}) // a failure ends it, in its log
+  }
 }
 
 function enter(r: FlowRun, b: Block, again = false): void {
@@ -940,6 +969,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed' })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
+  next() // its slot
 }
 
 export function flowStop(o: { id: string }) {
@@ -985,6 +1015,7 @@ export function flowTick(now = Date.now()) {
     }
     else if (r.wait?.kind === 'agent' && r.status === 'running') agentTick(r, b, r.wait, now)
   }
+  next()
 }
 
 // at the daemon's start: each run back at its block. An agent's turn was cut short, so it's asked again (its tab
@@ -996,9 +1027,13 @@ export function flowResume() {
   resumeLater = state.settings?.workflows !== true
   if (resumeLater) return // off: they wait until it's on again
   const asks = (r: FlowRun) => r.status === 'waiting' && r.wait?.kind !== 'agent-ask' // yours wait on; an agent's ask was cut short with its turn
-  const back = runs().filter(r => live(r) && !asks(r) && r.started < boot)
+  // queued ones wait on (flowTick's next); one cut short before it had a workspace goes back in the queue
+  const requeue = runs().filter(r => going(r) && !r.ws && !r.cur && r.started < boot)
+  for (const r of requeue) (r.status = 'queued'), say(r, 'Laki restarted before its workspace was made: queued again')
+  const back = runs().filter(r => going(r) && !asks(r) && r.started < boot)
   const was = new Map(back.map(r => [r, r.cur]))
   for (const r of back) say(r, `Laki restarted: back at ${blockName(blockOf(r, r.cur) ?? ({ id: '?' } as Block))}`)
+  if (requeue.length) save()
   if (!back.length) return
   save()
   setTimeout(() => {

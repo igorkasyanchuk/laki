@@ -45,6 +45,7 @@ export const QTYPE_INFO: Record<(typeof QTYPES)[number], { api: string; name: st
 export type DecideQ = { name: string; type: (typeof QTYPES)[number]; ask: string; opts: { label: string; text: string }[] }
 export const SURE = 0.7 // yes from this probability, no below 1 - it; a choice or a score this confident: else it asks you
 export const RUNS_AT_ONCE = 3 // a workflow's runs going at the same time (its at once:)
+export const QUEUE_MAX = 20 // runs waiting their turn past at once:, per workflow
 export const TURNS = 30 // agent turns in one run before it asks you (its turns:)
 export const MAX_BLOCKS = 100 // a workflow's blocks: past it, it won't run (and + Block stops)
 export const RETRY_KINDS: BlockKind[] = ['agent', 'run', 'llm', 'decide', 'extension'] // what retry: takes
@@ -652,7 +653,7 @@ export const fill = (text: string, vars: Record<string, string | undefined>) => 
 
 // ---------- runs
 
-export type FlowStatus = 'running' | 'waiting' | 'paused' | 'done' | 'stopped' | 'failed'
+export type FlowStatus = 'queued' | 'running' | 'waiting' | 'paused' | 'done' | 'stopped' | 'failed' // queued: past at once, no workspace yet
 export const FLOW_ENDED: FlowStatus[] = ['done', 'stopped', 'failed']
 // a run of this workflow: a project's only in that project (two repos may each have a review.md)
 export const runOf = (r: { workflow: string; source: WorkflowSource; project: string }, w: { id: string; source: WorkflowSource; project?: string }) => r.workflow === w.id && r.source === w.source && (w.source !== 'project' || r.project === w.project)
@@ -710,7 +711,7 @@ export const WORKFLOW_FORMAT = `A Laki workflow is one Markdown file: a graph of
 # <Name>
 <one line: what it does>
 
-runs in: worktree|main · session: new|shared · at once: 3 · turns: 30
+runs in: worktree|main · session: new|shared · at once: 3 · turns: 30 (at once: runs going together; one started past it waits its turn, queued, up to 20)
 var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:

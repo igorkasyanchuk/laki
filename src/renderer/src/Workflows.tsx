@@ -8,7 +8,7 @@
 import { type ChangeEvent, type PointerEvent as PE, useEffect, useMemo, useRef, useState } from 'react'
 import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
@@ -33,7 +33,7 @@ const W = 180
 const H = 58
 const RUNS_SHOWN = 12
 const KIND_COLOR: Record<BlockKind, string> = { start: 'teal', agent: 'purple', llm: 'red', decide: 'yellow', popup: 'teal', webhook: 'brown', run: 'blue', choice: 'yellow', case: 'yellow', ask: 'orange', action: 'green', wait: 'pink', save: 'lime', extension: 'teal', end: 'gray' }
-const STATUS_WORDS: Record<string, string> = { running: 'running', waiting: 'asks you', paused: 'paused', done: 'done', stopped: 'stopped', failed: 'failed' }
+const STATUS_WORDS: Record<string, string> = { queued: 'queued', running: 'running', waiting: 'asks you', paused: 'paused', done: 'done', stopped: 'stopped', failed: 'failed' }
 const same = (a: Sel | null | undefined, w: { id: string; source: WorkflowSource; project?: string }) => !!a && a.id === w.id && a.source === w.source && (a.project ?? '') === (w.project ?? '')
 const ended = (r: { status: FlowRun['status'] }) => FLOW_ENDED.includes(r.status)
 // unsaved edits, by workflow: kept while Laki runs, whatever closes the editor (the rail, another page, a notification)
@@ -75,7 +75,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
   const pname = (id?: string) => projects.find(p => p.id === id)?.name ?? id ?? ''
   const cur = at.kind === 'wf' ? list?.find(w => same(at.sel, w)) : undefined
   const run = at.kind === 'run' ? flows.find(r => r.id === at.id) : undefined
-  const going = flows.filter(r => !ended(r))
+  const going = flows.filter(r => !ended(r) && r.status !== 'queued')
+  const queued = flows.filter(r => r.status === 'queued')
   const asks = flows.filter(r => r.status === 'waiting').length
   const done = flows.filter(ended)
   const ok = done.filter(r => r.status === 'done').length
@@ -193,6 +194,12 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                 <b>{going.length}</b>
                 <span>running</span>
               </div>
+              {queued.length > 0 && (
+                <div>
+                  <b>{queued.length}</b>
+                  <span>queued</span>
+                </div>
+              )}
               <div className={asks ? 'warn' : ''}>
                 <b>{asks}</b>
                 <span>ask you</span>
@@ -225,6 +232,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                         <span className="sched-meta">
                           {w.problems.length ? <b className="wf-bad">{w.problems[0]}</b> : <span>{w.desc || `${w.blocks.length} blocks`}</span>}
                           {n > 0 && <span className="sched-next">{n} running</span>}
+                          {queued.some(r => runOf(r, w)) && <span className="sched-next">{queued.filter(r => runOf(r, w)).length} queued</span>}
                         </span>
                         <span className="sched-tags">
                           <span className="tag">{w.source === 'project' ? pname(w.project) : 'yours'}</span>
@@ -293,7 +301,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
       ) : (
         <div className="wf-page">
           {at.kind === 'run' ? (
-            <RunView key={at.id} id={at.id} entry={run} api={api} pname={pname} ws={view.workspaces} tabs={view.tabs.map(t => t.id)} onGone={() => setAt({ kind: 'index' })} onDelete={r => removeRun(r).then(y => y && setAt({ kind: 'index' }))} />
+            <RunView key={at.id} id={at.id} entry={run} ahead={run ? queued.filter(x => x.started < run.started && runOf(x, { id: run.workflow, source: run.source, project: run.project })).length : 0} api={api} pname={pname} ws={view.workspaces} tabs={view.tabs.map(t => t.id)} onGone={() => setAt({ kind: 'index' })} onDelete={r => removeRun(r).then(y => y && setAt({ kind: 'index' }))} />
           ) : cur ? (
             <Editor
               key={`${cur.source}/${cur.project}/${cur.id}`}
@@ -1729,7 +1737,7 @@ function StartRun({ item, projects, api, onClose, onStarted }: { item: WorkflowI
 
 // ---------- a run: where it is, what it asks, its decisions, variables and log
 
-function RunView({ id, entry, api, pname, ws, tabs, onGone, onDelete }: { id: string; entry?: FlowView; api: WorkflowsApi; pname: (id?: string) => string; ws: WorkspaceView[]; tabs: string[]; onGone: () => void; onDelete: (r: FlowView) => void }) {
+function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete }: { id: string; entry?: FlowView; ahead: number; api: WorkflowsApi; pname: (id?: string) => string; ws: WorkspaceView[]; tabs: string[]; onGone: () => void; onDelete: (r: FlowView) => void }) {
   const [r, setR] = useState<FlowRun | null>(null)
   const [tab, setTab] = useState<'decisions' | 'state'>('decisions')
   const [mode, setMode] = useState<'blocks' | 'log'>('blocks')
@@ -1837,6 +1845,7 @@ function RunView({ id, entry, api, pname, ws, tabs, onGone, onDelete }: { id: st
         </div>
       )}
       {win && <ShownDialog s={{ run: r.id, name: r.flow.name, title: win.title, body: win.body }} onClose={() => setWin(null)} />}
+      {r.status === 'queued' && <div className="wf-note">Queued: {ahead ? `${ahead} ${ahead === 1 ? 'run' : 'runs'} of ${r.flow.name} ahead of it` : 'next in line'}. It starts in a workspace of its own once a run of it ends (at once: {r.flow.runs ?? RUNS_AT_ONCE}).</div>}
       {r.status === 'paused' && r.wait?.kind === 'limit' && <div className="wf-note">Paused at a usage limit: it goes on when the limit resets{r.wait.until ? `, at ${new Date(r.wait.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.</div>}
       {mode === 'log' ? (
         <RunLog log={r.log} />
