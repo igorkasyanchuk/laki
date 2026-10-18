@@ -1161,7 +1161,7 @@ export function App() {
   const [oldSkills, setOldSkills] = useState<SkillInfo[]>([])
   const skillsAt = useRef(0)
   const skillsLater = useRef(false)
-  const stale = (rows: SkillInfo[]) => setOldSkills(rows.filter(r => r.state === 'outdated' && !r.foreign))
+  const stale = (rows: SkillInfo[]) => setOldSkills(skillsLater.current ? [] : rows.filter(r => r.state === 'outdated' && !r.foreign))
   useEffect(() => {
     if (!connected) return
     const check = () => {

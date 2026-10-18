@@ -181,7 +181,8 @@ export function helpFor(cmd: string, sub?: string): string | null {
   const head = (b: string[]) => b[0].split(/(?<=\S) {2,}/)[0] // the command, not what it does (| stop it)
   const own = blocks.filter(b => re('^  laki ').test(head(b)))
   const mine = own.length ? own : blocks.filter(b => re('\\| ').test(head(b)))
-  if (!mine.length && !HELP[cmd]) return null
+  const more = Object.hasOwn(HELP, cmd) ? HELP[cmd] : '' // not an inherited key (constructor)
+  if (!mine.length && !more) return null
   const narrow = sub && mine.filter(b => new RegExp(`^  laki ${w} (\\S*\\|)?${sub.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}([ |]|$)`).test(head(b)))
-  return [...(narrow && narrow.length ? narrow : mine).flat(), ...(HELP[cmd] ? ['', HELP[cmd]] : [])].join('\n')
+  return [...(narrow && narrow.length ? narrow : mine).flat(), ...(more ? ['', more] : [])].join('\n')
 }

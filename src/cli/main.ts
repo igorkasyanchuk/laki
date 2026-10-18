@@ -158,8 +158,8 @@ async function serve(a: string[]) {
 
 // laki, laki help [command [sub]], --help or -h first or after a command (laki new --help, laki widget new -h): no
 // daemon started for it. After --, words are text: laki send ws -- --help sends it
-const text = argv.indexOf('--')
-const asks = (a?: string) => (a === '--help' || a === '-h') && (text < 0 || argv.indexOf(a) < text)
+const textFrom = argv.indexOf('--')
+const asks = (a?: string) => (a === '--help' || a === '-h') && (textFrom < 0 || argv.indexOf(a) < textFrom)
 function help(cmd: string | undefined, rest: string[]): boolean {
   const topic = cmd === undefined ? [] : asks(cmd) || cmd === 'help' ? rest.filter(a => !asks(a)) : asks(rest[0]) ? [cmd] : asks(rest[1]) ? [cmd, rest[0]] : null
   if (!topic) return false
