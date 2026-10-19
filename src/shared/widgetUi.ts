@@ -97,6 +97,8 @@ export const UI = {
   hero: { group: 'Layout', blurb: 'A banner: a big title, words, a picture or an icon, buttons, on a soft glow. A welcome, a release, what’s on now.', props: { title: p('text', 'Its title, large'), text: p('text', 'Words under it'), icon: p('icon', 'An icon or emoji beside it (no image)'), image: p('text', 'A picture beside it: data: or https'), align: p(['start', 'center'] as const, 'start (the default) or center'), color: COLOR, actions: BUTTONS, children: p('children', 'Elements under its words') } },
   mockup: { group: 'Layout', blurb: 'A frame around what it shows: a browser with its address, a window, a terminal, a phone. Screenshots, a command.', props: { kind: p(['browser', 'window', 'terminal', 'phone'] as const, 'browser (the default), window, terminal or phone'), url: p('text', 'browser: the address in its bar (a link it opens)'), title: p('text', 'window: its title'), value: p('text', 'terminal: its lines, one each; a line starting $ or > is a command'), image: p('text', 'A picture inside it: data: or https (a screenshot)'), children: p('children', 'Elements inside it') } },
   filter: { group: 'Layout', blurb: 'Chips over elements: a click shows only the rows whose words have it. All · Failing · Passing over a list or a table.', props: { options: p('items', 'The chips: words, or [{ "value", "label" }]: a chip keeps the rows whose words have its value'), all: p('text', 'The first chip, every row (All); "" for none: a chip clicked again lets go'), children: p('children', 'The elements whose rows it filters: a list, a table, status…') } },
+  marquee: { group: 'Layout', blurb: 'Words, tags or elements that scroll by in a loop: sponsors, what shipped, live numbers. Hovering stops it.', rows: true, props: { items: p('items', 'What scrolls: words, or [{ "label", "icon", "href", "tone" }]'), label: p('text', 'With each: an item’s words ({{label}} by default)'), icon: p('icon', 'With each: an icon or emoji before it'), href: p('text', 'With each: a link it opens'), children: p('children', 'Or elements that scroll (instead of items)'), seconds: p('number', 'Seconds for one lap (20)'), reverse: p('bool', 'Scroll the other way') } },
+  bento: { group: 'Layout', blurb: 'Tiles of different sizes on a grid: a dashboard, a feature overview. Each spans columns and rows.', props: { items: p('items', 'The tiles: [{ "title", "text", "icon", "color", "href", "cols" (1-4), "rows" (1-3), "children" }]'), columns: p('number', 'Columns, 2-6 (4): fewer in a narrow cell, the big tiles too') } },
   text: { group: 'Text', blurb: 'A line of text.', props: { value: p('text', 'The words'), size: p(['sm', 'md', 'lg', 'xl'] as const, 'sm, md (the default), lg or xl'), weight: p(['normal', 'medium', 'semibold', 'bold'] as const, 'How bold'), mono: p('bool', 'In the monospace font'), muted: p('bool', 'Dimmer'), wrap: p('bool', 'Wrap onto more lines (default: one line, cut with …)'), color: COLOR } },
   heading: { group: 'Text', blurb: 'A heading.', props: { value: p('text', 'The words'), level: p('number', '1, 2 (the default) or 3'), color: COLOR } },
   markdown: { group: 'Text', blurb: 'Formatted text: headings, lists, tasks, code, tables, quotes, links and https images.', props: { value: p('text', 'The Markdown (a whole note: “{{text}}” of a file or a typed text)') } },
@@ -109,6 +111,7 @@ export const UI = {
   kbd: { group: 'Text', blurb: 'A keyboard shortcut, each key in a box: ⌘ K, Ctrl+Shift+P.', props: { keys: p('text', 'The keys, by spaces or + (⌘ ⇧ P, Ctrl+C)'), label: p('text', 'What it does, after the keys') } },
   secret: { group: 'Text', blurb: 'A token, a password, a key: dots until a click shows it, a copy button.', props: { value: p('text', 'The secret'), label: p('text', 'What it is'), copy: p('bool', 'A copy button: on by default') } },
   rotate: { group: 'Text', blurb: 'Words that take turns in one place: Building, Testing, Shipping. A hero’s line, what runs now.', rows: true, props: { items: p('items', 'The words: ["Build", "Test", "Ship"]'), text: p('text', 'With each: a word ({{text}} by default)'), prefix: p('text', 'Words before them'), suffix: p('text', 'Words after them'), seconds: p('number', 'Seconds each shows (2)'), size: p(['sm', 'md', 'lg', 'xl'] as const, 'sm, md (the default), lg or xl'), color: COLOR } },
+  snippet: { group: 'Text', blurb: 'A command or code with Copy, in tabs: npm, pnpm, yarn and bun; curl and httpie; a file each.', rows: true, props: { items: p('items', 'The tabs: [{ "label", "value" }] (none: one block of value)'), label: p('text', 'With each: a tab’s name'), value: p('text', 'The code (with each: a tab’s)'), title: p('text', 'A file name or title over one block'), prompt: p('bool', 'A $ before each line: commands to type'), copy: p('bool', 'A copy button: on by default') } },
   stat: { group: 'Data', blurb: 'One number with its label, a change and a sparkline.', props: STAT },
   stats: { group: 'Data', blurb: 'A few numbers in a line.', rows: true, props: { items: p('items', 'Each one’s stat props: [{ "value", "label", "delta", "tone" }]'), ...STAT } },
   kv: { group: 'Data', blurb: 'Names and values.', rows: true, props: { items: p('items', 'Each row: [{ "key", "value", "tone", "mono", "copy" }]'), key: p('text', 'With each: a row’s name'), value: p('text', 'With each: a row’s value'), mono: p('bool', 'Values in the monospace font'), copy: p('bool', 'A copy button by each value') } },
@@ -194,6 +197,16 @@ export const UI = {
   radial: { group: 'Data', blurb: 'A ring that fills, its number in the middle: a score, a quota, coverage.', props: { value: p('text', 'How much'), max: p('number', 'Of how much (100)'), text: p('text', 'What it says in the middle (default: the percent)'), label: p('text', 'What it is, under it'), size: p(['sm', 'md', 'lg'] as const, 'sm, md (the default) or lg'), color: COLOR } },
   indicator: { group: 'Data', blurb: 'An icon, a picture or a word with a count on its corner: unread mail, reviews waiting.', props: { icon: p('icon', 'An icon or emoji'), avatar: p('text', 'Or a GitHub login: its picture'), label: p('text', 'Or words in a box'), badge: p('text', 'The count or word on its corner (empty or 0: none)'), dot: p('text', 'A path or template: a dot on its corner when truthy (no count)'), color: COLOR, href: p('text', 'A link a click opens') } },
   avatar: { group: 'Data', blurb: 'One picture, any size and shape, a ring, a dot for whether they’re around: who’s on call, a reviewer.', props: { login: p('text', 'A GitHub login: its picture'), image: p('text', 'Or a picture: data: or https'), name: p('text', 'A name: its initials when there’s no picture'), size: p(['sm', 'md', 'lg', 'xl'] as const, 'sm, md (the default), lg or xl'), shape: p(['circle', 'rounded', 'squircle', 'hexagon', 'diamond'] as const, 'circle (the default), rounded, squircle, hexagon or diamond'), ring: p('text', 'A ring around it: a color'), state: p('text', 'online, away, busy, offline…: its dot'), label: p('text', 'Words beside it'), text: p('text', 'A line under them'), href: p('text', 'A link a click opens') } },
+  env: { group: 'Data', blurb: 'Environment variables, KEY=value: secrets as dots until a click, a copy button, an environment each.', rows: true, props: { items: p('items', 'The variables: [{ "key", "value", "secret", "tag" }]'), key: p('text', 'With each: its name ({{key}} by default)'), value: p('text', 'With each: its value ({{value}} by default)'), secret: p('text', 'A path or template: dots when truthy (default: names with KEY, TOKEN, SECRET, PASSWORD or PRIVATE)'), tag: p('text', 'With each: a pill: its environment (production, preview)'), copy: p('bool', 'A copy button by each value: on by default') } },
+  uptime: { group: 'Data', blurb: 'A bar a day (or an hour), colored by state: up, degraded, down. A status page’s last 90 days.', rows: true, props: { state: p('text', 'A bar’s state ({{state}} by default): up, degraded, down…; none or empty: no data'), x: p('text', 'Its label in the tooltip: a date'), text: p('text', 'More words in its tooltip'), title: p('text', 'Its title, above it'), value: p('text', 'A number by the title: 99.98%'), legend: p('bool', 'The first and last labels under it: on in the full view') } },
+  deploys: { group: 'Data', blurb: 'Deployments, Vercel style: a dot for its state, the commit, branch, environment, when and how long.', rows: true, props: { state: p('text', 'ready, building, queued, error, canceled… ({{state}} by default): its dot'), title: p('text', 'What went out: the commit’s message ({{title}} by default)'), branch: p('text', 'Its branch'), env: p('text', 'production, preview…: a pill'), time: p('text', 'When it started (an ISO date or ms: 3 hours ago)'), took: p('text', 'How long it took: 1m 12s'), author: p('text', 'Who: a GitHub login’s picture'), href: p('text', 'A link a click opens ({{url}} by default)') } },
+  issues: { group: 'Data', blurb: 'Issues, Linear style: priority bars, the id, a status circle, the title, labels and who has it.', rows: true, props: { id: p('text', 'Its key: ACME-142 ({{id}} by default)'), title: p('text', 'Its title ({{title}} by default)'), state: p('text', 'backlog, todo, in progress, in review, done, canceled ({{state}} by default): its circle'), priority: p('text', 'urgent, high, medium, low or none (or Linear’s 1-4, P0-P4): its bars'), labels: p('path', 'A field with its labels: words, or { "name", "color" }'), assignee: p('text', 'A GitHub login: its picture'), href: p('text', 'A link a click opens ({{url}} by default)') } },
+  endpoints: { group: 'Data', blurb: 'API routes: the method in its color, the path, the status, how long and how often. An API’s health, its docs.', rows: true, props: { method: p('text', 'GET, POST, PUT, PATCH, DELETE… ({{method}} by default)'), path: p('text', 'The route: /api/orders/:id ({{path}} by default)'), status: p('text', 'Its status: 200 green, 4xx yellow, 5xx red'), text: p('text', 'Words under it: what it does'), took: p('text', 'How long: 41 ms'), count: p('text', 'How often: 1.2k/min'), href: p('text', 'A link a click opens') } },
+  changelog: { group: 'Data', blurb: 'Releases with their changes, each tagged feat, fix, perf or breaking (a conventional commit’s words count).', rows: true, props: { version: p('text', 'Its version ({{version}} by default)'), date: p('text', 'When (an ISO date or ms)'), title: p('text', 'A line by the version: its name'), changes: p('path', 'A field with its changes: "feat: faster search", or { "type", "text" } (changes by default)'), href: p('text', 'A link its version opens') } },
+  clock: { group: 'Data', blurb: 'The time in a few places, ticking: a team across time zones, the servers’ regions.', rows: true, props: { items: p('items', 'The places: [{ "label", "zone" }]'), label: p('text', 'With each: its name ({{label}} by default)'), zone: p('text', 'With each: its time zone, as Europe/Kyiv or UTC ({{zone}} by default)'), text: p('text', 'With each: words under its name (default: how far from here)'), hour12: p('bool', '3:05 PM instead of 15:05') } },
+  funnel: { group: 'Data', blurb: 'Steps that fewer get through: each one’s bar, its share of the first and what it lost. Sign-ups, a checkout.', rows: true, props: { label: p('text', 'A step’s name ({{label}} by default)'), value: p('text', 'How many got there ({{value}} by default)'), unit: p('text', 'After each number'), color: COLOR } },
+  swatches: { group: 'Data', blurb: 'Colors as chips, a click copies one: a design system’s tokens, a brand’s palette.', rows: true, props: { color: p('text', 'Its color: a hex, a palette name or a tone ({{color}} by default)'), label: p('text', 'Its name ({{name}} by default)'), text: p('text', 'A line under it: its token (--accent)'), copy: p('text', 'What a click copies (default: the color as written)') } },
+  matrix: { group: 'Data', blurb: 'A grid of states, a row and a column each: a CI matrix (versions × systems), environments × services.', rows: true, props: { row: p('text', 'An item’s row: a template ({{row}} by default)'), column: p('text', 'Its column ({{column}} by default)'), state: p('text', 'Its state: passed, failed, running, skipped… ({{state}} by default)'), rows: p('items', 'The rows in order (default: as first seen)'), columns: p('items', 'The columns in order (default: as first seen)'), href: p('text', 'A link a cell opens') } },
   button: { group: 'Actions', blurb: 'Runs an action or a Laki command, opens a link, refreshes, copies.', props: BUTTON },
   toggle: { group: 'Actions', blurb: 'A switch that runs an action with on or off: a feature flag, maintenance mode.', props: { label: p('text', 'Its words'), text: p('text', 'Words under it'), on: p('text', 'A path or template: on when truthy'), run: p('text', 'One of widget.json’s actions, run with $WIDGET_ARG on or off (what it’s turned to); then it fetches again and shows what’s true'), confirm: p('text', 'A question the app asks first') } },
   segmented: { group: 'Actions', blurb: 'One of a few options, picked: runs an action with it. An environment, a mode, a range.', props: { options: p('items', 'The options: words, or [{ "value", "label" }]'), value: p('text', 'The one picked now ({{env}})'), label: p('text', 'Words before it'), run: p('text', 'One of widget.json’s actions, run with the option’s value as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
@@ -206,11 +219,24 @@ export const UI = {
   actions: { group: 'Actions', blurb: 'A row of buttons.', props: { items: p('buttons', 'The buttons') } },
   menu: { group: 'Actions', blurb: 'A list of places or commands, one lit as the current, headings between them: a launcher, a sidebar.', rows: true, props: { items: p('items', 'Its rows: [{ "label", "icon", "badge", "on", and a button’s run, open, do… }], or { "title" } for a heading'), ...BUTTON, badge: p('text', 'A count or word at a row’s end'), on: p('text', 'A path or template: the current row, lit'), title: p('text', 'In items: a heading over the rows after it'), limit: p('number', 'Rows at most (a preview: as many as fit), then +N more'), empty: p('text', 'What it says with no rows') } },
   dropdown: { group: 'Actions', blurb: 'A button that opens a menu of more buttons: the actions that don’t fit.', props: { label: p('text', 'Its button’s words'), icon: p('icon', 'Its button’s icon'), style: p(['primary', 'quiet', 'danger'] as const, 'primary, quiet or danger; none: plain'), items: BUTTONS, align: p(['start', 'end'] as const, 'The menu under its start (the default) or its end') } },
+  popover: { group: 'Actions', blurb: 'A button that opens a small panel of elements: details, a form, more numbers. hover: a hover card.', props: { label: p('text', 'Its button’s words'), icon: p('icon', 'Its button’s icon'), style: p(['primary', 'quiet', 'danger'] as const, 'primary, quiet or danger; none: plain'), title: p('text', 'The panel’s title'), text: p('text', 'Its words'), children: p('children', 'Its elements'), hover: p('bool', 'Opens as the pointer rests on it too'), align: p(['start', 'end'] as const, 'The panel under its start (the default) or its end') } },
+  command: { group: 'Actions', blurb: 'A command palette: a box that narrows the rows as you type, ↑ ↓ and Enter to run one. Shortcuts, places, recent things.', rows: true, props: { items: p('items', 'Its rows: [{ "label", "icon", "badge", "keys", and a button’s run, open, do… }], or { "title" } for a heading'), ...BUTTON, badge: p('text', 'A count or word at a row’s end'), keys: p('text', 'A shortcut at a row’s end: ⌘ K'), title: p('text', 'In items: a heading over the rows after it'), placeholder: p('text', 'What the empty box says (Type a command…)'), limit: p('number', 'Rows at most before you type (a preview: as many as fit)'), empty: p('text', 'What it says when nothing matches') } },
+  combobox: { group: 'Actions', blurb: 'A box that suggests from a list as you type, or takes any words: runs an action with them. A branch, a package, a user.', props: { options: p('path', 'The suggestions: a field with them (branches), or a list: words, or [{ "value", "label" }]'), value: p('text', 'What it starts with'), placeholder: p('text', 'What the empty box says'), label: p('text', 'Its button’s words (Go)'), icon: p('icon', 'Its button’s icon'), run: p('text', 'One of widget.json’s actions, run with what’s typed or picked as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
+  datepicker: { group: 'Actions', blurb: 'A date, a time or a month to pick: runs an action with it. A release date, a freeze, a report’s day.', props: { value: p('text', 'The one picked now: 2026-10-24, 2026-10-24T15:00, 15:00 or 2026-10'), kind: p(['date', 'datetime', 'time', 'month'] as const, 'date (the default), datetime, time or month'), min: p('text', 'The earliest'), max: p('text', 'The latest'), label: p('text', 'Words before it'), run: p('text', 'One of widget.json’s actions, run with what’s picked (as value shows it) as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
+  split: { group: 'Actions', blurb: 'A button with a ▾ beside it for the other ways to do it: Merge ▾ squash, rebase; Deploy ▾ staging.', props: { ...BUTTON, items: BUTTONS, align: p(['start', 'end'] as const, 'The menu under its end (the default) or its start') } },
+  radio: { group: 'Actions', blurb: 'One of a few options as cards, each with a line about it: runs an action with the one picked. A plan, a strategy, a model.', props: { options: p('items', 'The options: [{ "value", "label", "text", "icon", "badge" }]'), value: p('text', 'The one picked now'), label: p('text', 'A heading over them'), columns: p('number', 'Columns, 1-4 (1): fewer in a narrow cell'), run: p('text', 'One of widget.json’s actions, run with the option’s value as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
+  textarea: { group: 'Actions', blurb: 'A box for a few lines and a button (or ⌘ Enter): runs an action with them, or sends them to an agent or Laki AI.', props: { placeholder: p('text', 'What the empty box says'), value: p('text', 'What it starts with'), label: p('text', 'Its button’s words (Send)'), icon: p('icon', 'Its button’s icon'), rows: p('number', 'Lines tall, 2-12 (3)'), run: p('text', 'One of widget.json’s actions, run with what’s typed as $WIDGET_ARG'), do: p(['new', 'send', 'ai'] as const, 'Or a Laki command with what’s typed as its prompt: new (a workspace), send (to the workspace’s agent) or ai (Laki AI); the app asks first'), agent: p('text', 'With do new: an agent or a profile of yours'), project: p('text', 'With do new: a project by name or id'), confirm: p('text', 'A question the app asks first'), clear: p('bool', 'Empty the box once sent: on by default') } },
   breadcrumbs: { group: 'Actions', blurb: 'Where you are: a path of links, › between them. A repo’s folders, a site’s pages.', rows: true, props: { items: p('items', 'Each one: a word, or { "label", "href", "icon" }'), label: p('text', 'With each: its words'), href: p('text', 'With each: a link it opens'), icon: p('icon', 'With each: an icon or emoji before it') } },
   links: { group: 'Actions', blurb: 'Links in a line, a rule between them.', rows: true, props: { items: p('items', 'Each one: { "label", "href" }'), label: p('text', 'With each: a link’s words'), href: p('text', 'With each: where it goes') } },
   form: { group: 'Actions', blurb: 'Fields and a button that runs an action with them.', props: { fields: p('items', 'Its fields: [{ "id", "type": "text" | "number" | "bool" | "choice" | "textarea", "label", "hint", "default", "choices" }]'), submit: p('button', 'Its button: { "label", "run", "confirm" }; the action gets the fields as JSON in $WIDGET_ARG') } },
   empty: { group: 'Actions', blurb: 'Nothing to show, and what to do about it.', props: { text: p('text', 'What it says'), icon: p('icon', 'An icon or emoji over it'), action: p('button', 'A button under it') } },
 } satisfies Record<string, Def>
+
+// the elements whose rows are cut (rowsOf, cap) or say so when there are none (empty) without their own words for it
+const ROWS = { limit: p('number', 'Rows at most (a preview: as many as fit), then +N more'), empty: p('text', 'What it says with no rows') }
+const CUT = ['status', 'checklist', 'timeline', 'people', 'inbox', 'chat', 'prs', 'commits', 'env', 'deploys', 'issues', 'endpoints', 'changelog', 'clock', 'funnel', 'matrix'] as const
+for (const t of [...CUT, 'snippet', 'card', 'steps', 'board', 'tree', 'log', 'uptime', 'swatches'] as const) (UI[t].props as Record<string, Prop>).empty ??= ROWS.empty
+for (const t of CUT) (UI[t].props as Record<string, Prop>).limit ??= ROWS.limit
 
 export type UiType = keyof typeof UI
 export const UI_TYPES = Object.keys(UI) as UiType[]
@@ -220,7 +246,7 @@ type KindType<K> = K extends readonly (infer W)[] ? W : K extends 'number' ? num
 type PropsOf<P> = { -readonly [K in keyof P]?: P[K] extends { kind: infer Q } ? KindType<Q> : never }
 type Common = PropsOf<typeof COMMON>
 export type UiButton = PropsOf<typeof BUTTON> & Common
-export type UiElement = { [T in UiType]: { type: T } & Common & PropsOf<(typeof UI)[T]['props']> }[UiType]
+export type UiElement = { [T in UiType]: { type: T } & Common & PropsOf<(typeof UI)[T]['props']> & (T extends (typeof CUT)[number] ? PropsOf<typeof ROWS> : unknown) }[UiType]
 export type UiSpec = UiElement | { preview?: UiElement; full?: UiElement }
 
 type El = Record<string, unknown> & { type?: string }
@@ -365,7 +391,8 @@ function menuRow(x: El, r: S, tone: unknown, attrs = '') {
   const on = x.on !== undefined && holds(x.on, r)
   const badge = x.badge !== undefined ? txt(x.badge, r) : ''
   const act = (a => (/ data-(run|do|open|laki|copy)=/.test(a) ? a : ''))(actOf(x, r))
-  return `<button type="button" class="k-mn-i${on ? ' on' : ''}"${act || ' disabled'}${on ? ' aria-current="true"' : ''}${x.tip !== undefined ? ` title="${h(x.tip, r)}"` : ''}${attrs}>${x.icon !== undefined ? icon(x.icon, r, 13) : ''}<span class="k-title ${toneOf({ tone }, label, r)}">${esc(label)}</span>${badge ? `<span class="k-badge">${esc(badge)}</span>` : ''}</button>`
+  const keys = x.keys !== undefined ? keysOf(txt(x.keys, r).trim()) : [] // a command's shortcut
+  return `<button type="button" class="k-mn-i${on ? ' on' : ''}" data-label="${esc(label)}"${act || ' disabled'}${on ? ' aria-current="true"' : ''}${x.tip !== undefined ? ` title="${h(x.tip, r)}"` : ''}${attrs}>${x.icon !== undefined ? icon(x.icon, r, 13) : ''}<span class="k-title ${toneOf({ tone }, label, r)}">${esc(label)}</span>${badge ? `<span class="k-badge">${esc(badge)}</span>` : ''}${keys.length ? `<span class="k-kbd k-mn-k">${keys.map(k => `<kbd>${esc(k)}</kbd>`).join('')}</span>` : ''}</button>`
 }
 // a segmented's or a select's options: words, or { value, label }
 const optsOf = (v: unknown, s: S, max: number) =>
@@ -615,7 +642,7 @@ const itemsOf = (e: El, s: S): [El, S][] => (Array.isArray(e.items) ? e.items.fi
 const STEP: [RegExp, string][] = [
   [/^(done|passed|pass|success|succeeded|ok|complete|completed|finished|shipped)$/i, 'done'],
   [/^(running|current|active|in.progress|doing|building|deploying|started)$/i, 'now'],
-  [/^(failed|failing|fail|error|errored|broken|cancell?ed|timed.out)$/i, 'fail'],
+  [/^(failed|failing|fail|failure|error|errored|broken|cancell?ed|timed.out)$/i, 'fail'],
   [/^(skipped|skip|n\/a)$/i, 'skip'],
 ]
 // a log line's level: its word, else read off the line
@@ -671,6 +698,89 @@ function jsonHtml(v: unknown, open: number) {
   }
   return walk('', v, 0)
 }
+
+// a box's button (an input's, a combobox's, a textarea's): act is its data-run or data-do, and what's typed goes with it
+const sendBtn = (e: El, s: S, act: string, label: string, extra = '') => `<button type="button" class="k-btn sm primary"${act ? `${act} data-input${extra}${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}` : ' disabled'}${label ? '' : ' aria-label="Send"'}>${e.icon !== undefined ? icon(e.icon, s, 12) : ''}${label ? `<span>${esc(label)}</span>` : ''}</button>`
+// a date as a date, datetime-local, time or month input takes it: an ISO date as written, a moment (ms, or with its
+// zone) in this Mac's time
+function dateIn(kind: string, v: string) {
+  const t = v.trim()
+  const at = /^\d{10,13}$/.test(t) ? Number(t.length === 10 ? Number(t) * 1000 : t) : /T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})$/i.test(t) ? Date.parse(t) : NaN
+  const d = new Date(at)
+  const local = Number.isFinite(at) ? `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}` : t.replace(' ', 'T')
+  const m = (kind === 'datetime' ? /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/ : kind === 'month' ? /^\d{4}-\d{2}/ : kind === 'time' ? /\d{2}:\d{2}/ : /^\d{4}-\d{2}-\d{2}/).exec(local)
+  return m ? m[0] : kind === 'datetime' && /^\d{4}-\d{2}-\d{2}$/.test(local) ? `${local}T00:00` : ''
+}
+// a variable whose value is dots until a click: by its name
+const SECRETS = /KEY|TOKEN|SECRET|PASSWORD|PASSWD|PRIVATE|CREDENTIAL|DSN|DATABASE_URL/i
+const DEPLOY: [RegExp, Tone][] = [
+  [/^(ready|success|succeeded|live|active|deployed|done|promoted|current|healthy)$/i, 'good'],
+  [/^(building|deploying|queued|enqueued|pending|new|preparing|processing|uploading|initializing|in.progress|running|started|waiting)$/i, 'warn'],
+  [/^(error|errored|failed|failure|crashed|broken)$/i, 'bad'],
+]
+// an issue's state: its circle, Linear's
+const ISSUE: [RegExp, string][] = [
+  [/^(backlog|triage|icebox|later)$/i, 'backlog'],
+  [/^(in.?progress|doing|started|active|wip|working|in.?development)$/i, 'doing'],
+  [/^(in.?review|review|reviewing|qa|testing|ready.for.review)$/i, 'review'],
+  [/^(done|closed|completed?|fixed|resolved|shipped|merged)$/i, 'done'],
+  [/^(canceled|cancelled|duplicate|won.?t.?(fix|do)|invalid|declined|not.planned)$/i, 'canceled'],
+]
+const svg14 = (body: string, style = '') => `<svg class="k-icon" width="14" height="14" viewBox="0 0 14 14" aria-hidden="true"${style}>${body}</svg>`
+const ring = (inner: string, dash = '') => svg14(`<circle cx="7" cy="7" r="5.5" fill="none" stroke="currentColor" stroke-width="1.5"${dash}/>${inner}`)
+const ISSUE_ICON: Record<string, string> = {
+  backlog: ring('', ' stroke-dasharray="1.6 1.9"'),
+  todo: ring(''),
+  doing: ring('<path d="M7 3.5a3.5 3.5 0 010 7z" fill="currentColor"/>'),
+  review: ring('<path d="M7 3.5a3.5 3.5 0 11-3.5 3.5H7z" fill="currentColor"/>'),
+  done: svg14('<circle cx="7" cy="7" r="6.25" fill="currentColor"/><path d="M4.4 7.2l1.8 1.8 3.5-3.6" fill="none" stroke="var(--bg, #0f1117)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>'),
+  canceled: svg14('<circle cx="7" cy="7" r="6.25" fill="currentColor"/><path d="M5 5l4 4M9 5l-4 4" stroke="var(--bg, #0f1117)" stroke-width="1.5" stroke-linecap="round"/>'),
+}
+// a priority: urgent's box, then three bars lit by how high, none's dots
+function priorityIcon(p: string) {
+  if (/^(urgent|critical|p0|blocker|1)$/.test(p)) return svg14('<rect x="1" y="1" width="12" height="12" rx="3" fill="currentColor"/><path d="M7 3.8v4M7 10v.2" stroke="var(--bg, #0f1117)" stroke-width="1.7" stroke-linecap="round"/>', ' style="color:var(--tc-orange, #ff9e64)"')
+  const lv = /^(highest|high|p1|2)$/.test(p) ? 3 : /^(medium|med|normal|p2|3)$/.test(p) ? 2 : /^(low|lowest|p3|p4|4)$/.test(p) ? 1 : 0 // Linear's numbers: 1 urgent … 4 low, 0 none
+  if (!lv) return svg14('<path d="M3 7h.01M7 7h.01M11 7h.01" stroke="currentColor" stroke-width="2" stroke-linecap="round" opacity="0.5"/>')
+  return svg14([0, 1, 2].map(i => `<rect x="${1.5 + i * 4}" y="${9 - i * 3}" width="3" height="${3.5 + i * 3}" rx="1" fill="currentColor"${i < lv ? '' : ' opacity="0.3"'}/>`).join(''))
+}
+// an HTTP method's color, Swagger's
+const METHOD: Record<string, string> = { GET: 'blue', POST: 'green', PUT: 'orange', PATCH: 'teal', DELETE: 'red', HEAD: 'purple', OPTIONS: 'gray' }
+// a change: "feat(search)!: its words", or { type, text }: its tag, tone and words
+const CHANGE: [RegExp, string, Tone][] = [
+  [/^(break|breaking|removed?|drop|dropped)$/i, 'breaking', 'bad'],
+  [/^(feat|feature|features|add|added|new)$/i, 'feat', 'good'],
+  [/^(fix|fixes|fixed|bug|bugfix)$/i, 'fix', 'accent'],
+  [/^(perf|performance)$/i, 'perf', 'warn'],
+  [/^(security|sec)$/i, 'security', 'bad'],
+  [/^(deprecated?)$/i, 'deprecated', 'warn'],
+]
+function changeOf(c: unknown) {
+  let type = obj(c) ? String(c.type ?? '').trim() : ''
+  let text = obj(c) ? String(c.text ?? c.title ?? '') : typeof c === 'string' || typeof c === 'number' ? String(c) : ''
+  let bang = false
+  const m = type ? null : /^(\w+)(?:\([^)]*\))?(!)?:\s+([\s\S]+)$/.exec(text)
+  if (m) [type, bang, text] = [m[1], !!m[2], m[3]]
+  const k = bang ? CHANGE[0] : CHANGE.find(([re]) => re.test(type))
+  return { tag: k ? k[1] : type.toLowerCase().slice(0, 16), tone: k ? k[2] : 'muted', text: text.trim().split('\n')[0] }
+}
+// a time zone's time now, how far it is from here and whether it's night there; null: no such zone. uiBehave's tick
+// formats it with the same options
+const CLOCK = (zone: string, h12: boolean): Intl.DateTimeFormatOptions => ({ timeZone: zone || undefined, hour: h12 ? 'numeric' : '2-digit', minute: '2-digit', hourCycle: h12 ? 'h12' : 'h23' })
+function zoned(zone: string, h12: boolean, now = new Date()) {
+  try {
+    const time = new Intl.DateTimeFormat('en-US', CLOCK(zone, h12)).format(now)
+    const p = Object.fromEntries(new Intl.DateTimeFormat('en-US', { timeZone: zone || undefined, year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', hourCycle: 'h23' }).formatToParts(now).map(x => [x.type, Number(x.value)]))
+    const mins = Math.round((Date.UTC(p.year, p.month - 1, p.day, p.hour, p.minute) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), now.getHours(), now.getMinutes())) / 60_000)
+    const day = Math.round((Date.UTC(p.year, p.month - 1, p.day) - Date.UTC(now.getFullYear(), now.getMonth(), now.getDate())) / 86_400_000)
+    const a = Math.abs(mins)
+    const off = mins ? `${mins > 0 ? '+' : '−'}${Math.floor(a / 60)}h${a % 60 ? ` ${a % 60}m` : ''} from here` : 'Same time as here'
+    return { time, night: p.hour < 7 || p.hour >= 19, from: [off, day > 0 ? 'tomorrow' : day < 0 ? 'yesterday' : ''].filter(Boolean).join(', ') }
+  } catch {
+    return null
+  }
+}
+// a matrix cell's mark by its step (STEP's words)
+const MX: Record<string, [string, string]> = { done: [iconSvg('check', 12), 't-good'], fail: [iconSvg('x', 12), 't-bad'], now: ['<i class="k-mx-run"></i>', 't-warn'], skip: ['<i class="k-mx-skip"></i>', 't-muted'], todo: ['<i class="k-mx-todo"></i>', 't-muted'] }
 
 const R: Record<UiType, (e: El, s: S) => string> = {
   stack: (e, s) => `<div${at(e, s, `k-stack${gap(e.gap)}`)}>${kids(e.children, s)}</div>`,
@@ -1214,7 +1324,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     const run = e.run !== undefined ? txt(e.run, s) : ''
     const label = e.label !== undefined ? txt(e.label, s) : e.icon !== undefined ? '' : 'Add'
     const ph = txt(e.placeholder, s)
-    return `<div${at(e, s, 'k-input')} data-inbox><input type="text" value="${h(e.value, s)}" placeholder="${esc(ph)}" aria-label="${esc(ph || label || 'Text')}"${run ? '' : ' disabled'}><button type="button" class="k-btn sm primary"${run ? ` data-run="${esc(run)}" data-input${e.clear === false ? ' data-keep' : ''}${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}` : ' disabled'}${label ? '' : ' aria-label="Send"'}>${e.icon !== undefined ? icon(e.icon, s, 12) : ''}${label ? `<span>${esc(label)}</span>` : ''}</button></div>`
+    return `<div${at(e, s, 'k-input')} data-inbox><input type="text" value="${h(e.value, s)}" placeholder="${esc(ph)}" aria-label="${esc(ph || label || 'Text')}"${run ? '' : ' disabled'}>${sendBtn(e, s, run ? ` data-run="${esc(run)}"` : '', label, e.clear === false ? ' data-keep' : '')}</div>`
   },
   swap: (e, s) => {
     const on = e.on !== undefined && holds(e.on, s)
@@ -1256,6 +1366,264 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     const style = ['primary', 'quiet', 'danger'].includes(String(e.style)) ? ` ${e.style}` : ''
     const rows = (Array.isArray(e.items) ? e.items : []).filter((b): b is El => obj(b) && !hidden(b, s)).map(b => menuRow(b, s, b.tone)).join('')
     return `<details${at({ tip: e.tip }, s, `k-dd${e.align === 'end' ? ' end' : ''}`)}><summary class="k-dd-s${style}"${s.line ? ' data-laki="full"' : ''}${label ? '' : ' aria-label="More"'}>${e.icon !== undefined ? icon(e.icon, s, 12) : ''}${label ? `<span>${esc(label)}</span>` : ''}${iconSvg('chevron', 10)}</summary><div class="k-dd-m">${rows}</div></details>`
+  },
+  // after shadcn's, and what developers keep open: a panel on a button, a palette, a box that suggests, a date, a split
+  // button, cards to pick from, a prompt box; a snippet, env vars, uptime, deploys, issues, routes, a changelog, clocks,
+  // a funnel, colors, a matrix; a marquee and a bento grid
+  // a native popover (the top layer: no cell or full view clips it), anchored under its button; uiBehave opens a hover
+  // card's as the pointer comes
+  popover: (e, s) => {
+    const label = txt(e.label, s)
+    const style = ['primary', 'quiet', 'danger'].includes(String(e.style)) ? ` ${e.style}` : ''
+    const title = e.title !== undefined ? txt(e.title, s) : ''
+    const id = `kp-${s.ids.uid}-${++s.ids.n}`
+    return `<span${at({ tip: e.tip }, s, `k-pop${e.align === 'end' ? ' end' : ''}${e.hover === true && !s.line ? ' hover' : ''}`)}><button type="button" class="k-dd-s${style}"${s.line ? ' data-laki="full"' : ` popovertarget="${id}" style="anchor-name:--${id}"`}${label ? '' : ' aria-label="More"'}>${e.icon !== undefined ? icon(e.icon, s, 12) : ''}${label ? `<span>${esc(label)}</span>` : ''}${iconSvg('chevron', 10)}</button>${s.line ? '' : `<div class="k-pop-b" id="${id}" popover style="position-anchor:--${id}">${title ? `<div class="k-pop-t">${esc(title)}</div>` : ''}${e.text !== undefined ? `<div class="k-pop-x">${h(e.text, s)}</div>` : ''}${kids(e.children, s)}</div>`}</span>`
+  },
+  // a menu's rows under a box that sifts them (uiBehave: data-filter, ↑ ↓ and Enter); every row drawn, the ones past
+  // the cut hidden: typing finds them too
+  command: (e, s) => {
+    const ph = e.placeholder !== undefined ? txt(e.placeholder, s) : 'Type a command…'
+    if (s.line) return `<button type="button"${at({ tip: e.tip }, s, 'k-btn sm k-cmd-l')} data-laki="full">${iconSvg('search', 11)}<span>${esc(ph)}</span></button>`
+    const items = itemsOf(e, s).slice(0, 500)
+    const head = (x: El) => x !== e && x.title !== undefined && x.label === undefined
+    const rows = items.filter(([x]) => !head(x)).length
+    const max = cap(e, s, 28)
+    let k = 0
+    const body = items
+      .map(([x, r]) => {
+        if (head(x)) return `<div class="k-mn-h" data-sect${k >= max ? ' hidden' : ''}>${h(x.title, r)}</div>`
+        const i = k++
+        const row = x === e && e.label === undefined ? { ...e, label: '{{label}}' } : x
+        return menuRow(row, r, x === e ? e.tone : (x.tone ?? e.tone), ` data-row${i >= max ? ' data-extra hidden' : ''}`)
+      })
+      .join('')
+    return `<div${at({ tip: e.tip }, s, 'k-cmd')} data-rows><label class="k-cmd-q">${iconSvg('search', 12)}<input type="search" data-filter placeholder="${esc(ph)}" aria-label="${esc(ph)}" autocomplete="off"></label><nav class="k-menu k-cmd-m">${body}</nav>${rows ? `<div class="k-empty small" data-none hidden>${h(e.empty ?? 'Nothing matches', s)}</div>` : empty(e, s, 0)}${more(rows - Math.min(max, rows))}</div>`
+  },
+  combobox: (e, s) => {
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const label = e.label !== undefined ? txt(e.label, s) : e.icon !== undefined ? '' : 'Go'
+    const ph = txt(e.placeholder, s)
+    const id = `kc-${s.ids.uid}-${++s.ids.n}`
+    // written ones are templates; a field's are the data's own words
+    const opts = Array.isArray(e.options) ? optsOf(e.options, s, 500) : listAt(e.options, s).slice(0, 500).map(o => (obj(o) ? { v: String(o.value ?? o.label ?? '').trim(), l: String(o.label ?? o.value ?? '') } : { v: String(o ?? '').trim(), l: String(o ?? '') })).filter(o => o.v)
+    return `<div${at(e, s, 'k-input k-combo')} data-inbox><input type="text" list="${id}" value="${h(e.value, s)}" placeholder="${esc(ph)}" aria-label="${esc(ph || label || 'Text')}" autocomplete="off"${run ? '' : ' disabled'}><datalist id="${id}">${opts.map(o => `<option value="${esc(o.v)}"${o.l !== o.v ? ` label="${esc(o.l)}"` : ''}></option>`).join('')}</datalist>${sendBtn(e, s, run ? ` data-run="${esc(run)}"` : '', label, ' data-keep')}</div>`
+  },
+  datepicker: (e, s) => {
+    const kind = ['datetime', 'time', 'month'].includes(String(e.kind)) ? String(e.kind) : 'date'
+    const label = txt(e.label, s)
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const lim = (k: string) => (v => (v ? ` ${k}="${esc(v)}"` : ''))(e[k] !== undefined ? dateIn(kind, txt(e[k], s)) : '')
+    return `<label${at(e, s, 'k-date')}>${label ? `<span class="k-seg-l">${esc(label)}</span>` : ''}<input type="${kind === 'datetime' ? 'datetime-local' : kind}" value="${esc(dateIn(kind, txt(e.value, s)))}"${lim('min')}${lim('max')} aria-label="${esc(label || kind)}"${run ? ` data-change="${esc(run)}"${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}` : ' disabled'}></label>`
+  },
+  // the button and a dropdown of the others, joined
+  split: (e, s) => {
+    const style = ['primary', 'quiet', 'danger'].includes(String(e.style)) ? ` ${e.style}` : ''
+    const rows = (Array.isArray(e.items) ? e.items : []).filter((b): b is El => obj(b) && !hidden(b, s)).map(b => menuRow(b, s, b.tone)).join('')
+    return `<div class="k-split">${button({ ...e, items: undefined }, s)}${rows ? `<details class="k-dd${e.align === 'start' ? '' : ' end'}"><summary class="k-dd-s k-split-s${style}"${s.line ? ' data-laki="full"' : ''} aria-label="More">${iconSvg('chevron', 10)}</summary><div class="k-dd-m">${rows}</div></details>` : ''}</div>`
+  },
+  radio: (e, s) => {
+    const cur = txt(e.value, s).trim()
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const confirm = e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''
+    const label = txt(e.label, s)
+    const cols = Math.min(4, Math.max(1, Math.round(n(e.columns, s) ?? 1)))
+    const opts = (Array.isArray(e.options) ? e.options : [])
+      .filter(o => !obj(o) || !hidden(o, s))
+      .slice(0, 12)
+      .map(o => (obj(o) ? { v: txt(o.value ?? o.label, s).trim(), l: txt(o.label ?? o.value, s), t: txt(o.text, s), i: o.icon, b: txt(o.badge, s) } : { v: txt(o, s).trim(), l: txt(o, s), t: '', i: undefined, b: '' }))
+      .filter(o => o.v)
+    const card = (o: (typeof opts)[number], on: boolean) => `<button type="button" role="radio" aria-checked="${on}" class="k-ro${on ? ' on' : ''}" data-label="${esc(o.l)}"${on ? '' : run ? ` data-run="${esc(run)}" data-arg="${esc(o.v)}"${confirm}` : ' disabled'}>${o.i !== undefined ? icon(o.i, s, 14) : ''}<span class="k-main"><span class="k-ro-l"><span class="k-title">${esc(o.l)}</span>${o.b ? `<span class="k-badge">${esc(o.b)}</span>` : ''}</span>${o.t && !s.line ? `<span class="k-ro-t">${esc(o.t)}</span>` : ''}</span><i class="k-ro-d"></i></button>`
+    return `<div${at(e, s, 'k-radio', cur)} role="radiogroup"${label ? ` aria-label="${esc(label)}"` : ''}>${label && !s.line ? `<div class="k-ro-h">${esc(label)}</div>` : ''}<div class="k-ro-g c-${cols}" style="--cols:${cols}">${opts.map(o => card(o, o.v === cur)).join('')}</div></div>`
+  },
+  // what's typed is the arg, or a do's prompt (uiBehave's data-input); ⌘ Enter sends
+  textarea: (e, s) => {
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const d = !run && ['new', 'send', 'ai'].includes(txt(e.do, s).trim()) ? doOf({ do: e.do, agent: e.agent, project: e.project }, s) : undefined
+    const label = e.label !== undefined ? txt(e.label, s) : e.icon !== undefined ? '' : 'Send'
+    const ph = txt(e.placeholder, s)
+    if (s.line) return `<button type="button"${at({ tip: e.tip }, s, 'k-btn sm')} data-laki="full">${e.icon !== undefined ? icon(e.icon, s, 12) : ''}<span>${esc(ph || label)}</span></button>`
+    const act = run ? ` data-run="${esc(run)}"` : d ? ` data-do="${esc(JSON.stringify(d))}"` : ''
+    const rows = Math.min(12, Math.max(2, Math.round(n(e.rows, s) ?? 3)))
+    return `<div${at(e, s, 'k-area')} data-inbox><textarea rows="${s.full ? rows : Math.min(rows, 2)}" placeholder="${esc(ph)}" aria-label="${esc(ph || label || 'Text')}"${act ? '' : ' disabled'}>${h(e.value, s)}</textarea><div class="k-area-f"><span class="k-sub">⌘ ⏎</span>${sendBtn(e, s, act, label, e.clear === false ? ' data-keep' : '')}</div></div>`
+  },
+  snippet: (e, s) => {
+    const many = Array.isArray(e.items) || e.each !== undefined
+    const tabs = (many ? itemsOf(e, s).map(([x, r]) => ({ l: txt(x.label, r), v: txt(x.value, r) })) : [{ l: txt(e.title, s), v: txt(e.value, s) }]).filter(t => t.l || t.v).slice(0, 8)
+    if (!tabs.length) return empty(e, s, 0)
+    const lines = (v: string) => (e.prompt === true ? v.split('\n').map(l => (l ? `<span class="k-snip-d">$</span>${esc(l)}` : '')).join('\n') : esc(v))
+    const block = (v: string) => `<pre><code>${lines(v)}</code></pre>${e.copy !== false && v ? copyBtn(v) : ''}`
+    if (s.line) return `<span${at({ tip: e.tip }, s, 'k-snip-l')}><code class="mono">${esc(tabs[0].v.split('\n')[0])}</code>${e.copy !== false && tabs[0].v ? copyBtn(tabs[0].v) : ''}</span>`
+    if (!many) return `<div${at({ tip: e.tip }, s, 'k-snip')}>${tabs[0].l ? `<div class="k-snip-bar"><span class="k-snip-f">${iconSvg('file', 11)}<span>${esc(tabs[0].l)}</span></span></div>` : ''}<section class="k-snip-c">${block(tabs[0].v)}</section></div>`
+    const name = `ks-${s.ids.uid}-${++s.ids.n}`
+    return `<div${at({ tip: e.tip }, s, 'k-snip tabs')}><div class="k-snip-bar" role="tablist">${tabs.map((t, i) => `<label><input type="radio" name="${name}"${i ? '' : ' checked'}><span>${esc(t.l)}</span></label>`).join('')}</div>${tabs.map(t => `<section class="k-snip-c">${block(t.v)}</section>`).join('')}</div>`
+  },
+  env: (e, s) => {
+    const items = listAt(e.each ?? e.items, s)
+    const all: string[] = []
+    const list = rowsOf(e, s, 'k-env', 26, (r, item, _i, attrs) => {
+      const key = txt(e.key ?? '{{key}}', r).trim()
+      const v = txt(e.value ?? '{{value}}', r)
+      all.push(`${key}=${/[\s#"']/.test(v) ? JSON.stringify(v) : v}`)
+      const hush = e.secret !== undefined ? holds(e.secret, r) : obj(item) && item.secret !== undefined ? truthy(item.secret) : SECRETS.test(key)
+      const tag = e.tag !== undefined ? txt(e.tag, r).trim() : ''
+      const shown = hush && v ? `<details class="k-sc"><summary title="Show it"><span class="k-sc-d mono">${'•'.repeat(8)}</span>${iconSvg('eye', 11)}</summary><code class="mono">${esc(v)}</code></details>` : `<code class="k-env-v mono">${esc(v)}</code>`
+      return `<div class="k-env-r"${attrs}><code class="k-env-k mono">${esc(key)}</code>${shown}${tag ? `<span class="k-tag ${toneOf(e, tag, r) || (/^prod/i.test(tag) ? 't-accent' : '')}">${esc(tag)}</span>` : ''}${e.copy !== false && v ? copyBtn(v) : ''}</div>`
+    })
+    return `${list}${s.full && items.length ? `<div class="k-actions"><button type="button" class="k-btn sm quiet" data-copy="${esc(all.join('\n'))}">${iconSvg('copy', 11)}<span>Copy as .env</span></button></div>` : ''}`
+  },
+  uptime: (e, s) => {
+    const items = listAt(e.each ?? e.items, s)
+    const from = Math.max(0, items.length - 400)
+    const rs = items.slice(from).map((item, i) => inner(s, item, from + i))
+    const bar = rs
+      .map(r => {
+        const st = txt(e.state ?? '{{state}}', r).trim()
+        const tip = [txt(e.x, r), st || 'no data', txt(e.text, r)].filter(Boolean).join(' · ')
+        return `<i class="k-up-i ${st ? stateTone(e, st, r) : 'none'}" title="${esc(tip)}"></i>`
+      })
+      .join('')
+    const title = txt(e.title, s)
+    const value = txt(e.value, s)
+    const legend = (e.legend ?? s.full) === true && rs.length > 1 && !s.line ? `<div class="k-up-x"><span>${esc(txt(e.x, rs[0]))}</span><span>${esc(txt(e.x, rs.at(-1)!))}</span></div>` : ''
+    return rs.length ? `<div${at({ tip: e.tip }, s, 'k-up')}>${(title || value) && !s.line ? `<div class="k-up-h"><span>${esc(title)}</span><b>${esc(value)}</b></div>` : ''}<div class="k-up-b">${bar}</div>${s.line && value ? `<b>${esc(value)}</b>` : ''}${legend}</div>` : empty(e, s, 0)
+  },
+  deploys: (e, s) =>
+    rowsOf(e, s, 'k-deploys', 36, (r, _item, _i, attrs) => {
+      const state = txt(e.state ?? '{{state}}', r).trim()
+      const k = DEPLOY.find(([re]) => re.test(state))?.[1] ?? 'muted'
+      const branch = e.branch !== undefined ? txt(e.branch, r).trim() : ''
+      const env = e.env !== undefined ? txt(e.env, r).trim() : ''
+      const tm = e.time !== undefined ? txt(e.time, r).trim() : ''
+      const took = e.took !== undefined ? txt(e.took, r).trim() : ''
+      const t = timeOf(tm)
+      const sub = [branch && `${iconSvg('gitBranch', 10)} ${esc(branch)}`, tm && esc(t !== undefined ? ago(t) : tm), took && esc(took)].filter(Boolean).join(' · ')
+      return `<div class="k-dp"${attrs}${opens(txt(e.href ?? '{{url}}', r))}><i class="k-dp-dot ${toneOf(e, state, r) || `t-${k}`}${k === 'warn' ? ' live' : ''}" title="${esc(state || 'unknown')}"></i><div class="k-main"><span class="k-title">${h(e.title ?? '{{title}}', r)}</span>${sub ? `<span class="k-sub">${sub}</span>` : ''}</div>${env ? `<span class="k-tag${/^prod/i.test(env) ? ' t-accent' : ''}">${esc(env)}</span>` : ''}${e.author !== undefined ? avImg(txt(e.author, r).trim()) : ''}</div>`
+    }),
+  issues: (e, s) =>
+    rowsOf(e, s, 'k-issues', 28, (r, _item, _i, attrs) => {
+      const id = txt(e.id ?? '{{id}}', r).trim()
+      const state = txt(e.state ?? '{{state}}', r).trim()
+      const st = ISSUE.find(([re]) => re.test(state))?.[1] ?? 'todo'
+      const pr = e.priority !== undefined ? txt(e.priority, r).trim().toLowerCase() : ''
+      const labels = (e.labels !== undefined ? (v => (Array.isArray(v) ? v : []))(valueAt(e.labels, r.scopes)) : []).slice(0, 3)
+      const tags = labels.map(l => (x => (x.name ? `<span class="k-tag"${x.c ? ` style="border-color:${x.c}"` : ''}>${x.c ? `<i class="k-dotc" style="background:${x.c}"></i>` : ''}${esc(x.name)}</span>` : ''))(obj(l) ? { name: String(l.name ?? l.label ?? ''), c: l.color !== undefined ? colorCss(String(l.color)) : '' } : { name: String(l ?? ''), c: '' })).join('')
+      return `<div class="k-is"${attrs}${opens(txt(e.href ?? '{{url}}', r))}>${e.priority !== undefined ? `<span class="k-is-p" title="Priority: ${esc(pr || 'none')}">${priorityIcon(pr)}</span>` : ''}${id ? `<span class="k-is-id">${esc(id)}</span>` : ''}<span class="k-is-s ${st}" title="${esc(state || st)}">${ISSUE_ICON[st]}</span><span class="k-title">${h(e.title ?? '{{title}}', r)}</span>${tags ? `<span class="k-is-ls">${tags}</span>` : ''}${e.assignee !== undefined ? avImg(txt(e.assignee, r).trim()) : ''}</div>`
+    }),
+  endpoints: (e, s) =>
+    rowsOf(e, s, 'k-eps', 28, (r, _item, _i, attrs) => {
+      const m = txt(e.method ?? '{{method}}', r).trim().toUpperCase().slice(0, 7)
+      const status = e.status !== undefined ? txt(e.status, r).trim() : ''
+      const st = toneOf(e, status, r) || (/^2/.test(status) ? 't-good' : /^3/.test(status) ? 't-accent' : /^4/.test(status) ? 't-warn' : /^5/.test(status) ? 't-bad' : 't-muted')
+      const path = esc(txt(e.path ?? '{{path}}', r).trim()).replace(/(:[A-Za-z_]\w*|\{[^}/]+\})/g, '<span class="k-ep-v">$1</span>') // its params lit
+      const text = e.text !== undefined ? txt(e.text, r) : ''
+      const side = (v: unknown) => (w => (w ? `<span class="k-ep-n">${esc(w)}</span>` : ''))(v !== undefined ? txt(v, r).trim() : '')
+      return `<div class="k-ep"${attrs}${e.href !== undefined ? opens(txt(e.href, r)) : ''}><span class="k-ep-m" style="color:${colorCss(METHOD[m] ?? 'gray')}">${esc(m)}</span><div class="k-main"><code class="k-ep-p">${path}</code>${text ? `<span class="k-sub">${esc(text)}</span>` : ''}</div>${side(e.count)}${side(e.took)}${status ? `<span class="k-ep-s ${st}">${esc(status)}</span>` : ''}</div>`
+    }),
+  changelog: (e, s) => {
+    const most = s.full ? 200 : 4
+    return rowsOf(e, s, 'k-chl', 92, (r, _item, _i, attrs) => {
+      const v = txt(e.version ?? '{{version}}', r).trim()
+      const d = e.date !== undefined ? txt(e.date, r).trim() : ''
+      const t = timeOf(d)
+      const title = e.title !== undefined ? txt(e.title, r) : ''
+      const all = (v => (Array.isArray(v) ? v : []))(valueAt(e.changes ?? 'changes', r.scopes)).map(changeOf).filter(c => c.text)
+      const li = all.slice(0, most).map(c => `<li>${c.tag ? `<span class="k-chl-t t-${c.tone}">${esc(c.tag)}</span>` : ''}<span>${esc(c.text)}</span></li>`).join('')
+      return `<div class="k-chl-r"${attrs}><div class="k-chl-h"><b>${e.href !== undefined ? link(txt(e.href, r), esc(v)) : esc(v)}</b>${title ? `<span class="k-sub">${esc(title)}</span>` : ''}${d ? `<span class="k-time"${t !== undefined ? ` title="${esc(new Date(t).toLocaleString())}"` : ''}>${esc(t !== undefined ? date(t) : d)}</span>` : ''}</div>${li && !s.line ? `<ul class="k-chl-l">${li}${all.length > most ? `<li class="k-sub">+${all.length - most} more</li>` : ''}</ul>` : ''}</div>`
+    })
+  },
+  // its time as of the render, then uiBehave's tick (data-clock) keeps it right
+  clock: (e, s) =>
+    rowsOf(e, s, 'k-clocks', 30, (r, item, _i, attrs) => {
+      const zone = txt(e.zone ?? '{{zone}}', r).trim()
+      const h12 = e.hour12 === true
+      const z = zoned(zone, h12)
+      const label = (e.label !== undefined ? txt(e.label, r) : typeof item === 'string' ? item : txt('{{label}}', r)) || zone.split('/').pop()!.replace(/_/g, ' ') || 'Here'
+      const sub = e.text !== undefined ? txt(e.text, r) : z ? z.from : 'no such time zone'
+      return `<div class="k-clk"${attrs}${z ? '' : ' title="A time zone: Europe/Kyiv, America/New_York, UTC"'}><span class="k-clk-i ${z?.night ? 't-accent' : 't-warn'}">${iconSvg(z?.night ? 'moon' : 'sun', 13)}</span><div class="k-main"><span class="k-title">${esc(label)}</span>${sub ? `<span class="k-sub">${esc(sub)}</span>` : ''}</div><b class="k-clk-t"${z ? ` data-clock="${esc(zone)}"${h12 ? ' data-h12' : ''}` : ''}>${esc(z?.time ?? '–')}</b></div>`
+    }),
+  funnel: (e, s) => {
+    const rs = listAt(e.each ?? e.items, s).map((item, i) => inner(s, item, i))
+    const vals = rs.map(r => n(e.value ?? '{{value}}', r) ?? 0)
+    const top = vals[0] || 0
+    const unit = txt(e.unit, s)
+    const c = hue(e.color, s)
+    const max = cap(e, s, 22)
+    const pct = (v: number, of: number) => (of > 0 ? Math.round((v / of) * 1000) / 10 : 0)
+    if (s.line && rs.length > 1) return `<span${at({ tip: e.tip }, s, 'k-fn-line')}><b>${esc(`${num(top)}${unit}`)}</b> → <b>${esc(`${num(vals.at(-1))}${unit}`)}</b><span class="k-sub">${pct(vals.at(-1)!, top)}%</span></span>`
+    const rows = rs
+      .map((r, i) => {
+        if (i >= max && !s.full) return ''
+        const lost = i && vals[i - 1] > 0 ? Math.round((1 - vals[i] / vals[i - 1]) * 100) : 0
+        return `<div class="k-fn-r" data-row${i >= max ? ' data-extra hidden' : ''}><span class="k-fn-l">${h(e.label ?? '{{label}}', r)}</span><span class="k-fn-t"><i style="width:${f1(Math.min(100, pct(vals[i], top)))}%${c ? `;background:${c}` : ''}"></i></span><b>${esc(`${num(vals[i])}${unit}`)}</b><span class="k-fn-p">${i ? `${pct(vals[i], top)}%` : ''}</span><span class="k-fn-d${lost > 0 ? ' t-bad' : ''}">${i && lost ? `${lost > 0 ? '−' : '+'}${Math.abs(lost)}%` : ''}</span></div>`
+      })
+      .join('')
+    return `<div${at({ tip: e.tip }, s, 'k-funnel')} data-rows>${rows}${empty(e, s, rs.length)}${s.line ? '' : more(rs.length - Math.min(max, rs.length))}</div>`
+  },
+  swatches: (e, s) => {
+    const items = listAt(e.each ?? e.items, s).slice(0, 200)
+    const chips = items
+      .map((item, i) => {
+        const r = inner(s, item, i)
+        const word = (e.color !== undefined ? txt(e.color, r) : typeof item === 'string' ? item : txt('{{color}}', r)).trim()
+        const css = colorCss(word)
+        if (!css) return ''
+        const label = e.label !== undefined ? txt(e.label, r) : typeof item === 'string' ? '' : txt('{{name}}', r)
+        const copy = e.copy !== undefined ? txt(e.copy, r) : word
+        const text = e.text !== undefined ? txt(e.text, r) : label ? word : ''
+        return `<button type="button" class="k-sw" data-copy="${esc(copy)}" title="Copy ${esc(copy)}"><i style="background:${css}"></i><span class="k-main"><span class="k-title">${esc(label || word)}</span>${text && !s.line ? `<span class="k-sub">${esc(text)}</span>` : ''}</span></button>`
+      })
+      .join('')
+    return chips ? `<div${at({ tip: e.tip }, s, 'k-sws')}>${chips}</div>` : empty(e, s, 0)
+  },
+  matrix: (e, s) => {
+    const rowK = (Array.isArray(e.rows) ? e.rows : []).map(x => txt(x, s))
+    const colK = (Array.isArray(e.columns) ? e.columns : []).map(x => txt(x, s))
+    const cells = new Map<string, { k: string; state: string; href: string }>()
+    const count: Record<string, number> = {}
+    listAt(e.each ?? e.items, s).forEach((item, i) => {
+      const r = inner(s, item, i)
+      const rk = txt(e.row ?? '{{row}}', r)
+      const ck = txt(e.column ?? '{{column}}', r)
+      if (!rowK.includes(rk)) rowK.push(rk)
+      if (!colK.includes(ck)) colK.push(ck)
+      const state = txt(e.state ?? '{{state}}', r).trim()
+      const k = STEP.find(([re]) => re.test(state))?.[1] ?? 'todo'
+      count[k] = (count[k] ?? 0) + 1
+      cells.set(JSON.stringify([rk, ck]), { k, state, href: e.href !== undefined ? safeUrl(txt(e.href, r)) : '' })
+    })
+    if (!cells.size) return empty(e, s, 0)
+    if (s.line) return `<span${at({ tip: e.tip }, s, 'k-mx-line')}>${['done', 'fail', 'now'].filter(k => count[k]).map(k => `<span class="${MX[k][1]}">${MX[k][0]}${count[k]}</span>`).join('')}</span>`
+    const max = cap(e, s, 24) - 1 // its head a row too
+    const cell = (rk: string, ck: string) => (c => (c ? `<td class="${MX[c.k][1]}"${c.href ? ` data-open="${esc(c.href)}"` : ''} title="${esc(`${rk} · ${ck}: ${c.state || 'to do'}`)}">${MX[c.k][0]}</td>` : '<td></td>'))(cells.get(JSON.stringify([rk, ck])))
+    return `<div${at({ tip: e.tip }, s, 'k-mx')} data-rows><table><thead><tr><th></th>${colK.map(c => `<th>${esc(c)}</th>`).join('')}</tr></thead><tbody>${rowK.map((rk, i) => (i >= max && !s.full ? '' : `<tr data-row${i >= max ? ' data-extra hidden' : ''}><th>${esc(rk)}</th>${colK.map(ck => cell(rk, ck)).join('')}</tr>`)).join('')}</tbody></table>${more(rowK.length - Math.min(Math.max(1, max), rowK.length))}</div>`
+  },
+  marquee: (e, s) => {
+    const sec = Math.min(300, Math.max(2, n(e.seconds, s) ?? 20))
+    // drawn once per copy: ids and radio names of its own (a snippet's tabs, a popover's)
+    const one = () =>
+      e.children !== undefined
+        ? kids(e.children, s)
+        : itemsOf(e, s)
+            .slice(0, 60)
+            .map(([x, r]) => {
+              const label = x === e ? (e.label !== undefined ? txt(e.label, r) : (t => (typeof t === 'string' ? t : txt('{{label}}', r)))(r.scopes[0].this)) : txt(x.label ?? x.tag, r)
+              const body = `${x.icon !== undefined ? icon(x.icon, r, 13) : ''}${label ? `<span>${esc(label)}</span>` : ''}`
+              return body ? link(x.href !== undefined ? txt(x.href, r) : '', body, `k-mq-i ${toneOf(x === e ? e : { tone: x.tone ?? e.tone }, label, r)}`.trim()) : ''
+            })
+            .join('')
+    // two copies, the second inert, so a lap ends where it began
+    return `<div${at({ tip: e.tip }, s, `k-mq${e.reverse === true ? ' rev' : ''}`)} style="--s:${sec}s"><div class="k-mq-t"><div class="k-mq-g">${one()}</div><div class="k-mq-g" aria-hidden="true" inert>${one()}</div></div></div>`
+  },
+  bento: (e, s) => {
+    const cols = Math.min(6, Math.max(2, Math.round(n(e.columns, s) ?? 4)))
+    const tile = (x: El) => {
+      const w = Math.min(cols, Math.max(1, Math.round(n(x.cols, s) ?? 1)))
+      const tall = Math.min(3, Math.max(1, Math.round(n(x.rows, s) ?? 1)))
+      const c = hue(x.color, s)
+      const href = x.href !== undefined ? safeUrl(txt(x.href, s)) : ''
+      return `<div class="k-bt w-${w}${href ? ' link' : ''}" style="grid-column:span ${w};grid-row:span ${tall}${c ? `;--bt:${c}` : ''}"${href ? ` data-open="${esc(href)}"` : ''}>${x.icon !== undefined ? `<span class="k-bt-i">${icon(x.icon, s, 16)}</span>` : ''}${x.title !== undefined ? `<b class="k-bt-t">${h(x.title, s)}</b>` : ''}${x.text !== undefined ? `<span class="k-bt-x">${h(x.text, s)}</span>` : ''}${kids(x.children, s)}</div>`
+    }
+    return `<div${at(e, s, `k-bento c-${cols}`)} style="--cols:${cols}">${(Array.isArray(e.items) ? e.items : []).filter((x): x is El => obj(x) && !hidden(x, s)).slice(0, 24).map(tile).join('')}</div>`
   },
   empty: (e, s) => `<div${at(e, s, 'k-empty')}>${e.icon !== undefined ? icon(e.icon, s, 18) : ''}<div>${h(e.text ?? 'Nothing here', s)}</div>${e.action !== undefined ? button(e.action, s, true) : ''}</div>`,
 }
@@ -1365,8 +1733,9 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
       else if (pr.kind === 'icon' && !iconOk(v)) say('warn', here, noIcon(v))
     }
     for (const c of [el.color, el.ring, ...(Array.isArray(el.colors) ? el.colors : []), ...(Array.isArray(el.series) ? el.series.map(x => (obj(x) ? x.color : undefined)) : [])]) if (!colorOk(c)) say('warn', here, `color ${c}: a tone (${TONES.join(', ')}), one of ${COLORS.join(', ')}, or a hex${mean(String(c), [...TONES, ...COLORS])}`)
-    if (['button', 'toggle', 'segmented', 'stepper', 'range', 'select', 'input', 'swap', 'pagination', 'menu'].includes(type)) runs(el, here, true)
-    if (type === 'menu' && Array.isArray(el.items)) el.items.forEach((b, i) => runs(b, `${here}.items[${i}]`))
+    if (['button', 'toggle', 'segmented', 'stepper', 'range', 'select', 'input', 'swap', 'pagination', 'menu', 'command', 'combobox', 'datepicker', 'split', 'radio'].includes(type)) runs(el, here, true)
+    if (type === 'textarea') runs({ ...el, prompt: '', ...(typeof el.do === 'string' && !['new', 'send', 'ai'].includes(el.do) && { do: undefined }) }, here, true) // what's typed is its prompt; a wrong do: its kind says it
+    if ((type === 'menu' || type === 'command') && Array.isArray(el.items)) el.items.forEach((b, i) => runs(b, `${here}.items[${i}]`))
     if (type === 'swap' && Array.isArray(el.icons)) for (const v of el.icons) if (!iconOk(v)) say('warn', here, noIcon(v))
     if (type === 'form') runs(el.submit, `${here}.submit`)
     for (const k of ['action', 'submit']) if (obj(el[k]) && type !== 'form') runs(el[k], `${here}.${k}`)
@@ -1392,8 +1761,9 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
         if (items.length && def.rows) {
           const fields = new Set(items.flatMap(x => (obj(x) ? Object.keys(x) : [])))
           const outer = new Set(scopes.flatMap(sc => Object.keys(sc)))
-          const skip = new Set(['each', 'items', 'empty', 'limit', 'filter', 'sort', 'kind', 'height', 'min', 'max', 'label', 'unit', 'if', 'unless', 'tip', 'series', 'colors', 'legend', 'rows', 'count', 'nested', 'open', 'wrap', ...(type === 'board' ? ['columns'] : []), ...(type === 'log' ? ['value'] : []), ...(type === 'meter' ? ['title'] : [])])
-          if (type === 'meter' || type === 'tree' || type === 'steps' || type === 'breadcrumbs' || type === 'links' || type === 'menu') skip.delete('label') // a row's name there, not a title
+          const skip = new Set(['each', 'items', 'empty', 'limit', 'filter', 'sort', 'kind', 'height', 'min', 'max', 'label', 'unit', 'if', 'unless', 'tip', 'series', 'colors', 'legend', 'rows', 'count', 'nested', 'open', 'wrap', 'placeholder', 'seconds', ...(type === 'board' || type === 'matrix' ? ['columns'] : []), ...(type === 'log' ? ['value'] : []), ...(type === 'meter' ? ['title'] : []), ...(type === 'uptime' ? ['title', 'value'] : [])])
+          if (['meter', 'tree', 'steps', 'breadcrumbs', 'links', 'menu', 'command', 'marquee', 'snippet', 'clock', 'funnel', 'swatches'].includes(type)) skip.delete('label') // a row's name there, not a title
+          if (type === 'endpoints') skip.delete('count') // a row's calls
           for (const [k, val] of Object.entries(el)) {
             if (skip.has(k)) continue
             for (const r of refs(k === 'columns' && Array.isArray(val) ? val.map(c => (obj(c) ? { ...c, title: undefined } : c)) : val)) if (!NAMES.has(r) && !fields.has(r) && !outer.has(r)) say('warn', here, `${k} uses ${r}, which no item of ${path} has${mean(r, [...fields])}`)
@@ -1409,6 +1779,7 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
     }
     if (Array.isArray(el.children)) el.children.forEach((c, i) => walk(c, `${here}.children[${i}]`, rowScopes)) // with each: over its row (an accordion's panel)
     if (type === 'accordion' && Array.isArray(el.items)) el.items.forEach((t, i) => obj(t) && (Array.isArray(t.children) ? t.children.forEach((c, j) => walk(c, `${here}.items[${i}].children[${j}]`, scopes)) : t.children !== undefined && say('error', `${here}.items[${i}]`, 'children: a list of elements')))
+    if (type === 'bento' && Array.isArray(el.items)) el.items.forEach((t, i) => obj(t) && (Array.isArray(t.children) ? t.children.forEach((c, j) => walk(c, `${here}.items[${i}].children[${j}]`, scopes)) : t.children !== undefined && say('error', `${here}.items[${i}]`, 'children: a list of elements')))
     if (type === 'tabs' && Array.isArray(el.tabs)) el.tabs.forEach((t, i) => (obj(t) && Array.isArray(t.children) ? t.children.forEach((c, j) => walk(c, `${here}.tabs[${i}].children[${j}]`, scopes)) : say('error', `${here}.tabs[${i}]`, 'a tab: { "label", "children": [elements] }')))
   }
   if (isElement(spec)) walk(spec, 'ui', has ? [top] : null)
@@ -1441,6 +1812,8 @@ const LOG = [
   { at: '2026-10-17T09:10:07Z', level: 'error', text: 'POST /api/checkout 500 TypeError: card is undefined' },
   { at: '2026-10-17T09:10:09Z', level: 'info', text: 'GET /api/orders 200 39ms' },
 ]
+// ninety days of a status page: mostly up, a slow day or two, one outage
+const UP = Array.from({ length: 90 }, (_, i) => ({ date: new Date(Date.UTC(2026, 6, 20 + i)).toISOString().slice(0, 10), state: i === 61 ? 'down' : i % 23 === 7 || i === 84 ? 'degraded' : i === 3 ? '' : 'up' }))
 const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   stack: { spec: { type: 'stack', gap: 'sm', children: [{ type: 'text', value: '{{repo}}', weight: 'semibold' }, { type: 'text', value: '{{open}} open · {{drafts}} drafts', muted: true }] }, data: { repo: 'acme/web', open: 6, drafts: 1 } },
   row: { spec: { type: 'row', align: 'between', children: [{ type: 'text', value: 'Deploys today' }, { type: 'badge', value: '{{n}}', tone: 'good' }] }, data: { n: 4 } },
@@ -1534,6 +1907,26 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   pagination: { spec: { type: 'pagination', page: '{{page}}', pages: '{{pages}}', run: 'page' }, data: { page: 6, pages: 20 } },
   menu: { spec: { type: 'menu', items: [{ title: 'Go to' }, { label: 'Board', icon: 'board', open: 'laki://board', on: true }, { label: 'Settings', icon: 'settings', open: 'laki://settings' }, { title: '{{repo}}' }, { label: 'Pull requests', icon: 'pr', badge: '{{prs}}', open: 'https://github.com/{{repo}}/pulls' }, { label: 'Deploy main', icon: 'ship', run: 'deploy', confirm: 'Deploy main to production?' }] }, data: { repo: 'acme/web', prs: 6 } },
   dropdown: { spec: { type: 'row', align: 'between', children: [{ type: 'text', value: '{{env}}', weight: 'semibold' }, { type: 'dropdown', label: 'More', align: 'end', items: [{ label: 'Redeploy', icon: 'refresh', run: 'redeploy', confirm: 'Redeploy {{env}}?' }, { label: 'Logs', icon: 'fileText', open: 'https://dash.example.com/{{env}}/logs' }, { label: 'Roll back', icon: 'undo', run: 'rollback', tone: 'bad', confirm: 'Roll back {{env}}?' }] }] }, data: { env: 'production' } },
+  marquee: { spec: { type: 'marquee', each: 'shipped', label: '{{title}}', icon: '{{icon}}', seconds: 24 }, data: { shipped: [{ title: 'v2.4.0 is live', icon: '🚀' }, { title: 'Search, 30% faster', icon: 'zap' }, { title: 'Dark mode for the dashboard', icon: 'moon' }, { title: '#418 merged', icon: 'gitMerge' }, { title: '12 bugs fixed', icon: 'bug' }] } },
+  bento: { spec: { type: 'bento', items: [{ title: '{{num visits}} visits', text: 'today, {{change}} on last week', icon: 'barChart', color: 'blue', cols: 2, rows: 2, children: [{ type: 'spark', values: 'week' }] }, { title: '{{deploys}} deploys', icon: 'ship', color: 'green' }, { title: '{{errors}} errors', icon: 'ciFail', color: 'red', href: 'https://sentry.io' }, { title: 'p95 {{p95}} ms', text: 'checkout is the slowest', icon: 'clock', color: 'orange', cols: 2 }] }, data: { visits: 12840, change: '+12%', week: [8, 9, 7, 11, 10, 12, 13], deploys: 4, errors: 3, p95: 260 } },
+  snippet: { spec: { type: 'snippet', prompt: true, items: [{ label: 'npm', value: 'npm i @acme/sdk' }, { label: 'pnpm', value: 'pnpm add @acme/sdk' }, { label: 'yarn', value: 'yarn add @acme/sdk' }, { label: 'bun', value: 'bun add @acme/sdk' }] } },
+  env: { spec: { type: 'env', each: 'vars', tag: '{{env}}' }, data: { vars: [{ key: 'DATABASE_URL', value: 'postgres://app:hunter2@db.internal:5432/app', env: 'production' }, { key: 'API_BASE', value: 'https://api.acme.com', env: 'production' }, { key: 'STRIPE_SECRET_KEY', value: 'sk_test_51Hx9kQ2eZvKYlo2C0aBcDeF', env: 'preview' }, { key: 'LOG_LEVEL', value: 'info', env: 'preview' }] } },
+  uptime: { spec: { type: 'uptime', each: 'days', x: '{{date}}', state: '{{state}}', title: 'API · 90 days', value: '{{uptime}}' }, data: { uptime: '99.94%', days: UP } },
+  deploys: { spec: { type: 'deploys', each: 'deploys', branch: '{{branch}}', env: '{{env}}', time: '{{at}}', took: '{{took}}', author: '{{who}}' }, data: { deploys: [{ state: 'building', title: 'Faster search on the orders page', branch: 'feat/search', env: 'preview', at: '2026-10-17T09:58:00Z', took: '40s', who: 'hubot', url: 'https://vercel.com/acme/web' }, { state: 'ready', title: 'Fix the date picker on Safari', branch: 'main', env: 'production', at: '2026-10-17T08:50:00Z', took: '1m 12s', who: 'octocat', url: 'https://vercel.com/acme/web' }, { state: 'error', title: 'Bump the API client to 3.2', branch: 'deps/api', env: 'preview', at: '2026-10-16T16:20:00Z', took: '28s', who: 'monalisa', url: 'https://vercel.com/acme/web' }] } },
+  issues: { spec: { type: 'issues', each: 'issues', priority: '{{priority}}', labels: 'labels', assignee: '{{who}}' }, data: { issues: [{ id: 'ACME-142', title: 'Login loops on Safari', state: 'In Progress', priority: 'urgent', labels: [{ name: 'bug', color: 'd73a4a' }], who: 'octocat', url: 'https://linear.app/acme/issue/ACME-142' }, { id: 'ACME-139', title: 'Export orders as CSV', state: 'Todo', priority: 'medium', labels: ['feature'], who: 'hubot', url: 'https://linear.app/acme/issue/ACME-139' }, { id: 'ACME-131', title: 'Dark mode for emails', state: 'In Review', priority: 'low', labels: [], who: 'monalisa', url: 'https://linear.app/acme/issue/ACME-131' }, { id: 'ACME-120', title: 'Faster search', state: 'Done', priority: 'high', labels: ['perf'], who: 'hubot', url: 'https://linear.app/acme/issue/ACME-120' }, { id: 'ACME-118', title: 'Keep the old checkout', state: 'Canceled', priority: 'none', labels: [], who: '', url: 'https://linear.app/acme/issue/ACME-118' }] } },
+  endpoints: { spec: { type: 'endpoints', each: 'routes', status: '{{status}}', took: '{{ms}} ms', count: '{{rpm}}/min' }, data: { routes: [{ method: 'GET', path: '/api/orders', status: 200, ms: 41, rpm: '1.2k' }, { method: 'POST', path: '/api/checkout', status: 500, ms: 812, rpm: 84 }, { method: 'GET', path: '/api/orders/:id', status: 200, ms: 23, rpm: 640 }, { method: 'PATCH', path: '/api/users/{id}', status: 422, ms: 57, rpm: 12 }, { method: 'DELETE', path: '/api/sessions/:token', status: 204, ms: 9, rpm: 30 }] } },
+  changelog: { spec: { type: 'changelog', each: 'releases', date: '{{date}}', title: '{{name}}', href: 'https://github.com/acme/web/releases/tag/{{version}}' }, data: { releases: [{ version: 'v2.4.0', name: 'Search', date: '2026-10-17', changes: ['feat: search, 30% faster', 'feat(ui): dark mode for the dashboard', 'fix: the date picker on Safari', 'perf: a smaller bundle, 182 KB'] }, { version: 'v2.3.2', name: '', date: '2026-10-09', changes: ['fix: a crash on an empty cart', 'feat!: the v1 API is gone'] }] } },
+  clock: { spec: { type: 'clock', items: [{ label: 'Kyiv', zone: 'Europe/Kyiv' }, { label: 'New York', zone: 'America/New_York' }, { label: 'San Francisco', zone: 'America/Los_Angeles' }, { label: 'Tokyo', zone: 'Asia/Tokyo' }] } },
+  funnel: { spec: { type: 'funnel', each: 'steps', label: '{{step}}', value: '{{n}}' }, data: { steps: [{ step: 'Visited', n: 12840 }, { step: 'Signed up', n: 2140 }, { step: 'Made a project', n: 1310 }, { step: 'Invited a teammate', n: 480 }, { step: 'Paid', n: 212 }] } },
+  swatches: { spec: { type: 'swatches', each: 'tokens', color: '{{hex}}', label: '{{name}}', text: '--{{name}}' }, data: { tokens: [{ name: 'accent', hex: '#7aa2f7' }, { name: 'done', hex: '#9ece6a' }, { name: 'waiting', hex: '#e0af68' }, { name: 'error', hex: '#f7768e' }, { name: 'purple', hex: '#bb9af7' }, { name: 'muted', hex: '#7a8294' }] } },
+  matrix: { spec: { type: 'matrix', each: 'jobs', row: 'Node {{node}}', column: '{{os}}', state: '{{state}}', href: '{{url}}' }, data: { jobs: [18, 20, 22].flatMap(node => ['ubuntu', 'macos', 'windows'].map(os => ({ node, os, state: node === 22 && os === 'windows' ? 'failed' : node === 22 && os === 'macos' ? 'running' : node === 18 && os === 'windows' ? 'skipped' : 'passed', url: 'https://github.com/acme/web/actions/runs/4120' }))) } },
+  popover: { spec: { type: 'row', align: 'between', children: [{ type: 'text', value: '{{service}}', weight: 'semibold' }, { type: 'popover', label: 'Details', icon: 'info', align: 'end', title: '{{service}}', text: 'Deployed {{ago deployed}} by {{who}}', children: [{ type: 'kv', items: [{ key: 'Version', value: '{{version}}', mono: true }, { key: 'Region', value: '{{region}}' }] }, { type: 'button', label: 'Open the logs', icon: 'fileText', open: 'https://dash.example.com/{{service}}/logs', style: 'quiet' }] }] }, data: { service: 'checkout', deployed: '2026-10-17T09:00:00Z', who: 'octocat', version: 'v2.4.0', region: 'eu-west-1' } },
+  command: { spec: { type: 'command', placeholder: 'Search or run a command…', items: [{ title: 'Go to' }, { label: 'Board', icon: 'board', open: 'laki://board' }, { label: 'Settings', icon: 'settings', keys: '⌘ ,', open: 'laki://settings' }, { title: '{{repo}}' }, { label: 'Pull requests', icon: 'pr', badge: '{{prs}}', open: 'https://github.com/{{repo}}/pulls' }, { label: 'Deploy main', icon: 'ship', run: 'deploy', confirm: 'Deploy main to production?' }, { label: 'Run the tests', icon: 'terminal', do: 'terminal', command: 'npm test' }, { label: 'Ask Laki AI', icon: 'ai', keys: '⌘ J', do: 'ai', prompt: 'What needs my review in {{repo}}?' }] }, data: { repo: 'acme/web', prs: 6 } },
+  combobox: { spec: { type: 'combobox', placeholder: 'A branch…', options: 'branches', label: 'Check out', icon: 'gitBranch', run: 'checkout' }, data: { branches: ['main', 'feat/search', 'fix/safari-dates', 'deps/api-3.2'] } },
+  datepicker: { spec: { type: 'datepicker', label: 'Release on', value: '{{release}}', run: 'release', confirm: 'Move the release to another day?' }, data: { release: '2026-10-24' } },
+  split: { spec: { type: 'split', label: 'Squash and merge', icon: 'gitMerge', style: 'primary', run: 'merge', arg: 'squash', confirm: 'Squash and merge #{{pr}}?', items: [{ label: 'Create a merge commit', run: 'merge', arg: 'merge' }, { label: 'Rebase and merge', run: 'merge', arg: 'rebase' }, { label: 'Close the PR', icon: 'x', run: 'close', tone: 'bad', confirm: 'Close #{{pr}}?' }] }, data: { pr: 412 } },
+  radio: { spec: { type: 'radio', label: 'Merge with', value: '{{how}}', run: 'strategy', options: [{ value: 'squash', label: 'Squash', text: 'One commit on main per PR', icon: 'gitCommit', badge: 'default' }, { value: 'merge', label: 'Merge commit', text: 'Every commit, and a merge', icon: 'gitMerge' }, { value: 'rebase', label: 'Rebase', text: 'Every commit, replayed on main', icon: 'gitBranch' }] }, data: { how: 'squash' } },
+  textarea: { spec: { type: 'textarea', placeholder: 'Ask the agent to…', do: 'send', label: 'Send', icon: 'agent' } },
 }
 export const UI_SAMPLES = UI_TYPES.map(type => ({ type, group: UI[type].group, blurb: UI[type].blurb, spec: SAMPLES[type].spec, data: SAMPLES[type].data }))
 
@@ -1558,4 +1951,6 @@ export const UI_EXAMPLES: { title: string; blurb: string; spec: UiElement; data?
   { title: 'A table with pictures and bars', full: true, blurb: 'Columns of more than words: a picture with a name and a line under it, a bar of how far along, a sparkline, a badge, a button.', spec: { type: 'table', each: 'team', columns: [{ title: 'Who', avatar: '{{login}}', value: '{{name}}', subtitle: '{{role}}' }, { title: 'Sprint', progress: '{{done}}', max: '{{total}}', value: '{{done}}/{{total}}', color: '{{#if late}}bad{{else}}accent{{/if}}' }, { title: 'This week', spark: 'week', hide: 'narrow' }, { title: 'State', badge: '{{state}}', tone: { busy: 'warn', away: 'muted', free: 'good' } }, { title: '', align: 'right', actions: [{ label: 'Profile', icon: 'github', open: 'https://github.com/{{login}}', style: 'quiet' }], hide: 'narrow' }] }, data: { team: [{ name: 'Mona Lisa', login: 'monalisa', role: 'Frontend', done: 8, total: 10, week: [2, 3, 1, 4, 3], state: 'busy' }, { name: 'Hubot', login: 'hubot', role: 'Backend', done: 3, total: 9, late: true, week: [1, 0, 2, 1, 0], state: 'free' }, { name: 'The Octocat', login: 'octocat', role: 'Design', done: 5, total: 6, week: [0, 2, 2, 3, 4], state: 'away' }] } },
   { title: 'Rows with progress', blurb: 'A list whose rows end in a small bar: projects, uploads, migrations.', spec: { type: 'list', each: 'projects', title: '{{name}}', subtitle: '{{owner}}', icon: 'folder', accessories: [{ progress: '{{pct}}', tone: '{{#if stuck}}bad{{/if}}' }] }, data: { projects: [{ name: 'Checkout v2', owner: 'Payments', pct: 82 }, { name: 'Search index', owner: 'Platform', pct: 45 }, { name: 'Mobile app', owner: 'Apps', pct: 12, stuck: true }] } },
   { title: 'Folding panels with elements', full: true, blurb: 'An accordion whose panels hold other elements: a release’s notes, its checks, its numbers.', spec: { type: 'accordion', items: [{ title: '{{version}}', subtitle: 'shipped {{ago shipped}}', icon: 'ship', badge: 'new', children: [{ type: 'markdown', value: '{{notes}}' }] }, { title: 'Checks', icon: 'check', badge: '{{checks.length}}', children: [{ type: 'status', each: 'checks', label: '{{name}}', state: '{{state}}' }] }, { title: 'Numbers', icon: 'barChart', children: [{ type: 'progress', value: '{{tests}}', max: '{{testsAll}}', label: 'Tests passing' }, { type: 'kv', items: [{ key: 'Bundle', value: '{{bundle}}' }, { key: 'p95', value: '{{p95}}' }] }] }] }, data: { version: 'v2.4.0', shipped: '2026-10-17T09:00:00Z', notes: '- Search, **30% faster**\n- Dark mode for the dashboard', checks: [{ name: 'Build', state: 'passed' }, { name: 'E2E', state: 'passed' }, { name: 'Lighthouse', state: 'degraded' }], tests: 412, testsAll: 420, bundle: '182 KB', p95: '260 ms' } },
+  { title: 'A developer dashboard', full: true, blurb: 'Bento tiles holding other elements: uptime, deploys, the CI matrix and a number.', spec: { type: 'bento', columns: 4, items: [{ title: 'API', text: '{{uptime}} up, 30 days', icon: 'activity', color: 'green', cols: 2, children: [{ type: 'uptime', each: 'days', state: '{{state}}', x: '{{day}}' }] }, { title: '{{errors}} errors today', icon: 'ciFail', color: 'red', href: 'https://sentry.io', children: [{ type: 'spark', values: 'errorsWeek', color: 'red' }] }, { title: 'p95 {{p95}} ms', icon: 'clock', color: 'orange' }, { title: 'Deploys', icon: 'ship', cols: 2, rows: 2, children: [{ type: 'deploys', each: 'deploys', limit: 3, branch: '{{branch}}', env: '{{env}}', time: '{{at}}', author: '{{by}}' }] }, { title: 'CI on main', icon: 'gitBranch', cols: 2, rows: 2, children: [{ type: 'matrix', each: 'jobs' }] }] }, data: { uptime: '99.94%', days: Array.from({ length: 30 }, (_, i) => ({ day: `Oct ${i + 1}`, state: i === 11 ? 'degraded' : 'up' })), errors: 3, errorsWeek: [9, 4, 6, 2, 5, 1, 3], p95: 260, deploys: [{ state: 'building', title: 'Faster search', branch: 'feat/search', env: 'preview', at: '2026-10-17T09:58:00Z', by: 'hubot' }, { state: 'ready', title: 'Fix Safari dates', branch: 'main', env: 'production', at: '2026-10-17T08:12:00Z', by: 'octocat' }, { state: 'error', title: 'API client 3.2', branch: 'deps/api', env: 'preview', at: '2026-10-16T17:40:00Z', by: 'octocat' }], jobs: [{ row: 'Node 20', column: 'ubuntu', state: 'passed' }, { row: 'Node 20', column: 'macos', state: 'passed' }, { row: 'Node 22', column: 'ubuntu', state: 'running' }, { row: 'Node 22', column: 'macos', state: 'failure' }] } },
+  { title: 'Ship a release', full: true, blurb: 'A split button to publish it, what changed as conventional commits and how to install it.', spec: { type: 'stack', children: [{ type: 'row', align: 'between', children: [{ type: 'heading', value: '{{version}}', level: 2 }, { type: 'split', label: 'Publish', icon: 'ship', style: 'primary', run: 'publish', confirm: 'Publish {{version}}?', items: [{ label: 'As a pre-release', run: 'publish', arg: 'pre' }, { label: 'As a draft', run: 'publish', arg: 'draft' }] }] }, { type: 'changelog', each: 'releases', date: '{{date}}' }, { type: 'snippet', prompt: true, items: [{ label: 'npm', value: 'npm i @acme/sdk@{{version}}' }, { label: 'pnpm', value: 'pnpm add @acme/sdk@{{version}}' }] }] }, data: { version: 'v2.4.0', releases: [{ version: 'v2.4.0', date: '2026-10-17', changes: ['feat(search): 30% faster', 'feat: dark mode for the dashboard', 'fix(dates): the picker on Safari', 'perf: a smaller bundle'] }, { version: 'v2.3.2', date: '2026-10-09', changes: ['fix: a crash on an empty cart', 'feat(api)!: the v1 API is gone'] }] } },
 ]

@@ -734,6 +734,12 @@
           "$ref": "#/definitions/filter"
         },
         {
+          "$ref": "#/definitions/marquee"
+        },
+        {
+          "$ref": "#/definitions/bento"
+        },
+        {
           "$ref": "#/definitions/text"
         },
         {
@@ -768,6 +774,9 @@
         },
         {
           "$ref": "#/definitions/rotate"
+        },
+        {
+          "$ref": "#/definitions/snippet"
         },
         {
           "$ref": "#/definitions/stat"
@@ -884,6 +893,36 @@
           "$ref": "#/definitions/avatar"
         },
         {
+          "$ref": "#/definitions/env"
+        },
+        {
+          "$ref": "#/definitions/uptime"
+        },
+        {
+          "$ref": "#/definitions/deploys"
+        },
+        {
+          "$ref": "#/definitions/issues"
+        },
+        {
+          "$ref": "#/definitions/endpoints"
+        },
+        {
+          "$ref": "#/definitions/changelog"
+        },
+        {
+          "$ref": "#/definitions/clock"
+        },
+        {
+          "$ref": "#/definitions/funnel"
+        },
+        {
+          "$ref": "#/definitions/swatches"
+        },
+        {
+          "$ref": "#/definitions/matrix"
+        },
+        {
           "$ref": "#/definitions/button"
         },
         {
@@ -918,6 +957,27 @@
         },
         {
           "$ref": "#/definitions/dropdown"
+        },
+        {
+          "$ref": "#/definitions/popover"
+        },
+        {
+          "$ref": "#/definitions/command"
+        },
+        {
+          "$ref": "#/definitions/combobox"
+        },
+        {
+          "$ref": "#/definitions/datepicker"
+        },
+        {
+          "$ref": "#/definitions/split"
+        },
+        {
+          "$ref": "#/definitions/radio"
+        },
+        {
+          "$ref": "#/definitions/textarea"
         },
         {
           "$ref": "#/definitions/breadcrumbs"
@@ -2141,6 +2201,173 @@
         }
       }
     },
+    "marquee": {
+      "type": "object",
+      "description": "marquee: Words, tags or elements that scroll by in a loop: sponsors, what shipped, live numbers. Hovering stops it.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "marquee"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "items": {
+          "type": "array",
+          "description": "What scrolls: words, or [{ \"label\", \"icon\", \"href\", \"tone\" }]"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: an item’s words ({{label}} by default)"
+        },
+        "icon": {
+          "type": "string",
+          "description": "With each: an icon or emoji before it"
+        },
+        "href": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: a link it opens"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/element"
+          },
+          "description": "Or elements that scroll (instead of items)"
+        },
+        "seconds": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Seconds for one lap (20)"
+        },
+        "reverse": {
+          "type": "boolean",
+          "description": "Scroll the other way"
+        }
+      }
+    },
+    "bento": {
+      "type": "object",
+      "description": "bento: Tiles of different sizes on a grid: a dashboard, a feature overview. Each spans columns and rows.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "bento"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "items": {
+          "type": "array",
+          "description": "The tiles: [{ \"title\", \"text\", \"icon\", \"color\", \"href\", \"cols\" (1-4), \"rows\" (1-3), \"children\" }]"
+        },
+        "columns": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Columns, 2-6 (4): fewer in a narrow cell, the big tiles too"
+        }
+      }
+    },
     "text": {
       "type": "object",
       "description": "text: A line of text.",
@@ -3146,6 +3373,107 @@
             "boolean"
           ],
           "description": "A color: a tone (good, bad…), one of Laki’s palette (blue, green, red, orange, yellow, purple, pink, teal, lime, brown, gray) or a hex (d73a4a)"
+        }
+      }
+    },
+    "snippet": {
+      "type": "object",
+      "description": "snippet: A command or code with Copy, in tabs: npm, pnpm, yarn and bun; curl and httpie; a file each.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "snippet"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "items": {
+          "type": "array",
+          "description": "The tabs: [{ \"label\", \"value\" }] (none: one block of value)"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: a tab’s name"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "The code (with each: a tab’s)"
+        },
+        "title": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A file name or title over one block"
+        },
+        "prompt": {
+          "type": "boolean",
+          "description": "A $ before each line: commands to type"
+        },
+        "copy": {
+          "type": "boolean",
+          "description": "A copy button: on by default"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
         }
       }
     },
@@ -4379,6 +4707,21 @@
             "boolean"
           ],
           "description": "A link a click opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -4456,6 +4799,21 @@
         "count": {
           "type": "boolean",
           "description": "Its count above it (3/5): on by default"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -4763,6 +5121,21 @@
         "icon": {
           "type": "string",
           "description": "An icon or emoji"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -5040,6 +5413,14 @@
             "boolean"
           ],
           "description": "A link a click opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
         }
       }
     },
@@ -5129,6 +5510,14 @@
             "boolean"
           ],
           "description": "A link a click opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
         }
       }
     },
@@ -5357,6 +5746,14 @@
             "string"
           ],
           "description": "Cards per column at most, then +N more"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
         }
       }
     },
@@ -5457,6 +5854,14 @@
             "string"
           ],
           "description": "Levels open at first (1; 0: all folded)"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
         }
       }
     },
@@ -5557,6 +5962,14 @@
         "wrap": {
           "type": "boolean",
           "description": "Wrap long lines"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
         }
       }
     },
@@ -5914,6 +6327,21 @@
             "boolean"
           ],
           "description": "A link a click opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -6027,6 +6455,21 @@
             "boolean"
           ],
           "description": "A link a click opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -6124,6 +6567,21 @@
             "boolean"
           ],
           "description": "A path or template: yours when truthy, on the right"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -6245,6 +6703,21 @@
             "boolean"
           ],
           "description": "A link a click opens ({{url}} by default)"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -6342,6 +6815,21 @@
             "boolean"
           ],
           "description": "A link a click opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -6883,6 +7371,1146 @@
             "boolean"
           ],
           "description": "A link a click opens"
+        }
+      }
+    },
+    "env": {
+      "type": "object",
+      "description": "env: Environment variables, KEY=value: secrets as dots until a click, a copy button, an environment each.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "env"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "items": {
+          "type": "array",
+          "description": "The variables: [{ \"key\", \"value\", \"secret\", \"tag\" }]"
+        },
+        "key": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: its name ({{key}} by default)"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: its value ({{value}} by default)"
+        },
+        "secret": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A path or template: dots when truthy (default: names with KEY, TOKEN, SECRET, PASSWORD or PRIVATE)"
+        },
+        "tag": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: a pill: its environment (production, preview)"
+        },
+        "copy": {
+          "type": "boolean",
+          "description": "A copy button by each value: on by default"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
+        }
+      }
+    },
+    "uptime": {
+      "type": "object",
+      "description": "uptime: A bar a day (or an hour), colored by state: up, degraded, down. A status page’s last 90 days.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "uptime"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "state": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A bar’s state ({{state}} by default): up, degraded, down…; none or empty: no data"
+        },
+        "x": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its label in the tooltip: a date"
+        },
+        "text": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "More words in its tooltip"
+        },
+        "title": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its title, above it"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A number by the title: 99.98%"
+        },
+        "legend": {
+          "type": "boolean",
+          "description": "The first and last labels under it: on in the full view"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        }
+      }
+    },
+    "deploys": {
+      "type": "object",
+      "description": "deploys: Deployments, Vercel style: a dot for its state, the commit, branch, environment, when and how long.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "deploys"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "state": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "ready, building, queued, error, canceled… ({{state}} by default): its dot"
+        },
+        "title": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What went out: the commit’s message ({{title}} by default)"
+        },
+        "branch": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its branch"
+        },
+        "env": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "production, preview…: a pill"
+        },
+        "time": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "When it started (an ISO date or ms: 3 hours ago)"
+        },
+        "took": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "How long it took: 1m 12s"
+        },
+        "author": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Who: a GitHub login’s picture"
+        },
+        "href": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A link a click opens ({{url}} by default)"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
+        }
+      }
+    },
+    "issues": {
+      "type": "object",
+      "description": "issues: Issues, Linear style: priority bars, the id, a status circle, the title, labels and who has it.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "issues"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "id": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its key: ACME-142 ({{id}} by default)"
+        },
+        "title": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its title ({{title}} by default)"
+        },
+        "state": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "backlog, todo, in progress, in review, done, canceled ({{state}} by default): its circle"
+        },
+        "priority": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "urgent, high, medium, low or none (or Linear’s 1-4, P0-P4): its bars"
+        },
+        "labels": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "A field with its labels: words, or { \"name\", \"color\" }"
+        },
+        "assignee": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A GitHub login: its picture"
+        },
+        "href": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A link a click opens ({{url}} by default)"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
+        }
+      }
+    },
+    "endpoints": {
+      "type": "object",
+      "description": "endpoints: API routes: the method in its color, the path, the status, how long and how often. An API’s health, its docs.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "endpoints"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "method": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "GET, POST, PUT, PATCH, DELETE… ({{method}} by default)"
+        },
+        "path": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "The route: /api/orders/:id ({{path}} by default)"
+        },
+        "status": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its status: 200 green, 4xx yellow, 5xx red"
+        },
+        "text": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Words under it: what it does"
+        },
+        "took": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "How long: 41 ms"
+        },
+        "count": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "How often: 1.2k/min"
+        },
+        "href": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A link a click opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
+        }
+      }
+    },
+    "changelog": {
+      "type": "object",
+      "description": "changelog: Releases with their changes, each tagged feat, fix, perf or breaking (a conventional commit’s words count).",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "changelog"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "version": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its version ({{version}} by default)"
+        },
+        "date": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "When (an ISO date or ms)"
+        },
+        "title": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A line by the version: its name"
+        },
+        "changes": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "A field with its changes: \"feat: faster search\", or { \"type\", \"text\" } (changes by default)"
+        },
+        "href": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A link its version opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
+        }
+      }
+    },
+    "clock": {
+      "type": "object",
+      "description": "clock: The time in a few places, ticking: a team across time zones, the servers’ regions.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "clock"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "items": {
+          "type": "array",
+          "description": "The places: [{ \"label\", \"zone\" }]"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: its name ({{label}} by default)"
+        },
+        "zone": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: its time zone, as Europe/Kyiv or UTC ({{zone}} by default)"
+        },
+        "text": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With each: words under its name (default: how far from here)"
+        },
+        "hour12": {
+          "type": "boolean",
+          "description": "3:05 PM instead of 15:05"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
+        }
+      }
+    },
+    "funnel": {
+      "type": "object",
+      "description": "funnel: Steps that fewer get through: each one’s bar, its share of the first and what it lost. Sign-ups, a checkout.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "funnel"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A step’s name ({{label}} by default)"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "How many got there ({{value}} by default)"
+        },
+        "unit": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "After each number"
+        },
+        "color": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A color: a tone (good, bad…), one of Laki’s palette (blue, green, red, orange, yellow, purple, pink, teal, lime, brown, gray) or a hex (d73a4a)"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
+        }
+      }
+    },
+    "swatches": {
+      "type": "object",
+      "description": "swatches: Colors as chips, a click copies one: a design system’s tokens, a brand’s palette.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "swatches"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "color": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its color: a hex, a palette name or a tone ({{color}} by default)"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its name ({{name}} by default)"
+        },
+        "text": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A line under it: its token (--accent)"
+        },
+        "copy": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What a click copies (default: the color as written)"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        }
+      }
+    },
+    "matrix": {
+      "type": "object",
+      "description": "matrix: A grid of states, a row and a column each: a CI matrix (versions × systems), environments × services.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "matrix"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "row": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "An item’s row: a template ({{row}} by default)"
+        },
+        "column": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its column ({{column}} by default)"
+        },
+        "state": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its state: passed, failed, running, skipped… ({{state}} by default)"
+        },
+        "rows": {
+          "type": "array",
+          "description": "The rows in order (default: as first seen)"
+        },
+        "columns": {
+          "type": "array",
+          "description": "The columns in order (default: as first seen)"
+        },
+        "href": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A link a cell opens"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says with no rows"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most (a preview: as many as fit), then +N more"
         }
       }
     },
@@ -8098,6 +9726,1062 @@
             }
           ],
           "description": "The menu under its start (the default) or its end"
+        }
+      }
+    },
+    "popover": {
+      "type": "object",
+      "description": "popover: A button that opens a small panel of elements: details, a form, more numbers. hover: a hover card.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "popover"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its button’s words"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Its button’s icon"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "enum": [
+                "primary",
+                "quiet",
+                "danger"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "primary, quiet or danger; none: plain"
+        },
+        "title": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "The panel’s title"
+        },
+        "text": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its words"
+        },
+        "children": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/element"
+          },
+          "description": "Its elements"
+        },
+        "hover": {
+          "type": "boolean",
+          "description": "Opens as the pointer rests on it too"
+        },
+        "align": {
+          "anyOf": [
+            {
+              "enum": [
+                "start",
+                "end"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "The panel under its start (the default) or its end"
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "description": "command: A command palette: a box that narrows the rows as you type, ↑ ↓ and Enter to run one. Shortcuts, places, recent things.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "command"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "items": {
+          "type": "array",
+          "description": "Its rows: [{ \"label\", \"icon\", \"badge\", \"keys\", and a button’s run, open, do… }], or { \"title\" } for a heading"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its words"
+        },
+        "icon": {
+          "type": "string",
+          "description": "An icon of Laki’s by name (refresh, check, github…) or an emoji"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "enum": [
+                "primary",
+                "quiet",
+                "danger"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "primary, quiet or danger; none: plain"
+        },
+        "run": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "One of widget.json’s actions, run on a click"
+        },
+        "arg": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What the action gets as $WIDGET_ARG"
+        },
+        "open": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A link to open: http(s), mailto or laki://"
+        },
+        "refresh": {
+          "type": "boolean",
+          "description": "Fetch again"
+        },
+        "full": {
+          "type": "boolean",
+          "description": "Open the full view"
+        },
+        "copy": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Text to copy"
+        },
+        "do": {
+          "anyOf": [
+            {
+              "enum": [
+                "new",
+                "send",
+                "ai",
+                "terminal",
+                "browse"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "A Laki command: new (a workspace, its agent starting on prompt), send (prompt to the workspace’s agent), ai (prompt to Laki AI), terminal (command in a new terminal), browse (url in a Laki browser tab). The app shows what and asks first (browse just opens, like a link)"
+        },
+        "prompt": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new, send or ai: the prompt"
+        },
+        "command": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do terminal: the command line"
+        },
+        "url": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do browse: the page (http or https)"
+        },
+        "agent": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: an agent or a profile of yours (claude, codex…); none: your default"
+        },
+        "project": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: a project by name or id; none: the workspace’s (per workspace), else the selected one’s"
+        },
+        "confirm": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A question the app asks first"
+        },
+        "badge": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A count or word at a row’s end"
+        },
+        "keys": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A shortcut at a row’s end: ⌘ K"
+        },
+        "title": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "In items: a heading over the rows after it"
+        },
+        "placeholder": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What the empty box says (Type a command…)"
+        },
+        "limit": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Rows at most before you type (a preview: as many as fit)"
+        },
+        "empty": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it says when nothing matches"
+        }
+      }
+    },
+    "combobox": {
+      "type": "object",
+      "description": "combobox: A box that suggests from a list as you type, or takes any words: runs an action with them. A branch, a package, a user.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "combobox"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "options": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "The suggestions: a field with them (branches), or a list: words, or [{ \"value\", \"label\" }]"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it starts with"
+        },
+        "placeholder": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What the empty box says"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its button’s words (Go)"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Its button’s icon"
+        },
+        "run": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "One of widget.json’s actions, run with what’s typed or picked as $WIDGET_ARG"
+        },
+        "confirm": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A question the app asks first"
+        }
+      }
+    },
+    "datepicker": {
+      "type": "object",
+      "description": "datepicker: A date, a time or a month to pick: runs an action with it. A release date, a freeze, a report’s day.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "datepicker"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "The one picked now: 2026-10-24, 2026-10-24T15:00, 15:00 or 2026-10"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "enum": [
+                "date",
+                "datetime",
+                "time",
+                "month"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "date (the default), datetime, time or month"
+        },
+        "min": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "The earliest"
+        },
+        "max": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "The latest"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Words before it"
+        },
+        "run": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "One of widget.json’s actions, run with what’s picked (as value shows it) as $WIDGET_ARG"
+        },
+        "confirm": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A question the app asks first"
+        }
+      }
+    },
+    "split": {
+      "type": "object",
+      "description": "split: A button with a ▾ beside it for the other ways to do it: Merge ▾ squash, rebase; Deploy ▾ staging.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "split"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its words"
+        },
+        "icon": {
+          "type": "string",
+          "description": "An icon of Laki’s by name (refresh, check, github…) or an emoji"
+        },
+        "style": {
+          "anyOf": [
+            {
+              "enum": [
+                "primary",
+                "quiet",
+                "danger"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "primary, quiet or danger; none: plain"
+        },
+        "run": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "One of widget.json’s actions, run on a click"
+        },
+        "arg": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What the action gets as $WIDGET_ARG"
+        },
+        "open": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A link to open: http(s), mailto or laki://"
+        },
+        "refresh": {
+          "type": "boolean",
+          "description": "Fetch again"
+        },
+        "full": {
+          "type": "boolean",
+          "description": "Open the full view"
+        },
+        "copy": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Text to copy"
+        },
+        "do": {
+          "anyOf": [
+            {
+              "enum": [
+                "new",
+                "send",
+                "ai",
+                "terminal",
+                "browse"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "A Laki command: new (a workspace, its agent starting on prompt), send (prompt to the workspace’s agent), ai (prompt to Laki AI), terminal (command in a new terminal), browse (url in a Laki browser tab). The app shows what and asks first (browse just opens, like a link)"
+        },
+        "prompt": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new, send or ai: the prompt"
+        },
+        "command": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do terminal: the command line"
+        },
+        "url": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do browse: the page (http or https)"
+        },
+        "agent": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: an agent or a profile of yours (claude, codex…); none: your default"
+        },
+        "project": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: a project by name or id; none: the workspace’s (per workspace), else the selected one’s"
+        },
+        "confirm": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A question the app asks first"
+        },
+        "items": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/button"
+          },
+          "description": "Buttons: each a button’s props (run, open, do, refresh, full, copy)"
+        },
+        "align": {
+          "anyOf": [
+            {
+              "enum": [
+                "start",
+                "end"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "The menu under its end (the default) or its start"
+        }
+      }
+    },
+    "radio": {
+      "type": "object",
+      "description": "radio: One of a few options as cards, each with a line about it: runs an action with the one picked. A plan, a strategy, a model.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "radio"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "options": {
+          "type": "array",
+          "description": "The options: [{ \"value\", \"label\", \"text\", \"icon\", \"badge\" }]"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "The one picked now"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A heading over them"
+        },
+        "columns": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Columns, 1-4 (1): fewer in a narrow cell"
+        },
+        "run": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "One of widget.json’s actions, run with the option’s value as $WIDGET_ARG"
+        },
+        "confirm": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A question the app asks first"
+        }
+      }
+    },
+    "textarea": {
+      "type": "object",
+      "description": "textarea: A box for a few lines and a button (or ⌘ Enter): runs an action with them, or sends them to an agent or Laki AI.",
+      "required": [
+        "type"
+      ],
+      "properties": {
+        "type": {
+          "const": "textarea"
+        },
+        "if": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is truthy (an empty list is false)"
+        },
+        "unless": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Show it only when this path or template is falsy"
+        },
+        "each": {
+          "type": [
+            "string",
+            "array"
+          ],
+          "description": "Repeat it once per item of this list (or object); inside, the item’s fields, this and @index. A list, table, chart… takes its rows from it instead"
+        },
+        "tip": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A tooltip"
+        },
+        "tone": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          ],
+          "description": "good, bad, warn, accent or muted, or a map from its text to one: { \"failed\": \"bad\", \"live\": \"good\" }"
+        },
+        "placeholder": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What the empty box says"
+        },
+        "value": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "What it starts with"
+        },
+        "label": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "Its button’s words (Send)"
+        },
+        "icon": {
+          "type": "string",
+          "description": "Its button’s icon"
+        },
+        "rows": {
+          "type": [
+            "number",
+            "string"
+          ],
+          "description": "Lines tall, 2-12 (3)"
+        },
+        "run": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "One of widget.json’s actions, run with what’s typed as $WIDGET_ARG"
+        },
+        "do": {
+          "anyOf": [
+            {
+              "enum": [
+                "new",
+                "send",
+                "ai"
+              ]
+            },
+            {
+              "type": "string",
+              "pattern": "\\{\\{"
+            }
+          ],
+          "description": "Or a Laki command with what’s typed as its prompt: new (a workspace), send (to the workspace’s agent) or ai (Laki AI); the app asks first"
+        },
+        "agent": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: an agent or a profile of yours"
+        },
+        "project": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "With do new: a project by name or id"
+        },
+        "confirm": {
+          "type": [
+            "string",
+            "number",
+            "boolean"
+          ],
+          "description": "A question the app asks first"
+        },
+        "clear": {
+          "type": "boolean",
+          "description": "Empty the box once sent: on by default"
         }
       }
     },

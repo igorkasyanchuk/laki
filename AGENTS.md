@@ -1319,8 +1319,23 @@ typed words as the arg, Enter clicks it, cleared once it ran unless `data-keep`;
 too), swap, pagination (`pn`, not `num`: `WIDGET_CSS`'s), menu (`menuRow`, shared with dropdown; its headings `data-sect`,
 which `sift` hides with no row under them shown) and dropdown (a `<details>`; `uiBehave` closes one at a click outside
 it or in its menu, or as the focus leaves it (`focusout`: the rest of the app too), scrolls a full view's menu into sight; a
-preview's covers the cell, a bar's opens the full view). The app's CSP takes `img-src https:` (the kit's images,
-Markdown's pictures). The guide tool's `max`: 50,000. Starters `note` (a static source) and `launcher` (`do` buttons).
+preview's covers the cell, a bar's opens the full view). After shadcn/ui's and developers' tools: popover (the native
+Popover API, `popovertarget`, anchored by CSS anchor positioning: the top layer, so no cell or full view clips it; `hover`:
+`uiBehave`'s `hover` shows it on `mouseover` and hides it 250 ms after `mouseout` (`kHide`: the pointer crosses the gap
+to it), `data-hov` until a click on its button pins it; Esc in `uiBehave`'s `key` closes an open popover or dropdown and
+takes the key, so a full view's `Modal` (`escapes`) and a JS page's close stay), command (a palette: a
+`data-filter` box over `menuRow`s, `data-none` shown when `sift` leaves no row, a row's `keys` as `kbd` (`said` skips
+them); `uiBehave`'s `key`: ↑ ↓ between box and rows, Enter in the box clicks the first shown), combobox (an input's
+`<datalist>`; a path's options are the data's words, never templates), datepicker (`dateIn`: the value in its input's
+shape; `data-change`), split (`button` and a dropdown of its `items`), radio (cards, `data-run` with each value but the
+picked one's), textarea (`data-inbox`; ⌘/Ctrl Enter clicks its button; a `do` (new, send, ai) takes the typed words as
+`cmd.prompt`: `uiBehave`'s `do` branch with `data-input`, emptied once App's `widgetDo` returns true), snippet (tabs as
+radios, no script), env (`SECRETS` names behind a `k-sc`), uptime, deploys (`DEPLOY`), issues (`ISSUE`, `ISSUE_ICON`,
+`priorityIcon`), endpoints (`METHOD`), changelog (`changeOf`: conventional commits), clock (`zoned`; `uiBehave`'s `tick`
+every 15 s with `CLOCK`'s options, its interval cleared by the cleanup), funnel, swatches (`colorCss` only), matrix
+(`STEP`'s words, `MX`), marquee (two copies, the second `inert`; paused on hover and under reduced motion) and bento.
+`menuRow` gives each row `data-label` (its words for a confirm and `run`'s label). The app's CSP takes `img-src https:` (the kit's images,
+Markdown's pictures). The guide tool's `max`: 60,000. Starters `note` (a static source) and `launcher` (`do` buttons).
 
 Tools for agents (widgets.ts' tools section; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an
 action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPES`, `TOOL_ASKS`; `ask` unset: first).

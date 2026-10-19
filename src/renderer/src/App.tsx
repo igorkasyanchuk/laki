@@ -1559,13 +1559,15 @@ export function App() {
       if (!(await ask('Ask Laki AI this?', { text: `${by}: ${shown(prompt)}`, ok: 'Ask' }))) return
       if (settings.ai?.float === false) setDialog('ai')
       else setAiFloat(true)
-      return void api.call('aiAsk', { text: prompt }).catch(fail)
+      void api.call('aiAsk', { text: prompt }).catch(fail)
+      return true
     }
     if (c.do === 'send') {
       if (!here || view?.projects.find(x => x.id === here.project)?.kind) return toast(`${w.name}: select a workspace with an agent to send it to`)
       if (!(await ask(`Send this to ${here.name}’s agent?`, { text: `${by}: ${shown(prompt)}`, ok: 'Send' }))) return
       const r = await call<{ queued?: number }>('send', { target: here.id, text: prompt, whenIdle: true, agent: true }).catch(() => null)
-      return void (r && done(r.queued ? `Queued for ${here.name}’s agent` : `Sent to ${here.name}’s agent`))
+      if (r) done(r.queued ? `Queued for ${here.name}’s agent` : `Sent to ${here.name}’s agent`)
+      return !!r
     }
     if (c.do === 'new') {
       const want = String(c.project ?? '').trim().toLowerCase()
@@ -1575,6 +1577,7 @@ export function App() {
       if (!(await ask(`Start a new workspace in ${p.name}?`, { text: `${by}${agent ? `, with ${agent}` : ''}: ${shown(prompt)}`, ok: 'Start' }))) return
       const made = await call<WorkspaceView>('wsNew', { project: p.id, prompt, place: 'top', ...(agent && { preset: agent }), ...(p.git === false && { local: true, another: true, name: nameOf(prompt) }) }).catch(() => null)
       if (made) (showNew(made.id), setDialog(null))
+      return !!made
     }
   }
   // an extension's tool an agent calls (widgetToolCall): what would run, asked here and as a notification; the first

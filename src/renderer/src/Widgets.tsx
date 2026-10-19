@@ -22,7 +22,7 @@ export type WidgetApi = {
   close: () => void // the full view's dialog (Esc in a JS widget's frame)
   action: (id: string, action: string, arg: string, label?: string, ws?: string) => Promise<false | void> // a button's data-run: one of widget.json's actions, done when it is (false: it failed)
   say: (id: string, s: WidgetSay, ws?: string) => void // a toast, a dialog with buttons
-  do: (w: WidgetView, cmd: UiDo, label?: string) => unknown // a Laki command (a button's do, laki.do): said and asked first
+  do: (w: WidgetView, cmd: UiDo, label?: string) => Promise<unknown> | void // a Laki command (a button's do, laki.do): said and asked first; true once done
   settings: (id?: string, key?: string) => void // its page (Extension.tsx), key: at that setting; none: Settings › Extensions
   menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page
   key?: string // the daemon's key for JS widgets' pages
@@ -81,7 +81,7 @@ function act(m: Record<string, unknown>, w: WidgetView, full: boolean, api: Widg
   if (laki === 'run' && typeof action === 'string' && action) return (typeof confirm === 'string' && confirm ? ask(confirm.slice(0, 300), { ok: String(label || 'Run').slice(0, 40) }) : Promise.resolve(true)).then((yes): unknown => yes && api.action(w.id, action, String(arg ?? ''), String(label ?? ''), wsOf(w)))
   if (laki === 'copy' && typeof text === 'string') return api.copy(text)
   if (laki === 'say') return (s => void (s && api.say(w.id, s, wsOf(w))))(sayOf(m))
-  if (laki === 'do' && m.cmd && typeof m.cmd === 'object' && (DO as readonly string[]).includes(String((m.cmd as UiDo).do))) return void api.do(w, m.cmd as UiDo, typeof label === 'string' ? label.slice(0, 60) : undefined)
+  if (laki === 'do' && m.cmd && typeof m.cmd === 'object' && (DO as readonly string[]).includes(String((m.cmd as UiDo).do))) return api.do(w, m.cmd as UiDo, typeof label === 'string' ? label.slice(0, 60) : undefined) // true: done (a prompt box empties)
   if (laki === 'refresh') return void api.run(w.id, wsOf(w)).catch(() => {})
   if (laki === 'full' && !full && w.full) api.full(w.id)
 }

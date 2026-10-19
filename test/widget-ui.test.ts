@@ -10,7 +10,7 @@ import { fresh, until } from './helpers.ts'
 const at = Date.parse('2026-10-17T10:00:00Z')
 
 test('UI kit: every element has a sample, and every sample draws at a 1×1 preview, a bar and in full', () => {
-  assert.equal(UI_TYPES.length, 80)
+  assert.equal(UI_TYPES.length, 100)
   assert.deepEqual(UI_SAMPLES.map(s => s.type), UI_TYPES, 'a sample per element, in order')
   for (const s of UI_SAMPLES) {
     const ctx = { data: s.data, config: {}, at }
@@ -19,7 +19,7 @@ test('UI kit: every element has a sample, and every sample draws at a 1×1 previ
       assert.match(html, /^<div class="k" data-kit="(preview|full)"/, s.type)
       assert.doesNotMatch(html, /k-chip-err/, `${s.type}: no error chip`)
     }
-    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file', 'maintenance', 'deploys', 'env', 'scale', 'rollout', 'region', 'add', 'watch', 'like', 'page', 'redeploy', 'rollback'] }), [], `${s.type}'s sample checks clean`)
+    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file', 'maintenance', 'deploys', 'env', 'scale', 'rollout', 'region', 'add', 'watch', 'like', 'page', 'redeploy', 'rollback', 'checkout', 'release', 'merge', 'close', 'strategy'] }), [], `${s.type}'s sample checks clean`)
   }
 })
 
@@ -547,10 +547,10 @@ test('UI kit: hero, mockup, filter, rotate, compare, skeleton, radial, indicator
   assert.match(pg({ full: true }, 1), /aria-label="Previous page" disabled/)
   // menu: headings, the current row, a badge; dropdown: its items, in a bar the full view
   const mn = draw({ type: 'menu', items: [{ title: 'Go' }, { label: 'Board', on: true, open: 'laki://board' }, { label: 'PRs', badge: '{{n}}', run: 'prs' }, { label: 'Nothing' }] }, { n: 4 })
-  assert.match(mn, /<div class="k-mn-h" data-sect>Go<\/div><button type="button" class="k-mn-i on" data-open="laki:\/\/board" aria-current="true" data-row>/)
+  assert.match(mn, /<div class="k-mn-h" data-sect>Go<\/div><button type="button" class="k-mn-i on" data-label="Board" data-open="laki:\/\/board" aria-current="true" data-row>/)
   assert.match(mn, /data-run="prs" data-row>[^]*<span class="k-badge">4<\/span>/)
-  assert.match(mn, /class="k-mn-i" disabled data-row><span class="k-title ">Nothing/)
-  assert.match(draw({ type: 'dropdown', items: [{ label: 'Wipe', confirm: 'Sure?' }] }), /class="k-mn-i" disabled>/, 'a confirm with nothing to do: disabled')
+  assert.match(mn, /class="k-mn-i" data-label="Nothing" disabled data-row><span class="k-title ">Nothing/)
+  assert.match(draw({ type: 'dropdown', items: [{ label: 'Wipe', confirm: 'Sure?' }] }), /class="k-mn-i" data-label="Wipe" disabled>/, 'a confirm with nothing to do: disabled')
   assert.deepEqual(uiCheck({ type: 'menu', limit: 3, empty: 'None', items: [{ label: 'a' }] }), [])
   // past a full view's limit a heading is hidden with its rows; over each, a row's label by default
   const cut = { type: 'menu', limit: 1, items: [{ label: 'a', run: 'x' }, { title: 'Later' }, { label: 'b', run: 'x' }] }
@@ -590,7 +590,7 @@ test('UI kit: a filter chip, an input, a slider and a pick, as clicks and keys',
   const box = { value: '  Buy milk ', focus() { this.focused = true }, focused: false }
   const attrs: Record<string, string> = { 'data-run': 'add', 'data-input': '' }
   const btn: any = { textContent: 'Add', getAttribute: (k: string) => attrs[k] ?? null, hasAttribute: (k: string) => k in attrs, setAttribute: (k: string, v: string) => (attrs[k] = v), removeAttribute: (k: string) => delete attrs[k], matches: (q: string) => q === '[data-run]', closest: (q: string) => (q === '[data-inbox]' ? { querySelector: () => box } : q.includes('[data-run]') ? btn : null), click: () => on.click({ target: btn, preventDefault() {} }) }
-  on.keydown({ key: 'Enter', target: { localName: 'input', closest: () => ({ querySelector: () => btn }) }, preventDefault() {} })
+  on.keydown({ key: 'Enter', target: { localName: 'input', closest: (q: string) => (q === '[data-inbox]' ? { querySelector: () => btn } : null) }, preventDefault() {} })
   assert.deepEqual(sent.pop(), { laki: 'run', action: 'add', arg: 'Buy milk', label: 'Add', confirm: undefined })
   return Promise.resolve().then(() => {
     assert.equal(box.value, '')
@@ -622,4 +622,180 @@ test('UI kit: a slider whose run is declined goes back to its value', async () =
   assert.equal(dd.open, true)
   on.focusout({ target: summary, relatedTarget: null })
   assert.equal(dd.open, false)
+})
+
+test('UI kit: popover, command, combobox, datepicker, split, radio, textarea and the developer ones', () => {
+  const draw = (spec: object, data: object = {}, o: object = { full: true }) => uiHtml(spec, { data, config: {}, at }, o)
+  const bar = { cells: [3, 0.5] }
+  // popover: a native one its button opens; a bar's opens the full view
+  const pop = draw({ type: 'popover', label: 'Details', title: '{{t}}', hover: true, children: [{ type: 'text', value: 'x' }] }, { t: '<b>' })
+  const id = /popovertarget="(kp-[^"]+)"/.exec(pop)?.[1]
+  assert.ok(id && pop.includes(`id="${id}" popover`), pop)
+  assert.match(pop, /class="k-pop hover"[^]*<div class="k-pop-t">&lt;b&gt;<\/div>/)
+  assert.match(draw({ type: 'popover', label: 'D', children: [] }, {}, bar), /data-laki="full"(?![^]*popover)/)
+  // command: a box that sifts its rows, its words when none is left, a row's keys; a bar's a button to the full view
+  const cmd = draw({ type: 'command', items: [{ title: 'Go' }, { label: 'Board', open: 'laki://board', keys: '⌘ B' }, { label: 'Deploy', run: 'deploy' }] })
+  assert.match(cmd, /<input type="search" data-filter[^]*<div class="k-mn-h" data-sect>Go<\/div>[^]*data-label="Board"[^]*<kbd>⌘<\/kbd><kbd>B<\/kbd>[^]*data-run="deploy" data-row>[^]*data-none hidden>Nothing matches/)
+  assert.match(draw({ type: 'command', items: [] }, {}, bar), /k-cmd-l" data-laki="full"/)
+  // combobox: a field's options as they are (never a template), written ones filled; its button keeps the words
+  const cb = draw({ type: 'combobox', options: 'b', run: 'checkout' }, { b: ['main', '{{x}}', { value: 'v', label: 'Vee' }], x: 'no' })
+  assert.match(cb, /list="(kc-[^"]+)"[^]*<datalist id="\1"><option value="main"><\/option><option value="\{\{x\}\}"><\/option><option value="v" label="Vee"><\/option><\/datalist>/)
+  assert.match(cb, /data-run="checkout" data-input data-keep/)
+  assert.match(draw({ type: 'combobox', options: ['{{x}}'] }, { x: 'dev' }), /<option value="dev">[^]* disabled>/, 'nothing to run: disabled')
+  // datepicker: its kind's input, the value in its shape, on change
+  assert.match(draw({ type: 'datepicker', value: '2026-10-24 15:30', kind: 'datetime', min: '2026-10-01', run: 'r' }), /type="datetime-local" value="2026-10-24T15:30" min="2026-10-01T00:00" aria-label="datetime" data-change="r"/)
+  assert.match(draw({ type: 'datepicker', value: '2026-10-24T15:30', kind: 'time' }), /type="time" value="15:30"[^>]* disabled/)
+  assert.match(draw({ type: 'datepicker', value: 'soon', kind: 'month' }), /type="month" value=""/)
+  // split: its button, the others in a menu; a bar's menu is the full view
+  const sp = { type: 'split', label: 'Merge', run: 'merge', items: [{ label: 'Rebase', run: 'merge', arg: 'rebase' }, { label: 'No', run: 'x', if: 'no' }] }
+  assert.match(draw(sp), /<div class="k-split"><button type="button" class="k-btn" data-run="merge"[^]*<details class="k-dd end">[^]*data-label="Rebase" data-run="merge" data-arg="rebase"/)
+  assert.doesNotMatch(draw(sp), /"No"/)
+  assert.match(draw(sp, {}, bar), /k-split-s" data-laki="full"/)
+  assert.doesNotMatch(draw({ type: 'split', label: 'Go', run: 'go' }), /details/, 'no others: the button alone')
+  assert.deepEqual(uiCheck(sp, undefined, { actions: ['merge'] }).map(p => p.where.replace(/.*\(split\)/, '')), ['.items[1]'], 'its others’ actions too')
+  // radio: the picked one runs nothing, the others their value
+  const ro = draw({ type: 'radio', value: '{{v}}', run: 'pick', options: ['a', { value: 'b', label: 'Bee', text: 'more' }] }, { v: 'a' })
+  assert.match(ro, /aria-checked="true" class="k-ro on" data-label="a"><span/)
+  assert.match(ro, /aria-checked="false" class="k-ro" data-label="Bee" data-run="pick" data-arg="b">[^]*<span class="k-ro-t">more<\/span>/)
+  assert.match(draw({ type: 'radio', options: ['a', 'b'] }), /data-label="b" disabled/)
+  // textarea: a run, else a do (the prompt is what's typed), else disabled; rows kept to 2-12, a preview's 2
+  assert.match(draw({ type: 'textarea', do: 'new', agent: 'codex', rows: 40 }), /<textarea rows="12"[^]*data-do="\{&quot;do&quot;:&quot;new&quot;,&quot;agent&quot;:&quot;codex&quot;\}" data-input>/)
+  assert.match(draw({ type: 'textarea', run: 'note', do: 'ai' }), /data-run="note" data-input>/, 'a run wins')
+  assert.match(draw({ type: 'textarea', do: 'rm' }), /<textarea rows="3"[^>]* disabled>[^]*class="k-btn sm primary" disabled/)
+  assert.match(draw({ type: 'textarea', run: 'n', rows: 6 }, {}, { cells: [2, 2] }), /rows="2"/)
+  assert.match(draw({ type: 'textarea', run: 'n', placeholder: 'Note' }, {}, bar), /data-laki="full"><span>Note<\/span>/)
+  assert.deepEqual(uiCheck({ type: 'textarea', do: 'rm' }, undefined, { actions: [] }).map(p => p.level), ['error'])
+  // snippet: tabs, a prompt's $, copies the command alone
+  assert.match(draw({ type: 'snippet', items: [{ label: 'npm', value: 'npm i x' }, { label: 'bun', value: 'bun add x' }], prompt: true }), /<input type="radio" name="(ks-[^"]+)" checked><span>npm[^]*name="\1"><span>bun[^]*<span class="k-snip-d">\$<\/span>npm i x<\/code><\/pre><button type="button" class="k-copy quiet" data-copy="npm i x"/)
+  // env: secrets by their names hidden until a click; the whole list as a .env
+  const env = draw({ type: 'env', each: 'v' }, { v: [{ key: 'API_TOKEN', value: 'abc' }, { key: 'HOST', value: 'a b' }, { key: 'DEBUG', value: '1', secret: true }] })
+  assert.match(env, /API_TOKEN<\/code><details class="k-sc">[^]*HOST<\/code><code class="k-env-v mono">a b<\/code>[^]*DEBUG<\/code><details class="k-sc">/)
+  assert.match(env, /data-copy="API_TOKEN=abc\nHOST=&quot;a b&quot;\nDEBUG=1"><svg[^]*Copy as \.env/)
+  // uptime: a tick a day by its state, the gaps none
+  assert.match(draw({ type: 'uptime', each: 'd', x: '{{day}}', title: 'API', value: '99%' }, { d: [{ day: 'Mon', state: 'up' }, { day: 'Tue', state: 'down' }, { day: 'Wed' }] }), /<b>99%<\/b>[^]*t-good" title="Mon · up">[^]*t-bad" title="Tue · down">[^]*none" title="Wed · no data">/)
+  // deploys, issues, endpoints, changelog
+  assert.match(draw({ type: 'deploys', each: 'd', env: '{{env}}' }, { d: [{ state: 'building', title: 'x', env: 'Production' }, { state: 'error', title: 'y' }] }), /t-warn live" title="building"[^]*k-tag t-accent">Production[^]*t-bad" title="error"/)
+  assert.match(draw({ type: 'issues', each: 'i', priority: '{{p}}', labels: 'ls' }, { i: [{ id: 'A-1', state: 'In Review', title: '<x>', p: 'High', ls: [{ name: 'bug', color: 'red' }, 'ui'] }] }), /title="Priority: high">[^]*k-is-s review" title="In Review"[^]*&lt;x&gt;[^]*background:var\(--tc-red[^]*>bug<\/span><span class="k-tag">ui<\/span>/)
+  assert.match(draw({ type: 'endpoints', each: 'e', status: '{{s}}' }, { e: [{ method: 'delete', path: '/a/:id/{b}', s: 404 }] }), /color:var\(--tc-red[^>]*>DELETE<\/span>[^]*\/a\/<span class="k-ep-v">:id<\/span>\/<span class="k-ep-v">\{b\}<\/span>[^]*k-ep-s t-warn">404/)
+  const chl = draw({ type: 'changelog', each: 'r' }, { r: [{ version: 'v2', changes: ['feat(ui)!: no more v1', { type: 'fix', text: 'a crash' }, 'plain words', 'chore: deps'] }] })
+  assert.deepEqual([...chl.matchAll(/<li>(?:<span class="k-chl-t t-(\w+)">(\w+)<\/span>)?<span>([^<]*)/g)].map(m => m.slice(1).join(' ').trim()), ['bad breaking no more v1', 'accent fix a crash', 'plain words', 'muted chore deps'])
+  // clock: a zone's time, ticked by uiBehave; a zone that isn't one says so
+  const ck = draw({ type: 'clock', items: [{ label: 'UTC', zone: 'UTC' }, { label: 'Mars', zone: 'Mars/Base' }] })
+  assert.match(ck, /data-clock="UTC">\d{2}:\d{2}<\/b>/)
+  assert.match(ck, /Mars<\/span><span class="k-sub">no such time zone<\/span><\/div><b class="k-clk-t">–<\/b>/)
+  // funnel: each step of the first and of the one before; a bar's first → last
+  const fn = { type: 'funnel', items: [{ label: 'a', value: 200 }, { label: 'b', value: 50 }, { label: 'c', value: 0 }] }
+  assert.match(draw(fn), /width:25\.0%[^]*<span class="k-fn-p">25%<\/span><span class="k-fn-d t-bad">−75%<\/span>[^]*k-fn-d t-bad">−100%/)
+  assert.match(draw(fn, {}, bar), /<b>200<\/b> → <b>0<\/b><span class="k-sub">0%<\/span>/)
+  // swatches: only colors that are colors
+  assert.equal([...draw({ type: 'swatches', items: ['#fff', 'red;}x', 'teal'] }).matchAll(/class="k-sw"/g)].length, 2)
+  // matrix: a cell per row and column, its mark by state; a bar's counts
+  const mx = { type: 'matrix', each: 'j', href: '{{u}}' }
+  const jobs = { j: [{ row: 'N18', column: 'linux', state: 'success', u: 'javascript:x' }, { row: 'N20', column: 'mac', state: 'failure' }] }
+  assert.match(draw(mx, jobs), /<th>linux<\/th><th>mac<\/th>[^]*<th>N18<\/th><td class="t-good" title="N18 · linux: success">[^]*<\/td><td><\/td><\/tr>/)
+  assert.doesNotMatch(draw(mx, jobs), /javascript/)
+  assert.match(draw(mx, jobs, bar), /k-mx-line"><span class="t-good">[^]*1<\/span><span class="t-bad">[^]*1<\/span><\/span>/)
+  // marquee: twice, the second hidden from readers; bento: spans kept to its columns, a bad link none
+  assert.match(draw({ type: 'marquee', items: ['a'], seconds: 1 }), /--s:2s[^]*<div class="k-mq-g" aria-hidden="true" inert>/)
+  assert.equal(new Set([...draw({ type: 'marquee', children: [{ type: 'snippet', items: [{ label: 'a', value: 'x' }, { label: 'b', value: 'y' }] }] }).matchAll(/name="([^"]+)"/g)].map(m => m[1])).size, 2, 'each copy its own tabs')
+  assert.match(draw({ type: 'bento', columns: 3, items: [{ title: 'x', cols: 9, rows: 9, href: 'javascript:x' }] }), /k-bt w-3" style="grid-column:span 3;grid-row:span 3">/)
+})
+
+test('UI kit: a palette’s keys, a textarea’s ⌘ Enter, a prompt box’s do, a hover card', async () => {
+  const sent: any[] = []
+  const on: Record<string, (e: any) => void> = {}
+  let answer: unknown = true
+  let opened: any[] = []
+  const stop = uiBehave({ addEventListener: (t: string, f: any) => (on[t] = f), removeEventListener: () => {}, querySelectorAll: (q: string) => (q.includes('popover-open') ? opened : []) } as any, m => (sent.push(m), Promise.resolve(answer)))
+  // ↓ from the box goes to the first row, ↑ from it back to the box; Enter in the box runs the first row
+  const focus: any[] = []
+  const el = (name: string, more: object = {}): any => ({ name, localName: 'button', focus: () => focus.push(name), click: () => focus.push(`click ${name}`), closest: (s: string) => (s === '.k-cmd' ? cmd : null), ...more })
+  const q = el('q', { localName: 'input' })
+  const rows = [el('a'), el('b')]
+  const cmd = { querySelectorAll: () => rows, querySelector: () => q }
+  const keyIn = (t: any, key: string, more: object = {}) => {
+    let stopped = false
+    on.keydown({ key, target: t, preventDefault: () => (stopped = true), ...more })
+    return stopped
+  }
+  assert.ok(keyIn(q, 'ArrowDown'))
+  keyIn(rows[0], 'ArrowDown')
+  keyIn(rows[1], 'ArrowDown')
+  keyIn(rows[0], 'ArrowUp')
+  keyIn(q, 'Enter')
+  assert.deepEqual(focus, ['a', 'b', 'q', 'click a'])
+  assert.equal(keyIn(q, 'Enter', { isComposing: true }), false, 'an IME’s Enter')
+  // a textarea: Enter is a new line, ⌘ Enter sends
+  let clicks = 0
+  const area = { localName: 'textarea', closest: (s: string) => (s === '[data-inbox]' ? { querySelector: () => ({ click: () => clicks++ }) } : null) }
+  on.keydown({ key: 'Enter', target: area, preventDefault() {} })
+  on.keydown({ key: 'Enter', metaKey: true, target: area, preventDefault() {} })
+  assert.equal(clicks, 1)
+  // a do with a box: what's typed is its prompt, the box emptied once it went, kept when it didn't
+  const box = { value: ' fix the login ', focus() {} }
+  const attrs: Record<string, string> = { 'data-do': '{"do":"send"}', 'data-input': '' }
+  const btn: any = { textContent: 'Send', getAttribute: (k: string) => attrs[k] ?? null, hasAttribute: (k: string) => k in attrs, setAttribute: (k: string, v: string) => (attrs[k] = v), removeAttribute: (k: string) => delete attrs[k], matches: (s: string) => s === '[data-do]', closest: (s: string) => (s === '[data-inbox]' ? { querySelector: () => box } : s.includes('[data-do]') ? btn : null) }
+  const press = () => on.click({ target: btn, preventDefault() {} })
+  answer = false
+  press()
+  assert.deepEqual(sent.pop(), { laki: 'do', cmd: { do: 'send', prompt: 'fix the login' }, label: 'Send', confirm: undefined })
+  press()
+  assert.equal(sent.length, 0, 'one at a time')
+  await new Promise(r => setTimeout(r, 0))
+  assert.equal(box.value, ' fix the login ', 'declined: the words stay')
+  answer = true
+  press()
+  await new Promise(r => setTimeout(r, 0))
+  assert.equal(box.value, '')
+  sent.length = 0
+  // a hover card: shown as the pointer comes, hidden as it goes; a click on its button keeps it
+  const shown: string[] = []
+  const popAttrs = new Set<string>()
+  let open = false
+  const body = { matches: () => open, showPopover: () => ((open = true), shown.push('show')), hidePopover: () => ((open = false), shown.push('hide')) }
+  const pop: any = { querySelector: () => body, contains: (x: unknown) => x === inside, setAttribute: (k: string) => popAttrs.add(k), removeAttribute: (k: string) => popAttrs.delete(k), hasAttribute: (k: string) => popAttrs.has(k) }
+  const inside = {}
+  const over = (type: string, related: unknown = null) => on[type]({ type, target: { closest: (s: string) => (s === '.k-pop.hover' ? pop : null) }, relatedTarget: related })
+  const later = () => new Promise(r => setTimeout(r, 300))
+  over('mouseover')
+  over('mouseout', inside)
+  over('mouseout')
+  over('mouseover') // back on it within the moment: it stays
+  await later()
+  over('mouseout')
+  await later()
+  over('mouseover')
+  let kept = false
+  on.click({ target: { closest: (s: string) => (s.startsWith('.k-pop[data-hov]') && popAttrs.has('data-hov') ? { parentNode: pop } : null) }, preventDefault: () => (kept = true) })
+  over('mouseout')
+  await later()
+  assert.deepEqual(shown, ['show', 'hide', 'show'])
+  assert.ok(kept && open, 'pinned: it stays as the pointer goes')
+  assert.equal(sent.length, 0)
+  // Esc: an open popover or dropdown closes first, the full view's dialog stays (its key taken)
+  const card = { localName: 'div', shut: false, hidePopover() { this.shut = true } }
+  let taken = false
+  on.keydown({ key: 'Escape', target: { closest: () => null }, preventDefault: () => (taken = true) })
+  assert.ok(!taken, 'nothing open: the dialog’s')
+  opened = [card]
+  on.keydown({ key: 'Escape', target: { closest: () => null }, preventDefault: () => (taken = true) })
+  assert.ok(taken && card.shut)
+  stop()
+})
+
+test('UI kit: a palette’s “Nothing matches” as a search leaves no row', () => {
+  const on: Record<string, (e: any) => void> = {}
+  uiBehave({ addEventListener: (t: string, f: any) => (on[t] = f), removeEventListener: () => {} }, () => {})
+  const text = (data: string) => ({ nodeType: 3, data })
+  const row = (w: string, k: string): any => ({ nodeType: 1, localName: 'button', childNodes: [{ nodeType: 1, localName: 'span', childNodes: [text(w)] }, { nodeType: 1, localName: 'kbd', childNodes: [text(k)] }], hidden: false, hasAttribute: () => false })
+  const rows = [row('Deploy', 'D'), row('Board', 'X')]
+  const none = { hidden: true }
+  const box: any = { hasAttribute: () => false, querySelectorAll: (q: string) => (q === '[data-row]' ? rows : []), querySelector: (q: string) => (q === '[data-none]' ? none : q === '[data-row]:not([hidden])' ? (rows.find(r => !r.hidden) ?? null) : null) }
+  const type = (v: string) => on.input({ target: { value: v, closest: (q: string) => (q === '[data-filter]' ? { value: v, closest: () => box } : null) } })
+  type('dep')
+  assert.deepEqual([rows.map(r => r.hidden), none.hidden], [[false, true], true])
+  type('x')
+  assert.deepEqual([rows.map(r => r.hidden), none.hidden], [[true, true], false], 'a key’s letter isn’t a row’s word')
+  type('')
+  assert.deepEqual([rows.map(r => r.hidden), none.hidden], [[false, false], true])
 })

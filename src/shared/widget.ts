@@ -240,7 +240,7 @@ ${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `.k-tabs:has(> .k-tabbar > label:nth-child($
 .k-table { overflow-x: auto; } .k-table table { min-width: 100%; } .k-table :is(th, td) { max-width: 320px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-table :is(th, td).wrap { white-space: normal; overflow-wrap: anywhere; }
 .k[data-kit=preview] .k-table :is(th, td) { padding: 3px 6px; } .k-table .al-right { text-align: right; } .k-table .al-center { text-align: center; } .k-table tr[data-open] { cursor: pointer; } .k-table tr[data-open]:hover td { background: var(--hover, #1b2029); }
 @container kit (max-width: 360px) { .k-table .hide-narrow { display: none; } }
-.k[data-line] .k-table thead, .k[data-line] :is(.k-gh, .k-filter, .k-more, .k-sh, .k-ch-head, .k-ch-axis, .k-legend) { display: none; } .k[data-line] .k-stack { flex-direction: row; align-items: center; } .k[data-line] .k-table :is(th, td) { padding: 0 6px; border: 0; }
+.k[data-line] .k-table thead, .k[data-line] :is(.k-gh, .k-filter, .k-more, .k-sh, .k-ch-head, .k-ch-axis, .k-legend) { display: none; } .k[data-line] .k-stack { flex-direction: row; align-items: center; } .k[data-line] .k-stack > :is(.k-row, .k-chl) { flex-shrink: 0; } /* their min-width 0 would let a bar's line squeeze them to nothing, the words over the next */ .k[data-line] .k-table :is(th, td) { padding: 0 6px; border: 0; }
 .k-chart { display: flex; flex-direction: column; gap: 2px; min-width: 0; color: var(--accent, #7aa2f7); } .k > .k-chart { flex: 1; }
 .k-ch-head { display: flex; align-items: baseline; gap: 8px; min-width: 0; color: var(--muted, #7a8294); font-size: 11px; } .k-ch-head b { margin-left: auto; color: var(--fg, #d5d9e3); font-variant-numeric: tabular-nums; }
 .k-ch-body { display: flex; flex: 1; gap: 4px; min-height: 0; } .k-ch-axis { display: flex; flex-direction: column; justify-content: space-between; color: var(--muted, #7a8294); font-size: 9.5px; line-height: 1; text-align: right; font-variant-numeric: tabular-nums; }
@@ -464,6 +464,75 @@ ${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `.k-tabs:has(> .k-tabbar > label:nth-child($
 .k-dd-m { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5; display: flex; flex-direction: column; gap: 1px; min-width: 160px; max-width: 280px; padding: 4px; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); background: var(--bg, #0f1117); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); } .k-dd.end .k-dd-m { right: 0; left: auto; }
 .k[data-kit=preview] .k-dd { position: static; } .k[data-kit=preview] .k-dd-m { inset: 4px; min-width: 0; max-width: none; overflow: auto; } .k[data-kit=preview] .k-dd-s { padding: 1px 8px; font-size: 11px; } .k[data-line] .k-dd-s { padding: 0 7px; line-height: 15px; } .k[data-line] .k-dd-m { display: none; }
 @media (prefers-reduced-motion: reduce) { .k-rot-t { animation-duration: calc(var(--n) * var(--s) * 2); } .k-sk { animation-duration: 4s; } .k-dd-s > .k-icon:last-child, .k-swap .k-icon { transition: none; } }
+.k-pop { display: inline-flex; flex: none; width: fit-content; } .k-pop > .k-dd-s { font: inherit; color: inherit; }
+.k-pop-b { position: fixed; inset: auto; top: anchor(bottom); left: anchor(left); position-try-fallbacks: flip-block, flip-inline; flex-direction: column; gap: 6px; min-width: 220px; max-width: 320px; max-height: 70vh; margin: 4px 0; padding: 10px 12px; overflow: auto; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); background: var(--bg, #0f1117); color: var(--fg, #d5d9e3); font: 12px/1.4 var(--ui-font, -apple-system, system-ui, sans-serif); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); }
+.k-pop-b:popover-open { display: flex; } .k-pop.end .k-pop-b { left: auto; right: anchor(right); } .k-pop-t { font-weight: 600; } .k-pop-x { color: var(--muted, #7a8294); overflow-wrap: anywhere; } .k-pop.hover > .k-dd-s { cursor: default; }
+.k-cmd { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); } .k-cmd-q { display: flex; flex: none; align-items: center; gap: 6px; padding: 0 10px; border-bottom: 1px solid var(--line, #232833); color: var(--muted, #7a8294); }
+.k .k-cmd-q input { flex: 1; padding: 7px 0; border: 0; border-radius: 0; background: none; outline: none; } .k-cmd-m { padding: 4px; overflow: auto; } .k-cmd .k-mn-i:focus-visible { outline: none; background: var(--hover, #1b2029); box-shadow: inset 2px 0 0 var(--accent, #7aa2f7); }
+.k-cmd > .k-empty, .k-cmd > .k-more { margin: 2px 4px 6px; } .k-mn-k { flex: none; margin-left: auto; } .k-mn-i .k-badge + .k-mn-k { margin-left: 6px; } .k-mn-k kbd { min-width: 16px; padding: 0 4px; font-size: 10px; line-height: 15px; }
+.k[data-kit=preview] .k-cmd { flex: 1; min-height: 0; } .k[data-kit=preview] .k-cmd-q input { padding: 4px 0; font-size: 11px; } .k-cmd-l { color: var(--muted, #7a8294); }
+.k-date { display: flex; align-items: center; gap: 8px; min-width: 0; } .k .k-date input { flex: 1; min-width: 0; color-scheme: inherit; cursor: pointer; } .k .k-date input:disabled { opacity: 0.6; cursor: default; }
+.k .k-date input::-webkit-calendar-picker-indicator { opacity: 0.6; cursor: pointer; } @container kit (max-width: 150px) { .k-date .k-seg-l { display: none; } }
+.k[data-kit=preview] .k-date input { padding: 2px 6px; font-size: 11px; } .k[data-line] .k-date { flex: none; } .k[data-line] .k-date input { width: auto; padding: 0 4px; font-size: 11px; }
+.k-split { display: inline-flex; flex: none; align-items: stretch; width: fit-content; max-width: 100%; } .k-split > .k-btn { min-width: 0; border-top-right-radius: 0; border-bottom-right-radius: 0; } .k-split > .k-btn > span { overflow: hidden; text-overflow: ellipsis; }
+.k-split > .k-dd { display: flex; } .k-split-s.k-dd-s { height: 100%; margin-left: -1px; padding: 0 6px; border-top-left-radius: 0; border-bottom-left-radius: 0; } .k-split-s.primary { border-left: 1px solid color-mix(in srgb, var(--accent-fg, #fff) 35%, transparent); } .k[data-line] .k-split-s.k-dd-s { padding: 0 4px; }
+.k-radio { display: flex; flex-direction: column; gap: 6px; min-width: 0; } .k-ro-h { color: var(--muted, #7a8294); font-size: 11px; font-weight: 600; } .k-ro-g { display: grid; gap: 6px; grid-template-columns: repeat(var(--cols, 1), minmax(0, 1fr)); }
+.k-ro, .k-ro:hover { display: flex; align-items: flex-start; gap: 9px; min-width: 0; padding: 8px 10px; border: 1px solid var(--line, #232833); background: none; text-align: left; } .k-ro:not(:disabled):not(.on):hover { background: var(--hover, #1b2029); } .k-ro > .k-icon, .k-ro > .k-emoji { margin-top: 2px; color: var(--muted, #7a8294); }
+.k-ro-l { display: flex; align-items: center; gap: 6px; min-width: 0; font-weight: 500; } .k-ro-t { color: var(--muted, #7a8294); font-size: 11px; white-space: normal; } .k-ro-d { flex: none; width: 14px; height: 14px; margin: 1px 0 0 auto; border: 1.5px solid var(--muted, #7a8294); border-radius: 50%; }
+.k-ro.on { border-color: var(--accent, #7aa2f7); background: color-mix(in srgb, var(--accent, #7aa2f7) 9%, transparent); cursor: default; } .k-ro.on > .k-icon { color: var(--accent, #7aa2f7); } .k-ro.on .k-ro-d { border: 4px solid var(--accent, #7aa2f7); }
+@container kit (max-width: 300px) { .k-ro-g { grid-template-columns: minmax(0, 1fr); } } .k[data-kit=preview] .k-ro { padding: 4px 8px; } .k[data-kit=preview] .k-ro-g, .k[data-kit=preview] .k-radio { gap: 4px; }
+.k[data-line] .k-radio, .k[data-line] .k-ro-g { display: flex; flex: none; flex-direction: row; gap: 4px; } .k[data-line] .k-ro { flex: none; padding: 0 7px; } .k[data-line] .k-ro-d, .k[data-line] .k-ro > .k-icon { display: none; }
+.k-area { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); } .k-area:focus-within { border-color: color-mix(in srgb, var(--accent, #7aa2f7) 60%, transparent); }
+.k .k-area textarea { display: block; padding: 8px 10px; border: 0; border-radius: 0; outline: none; resize: none; line-height: 1.45; } .k-area-f { display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 4px 6px; }
+.k[data-kit=preview] .k-area { flex: 1; min-height: 0; } .k[data-kit=preview] .k-area textarea { flex: 1; padding: 4px 8px; font-size: 11px; } .k[data-kit=preview] .k-area-f { padding: 2px 4px; } .k[data-kit=preview] .k-area-f .k-sub { display: none; }
+.k-snip { min-width: 0; overflow: hidden; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); background: var(--hover, #1b2029); } .k-snip-bar { display: flex; gap: 2px; padding: 0 6px; border-bottom: 1px solid var(--line, #232833); overflow-x: auto; scrollbar-width: none; }
+.k-snip-bar label { position: relative; padding: 4px 8px; margin-bottom: -1px; border-bottom: 2px solid transparent; color: var(--muted, #7a8294); font-size: 11px; white-space: nowrap; cursor: pointer; } .k-snip-bar label:hover { color: var(--fg, #d5d9e3); } .k-snip-bar input { position: absolute; opacity: 0; width: 0; height: 0; pointer-events: none; }
+.k-snip-bar label:has(input:checked) { color: var(--fg, #d5d9e3); border-bottom-color: var(--accent, #7aa2f7); } .k-snip-bar label:has(input:focus-visible) { outline: 1px solid var(--accent, #7aa2f7); } .k-snip-f { display: inline-flex; align-items: center; gap: 5px; padding: 4px 2px; color: var(--muted, #7a8294); font-size: 11px; }
+.k-snip-c { position: relative; margin: 0; } .k-snip.tabs > .k-snip-c { display: none; } .k-snip-c pre { margin: 0; padding: 8px 34px 8px 10px; overflow: auto; font: 11.5px/1.5 var(--mono, ui-monospace, Menlo, monospace); } .k-snip-c > .k-copy { position: absolute; top: 6px; right: 6px; } .k-snip-d { margin-right: 8px; color: var(--muted, #7a8294); user-select: none; }
+${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `.k-snip:has(> .k-snip-bar > label:nth-child(${i}) input:checked) > .k-snip-c:nth-of-type(${i})`).join(', ')} { display: block; }
+.k[data-kit=preview] .k-snip-c pre { padding: 5px 30px 5px 8px; font-size: 10.5px; } .k-snip-l { display: inline-flex; flex: none; align-items: center; gap: 6px; min-width: 0; } .k-snip-l code { min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+.k-env { display: flex; flex-direction: column; min-width: 0; font-size: 11.5px; } .k-env-r { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 26px; } .k-env-r + .k-env-r { border-top: 1px solid var(--line, #232833); }
+.k-env-k { flex: 0 0 min(38%, 220px); overflow: hidden; color: var(--accent, #7aa2f7); text-overflow: ellipsis; white-space: nowrap; } .k-env-v, .k-env-r > .k-sc { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-env-r > .k-tag, .k-env-r > .k-copy { flex: none; }
+@container kit (max-width: 220px) { .k-env-r > .k-tag { display: none; } } .k[data-line] .k-env { flex-direction: row; gap: 10px; overflow: hidden; } .k[data-line] .k-env-r { flex: none; min-height: 0; border: 0; } .k[data-line] .k-env-r > :not(.k-env-k) { display: none; }
+.k-up { display: flex; flex-direction: column; gap: 5px; min-width: 0; } .k-up-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; } .k-up-h span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-up-h b { flex: none; font-variant-numeric: tabular-nums; }
+.k-up-b { display: flex; justify-content: flex-end; gap: 2px; height: 26px; min-width: 0; overflow: hidden; } .k-up-i { flex: 1 0 3px; max-width: 12px; border-radius: 2px; background: currentColor; } .k-up-i.none { color: var(--line, #232833); } .k-up-i:hover { opacity: 0.7; }
+.k-up-x { display: flex; justify-content: space-between; color: var(--muted, #7a8294); font-size: 10.5px; } .k[data-kit=preview] .k-up-b { height: 20px; } .k[data-line] .k-up { flex: 1; flex-direction: row; align-items: center; gap: 6px; } .k[data-line] .k-up-b { flex: 1; height: 12px; min-width: 60px; } .k[data-line] .k-up-i { flex-basis: 2px; }
+.k-deploys, .k-issues, .k-eps, .k-clocks { display: flex; flex-direction: column; min-width: 0; } :is(.k-dp, .k-is, .k-ep, .k-clk) + :is(.k-dp, .k-is, .k-ep, .k-clk) { border-top: 1px solid var(--line, #232833); } :is(.k-dp, .k-is, .k-ep)[data-open] { cursor: pointer; } :is(.k-dp, .k-is, .k-ep)[data-open]:hover { background: var(--hover, #1b2029); }
+.k-dp { display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 36px; } .k-dp > .k-tag { flex: none; } .k-dp .k-sub .k-icon { vertical-align: -1px; }
+.k-dp-dot { flex: none; width: 8px; height: 8px; border-radius: 50%; background: currentColor; } .k-dp-dot.live { box-shadow: 0 0 0 0 currentColor; animation: k-ping 1.6s ease-out infinite; } @keyframes k-ping { 70% { box-shadow: 0 0 0 5px transparent; } 100% { box-shadow: 0 0 0 0 transparent; } }
+.k-is { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 28px; } .k-is-p { flex: none; display: inline-flex; color: var(--muted, #7a8294); } .k-is-id { flex: none; color: var(--muted, #7a8294); font: 11px var(--mono, ui-monospace, monospace); }
+.k-is-s { flex: none; display: inline-flex; color: var(--muted, #7a8294); } .k-is-s.doing { color: var(--waiting, #e0af68); } .k-is-s.review { color: var(--done, #9ece6a); } .k-is-s.done { color: var(--tc-purple, #bb9af7); } .k-is > .k-title { flex: 1; min-width: 0; } .k-is-ls { display: flex; flex: none; gap: 4px; }
+@container kit (max-width: 240px) { .k-is-id, .k-is-ls, .k-is > .k-av { display: none; } }
+.k-ep { display: flex; align-items: center; gap: 8px; min-width: 0; min-height: 28px; } .k-ep-m { flex: none; width: 50px; font: 600 10.5px var(--mono, ui-monospace, monospace); letter-spacing: 0.02em; } .k-ep-p { min-width: 0; overflow: hidden; font: 11.5px var(--mono, ui-monospace, monospace); text-overflow: ellipsis; white-space: nowrap; } .k-ep-v { color: var(--tc-orange, #ff9e64); }
+.k-ep-n { flex: none; color: var(--muted, #7a8294); font-size: 11px; font-variant-numeric: tabular-nums; white-space: nowrap; } .k-ep-s { flex: none; min-width: 30px; font: 600 11px var(--mono, ui-monospace, monospace); text-align: right; } @container kit (max-width: 260px) { .k-ep-n { display: none; } .k-ep-m { width: auto; } }
+.k-chl { display: flex; flex-direction: column; gap: 10px; min-width: 0; } .k-chl-r + .k-chl-r { padding-top: 10px; border-top: 1px solid var(--line, #232833); } .k-chl-h { display: flex; align-items: baseline; gap: 8px; min-width: 0; } .k-chl-h b { flex: none; font-weight: 600; } .k-chl-h .k-sub { min-width: 0; }
+.k-chl-l { display: flex; flex-direction: column; gap: 3px; margin: 5px 0 0; padding: 0; list-style: none; } .k-chl-l li { display: flex; align-items: baseline; gap: 7px; min-width: 0; } .k-chl-l li > span:last-child { min-width: 0; overflow-wrap: anywhere; }
+.k-chl-t { flex: none; width: 62px; padding: 0 5px; border-radius: 4px; background: color-mix(in srgb, currentColor 14%, transparent); font: 600 10px/16px var(--mono, ui-monospace, monospace); text-align: center; } .k[data-kit=preview] .k-chl-l li > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.k[data-line] .k-chl { flex-direction: row; gap: 10px; overflow: hidden; } .k[data-line] .k-chl-r { flex: none; padding: 0; border: 0; } .k[data-line] .k-chl-h .k-sub { display: none; }
+.k-clk { display: flex; align-items: center; gap: 9px; min-width: 0; min-height: 30px; } .k-clk-i { flex: none; display: inline-flex; } .k-clk-t { flex: none; font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+.k[data-line] .k-clocks, .k[data-line] .k-deploys, .k[data-line] .k-issues, .k[data-line] .k-eps { flex-direction: row; gap: 12px; overflow: hidden; } .k[data-line] :is(.k-clk, .k-dp, .k-is, .k-ep) { flex: none; min-height: 0; border: 0; } .k[data-line] :is(.k-clk, .k-dp, .k-ep) .k-sub, .k[data-line] :is(.k-dp, .k-is) > :is(.k-tag, .k-av), .k[data-line] :is(.k-is-ls, .k-ep-n) { display: none; } .k[data-line] .k-clk-t { font-size: inherit; }
+.k-funnel { display: flex; flex-direction: column; gap: 4px; min-width: 0; } .k-fn-r { display: grid; grid-template-columns: minmax(60px, 32%) minmax(0, 1fr) auto 44px 40px; align-items: center; gap: 8px; min-width: 0; font-size: 11.5px; }
+.k-fn-l { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-fn-t { height: 14px; overflow: hidden; border-radius: 3px; background: var(--hover, #1b2029); } .k-fn-t > i { display: block; height: 100%; border-radius: 3px; background: var(--accent, #7aa2f7); }
+.k-fn-r > b { font-variant-numeric: tabular-nums; text-align: right; } .k-fn-p, .k-fn-d { color: var(--muted, #7a8294); font-size: 10.5px; font-variant-numeric: tabular-nums; text-align: right; } .k .k-fn-d.t-bad { color: var(--error, #f7768e); }
+@container kit (max-width: 240px) { .k-fn-r { grid-template-columns: minmax(50px, 38%) minmax(0, 1fr) auto; } .k-fn-p, .k-fn-d { display: none; } } .k-fn-line { display: inline-flex; flex: none; align-items: baseline; gap: 5px; }
+.k-sws { display: grid; gap: 6px; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); min-width: 0; } .k-sw, .k-sw:hover { display: flex; align-items: center; gap: 7px; min-width: 0; padding: 4px; border: 1px solid var(--line, #232833); background: none; text-align: left; cursor: copy; } .k-sw:hover { background: var(--hover, #1b2029); }
+.k-sw > i { flex: none; width: 26px; height: 26px; border-radius: calc(var(--radius, 6px) - 2px); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--fg, #d5d9e3) 14%, transparent); } .k-sw .k-sub { font-family: var(--mono, ui-monospace, monospace); font-size: 10px; }
+.k[data-line] .k-sws { display: flex; flex: none; gap: 3px; } .k[data-line] .k-sw { padding: 0; border: 0; } .k[data-line] .k-sw > i { width: 12px; height: 12px; } .k[data-line] .k-sw .k-main { display: none; }
+.k-mx { min-width: 0; overflow-x: auto; } .k .k-mx table { width: auto; border-collapse: separate; border-spacing: 3px; } .k .k-mx :is(th, td) { padding: 0; border: 0; vertical-align: middle; } .k .k-mx thead th { padding: 0 2px 2px; color: var(--muted, #7a8294); font-size: 10.5px; font-weight: 500; text-align: center; white-space: nowrap; }
+.k .k-mx tbody th { padding-right: 8px; font-weight: 500; text-align: left; white-space: nowrap; } .k .k-mx td { width: 30px; min-width: 30px; height: 22px; border-radius: 4px; background: color-mix(in srgb, currentColor 12%, transparent); text-align: center; } .k .k-mx td:empty { background: var(--hover, #1b2029); } .k .k-mx td[data-open] { cursor: pointer; } .k .k-mx td[data-open]:hover { background: color-mix(in srgb, currentColor 24%, transparent); }
+.k-mx td .k-icon { vertical-align: -2px; } .k-mx-run { display: inline-block; width: 9px; height: 9px; border: 2px solid currentColor; border-right-color: transparent; border-radius: 50%; vertical-align: -1px; animation: k-spin 0.9s linear infinite; } .k-mx-skip { display: inline-block; width: 9px; height: 2px; border-radius: 1px; background: currentColor; vertical-align: 3px; } .k-mx-todo { display: inline-block; width: 8px; height: 8px; border: 1.5px solid currentColor; border-radius: 50%; vertical-align: 0; }
+.k-mx-line { display: inline-flex; flex: none; gap: 8px; } .k-mx-line > span { display: inline-flex; align-items: center; gap: 3px; } .k-mx-line .k-mx-run { width: 8px; height: 8px; }
+.k-mq { min-width: 0; overflow: hidden; -webkit-mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); mask-image: linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent); } .k-mq-t { display: flex; width: max-content; animation: k-mq var(--s, 20s) linear infinite; } .k-mq:hover .k-mq-t { animation-play-state: paused; }
+.k-mq.rev .k-mq-t { animation-direction: reverse; } .k-mq-g { display: flex; flex: none; align-items: center; gap: 28px; padding-right: 28px; } .k-mq-i { display: inline-flex; flex: none; align-items: center; gap: 6px; white-space: nowrap; } a.k-mq-i { color: inherit; } a.k-mq-i:hover { color: var(--accent, #7aa2f7); text-decoration: none; }
+@keyframes k-mq { to { transform: translateX(-50%); } } .k[data-line] .k-mq { flex: 1; }
+.k-bento { display: grid; gap: 8px; grid-template-columns: repeat(var(--cols, 4), minmax(0, 1fr)); grid-auto-rows: minmax(76px, auto); grid-auto-flow: dense; min-width: 0; }
+.k-bt { --bt: var(--accent, #7aa2f7); display: flex; flex-direction: column; gap: 4px; min-width: 0; padding: 10px 12px; overflow: hidden; border: 1px solid var(--line, #232833); border-radius: calc(var(--radius, 6px) + 2px); background: radial-gradient(120% 90% at 0 0, color-mix(in srgb, var(--bt) 16%, transparent), transparent 65%), var(--hover, #1b2029); }
+.k-bt.link { cursor: pointer; } .k-bt.link:hover { border-color: color-mix(in srgb, var(--bt) 50%, transparent); } .k-bt-i { display: inline-flex; color: var(--bt); } .k-bt-t { font-size: 14px; font-weight: 600; line-height: 1.25; } .k-bt-x { color: var(--muted, #7a8294); font-size: 11px; } .k-bt > .k-spark { margin-top: auto; color: var(--bt); }
+@container kit (max-width: 340px) { .k-bento { grid-template-columns: repeat(2, minmax(0, 1fr)); } .k-bento > .k-bt:is(.w-3, .w-4, .w-5, .w-6) { grid-column: span 2 !important; } }
+@container kit (max-width: 180px) { .k-bento { grid-template-columns: minmax(0, 1fr); } .k-bento > .k-bt { grid-column: span 1 !important; grid-row: span 1 !important; } }
+.k[data-kit=preview] .k-bento { grid-auto-rows: minmax(56px, auto); gap: 6px; } .k[data-kit=preview] .k-bt { padding: 6px 8px; } .k[data-kit=preview] .k-bt-t { font-size: 12px; }
+.k[data-line] .k-bento { display: flex; flex: none; gap: 10px; overflow: hidden; } .k[data-line] .k-bt { flex: none; flex-direction: row; align-items: center; gap: 5px; padding: 0; border: 0; background: none; } .k[data-line] .k-bt > :not(.k-bt-i):not(.k-bt-t) { display: none; } .k[data-line] .k-bt-t { font-size: inherit; }
+@media (prefers-reduced-motion: reduce) { .k-mq-t { flex-wrap: wrap; width: auto; animation: none; } .k-mq-g { flex-wrap: wrap; row-gap: 6px; } .k-mq-g[inert] { display: none; } .k-dp-dot.live, .k-mx-run { animation-duration: 4s; } }
 /* tones last, over an element's own color (a badge's, a bar's, a chart's) */
 .k .t-good { color: var(--done, #9ece6a); } .k .t-bad { color: var(--error, #f7768e); } .k .t-warn { color: var(--waiting, #e0af68); } .k .t-accent { color: var(--accent, #7aa2f7); } .k .t-muted { color: var(--muted, #7a8294); } .k .k-badge.t-accent { color: var(--accent-fg, #fff); }`
 
@@ -550,7 +619,7 @@ export function sayOf(x: unknown): WidgetSay | null {
 // shows the rows a limit hid (a preview: its full view); a click elsewhere on a preview opens the full view (the app
 // knows whether there is one)
 export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => void) => void; removeEventListener: (t: string, f: (e: any) => void) => void }, send: (m: Record<string, unknown>) => unknown) {
-  const said = (x: any): string => [...x.childNodes].map((c: any) => (c.nodeType === 3 ? c.data : c.nodeType === 1 && c.localName !== 'button' ? said(c) : '')).join('') // a row's words, not its buttons'
+  const said = (x: any): string => [...x.childNodes].map((c: any) => (c.nodeType === 3 ? c.data : c.nodeType === 1 && c.localName !== 'button' && c.localName !== 'kbd' ? said(c) : '')).join('') // a row's words, not its buttons'
   // the rows of a box: those whose words have q (none: all but the extra ones, unless it's open)
   const sift = (box: any, q: string) => {
     const open = box.hasAttribute('data-open')
@@ -564,6 +633,8 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     })
     const more = box.querySelector('[data-more]')
     if (more) more.hidden = !!q
+    const none = box.querySelector('[data-none]') // a palette's "Nothing matches"
+    if (none) none.hidden = !q || !!box.querySelector('[data-row]:not([hidden])')
   }
   const all = (q: string): any[] => (d => (d && d.querySelectorAll ? [...d.querySelectorAll(q)] : []))((root as any).querySelectorAll ? root : (root as any).document) // a shadow root's, a page's
   const click = (e: any) => {
@@ -572,6 +643,9 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     // an open dropdown closes at a click outside it or in its menu (its own summary toggles it)
     let shut = false
     for (const dd of all('details.k-dd[open]')) if (!dd.contains(t) || t.closest('.k-dd-m')) (dd.open = false), (shut = true)
+    // a hover card opened by the pointer: a click on its button keeps it open (it would toggle it shut)
+    const pin = t.closest('.k-pop[data-hov] > [popovertarget]')
+    if (pin) return void (e.preventDefault(), pin.parentNode.removeAttribute('data-hov'))
     const chip = t.closest('[data-chip]')
     if (chip) {
       // a filter's chip: the rows under it with its words; clicked again (or All), every row
@@ -604,7 +678,7 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       if (r.hasAttribute('data-busy')) return
       let arg = r.getAttribute('data-arg') ?? ''
       // an input's button: what's typed is the arg; nothing typed, the box gets the keyboard
-      const box = r.hasAttribute('data-input') && r.closest('[data-inbox]')?.querySelector('input')
+      const box = r.hasAttribute('data-input') && r.closest('[data-inbox]')?.querySelector('input, textarea')
       if (box) {
         arg = String(box.value).trim()
         if (!arg) return void box.focus()
@@ -616,7 +690,7 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
         arg = JSON.stringify(v)
       }
       r.setAttribute('data-busy', '')
-      const p: any = send({ laki: 'run', action: r.getAttribute('data-run'), arg, label: (r.textContent || '').trim(), confirm: r.getAttribute('data-confirm') || undefined })
+      const p: any = send({ laki: 'run', action: r.getAttribute('data-run'), arg, label: (r.getAttribute('data-label') || r.textContent || '').trim(), confirm: r.getAttribute('data-confirm') || undefined })
       const clear = () => box && !r.hasAttribute('data-keep') && box.value.trim() === arg && (box.value = '')
       if (p && typeof p.then === 'function') p.then((ok: unknown) => (r.removeAttribute('data-busy'), ok !== false && clear()), () => r.removeAttribute('data-busy'))
       else clear() // a JS page's: the app says when it's done
@@ -627,12 +701,25 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       try {
         cmd = JSON.parse(d.getAttribute('data-do') || 'null')
       } catch {}
-      if (cmd && typeof cmd === 'object') send({ laki: 'do', cmd, label: (d.textContent || d.getAttribute('aria-label') || '').trim(), confirm: d.getAttribute('data-confirm') || undefined })
+      if (!cmd || typeof cmd !== 'object') return
+      // a prompt box's button: what's typed is the prompt; nothing typed, the box gets the keyboard
+      const box = d.hasAttribute('data-input') && d.closest('[data-inbox]')?.querySelector('input, textarea')
+      if (box) {
+        if (d.hasAttribute('data-busy')) return
+        cmd.prompt = String(box.value).trim()
+        if (!cmd.prompt) return void box.focus()
+        d.setAttribute('data-busy', '')
+      }
+      const p: any = send({ laki: 'do', cmd, label: (d.getAttribute('data-label') || d.textContent || d.getAttribute('aria-label') || '').trim(), confirm: d.getAttribute('data-confirm') || undefined })
+      // emptied once it went. ponytail: a JS page's box keeps its words (the app doesn't say back when a do went)
+      const done = (ok: unknown) => box && (d.removeAttribute('data-busy'), ok === true && !d.hasAttribute('data-keep') && box.value.trim() === cmd.prompt && (box.value = ''))
+      if (p && typeof p.then === 'function') p.then(done, () => done(false))
+      else done(false)
     } else if (c) e.preventDefault(), send({ laki: 'copy', text: c.getAttribute('data-copy') })
     else if (a) e.preventDefault(), send({ laki: 'open', url: a.getAttribute('href') })
     else if (o) e.preventDefault(), send({ laki: 'open', url: o.getAttribute('data-open') })
     else if (b) e.preventDefault(), send({ laki: b.getAttribute('data-laki') })
-    else if (!shut && !t.closest('button, input, select, textarea, label, summary, .k-sc, .k-dd-m, .k-cmp, [data-kit="full"]')) send({ laki: 'full' }) // .k-sc: a secret shown, to select; .k-cmp: a drag between pictures
+    else if (!shut && !t.closest('button, input, select, textarea, label, summary, .k-sc, .k-dd-m, .k-pop-b, .k-cmp, [data-kit="full"]')) send({ laki: 'full' }) // .k-sc: a secret shown, to select; .k-cmp: a drag between pictures
   }
   const input = (e: any) => {
     const t = e.target && e.target.closest ? e.target : null
@@ -664,20 +751,65 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     const dd = e.target && e.target.closest ? e.target.closest('details.k-dd[open]') : null
     if (dd && !(e.relatedTarget && dd.contains(e.relatedTarget))) dd.open = false
   }
-  // Enter in an input's box clicks its button
+  // Enter in an input's box clicks its button, ⌘ Enter in a textarea's; in a palette ↑ ↓ go through its rows and Enter
+  // in its box runs the first
   const key = (e: any) => {
-    if (e.key !== 'Enter' || e.isComposing || !e.target || !e.target.closest) return
-    const b = e.target.closest('[data-inbox]')?.querySelector('[data-input]')
-    if (b && e.target.localName === 'input') e.preventDefault(), b.click()
+    const t = e.target && e.target.closest ? e.target : null
+    if (!t || e.isComposing) return
+    // Esc closes an open popover or dropdown first, not the full view's dialog under it (it waits for a key not taken)
+    if (e.key === 'Escape') {
+      const open = all('.k-pop-b:popover-open, details.k-dd[open]')
+      if (open.length) e.preventDefault(), open.forEach((x: any) => (x.localName === 'details' ? (x.open = false) : x.hidePopover()))
+      return
+    }
+    const cmd = t.closest('.k-cmd')
+    if (cmd && (e.key === 'ArrowDown' || e.key === 'ArrowUp' || (e.key === 'Enter' && t.localName === 'input'))) {
+      const rows = [...cmd.querySelectorAll('.k-mn-i:not([hidden]):not(:disabled)')]
+      const i = rows.indexOf(t)
+      const to = e.key === 'Enter' ? rows[0] : e.key === 'ArrowDown' ? rows[i + 1] : i > 0 ? rows[i - 1] : i === 0 ? cmd.querySelector('input') : null
+      if (!to) return
+      e.preventDefault()
+      return void (e.key === 'Enter' ? to.click() : to.focus())
+    }
+    if (e.key !== 'Enter') return
+    const b = t.closest('[data-inbox]')?.querySelector('[data-input]')
+    if (b && (t.localName === 'input' || (t.localName === 'textarea' && (e.metaKey || e.ctrlKey)))) e.preventDefault(), b.click()
   }
+  // a hover card: open while the pointer is on it, unless a click pinned it (data-hov: opened by the pointer); it goes
+  // a moment after the pointer leaves, so the pointer can cross the gap to the card
+  const hover = (e: any) => {
+    const pop = e.target && e.target.closest ? e.target.closest('.k-pop.hover') : null
+    const b = pop && pop.querySelector('[popover]')
+    if (!b || (e.relatedTarget && pop.contains(e.relatedTarget))) return
+    clearTimeout(pop.kHide)
+    const shut = () => {
+      try {
+        if (pop.hasAttribute('data-hov')) b.hidePopover(), pop.removeAttribute('data-hov')
+      } catch {} // gone from the page meanwhile
+    }
+    try {
+      if (e.type === 'mouseover' && !b.matches(':popover-open')) b.showPopover(), pop.setAttribute('data-hov', '')
+    } catch {}
+    if (e.type === 'mouseout') pop.kHide = setTimeout(shut, 250)
+  }
+  // a clock's time, every 15 s (its options are widgetUi.ts' CLOCK's)
+  const tick = () =>
+    all('[data-clock]').forEach((c: any) => {
+      try {
+        const h12 = c.hasAttribute('data-h12')
+        c.textContent = new Intl.DateTimeFormat('en-US', { timeZone: c.getAttribute('data-clock') || undefined, hour: h12 ? 'numeric' : '2-digit', minute: '2-digit', hourCycle: h12 ? 'h12' : 'h23' }).format(new Date())
+      } catch {}
+    })
+  const clock: any = setInterval(tick, 15_000)
+  clock?.unref?.() // node's (the tests'): it never holds the process
   // a full view's dropdown opened near its bottom: its menu scrolled into sight (toggle doesn't bubble: caught on the way down)
   const toggle = (e: any) => {
     const t = e.target
     if (t && t.open && t.matches && t.matches('details.k-dd') && t.closest('[data-kit="full"]')) t.querySelector('.k-dd-m')?.scrollIntoView({ block: 'nearest' })
   }
-  const on: [string, (e: any) => void, boolean?][] = [['click', click], ['input', input], ['change', change], ['keydown', key], ['toggle', toggle, true], ['focusout', blur]]
+  const on: [string, (e: any) => void, boolean?][] = [['click', click], ['input', input], ['change', change], ['keydown', key], ['toggle', toggle, true], ['focusout', blur], ['mouseover', hover], ['mouseout', hover]]
   for (const [k, f, c] of on) (root as any).addEventListener(k, f, c)
-  return () => on.forEach(([k, f, c]) => (root as any).removeEventListener(k, f, c))
+  return () => (clearInterval(clock), on.forEach(([k, f, c]) => (root as any).removeEventListener(k, f, c)))
 }
 
 // a JS widget's page (the daemon serves it, sandboxed, to a frame of the app): the filled template with window.laki
@@ -699,7 +831,7 @@ window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url =
   ui: (spec, data) => new Promise(ok => { const req = uiWait.size + Math.random(); uiWait.set(req, ok); say({ laki: 'ui', req, spec, ctx: { data: data === undefined ? laki.data : data, config: laki.config, at: laki.at, error: laki.error, full: laki.full, workspace: laki.workspace } }) }),
   mount: (el, spec, data) => laki.ui(spec, data).then(html => { el.innerHTML = html }) }
 ;(${String(uiBehave)})(window, say)
-addEventListener('keydown', e => e.key === 'Escape' && say({ laki: 'close' }))
+addEventListener('keydown', e => e.key === 'Escape' && !e.defaultPrevented && say({ laki: 'close' })) // not one that closed a popover or dropdown
 // the app says an action is done (its buttons work again), or gives the UI kit's HTML
 addEventListener('message', e => {
   if (e.source !== parent || !e.data) return

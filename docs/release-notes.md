@@ -15,6 +15,11 @@ version it builds, with the date. -->
   the rows with their words), rotate (words that take turns), compare (two pictures, a divider to drag), skeleton,
   radial, indicator, avatar (sizes, shapes, a ring), range (a slider), select, input (a box and a button), swap,
   pagination, menu and dropdown.
+- 20 more UI kit elements, for developers (after shadcn/ui's and the dev tools people use): popover, command (a
+  palette: ↑ ↓ and Enter), combobox, datepicker, split button, radio cards, textarea (an action, or a prompt for a new
+  workspace, the agent or Laki AI), snippet (npm / pnpm / yarn tabs), env (secrets behind dots, copy as .env), uptime,
+  deploys, issues (Linear's look), endpoints, changelog (conventional commits), clock (time zones), funnel, swatches,
+  CI matrix, marquee and bento.
 - The rail with labels puts its least used pages (Calendar, Flows, Specs, Board) in a ⋯ More menu once they don't fit.
 - Fixes: ⌘P no longer leaves an empty window.
 
