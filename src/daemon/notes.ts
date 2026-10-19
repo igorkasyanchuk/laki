@@ -24,6 +24,10 @@ const fileOf = (id: unknown) => {
   if (typeof id !== 'string' || !ID.test(id)) throw new Error('no such note')
   return join(home, `${id}.json`)
 }
+// it's there (a file of it beside it, an image shown): no need to read all of it
+const known = (id: unknown) => {
+  if (!exists(fileOf(id))) throw new Error('no such note: deleted?')
+}
 function read(id: unknown): Note {
   try {
     return JSON.parse(readFileSync(fileOf(id), 'utf8'))
@@ -109,7 +113,7 @@ export function noteRm(p: { id: string }) {
 // a file pasted or dropped into it: <id>/<name> (a name taken: -2, -3…), as files/<name> in its blocks
 export function noteUpload(p: { id: string; name?: string; data?: string }) {
   on()
-  read(p.id)
+  known(p.id)
   const buf = Buffer.from(String(p.data ?? ''), 'base64')
   if (!buf.length) throw new Error('an empty file')
   if (buf.length > MAX_FILE) throw new Error('over 20 MB')
@@ -133,7 +137,7 @@ const exists = (f: string) => {
 // an image it holds, as a data URL (the editor shows files/<name> through it); anything else: none
 export function noteFile(p: { id: string; path?: string }) {
   on()
-  read(p.id)
+  known(p.id)
   const name = /^files\/([^/\\]+)$/.exec(String(p.path ?? ''))?.[1]
   const type = name && IMAGES[extname(name).toLowerCase()]
   if (!name || name.startsWith('.') || !type) return {}

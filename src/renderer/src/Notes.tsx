@@ -41,7 +41,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
   const shown = (list ?? []).filter(n => !only || n.color === only)
   const open = id || (!q && !only ? list?.[0]?.id : undefined) // none asked for: the first
   const colors = TAB_COLORS.filter(c => list?.some(n => n.color === c))
-  const make = () => api.call<Note>('noteNew', { color: only ?? undefined }).then(n => (setQ(''), void load(), onOpen(n.id)), e => setErr((e as Error).message))
+  const make = () => api.call<Note>('noteNew', { color: only ?? undefined }).then(n => (q ? setQ('') : void load(), onOpen(n.id)), e => setErr((e as Error).message)) // a search typed: clearing it loads
   // a save's item in the list as it is now, not the whole list read again (a search's match: at the next one)
   const saved = (it: Item) => setList(l => l && order(l.map(x => (x.id === it.id ? it : x))))
   const save = (nid: string, c: Change) => api.call<Item>('noteSave', { id: nid, ...c }).then(saved)
@@ -105,7 +105,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
           </div>
         </aside>
         {open ? (
-          <NoteEdit key={open} id={open} api={api} onSaved={saved} colorItems={colorItems} onRemove={remove} openMenu={openMenu} />
+          <NoteEdit key={open} id={open} meta={list?.find(x => x.id === open)} api={api} onSaved={saved} colorItems={colorItems} onRemove={remove} openMenu={openMenu} />
         ) : (
           <div className="note-empty">
             <Icon name="note" size={28} />
@@ -122,7 +122,7 @@ export default function NotesPage({ id, api, onOpen, onClose }: { id: string; ap
 }
 
 // the open note: its title, color, pin, the editor; a change saved 600 ms later, and as it closes
-function NoteEdit({ id, api, onSaved, colorItems, onRemove, openMenu }: { id: string; api: NotesApi; onSaved: (it: Item) => void; colorItems: (n: Item, set: (c: string | null) => void) => MenuItem[]; onRemove: (n: Item) => void; openMenu: (e: React.MouseEvent, items: MenuItem[]) => void }) {
+function NoteEdit({ id, meta, api, onSaved, colorItems, onRemove, openMenu }: { id: string; meta?: Item; api: NotesApi; onSaved: (it: Item) => void; colorItems: (n: Item, set: (c: string | null) => void) => MenuItem[]; onRemove: (n: Item) => void; openMenu: (e: React.MouseEvent, items: MenuItem[]) => void }) {
   const [n, setN] = useState<Note | null>(null)
   const [err, setErr] = useState('')
   const pending = useRef<Change | null>(null)
@@ -135,6 +135,8 @@ function NoteEdit({ id, api, onSaved, colorItems, onRemove, openMenu }: { id: st
     if (p) return api.call<Item>('noteSave', { id, ...p }).then(onSaved, e => setErr((e as Error).message))
   }
   useEffect(() => () => void flush(), []) // leaving it (another note, the page closed) saves
+  // a row's right click pins or colors it too: the list's item, as it changes
+  useEffect(() => void (meta && setN(x => x && { ...x, color: meta.color, pinned: meta.pinned })), [meta?.color, meta?.pinned])
   const later = (c: Change) => {
     pending.current = { ...pending.current, ...c }
     clearTimeout(timer.current)
@@ -143,13 +145,14 @@ function NoteEdit({ id, api, onSaved, colorItems, onRemove, openMenu }: { id: st
   const now = (c: Change) => (setN(x => x && { ...x, ...c, color: c.color === null ? undefined : (c.color ?? x.color) }), api.call<Item>('noteSave', { id, ...c }).then(onSaved, e => setErr((e as Error).message)))
   if (err) return <div className="note-edit"><p className="warn small">{err}</p></div>
   if (!n) return <div className="note-edit muted small">Loading…</div>
+  const { color, pinned } = n
   return (
     <div className="note-edit">
       <div className="note-page">
         <div className="note-head">
           <input className="note-title" value={n.title} placeholder="Untitled" autoFocus={!n.title && !n.md} aria-label="Title" onChange={e => (setN({ ...n, title: e.target.value }), later({ title: e.target.value }))} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), document.querySelector<HTMLElement>('.note-edit .bn-editor')?.focus())} />
-          <button type="button" className="note-color" style={colorVar(n.color)} data-tip={n.color ? `Color: ${n.color}` : 'A color'} aria-label="Color" onClick={e => openMenu(e, colorItems(n, c => void now({ color: c })))} />
-          <IconButton icon="pin" title={n.pinned ? 'Unpin' : 'Pin to the top of the list'} on={!!n.pinned} onClick={() => void now({ pinned: !n.pinned })} />
+          <button type="button" className={`note-color ${color ? 'set' : ''}`} style={colorVar(color)} data-tip={color ? `Color: ${color}` : 'A color'} aria-label="Color" onClick={e => openMenu(e, colorItems({ ...n, color }, c => void now({ color: c })))} />
+          <IconButton icon="pin" title={pinned ? 'Unpin' : 'Pin to the top of the list'} on={!!pinned} onClick={() => void now({ pinned: !pinned })} />
           <IconButton icon="trash" title="Delete this note" onClick={() => (void flush(), onRemove(n))} />
         </div>
         <div className="muted small note-meta">

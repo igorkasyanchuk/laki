@@ -541,7 +541,7 @@ export function App() {
     const h = hist.current
     const by = j < h.i ? -1 : 1
     const s = view?.settings ?? {}
-    const off = (d: Dialog) => (d === 'desk' && s.desk !== true) || (d === 'calendar' && s.calendar !== true) || (d === 'bird' && s.birdView !== true) || (d === 'ai' && !s.ai?.on) || (!!notesOf(d) && s.notes !== true) || (!!specsOf(d) && s.specs !== true) || (!!flowsOf(d) && s.workflows !== true)
+    const off = (d: Dialog) => (d === 'desk' && s.desk !== true) || (d === 'calendar' && s.calendar !== true) || (d === 'bird' && s.birdView !== true) || (d === 'ai' && !s.ai?.on) || (!!notesOf(d) && s.notes !== true) || (!!specsOf(d) && s.specs !== true) || (!!flowsOf(d) && s.workflows !== true) || (!!studioOf(d) && !s.ai?.on)
     const gone = (p: Place) => off(p.d) || (p.d === null && !!p.ws && !live.some(w => w.id === p.ws))
     while (h.at[j] && gone(h.at[j])) j += by
     const p = h.at[j]

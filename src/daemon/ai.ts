@@ -261,7 +261,7 @@ export function aiOpen(p: { id: string }) {
   if (!j) throw new Error('that chat is gone')
   shelve(t)
   rmSync(join(pastDir, `${p.id}.json`), { force: true })
-  Object.assign(t, { chat: j.chat, resume: j.resume, at: j.at || Date.now(), ended: undefined })
+  Object.assign(t, { chat: j.chat, resume: j.resume, at: j.at || Date.now(), ended: undefined, allowed: undefined }) // Always in this chat: that chat's, not this one's
   changed(t)
   return { ok: true }
 }
@@ -566,7 +566,8 @@ function dataUrl(path: string) {
 }
 
 // `laki mcp` as an MCP server for a CLI agent: this daemon's (LAKI_HOME), through node or Electron as node
-const mcpServer = () => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, LAKI_AI: '1', ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
+// perm: claude's, whose --permission-prompt-tool is laki mcp's laki_permission (codex has none)
+const mcpServer = (perm = false) => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, LAKI_AI: '1', ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(perm && { LAKI_AI_PERM: '1' }), ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
 
 // Settings › AI's preset of the agent (an account of its own: CLAUDE_CONFIG_DIR, CODEX_HOME…): its env, over Settings'
 // env as a tab of it gets; its args are a tab's, not used here
@@ -621,7 +622,7 @@ async function claude(o: Opts) {
   const sk = sessionKey('claude')
   const resume = o.t.resume
   const prompt = o.images.length ? `${o.ask}\n\nImages (read them): ${o.images.join(' ')}` : o.ask
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--permission-prompt-tool', 'mcp__laki__laki_permission', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...effortArgs('claude'), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer(true) } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--permission-prompt-tool', 'mcp__laki__laki_permission', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...effortArgs('claude'), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
   const r = o.r
   let failed = ''
   await cli(o, 'claude', args, j => {
