@@ -5,6 +5,8 @@ version it builds, with the date. -->
 ## Next
 
 - Security: an extension's HTML can't add a web view, and every web view runs with web security on.
+- Security: Laki's daemon answers only requests addressed to it (127.0.0.1, localhost, or remote access's link), so
+  a web page can't reach it by renaming itself (DNS rebinding).
 
 ## 0.21.0 · Oct 19, 2026
 

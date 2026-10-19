@@ -2,8 +2,10 @@
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { request } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import WebSocket from 'ws'
 import { connect, fresh, until } from './helpers.ts'
 
 test('errors name what is wrong: methods, lookups, the WebSocket', async t => {
@@ -302,6 +304,29 @@ test('images: the kind kept, empty ones refused, month-old ones cleaned up', asy
   assert.match(path, /\.jpg$/)
   assert.deepEqual(readdirSync(images), [path.slice(images.length + 1)])
   await assert.rejects(rig.rpc('imageSave', { data: '' }), /an image up to 20 MB/)
+})
+
+test('the Host a request names: the daemon\'s own address, or remote access\'s while it runs; another (DNS rebinding) is turned away', async t => {
+  const rig = await fresh(t)
+  const { port, token } = rig.info()
+  const at = (host: string, method = 'POST', path = '/rpc') =>
+    new Promise<number>((res, rej) => {
+      const r = request({ host: '127.0.0.1', port, path, method, headers: { host, authorization: `Bearer ${token}` } }, x => (x.resume(), res(x.statusCode!)))
+      r.on('error', rej).end(method === 'POST' ? JSON.stringify({ method: 'ping' }) : undefined)
+    })
+  for (const h of [`127.0.0.1:${port}`, `localhost:${port}`]) assert.equal(await at(h), 200, h)
+  for (const h of ['evil.example', `evil.example:${port}`, `127.0.0.1:${port + 1}`, `fake-${port}.trycloudflare.com`]) {
+    assert.equal(await at(h), 421, h)
+    assert.equal(await at(h, 'GET', '/'), 421, h) // the page, a widget's, an artifact: every route
+  }
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`, { headers: { host: 'evil.example' } })
+  await assert.rejects(new Promise((res, rej) => (ws.once('open', res), ws.once('error', rej))))
+  // remote access: its own host too, until it stops
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev' })
+  assert.equal(await at(`fake-${port}.trycloudflare.com`), 200)
+  await rig.rpc('remoteStop')
+  assert.equal(await at(`fake-${port}.trycloudflare.com`), 421)
 })
 
 test('daemon start: a stale lock is taken over; from the app, the login shell\'s PATH; a dev origin when configured', async t => {
@@ -834,6 +859,10 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.equal(await page.text(), '<link rel="stylesheet" href="a.css"><h1>hi</h1>')
   const css = await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`)
   assert.equal(css.headers.get('content-type'), 'text/css')
+  assert.equal(css.headers.get('access-control-allow-origin'), null) // CORS only for its sandboxed page (Origin null)
+  const fromPage = await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`, { headers: { origin: 'null' } })
+  assert.equal(fromPage.headers.get('access-control-allow-origin'), 'null')
+  assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`, { headers: { origin: 'https://evil.example' } })).headers.get('access-control-allow-origin'), null)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${'0'.repeat(widgetKey.length)}/${w.id}/site/index.html`)).status, 401)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/..%2f..%2fstate.json`)).status, 404)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/nope/site/index.html`)).status, 404)

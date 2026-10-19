@@ -92,6 +92,10 @@ const originOk = (o: string | undefined) => o === undefined || origins.has(o) ||
 const { same } = core
 // remote access's token only from its page: a client with no Origin (curl past Cloudflare's sign-in) needs ours
 const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (same(t, token) || (!!o && o === core.remoteOrigin() && same(t, core.remoteToken())))
+// the Host a request names: this daemon's own address, or remote access's while it runs. A page on another site whose
+// name was pointed at 127.0.0.1 (DNS rebinding) names its own: turned away on every route
+let port = 0
+const hostOk = (h: string | undefined) => h === `127.0.0.1:${port}` || h === `localhost:${port}` || (!!h && h === (o => o && new URL(o).host)(core.remoteOrigin()))
 
 // the app's page, for remote access: the built renderer (out/renderer, next to the built daemon; from source, after a
 // build; LAKI_PAGE: that folder instead, as tests do). Its files hold no secrets: the token comes in the link.
@@ -120,8 +124,10 @@ function page(path: string, res: ServerResponse) {
 // scripts and pictures beside it: the key is in the path, so its relative links carry it). Sandboxed, an origin of its
 // own: it reads nothing of the daemon's or other files; https: for a CDN's script, style, font or picture (no fetch or
 // XHR: connect-src; a picture's URL can still carry words out, as any page's can). ponytail: 50 MB a file
+// ponytail: https: scripts and pictures stay, agents' reports load Chart.js and the like from a CDN; 'unsafe-inline'
+// lets a page do inline whatever a CDN's script would, so dropping https: from script-src alone keeps nothing out
 const ART_TYPES: Record<string, string> = { ...TYPES, '.htm': 'text/html; charset=utf-8', '.mjs': 'text/javascript', '.md': 'text/plain; charset=utf-8', '.txt': 'text/plain; charset=utf-8', '.csv': 'text/plain; charset=utf-8', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.gif': 'image/gif', '.webp': 'image/webp', '.woff': 'font/woff', '.ttf': 'font/ttf', '.mp4': 'video/mp4', '.webm': 'video/webm', '.mp3': 'audio/mpeg', '.wav': 'audio/wav', '.pdf': 'application/pdf' }
-function artifactPage(path: string, res: ServerResponse) {
+function artifactPage(path: string, origin: string | undefined, res: ServerResponse) {
   const no = (code: number, text: string) => (res.writeHead(code, { 'content-type': 'text/plain' }), res.end(text))
   const m = /^\/artifact\/([0-9a-f]+)\/([\w.-]+)\/(.+)$/.exec(path)
   const key = Buffer.from(m?.[1] ?? '')
@@ -141,7 +147,7 @@ function artifactPage(path: string, res: ServerResponse) {
     'cache-control': 'no-store',
     'referrer-policy': 'no-referrer',
     'x-content-type-options': 'nosniff',
-    ...(!/^text\/html/.test(ART_TYPES[extname(file).toLowerCase()] ?? '') && { 'access-control-allow-origin': '*' }), // its page's module scripts and fonts: CORS loads, from its opaque origin
+    ...(origin === 'null' && !/^text\/html/.test(ART_TYPES[extname(file).toLowerCase()] ?? '') && { 'access-control-allow-origin': 'null' }), // its page's module scripts and fonts: CORS loads, from its opaque origin (sandboxed: Origin null)
   })
   res.end(body)
 }
@@ -363,11 +369,12 @@ const server = createServer(async (req, res) => {
     res.writeHead(code, { 'content-type': 'application/json' })
     res.end(text)
   }
+  if (!hostOk(req.headers.host)) return reply(421, { error: 'host not allowed' })
   if (req.method === 'GET') {
     const u = new URL(req.url ?? '/', 'http://x')
     const w = /^\/widget\/([\w.-]+)$/.exec(u.pathname) // a JS widget's page: its own key, its own CSP
     const plan = u.pathname.startsWith('/plan/') // a brainstorm's prototype: the same
-    if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, res) // an artifact in the app's viewer: the key in its path
+    if (u.pathname.startsWith('/artifact/')) return artifactPage(u.pathname, req.headers.origin, res) // an artifact in the app's viewer: the key in its path
     if (!w && !plan) return page(u.pathname, res) // no secrets: any origin
     const r = w ? widgetPage(w[1], u.searchParams) : planPage(u.pathname, u.searchParams)
     res.writeHead(r.code, r.headers)
@@ -407,7 +414,7 @@ const wss = new WebSocketServer({ noServer: true, maxPayload: 32 << 20 }) // a p
 let clientSeq = 0
 server.on('upgrade', (req: IncomingMessage, socket, head) => {
   const url = new URL(req.url ?? '', 'http://x')
-  if (url.pathname !== '/ws' || !originOk(req.headers.origin) || !tokenOk(url.searchParams.get('token'), req.headers.origin)) {
+  if (url.pathname !== '/ws' || !hostOk(req.headers.host) || !originOk(req.headers.origin) || !tokenOk(url.searchParams.get('token'), req.headers.origin)) {
     log('refused websocket', req.headers.origin ?? '(no origin)')
     socket.end('HTTP/1.1 401 Unauthorized\r\n\r\n')
     return
@@ -464,7 +471,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
 const timers: NodeJS.Timeout[] = []
 server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   const addr = server.address()
-  const port = typeof addr === 'object' && addr ? addr.port : 0
+  port = typeof addr === 'object' && addr ? addr.port : 0
   const info = join(dir, 'daemon.json')
   writeFileSync(info, JSON.stringify({ port, token, pid: process.pid }), { mode: 0o600 })
   chmodSync(info, 0o600)
