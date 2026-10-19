@@ -11,7 +11,14 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import type { View } from '../shared/types.ts'
 
+// a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
+// environment (launchctl setenv reaches every launch), nor passes them on to the daemon and agents
+if (app.isPackaged) delete process.env.ELECTRON_RENDERER_URL, delete process.env.LAKI_DEV_ORIGIN
 const dev = !!process.env.ELECTRON_RENDERER_URL
+// scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
+// none reach a launch from Finder or the Dock
+const capture = app.commandLine.getSwitchValue('laki-capture')
+const notifyLog = app.commandLine.getSwitchValue('laki-notify-log')
 const mac = process.platform === 'darwin' // elsewhere (Linux): the system's title bar, and closing the window quits (no Dock to bring it back)
 let win: BrowserWindow | null = null
 let pendingTab: string | null = null
@@ -235,9 +242,8 @@ function create() {
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
     pendingTab = null
-    // LAKI_CAPTURE=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
-    const out = process.env.LAKI_CAPTURE
-    if (out) setTimeout(async () => win && writeFileSync(out, (await win.webContents.capturePage()).toPNG()), 3000)
+    // --laki-capture=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
+    if (capture) setTimeout(async () => win && writeFileSync(capture, (await win.webContents.capturePage()).toPNG()), 3000)
   })
   if (dev) win.loadURL(process.env.ELECTRON_RENDERER_URL!)
   else win.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)))
@@ -292,7 +298,7 @@ ipcMain.handle('conn', async () => {
 type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string } } // tool: an extension's tool call, answered (widgetToolAnswer)
 const notes = new Set<Notification>()
 ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
-  if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
+  if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
   const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string')).slice(0, 9)
   const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })) })

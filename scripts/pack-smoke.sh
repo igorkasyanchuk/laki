@@ -27,7 +27,7 @@ for i in $(seq 100); do laki ls | grep -q "○● claude" && break; sleep 0.1; d
 laki ls
 echo "--- hook command:"; grep -o '"command": "[^"]*hook idle' "$LAKI_HOME/claude-settings.json"
 echo "--- screen:"; laki screen packed
-LAKI_CAPTURE=$H/shot.png LAKI_NOTIFY_LOG=$H/notify.log $X "$BIN" $NOSB > "$H/app.out" 2>&1 &
+$X "$BIN" $NOSB --laki-capture="$H/shot.png" --laki-notify-log="$H/notify.log" > "$H/app.out" 2>&1 &
 APP_PID=$!
 for i in $(seq 100); do [ -f "$H/shot.png" ] && break; sleep 0.1; done
 # a turn that ends in a workspace the window doesn't show: the app posts a notification
