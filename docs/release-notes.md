@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.22.0 · Oct 20, 2026
 
 - GitHub labels on a pull request: the PR section (Info, Review) shows its labels, and its tag button lists the
   repository's: a click puts one on or takes it off.
