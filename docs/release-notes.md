@@ -2,7 +2,7 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
-## Next
+## 0.19.0 · Oct 19, 2026
 
 - **Notes** (experimental: Settings › General): your own notes, one list for every project, on the rail's Notes:
   written like a Notion page (headings, checklists, tables, code, images, diagrams), each with a color, pinned or not,
