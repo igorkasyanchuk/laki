@@ -2,6 +2,10 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Security: an extension's HTML can't add a web view, and every web view runs with web security on.
+
 ## 0.21.0 · Oct 19, 2026
 
 - Extensions' dialogs: up to 6 buttons styled primary, danger or quiet, a UI kit element inside (a table, a toggle,

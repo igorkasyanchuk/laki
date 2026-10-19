@@ -80,7 +80,7 @@ app.on('web-contents-created', (_e, wc) => {
   if (wc.session === session.fromPartition(BROWSER)) googleSignIn(wc)
   wc.on('will-attach-webview', (e, prefs, params) => {
     delete prefs.preload
-    Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true })
+    Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, experimentalFeatures: false }) // whatever the tag's webpreferences said
     if (params.partition === BROWSER ? !/^(https?:\/\/|about:blank$)/.test(params.src) : !local(params.src) || params.partition !== PREVIEW) e.preventDefault()
   })
   // a Browsers page's link to a new tab opens in that page; a window.open popup (a sign-in's: Google, GitHub) gets a
