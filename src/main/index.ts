@@ -15,6 +15,9 @@ import type { View } from '../shared/types.ts'
 // environment (launchctl setenv reaches every launch), nor passes them on to the daemon and agents
 if (app.isPackaged) delete process.env.ELECTRON_RENDERER_URL, delete process.env.LAKI_DEV_ORIGIN
 const dev = !!process.env.ELECTRON_RENDERER_URL
+// the app's own pages, its windows' (built: file:, nothing else loads one), not a site or a frame inside them
+const appPage = (url: string | undefined) => !!url && url.startsWith(dev ? process.env.ELECTRON_RENDERER_URL! : 'file:')
+const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => e.sender.getType() === 'window' && e.senderFrame === e.sender.mainFrame && appPage(e.senderFrame?.url)
 // scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
 // none reach a launch from Finder or the Dock
 const capture = app.commandLine.getSwitchValue('laki-capture')
@@ -149,6 +152,11 @@ app.whenReady().then(() => {
     s.setPermissionRequestHandler((_wc, perm, cb) => cb(PREVIEW_OK.has(perm)))
     s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
   }
+  // the app's own session (its windows, and the frames in them: an extension's page, an artifact, the video): the
+  // microphone for its own pages (Settings › Voice's cloud), full screen and a clipboard write for any, nothing else
+  const ok = (perm: string, url?: string) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write' || (perm === 'media' && appPage(url))
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ok(perm, d.requestingUrl || wc.getURL())))
+  session.defaultSession.setPermissionCheckHandler((wc, perm, _origin, d) => ok(perm, d.requestingUrl || wc?.getURL()))
   // Browsers: Chrome's user agent without Laki's and Electron's names (sites that turn away an app's web view)
   const b = session.fromPartition(BROWSER)
   b.setUserAgent((chromeUA = b.getUserAgent().replace(/ (laki|Laki|Electron)\/\S+/g, '')))
@@ -285,7 +293,8 @@ ipcMain.handle('hotkey', (_e, label: unknown) => {
 })
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
-ipcMain.handle('conn', async () => {
+ipcMain.handle('conn', async e => {
+  if (!fromApp(e)) throw new Error('not the app') // the token: the app's pages only
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
   const { port, token } = await daemon()
   return { port, token }
@@ -297,7 +306,8 @@ ipcMain.handle('conn', async () => {
 // collected Notification's events never come
 type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string } } // tool: an extension's tool call, answered (widgetToolAnswer)
 const notes = new Set<Notification>()
-ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
+ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
+  if (!fromApp(e)) return
   if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
   const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string')).slice(0, 9)

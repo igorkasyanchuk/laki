@@ -9,6 +9,8 @@ version it builds, with the date. -->
   a web page can't reach it by renaming itself (DNS rebinding).
 - Settings › General › **Export** leaves out env, presets' env and the phone webhook (secrets); Laki's state file and
   the workspaces' storage folders are yours alone (0600, 0700).
+- Security: the installed app ignores development settings in its environment, and a page inside it (an extension, an
+  artifact) gets no permission beyond full screen and copying.
 
 ## 0.21.0 · Oct 19, 2026
 
