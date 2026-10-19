@@ -8,10 +8,10 @@
 // Only what's on screen is rendered: a folded grid, or a closed dialog, holds nothing.
 import { type CSSProperties, type MouseEvent, useEffect, useRef, useState } from 'react'
 import { placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
-import { ago, sayOf, uiBehave, WIDGET_CSS, type WidgetSay } from '../../shared/widget'
+import { ago, type SayModal, sayOf, uiBehave, WIDGET_CSS, type WidgetButton, type WidgetSay } from '../../shared/widget'
 import { DO, type UiDo, uiHtml } from '../../shared/widgetUi'
 import { daemonBase } from './api'
-import { ask, Icon, IconButton, isIconName } from './ui'
+import { ask, escapes, Icon, IconButton, isIconName } from './ui'
 
 export type WidgetApi = {
   render: (id: string, full: boolean, sample?: boolean | string, cells?: [number, number], ws?: string) => Promise<string | null> // sample: widget.json's made-up data (a name: fixtures/<name>.json's); cells: where it shows (the UI kit's size); ws: a per-workspace one's instance
@@ -328,6 +328,67 @@ export function WidgetDialog({ w, api, onClose }: { w: WidgetView; api: WidgetAp
         <div className="widget-full">
           <WidgetBody w={w} full api={api} />
         </div>
+      </div>
+    </div>
+  )
+}
+
+// an extension's own dialog (a say's modal: an action's JSON, laki.modal): its words, a UI kit element over its own data
+// (its buttons run the extension's actions, as in its full view) and its buttons. A button closes it first (close
+// false: it stays while its action runs; 'done': once it's done); a later say with its id is drawn in its place, a
+// close with its id (or true) closes it. onClose(m): only while m is still the one shown
+export function WidgetModal({ w, ws, m, api, onClose }: { w: WidgetView; ws?: string; m: SayModal; api: WidgetApi; onClose: (m?: SayModal) => void }) {
+  const host = useRef<HTMLDivElement>(null)
+  const box = useRef<HTMLDivElement>(null)
+  const [busy, setBusy] = useState(-1)
+  const here = { ...w, here: ws ?? w.here }
+  const now = useRef({ here, api })
+  now.current = { here, api }
+  const ui = JSON.stringify([m.ui, m.data])
+  useEffect(() => {
+    if (!m.ui || !host.current) return
+    const root = host.current.shadowRoot ?? host.current.attachShadow({ mode: 'open' })
+    root.replaceChildren(Object.assign(document.createElement('style'), { textContent: WIDGET_CSS }), clean(uiHtml(m.ui, { data: m.data, config: w.config ?? {}, at: Date.now() }, { full: true })))
+    return uiBehave(root, x => act(x, now.current.here, true, now.current.api) ?? Promise.resolve())
+  }, [ui])
+  useEffect(() => {
+    const back = document.activeElement
+    ;(box.current?.querySelector<HTMLElement>('.ext-modal-buttons button.primary') ?? box.current)?.focus() // Enter: the primary one; none: no button takes it by chance
+    const f = (e: KeyboardEvent) => escapes(e) && (e.preventDefault(), e.stopPropagation(), onClose()) // before the full view under it (an ask over it took it first)
+    window.addEventListener('keydown', f, true)
+    return () => {
+      window.removeEventListener('keydown', f, true)
+      if (back instanceof HTMLElement && back.isConnected) back.focus() // the terminal it came from
+    }
+  }, [])
+  const press = (b: WidgetButton, i: number) => {
+    if (b.open) return void (api.open(b.open), b.close !== false && onClose(m))
+    if (!b.run) return onClose(m)
+    if (b.close === undefined) return void (onClose(m), api.action(w.id, b.run, b.arg ?? '', b.label, here.here ?? undefined))
+    setBusy(i)
+    void api.action(w.id, b.run, b.arg ?? '', b.label, here.here ?? undefined).then(r => (setBusy(-1), b.close === 'done' && r !== false && onClose(m)))
+  }
+  return (
+    <div className="overlay ext-overlay" onMouseDown={e => e.target === e.currentTarget && onClose()}>
+      <div ref={box} tabIndex={-1} className={`modal ext-modal ${m.size ?? (m.ui ? 'm' : '')}`} role="dialog" aria-modal aria-label={m.title || w.name} data-widget={w.id}>
+        <div className="ext-modal-head">
+          <b>{m.title || w.name}</b>
+          <span className="spacer" />
+          <IconButton icon="x" title="Close (Esc)" onClick={() => onClose()} />
+        </div>
+        <div className="ext-modal-body">
+          {m.text && <p className="ext-modal-text">{m.text}</p>}
+          {m.ui && <div ref={host} className="widget-body" data-view="full" />}
+        </div>
+        {m.buttons.length > 0 && (
+          <div className="ext-modal-buttons">
+            {m.buttons.map((b, i) => (
+              <button key={i} className={`${b.style ?? ''} ${busy === i ? 'busy' : ''}`} disabled={busy >= 0} onClick={() => press(b, i)}>
+                {b.label}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   )

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions' dialogs: up to 6 buttons styled primary, danger or quiet, a UI kit element inside (a table, a toggle,
+  a form), a button that keeps it open while its action runs, and an id an action updates or closes it by.
 - My Desk's **Build with AI** is a dialog now: a text area, screenshots (paste, drop, attach, or take one) and text
   files; **Build it** opens the extension studio, where Laki AI builds it.
 - The floating **Laki AI** chat resizes from its edges and corners, and keeps its size.

@@ -109,7 +109,8 @@ setting's `required` and the view's `missing`, the `panel` and `row` places (a r
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
 `widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`; 86: workflows' `agent-ask` wait (`turnWaits`, `flowAnswer` through `answer`), a
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
-(`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`). A
+(`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
+`close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1042,10 +1043,16 @@ guide says so) in the widget's folder with `$WIDGET_<NAME>` per setting, `$LAKI_
 command); stdout must be JSON; a failure keeps the last data. `widgetTick` (30 s, and as the first client connects)
 fetches what's due, only while a client is on the socket (the app is open) and within `settings.widgetHours` (`when.ts`
 `parseHours`/`inHours`: `9am-9pm weekdays`, `no weekends`, overnight spans; a line that doesn't read: always). An action that prints
-JSON (all of stdout, or its last line) with `toast`/`modal` (`shared/widget.ts` `sayOf`: up to 4 buttons, each `run` (an action, `arg`), `open` (http(s),
-mailto, laki://) or nothing) returns them; a JS page's `laki.toast`/`laki.modal` post the same (`say`). The renderer
-shows a busy toast while an action runs (the button `data-busy`, cleared by a `done` message to the frame), then the
-result: App's `widgetApi.say`, a modal through ui.tsx's `choose` (the `ask` dialog with any buttons).
+JSON (all of stdout, or its last line) with `toast`/`modal`/`close` (`shared/widget.ts` `sayOf`: a modal's `title`,
+`text`, `ui` (a kit element, 64 KB) over its own `data` (512 KB), `size`, `id`; up to 6 buttons, each `run` (an action,
+`arg`), `open` (http(s), mailto, laki://) or nothing, `style` primary/danger/quiet, `close` false or `'done'`; `[]`: none;
+`close`: true or an id) returns them; a JS page's `laki.toast`/`laki.modal`/`laki.close` post the same (`say`). The
+renderer shows a busy toast while an action runs (the button `data-busy`, cleared by a `done` message to the frame), then
+the result: App's `widgetApi.say` (a close first: true, the widget's dialog, else the one with that id; then a modal: one
+with the shown one's widget and id keeps its key, `extModal.n`, drawn in place) and Widgets.tsx' `WidgetModal` (z 35:
+over pages, under asks; its kit body in a shadow root with `uiBehave` through `act`, full; Esc in the capture phase,
+before a full view under it; Enter: the primary button; a button closes it first, `close: false` runs it with the
+button busy and stays, `'done'` closes it after a result that isn't false, only while that modal is still shown).
 
 `shared/widget.ts`: the template language (`render`: `{{a.b}}` escaped, `#each`/`#if`/`#unless` with `else`, `date`,
 `ago`, `spark`), `viewOf` (`<template preview>` / `<template full>`), `WIDGET_CSS` and `pageOf`. A widget whose HTML

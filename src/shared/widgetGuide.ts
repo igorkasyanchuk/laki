@@ -73,7 +73,12 @@ export const widgetFormat = () => `## widget.json
   \`$LAKI_CLI\` (the laki command: \`"$LAKI_CLI" ls --json\`).
 - \`actions\`: commands its buttons run by name, the button's arg as \`$WIDGET_ARG\` (never paste it into the command);
   then it fetches again. Its output's last line is a toast, or print JSON: \`{"toast": "Done"}\`, \`{"modal": {"title",
-  "text", "buttons": [{"label", "run", "arg", "open", "primary"}]}}\` (4 buttons at most; \`open\`: http(s), mailto, laki://).
+  "text", "buttons": [{"label", "run", "arg", "open", "style", "close"}]}}\` (6 buttons at most; \`open\`: http(s), mailto,
+  laki://; \`style\`: primary, danger or quiet; a button closes the dialog first, \`"close": false\` keeps it open while
+  its action runs, \`"done"\` closes it once that's done; \`[]\`: none, only ✕). A dialog can hold a UI kit element over
+  its own data: \`"ui": {"type": "table", …}, "data": {…}, "size": "s|m|l"\`, its buttons running actions as in the
+  full view. \`"id": "deploy"\`: a later modal with that id is drawn in its place (a progress dialog an action updates),
+  and \`{"close": "deploy"}\` (or \`true\`: any of its own) closes it.
   An action may be an agent instead of a command: \`"draft": { "ai": "Draft a short reply to {{arg}}", "tools":
   "mcp__slack__post_message" }\` (\`{{arg}}\`, \`{{config.x}}\`, its data's fields and \`{{workspace.branch}}\` filled in; the
   agent of Settings › Extensions, with the user's MCP servers; \`tools\`: claude's it may use unasked). Its answer shows
@@ -180,7 +185,7 @@ ${examples()}
   Without a script it's drawn in the app: scripts, frames, forms and \`on…\` attributes are removed.
 - With a \`<script>\`: a page in a sandboxed frame with no network (unless the user turns on its Network access) and
   \`window.laki\`: \`data\`, \`config\`, \`at\`, \`error\`, \`full\`, \`refresh()\`, \`open(url)\`, \`expand()\`, \`run(action, arg)\`, \`do(cmd)\`,
-  \`toast(text)\`, \`modal({…})\` (these right after a click), \`ui(spec, data)\` and \`mount(el, spec, data)\` (the kit's
+  \`toast(text)\`, \`modal({…})\`, \`close(id?)\` (these right after a click), \`ui(spec, data)\` and \`mount(el, spec, data)\` (the kit's
   HTML). Inline everything; draw a canvas at a fixed size.
 `
 
