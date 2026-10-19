@@ -216,6 +216,9 @@ const SIDE = 240 // the sidebar's default width
 // the rail layout (Settings › Appearance › Layout): a kind each, its words, its icon
 type RailKind = 'projects' | 'shells' | 'browsers'
 const RAIL: [RailKind, string, IconName][] = [['projects', 'Projects', 'fork'], ['shells', 'Terminal', 'terminal'], ['browsers', 'Browser', 'globe']]
+// the rail with words: past RAIL_FIT buttons above the pins (⋯ More one of them), these go into More, the least used first
+const RAIL_FIT = 7
+const RAIL_MORE = ['calendar', 'workflows', 'specs', 'board']
 let requests = 0
 // a file open in the app (the preview's tabs): its workspace, path and line; an artifact's is read-only
 type Opened = { ws: string; path: string; line?: number; n: number; edit?: Edit; storage?: boolean }
@@ -2571,8 +2574,8 @@ export function App() {
     return { n: mine.filter(needsYou).length, busy: mine.some(t => spins(t)) }
   }
   // a rail button: its icon, words (Labels), and a count or a dot on the icon
-  const railButton = (key: string, icon: IconName, label: string, on: boolean, tip: string, run: () => void, mark?: ReactNode) => (
-    <button key={key} type="button" data-rail={key} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} onClick={run}>
+  const railButton = (key: string, icon: IconName, label: string, on: boolean, tip: string, run: () => void, mark?: ReactNode, menu?: (e: React.MouseEvent) => void) => (
+    <button key={key} type="button" data-rail={key} className={`rail-kind nodrag ${on ? 'on' : ''}`} aria-pressed={on} aria-label={tip} data-tip={tip} aria-haspopup={menu ? 'menu' : undefined} onClick={menu ?? run}>
       <span className="rail-icon">
         <Icon name={icon} size={18} />
         {mark}
@@ -2676,18 +2679,31 @@ export function App() {
       <IconButton icon="chevronRight" title={histAt.at[histAt.i + 1] ? `Forward to ${placeName(histAt.at[histAt.i + 1])} (⌘])` : 'Forward (⌘])'} disabled={histAt.i >= histAt.at.length - 1} onClick={() => travel(histAt.i + 1)} onContextMenu={e => histMenu(e, 1)} />
     </span>
   )
+  // the rail's pages after Projects, then the other kinds; with words under the icons and more than RAIL_FIT buttons,
+  // the least used ones (RAIL_MORE's order) go into ⋯ More, a menu, its count their counts', lit while one is open
+  type RailPage = { key: string; icon: IconName; label: string; on: boolean; tip: string; run: () => void; mark?: ReactNode; n?: number } | { key: string; kind: (typeof RAIL)[number] }
+  const railPages: RailPage[] = [
+    { key: 'board', icon: 'board', label: 'Board', on: dialog === 'board', tip: BOARD_TIP, run: toBoard },
+    { key: 'schedules', icon: 'clock', label: 'Schedule', on: schedulesFor !== undefined, tip: `${schedTip}${runFailed ? ' · a run failed' : ''}`, run: toSchedules, mark: runFailed && <span className="rail-dot bad" /> },
+    ...(specsOn ? [{ key: 'specs', icon: 'spec' as const, label: 'Specs', on: !!specsOf(dialog), tip: SPECS_TIP, run: toSpecs }] : []),
+    ...(flowsOn ? [{ key: 'workflows', icon: 'flow' as const, label: 'Flows', on: !!flowsOf(dialog), tip: FLOWS_TIP, run: toFlows, n: flowsAsk }] : []),
+    ...(deskOn ? [{ key: 'desk', icon: 'desk' as const, label: 'My Desk', on: dialog === 'desk', tip: 'My Desk (experimental): your extensions as tiles', run: toDesk }] : []),
+    ...(notesOn ? [{ key: 'notes', icon: 'note' as const, label: 'Notes', on: !!notesOf(dialog), tip: 'Notes (experimental): yours, for any project', run: toNotes }] : []),
+    ...(calOn ? [{ key: 'calendar', icon: 'calendar' as const, label: 'Calendar', on: dialog === 'calendar', tip: `Calendar (experimental): scheduled tasks and reminders${calSoon ? ` · ${calSoon} rang` : ''}`, run: toCal, n: calSoon }] : []),
+    ...RAIL.slice(1).filter(([k]) => railOf(k) === k).map(kind => ({ key: kind[0], kind })),
+  ]
+  const over = railWords && railPages.length + 1 > RAIL_FIT ? RAIL_MORE.filter(k => railPages.some(x => x.key === k)).slice(0, railPages.length + 1 - (RAIL_FIT - 1)) : []
+  const railKept = railPages.filter(x => !over.includes(x.key))
+  const railMore = railPages.filter((x): x is Extract<RailPage, { run: () => void }> => over.includes(x.key) && 'run' in x)
   const railBar = rail && sideOpen && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }}>
       {histNav}
       {kindButton(RAIL[0])}
-      {railButton('board', 'board', 'Board', dialog === 'board', BOARD_TIP, toBoard)}
-      {railButton('schedules', 'clock', 'Schedule', schedulesFor !== undefined, `${schedTip}${runFailed ? ' · a run failed' : ''}`, toSchedules, runFailed && <span className="rail-dot bad" />)}
-      {specsOn && railButton('specs', 'spec', 'Specs', !!specsOf(dialog), SPECS_TIP, toSpecs)}
-      {flowsOn && railButton('workflows', 'flow', 'Flows', !!flowsOf(dialog), FLOWS_TIP, toFlows, flowsAsk > 0 && <span className="rail-count">{flowsAsk}</span>)}
-      {deskOn && railButton('desk', 'desk', 'My Desk', dialog === 'desk', 'My Desk (experimental): your extensions as tiles', toDesk)}
-      {notesOn && railButton('notes', 'note', 'Notes', !!notesOf(dialog), 'Notes (experimental): yours, for any project', toNotes)}
-      {calOn && railButton('calendar', 'calendar', 'Calendar', dialog === 'calendar', `Calendar (experimental): scheduled tasks and reminders${calSoon ? ` · ${calSoon} rang` : ''}`, toCal, calSoon > 0 && <span className="rail-count">{calSoon}</span>)}
-      {RAIL.slice(1).filter(([k]) => railOf(k) === k).map(kindButton)}
+      {railKept.map(x => ('kind' in x ? kindButton(x.kind) : railButton(x.key, x.icon, x.label, x.on, x.tip, x.run, x.n ? <span className="rail-count">{x.n}</span> : x.mark)))}
+      {railMore.length > 0 &&
+        railButton('more', 'more', 'More', railMore.some(x => x.on), `More: ${railMore.map(x => x.label).join(', ')}`, () => {}, (n => (n ? <span className="rail-count">{n}</span> : undefined))(railMore.reduce((a, x) => a + (x.n ?? 0), 0)), e =>
+          openMenu(e, railMore.map(x => ({ label: x.label, icon: x.icon, sub: x.tip, run: x.run, ...(x.on && { hint: 'ON' }), ...(x.n ? { pill: String(x.n), tone: 'warn' as const } : {}) }))),
+        )}
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
       {railPins.map(pinButton)}
       {planPins.map(planButton)}

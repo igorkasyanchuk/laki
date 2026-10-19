@@ -1412,7 +1412,7 @@ export function FileFinder(p: { files: () => Promise<FileList>; onPick: (path: s
   useEffect(() => void p.files().then(f => setAll(f?.files ?? []), e => setErr(String(e?.message ?? e))), [])
   const found = useMemo(() => findFiles(q, all ?? []), [q, all])
   useEffect(() => setI(0), [q])
-  useEffect(() => list.current?.querySelector('.ff-item.sel')?.scrollIntoView({ block: 'nearest' }), [i])
+  useEffect(() => void list.current?.querySelector('.ff-item.sel')?.scrollIntoView({ block: 'nearest' }), [i])
   const pick = (path?: string) => path && (p.onClose(), p.onPick(path))
   const mark = (path: string, hits: number[]) => {
     const at = path.lastIndexOf('/') + 1
