@@ -11,7 +11,18 @@ import { fileURLToPath, pathToFileURL } from 'node:url'
 import { ensureDaemon, rpc } from '../shared/conn.ts'
 import type { View } from '../shared/types.ts'
 
+// a dev build's: the page its windows load and the daemon's extra origin. An installed app takes neither from its
+// environment (launchctl setenv reaches every launch), nor passes them on to the daemon and agents
+if (app.isPackaged) delete process.env.ELECTRON_RENDERER_URL, delete process.env.LAKI_DEV_ORIGIN
 const dev = !!process.env.ELECTRON_RENDERER_URL
+// the app's own pages, its windows' (built: file:, nothing else loads one), not a site or a frame inside them
+const devOrigin = dev ? new URL(process.env.ELECTRON_RENDERER_URL!).origin : ''
+const appPage = (url: string | undefined) => !!url && (dev ? URL.canParse(url) && new URL(url).origin === devOrigin : url.startsWith('file:'))
+const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => e.sender.getType() === 'window' && e.senderFrame === e.sender.mainFrame && appPage(e.senderFrame?.url)
+// scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
+// none reach a launch from Finder or the Dock
+const capture = app.commandLine.getSwitchValue('laki-capture')
+const notifyLog = app.commandLine.getSwitchValue('laki-notify-log')
 const mac = process.platform === 'darwin' // elsewhere (Linux): the system's title bar, and closing the window quits (no Dock to bring it back)
 let win: BrowserWindow | null = null
 let pendingTab: string | null = null
@@ -80,7 +91,7 @@ app.on('web-contents-created', (_e, wc) => {
   if (wc.session === session.fromPartition(BROWSER)) googleSignIn(wc)
   wc.on('will-attach-webview', (e, prefs, params) => {
     delete prefs.preload
-    Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true })
+    Object.assign(prefs, { nodeIntegration: false, contextIsolation: true, sandbox: true, webSecurity: true, allowRunningInsecureContent: false, experimentalFeatures: false }) // whatever the tag's webpreferences said
     if (params.partition === BROWSER ? !/^(https?:\/\/|about:blank$)/.test(params.src) : !local(params.src) || params.partition !== PREVIEW) e.preventDefault()
   })
   // a Browsers page's link to a new tab opens in that page; a window.open popup (a sign-in's: Google, GitHub) gets a
@@ -142,6 +153,12 @@ app.whenReady().then(() => {
     s.setPermissionRequestHandler((_wc, perm, cb) => cb(PREVIEW_OK.has(perm)))
     s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
   }
+  // the app's own session (its windows, and the frames in them: an extension's page, an artifact, the video): the
+  // microphone (not the camera) for its own pages (Settings › Voice's cloud), full screen and a clipboard write for
+  // any, nothing else
+  const ok = (perm: string, url?: string, video?: boolean) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write' || (perm === 'media' && !video && appPage(url))
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ok(perm, d.requestingUrl || wc.getURL(), 'mediaTypes' in d && !!d.mediaTypes?.includes('video'))))
+  session.defaultSession.setPermissionCheckHandler((wc, perm, _origin, d) => ok(perm, d.requestingUrl || wc?.getURL(), d.mediaType === 'video'))
   // Browsers: Chrome's user agent without Laki's and Electron's names (sites that turn away an app's web view)
   const b = session.fromPartition(BROWSER)
   b.setUserAgent((chromeUA = b.getUserAgent().replace(/ (laki|Laki|Electron)\/\S+/g, '')))
@@ -160,7 +177,7 @@ const daemon = () =>
   ensureDaemon({
     ELECTRON_RUN_AS_NODE: '1',
     LAKI_FROM_APP: '1',
-    ...(dev ? { LAKI_DEV_ORIGIN: new URL(process.env.ELECTRON_RENDERER_URL!).origin } : {}),
+    ...(dev ? { LAKI_DEV_ORIGIN: devOrigin } : {}),
   })
 
 // where the window was left (window.json in userData): its bounds out of maximized and full screen, and whether it
@@ -235,9 +252,8 @@ function create() {
   win.webContents.on('did-finish-load', () => {
     if (pendingTab) win?.webContents.send('focus-tab', pendingTab)
     pendingTab = null
-    // LAKI_CAPTURE=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
-    const out = process.env.LAKI_CAPTURE
-    if (out) setTimeout(async () => win && writeFileSync(out, (await win.webContents.capturePage()).toPNG()), 3000)
+    // --laki-capture=<file.png>: a screenshot of the window 3s after load (checks a build without screen access)
+    if (capture) setTimeout(async () => win && writeFileSync(capture, (await win.webContents.capturePage()).toPNG()), 3000)
   })
   if (dev) win.loadURL(process.env.ELECTRON_RENDERER_URL!)
   else win.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)))
@@ -279,7 +295,8 @@ ipcMain.handle('hotkey', (_e, label: unknown) => {
 })
 app.on('will-quit', () => globalShortcut.unregisterAll())
 
-ipcMain.handle('conn', async () => {
+ipcMain.handle('conn', async e => {
+  if (!fromApp(e)) throw new Error('not the app') // the token: the app's pages only
   if (quitting) throw new Error('quitting') // after Quit Completely: no new daemon
   const { port, token } = await daemon()
   return { port, token }
@@ -291,8 +308,9 @@ ipcMain.handle('conn', async () => {
 // collected Notification's events never come
 type NoteAction = { text: string; n?: number; label?: string; pick?: 'first' | 'last'; tool?: { req: string; allow: string } } // tool: an extension's tool call, answered (widgetToolAnswer)
 const notes = new Set<Notification>()
-ipcMain.on('notify', (_e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
-  if (process.env.LAKI_NOTIFY_LOG) appendFileSync(process.env.LAKI_NOTIFY_LOG, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
+ipcMain.on('notify', (e, title: string, body: string, tab: string, sound?: string, actions?: NoteAction[]) => {
+  if (!fromApp(e)) return
+  if (notifyLog) appendFileSync(notifyLog, JSON.stringify({ title, body, tab, sound, actions }) + '\n') // smoke tests
   const named = typeof sound === 'string' && /^[A-Za-z]+$/.test(sound) && sound !== 'none'
   const buttons = (Array.isArray(actions) ? actions : []).filter(a => typeof a?.text === 'string' && (Number.isInteger(a.n) || a.pick === 'first' || a.pick === 'last' || typeof a.tool?.req === 'string')).slice(0, 9)
   const n = new Notification({ title, body, silent: sound === 'none', ...(named && { sound }), actions: buttons.map(a => ({ type: 'button' as const, text: a.text.slice(0, 60) })) })

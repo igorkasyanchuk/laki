@@ -160,10 +160,15 @@ export function toCsv(rows: string[][], sep = ',', quoted: boolean[][] = [], tra
 const KINDS: Record<string, string> = { presets: 'array null', memory: 'array', imageDays: 'number', templates: 'array', actions: 'array', tunnelMails: 'array', widgetDirs: 'array', favThemes: 'array', env: 'object', prPrompts: 'object', webhook: 'object', ai: 'object', voice: 'object', prScan: 'number', prTries: 'number', archivedDays: 'number', sleepAfter: 'number', pageZoom: 'number', notifyOn: 'object', usage: 'object', projectLook: 'object', sideLook: 'object', prMarks: 'object', planTemplates: 'array', railPlans: 'array', fontSize: 'number', lineHeight: 'number', letterSpacing: 'number', minContrast: 'number', scrollSpeed: 'number', glassWindow: 'number', glassSide: 'number', glassTerm: 'number', sideClear: 'number', floaterRecent: 'number', floaterRecentHours: 'number', floaterMax: 'number', flowVars: 'object', deskTiles: 'array', deskTabs: 'array' }
 // an imported settings file (Settings › General › Import): a field of the wrong kind (a file from another version) is
 // left out, the rest comes in; one this version doesn't know stays, harmless. ponytail: top level only
-export function importable(v: Record<string, unknown>) {
+type EnvPreset = { name: string; env?: Record<string, string> }
+export function importable(v: Record<string, unknown>, mine?: { presets?: EnvPreset[] | null }) {
   const kind = (x: unknown) => (x === null ? 'null' : Array.isArray(x) ? 'array' : typeof x)
   const bad = Object.keys(v).filter(k => KINDS[k] && v[k] !== undefined && !KINDS[k].split(' ').includes(kind(v[k])))
-  return { ok: Object.fromEntries(Object.entries(v).filter(([k]) => !bad.includes(k))), bad }
+  const ok = Object.fromEntries(Object.entries(v).filter(([k]) => !bad.includes(k)))
+  // Export leaves presets' env out (secrets): a preset in the file keeps this Mac's, by name; the file's own wins
+  const envs = new Map((mine?.presets ?? []).map(p => [p.name, p.env]))
+  if (Array.isArray(ok.presets)) ok.presets = (ok.presets as EnvPreset[]).map(p => (p?.env || !envs.get(p?.name) ? p : { ...p, env: envs.get(p.name) }))
+  return { ok, bad }
 }
 
 // the preview's address bar: a path on the port (/x), :5173/x, localhost:5173/x, a whole URL, or a site's address

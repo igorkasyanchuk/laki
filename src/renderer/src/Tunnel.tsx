@@ -6,13 +6,13 @@ import { qr, qrPath } from './qr'
 import { MAIL_OK, parseMails } from './text'
 import { Icon, IconButton } from './ui'
 
-export type Tunnel = { port: number; url?: string; mails?: string[] } // no url yet: starting
+export type Tunnel = { port: number; url?: string; mails?: string[]; until?: number } // no url yet: starting; until: when it stops
 // version: missing when cloudflared isn't installed; mails: who the last tunnel let in (or git's user.email);
 // expose: the project's default (Settings › the project, or .laki.json): only those, every time the popup opens
 export type Cloudflared = { version?: string; mails?: string[]; expose?: string }
 export type TunnelApi = {
   check: () => Promise<Cloudflared>
-  start: (port: number, mails: string[]) => Promise<unknown>
+  start: (port: number, mails: string[], hours: number) => Promise<unknown>
   stop: (port: number) => Promise<unknown>
   open: (url: string) => void
   copy: (text: string) => void
@@ -51,6 +51,7 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
   const [cf, setCf] = useState<Cloudflared | null | 'failed'>(null)
   const [mails, setMails] = useState<string | null>(null) // null: not typed in yet
   const [only, setOnly] = useState(false) // only some emails; else anyone with the link
+  const [hours, setHours] = useState(8)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const box = useRef<HTMLDivElement>(null)
@@ -81,7 +82,7 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
     if (busy) return
     setBusy(true)
     setErr('')
-    await api.start(port, list).catch(e => setErr(String((e as Error).message ?? e)))
+    await api.start(port, list, hours).catch(e => setErr(String((e as Error).message ?? e)))
     setBusy(false)
   }
   const stop = () => api.stop(port).catch(e => setErr(String((e as Error).message ?? e)))
@@ -102,8 +103,9 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
           <IconButton icon="link" title="Open" onClick={() => api.open(tunnel.url!)} />
         </div>
         <p className="muted small">
-          {tunnel.mails?.length ? `Only ${tunnel.mails.join(', ')}: Cloudflare emails each visitor a one-time code.` : 'Public: anyone with the link can open it.'} It runs until you stop it or the
-          workspace goes, with the app closed too.
+          {tunnel.mails?.length ? `Only ${tunnel.mails.join(', ')}: Cloudflare emails each visitor a one-time code.` : 'Public: anyone with the link can open it.'}{' '}
+          {tunnel.until ? `It ends in ${timeLeft(tunnel.until)}, or when you stop it or the workspace goes` : 'It runs until you stop it or the workspace goes'}, with the app closed
+          too.
         </p>
         <div className="buttons">
           <span className="grow" />
@@ -194,6 +196,14 @@ function TunnelPop({ anchor, port, tunnel, api, onClose }: { anchor: DOMRect; po
             'No sign-in: anyone who gets the link can open it.'
           )}
         </p>
+        <div className="tunnel-radios" role="radiogroup" aria-label="For how long">
+          <span className="muted">For how long</span>
+          {SHARE_FOR.map(([h, label]) => (
+            <label key={h} className="check">
+              <input type="radio" name="for" checked={hours === h} onChange={() => setHours(h)} /> {label}
+            </label>
+          ))}
+        </div>
         <div className="buttons">
           <span className="muted small">cloudflared {cf.version}</span>
           <span className="grow" />

@@ -89,6 +89,8 @@ test("text helpers: a nameless action doesn't replace a named one, YouTube start
   assert.equal(toCsv([['a']], ',', [[]], false), 'a')
   assert.equal(toCsv([], ','), '')
   assert.deepEqual(importable({ presets: null, templates: null, env: [], prScan: '2', fontSize: 13, other: 'x' }), { ok: { presets: null, fontSize: 13, other: 'x' }, bad: ['templates', 'env', 'prScan'] })
+  // presets' env: Export leaves it out, so a preset of the same name keeps this Mac's; the file's own wins
+  assert.deepEqual(importable({ presets: [{ name: 'a' }, { name: 'b', env: { X: 'file' } }, { name: 'c' }] }, { presets: [{ name: 'a', env: { K: '1' } }, { name: 'b', env: { X: 'mine' } }] }).ok.presets, [{ name: 'a', env: { K: '1' } }, { name: 'b', env: { X: 'file' } }, { name: 'c' }])
 })
 
 test('layouts: nothing has no tabs, moving a tab not there changes nothing, resize down either side', () => {

@@ -2,6 +2,20 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- Security: an extension's HTML can't add a web view, and every web view runs with web security on.
+- Security: Laki's daemon answers only requests addressed to it (127.0.0.1, localhost, or remote access's link), so
+  a web page can't reach it by renaming itself (DNS rebinding).
+- Settings › General › **Export** leaves out env, presets' env and the phone webhook (secrets); Laki's state file and
+  the workspaces' storage folders are yours alone (0600, 0700).
+- Security: the installed app ignores development settings in its environment, and a page inside it (an extension, an
+  artifact) gets no permission beyond full screen and copying.
+- Workflows' webhooks go to https URLs only (plain http to this Mac) and don't follow redirects: a 3xx is the
+  answer.
+- **Expose to the world** asks for how long: 1, 8 (the default) or 24 hours, or until you stop it. A tunnel left
+  open stops on its own.
+
 ## 0.22.0 · Oct 20, 2026
 
 - GitHub labels on a pull request: the PR section (Info, Review) shows its labels, and its tag button lists the

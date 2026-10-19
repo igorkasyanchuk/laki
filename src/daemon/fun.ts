@@ -22,7 +22,8 @@ const json = async (url: string) => {
   return r.json()
 }
 // a picture's URL: https (or the fake server's), a still or a GIF
-const picture = (u: unknown): u is string => typeof u === 'string' && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(u) && (u.startsWith('https://') || (!!fake() && u.startsWith(`${fake()}/`)))
+const safe = (u: string) => u.startsWith('https://') || (!!fake() && u.startsWith(`${fake()}/`))
+const picture = (u: unknown): u is string => typeof u === 'string' && /\.(png|jpe?g|gif|webp)(\?|$)/i.test(u) && safe(u)
 
 async function fromReddit(sub: string): Promise<Post[]> {
   const d = await json(`${fake() || 'https://www.reddit.com'}/r/${sub}/hot.json?limit=100&raw_json=1`)
@@ -70,9 +71,18 @@ export async function meme(): Promise<Meme> {
         if (seen.length > 500) seen.shift()
         const r = await fetch(m.url, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(10000) }).catch(e => ((why = (e as Error).message), null))
         const type = (r?.headers.get('content-type') ?? '').split(';')[0]
-        if (!r?.ok || !type.startsWith('image/') || Number(r.headers.get('content-length')) > MAX) continue
-        const buf = Buffer.from(await r.arrayBuffer())
-        if (buf.length > MAX) continue
+        if (!r?.ok || !safe(r.url) || !type.startsWith('image/') || Number(r.headers.get('content-length')) > MAX) {
+          void r?.body?.cancel().catch(() => {}) // its connection let go now, not at GC
+          continue // redirected: still https
+        }
+        const parts: Buffer[] = []
+        let size = 0
+        for await (const b of r.body ?? []) {
+          if ((size += b.length) > MAX) break // no content-length, or a wrong one: no more than 8 MB read (break cancels it)
+          parts.push(Buffer.from(b))
+        }
+        if (size > MAX) continue
+        const buf = Buffer.concat(parts)
         return { title: m.title, link: m.link, by: m.by, sub, image: `data:${type};base64,${buf.toString('base64')}` }
       }
     } catch (e) {

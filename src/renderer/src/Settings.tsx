@@ -2567,8 +2567,12 @@ export function SettingsPage(p: {
   const [moved, setMoved] = useState('') // what the last export or import did
   const file = useRef<HTMLInputElement>(null)
   const exportAll = () => {
+    // without its secrets (env and presets' env: API keys; the phone webhook's URL: its token), set again on that Mac;
+    // an import leaves the ones there as they are
+    const { env: _env, webhook: _hook, ...rest } = s
+    const out = { ...rest, ...(s.presets && { presets: s.presets.map(({ env: _e, ...p }) => p) }) }
     const a = document.createElement('a')
-    a.href = URL.createObjectURL(new Blob([JSON.stringify({ laki: 'settings', version: 1, settings: s }, null, 2)], { type: 'application/json' }))
+    a.href = URL.createObjectURL(new Blob([JSON.stringify({ laki: 'settings', version: 1, settings: out }, null, 2)], { type: 'application/json' }))
     a.download = 'laki-settings.json'
     a.click()
     setTimeout(() => URL.revokeObjectURL(a.href), 60000)
@@ -2580,7 +2584,7 @@ export function SettingsPage(p: {
         const j = JSON.parse(t)
         const v = j?.laki === 'settings' ? j.settings : undefined
         if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error("it isn't a file Export made")
-        const { ok, bad } = importable(v)
+        const { ok, bad } = importable(v, s)
         paint(ok)
         setMoved(`Imported ${f.name}${bad.length ? `, without ${bad.join(', ')}: not what Laki keeps there now` : ''}`)
       })
@@ -3030,7 +3034,7 @@ export function SettingsPage(p: {
               <Group title="Environment" hint="Every session's (agents, shells, setup); a project's or preset's env wins. New sessions get it.">
                 <EnvField value={s.env} onChange={env => set({ env })} />
               </Group>
-              <Group title="Move to another Mac" hint="Every setting on these pages in a file (it holds your env: keep it private); projects and their own settings stay here">
+              <Group title="Move to another Mac" hint="Every setting on these pages in a file, but env, presets' env and the phone webhook (secrets: set them again there); projects and their own settings stay here">
                 <div className="row-buttons">
                   <button type="button" onClick={exportAll}>
                     Export…

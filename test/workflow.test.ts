@@ -533,6 +533,7 @@ test('workflow decisions: a decision model’s answers, one it isn’t sure of a
       chats.push(JSON.parse(body))
       return res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify({ model: 'x/fast', choices: [{ message: { content: '{"title": "T"}' } }] }))
     }
+    if (q.url === '/moved') return res.writeHead(302, { location: 'https://elsewhere.example/' }).end()
     if (q.url === '/flaky') return ++flaky < 2 ? res.writeHead(503, { 'retry-after': '1' }).end('busy') : res.writeHead(200).end('{"ok": true}')
     res.writeHead(404).end()
   })
@@ -633,6 +634,11 @@ end: success
   const got = await rig.rpc('flowTest', { block: hook })
   assert.deepEqual([got.exit, got.vars['steps.h.status'], flaky], ['ok', '200', 2])
   assert.match(got.log.join('\n'), /h: 503, again in 1 s/)
+  // a redirect is its answer, followed nowhere; plain http only to this Mac
+  const moved = await rig.rpc('flowTest', { block: { ...hook, url: `${at}/moved` } })
+  assert.deepEqual([moved.exit, moved.vars['steps.h.status']], ['error', '302'])
+  const plain = await rig.rpc('flowTest', { block: { ...hook, url: 'http://example.com/hook' } })
+  assert.deepEqual([plain.exit, /an https URL \(http only to this Mac\)/.test(JSON.stringify(plain))], ['error', true])
   await assert.rejects(rig.rpc('flowTest', { block: { id: 'r', kind: 'run', cmd: 'true' } }), /Test sends an AI call/)
 
   // a scheduled task runs the workflow on its task; again while that run goes: skipped

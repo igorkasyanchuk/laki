@@ -30,7 +30,9 @@ export type WidgetApi = {
 
 const LINK = /^(https?:|mailto:)/i
 const OPEN = /^(https?:|mailto:|laki:\/\/)/i
-const DROP = new Set(['script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'form', 'base', 'meta', 'link', 'template', 'portal', 'animate', 'set', 'animatemotion', 'animatetransform', 'foreignobject'])
+// webview: the app window has webviewTag (the preview), and one in a Browsers partition may load any site.
+// ponytail: <style> stays, widget.html's shared styles are the documented format (a style attribute could do as much)
+const DROP = new Set(['script', 'iframe', 'frame', 'frameset', 'object', 'embed', 'webview', 'form', 'base', 'meta', 'link', 'template', 'portal', 'animate', 'set', 'animatemotion', 'animatetransform', 'foreignobject'])
 const URL_ATTRS = new Set(['href', 'xlink:href', 'src', 'srcset', 'action', 'formaction', 'poster', 'background', 'ping'])
 
 // a widget's HTML without scripts, frames, forms, event attributes or URLs that go anywhere but a page (links open in

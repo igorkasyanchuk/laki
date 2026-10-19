@@ -160,7 +160,7 @@ exec sleep 600
   // a version it can't read: '?', and emails are tried anyway
   writeFileSync(join(cf, 'version'), 'dev')
   assert.equal((await rig.rpc('cloudflared', {})).version, '?')
-  assert.deepEqual(await rig.rpc('tunnelStart', { ws: ws.id, port: 4000, mails: ['a@b.co'] }), { port: 4000, url: 'https://fake-4000.trycloudflare.com', mails: ['a@b.co'] })
+  assert.deepEqual(await rig.rpc('tunnelStart', { ws: ws.id, port: 4000, mails: ['a@b.co'], hours: 0 }), { port: 4000, url: 'https://fake-4000.trycloudflare.com', mails: ['a@b.co'] })
   await rig.rpc('tunnelStop', { ws: ws.id, port: 4000 })
   assert.equal(await rig.rpc('tunnelStop', { ws: ws.id, port: 4000 }), null) // none: nothing to do
   // a version with zeros, older than the one with --allowed-mail

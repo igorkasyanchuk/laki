@@ -1,9 +1,11 @@
 // The daemon's API beyond the happy paths: errors, projects, tabs, workspaces, files, open in, ship, start.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { request } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
+import WebSocket from 'ws'
 import { connect, fresh, until } from './helpers.ts'
 
 test('errors name what is wrong: methods, lookups, the WebSocket', async t => {
@@ -304,6 +306,29 @@ test('images: the kind kept, empty ones refused, month-old ones cleaned up', asy
   await assert.rejects(rig.rpc('imageSave', { data: '' }), /an image up to 20 MB/)
 })
 
+test('the Host a request names: the daemon\'s own address, or remote access\'s while it runs; another (DNS rebinding) is turned away', async t => {
+  const rig = await fresh(t)
+  const { port, token } = rig.info()
+  const at = (host: string, method = 'POST', path = '/rpc') =>
+    new Promise<number>((res, rej) => {
+      const r = request({ host: '127.0.0.1', port, path, method, headers: { host, authorization: `Bearer ${token}` } }, x => (x.resume(), res(x.statusCode!)))
+      r.on('error', rej).end(method === 'POST' ? JSON.stringify({ method: 'ping' }) : undefined)
+    })
+  for (const h of [`127.0.0.1:${port}`, `localhost:${port}`]) assert.equal(await at(h), 200, h)
+  for (const h of ['evil.example', `evil.example:${port}`, `127.0.0.1:${port + 1}`, `fake-${port}.trycloudflare.com`]) {
+    assert.equal(await at(h), 421, h)
+    assert.equal(await at(h, 'GET', '/'), 421, h) // the page, a widget's, an artifact: every route
+  }
+  const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token}`, { headers: { host: 'evil.example' } })
+  await assert.rejects(new Promise((res, rej) => (ws.once('open', res), ws.once('error', rej))))
+  // remote access: its own host too, until it stops
+  symlinkSync(join(import.meta.dirname, 'cloudflared'), join(rig.home, 'bin/cloudflared'))
+  await rig.rpc('remoteStart', { hours: 1, mail: 'me@x.dev' })
+  assert.equal(await at(`fake-${port}.trycloudflare.com`), 200)
+  await rig.rpc('remoteStop')
+  assert.equal(await at(`fake-${port}.trycloudflare.com`), 421)
+})
+
 test('daemon start: a stale lock is taken over; from the app, the login shell\'s PATH; a dev origin when configured', async t => {
   const rig = await fresh(t)
   await rig.stop()
@@ -311,7 +336,7 @@ test('daemon start: a stale lock is taken over; from the app, the login shell\'s
   // a login shell whose profile adds /login/bin (only the PATH probe sees it: tabs show what the daemon took)
   const sh = join(rig.home, 'login-sh')
   writeFileSync(sh, `#!/bin/sh\ncase "$2" in *__LAKI__*) PATH="$PATH:/login/bin" ;; esac\nexec '${rig.env.SHELL}' "$@"\n`, { mode: 0o755 })
-  Object.assign(rig.env, { SHELL: sh, LAKI_FROM_APP: '1', LAKI_DEV_ORIGIN: 'http://127.0.0.1:5199' })
+  Object.assign(rig.env, { SHELL: sh, LAKI_FROM_APP: '1', LAKI_DEV_ORIGIN: 'http://127.0.0.1:5199,https://evil.example' })
   await rig.start()
   assert.equal(readFileSync(join(rig.data, 'daemon.lock'), 'utf8'), String(rig.info().pid))
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -323,6 +348,7 @@ test('daemon start: a stale lock is taken over; from the app, the login shell\'s
   assert.equal(await c.call('ping'), 'pong')
   c.close()
   await assert.rejects(connect(rig, 'http://localhost:5199'))
+  await assert.rejects(connect(rig, 'https://evil.example')) // only this Mac's: a site in the env isn't let in
 })
 
 test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, cloudflared failing, stop while starting, gone with the workspace and the daemon', async t => {
@@ -352,14 +378,23 @@ test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, 
   await assert.rejects(rig.rpc('tunnelStart', { ws: 'nope', port: 5173 }), /no workspace nope/)
 
   // protected: the login page's URL isn't the tunnel's; the list is remembered
+  const t0 = Date.now()
   const tn = await rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: [' me@x.dev', '*@team.dev', 'me@x.dev', ''] })
-  assert.deepEqual(tn, { port: 5173, url: 'https://fake-5173.trycloudflare.com', mails: ['me@x.dev', '*@team.dev'] })
+  assert.deepEqual({ ...tn, until: undefined }, { port: 5173, url: 'https://fake-5173.trycloudflare.com', mails: ['me@x.dev', '*@team.dev'], until: undefined })
+  assert.ok(Math.abs(tn.until - (t0 + 8 * 3600e3)) < 5000) // 8 hours unless asked
   assert.match(log(), /cloudflared tunnel --url http:\/\/localhost:5173 --allowed-mail=me@x\.dev --allowed-mail=\*@team\.dev\n/)
   assert.deepEqual((await rig.rpc('cloudflared')).mails, ['me@x.dev', '*@team.dev'])
   assert.deepEqual(await rig.rpc('tunnelStart', { ws: ws.id, port: 5173 }), tn) // running already: that one
-  const pub = await rig.rpc('tunnelStart', { ws: ws.id, port: 3000 })
-  assert.deepEqual(pub, { port: 3000, url: 'https://fake-3000.trycloudflare.com', mails: [] })
+  const pub = await rig.rpc('tunnelStart', { ws: ws.id, port: 3000, hours: 1 })
+  assert.deepEqual({ ...pub, until: undefined }, { port: 3000, url: 'https://fake-3000.trycloudflare.com', mails: [], until: undefined })
+  assert.ok(Math.abs(pub.until - (t0 + 3600e3)) < 5000)
   assert.deepEqual((await rig.rpc('state')).workspaces[0].tunnels, [tn, pub])
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 3001, hours: 3 }), /for how long: 1, 8, 24 hours, or 0 \(until stopped\)/)
+  // past its hours: stopped (the 8-hour one stays)
+  await rig.rpc('tunnelTick', { now: pub.until + 1 })
+  await until(() => log().includes('cloudflared 3000 stopped'), 'the hour is up')
+  assert.deepEqual((await rig.rpc('state')).workspaces[0].tunnels, [tn])
+  assert.equal((await rig.rpc('tunnelStart', { ws: ws.id, port: 3000, hours: 0 })).until, undefined) // until stopped: none
 
   writeFileSync(join(rig.home, 'cf-version'), '2025.1.0')
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 4000, mails: ['me@x.dev'] }), /cloudflared 2025\.1\.0 can't limit who opens a tunnel \(that needs 2026\.9\.3\): brew upgrade cloudflared/)
@@ -375,7 +410,7 @@ test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, 
   rmSync(join(rig.home, 'cf-silent'))
 
   await rig.rpc('tunnelStop', { ws: ws.id, port: 3000 })
-  await until(() => log().includes('cloudflared 3000 stopped'), 'the public tunnel stopped')
+  await until(() => log().split('cloudflared 3000 stopped').length === 3, 'the public tunnel stopped (again)')
   await rig.rpc('wsRm', { id: ws.id })
   await until(() => log().includes('cloudflared 5173 stopped'), 'the workspace takes its tunnel')
   const other = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'tun2' })
@@ -812,6 +847,9 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
   const ws = async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id)
   const dir = await until(async () => (await ws()).storage, 'its storage folder')
+  // yours alone: the storage folder, and state.json (settings' env, the webhook's URL)
+  assert.equal(statSync(dir).mode & 0o777, 0o700)
+  assert.equal(statSync(join(rig.data, 'state.json')).mode & 0o777, 0o600)
   assert.equal((await ws()).artifacts, undefined)
   mkdirSync(join(dir, 'shots', '.cache'), { recursive: true })
   mkdirSync(join(dir, '.git'))
@@ -834,6 +872,10 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   assert.equal(await page.text(), '<link rel="stylesheet" href="a.css"><h1>hi</h1>')
   const css = await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`)
   assert.equal(css.headers.get('content-type'), 'text/css')
+  assert.equal(css.headers.get('access-control-allow-origin'), null) // CORS only for its sandboxed page (Origin null)
+  const fromPage = await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`, { headers: { origin: 'null' } })
+  assert.equal(fromPage.headers.get('access-control-allow-origin'), 'null')
+  assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/site/a.css`, { headers: { origin: 'https://evil.example' } })).headers.get('access-control-allow-origin'), null)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${'0'.repeat(widgetKey.length)}/${w.id}/site/index.html`)).status, 401)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/${w.id}/..%2f..%2fstate.json`)).status, 404)
   assert.equal((await fetch(`http://127.0.0.1:${port}/artifact/${widgetKey}/nope/site/index.html`)).status, 404)
