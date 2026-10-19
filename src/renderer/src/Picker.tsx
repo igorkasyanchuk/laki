@@ -47,11 +47,13 @@ export function componentsOf(el: Element): string[] {
   return out
 }
 
-// the UI kit's elements by their root's class (k-ck: checklist), from drawing each one's sample once
+// the UI kit's elements by their root's class (k-ck: checklist), from drawing each one's sample once (one shown in a
+// stack or a row: the element itself)
 let kitClass: Map<string, string> | undefined
+const own = (type: string, e: any): any => (e?.type === type ? e : Array.isArray(e?.children) ? e.children.map((c: unknown) => own(type, c)).find(Boolean) : undefined)
 const kitOf = (c: string) =>
   (kitClass ??= new Map(
-    UI_SAMPLES.map(x => [/class="(k-[\w-]+)/.exec(uiHtml(x.spec, { data: x.data, config: {}, at: 0 }, { full: true }))?.[1] ?? '', x.type] as [string, string]).filter(([k], i, all) => k && all.findIndex(y => y[0] === k) === i),
+    UI_SAMPLES.map(x => [/class="(k-[\w-]+)/.exec(uiHtml(own(x.type, x.spec) ?? x.spec, { data: x.data, config: {}, at: 0 }, { full: true }))?.[1] ?? '', x.type] as [string, string]).filter(([k], i, all) => k && all.findIndex(y => y[0] === k) === i),
   )).get(c)
 // an extension's (data-widget on its body, frame or button: Widgets.tsx); inside a template's shadow root, its host's.
 // The kit's element: the nearest k-<type> class (a JS page's frame keeps what's in it to itself: its pixels only)

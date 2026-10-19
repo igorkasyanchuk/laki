@@ -1296,7 +1296,10 @@ weeks that fit from today's; a bar's line the next one; `list` in full), people 
 `initialsOf`; `PRESENCE` dots), inbox (`unread`), chat (the newest last, `mine` on the right), prs (`PR_STATE`, `CHECKS`,
 a review's tag), commits (the hash's `data-copy`), segmented (each option `data-run` with its value, the picked one none)
 and stepper (− and + `data-run` with the new number, `round6`, past `min`/`max` disabled); `rowsOf` is their rows' cap,
-+N more and empty. `UI_EXAMPLES`: the UI kit
++N more and empty. Then accordion (`<details>` sharing a `name` per tree: one open at a time, none with `multiple`; a panel's `children`
+over its row, uiCheck's walk too), breadcrumbs, gallery (scroll-snap, `imageOk` pictures) and loading (`k-spin`,
+`k-blink`, `k-slide`; slower under reduced motion); a table cell's `subtitle`, `image`/`avatar`/`icon`, `progress`
+(`pctOf`, `minibar`, a list accessory's too), `badge`, `spark`, `copy` and `actions` (`.k-tc`; none: the words alone). `UI_EXAMPLES`: the UI kit
 page's Examples (`UiKit.tsx` `KitCard`), the guide's examples (`widgetGuide.ts` `examples`); `UI_SAMPLES` stays one
 per element. The app's CSP takes `img-src https:` (the kit's images, Markdown's pictures). The guide tool's `max`:
 40,000. Starters `note` (a static source) and `launcher` (`do` buttons).

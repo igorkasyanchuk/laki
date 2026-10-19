@@ -14,6 +14,10 @@ version it builds, with the date. -->
 - **A new remote access PIN page**: one solid card, a ring that fills as you type the PIN and turns green as it opens,
   and *Unlock* is always a button.
 - **Desk is My Desk**, and its tabs no longer show a count; an extension's *Its page* is now *Edit*.
+- **More for extensions' UI kit**: a table's column can show a picture with a name and a line under it, a progress bar,
+  a badge, a sparkline, a copy button and buttons; a list row can end in a small bar. New elements: `accordion` (panels
+  that fold, one open at a time, other elements inside), `breadcrumbs`, `gallery` (pictures in a row that scrolls) and
+  `loading` (a spinner, dots or a moving bar).
 - My Desk keeps room under the last row, so a bottom tile's corner is clear of the AI button for resizing.
 - Extensions scroll with a slim scrollbar, as the sidebar does.
 - The new-workspace page keeps its top row on one line: a long project, branch or name gets cut with … instead of the

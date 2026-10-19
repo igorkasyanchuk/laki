@@ -4,12 +4,13 @@ import { join } from 'node:path'
 import { test } from 'node:test'
 import { bytes, dur, num, pageOf, pct, render, uiBehave } from '../src/shared/widget.ts'
 import { CHARTS, chartPoints, colorCss, COLORS, near, TONES, uiCheck, UI_EXAMPLES, uiHtml, UI_SAMPLES, UI_TYPES } from '../src/shared/widgetUi.ts'
+import { tools } from '../src/cli/mcp.ts'
 import { fresh, until } from './helpers.ts'
 
 const at = Date.parse('2026-10-17T10:00:00Z')
 
 test('UI kit: every element has a sample, and every sample draws at a 1×1 preview, a bar and in full', () => {
-  assert.equal(UI_TYPES.length, 60)
+  assert.equal(UI_TYPES.length, 64)
   assert.deepEqual(UI_SAMPLES.map(s => s.type), UI_TYPES, 'a sample per element, in order')
   for (const s of UI_SAMPLES) {
     const ctx = { data: s.data, config: {}, at }
@@ -112,8 +113,8 @@ test('UI kit: diff, log, steps, board, tree, json, meter, countdown, toggle and 
   assert.doesNotMatch(mt, />c</, 'zero: no part')
   // a countdown: in, soon (warn), past (ago, or its words)
   const cd = (to: number, extra = {}) => draw({ type: 'countdown', to: '{{t}}', label: 'go', ...extra }, { t: to })
-  assert.match(cd(Date.now() + 3 * 86_400_000 + 7_200_000), /class="k-cd"[^>]*><b>in 3d 2h<\/b><span>go/)
-  assert.match(cd(Date.now() + 90 * 60_000), /class="k-cd t-warn"[^>]*><b>in 1h 3\dm/)
+  assert.match(cd(Date.now() + 3 * 86_400_000 + 7_230_000), /class="k-cd"[^>]*><b>in 3d 2h<\/b><span>go/)
+  assert.match(cd(Date.now() + 90 * 60_000 + 30_000), /class="k-cd t-warn"[^>]*><b>in 1h 3\dm/)
   assert.match(cd(Date.now() - 3 * 3_600_000), /class="k-cd t-muted"[^>]*><b>3 hours ago/)
   assert.match(cd(Date.now() - 1000, { past: 'Frozen' }), /<b>Frozen<\/b>/)
   assert.match(draw({ type: 'countdown', to: 'nope' }, {}), /<b>–<\/b>/)
@@ -127,6 +128,59 @@ test('UI kit: diff, log, steps, board, tree, json, meter, countdown, toggle and 
   // the rows' field check still reads a heatmap's value and a table's columns
   assert.match(uiCheck({ type: 'heatmap', each: 'd', value: '{{nn}}' }, { d: [{ n: 1 }] })[0].text, /value uses nn/)
   assert.match(uiCheck({ type: 'tree', each: 'd', label: '{{nme}}' }, { d: [{ name: 'a' }] })[0].text, /label uses nme/)
+})
+
+test('UI kit: table cells with pictures, bars, lines and buttons; accordion, breadcrumbs, gallery, loading', () => {
+  const draw = (spec: object, data: object, o: object = { full: true }) => uiHtml(spec, { data, config: {}, at }, o)
+  const rows = [{ login: 'octocat', name: 'The <Octocat>', role: 'Design', d: 3, t: 4, week: [1, 3, 2], pic: 'javascript:alert(1)', id: 7 }]
+  // a picture with a name and a line under it; a bar of how far along; a badge, a line, copy and a button
+  const tb = draw({ type: 'table', each: 'r', columns: [{ title: 'Who', avatar: '{{login}}', value: '{{name}}', subtitle: '{{role}}' }, { title: 'Done', progress: '{{d}}', max: '{{t}}', color: 'bad' }, { title: 'Of', progress: '{{d}}', max: '{{t}}', value: '{{d}}/{{t}}' }, { title: 'Pic', image: '{{pic}}', value: 'x' }, { title: 'More', badge: 'new', spark: 'week', copy: true, value: '{{id}}', actions: [{ label: 'Review', run: 'review', arg: '{{id}}' }] }, { title: 'Plain', value: '{{role}}' }] }, { r: rows })
+  assert.match(tb, /<div class="k-tc"><img class="k-av" src="https:\/\/avatars\.githubusercontent\.com\/octocat\?s=40"[^>]*><div class="k-main"><span><span class="">The &lt;Octocat&gt;<\/span><\/span><span class="k-sub">Design<\/span>/)
+  assert.match(tb, /<span class="k-tbar" style="color:var\(--error[^"]*"><span class="k-bar"><i style="width:75%"><\/i><\/span><b>75%<\/b>/)
+  assert.match(tb, /<i style="width:75%"><\/i><\/span><b>3\/4<\/b>/, 'its value: the bar’s words')
+  assert.doesNotMatch(tb, /javascript/, 'a picture that isn’t data: or https: none')
+  assert.match(tb, /<span class="k-badge ">new<\/span><span class="k-tc-sp"><svg class="spark"[^]*data-copy="7"[^]*data-run="review" data-arg="7"/)
+  assert.match(tb, /<td class=""><span class="">Design<\/span><\/td>/, 'a column of words alone: as before')
+  assert.match(draw({ type: 'table', each: 'r', columns: [{ avatar: '{{login}}', href: 'https://github.com/{{login}}' }] }, { r: rows }), /<td class=""><div class="k-tc"><a class="link k-tc-a" href="https:\/\/github\.com\/octocat"[^>]*><img class="k-av"/, 'a picture alone links too')
+  assert.match(draw({ type: 'table', each: 'r', columns: [{ progress: '{{d}}', max: 2 }] }, { r: rows }), /width:100%/, 'past its max: full')
+  const problems = uiCheck({ type: 'table', each: 'r', columns: [{ title: 'x', icon: 'nope', actions: [{ label: 'Go', run: 'gone' }], color: 'nocolor' }] }, { r: rows }, { actions: ['review'] })
+  assert.deepEqual(problems.map(p => p.level).sort(), ['error', 'warn', 'warn'], JSON.stringify(problems))
+  // a row's progress at its end
+  assert.match(draw({ type: 'list', each: 'r', title: '{{name}}', accessories: [{ progress: '{{d}}', max: '{{t}}', tone: 'good' }] }, { r: rows }), /<span class="k-tbar sm t-good"><span class="k-bar"><i style="width:75%">/)
+  // an accordion: one name (one open at a time), the first open; multiple: no name; -1: none open; its panels' elements
+  const faq = { f: [{ q: 'A?', a: 'yes' }, { q: 'B?', a: 'no' }, { q: '<C>?', a: 'maybe' }] }
+  const ac = draw({ type: 'accordion', each: 'f', title: '{{q}}', text: '{{a}}' }, faq)
+  assert.equal([...ac.matchAll(/<details class="k-ad" name="(ka-[\w-]+)"/g)].map(m => m[1]).filter((x, i, l) => l.indexOf(x) === i).length, 1)
+  assert.equal([...ac.matchAll(/ open>/g)].length, 1)
+  assert.match(ac, /<span class="k-title ">&lt;C&gt;\?<\/span>/)
+  assert.doesNotMatch(draw({ type: 'accordion', each: 'f', title: '{{q}}', multiple: true }, faq), /name="ka-/)
+  assert.doesNotMatch(draw({ type: 'accordion', each: 'f', title: '{{q}}', open: -1 }, faq), / open>/)
+  assert.match(draw({ type: 'accordion', each: 'f', title: '{{q}}' }, faq, { cells: [1, 1] }), /\+2 more/, 'a preview: the panels that fit')
+  assert.match(draw({ type: 'accordion', items: [{ title: 'Numbers', badge: '2', children: [{ type: 'progress', value: '{{n}}' }] }] }, { n: 40 }), /<span class="k-badge">2<\/span><\/summary><div class="k-ad-b"><div class="k-prog"/)
+  assert.match(JSON.stringify(uiCheck({ type: 'accordion', each: 'f', title: '{{q}}', children: [{ type: 'text', value: '{{nope}}' }] }, faq)), /children uses nope/, 'its children over each panel’s row')
+  assert.match(JSON.stringify(uiCheck({ type: 'accordion', items: [{ title: 'x', children: [{ type: 'nope' }] }] })), /items\[0\]\.children\[0\].*no element nope/)
+  // breadcrumbs: words, links, a bad link as words
+  const bc = draw({ type: 'breadcrumbs', items: ['acme', { label: 'web', href: 'https://github.com/acme/web' }, { label: 'x', href: 'javascript:alert(1)' }] }, {})
+  assert.equal([...bc.matchAll(/class="k-cr"/g)].length, 3)
+  assert.match(bc, /<a href="https:\/\/github\.com\/acme\/web"[^>]*><span>web<\/span><\/a>/)
+  assert.doesNotMatch(bc, /javascript/)
+  assert.equal([...draw({ type: 'breadcrumbs', each: 'p' }, { p: ['acme', 'web'], label: 'no' }).matchAll(/<span>(\w+)<\/span>/g)].map(m => m[1]).join(' '), 'acme web', 'each: a string item is its words')
+  assert.doesNotMatch(draw({ type: 'breadcrumbs', items: [{ icon: 'github' }] }, { label: 'no' }), />no</, 'a written one takes nothing from the data')
+  // a gallery: data: and https pictures only, captions, links; none: Nothing here
+  const gl = draw({ type: 'gallery', each: 'p', src: '{{u}}', caption: '{{c}}', href: '{{u}}' }, { p: [{ u: 'https://example.com/a.png', c: '<A>' }, { u: 'javascript:x', c: 'bad' }] })
+  assert.match(gl, /<figure class="k-gl-i" data-open="https:\/\/example\.com\/a\.png" title="&lt;A&gt;"><img src="https:\/\/example\.com\/a\.png" alt="&lt;A&gt;" style="height:160px"/)
+  assert.doesNotMatch(gl, /bad/)
+  assert.match(draw({ type: 'gallery', each: 'p' }, { p: ['javascript:x'] }), /k-empty/)
+  // loading: a spinner, dots or a bar, its words
+  assert.match(draw({ type: 'loading', label: '<x>' }, {}), /class="k-load spinner" role="status"><i class="k-ld-s"><\/i><span>&lt;x&gt;<\/span>/)
+  assert.match(draw({ type: 'loading', style: 'dots', size: 'lg' }, {}), /k-load dots s-lg[^]*k-ld-d/)
+  assert.match(draw({ type: 'loading', style: 'bar', color: 'teal' }, {}), /k-load bar" style="color:var\(--tc-teal[^]*k-ld-b/)
+})
+
+test('UI kit: the extension guide, its catalog and examples, fits what Laki AI reads of it', async () => {
+  const g = tools((() => Promise.reject(new Error('no daemon'))) as never).find(t => t.name === 'laki_extension_guide')!
+  const text = String(await g.run({}))
+  assert.ok(g.max && text.length <= g.max, `${text.length} of ${g.max}: past it, the guide's last examples are cut`)
 })
 
 test('UI kit: helpers', () => {
@@ -354,6 +408,20 @@ test('UI kit: the new elements, and buttons that ask Laki to do things', () => {
   assert.match(h({ type: 'button', label: 'X', do: 'rm' }), /disabled/)
   const probs = uiCheck({ type: 'stack', children: [{ type: 'button', label: 'a', do: 'terminal' }, { type: 'button', label: 'b', do: 'nuke' }, { type: 'toolbar', items: [{ icon: 'x', run: 'nope', label: 'n' }] }] }, undefined, { actions: ['go'] })
   assert.match(probs.map(p => `${p.level}: ${p.text}`).join('\n'), /warn: do terminal without command[\s\S]*error: do: one of new, send, ai, terminal, browse[\s\S]*error: runs nope/)
+})
+
+test('UI kit: a filter matches a row by its words, not its buttons’', () => {
+  const listeners: Record<string, (e: any) => void> = {}
+  uiBehave({ addEventListener: (t: string, f: any) => (listeners[t] = f), removeEventListener: () => {} }, () => {})
+  const text = (data: string) => ({ nodeType: 3, data })
+  const node = (localName: string, ...childNodes: object[]) => ({ nodeType: 1, localName, childNodes, hidden: false, hasAttribute: () => false })
+  const rows = [node('tr', node('td', text('Mona Lisa')), node('td', node('button', text('Profile')))), node('tr', node('td', text('Hubot')), node('td', node('button', text('Profile'))))]
+  const box = { hasAttribute: () => false, querySelector: () => null, querySelectorAll: (q: string) => (q === '[data-row]' ? rows : []) }
+  const filter = (value: string) => listeners.input({ target: { closest: (q: string) => (q === '[data-filter]' ? { value, closest: () => box } : null) } })
+  filter('pro')
+  assert.deepEqual(rows.map(r => r.hidden), [true, true], 'a button’s label matches no row')
+  filter('hub')
+  assert.deepEqual(rows.map(r => r.hidden), [true, false])
 })
 
 test('UI kit: a click on a do button asks the app, with the command', () => {

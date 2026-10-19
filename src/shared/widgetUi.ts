@@ -71,6 +71,24 @@ export const UI = {
   grid: { group: 'Layout', blurb: 'Elements in columns, fewer as the cell narrows.', props: { children: p('children', 'Its elements'), columns: p('number', 'Columns, 1-6 (2 by default): fewer in a narrow cell') } },
   section: { group: 'Layout', blurb: 'A titled group, foldable.', props: { title: p('text', 'Its heading'), subtitle: p('text', 'Words beside the heading'), children: p('children', 'Its elements'), collapsed: p('bool', 'Foldable: true starts it folded, false open') } },
   tabs: { group: 'Layout', blurb: 'Panels behind tabs.', props: { tabs: p('items', 'The tabs: [{ "label", "badge", "children" }]') } },
+  accordion: {
+    group: 'Layout',
+    blurb: 'Panels that fold, one open at a time: questions and answers, a release’s notes, details under a title.',
+    rows: true,
+    props: {
+      items: p('items', 'The panels: [{ "title", "subtitle", "icon", "badge", "text", "children" }]'),
+      title: p('text', 'With each: a panel’s title'),
+      subtitle: p('text', 'With each: muted words beside it'),
+      icon: p('icon', 'With each: an icon or emoji before it'),
+      badge: p('text', 'With each: a count or word at its end'),
+      text: p('text', 'With each: the words inside it'),
+      children: p('children', 'With each: the elements inside it, over its row'),
+      open: p('number', 'The panel open at first, from 0 (0; -1: none)'),
+      multiple: p('bool', 'Several open at once (default: opening one folds the others)'),
+      limit: p('number', 'Panels at most (a preview: as many as fit), then +N more'),
+      empty: p('text', 'What it says with no panels'),
+    },
+  },
   header: { group: 'Layout', blurb: 'A title bar: an icon, a title and subtitle, buttons at its end.', props: { title: p('text', 'Its title'), subtitle: p('text', 'A line under it'), icon: p('icon', 'An icon or emoji before it'), color: COLOR, href: p('text', 'A link its title opens'), actions: BUTTONS } },
   footer: { group: 'Layout', blurb: 'A bar along the bottom: muted words, buttons and links at its end.', props: { text: p('text', 'Its words (“updated {{ago at}}”)'), actions: BUTTONS } },
   toolbar: { group: 'Layout', blurb: 'Icon buttons in a row, their words as tooltips.', props: { items: BUTTONS, labels: p('bool', 'Their words beside the icons too'), align: p(['start', 'end', 'between'] as const, 'start (the default), end, or between') } },
@@ -100,7 +118,7 @@ export const UI = {
       icon: p('icon', 'An icon or emoji before it'),
       avatar: p('text', 'A GitHub login: its picture before it'),
       image: p('text', 'An image before it: data: or https'),
-      accessories: p('items', 'At the row’s end: [{ "tag" | "text" | "badge" | "icon" | "avatar" | "ago" | "date", "tone", "color" (a palette name, or a tag’s hex border), "each" (one per item of a row’s list: its labels) }]'),
+      accessories: p('items', 'At the row’s end: [{ "tag" | "text" | "badge" | "icon" | "avatar" | "ago" | "date" | "progress" (a number: a small bar, + "max", 100), "tone", "color" (a palette name, or a tag’s hex border), "each" (one per item of a row’s list: its labels) }]'),
       actions: p('buttons', 'Buttons at the row’s end'),
       href: p('text', 'A link a click on the row opens'),
       limit: p('number', 'Rows at most (a preview: as many as fit), then +N more'),
@@ -114,7 +132,7 @@ export const UI = {
     blurb: 'Columns of rows, sorted, filtered, narrow-aware.',
     rows: true,
     props: {
-      columns: p('items', 'The columns: [{ "title", "value", "tag", "tone", "href", "align", "mono", "width", "wrap", "hide": "narrow" }]'),
+      columns: p('items', 'The columns: [{ "title", "value", "subtitle" (a muted line under it), "image" (a picture before it: data: or https) | "avatar" (a GitHub login’s) | "icon", "tag", "badge", "progress" (a number: a bar, of "max", 100, in "color"; value its words), "spark" (a path to numbers: a line), "copy" (true: a copy button), "actions" (buttons), "tone", "href", "align", "mono", "width", "wrap", "hide": "narrow" }]'),
       sort: p('text', 'A field to sort by: "age", or "age desc"'),
       limit: p('number', 'Rows at most, then +N more'),
       filter: p('bool', 'A filter box in the full view'),
@@ -142,6 +160,7 @@ export const UI = {
   },
   spark: { group: 'Data', blurb: 'A small line of numbers.', props: { values: p('path', 'A list of numbers'), color: COLOR } },
   progress: { group: 'Data', blurb: 'How far along: a bar or a ring.', props: { value: p('text', 'How much is done'), max: p('number', 'Of how much (100)'), label: p('text', 'What it is'), style: p(['bar', 'ring'] as const, 'bar (the default) or ring'), color: COLOR } },
+  loading: { group: 'Data', blurb: 'Something under way: a spinner, dots or a moving bar, and its words. Show it with if: while a job runs.', props: { label: p('text', 'What’s under way (“Deploying…”)'), style: p(['spinner', 'dots', 'bar'] as const, 'spinner (the default), dots, or bar: across the cell'), size: p(['sm', 'md', 'lg'] as const, 'sm, md (the default) or lg'), color: COLOR } },
   gauge: { group: 'Data', blurb: 'A dial: a number on a half circle between min and max.', props: { value: p('text', 'The number'), min: p('number', 'The low end (0)'), max: p('number', 'The high end (100)'), label: p('text', 'What it is'), unit: p('text', 'After the number: %, ms'), color: COLOR } },
   heatmap: { group: 'Data', blurb: 'A grid of squares, darker for more: days of activity, GitHub style.', rows: true, props: { x: p('text', 'A square’s label (its tooltip): a date'), value: p('text', 'Its number'), rows: p('number', 'Squares down, 7 by default (a week a column)'), max: p('number', 'The darkest (default: the highest)'), color: COLOR } },
   status: { group: 'Data', blurb: 'Things and their state, a dot each: services, environments, jobs.', rows: true, props: { label: p('text', 'Its name'), state: p('text', 'Its state: up, degraded, down… (its dot and words, colored by tone)'), text: p('text', 'More words beside it'), href: p('text', 'A link a click opens') } },
@@ -151,6 +170,7 @@ export const UI = {
   badge: { group: 'Data', blurb: 'A count or a short word, filled.', props: { value: p('text', 'The count or word'), color: COLOR } },
   timeline: { group: 'Data', blurb: 'What happened, newest first.', rows: true, props: { time: p('text', 'When (an ISO date or ms: shown as 3 hours ago; else as written)'), title: p('text', 'What happened'), text: p('text', 'More words under it'), icon: p('icon', 'An icon or emoji') } },
   image: { group: 'Data', blurb: 'A picture: a data: image or an https one.', props: { src: p('text', 'A data:image/… or https:// URL'), alt: p('text', 'What it shows'), height: p('number', 'Its height in px') } },
+  gallery: { group: 'Data', blurb: 'Pictures in a row that scrolls, a caption under each: screenshots, designs, a carousel.', rows: true, props: { src: p('text', 'A picture: data: or https ({{src}} by default)'), caption: p('text', 'Words under it'), href: p('text', 'A link a click opens'), height: p('number', 'Their height in px (default: as the cell fits; 160 in the full view)'), empty: p('text', 'What it says with no pictures') } },
   card: { group: 'Data', blurb: 'A box with a picture, a title, words and a tag: a link to open.', rows: true, props: { title: p('text', 'Its title'), text: p('text', 'Its words'), image: p('text', 'A picture: data: or https'), icon: p('icon', 'Or an icon or emoji'), tag: p('text', 'A pill by its title'), href: p('text', 'A link a click opens') } },
   steps: { group: 'Data', blurb: 'Stages in order, each done, running, failed, skipped or to do: a pipeline, a deploy, an onboarding.', rows: true, props: { label: p('text', 'A step’s name'), state: p('text', 'Its state: done, running, failed, skipped or todo (passed, success, current, error… count too)'), text: p('text', 'Words under it: how long, who'), href: p('text', 'A link a click opens') } },
   meter: { group: 'Data', blurb: 'One bar split into parts, a legend under it: disk, a budget, test results.', rows: true, props: { items: p('items', 'Each part: [{ "label", "value", "color" }]'), label: p('text', 'With each: a part’s name'), value: p('text', 'With each: its number'), color: p('text', 'With each: its color (default: the palette’s next)'), title: p('text', 'Its title, above it with the total'), max: p('number', 'The whole (default: the parts’ sum): the rest of the bar stays empty'), unit: p('text', 'After each number: GB, $, %'), legend: p('bool', 'Each part’s name and number under it: on by default') } },
@@ -170,6 +190,7 @@ export const UI = {
   segmented: { group: 'Actions', blurb: 'One of a few options, picked: runs an action with it. An environment, a mode, a range.', props: { options: p('items', 'The options: words, or [{ "value", "label" }]'), value: p('text', 'The one picked now ({{env}})'), label: p('text', 'Words before it'), run: p('text', 'One of widget.json’s actions, run with the option’s value as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
   stepper: { group: 'Actions', blurb: 'A number with − and +: runs an action with the new one. Replicas, a limit, a budget.', props: { value: p('text', 'The number now'), label: p('text', 'What it is'), unit: p('text', 'After the number'), min: p('number', 'The lowest'), max: p('number', 'The highest'), step: p('number', 'How much a click moves it (1)'), run: p('text', 'One of widget.json’s actions, run with the new number as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
   actions: { group: 'Actions', blurb: 'A row of buttons.', props: { items: p('buttons', 'The buttons') } },
+  breadcrumbs: { group: 'Actions', blurb: 'Where you are: a path of links, › between them. A repo’s folders, a site’s pages.', rows: true, props: { items: p('items', 'Each one: a word, or { "label", "href", "icon" }'), label: p('text', 'With each: its words'), href: p('text', 'With each: a link it opens'), icon: p('icon', 'With each: an icon or emoji before it') } },
   links: { group: 'Actions', blurb: 'Links in a line, a rule between them.', rows: true, props: { items: p('items', 'Each one: { "label", "href" }'), label: p('text', 'With each: a link’s words'), href: p('text', 'With each: where it goes') } },
   form: { group: 'Actions', blurb: 'Fields and a button that runs an action with them.', props: { fields: p('items', 'Its fields: [{ "id", "type": "text" | "number" | "bool" | "choice" | "textarea", "label", "hint", "default", "choices" }]'), submit: p('button', 'Its button: { "label", "run", "confirm" }; the action gets the fields as JSON in $WIDGET_ARG') } },
   empty: { group: 'Actions', blurb: 'Nothing to show, and what to do about it.', props: { text: p('text', 'What it says'), icon: p('icon', 'An icon or emoji over it'), action: p('button', 'A button under it') } },
@@ -247,6 +268,10 @@ const avImg = (login: string) => (u => (u ? `<img class="k-av" src="${u}" alt="$
 const when = (tm: string, words: (t: number | string) => string = ago) => (t => (tm ? `<span class="k-time"${t !== undefined ? ` title="${esc(new Date(t).toLocaleString())}"` : ''}>${esc(t !== undefined ? words(t) || tm : tm)}</span>` : ''))(timeOf(tm))
 const copyBtn = (text: string) => `<button type="button" class="k-copy quiet" data-copy="${esc(text)}" title="Copy">${iconSvg('copy', 11)}</button>`
 const timeOf = (t: string) => (/^\d{10,13}$/.test(t) ? Number(t.length === 10 ? Number(t) * 1000 : t) : /^\d{4}-\d{2}-\d{2}/.test(t) ? t : undefined)
+// how far along, 0-100: a number of a max (100)
+const pctOf = (v: unknown, max: unknown, s: S) => Math.round(Math.min(100, Math.max(0, ((n(v, s) ?? 0) / ((n(max, s) ?? 100) || 1)) * 100)))
+// a small bar and its words: a table cell's progress, a row's accessory
+const minibar = (pct: number, words: string, cls: string, color: string) => `<span class="k-tbar${cls ? ` ${cls}` : ''}"${color ? ` style="color:${color}"` : ''}><span class="k-bar"><i style="width:${pct}%"></i></span><b>${esc(words)}</b></span>`
 
 // if / unless: an element's, a button's, an accessory's, an item's
 const hidden = (x: El, s: S) => (x.if !== undefined && !holds(x.if, s)) || (x.unless !== undefined && holds(x.unless, s))
@@ -330,7 +355,7 @@ function accessory(a: unknown, s: S): string {
   if (!obj(a)) return ''
   if (a.each !== undefined) return listAt(a.each, s).map((x, i) => accessory({ ...a, each: undefined }, inner(s, x, i))).join('') // one per item: a PR's labels
   if (hidden(a, s)) return ''
-  const key = ['tag', 'badge', 'text', 'icon', 'avatar', 'ago', 'date'].find(k => a[k] !== undefined)
+  const key = ['tag', 'badge', 'text', 'icon', 'avatar', 'ago', 'date', 'progress'].find(k => a[k] !== undefined)
   if (!key) return ''
   const v = txt(a[key], s)
   const tone = toneOf(a, v, s)
@@ -339,6 +364,7 @@ function accessory(a: unknown, s: S): string {
   if (key === 'badge') return v ? `<span class="k-badge ${tone}${c ? ' c' : ''}"${c ? ` style="color:${c}"` : ''}>${esc(v)}</span>` : ''
   if (key === 'icon') return `<span class="${tone}"${c ? ` style="color:${c}"` : ''}>${icon(a.icon, s, 13)}</span>`
   if (key === 'avatar') return avImg(v)
+  if (key === 'progress') return (pct => minibar(pct, `${pct}%`, `sm ${tone}`, c))(pctOf(a.progress, a.max, s))
   const t = key === 'ago' || key === 'date' ? timeOf(v.trim()) : undefined
   const words = key === 'ago' ? (t === undefined ? v : ago(t)) : key === 'date' ? (t === undefined ? v : date(t)) : v
   return words ? `<span class="${tone}"${c ? ` style="color:${c}"` : ''}${t !== undefined ? ` title="${esc(new Date(t).toLocaleString())}"` : ''}>${esc(words)}</span>` : ''
@@ -389,17 +415,28 @@ function table(e: El, s: S) {
   const items = listAt(e.each ?? e.items, s).map((item, i) => ({ item, i }))
   const [field, dir] = String(e.sort ?? '').trim().split(/\s+/)
   if (field) items.sort((a, b) => cmp(valueAt(field, inner(s, a.item, a.i).scopes), valueAt(field, inner(s, b.item, b.i).scopes)) * (dir === 'desc' ? -1 : 1))
-  const max = cap(e, s, 28)
+  const max = cap(e, s, cols.some(c => c.subtitle !== undefined) ? 38 : 28)
   const cls = (c: El) => [c.align === 'right' || c.align === 'center' ? `al-${c.align}` : '', c.mono === true ? 'mono' : '', c.wrap === true ? 'wrap' : '', c.hide === 'narrow' ? 'hide-narrow' : ''].filter(Boolean).join(' ')
   const width = (c: El) => (w => (w ? ` style="width:${/^\d+$/.test(w) ? `${w}px` : w}"` : ''))(/^\d{1,4}(px|%)?$/.test(String(c.width ?? '')) ? String(c.width) : '')
   const head = `<thead><tr>${cols.map(c => `<th class="${cls(c)}"${width(c)}>${h(c.title, s)}</th>`).join('')}</tr></thead>`
+  // a cell: its words (a tag before them), or a bar; a picture before, a muted line under, a badge, a line, copy and
+  // buttons after (none of those: the words alone, as before)
   const cell = (c: El, r: S) => {
     const v = txt(c.value, r)
     const tag = c.tag !== undefined ? txt(c.tag, r) : ''
     const tone = toneOf(c, v || tag, r)
-    const inside = `${tag ? `<span class="k-tag ${tone}">${esc(tag)}</span>` : ''}${v ? (tag ? ` ${esc(v)}` : `<span class="${tone}">${esc(v)}</span>`) : ''}`
+    const pct = c.progress !== undefined ? pctOf(c.progress, c.max, r) : undefined
+    const words = pct !== undefined ? '' : `${tag ? `<span class="k-tag ${tone}">${esc(tag)}</span>` : ''}${v ? (tag ? ` ${esc(v)}` : `<span class="${tone}">${esc(v)}</span>`) : ''}`
     const href = c.href !== undefined ? txt(c.href, r) : ''
-    return `<td class="${cls(c)}">${href ? link(href, inside, 'link') : inside}</td>`
+    const sub = c.subtitle !== undefined ? txt(c.subtitle, r) : ''
+    const lead = c.avatar !== undefined ? avImg(txt(c.avatar, r)) : c.image !== undefined ? (u => (imageOk(u) ? `<img class="k-av sq" src="${esc(u)}" alt="">` : ''))(txt(c.image, r).trim()) : c.icon !== undefined ? icon(c.icon, r, 13) : ''
+    const bar = pct !== undefined ? minibar(pct, v || `${pct}%`, toneOf(c, v || String(pct), r), hue(c.color, r)) : ''
+    const badge = c.badge !== undefined ? (b => (b ? `<span class="k-badge ${toneOf(c, b, r)}">${esc(b)}</span>` : ''))(txt(c.badge, r)) : ''
+    const sp = c.spark !== undefined ? spark(valueAt(c.spark, r.scopes)) : ''
+    const end = `${badge}${sp ? `<span class="k-tc-sp">${sp}</span>` : ''}${c.copy === true && v ? copyBtn(v) : ''}${buttons(c.actions, r)}`
+    if (!lead && !sub && !bar && !end) return `<td class="${cls(c)}">${href && words ? link(href, words, 'link') : words}</td>`
+    const head = `${lead}${words || sub ? `<div class="k-main"><span>${words}</span>${sub ? `<span class="k-sub">${esc(sub)}</span>` : ''}</div>` : ''}` // the link: its picture and words
+    return `<td class="${cls(c)}"><div class="k-tc">${href && head ? link(href, head, 'link k-tc-a') : head}${bar}${end}</div></td>`
   }
   const body = items
     .map(({ item, i }, k) => (k >= max && !s.full ? '' : (r => `<tr data-row${k >= max ? ' data-extra hidden' : ''}>${cols.map(c => cell(c, r)).join('')}</tr>`)(inner(s, item, i))))
@@ -614,6 +651,23 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     const name = `kt-${s.ids.uid}-${++s.ids.n}`
     return `<div${at(e, s, 'k-tabs')}><div class="k-tabbar" role="tablist">${tabs.map((t, i) => `<label><input type="radio" name="${name}"${i ? '' : ' checked'}><span>${h(t.label, s)}</span>${(b => (b ? `<span class="k-badge">${esc(b)}</span>` : ''))(txt(t.badge, s))}</label>`).join('')}</div>${tabs.map(t => `<section class="k-panel">${kids(t.children, s)}</section>`).join('')}</div>`
   },
+  // panels that fold: one open at a time (details of one name), unless multiple
+  accordion: (e, s) => {
+    const items = itemsOf(e, s)
+    const max = cap(e, s, 28)
+    const open = Math.round(n(e.open, s) ?? 0)
+    const name = e.multiple === true ? '' : ` name="ka-${s.ids.uid}-${++s.ids.n}"`
+    return `<div${at({ tip: e.tip }, s, 'k-accord')} data-rows>${items
+      .map(([x, r], i) => {
+        if (i >= max && !s.full) return ''
+        const title = txt(x.title, r)
+        const sub = x.subtitle !== undefined ? txt(x.subtitle, r) : ''
+        const badge = x.badge !== undefined ? txt(x.badge, r) : ''
+        const body = `${x.text !== undefined ? `<div class="k-ad-t">${h(x.text, r)}</div>` : ''}${kids(x.children, r)}`
+        return `<details class="k-ad"${name} data-row${i >= max ? ' data-extra hidden' : ''}${i === open && !s.line ? ' open' : ''}><summary class="k-ad-h">${x.icon !== undefined ? icon(x.icon, r, 13) : ''}<span class="k-title ${toneOf(x === e ? e : { tone: x.tone ?? e.tone }, title, r)}">${esc(title)}</span>${sub ? `<span class="k-sub">${esc(sub)}</span>` : ''}${badge ? `<span class="k-badge">${esc(badge)}</span>` : ''}</summary>${body ? `<div class="k-ad-b">${body}</div>` : ''}</details>`
+      })
+      .join('')}${empty(e, s, items.length)}${s.line ? '' : more(items.length - Math.min(max, items.length))}</div>`
+  },
   header: (e, s) => {
     const title = txt(e.title, s)
     const href = e.href !== undefined ? txt(e.href, s) : ''
@@ -725,12 +779,17 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     return logins.length ? `<div${at({ tip: e.tip }, s, 'k-avs')}>${logins.slice(0, max).map(l => `<img class="k-av" src="${avatarUrl(l)}" alt="${esc(l)}" title="${esc(l)}">`).join('')}${logins.length > max ? `<span class="k-avs-n">+${logins.length - max}</span>` : ''}</div>` : ''
   },
   progress: (e, s) => {
-    const max = n(e.max, s) ?? 100
-    const pct = Math.round(Math.min(100, Math.max(0, ((n(e.value, s) ?? 0) / (max || 1)) * 100)))
+    const pct = pctOf(e.value, e.max, s)
     const label = txt(e.label, s)
     if (e.style === 'ring')
       return `<div${at(e, s, 'k-prog ring', String(pct), e.color)}><svg width="32" height="32" viewBox="0 0 36 36" aria-hidden="true"><circle class="bg" cx="18" cy="18" r="15.9155" fill="none" stroke-width="4"/><circle class="fg" cx="18" cy="18" r="15.9155" fill="none" stroke-width="4" stroke-linecap="round" stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/></svg><div class="k-prog-h"><b>${pct}%</b><span>${esc(label)}</span></div></div>`
     return `<div${at(e, s, 'k-prog', String(pct), e.color)}><div class="k-prog-h"><span>${esc(label)}</span><b>${pct}%</b></div><div class="k-bar"><i style="width:${pct}%"></i></div></div>`
+  },
+  loading: (e, s) => {
+    const style = ['dots', 'bar'].includes(String(e.style)) ? String(e.style) : 'spinner'
+    const label = txt(e.label, s)
+    const mark = style === 'dots' ? '<i class="k-ld-d"><i></i><i></i><i></i></i>' : style === 'bar' ? '<i class="k-ld-b"><i></i></i>' : '<i class="k-ld-s"></i>'
+    return `<div${at(e, s, `k-load ${style}${['sm', 'lg'].includes(String(e.size)) ? ` s-${e.size}` : ''}`, label, e.color)} role="status">${mark}${label ? `<span>${esc(label)}</span>` : ''}</div>`
   },
   tags: (e, s) =>
     `<div${at({ tip: e.tip }, s, 'k-tags')}>${itemsOf(e, s)
@@ -767,6 +826,20 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     if (e.each === undefined && e.items === undefined) return `<div${at({ tip: e.tip }, s, 'k-cards one')}>${one(s)}</div>`
     const items = listAt(e.each ?? e.items, s)
     return `<div${at({ tip: e.tip }, s, 'k-cards')} data-rows>${items.map((item, i) => one(inner(s, item, i))).join('')}${empty(e, s, items.length)}</div>`
+  },
+  gallery: (e, s) => {
+    const items = listAt(e.each ?? e.items, s)
+    const tall = Math.round(Math.min(2000, Math.max(12, n(e.height, s) ?? (s.line ? 16 : s.full ? 160 : s.cells[1] * 64 - (e.caption !== undefined ? 32 : 14)))))
+    const pics = items
+      .map((item, i) => {
+        const r = inner(s, item, i)
+        const src = (e.src !== undefined ? txt(e.src, r) : typeof item === 'string' ? item : txt('{{src}}', r)).trim()
+        if (!imageOk(src)) return ''
+        const words = e.caption !== undefined ? txt(e.caption, r) : ''
+        return `<figure class="k-gl-i"${e.href !== undefined ? opens(txt(e.href, r)) : ''}${words ? ` title="${esc(words)}"` : ''}><img src="${esc(src)}" alt="${esc(words)}" style="height:${tall}px" loading="lazy">${words && !s.line ? `<figcaption>${esc(words)}</figcaption>` : ''}</figure>`
+      })
+      .filter(Boolean)
+    return pics.length ? `<div${at({ tip: e.tip }, s, 'k-gallery')}>${pics.join('')}</div>` : empty(e, s, 0)
   },
   image: (e, s) => (u => (imageOk(u) ? `<img${at(e, s, 'k-img')} src="${esc(u)}" alt="${h(e.alt, s)}"${(x => (x ? ` style="height:${Math.min(2000, x)}px"` : ''))(n(e.height, s))}>` : ''))(txt(e.src, s).trim()),
   steps: (e, s) => {
@@ -972,6 +1045,14 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     return `<div${at(e, s, 'k-stepper', String(v))}>${label ? `<span class="k-step-l">${esc(label)}</span>` : ''}<div class="k-step">${go(v - step, '−', 'Less')}<b>${esc(round6(v))}${e.unit !== undefined ? `<span class="k-unit">${h(e.unit, s)}</span>` : ''}</b>${go(v + step, '+', 'More')}</div></div>`
   },
   actions: (e, s) => `<div${at(e, s, 'k-actions')}>${buttons(e.items, s, false)}</div>`,
+  breadcrumbs: (e, s) =>
+    `<nav${at({ tip: e.tip }, s, 'k-crumbs')} aria-label="Breadcrumbs">${itemsOf(e, s)
+      .map(([x, r]) => {
+        const label = x.label !== undefined ? txt(x.label, r) : x === e ? (t => (typeof t === 'string' ? t : txt('{{label}}', r)))(r.scopes[0].this) : '' // each: a string item is its words
+        const body = `${x.icon !== undefined ? icon(x.icon, r, 12) : ''}${label ? `<span>${esc(label)}</span>` : ''}`
+        return body ? `<span class="k-cr">${link(x.href !== undefined ? txt(x.href, r) : '', body)}</span>` : ''
+      })
+      .join('')}</nav>`,
   links: (e, s) => `<div${at(e, s, 'linkbar k-links')}>${itemsOf(e, s).map(([x, r]) => link(txt(x.href, r), h(x.label ?? x.href, r))).join('')}</div>`,
   form: (e, s) => {
     const fields = (Array.isArray(e.fields) ? e.fields : []).filter(obj).filter(f => /^[A-Za-z_][\w-]{0,40}$/.test(String(f.id)))
@@ -1069,12 +1150,13 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
     return acc
   }
   const iconOk = (v: unknown) => typeof v !== 'string' || v.includes('{{') || isIconName(v.trim()) || emoji(v.trim())
+  const noIcon = (v: unknown) => `icon ${v} isn't one of Laki's icons${mean(String(v), Object.keys(ICON_WORDS))} or an emoji`
   const colorOk = (v: unknown) => typeof v !== 'string' || v.includes('{{') || !!colorCss(v)
   const NEEDS: Record<string, string> = { new: 'prompt', send: 'prompt', ai: 'prompt', terminal: 'command', browse: 'url' }
   const runs = (b: unknown, where: string) => {
     if (!obj(b)) return
     if (typeof b.run === 'string' && !b.run.includes('{{') && o.actions && !o.actions.includes(b.run)) say('error', where, `runs ${b.run}, which isn't one of widget.json's actions${mean(b.run, o.actions)}`)
-    if (b.icon !== undefined && !iconOk(b.icon)) say('warn', where, `icon ${b.icon} isn't one of Laki's icons${mean(String(b.icon), Object.keys(ICON_WORDS))} or an emoji`)
+    if (b.icon !== undefined && !iconOk(b.icon)) say('warn', where, noIcon(b.icon))
     if (typeof b.do === 'string' && !b.do.includes('{{')) {
       if (!(DO as readonly string[]).includes(b.do)) say('error', where, `do: one of ${DO.join(', ')}${mean(b.do, DO)}`)
       else if (b[NEEDS[b.do]] === undefined) say('warn', where, `do ${b.do} without ${NEEDS[b.do]}: the app has nothing to ${b.do === 'browse' ? 'open' : b.do === 'terminal' ? 'run' : 'send'}`)
@@ -1096,13 +1178,21 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
         continue
       }
       if (!kindOk(pr.kind, v)) say('error', here, `${k}: ${kindName(pr.kind)}`)
-      else if (pr.kind === 'icon' && !iconOk(v)) say('warn', here, `icon ${v} isn't one of Laki's icons${mean(String(v), Object.keys(ICON_WORDS))} or an emoji`)
+      else if (pr.kind === 'icon' && !iconOk(v)) say('warn', here, noIcon(v))
     }
     for (const c of [el.color, ...(Array.isArray(el.colors) ? el.colors : []), ...(Array.isArray(el.series) ? el.series.map(x => (obj(x) ? x.color : undefined)) : [])]) if (!colorOk(c)) say('warn', here, `color ${c}: a tone (${TONES.join(', ')}), one of ${COLORS.join(', ')}, or a hex${mean(String(c), [...TONES, ...COLORS])}`)
     if (type === 'button' || type === 'toggle' || type === 'segmented' || type === 'stepper') runs(el, here)
     if (type === 'form') runs(el.submit, `${here}.submit`)
     for (const k of ['action', 'submit']) if (obj(el[k]) && type !== 'form') runs(el[k], `${here}.${k}`)
     for (const k of ['actions', 'items'] as const) if (UI[type as UiType].props[k as never] && (UI[type as UiType].props as Record<string, Prop>)[k].kind === 'buttons') (Array.isArray(el[k]) ? (el[k] as unknown[]) : []).forEach((b, i) => runs(b, `${here}.${k}[${i}]`))
+    if (type === 'table' && Array.isArray(el.columns))
+      el.columns.forEach((c, i) => {
+        if (!obj(c)) return
+        if (c.icon !== undefined && !iconOk(c.icon)) say('warn', `${here}.columns[${i}]`, noIcon(c.icon))
+        if (!colorOk(c.color)) say('warn', `${here}.columns[${i}]`, `color ${c.color}: a tone (${TONES.join(', ')}), one of ${COLORS.join(', ')}, or a hex`)
+        if (c.actions !== undefined && !Array.isArray(c.actions)) say('error', `${here}.columns[${i}]`, 'actions: a list of buttons')
+        ;(Array.isArray(c.actions) ? c.actions : []).forEach((b, j) => runs(b, `${here}.columns[${i}].actions[${j}]`))
+      })
     // against the data: each's list, then the fields the rows use
     let rowScopes = scopes
     const path = el.each ?? (def.rows && typeof el.items === 'string' ? el.items : undefined)
@@ -1117,7 +1207,7 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
           const fields = new Set(items.flatMap(x => (obj(x) ? Object.keys(x) : [])))
           const outer = new Set(scopes.flatMap(sc => Object.keys(sc)))
           const skip = new Set(['each', 'items', 'empty', 'limit', 'filter', 'sort', 'kind', 'height', 'min', 'max', 'label', 'unit', 'if', 'unless', 'tip', 'series', 'colors', 'legend', 'rows', 'count', 'nested', 'open', 'wrap', ...(type === 'board' ? ['columns'] : []), ...(type === 'log' ? ['value'] : []), ...(type === 'meter' ? ['title'] : [])])
-          if (type === 'meter' || type === 'tree' || type === 'steps') skip.delete('label') // a row's name there, not a title
+          if (type === 'meter' || type === 'tree' || type === 'steps' || type === 'breadcrumbs' || type === 'links') skip.delete('label') // a row's name there, not a title
           for (const [k, val] of Object.entries(el)) {
             if (skip.has(k)) continue
             for (const r of refs(k === 'columns' && Array.isArray(val) ? val.map(c => (obj(c) ? { ...c, title: undefined } : c)) : val)) if (!NAMES.has(r) && !fields.has(r) && !outer.has(r)) say('warn', here, `${k} uses ${r}, which no item of ${path} has${mean(r, [...fields])}`)
@@ -1131,7 +1221,8 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
         }
       }
     }
-    if (Array.isArray(el.children)) el.children.forEach((c, i) => walk(c, `${here}.children[${i}]`, def.rows ? scopes : rowScopes))
+    if (Array.isArray(el.children)) el.children.forEach((c, i) => walk(c, `${here}.children[${i}]`, rowScopes)) // with each: over its row (an accordion's panel)
+    if (type === 'accordion' && Array.isArray(el.items)) el.items.forEach((t, i) => obj(t) && (Array.isArray(t.children) ? t.children.forEach((c, j) => walk(c, `${here}.items[${i}].children[${j}]`, scopes)) : t.children !== undefined && say('error', `${here}.items[${i}]`, 'children: a list of elements')))
     if (type === 'tabs' && Array.isArray(el.tabs)) el.tabs.forEach((t, i) => (obj(t) && Array.isArray(t.children) ? t.children.forEach((c, j) => walk(c, `${here}.tabs[${i}].children[${j}]`, scopes)) : say('error', `${here}.tabs[${i}]`, 'a tab: { "label", "children": [elements] }')))
   }
   if (isElement(spec)) walk(spec, 'ui', has ? [top] : null)
@@ -1169,6 +1260,7 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   row: { spec: { type: 'row', align: 'between', children: [{ type: 'text', value: 'Deploys today' }, { type: 'badge', value: '{{n}}', tone: 'good' }] }, data: { n: 4 } },
   grid: { spec: { type: 'grid', columns: 3, children: [{ type: 'stat', value: '{{open}}', label: 'open' }, { type: 'stat', value: '{{failing}}', label: 'failing', tone: 'bad' }, { type: 'stat', value: '{{merged}}', label: 'merged', tone: 'good' }] }, data: { open: 6, failing: 1, merged: 12 } },
   section: { spec: { type: 'section', title: 'Releases', subtitle: '{{releases.length}}', collapsed: false, children: [{ type: 'tags', each: 'releases', tag: '{{this}}' }] }, data: { releases: ['v2.4.0', 'v2.3.2', 'v2.3.1'] } },
+  accordion: { spec: { type: 'accordion', each: 'faq', title: '{{q}}', badge: '{{#if new}}new{{/if}}', text: '{{a}}' }, data: { faq: [{ q: 'How do I deploy?', a: 'Merge to main: CI ships it to staging, then Promote sends it on to production.' }, { q: 'Who is on call?', a: 'Mona Lisa this week, Hubot the next.', new: true }, { q: 'Where are the logs?', a: 'In Grafana, under acme/web: one board per service.' }] } },
   tabs: { spec: { type: 'tabs', tabs: [{ label: 'Mine', badge: '{{mine.length}}', children: [{ type: 'list', each: 'mine', title: '{{title}}' }] }, { label: 'Team', badge: '{{team.length}}', children: [{ type: 'list', each: 'team', title: '{{title}}' }] }] }, data: { mine: [{ title: 'Fix the date picker' }], team: [{ title: 'Retry webhooks' }, { title: 'Spike: exports' }] } },
   header: { spec: { type: 'header', icon: 'github', title: '{{repo}}', subtitle: '{{open}} open pull requests', href: 'https://github.com/{{repo}}', actions: [{ icon: 'refresh', label: 'Refresh', refresh: true, style: 'quiet' }] }, data: { repo: 'acme/web', open: 6 } },
   footer: { spec: { type: 'stack', children: [{ type: 'text', value: '{{open}} open, {{failing}} failing' }, { type: 'footer', text: 'Updated {{ago updated}}', actions: [{ label: 'GitHub', icon: 'github', open: 'https://github.com/{{repo}}', style: 'quiet' }] }] }, data: { repo: 'acme/web', open: 6, failing: 1, updated: '2026-10-17T09:00:00Z' } },
@@ -1192,12 +1284,13 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
     data: { prs: PRS },
   },
   table: {
-    spec: { type: 'table', each: 'prs', sort: 'number desc', filter: true, columns: [{ title: 'PR', value: '#{{number}} {{title}}', href: '{{url}}' }, { title: 'Author', value: '{{author}}', hide: 'narrow' }, { title: 'CI', tag: '{{ci}}', tone: { failing: 'bad', passing: 'good', pending: 'warn' } }, { title: 'Updated', value: '{{ago updated}}', align: 'right', hide: 'narrow' }] },
-    data: { prs: PRS },
+    spec: { type: 'table', each: 'prs', sort: 'number desc', filter: true, columns: [{ title: 'PR', value: '#{{number}} {{title}}', subtitle: '{{author}}', avatar: '{{author}}', href: '{{url}}' }, { title: 'Review', progress: '{{approvals}}', max: 2, value: '{{approvals}}/2', hide: 'narrow' }, { title: 'CI', tag: '{{ci}}', tone: { failing: 'bad', passing: 'good', pending: 'warn' } }, { title: 'Updated', value: '{{ago updated}}', align: 'right', hide: 'narrow' }] },
+    data: { prs: PRS.map((x, i) => ({ ...x, approvals: [0, 2, 1][i] })) },
   },
   chart: { spec: { type: 'chart', kind: 'area', each: 'days', x: '{{day}}', y: '{{ms}}', unit: ' ms', label: 'p95 latency' }, data: { days: [{ day: 'Mon', ms: 320 }, { day: 'Tue', ms: 280 }, { day: 'Wed', ms: 410 }, { day: 'Thu', ms: 300 }, { day: 'Fri', ms: 260 }] } },
   spark: { spec: { type: 'spark', values: 'cpu', tone: 'accent' }, data: { cpu: [12, 30, 22, 48, 35, 60, 41] } },
   progress: { spec: { type: 'progress', value: '{{done}}', max: '{{total}}', label: 'Sprint 42' }, data: { done: 18, total: 25 } },
+  loading: { spec: { type: 'stack', children: [{ type: 'loading', label: 'Deploying {{version}}…' }, { type: 'loading', style: 'dots', label: 'Waiting for CI', color: 'orange' }, { type: 'loading', style: 'bar', label: 'Indexing the repo' }] }, data: { version: 'v2.4.0' } },
   gauge: { spec: { type: 'gauge', value: '{{cpu}}', unit: '%', label: 'CPU', color: 'teal' }, data: { cpu: 72 } },
   heatmap: { spec: { type: 'heatmap', each: 'days', x: '{{date}}', value: '{{n}}', color: 'green' }, data: { days: DAYS } },
   status: { spec: { type: 'status', each: 'services', label: '{{name}}', state: '{{state}}', text: '{{note}}' }, data: { services: [{ name: 'API', state: 'up', note: '99.98%' }, { name: 'Web', state: 'up', note: '99.95%' }, { name: 'Workers', state: 'degraded', note: 'queue 2k' }, { name: 'Search', state: 'down', note: 'since 09:10' }] } },
@@ -1207,6 +1300,7 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   badge: { spec: { type: 'badge', value: '{{failing}} failing', tone: 'bad', if: 'failing' }, data: { failing: 2 } },
   timeline: { spec: { type: 'timeline', each: 'events', time: '{{at}}', title: '{{what}}', text: '{{who}}', tone: { 'Deploy failed': 'bad', Deployed: 'good' } }, data: { events: [{ at: '2026-10-17T09:10:00Z', what: 'Deployed', who: 'v2.4.0 by octocat' }, { at: '2026-10-17T08:40:00Z', what: 'Deploy failed', who: 'v2.4.0-rc1' }, { at: '2026-10-16T17:00:00Z', what: 'Merged #418', who: 'hubot' }] } },
   card: { spec: { type: 'card', each: 'posts', title: '{{title}}', text: '{{blurb}}', icon: '{{icon}}', tag: '{{tag}}', href: '{{url}}', tone: { new: 'accent' } }, data: { posts: [{ title: 'Search, 30% faster', blurb: 'How we cut p95 by moving to the new index.', icon: '⚡', tag: 'new', url: 'https://example.com/blog/search' }, { title: 'Dark mode', blurb: 'The dashboard follows your system now.', icon: '🌙', tag: 'ui', url: 'https://example.com/blog/dark' }] } },
+  gallery: { spec: { type: 'gallery', each: 'repos', src: 'https://opengraph.githubassets.com/laki/{{name}}', caption: '{{name}}', href: 'https://github.com/{{name}}' }, data: { repos: [{ name: 'microsoft/vscode' }, { name: 'vercel/next.js' }, { name: 'electron/electron' }, { name: 'vitejs/vite' }] } },
   image: { spec: { type: 'image', src: 'https://avatars.githubusercontent.com/{{login}}?s=80', alt: '{{login}}', height: 40 }, data: { login: 'octocat' } },
   steps: { spec: { type: 'steps', each: 'stages', label: '{{name}}', state: '{{state}}', text: '{{took}}' }, data: { stages: [{ name: 'Build', state: 'done', took: '1m 12s' }, { name: 'Test', state: 'done', took: '3m 40s' }, { name: 'Deploy', state: 'running', took: 'now' }, { name: 'Smoke', state: 'todo', took: '' }] } },
   meter: { spec: { type: 'meter', each: 'disk', label: '{{name}}', value: '{{gb}}', color: '{{color}}', max: 512, unit: ' GB', title: 'Disk' }, data: { disk: [{ name: 'Apps', gb: 120, color: 'blue' }, { name: 'Docker', gb: 96, color: 'purple' }, { name: 'Photos', gb: 74, color: 'orange' }, { name: 'System', gb: 38, color: 'gray' }] } },
@@ -1223,6 +1317,7 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   },
   button: { spec: { type: 'button', label: 'Deploy', icon: 'ship', style: 'primary', run: 'deploy', arg: '{{branch}}', confirm: 'Deploy {{branch}} to production?' }, data: { branch: 'main' } },
   actions: { spec: { type: 'actions', items: [{ label: 'Refresh', icon: 'refresh', refresh: true }, { label: 'GitHub', icon: 'github', open: 'https://github.com/{{repo}}' }, { label: 'Copy repo', copy: '{{repo}}', style: 'quiet' }] }, data: { repo: 'acme/web' } },
+  breadcrumbs: { spec: { type: 'breadcrumbs', items: [{ label: 'acme', icon: 'github', href: 'https://github.com/acme' }, { label: 'web', href: 'https://github.com/acme/web' }, { label: 'src', href: 'https://github.com/acme/web/tree/main/src' }, { label: '{{file}}' }] }, data: { file: 'search.ts' } },
   links: { spec: { type: 'links', items: [{ label: 'Linear', href: 'https://linear.app' }, { label: 'Status', href: 'https://status.example.com' }, { label: 'Board', href: 'laki://board' }] } },
   form: { spec: { type: 'form', fields: [{ id: 'title', type: 'text', label: 'Title', hint: 'What broke?' }, { id: 'urgent', type: 'bool', label: 'Urgent' }, { id: 'team', type: 'choice', label: 'Team', choices: ['web', 'api'], default: 'web' }], submit: { label: 'File issue', run: 'file', confirm: 'File it on GitHub?' } } },
   empty: { spec: { type: 'empty', text: 'No deploys yet today', icon: 'ship', action: { label: 'Refresh', refresh: true } } },
@@ -1258,4 +1353,7 @@ export const UI_EXAMPLES: { title: string; blurb: string; spec: UiElement; data?
   { title: 'A status page', blurb: 'A header, each service’s state colored by its word, a callout for the worst.', spec: { type: 'stack', children: [{ type: 'header', icon: 'server', title: 'Production', subtitle: '{{services.length}} services' }, { type: 'callout', if: 'incident', tone: 'bad', title: '{{incident}}', action: { label: 'Fix it', icon: 'agent', do: 'new', prompt: 'Look into: {{incident}}' } }, { type: 'status', each: 'services', label: '{{name}}', state: '{{state}}' }] }, data: { incident: 'Search is down since 09:10', services: [{ name: 'API', state: 'up' }, { name: 'Workers', state: 'degraded' }, { name: 'Search', state: 'down' }] } },
   { title: 'A deploy', blurb: 'A header, the pipeline’s steps, its log’s last lines and a switch for the next ones.', spec: { type: 'stack', children: [{ type: 'header', icon: 'ship', title: 'Deploy {{version}}', subtitle: 'to production · started {{ago started}}' }, { type: 'steps', each: 'stages', label: '{{name}}', state: '{{state}}' }, { type: 'log', each: 'lines', text: '{{text}}', time: '{{at}}', level: '{{level}}', limit: 3 }, { type: 'toggle', label: 'Ship merges at once', on: 'auto', run: 'auto' }] }, data: { version: 'v2.4.0', started: '2026-10-17T09:08:00Z', auto: true, stages: [{ name: 'Build', state: 'done' }, { name: 'Test', state: 'done' }, { name: 'Deploy', state: 'running' }, { name: 'Smoke', state: 'todo' }], lines: LOG } },
   { title: 'Gauges in a grid', blurb: 'A few dials side by side, each its color.', spec: { type: 'grid', columns: 3, children: [{ type: 'gauge', value: '{{cpu}}', unit: '%', label: 'CPU', color: 'teal' }, { type: 'gauge', value: '{{mem}}', unit: '%', label: 'Memory', color: 'purple' }, { type: 'gauge', value: '{{disk}}', unit: '%', label: 'Disk', color: '{{#if diskFull}}bad{{else}}blue{{/if}}' }] }, data: { cpu: 42, mem: 68, disk: 91, diskFull: true } },
+  { title: 'A table with pictures and bars', full: true, blurb: 'Columns of more than words: a picture with a name and a line under it, a bar of how far along, a sparkline, a badge, a button.', spec: { type: 'table', each: 'team', columns: [{ title: 'Who', avatar: '{{login}}', value: '{{name}}', subtitle: '{{role}}' }, { title: 'Sprint', progress: '{{done}}', max: '{{total}}', value: '{{done}}/{{total}}', color: '{{#if late}}bad{{else}}accent{{/if}}' }, { title: 'This week', spark: 'week', hide: 'narrow' }, { title: 'State', badge: '{{state}}', tone: { busy: 'warn', away: 'muted', free: 'good' } }, { title: '', align: 'right', actions: [{ label: 'Profile', icon: 'github', open: 'https://github.com/{{login}}', style: 'quiet' }], hide: 'narrow' }] }, data: { team: [{ name: 'Mona Lisa', login: 'monalisa', role: 'Frontend', done: 8, total: 10, week: [2, 3, 1, 4, 3], state: 'busy' }, { name: 'Hubot', login: 'hubot', role: 'Backend', done: 3, total: 9, late: true, week: [1, 0, 2, 1, 0], state: 'free' }, { name: 'The Octocat', login: 'octocat', role: 'Design', done: 5, total: 6, week: [0, 2, 2, 3, 4], state: 'away' }] } },
+  { title: 'Rows with progress', blurb: 'A list whose rows end in a small bar: projects, uploads, migrations.', spec: { type: 'list', each: 'projects', title: '{{name}}', subtitle: '{{owner}}', icon: 'folder', accessories: [{ progress: '{{pct}}', tone: '{{#if stuck}}bad{{/if}}' }] }, data: { projects: [{ name: 'Checkout v2', owner: 'Payments', pct: 82 }, { name: 'Search index', owner: 'Platform', pct: 45 }, { name: 'Mobile app', owner: 'Apps', pct: 12, stuck: true }] } },
+  { title: 'Folding panels with elements', full: true, blurb: 'An accordion whose panels hold other elements: a release’s notes, its checks, its numbers.', spec: { type: 'accordion', items: [{ title: '{{version}}', subtitle: 'shipped {{ago shipped}}', icon: 'ship', badge: 'new', children: [{ type: 'markdown', value: '{{notes}}' }] }, { title: 'Checks', icon: 'check', badge: '{{checks.length}}', children: [{ type: 'status', each: 'checks', label: '{{name}}', state: '{{state}}' }] }, { title: 'Numbers', icon: 'barChart', children: [{ type: 'progress', value: '{{tests}}', max: '{{testsAll}}', label: 'Tests passing' }, { type: 'kv', items: [{ key: 'Bundle', value: '{{bundle}}' }, { key: 'p95', value: '{{p95}}' }] }] }] }, data: { version: 'v2.4.0', shipped: '2026-10-17T09:00:00Z', notes: '- Search, **30% faster**\n- Dark mode for the dashboard', checks: [{ name: 'Build', state: 'passed' }, { name: 'E2E', state: 'passed' }, { name: 'Lighthouse', state: 'degraded' }], tests: 412, testsAll: 420, bundle: '182 KB', p95: '260 ms' } },
 ]
