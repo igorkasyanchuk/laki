@@ -1392,7 +1392,7 @@ export function App() {
     }, fail)
   const tunnelApi = (w: WorkspaceView): TunnelApi => ({
     check: () => api.call<Cloudflared>('cloudflared', { ws: w.id }),
-    start: (port, mails) => api.call('tunnelStart', { ws: w.id, port, mails }),
+    start: (port, mails, hours) => api.call('tunnelStart', { ws: w.id, port, mails, hours }),
     stop: port => api.call('tunnelStop', { ws: w.id, port }),
     open: openExternal,
     copy,

@@ -377,14 +377,23 @@ test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, 
   await assert.rejects(rig.rpc('tunnelStart', { ws: 'nope', port: 5173 }), /no workspace nope/)
 
   // protected: the login page's URL isn't the tunnel's; the list is remembered
+  const t0 = Date.now()
   const tn = await rig.rpc('tunnelStart', { ws: ws.id, port: 5173, mails: [' me@x.dev', '*@team.dev', 'me@x.dev', ''] })
-  assert.deepEqual(tn, { port: 5173, url: 'https://fake-5173.trycloudflare.com', mails: ['me@x.dev', '*@team.dev'] })
+  assert.deepEqual({ ...tn, until: undefined }, { port: 5173, url: 'https://fake-5173.trycloudflare.com', mails: ['me@x.dev', '*@team.dev'], until: undefined })
+  assert.ok(Math.abs(tn.until - (t0 + 8 * 3600e3)) < 5000) // 8 hours unless asked
   assert.match(log(), /cloudflared tunnel --url http:\/\/localhost:5173 --allowed-mail=me@x\.dev --allowed-mail=\*@team\.dev\n/)
   assert.deepEqual((await rig.rpc('cloudflared')).mails, ['me@x.dev', '*@team.dev'])
   assert.deepEqual(await rig.rpc('tunnelStart', { ws: ws.id, port: 5173 }), tn) // running already: that one
-  const pub = await rig.rpc('tunnelStart', { ws: ws.id, port: 3000 })
-  assert.deepEqual(pub, { port: 3000, url: 'https://fake-3000.trycloudflare.com', mails: [] })
+  const pub = await rig.rpc('tunnelStart', { ws: ws.id, port: 3000, hours: 1 })
+  assert.deepEqual({ ...pub, until: undefined }, { port: 3000, url: 'https://fake-3000.trycloudflare.com', mails: [], until: undefined })
+  assert.ok(Math.abs(pub.until - (t0 + 3600e3)) < 5000)
   assert.deepEqual((await rig.rpc('state')).workspaces[0].tunnels, [tn, pub])
+  await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 3001, hours: 3 }), /for how long: 1, 8, 24 hours, or 0 \(until stopped\)/)
+  // past its hours: stopped (the 8-hour one stays)
+  await rig.rpc('tunnelTick', { now: pub.until + 1 })
+  await until(() => log().includes('cloudflared 3000 stopped'), 'the hour is up')
+  assert.deepEqual((await rig.rpc('state')).workspaces[0].tunnels, [tn])
+  assert.equal((await rig.rpc('tunnelStart', { ws: ws.id, port: 3000, hours: 0 })).until, undefined) // until stopped: none
 
   writeFileSync(join(rig.home, 'cf-version'), '2025.1.0')
   await assert.rejects(rig.rpc('tunnelStart', { ws: ws.id, port: 4000, mails: ['me@x.dev'] }), /cloudflared 2025\.1\.0 can't limit who opens a tunnel \(that needs 2026\.9\.3\): brew upgrade cloudflared/)
@@ -400,7 +409,7 @@ test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, 
   rmSync(join(rig.home, 'cf-silent'))
 
   await rig.rpc('tunnelStop', { ws: ws.id, port: 3000 })
-  await until(() => log().includes('cloudflared 3000 stopped'), 'the public tunnel stopped')
+  await until(() => log().split('cloudflared 3000 stopped').length === 3, 'the public tunnel stopped (again)')
   await rig.rpc('wsRm', { id: ws.id })
   await until(() => log().includes('cloudflared 5173 stopped'), 'the workspace takes its tunnel')
   const other = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'tun2' })

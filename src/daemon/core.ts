@@ -2825,7 +2825,7 @@ export const MAIL_VERSION = '2026.9.3' // the first cloudflared with --allowed-m
 // a quick tunnel's name is random words with dashes: not api. (in cloudflared's errors) or login.
 const TUNNEL_URL = /https:\/\/[a-z0-9]+(?:-[a-z0-9]+)+\.trycloudflare\.com/
 const MAIL = /^(?:\*|[^\s@*,]+)@[^\s@*,]+\.[^\s@*,]+$/ // an address, or *@domain: a whole domain
-const tunnelsOf = (ws: string) => [...tunnels.values()].filter(t => t.ws === ws).map(({ port, url, mails }) => ({ port, url, mails }))
+const tunnelsOf = (ws: string) => [...tunnels.values()].filter(t => t.ws === ws).map(({ port, url, mails, until }) => ({ port, url, mails, ...(until && { until }) }))
 // a < b, for x.y.z versions
 const older = (a: string, b: string) => {
   const [x, y] = [a, b].map(v => v.split('.').map(Number))
@@ -2915,12 +2915,15 @@ async function tsReady() {
 const tailscale = (bin: string, target: string, ended: (why: string) => void, who: [name: string, stop: string], funnel = false) =>
   publisher(`tailscale ${funnel ? 'funnel' : 'serve'}`, bin, [funnel ? 'funnel' : 'serve', '--https=443', target], TAILNET_URL, ended, who)
 
-// tunnelStart resolves once cloudflared prints the URL (or was stopped meanwhile), and fails with its output
-export async function tunnelStart(o: { ws: string; port: number; mails?: string[] }): Promise<Tunnel> {
+// tunnelStart resolves once cloudflared prints the URL (or was stopped meanwhile), and fails with its output. hours:
+// how long it runs, as a shared tab's (SHARE_HOURS; unset: 8, so a forgotten one doesn't stay open for good)
+export async function tunnelStart(o: { ws: string; port: number; mails?: string[]; hours?: number }): Promise<Tunnel> {
   const ws = findWs(o.ws)
   const live = () => state.workspaces.includes(ws) && !ws.archived
   const port = Number(o.port)
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error(`not a port: ${o.port}`)
+  const hours = Number(o.hours ?? 8)
+  if (!SHARE_HOURS.includes(hours)) throw new Error(`for how long: ${SHARE_HOURS.filter(Boolean).join(', ')} hours, or 0 (until stopped)`)
   const mails = [...new Set((o.mails ?? []).map(m => m.trim()).filter(Boolean))]
   const bad = mails.find(m => !MAIL.test(m))
   if (bad) throw new Error(`not an email address or *@domain: ${bad}`)
@@ -2928,7 +2931,7 @@ export async function tunnelStart(o: { ws: string; port: number; mails?: string[
   await cfReady(mails.length > 0)
   if (!live()) throw new Error(`no workspace ${o.ws}`) // archived, or gone while cloudflared answered
   const cur = tunnels.get(key)
-  if (cur) return { port, url: cur.url, mails: cur.mails }
+  if (cur) return { port, url: cur.url, mails: cur.mails, ...(cur.until && { until: cur.until }) }
   if (mails.length) settingsSet({ tunnelMails: mails })
   const drop = () => {
     if (tunnels.get(key) !== t) return
@@ -2936,7 +2939,7 @@ export async function tunnelStart(o: { ws: string; port: number; mails?: string[
     changed()
   }
   const { cf, url } = cloudflare(`http://localhost:${port}`, mails, why => (log(`tunnel ${key} ended (${why})`), drop()), [`Expose to the world · ${ws.name ?? ws.id} :${port}`, `tunnel:${key}`])
-  const t: TunnelRun = { ws: ws.id, port, mails, cf }
+  const t: TunnelRun = { ws: ws.id, port, mails, cf, ...(hours && { until: Date.now() + hours * 3600e3 }) }
   tunnels.set(key, t)
   changed()
   try {
@@ -2947,7 +2950,12 @@ export async function tunnelStart(o: { ws: string; port: number; mails?: string[
   }
   if (!t.url) return { port, mails } // stopped first (tunnelStop took it out)
   changed()
-  return { port, url: t.url, mails }
+  return { port, url: t.url, mails, ...(t.until && { until: t.until }) }
+}
+
+// every 15 s (main.ts): tunnels past their hours stop
+export function tunnelTick(now = Date.now()) {
+  for (const [key, t] of [...tunnels]) if (t.until && now >= t.until) tunnels.delete(key), t.cf.stop(), log(`tunnel ${key}: its time is up`), changed()
 }
 
 export function tunnelStop(o: { ws: string; port: number }) {

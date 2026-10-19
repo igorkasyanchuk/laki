@@ -299,6 +299,7 @@ const api: Record<string, Handler> = {
   remoteTick: p => core.remoteTick(p.now), // tests move the clock
   archivedTidy: p => core.archivedTidy(p.now), // tests move the clock
   shareTick: p => core.shareTick(p.now),
+  tunnelTick: p => core.tunnelTick(p.now), // tests move the clock
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
   widgetRun: p => widgetRun(p),
@@ -486,7 +487,7 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(60000, () => core.sleepTick())
   every(Number(process.env.LAKI_STAT_SCAN_MS || 10000), core.scanStats)
   every(30000, () => core.watchLimits())
-  every(15000, () => (core.remoteTick(), core.shareTick()))
+  every(15000, () => (core.remoteTick(), core.shareTick(), core.tunnelTick()))
   every(30000, () => core.scheduleTick())
   every(30000, () => core.reminderTick())
   every(1800000, () => memoryTick())

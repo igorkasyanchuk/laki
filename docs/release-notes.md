@@ -13,6 +13,8 @@ version it builds, with the date. -->
   artifact) gets no permission beyond full screen and copying.
 - Workflows' webhooks go to https URLs only (plain http to this Mac) and don't follow redirects: a 3xx is the
   answer.
+- **Expose to the world** asks for how long: 1, 8 (the default) or 24 hours, or until you stop it. A tunnel left
+  open stops on its own.
 
 ## 0.21.0 · Oct 19, 2026
 

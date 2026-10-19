@@ -578,7 +578,7 @@ export type ProcUse = { pid: number; rss: number; cpu: number; cmd: string }
 export type Resources = { app: (ProcUse & { kind: string })[]; daemon: ProcUse & { heap: number }; tabs: { tab: string; rss: number; cpu: number; procs: ProcUse[] }[]; others?: { name: string; stop?: string; rss: number; cpu: number; procs: ProcUse[] }[] }
 
 // a port exposed at a trycloudflare.com URL (no url yet: starting); mails: who can open it (none: anyone)
-export type Tunnel = { port: number; url?: string; mails?: string[] }
+export type Tunnel = { port: number; url?: string; mails?: string[]; until?: number } // until: when it stops (ms; none: when you stop it)
 
 // run: the project has a dev command; scripts: the RUN_SCRIPTS it has
 // stat: its changes against where it started (a worktree: its base; the repo itself: HEAD), lines added and deleted
@@ -665,5 +665,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 90
+export const API = 91
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

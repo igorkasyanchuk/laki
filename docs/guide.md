@@ -412,8 +412,8 @@ the workspace's path, short (`~/…/app/fix-login`; hover for all of it) with a 
   none yet, it's git's `user.email`.
 - Once it's up: a QR code to open it on your phone, the link (copy, open), and *Stop*. The globe lights up,
   and *Info* (⌘I) shows the public link too.
-- It runs in the daemon until you stop it, delete or archive the workspace, or stop the daemon; closing the
-  app leaves it on. A port with a tunnel stays in the status bar after its server stops.
+- *For how long*: 1, 8 (the default) or 24 hours, or until you stop it. It runs in the daemon until then, or
+  until you stop it, delete or archive the workspace, or stop the daemon; closing the app leaves it on. A port with a tunnel stays in the status bar after its server stops.
 
 **Share a tab** (a tab's right click › *Share live view…*: for 1, 8 or 24 hours, or until you stop it): a page
 anyone with the link can read, at a random `https://….trycloudflare.com/s/<id>` (the same Quick Tunnels, so it needs
