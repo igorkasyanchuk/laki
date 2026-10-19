@@ -389,6 +389,81 @@ ${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `.k-tabs:has(> .k-tabbar > label:nth-child($
 @keyframes k-spin { to { transform: rotate(360deg); } } @keyframes k-blink { 0%, 80%, 100% { opacity: 0.25; } 40% { opacity: 1; } } @keyframes k-slide { from { transform: translateX(-100%); } to { transform: translateX(290%); } }
 @media (prefers-reduced-motion: reduce) { .k-ld-s, .k-ld-d i, .k-ld-b > i { animation-duration: 3s; } }
 .k[data-line] .k-load { flex: none; } .k[data-line] .k-load.bar { flex: 1; flex-direction: row; align-items: center; } .k[data-line] .k-load.bar .k-ld-b { flex: 1; } .k[data-line] .k-load.bar > span { order: 0; }
+.k-hero { --hero: var(--accent, #7aa2f7); display: flex; align-items: center; gap: 14px; min-width: 0; padding: 14px 16px; border: 1px solid color-mix(in srgb, var(--hero) 28%, transparent); border-radius: calc(var(--radius, 6px) + 4px); background: radial-gradient(120% 140% at 0% 0%, color-mix(in srgb, var(--hero) 22%, transparent), transparent 62%), color-mix(in srgb, var(--hero) 5%, transparent); }
+.k-hero.center { flex-direction: column; text-align: center; } .k-hero.center .k-actions { justify-content: center; } .k-hero-b { display: flex; flex: 1; flex-direction: column; gap: 6px; min-width: 0; } .k-hero.center .k-hero-b { align-items: center; }
+.k-hero-img { flex: none; width: 96px; height: 96px; border-radius: var(--radius, 6px); object-fit: cover; } .k-hero-ic { flex: none; display: grid; place-items: center; width: 52px; height: 52px; border-radius: 14px; background: color-mix(in srgb, var(--hero) 18%, transparent); color: var(--hero); }
+.k-hero-t { font-size: 20px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; overflow-wrap: anywhere; } .k-hero-x { color: var(--muted, #7a8294); } .k-hero .k-actions { margin-top: 4px; }
+.k[data-kit=preview] .k-hero { gap: 10px; padding: 8px 10px; } .k[data-kit=preview] .k-hero-t { font-size: 15px; } .k[data-kit=preview] .k-hero-img { width: 56px; height: 56px; } .k[data-kit=preview] .k-hero-ic { width: 36px; height: 36px; border-radius: 10px; } .k[data-kit=preview] .k-hero .k-actions { margin-top: 0; }
+@container kit (max-width: 220px) { .k-hero-img, .k-hero-ic { display: none; } }
+.k[data-line] .k-hero { flex: none; padding: 0; border: 0; background: none; } .k[data-line] .k-hero > :not(.k-hero-b), .k[data-line] .k-hero-b > :not(.k-hero-t) { display: none; } .k[data-line] .k-hero-t { font-size: inherit; font-weight: 600; }
+.k-mk { display: flex; flex-direction: column; min-width: 0; overflow: hidden; border: 1px solid var(--line, #232833); border-radius: calc(var(--radius, 6px) + 2px); background: var(--hover, #1b2029); }
+.k-mk-bar { display: flex; flex: none; align-items: center; gap: 5px; min-width: 0; padding: 6px 9px; border-bottom: 1px solid var(--line, #232833); } .k-mk-bar > i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: #ff5f57; } .k-mk-bar > i:nth-child(2) { background: #febc2e; } .k-mk-bar > i:nth-child(3) { background: #28c840; }
+.k-mk-url, .k-mk-t { flex: 1; min-width: 0; margin-left: 6px; overflow: hidden; color: var(--muted, #7a8294); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; } .k-mk-url { padding: 0 8px; border-radius: 5px; background: var(--bg, #0f1117); line-height: 17px; cursor: pointer; } .k-mk-t { margin-right: 40px; text-align: center; }
+.k-mk-b { display: flex; flex: 1; flex-direction: column; min-width: 0; min-height: 0; overflow: hidden; background: var(--bg, #0f1117); } .k-mk-b > :not(.k-mk-img):not(.k-mk-code) { margin: 8px 10px; }
+.k-mk-img { display: block; width: 100%; object-fit: cover; object-position: top; } .k-mk-code { padding: 8px 10px; overflow: hidden; color: var(--muted, #7a8294); font: 11.5px/1.5 var(--mono, ui-monospace, monospace); white-space: pre; } .k-mk-code > div { overflow: hidden; text-overflow: ellipsis; } .k-mk-code .cmd { color: var(--fg, #d5d9e3); } .k-mk-p { margin-right: 7px; color: var(--done, #9ece6a); user-select: none; }
+.k:not([data-line]) .k-mk.terminal { border-color: #2a2e38; background: #1b1e25; } .k:not([data-line]) .k-mk.terminal .k-mk-bar { border-color: #2a2e38; } .k:not([data-line]) .k-mk.terminal .k-mk-b { background: #0d0f14; } .k:not([data-line]) .k-mk.terminal .k-mk-code { color: #9aa3b5; } .k:not([data-line]) .k-mk.terminal .cmd { color: #e6e9ef; } .k:not([data-line]) .k-mk.terminal .k-mk-p { color: #9ece6a; }
+.k-mk.phone { align-self: center; width: min(100%, 240px); padding: 6px; border-width: 2px; border-radius: 28px; } .k-mk.phone .k-mk-b { border-radius: 22px; } .k-mk-notch { display: block; flex: none; align-self: center; width: 64px; height: 12px; margin-bottom: 5px; border-radius: 8px; background: var(--line, #232833); }
+.k[data-kit=preview] .k-mk { flex: 1; min-height: 0; } .k[data-kit=preview] .k-mk-bar { padding: 4px 7px; } .k[data-kit=preview] .k-mk-code { padding: 5px 8px; font-size: 10.5px; }
+.k[data-line] .k-mk { flex: none; flex-direction: row; align-items: center; gap: 6px; border: 0; background: none; } .k[data-line] .k-mk-bar { padding: 0; border: 0; } .k[data-line] .k-mk-bar > i, .k[data-line] .k-mk-notch, .k[data-line] .k-mk-img, .k[data-line] .k-mk-code > div + div { display: none; } .k[data-line] .k-mk-b { flex-direction: row; background: none; } .k[data-line] .k-mk-code { padding: 0; }
+.k-filt { display: flex; flex-direction: column; gap: 8px; min-width: 0; } .k-chips { display: flex; flex-wrap: wrap; gap: 4px; min-width: 0; }
+.k-chip, .k-chip:hover { padding: 0 9px; border: 1px solid var(--line, #232833); border-radius: 10px; background: none; color: var(--muted, #7a8294); font-size: 11px; line-height: 18px; white-space: nowrap; } .k-chip:hover { color: var(--fg, #d5d9e3); } .k-chip.on { border-color: transparent; background: var(--accent, #7aa2f7); color: var(--accent-fg, #fff); font-weight: 600; }
+.k[data-kit=preview] .k-filt { gap: 5px; } .k[data-kit=preview] .k-chips { flex-wrap: nowrap; overflow: hidden; } .k[data-kit=preview] .k-chip { flex: none; } .k[data-line] .k-filt { flex: 1; flex-direction: row; } .k[data-line] .k-chips { display: none; }
+.k-rot { display: flex; flex-wrap: wrap; align-items: baseline; gap: 0 0.3em; min-width: 0; font-size: 15px; font-weight: 600; } .k-rot.s-sm { font-size: 12px; } .k-rot.s-lg { font-size: 20px; } .k-rot.s-xl { font-size: 28px; letter-spacing: -0.01em; }
+.k-rot-w { display: inline-block; height: 1.3em; overflow: hidden; color: var(--rc, var(--accent, #7aa2f7)); line-height: 1.3em; vertical-align: bottom; } .k-rot-t { display: flex; flex-direction: column; animation: k-rot calc(var(--n) * var(--s)) steps(var(--n)) infinite; } .k-rot-t > span { height: 1.3em; white-space: nowrap; } .k-rot-1 { color: var(--rc, var(--accent, #7aa2f7)); }
+@keyframes k-rot { to { transform: translateY(calc(var(--n) * -1.3em)); } }
+.k[data-line] .k-rot { flex: none; flex-wrap: nowrap; font-size: inherit; letter-spacing: normal; }
+.k-cmp { position: relative; display: grid; grid-template-columns: auto 1fr; width: 100%; min-width: 0; overflow: hidden; border-radius: var(--radius, 6px); background: var(--hover, #1b2029); container-type: inline-size; user-select: none; }
+.k-cmp > * { position: relative; grid-row: 1; grid-column: 1; } .k-cmp-a { grid-column: 1 / -1; } .k-cmp-b { z-index: 1; overflow: hidden; border-right: 2px solid #fff; }
+.k-cmp img { position: absolute; top: 0; left: 0; width: 100cqi; max-width: none; height: 100%; object-fit: cover; pointer-events: none; }
+.k-cmp-l { position: absolute; top: 6px; left: 6px; z-index: 1; padding: 0 6px; border-radius: 4px; background: rgba(0, 0, 0, 0.55); color: #fff; font-size: 10.5px; line-height: 16px; white-space: nowrap; pointer-events: none; } .k-cmp-l.r { right: 6px; left: auto; } @container (max-width: 160px) { .k-cmp-l { display: none; } }
+.k-cmp-h { z-index: 2; display: grid; place-items: center; align-self: center; justify-self: end; width: 26px; height: 26px; border-radius: 50%; background: #fff; box-shadow: 0 1px 6px rgba(0, 0, 0, 0.4); translate: 50%; pointer-events: none; } .k-cmp-h::after { content: '\\2039\\00a0\\203A'; color: #222; font: 700 13px/1 system-ui, sans-serif; font-style: normal; }
+.k-cmp-r { z-index: 3; top: 50%; width: 50cqi; min-width: 1rem; max-width: calc(100cqi - 1rem); height: 2rem; overflow: hidden; resize: horizontal; opacity: 0; cursor: ew-resize; transform-origin: 100% 100%; scale: 4; translate: 1.5rem -0.5rem; clip-path: inset(calc(100% - 0.75rem) 0 0 calc(100% - 0.75rem)); }
+.k[data-line] .k-cmp { flex: none; width: 48px; border-radius: 3px; } .k[data-line] .k-cmp-r, .k[data-line] .k-cmp-h { display: none; } .k[data-line] .k-cmp-b { width: 24px; border-right-width: 1px; }
+.k-skel { display: flex; flex-direction: column; gap: 8px; min-width: 0; } .k-sk-r { display: flex; align-items: flex-start; gap: 10px; min-width: 0; } .k-sk-ls { display: flex; flex: 1; flex-direction: column; gap: 7px; min-width: 0; padding-top: 2px; }
+.k-sk { display: block; height: 10px; border-radius: 5px; background: linear-gradient(90deg, color-mix(in srgb, var(--fg, #d5d9e3) 7%, transparent) 25%, color-mix(in srgb, var(--fg, #d5d9e3) 16%, transparent) 50%, color-mix(in srgb, var(--fg, #d5d9e3) 7%, transparent) 75%); background-size: 300% 100%; animation: k-shim 1.6s ease-in-out infinite; } .k-sk.av { flex: none; width: 32px; height: 32px; border-radius: 50%; } .k-sk.img { width: 100%; height: 72px; border-radius: var(--radius, 6px); }
+@keyframes k-shim { from { background-position: 100% 0; } to { background-position: 0 0; } }
+.k[data-kit=preview] .k-sk.img { height: 40px; } .k[data-kit=preview] .k-sk.av { width: 24px; height: 24px; } .k[data-line] .k-skel { flex: none; } .k[data-line] .k-sk.img, .k[data-line] .k-sk.av, .k[data-line] .k-sk-ls > .k-sk + .k-sk { display: none; } .k[data-line] .k-sk-ls { width: 80px; padding: 0; } .k[data-line] .k-sk { height: 8px; }
+.k-radial { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; color: var(--accent, #7aa2f7); } .k-rd-c { position: relative; width: 64px; height: 64px; } .k-radial.s-sm .k-rd-c { width: 40px; height: 40px; } .k-radial.s-lg .k-rd-c { width: 96px; height: 96px; }
+.k-rd-c svg { display: block; width: 100%; height: 100%; } .k-rd-c .bg { stroke: color-mix(in srgb, currentColor 16%, transparent); } .k-rd-c .fg { stroke: currentColor; }
+.k-rd-c b { position: absolute; inset: 0; display: grid; place-items: center; color: var(--fg, #d5d9e3); font-size: 13px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; } .k-radial.s-sm .k-rd-c b { font-size: 10px; } .k-radial.s-lg .k-rd-c b { font-size: 18px; }
+.k-rd-l { max-width: 100%; overflow: hidden; color: var(--muted, #7a8294); font-size: 11px; text-overflow: ellipsis; white-space: nowrap; }
+.k[data-kit=preview] .k-radial .k-rd-c { width: 46px; height: 46px; } .k[data-kit=preview] .k-radial.s-sm .k-rd-c { width: 32px; height: 32px; } .k[data-kit=preview] .k-radial.s-lg .k-rd-c { width: 64px; height: 64px; } .k[data-kit=preview] .k-radial .k-rd-c b { font-size: 11px; }
+.k[data-line] .k-radial { flex: none; flex-direction: row; gap: 5px; } .k[data-line] .k-radial .k-rd-c { display: flex; align-items: center; gap: 4px; width: auto; height: 14px; } .k[data-line] .k-radial .k-rd-c svg { width: 14px; height: 14px; } .k[data-line] .k-radial .k-rd-c b { position: static; font-size: inherit; }
+.k-ind { position: relative; display: inline-flex; flex: none; align-self: flex-start; width: fit-content; margin: 7px 9px 0 0; } .k-ind[data-open] { cursor: pointer; } .k-ind-x { display: inline-flex; align-items: center; gap: 6px; } .k-ind-x .k-av { width: 28px; height: 28px; } .k-ind-x.box { padding: 3px 10px; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); background: var(--hover, #1b2029); }
+.k-ind-b { position: absolute; top: -7px; right: -9px; min-width: 16px; padding: 0 4px; border-radius: 8px; color: var(--error, #f7768e); background: currentColor; box-shadow: 0 0 0 2px var(--bg, #0f1117); font-size: 10px; font-weight: 700; line-height: 15px; text-align: center; font-variant-numeric: tabular-nums; } .k-ind-b > span { color: #fff; } .k-ind-b:is(.t-warn, .t-good) > span { color: #16181d; }
+.k-ind-d { position: absolute; top: -2px; right: -3px; width: 9px; height: 9px; border-radius: 50%; color: var(--accent, #7aa2f7); background: currentColor; box-shadow: 0 0 0 2px var(--bg, #0f1117); }
+.k[data-line] .k-ind { align-self: center; align-items: center; margin: 0; } .k[data-line] .k-ind-b { position: static; margin-left: 4px; box-shadow: none; } .k[data-line] .k-ind-x .k-av { width: 16px; height: 16px; } .k[data-line] .k-ind-x.box { padding: 0 6px; } .k[data-line] .k-ind-d { top: 0; box-shadow: none; }
+.k-avatar { --av: 40px; display: flex; align-items: center; gap: 10px; min-width: 0; } .k-avatar.sm { --av: 24px; } .k-avatar.lg { --av: 64px; } .k-avatar.xl { --av: 96px; } .k-avatar[data-open] { cursor: pointer; }
+.k-avt-w { position: relative; flex: none; width: var(--av); height: var(--av); } .k-avt { display: block; width: 100%; height: 100%; } .k-avt.ring { padding: max(2px, calc(var(--av) * 0.05)); background: var(--ring); }
+.k-avt-f { display: grid; place-items: center; width: 100%; height: 100%; overflow: hidden; background: var(--hover, #1b2029); } .k-avt-f img { display: block; width: 100%; height: 100%; object-fit: cover; } .k-avt-i { color: var(--muted, #7a8294); font-size: calc(var(--av) * 0.36); font-weight: 600; }
+.k-avatar .sh-circle { border-radius: 50%; } .k-avatar .sh-rounded { border-radius: 22%; } .k-avatar .sh-squircle { border-radius: 34%; } .k-avatar .sh-hexagon { clip-path: polygon(25% 5%, 75% 5%, 100% 50%, 75% 95%, 25% 95%, 0 50%); } .k-avatar .sh-diamond { clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%); }
+.k-avt-d { position: absolute; right: 2%; bottom: 2%; width: max(8px, calc(var(--av) * 0.2)); height: max(8px, calc(var(--av) * 0.2)); border-radius: 50%; background: currentColor; box-shadow: 0 0 0 2px var(--bg, #0f1117); }
+.k[data-kit=preview] .k-avatar.lg { --av: 44px; } .k[data-kit=preview] .k-avatar.xl { --av: 52px; } .k[data-line] .k-avatar { --av: 16px; flex: none; gap: 6px; } .k[data-line] .k-avatar .k-sub { display: none; } .k[data-line] .k-avt-d { width: 6px; height: 6px; box-shadow: none; } .k[data-line] .k-avt.ring { padding: 1px; }
+.k-range { display: flex; flex-direction: column; gap: 3px; min-width: 0; } .k-rg-h { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; min-width: 0; } .k-rg-l { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .k-rg-h b { flex: none; font-variant-numeric: tabular-nums; } .k-rg-h .k-unit { margin-left: 1px; color: var(--muted, #7a8294); font-weight: 400; }
+.k .k-range input[type=range] { width: 100%; height: 16px; margin: 0; padding: 0; border: 0; background: none; accent-color: var(--accent, #7aa2f7); cursor: pointer; } .k .k-range input[type=range]:disabled { opacity: 0.5; cursor: default; }
+.k[data-line] .k-range { flex: 1; flex-direction: row; align-items: center; gap: 6px; min-width: 120px; } .k[data-line] .k-rg-h { order: 1; } .k[data-line] .k-rg-l { display: none; }
+.k-selw { display: flex; align-items: center; gap: 8px; min-width: 0; } @container kit (max-width: 150px) { .k-selw .k-seg-l { display: none; } } .k .k-selw select { flex: 1; min-width: 0; background: var(--hover, #1b2029); cursor: pointer; } .k .k-selw select:disabled { opacity: 0.6; cursor: default; }
+.k[data-kit=preview] .k-selw select { padding: 2px 6px; font-size: 11px; } .k[data-line] .k-selw { flex: none; } .k[data-line] .k-selw select { width: auto; padding: 0 4px; font-size: 11px; }
+.k-input { display: flex; align-items: center; gap: 6px; min-width: 0; } .k-input input { flex: 1; } .k-input .k-btn { flex: none; } .k[data-kit=preview] .k-input input { padding: 2px 6px; font-size: 11px; }
+.k[data-line] .k-input { flex: 1; min-width: 120px; max-width: 240px; } .k[data-line] .k-input input { padding: 0 6px; } .k[data-line] .k-input .k-btn { padding: 0 6px; line-height: 15px; }
+.k-swap, .k-swap:hover { display: inline-flex; flex: none; align-items: center; gap: 6px; width: fit-content; padding: 3px 9px; } .k-swap.bare { padding: 4px; border-color: transparent; background: none; } .k-swap.bare:hover { background: var(--hover, #1b2029); }
+.k-swap:not(.on) { color: var(--muted, #7a8294); } .k-swap:not(.on):hover { color: var(--fg, #d5d9e3); } .k-swap.on { border-color: color-mix(in srgb, currentColor 40%, transparent); color: var(--accent, #7aa2f7); } .k-swap .k-icon { transition: transform 0.15s; } .k-swap:active .k-icon { transform: scale(0.85); }
+.k[data-line] .k-swap { padding: 0 6px; line-height: 15px; } .k[data-line] .k-swap.bare { padding: 0 2px; }
+.k-pg { display: inline-flex; flex: none; align-items: stretch; width: fit-content; max-width: 100%; overflow: hidden; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); } .k-pg > * + * { border-left: 1px solid var(--line, #232833); }
+.k-pg-b, .k-pg-b:hover { min-width: 28px; padding: 2px 8px; border: 0; border-radius: 0; background: none; font-variant-numeric: tabular-nums; } .k-pg > * + .k-pg-b { border-left: 1px solid var(--line, #232833); } .k-pg-b:not(:disabled):hover { background: var(--hover, #1b2029); } .k-pg-b.arr { font-size: 14px; line-height: 1; }
+.k-pg-b.on, .k-pg-b.on:disabled { background: var(--accent, #7aa2f7); color: var(--accent-fg, #fff); font-weight: 600; opacity: 1; } .k-pg-gap, .k-pg-n { display: grid; place-items: center; padding: 0 6px; color: var(--muted, #7a8294); font-variant-numeric: tabular-nums; }
+@container kit (max-width: 220px) { .k-pg-b.pn:not(.on), .k-pg-gap { display: none; } }
+.k[data-kit=preview] .k-pg-b { min-width: 24px; padding: 1px 6px; font-size: 11px; } .k[data-line] .k-pg-b { min-width: 0; padding: 0 6px; line-height: 15px; }
+.k-menu { display: flex; flex-direction: column; gap: 1px; min-width: 0; } .k-mn-h { padding: 6px 8px 2px; overflow: hidden; color: var(--muted, #7a8294); font-size: 10.5px; font-weight: 600; letter-spacing: 0.04em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; } .k-mn-h:first-child { padding-top: 0; }
+.k-mn-i, .k-mn-i:hover { display: flex; align-items: center; gap: 8px; width: 100%; min-width: 0; padding: 4px 8px; border: 0; background: none; color: inherit; text-align: left; } .k-mn-i:not(:disabled):hover { background: var(--hover, #1b2029); } .k-mn-i .k-icon { color: var(--muted, #7a8294); } .k-mn-i .k-title { flex: 1; min-width: 0; } .k-mn-i .k-badge { flex: none; }
+.k-mn-i.on, .k-mn-i.on:hover { background: color-mix(in srgb, var(--accent, #7aa2f7) 16%, transparent); color: var(--accent, #7aa2f7); font-weight: 600; } .k-mn-i.on .k-icon { color: inherit; }
+.k[data-kit=preview] .k-mn-i { padding: 2px 6px; } .k[data-kit=preview] .k-mn-h { padding: 3px 6px 1px; } .k[data-line] .k-menu { flex-direction: row; gap: 4px; overflow: hidden; } .k[data-line] .k-mn-h { display: none; } .k[data-line] .k-mn-i { flex: none; width: auto; padding: 0 6px; }
+.k[data-kit=preview] { position: relative; } .k-dd { position: relative; display: inline-block; flex: none; width: fit-content; } .k-dd > summary { list-style: none; } .k-dd > summary::-webkit-details-marker { display: none; }
+.k-dd-s { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); background: var(--hover, #1b2029); white-space: nowrap; cursor: pointer; user-select: none; } .k-dd-s > .k-icon:last-child { opacity: 0.7; transition: transform 0.15s; } .k-dd[open] > .k-dd-s > .k-icon:last-child { transform: rotate(180deg); }
+.k-dd-s.primary { border-color: transparent; background: var(--accent, #7aa2f7); color: var(--accent-fg, #fff); font-weight: 600; } .k-dd-s.quiet { border-color: transparent; background: none; color: var(--muted, #7a8294); } .k-dd-s.quiet:hover { background: var(--hover, #1b2029); color: var(--fg, #d5d9e3); } .k-dd-s.danger { color: var(--error, #f7768e); }
+.k-dd-m { position: absolute; top: calc(100% + 4px); left: 0; z-index: 5; display: flex; flex-direction: column; gap: 1px; min-width: 160px; max-width: 280px; padding: 4px; border: 1px solid var(--line, #232833); border-radius: var(--radius, 6px); background: var(--bg, #0f1117); box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35); } .k-dd.end .k-dd-m { right: 0; left: auto; }
+.k[data-kit=preview] .k-dd { position: static; } .k[data-kit=preview] .k-dd-m { inset: 4px; min-width: 0; max-width: none; overflow: auto; } .k[data-kit=preview] .k-dd-s { padding: 1px 8px; font-size: 11px; } .k[data-line] .k-dd-s { padding: 0 7px; line-height: 15px; } .k[data-line] .k-dd-m { display: none; }
+@media (prefers-reduced-motion: reduce) { .k-rot-t { animation-duration: calc(var(--n) * var(--s) * 2); } .k-sk { animation-duration: 4s; } .k-dd-s > .k-icon:last-child, .k-swap .k-icon { transition: none; } }
 /* tones last, over an element's own color (a badge's, a bar's, a chart's) */
 .k .t-good { color: var(--done, #9ece6a); } .k .t-bad { color: var(--error, #f7768e); } .k .t-warn { color: var(--waiting, #e0af68); } .k .t-accent { color: var(--accent, #7aa2f7); } .k .t-muted { color: var(--muted, #7a8294); } .k .k-badge.t-accent { color: var(--accent-fg, #fff); }`
 
@@ -458,9 +533,32 @@ export function sayOf(x: unknown): WidgetSay | null {
 // shows the rows a limit hid (a preview: its full view); a click elsewhere on a preview opens the full view (the app
 // knows whether there is one)
 export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => void) => void; removeEventListener: (t: string, f: (e: any) => void) => void }, send: (m: Record<string, unknown>) => unknown) {
+  const said = (x: any): string => [...x.childNodes].map((c: any) => (c.nodeType === 3 ? c.data : c.nodeType === 1 && c.localName !== 'button' ? said(c) : '')).join('') // a row's words, not its buttons'
+  // the rows of a box: those whose words have q (none: all but the extra ones, unless it's open)
+  const sift = (box: any, q: string) => {
+    const open = box.hasAttribute('data-open')
+    box.querySelectorAll('[data-row]').forEach((x: any) => (x.hidden = q ? !said(x).toLowerCase().includes(q) : x.hasAttribute('data-extra') && !open))
+    box.querySelectorAll('[data-group]').forEach((g: any) => (g.hidden = !g.querySelector('[data-row]:not([hidden])')))
+    const more = box.querySelector('[data-more]')
+    if (more) more.hidden = !!q
+  }
+  const all = (q: string): any[] => (d => (d && d.querySelectorAll ? [...d.querySelectorAll(q)] : []))((root as any).querySelectorAll ? root : (root as any).document) // a shadow root's, a page's
   const click = (e: any) => {
     const t = e.target && e.target.closest ? e.target : null
     if (!t) return
+    // an open dropdown closes at a click outside it or in its menu (its own summary toggles it)
+    let shut = false
+    for (const dd of all('details.k-dd[open]')) if (!dd.contains(t) || t.closest('.k-dd-m')) (dd.open = false), (shut = true)
+    const chip = t.closest('[data-chip]')
+    if (chip) {
+      // a filter's chip: the rows under it with its words; clicked again (or All), every row
+      const box = chip.closest('[data-filt]')
+      if (!box) return
+      const v = chip.classList.contains('on') ? '' : chip.getAttribute('data-chip') || ''
+      box.querySelectorAll('[data-chip]').forEach((c: any) => (on => (c.classList.toggle('on', on), c.setAttribute('aria-pressed', String(on))))((c.getAttribute('data-chip') || '') === v))
+      box.querySelectorAll('[data-rows]').forEach((r: any) => sift(r, v.toLowerCase()))
+      return
+    }
     // the innermost thing to click wins: a button in a row that runs an action is the button's
     const hit = t.closest('[data-more], [data-run], [data-do], [data-copy], a[href], [data-open], [data-laki]')
     const at = (q: string) => (hit && hit.matches(q) ? hit : null)
@@ -482,6 +580,12 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       e.preventDefault()
       if (r.hasAttribute('data-busy')) return
       let arg = r.getAttribute('data-arg') ?? ''
+      // an input's button: what's typed is the arg; nothing typed, the box gets the keyboard
+      const box = r.hasAttribute('data-input') && r.closest('[data-inbox]')?.querySelector('input')
+      if (box) {
+        arg = String(box.value).trim()
+        if (!arg) return void box.focus()
+      }
       const form = r.hasAttribute('data-submit') && r.closest('[data-form]')
       if (form) {
         const v: Record<string, unknown> = {}
@@ -490,7 +594,9 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       }
       r.setAttribute('data-busy', '')
       const p: any = send({ laki: 'run', action: r.getAttribute('data-run'), arg, label: (r.textContent || '').trim(), confirm: r.getAttribute('data-confirm') || undefined })
-      if (p && typeof p.then === 'function') p.then(() => r.removeAttribute('data-busy'), () => r.removeAttribute('data-busy'))
+      const clear = () => box && !r.hasAttribute('data-keep') && box.value.trim() === arg && (box.value = '')
+      if (p && typeof p.then === 'function') p.then((ok: unknown) => (r.removeAttribute('data-busy'), ok !== false && clear()), () => r.removeAttribute('data-busy'))
+      else clear() // a JS page's: the app says when it's done
     } else if (d) {
       // a Laki command: the app says what it will do and asks first
       e.preventDefault()
@@ -503,23 +609,44 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     else if (a) e.preventDefault(), send({ laki: 'open', url: a.getAttribute('href') })
     else if (o) e.preventDefault(), send({ laki: 'open', url: o.getAttribute('data-open') })
     else if (b) e.preventDefault(), send({ laki: b.getAttribute('data-laki') })
-    else if (!t.closest('button, input, select, textarea, label, summary, .k-sc, [data-kit="full"]')) send({ laki: 'full' }) // .k-sc: a secret shown, to select
+    else if (!shut && !t.closest('button, input, select, textarea, label, summary, .k-sc, .k-dd-m, .k-cmp, [data-kit="full"]')) send({ laki: 'full' }) // .k-sc: a secret shown, to select; .k-cmp: a drag between pictures
   }
   const input = (e: any) => {
-    const f = e.target && e.target.closest ? e.target.closest('[data-filter]') : null
+    const t = e.target && e.target.closest ? e.target : null
+    if (!t) return
+    if (t.type === 'range') return void (v => v && (v.textContent = t.value))(t.closest('.k-range')?.querySelector('[data-rv]')) // a slider's number as it moves
+    const f = t.closest('[data-filter]')
     const box = f && f.closest('[data-rows]')
-    if (!box) return
-    const q = String(f.value).trim().toLowerCase()
-    const open = box.hasAttribute('data-open')
-    const said = (x: any): string => [...x.childNodes].map((c: any) => (c.nodeType === 3 ? c.data : c.nodeType === 1 && c.localName !== 'button' ? said(c) : '')).join('') // a row's words, not its buttons'
-    box.querySelectorAll('[data-row]').forEach((x: any) => (x.hidden = q ? !said(x).toLowerCase().includes(q) : x.hasAttribute('data-extra') && !open))
-    box.querySelectorAll('[data-group]').forEach((g: any) => (g.hidden = !g.querySelector('[data-row]:not([hidden])')))
-    const more = box.querySelector('[data-more]')
-    if (more) more.hidden = !!q
+    if (box) sift(box, String(f.value).trim().toLowerCase())
   }
-  root.addEventListener('click', click)
-  root.addEventListener('input', input)
-  return () => (root.removeEventListener('click', click), root.removeEventListener('input', input))
+  // a slider let go, an option picked: runs its action with the value
+  const change = (e: any) => {
+    const t = e.target && e.target.closest ? e.target.closest('[data-change]') : null
+    if (!t) return
+    const p: any = send({ laki: 'run', action: t.getAttribute('data-change'), arg: String(t.value), label: t.getAttribute('aria-label') || '', confirm: t.getAttribute('data-confirm') || undefined })
+    // declined or failed: back to what the data says (a done one is drawn again from the new data)
+    const back = () => {
+      if (t.localName === 'select') for (const o of t.options) o.selected = o.defaultSelected
+      else t.value = t.defaultValue
+      const v = t.closest('.k-range')?.querySelector('[data-rv]')
+      if (v) v.textContent = t.value
+    }
+    if (p && typeof p.then === 'function') p.then((ok: unknown) => ok === false && back(), back)
+  }
+  // Enter in an input's box clicks its button
+  const key = (e: any) => {
+    if (e.key !== 'Enter' || e.isComposing || !e.target || !e.target.closest) return
+    const b = e.target.closest('[data-inbox]')?.querySelector('[data-input]')
+    if (b && e.target.localName === 'input') e.preventDefault(), b.click()
+  }
+  // a full view's dropdown opened near its bottom: its menu scrolled into sight (toggle doesn't bubble: caught on the way down)
+  const toggle = (e: any) => {
+    const t = e.target
+    if (t && t.open && t.matches && t.matches('details.k-dd') && t.closest('[data-kit="full"]')) t.querySelector('.k-dd-m')?.scrollIntoView({ block: 'nearest' })
+  }
+  const on: [string, (e: any) => void, boolean?][] = [['click', click], ['input', input], ['change', change], ['keydown', key], ['toggle', toggle, true]]
+  for (const [k, f, c] of on) (root as any).addEventListener(k, f, c)
+  return () => on.forEach(([k, f, c]) => (root as any).removeEventListener(k, f, c))
 }
 
 // a JS widget's page (the daemon serves it, sandboxed, to a frame of the app): the filled template with window.laki
@@ -546,7 +673,7 @@ addEventListener('keydown', e => e.key === 'Escape' && say({ laki: 'close' }))
 addEventListener('message', e => {
   if (e.source !== parent || !e.data) return
   if (e.data.laki === 'ui' && uiWait.has(e.data.req)) uiWait.get(e.data.req)(String(e.data.html ?? '')), uiWait.delete(e.data.req)
-  if (e.data.laki === 'done') document.querySelectorAll('[data-run][data-busy]').forEach(r => r.getAttribute('data-run') === e.data.action && (r.hasAttribute('data-submit') || (r.getAttribute('data-arg') ?? '') === e.data.arg) && r.removeAttribute('data-busy'))
+  if (e.data.laki === 'done') document.querySelectorAll('[data-run][data-busy]').forEach(r => r.getAttribute('data-run') === e.data.action && (r.hasAttribute('data-submit') || r.hasAttribute('data-input') || (r.getAttribute('data-arg') ?? '') === e.data.arg) && r.removeAttribute('data-busy'))
 })
 </script></head><body>${body}</body></html>`
 }

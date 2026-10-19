@@ -1308,8 +1308,17 @@ over its row, uiCheck's walk too), breadcrumbs, gallery (scroll-snap, `imageOk` 
 `k-blink`, `k-slide`; slower under reduced motion); a table cell's `subtitle`, `image`/`avatar`/`icon`, `progress`
 (`pctOf`, `minibar`, a list accessory's too), `badge`, `spark`, `copy` and `actions` (`.k-tc`; none: the words alone). `UI_EXAMPLES`: the UI kit
 page's Examples (`UiKit.tsx` `KitCard`), the guide's examples (`widgetGuide.ts` `examples`); `UI_SAMPLES` stays one
-per element. The app's CSP takes `img-src https:` (the kit's images, Markdown's pictures). The guide tool's `max`:
-40,000. Starters `note` (a static source) and `launcher` (`do` buttons).
+per element. After DaisyUI's: hero (`--hero`, a glow), mockup (browser, window, terminal (dark in any theme), phone;
+`$ ` lines as commands), filter (`data-filt`, chips `data-chip`: `uiBehave`'s `sift` over its `[data-rows]`, the rows
+drawn only), rotate (`k-rot`: `steps()` over the words, no slide), compare (DaisyUI's diff: a CSS `resize` grip scaled
+up and see-through over the divider, no script; `.k-cmp` a container), skeleton (`k-shim`), radial, indicator, avatar
+(shapes by `border-radius` or `clip-path`, a ring as its padding), range and select (`data-change`: `uiBehave`'s `change`
+runs them, never a click; a range's `[data-rv]` follows it), input (`data-inbox`, its button's `data-input`: the
+typed words as the arg, Enter clicks it, cleared once it ran unless `data-keep`; a JS page's busy cleared by `done`
+too), swap, pagination (`pn`, not `num`: `WIDGET_CSS`'s), menu (`menuRow`, shared with dropdown) and dropdown (a
+`<details>`; `uiBehave` closes one at a click outside it or in its menu, scrolls a full view's menu into sight; a
+preview's covers the cell, a bar's opens the full view). The app's CSP takes `img-src https:` (the kit's images,
+Markdown's pictures). The guide tool's `max`: 50,000. Starters `note` (a static source) and `launcher` (`do` buttons).
 
 Tools for agents (widgets.ts' tools section; `widgetSchema.ts` `toolOf`, `toolSchema`, `toolArgs`, `actionCmd`): an
 action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPES`, `TOOL_ASKS`; `ask` unset: first).
@@ -1535,7 +1544,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     right click is `wsMenu`); `moveWs`
     keeps to the list; `SideHandle` `at`. Its settings: `railLabels` (off:
     `data-bare`, icons only, `railW` 52), `railShells` and `railBrowsers` (off: `railOf` makes that kind `projects`, no
-    button, its project in Projects' list; `rawKind` still gives a pin its icon and leaves out *Run ›*).
+    button, its project in Projects' list; `rawKind` still gives a pin its icon and leaves out *Run ›*). With words, past
+    `RAIL_FIT` buttons above the pins, `RAIL_MORE`'s (calendar, workflows, specs, board: the least used first) go into a
+    ⋯ More menu, lit while its page is open.
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses

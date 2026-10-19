@@ -94,6 +94,9 @@ export const UI = {
   toolbar: { group: 'Layout', blurb: 'Icon buttons in a row, their words as tooltips.', props: { items: BUTTONS, labels: p('bool', 'Their words beside the icons too'), align: p(['start', 'end', 'between'] as const, 'start (the default), end, or between') } },
   spacer: { group: 'Layout', blurb: 'Room that pushes what follows it in a row to the end.', props: {} },
   divider: { group: 'Layout', blurb: 'A line across.', props: {} },
+  hero: { group: 'Layout', blurb: 'A banner: a big title, words, a picture or an icon, buttons, on a soft glow. A welcome, a release, what’s on now.', props: { title: p('text', 'Its title, large'), text: p('text', 'Words under it'), icon: p('icon', 'An icon or emoji beside it (no image)'), image: p('text', 'A picture beside it: data: or https'), align: p(['start', 'center'] as const, 'start (the default) or center'), color: COLOR, actions: BUTTONS, children: p('children', 'Elements under its words') } },
+  mockup: { group: 'Layout', blurb: 'A frame around what it shows: a browser with its address, a window, a terminal, a phone. Screenshots, a command.', props: { kind: p(['browser', 'window', 'terminal', 'phone'] as const, 'browser (the default), window, terminal or phone'), url: p('text', 'browser: the address in its bar (a link it opens)'), title: p('text', 'window: its title'), value: p('text', 'terminal: its lines, one each; a line starting $ or > is a command'), image: p('text', 'A picture inside it: data: or https (a screenshot)'), children: p('children', 'Elements inside it') } },
+  filter: { group: 'Layout', blurb: 'Chips over elements: a click shows only the rows whose words have it. All · Failing · Passing over a list or a table.', props: { options: p('items', 'The chips: words, or [{ "value", "label" }]: a chip keeps the rows whose words have its value'), all: p('text', 'The first chip, every row (All); "" for none: a chip clicked again lets go'), children: p('children', 'The elements whose rows it filters: a list, a table, status…') } },
   text: { group: 'Text', blurb: 'A line of text.', props: { value: p('text', 'The words'), size: p(['sm', 'md', 'lg', 'xl'] as const, 'sm, md (the default), lg or xl'), weight: p(['normal', 'medium', 'semibold', 'bold'] as const, 'How bold'), mono: p('bool', 'In the monospace font'), muted: p('bool', 'Dimmer'), wrap: p('bool', 'Wrap onto more lines (default: one line, cut with …)'), color: COLOR } },
   heading: { group: 'Text', blurb: 'A heading.', props: { value: p('text', 'The words'), level: p('number', '1, 2 (the default) or 3'), color: COLOR } },
   markdown: { group: 'Text', blurb: 'Formatted text: headings, lists, tasks, code, tables, quotes, links and https images.', props: { value: p('text', 'The Markdown (a whole note: “{{text}}” of a file or a typed text)') } },
@@ -105,6 +108,7 @@ export const UI = {
   countdown: { group: 'Text', blurb: 'Time left until a moment, or since it: a release, a freeze, an on-call shift.', props: { to: p('text', 'When: an ISO date or ms'), label: p('text', 'What happens then (“until the freeze”)'), soon: p('number', 'Hours: it turns warn when it’s this close (24)'), past: p('text', 'What it says once it’s past (default: how long ago)') } },
   kbd: { group: 'Text', blurb: 'A keyboard shortcut, each key in a box: ⌘ K, Ctrl+Shift+P.', props: { keys: p('text', 'The keys, by spaces or + (⌘ ⇧ P, Ctrl+C)'), label: p('text', 'What it does, after the keys') } },
   secret: { group: 'Text', blurb: 'A token, a password, a key: dots until a click shows it, a copy button.', props: { value: p('text', 'The secret'), label: p('text', 'What it is'), copy: p('bool', 'A copy button: on by default') } },
+  rotate: { group: 'Text', blurb: 'Words that take turns in one place: Building, Testing, Shipping. A hero’s line, what runs now.', rows: true, props: { items: p('items', 'The words: ["Build", "Test", "Ship"]'), text: p('text', 'With each: a word ({{text}} by default)'), prefix: p('text', 'Words before them'), suffix: p('text', 'Words after them'), seconds: p('number', 'Seconds each shows (2)'), size: p(['sm', 'md', 'lg', 'xl'] as const, 'sm, md (the default), lg or xl'), color: COLOR } },
   stat: { group: 'Data', blurb: 'One number with its label, a change and a sparkline.', props: STAT },
   stats: { group: 'Data', blurb: 'A few numbers in a line.', rows: true, props: { items: p('items', 'Each one’s stat props: [{ "value", "label", "delta", "tone" }]'), ...STAT } },
   kv: { group: 'Data', blurb: 'Names and values.', rows: true, props: { items: p('items', 'Each row: [{ "key", "value", "tone", "mono", "copy" }]'), key: p('text', 'With each: a row’s name'), value: p('text', 'With each: a row’s value'), mono: p('bool', 'Values in the monospace font'), copy: p('bool', 'A copy button by each value') } },
@@ -185,11 +189,23 @@ export const UI = {
   chat: { group: 'Data', blurb: 'A conversation in bubbles, the newest last: a Slack thread, an agent’s answers.', rows: true, props: { from: p('text', 'Who said it ({{from}} by default)'), text: p('text', 'What they said ({{text}} by default)'), login: p('text', 'A GitHub login: its picture'), time: p('text', 'When (an ISO date or ms)'), mine: p('text', 'A path or template: yours when truthy, on the right') } },
   prs: { group: 'Data', blurb: 'Pull requests, GitHub style: state, title, number and author, checks, review.', rows: true, props: { title: p('text', 'Its title ({{title}} by default)'), number: p('text', 'Its number ({{number}} by default)'), author: p('text', 'Its author’s login: a picture ({{author}} by default)'), state: p('text', 'open, draft, merged or closed ({{state}} by default)'), checks: p('text', 'passing, failing or pending: an icon'), review: p('text', 'approved or changes: a tag'), time: p('text', 'When it last changed'), href: p('text', 'A link a click opens ({{url}} by default)') } },
   commits: { group: 'Data', blurb: 'Commits: the short hash (a click copies it), the message’s first line, who and when.', rows: true, props: { sha: p('text', 'Its hash ({{sha}} by default)'), message: p('text', 'Its message ({{message}} by default)'), author: p('text', 'Its author: a GitHub login’s picture and the name'), time: p('text', 'When'), href: p('text', 'A link a click opens') } },
+  compare: { group: 'Data', blurb: 'Two pictures, one over the other, a divider to drag between them: before and after, a design and the build.', props: { before: p('text', 'The picture before: data: or https'), after: p('text', 'The picture after'), labels: p('items', 'Words on each side: ["Before", "After"]'), height: p('number', 'Its height in px (default: as the cell fits; 260 in the full view)') } },
+  skeleton: { group: 'Data', blurb: 'Gray shapes that shimmer where something will be. Show it with if: while a fetch runs.', props: { lines: p('number', 'Lines of text (3)'), avatar: p('bool', 'A circle before them'), image: p('bool', 'A block over them: a picture’s place'), label: p('text', 'What it waits for, for screen readers (Loading…)') } },
+  radial: { group: 'Data', blurb: 'A ring that fills, its number in the middle: a score, a quota, coverage.', props: { value: p('text', 'How much'), max: p('number', 'Of how much (100)'), text: p('text', 'What it says in the middle (default: the percent)'), label: p('text', 'What it is, under it'), size: p(['sm', 'md', 'lg'] as const, 'sm, md (the default) or lg'), color: COLOR } },
+  indicator: { group: 'Data', blurb: 'An icon, a picture or a word with a count on its corner: unread mail, reviews waiting.', props: { icon: p('icon', 'An icon or emoji'), avatar: p('text', 'Or a GitHub login: its picture'), label: p('text', 'Or words in a box'), badge: p('text', 'The count or word on its corner (empty or 0: none)'), dot: p('text', 'A path or template: a dot on its corner when truthy (no count)'), color: COLOR, href: p('text', 'A link a click opens') } },
+  avatar: { group: 'Data', blurb: 'One picture, any size and shape, a ring, a dot for whether they’re around: who’s on call, a reviewer.', props: { login: p('text', 'A GitHub login: its picture'), image: p('text', 'Or a picture: data: or https'), name: p('text', 'A name: its initials when there’s no picture'), size: p(['sm', 'md', 'lg', 'xl'] as const, 'sm, md (the default), lg or xl'), shape: p(['circle', 'rounded', 'squircle', 'hexagon', 'diamond'] as const, 'circle (the default), rounded, squircle, hexagon or diamond'), ring: p('text', 'A ring around it: a color'), state: p('text', 'online, away, busy, offline…: its dot'), label: p('text', 'Words beside it'), text: p('text', 'A line under them'), href: p('text', 'A link a click opens') } },
   button: { group: 'Actions', blurb: 'Runs an action or a Laki command, opens a link, refreshes, copies.', props: BUTTON },
   toggle: { group: 'Actions', blurb: 'A switch that runs an action with on or off: a feature flag, maintenance mode.', props: { label: p('text', 'Its words'), text: p('text', 'Words under it'), on: p('text', 'A path or template: on when truthy'), run: p('text', 'One of widget.json’s actions, run with $WIDGET_ARG on or off (what it’s turned to); then it fetches again and shows what’s true'), confirm: p('text', 'A question the app asks first') } },
   segmented: { group: 'Actions', blurb: 'One of a few options, picked: runs an action with it. An environment, a mode, a range.', props: { options: p('items', 'The options: words, or [{ "value", "label" }]'), value: p('text', 'The one picked now ({{env}})'), label: p('text', 'Words before it'), run: p('text', 'One of widget.json’s actions, run with the option’s value as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
   stepper: { group: 'Actions', blurb: 'A number with − and +: runs an action with the new one. Replicas, a limit, a budget.', props: { value: p('text', 'The number now'), label: p('text', 'What it is'), unit: p('text', 'After the number'), min: p('number', 'The lowest'), max: p('number', 'The highest'), step: p('number', 'How much a click moves it (1)'), run: p('text', 'One of widget.json’s actions, run with the new number as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
+  range: { group: 'Actions', blurb: 'A slider: runs an action with where it’s let go. A volume, a threshold, a rollout percent.', props: { value: p('text', 'The number now'), min: p('number', 'The lowest (0)'), max: p('number', 'The highest (100)'), step: p('number', 'How far one notch moves it (1)'), label: p('text', 'What it is'), unit: p('text', 'After the number'), color: COLOR, run: p('text', 'One of widget.json’s actions, run with the number as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
+  select: { group: 'Actions', blurb: 'A pick from a long list: runs an action with it. A branch, a region, a model.', props: { options: p('items', 'The options: words, or [{ "value", "label" }]'), value: p('text', 'The one picked now'), label: p('text', 'Words before it'), run: p('text', 'One of widget.json’s actions, run with the option’s value as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first') } },
+  input: { group: 'Actions', blurb: 'A box to type in and a button (or Enter): runs an action with the words. Add a to-do, look something up.', props: { placeholder: p('text', 'What the empty box says'), value: p('text', 'What it starts with'), label: p('text', 'Its button’s words (Add)'), icon: p('icon', 'Its button’s icon'), run: p('text', 'One of widget.json’s actions, run with what’s typed as $WIDGET_ARG'), confirm: p('text', 'A question the app asks first'), clear: p('bool', 'Empty the box once sent: on by default') } },
+  swap: { group: 'Actions', blurb: 'An icon that flips between two: star and unstar, play and pause. Runs an action with on or off.', props: { on: p('text', 'A path or template: on when truthy'), icons: p('items', 'Its two icons or emoji, off then on: ["bell", "check"]'), labels: p('items', 'Its two words, off then on: ["Watch", "Watching"]'), color: COLOR, run: p('text', 'One of widget.json’s actions, run with $WIDGET_ARG on or off (what it’s turned to)'), confirm: p('text', 'A question the app asks first') } },
+  pagination: { group: 'Actions', blurb: 'Pages in a joined row, ‹ 1 … 5 6 7 … 20 ›: runs an action with the page picked.', props: { page: p('text', 'The page now, from 1'), pages: p('text', 'How many pages'), run: p('text', 'One of widget.json’s actions, run with the page as $WIDGET_ARG') } },
   actions: { group: 'Actions', blurb: 'A row of buttons.', props: { items: p('buttons', 'The buttons') } },
+  menu: { group: 'Actions', blurb: 'A list of places or commands, one lit as the current, headings between them: a launcher, a sidebar.', rows: true, props: { items: p('items', 'Its rows: [{ "label", "icon", "badge", "on", and a button’s run, open, do… }], or { "title" } for a heading'), ...BUTTON, badge: p('text', 'A count or word at a row’s end'), on: p('text', 'A path or template: the current row, lit'), title: p('text', 'In items: a heading over the rows after it'), limit: p('number', 'Rows at most (a preview: as many as fit), then +N more'), empty: p('text', 'What it says with no rows') } },
+  dropdown: { group: 'Actions', blurb: 'A button that opens a menu of more buttons: the actions that don’t fit.', props: { label: p('text', 'Its button’s words'), icon: p('icon', 'Its button’s icon'), style: p(['primary', 'quiet', 'danger'] as const, 'primary, quiet or danger; none: plain'), items: BUTTONS, align: p(['start', 'end'] as const, 'The menu under its start (the default) or its end') } },
   breadcrumbs: { group: 'Actions', blurb: 'Where you are: a path of links, › between them. A repo’s folders, a site’s pages.', rows: true, props: { items: p('items', 'Each one: a word, or { "label", "href", "icon" }'), label: p('text', 'With each: its words'), href: p('text', 'With each: a link it opens'), icon: p('icon', 'With each: an icon or emoji before it') } },
   links: { group: 'Actions', blurb: 'Links in a line, a rule between them.', rows: true, props: { items: p('items', 'Each one: { "label", "href" }'), label: p('text', 'With each: a link’s words'), href: p('text', 'With each: where it goes') } },
   form: { group: 'Actions', blurb: 'Fields and a button that runs an action with them.', props: { fields: p('items', 'Its fields: [{ "id", "type": "text" | "number" | "bool" | "choice" | "textarea", "label", "hint", "default", "choices" }]'), submit: p('button', 'Its button: { "label", "run", "confirm" }; the action gets the fields as JSON in $WIDGET_ARG') } },
@@ -323,12 +339,8 @@ const doOf = (b: El, s: S): UiDo | undefined => {
   for (const k of ['prompt', 'command', 'url', 'agent', 'project']) if (b[k] !== undefined) c[k] = txt(b[k], s)
   return c as UiDo
 }
-// bare: its icon alone, its words the tooltip (a toolbar's)
-function button(b: unknown, s: S, small = false, bare = false): string {
-  if (!obj(b) || hidden(b, s) || (b.refresh === true && s.hide?.refresh)) return ''
-  const label = txt(b.label, s)
-  const style = ['primary', 'quiet', 'danger'].includes(String(b.style)) ? ` ${b.style}` : ''
-  const iconOnly = bare && b.icon !== undefined && !!icon(b.icon, s, 12)
+// what a click on a button does, as its attributes: run (+ arg), do, open, refresh, full or copy, then confirm ('': none)
+function actOf(b: El, s: S) {
   let act = ''
   if (b.run !== undefined) act = ` data-run="${h(b.run, s)}"${b.arg !== undefined ? ` data-arg="${h(b.arg, s)}"` : ''}`
   else if (b.do !== undefined) act = (c => (c ? ` data-do="${esc(JSON.stringify(c))}"` : ' disabled'))(doOf(b, s))
@@ -336,9 +348,32 @@ function button(b: unknown, s: S, small = false, bare = false): string {
   else if (b.refresh === true) act = ' data-laki="refresh"'
   else if (b.full === true) act = ' data-laki="full"'
   else if (b.copy !== undefined) act = ` data-copy="${h(b.copy, s)}"`
-  const confirm = b.confirm !== undefined ? ` data-confirm="${h(b.confirm, s)}"` : ''
-  return `<button type="button"${at(iconOnly && b.tip === undefined ? { ...b, tip: label } : b, s, `k-btn${style}${small ? ' sm' : ''}${iconOnly ? ' bare' : ''}`, label)}${act}${confirm}${iconOnly && label ? ` aria-label="${esc(label)}"` : ''}>${b.icon !== undefined ? icon(b.icon, s, 12) : ''}${label && !iconOnly ? `<span>${esc(label)}</span>` : ''}</button>`
+  return `${act}${b.confirm !== undefined ? ` data-confirm="${h(b.confirm, s)}"` : ''}`
 }
+// bare: its icon alone, its words the tooltip (a toolbar's)
+function button(b: unknown, s: S, small = false, bare = false): string {
+  if (!obj(b) || hidden(b, s) || (b.refresh === true && s.hide?.refresh)) return ''
+  const label = txt(b.label, s)
+  const style = ['primary', 'quiet', 'danger'].includes(String(b.style)) ? ` ${b.style}` : ''
+  const iconOnly = bare && b.icon !== undefined && !!icon(b.icon, s, 12)
+  return `<button type="button"${at(iconOnly && b.tip === undefined ? { ...b, tip: label } : b, s, `k-btn${style}${small ? ' sm' : ''}${iconOnly ? ' bare' : ''}`, label)}${actOf(b, s)}${iconOnly && label ? ` aria-label="${esc(label)}"` : ''}>${b.icon !== undefined ? icon(b.icon, s, 12) : ''}${label && !iconOnly ? `<span>${esc(label)}</span>` : ''}</button>`
+}
+// a menu's row (a menu's, a dropdown's): its icon, words and badge, lit when on; nothing to do: disabled
+function menuRow(x: El, r: S, tone: unknown, attrs = '') {
+  if (x.refresh === true && r.hide?.refresh) return ''
+  const label = txt(x.label, r)
+  const on = x.on !== undefined && holds(x.on, r)
+  const badge = x.badge !== undefined ? txt(x.badge, r) : ''
+  const act = (a => (/ data-(run|do|open|laki|copy)=/.test(a) ? a : ''))(actOf(x, r))
+  return `<button type="button" class="k-mn-i${on ? ' on' : ''}"${act || ' disabled'}${on ? ' aria-current="true"' : ''}${x.tip !== undefined ? ` title="${h(x.tip, r)}"` : ''}${attrs}>${x.icon !== undefined ? icon(x.icon, r, 13) : ''}<span class="k-title ${toneOf({ tone }, label, r)}">${esc(label)}</span>${badge ? `<span class="k-badge">${esc(badge)}</span>` : ''}</button>`
+}
+// a segmented's or a select's options: words, or { value, label }
+const optsOf = (v: unknown, s: S, max: number) =>
+  (Array.isArray(v) ? v : [])
+    .filter(o => !obj(o) || !hidden(o, s))
+    .map(o => (obj(o) ? { v: txt(o.value ?? o.label, s).trim(), l: txt(o.label ?? o.value, s) } : { v: txt(o, s).trim(), l: txt(o, s) }))
+    .filter(o => o.v)
+    .slice(0, max)
 const buttons = (v: unknown, s: S, small = true, bare = false) => (Array.isArray(v) ? v.map(b => button(b, s, small, bare)).join('') : '')
 
 function stat(e: El, s: S) {
@@ -606,6 +641,7 @@ const PRESENCE: [RegExp, Tone][] = [
   [/^(away|idle|brb|lunch|later|ooo|out|vacation|holiday)$/i, 'warn'],
   [/^(busy|dnd|do not disturb|meeting|in a meeting|focus|presenting)$/i, 'bad'],
 ]
+const presence = (e: El, state: string, r: S) => toneOf(e, state, r) || (w => (w ? `t-${w}` : 't-muted'))(PRESENCE.find(([re]) => re.test(state))?.[1])
 // a PR's state: open green, draft muted, merged purple, closed red
 const PR_STATE: Record<string, [IconName, string]> = { open: ['pr', 'var(--done, #9ece6a)'], draft: ['pr', 'var(--muted, #7a8294)'], merged: ['gitMerge', 'var(--tc-purple, #bb9af7)'], closed: ['x', 'var(--error, #f7768e)'] }
 const CHECKS: [RegExp, IconName, string][] = [
@@ -971,7 +1007,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
       const name = e.name !== undefined ? txt(e.name, r) : typeof item === 'string' ? item : txt('{{name}}', r)
       const login = e.login !== undefined ? txt(e.login, r).trim() : ''
       const state = e.state !== undefined ? txt(e.state, r).trim() : ''
-      const t = state ? toneOf(e, state, r) || (w => (w ? `t-${w}` : 't-muted'))(PRESENCE.find(([re]) => re.test(state))?.[1]) : ''
+      const t = state ? presence(e, state, r) : ''
       return `<div class="k-pp"${attrs}${e.href !== undefined ? opens(txt(e.href, r)) : ''}${state ? ` title="${esc(`${name}: ${state}`)}"` : ''}><span class="k-pp-f">${face(login, name)}${state ? `<i class="k-pp-dot ${t}"></i>` : ''}</span><div class="k-main"><span class="k-title">${esc(name)}</span>${e.text !== undefined ? `<span class="k-sub">${h(e.text, r)}</span>` : ''}</div>${state ? `<span class="k-pp-s ${t}">${esc(state)}</span>` : ''}</div>`
     }),
   inbox: (e, s) =>
@@ -1027,7 +1063,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     return `<button type="button" role="switch" aria-checked="${on}"${at(e, s, `k-toggle${on ? ' on' : ''}`, label)}${run ? ` data-run="${esc(run)}" data-arg="${on ? 'off' : 'on'}"` : ' disabled'}${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}><span class="k-main"><span class="k-tg-l">${esc(label)}</span>${text ? `<span class="k-sub">${esc(text)}</span>` : ''}</span><i class="k-tg-s"></i></button>`
   },
   segmented: (e, s) => {
-    const opts = (Array.isArray(e.options) ? e.options : []).filter(o => !obj(o) || !hidden(o, s)).map(o => (obj(o) ? { v: txt(o.value ?? o.label, s).trim(), l: txt(o.label ?? o.value, s) } : { v: txt(o, s).trim(), l: txt(o, s) })).filter(o => o.v).slice(0, 8)
+    const opts = optsOf(e.options, s, 8)
     const cur = txt(e.value, s).trim()
     const run = e.run !== undefined ? txt(e.run, s) : ''
     const confirm = e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''
@@ -1072,6 +1108,153 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     }
     const sub = obj(e.submit) ? e.submit : {}
     return `<div${at(e, s, 'k-form')} data-form>${fields.map(field).join('')}<div class="k-form-foot"><button type="button" class="k-btn primary" data-run="${h(sub.run, s)}" data-submit${sub.confirm !== undefined ? ` data-confirm="${h(sub.confirm, s)}"` : ''}>${h(sub.label ?? 'Submit', s)}</button></div></div>`
+  },
+  // after DaisyUI's: a banner, frames, chips that filter, words in turn, pictures to compare, placeholders, a ring, a
+  // corner's count, one avatar, a slider, a pick, a box to type in, a flip, pages, a menu and a dropdown
+  hero: (e, s) => {
+    const title = txt(e.title, s)
+    const img = e.image !== undefined ? txt(e.image, s).trim() : ''
+    const c = hue(e.color, s)
+    const art = imageOk(img) ? `<img class="k-hero-img" src="${esc(img)}" alt="">` : e.icon !== undefined ? `<span class="k-hero-ic">${icon(e.icon, s, 26)}</span>` : ''
+    const acts = buttons(e.actions, s, false)
+    return `<section${at(e, s, `k-hero${e.align === 'center' ? ' center' : ''}`, title)}${c ? ` style="--hero:${c}"` : ''}>${art}<div class="k-hero-b">${title ? `<div class="k-hero-t">${esc(title)}</div>` : ''}${e.text !== undefined ? `<div class="k-hero-x">${h(e.text, s)}</div>` : ''}${kids(e.children, s)}${acts ? `<div class="k-actions">${acts}</div>` : ''}</div></section>`
+  },
+  mockup: (e, s) => {
+    const kind = ['window', 'terminal', 'phone'].includes(String(e.kind)) ? String(e.kind) : 'browser'
+    const img = e.image !== undefined ? txt(e.image, s).trim() : ''
+    const lines = e.value !== undefined ? (l => (l.at(-1) === '' ? l.slice(0, -1) : l))(txt(e.value, s).replace(/\r/g, '').split('\n')) : []
+    const code = lines.length ? `<div class="k-mk-code">${lines.map(l => (m => (m ? `<div class="cmd"><span class="k-mk-p">${esc(m[1])}</span>${esc(m[2])}</div>` : `<div>${esc(l) || ' '}</div>`))(/^([$>])(?: (.*))?$/.exec(l))).join('')}</div>` : ''
+    const url = kind === 'browser' ? txt(e.url, s).trim() : ''
+    const head = kind === 'phone' ? '<i class="k-mk-notch"></i>' : `<div class="k-mk-bar"><i></i><i></i><i></i>${url ? `<span class="k-mk-url"${opens(url)} title="${esc(url)}">${esc(url.replace(/^https?:\/\//i, ''))}</span>` : kind === 'window' && e.title !== undefined ? `<span class="k-mk-t">${h(e.title, s)}</span>` : ''}</div>`
+    return `<div${at(e, s, `k-mk ${kind}`)}>${head}<div class="k-mk-b">${imageOk(img) ? `<img class="k-mk-img" src="${esc(img)}" alt="">` : ''}${code}${kids(e.children, s)}</div></div>`
+  },
+  // chips that hide the rows (uiBehave's sift) of the elements under it whose words haven't the chip's value
+  // ponytail: only the rows drawn; a preview's past its cap aren't, so a chip there may show none (the full view has all)
+  filter: (e, s) => {
+    const all = e.all !== undefined ? txt(e.all, s) : 'All'
+    const chip = (v: string, l: string, on: boolean) => `<button type="button" class="k-chip${on ? ' on' : ''}" data-chip="${esc(v)}" aria-pressed="${on}">${esc(l)}</button>`
+    return `<div${at(e, s, 'k-filt')} data-filt><div class="k-chips" role="group">${all ? chip('', all, true) : ''}${optsOf(e.options, s, 12)
+      .map(o => chip(o.v, o.l, false))
+      .join('')}</div>${kids(e.children, s)}</div>`
+  },
+  // ponytail: a jump from word to word (steps), not a slide: a slide needs keyframes per count
+  rotate: (e, s) => {
+    const words = (e.each !== undefined ? listAt(e.each, s).map((item, i) => (e.text !== undefined ? txt(e.text, inner(s, item, i)) : typeof item === 'string' ? item : txt('{{text}}', inner(s, item, i)))) : (Array.isArray(e.items) ? e.items : []).map(x => txt(x, s)))
+      .map(w => w.trim())
+      .filter(Boolean)
+      .slice(0, 12)
+    const sec = Math.min(60, Math.max(0.5, n(e.seconds, s) ?? 2))
+    const c = hue(e.color, s)
+    const turn = words.length > 1 ? `<span class="k-rot-w"><span class="k-rot-t" style="--n:${words.length};--s:${sec}s">${words.map(w => `<span>${esc(w)}</span>`).join('')}</span></span>` : `<b class="k-rot-1">${esc(words[0] ?? '')}</b>`
+    return `<div${at({ tip: e.tip, tone: e.tone }, s, `k-rot${['sm', 'lg', 'xl'].includes(String(e.size)) ? ` s-${e.size}` : ''}`, words[0] ?? '')}${c ? ` style="--rc:${c}"` : ''}>${e.prefix !== undefined ? `<span>${h(e.prefix, s)}</span>` : ''}${turn}${e.suffix !== undefined ? `<span>${h(e.suffix, s)}</span>` : ''}</div>`
+  },
+  // the after picture under the before one, whose width a resizer sets (CSS resize, scaled up and see-through: no script)
+  compare: (e, s) => {
+    const a = txt(e.before, s).trim()
+    const b = txt(e.after, s).trim()
+    if (!imageOk(a) || !imageOk(b)) return empty(e, s, 0)
+    const tall = Math.round(Math.min(2000, Math.max(16, n(e.height, s) ?? (s.line ? 16 : s.full ? 260 : s.cells[1] * 64 - 12))))
+    const [l1, l2] = [0, 1].map(i => (Array.isArray(e.labels) && e.labels[i] !== undefined && !s.line ? txt(e.labels[i], s) : ''))
+    return `<div${at({ tip: e.tip }, s, 'k-cmp')} style="height:${tall}px"><div class="k-cmp-a"><img src="${esc(b)}" alt="${esc(l2 || 'After')}">${l2 ? `<span class="k-cmp-l r">${esc(l2)}</span>` : ''}</div><div class="k-cmp-b"><img src="${esc(a)}" alt="${esc(l1 || 'Before')}">${l1 ? `<span class="k-cmp-l">${esc(l1)}</span>` : ''}</div><i class="k-cmp-h" aria-hidden="true"></i><div class="k-cmp-r" title="Drag to compare"></div></div>`
+  },
+  skeleton: (e, s) => {
+    const lines = Math.min(12, Math.max(0, Math.round(n(e.lines, s) ?? 3)))
+    return `<div${at({ tip: e.tip }, s, 'k-skel')} role="status" aria-busy="true" aria-label="${h(e.label ?? 'Loading…', s)}">${e.image === true ? '<i class="k-sk img"></i>' : ''}<div class="k-sk-r">${e.avatar === true ? '<i class="k-sk av"></i>' : ''}<div class="k-sk-ls">${Array.from({ length: lines }, (_, i) => `<i class="k-sk" style="width:${[100, 86, 64, 92, 74][i % 5]}%"></i>`).join('')}</div></div></div>`
+  },
+  radial: (e, s) => {
+    const pct = pctOf(e.value, e.max, s)
+    const inside = e.text !== undefined ? txt(e.text, s) : `${pct}%`
+    const label = txt(e.label, s)
+    return `<div${at(e, s, `k-radial${['sm', 'lg'].includes(String(e.size)) ? ` s-${e.size}` : ''}`, String(pct), e.color)} role="img" aria-label="${esc(`${label ? `${label}: ` : ''}${inside}`)}"><div class="k-rd-c"><svg viewBox="0 0 36 36" aria-hidden="true"><circle class="bg" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.2"/><circle class="fg" cx="18" cy="18" r="15.9155" fill="none" stroke-width="3.2" stroke-linecap="${pct ? 'round' : 'butt'}" stroke-dasharray="${pct} 100" transform="rotate(-90 18 18)"/></svg><b>${esc(inside)}</b></div>${label ? `<span class="k-rd-l">${esc(label)}</span>` : ''}</div>`
+  },
+  indicator: (e, s) => {
+    const label = e.label !== undefined ? txt(e.label, s) : ''
+    const thing = e.avatar !== undefined ? avImg(txt(e.avatar, s)) : e.icon !== undefined ? icon(e.icon, s, 18) : ''
+    const b = e.badge !== undefined ? txt(e.badge, s).trim() : ''
+    const bg = (c => (c ? ` style="background:${c}"` : ''))(hue(e.color, s))
+    const mark = b && b !== '0' ? `<b class="k-ind-b ${toneOf(e, b, s)}"${bg}><span>${esc(b)}</span></b>` : e.dot !== undefined && holds(e.dot, s) ? `<i class="k-ind-d ${toneOf(e, '', s)}"${bg}></i>` : ''
+    return `<span${at({ tip: e.tip }, s, 'k-ind')}${e.href !== undefined ? opens(txt(e.href, s)) : ''}><span class="k-ind-x${label ? ' box' : ''}">${thing}${label ? `<span>${esc(label)}</span>` : ''}</span>${mark}</span>`
+  },
+  // its shape clips the picture, and a span under it (the ring's color, a little bigger) draws the ring in any shape
+  avatar: (e, s) => {
+    const login = e.login !== undefined ? txt(e.login, s).trim() : ''
+    const name = e.name !== undefined ? txt(e.name, s) : login
+    const img = e.image !== undefined ? txt(e.image, s).trim() : ''
+    const src = avatarUrl(login) ? avatarUrl(login).replace(/s=40$/, 's=200') : imageOk(img) ? img : ''
+    const shape = ['rounded', 'squircle', 'hexagon', 'diamond'].includes(String(e.shape)) ? String(e.shape) : 'circle'
+    const ring = hue(e.ring, s)
+    const state = e.state !== undefined ? txt(e.state, s).trim() : ''
+    const label = txt(e.label, s)
+    const text = e.text !== undefined ? txt(e.text, s) : ''
+    const tip = e.tip !== undefined ? txt(e.tip, s) : label ? '' : name
+    const face = src ? `<img src="${esc(src)}" alt="${esc(name)}">` : `<span class="k-avt-i">${esc(initialsOf(name || '?'))}</span>`
+    return `<div class="k-avatar ${['sm', 'lg', 'xl'].includes(String(e.size)) ? e.size : 'md'}"${tip ? ` title="${esc(tip)}"` : ''}${e.href !== undefined ? opens(txt(e.href, s)) : ''}><span class="k-avt-w"><span class="k-avt sh-${shape}${ring ? ' ring' : ''}"${ring ? ` style="--ring:${ring}"` : ''}><span class="k-avt-f sh-${shape}">${face}</span></span>${state ? `<i class="k-avt-d ${presence(e, state, s)}" title="${esc(state)}"></i>` : ''}</span>${label || text ? `<div class="k-main">${label ? `<span class="k-title">${esc(label)}</span>` : ''}${text ? `<span class="k-sub">${esc(text)}</span>` : ''}</div>` : ''}</div>`
+  },
+  // a slider and a select run on change (uiBehave's data-change): data-run would run them on a click
+  range: (e, s) => {
+    const min = n(e.min, s) ?? 0
+    const max = Math.max(min, n(e.max, s) ?? 100)
+    const step = Math.abs(n(e.step, s) || 1)
+    const v = Math.min(max, Math.max(min, n(e.value, s) ?? min))
+    const label = txt(e.label, s)
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const c = hue(e.color, s)
+    return `<label${at({ tip: e.tip }, s, 'k-range')}><span class="k-rg-h"><span class="k-rg-l">${esc(label)}</span><b class="${toneOf(e, round6(v), s)}"><span data-rv>${esc(round6(v))}</span>${e.unit !== undefined ? `<span class="k-unit">${h(e.unit, s)}</span>` : ''}</b></span><input type="range" min="${round6(min)}" max="${round6(max)}" step="${round6(step)}" value="${round6(v)}" aria-label="${esc(label || 'Value')}"${c ? ` style="accent-color:${c}"` : ''}${run ? ` data-change="${esc(run)}"${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}` : ' disabled'}></label>`
+  },
+  select: (e, s) => {
+    const opts = optsOf(e.options, s, 200)
+    const cur = txt(e.value, s).trim()
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const label = txt(e.label, s)
+    const list = cur && !opts.some(o => o.v === cur) ? [{ v: cur, l: cur }, ...opts] : opts // the one picked now, though the options lack it
+    return `<label${at(e, s, 'k-selw', cur)}>${label ? `<span class="k-seg-l">${esc(label)}</span>` : ''}<select aria-label="${esc(label || 'Pick one')}"${run ? ` data-change="${esc(run)}"${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}` : ' disabled'}>${cur ? '' : '<option value="" selected disabled>–</option>'}${list.map(o => `<option value="${esc(o.v)}"${o.v === cur ? ' selected' : ''}>${esc(o.l)}</option>`).join('')}</select></label>`
+  },
+  // its button's data-input: what's typed is the arg (uiBehave), Enter clicks it
+  input: (e, s) => {
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const label = e.label !== undefined ? txt(e.label, s) : e.icon !== undefined ? '' : 'Add'
+    const ph = txt(e.placeholder, s)
+    return `<div${at(e, s, 'k-input')} data-inbox><input type="text" value="${h(e.value, s)}" placeholder="${esc(ph)}" aria-label="${esc(ph || label || 'Text')}"${run ? '' : ' disabled'}><button type="button" class="k-btn sm primary"${run ? ` data-run="${esc(run)}" data-input${e.clear === false ? ' data-keep' : ''}${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}` : ' disabled'}${label ? '' : ' aria-label="Send"'}>${e.icon !== undefined ? icon(e.icon, s, 12) : ''}${label ? `<span>${esc(label)}</span>` : ''}</button></div>`
+  },
+  swap: (e, s) => {
+    const on = e.on !== undefined && holds(e.on, s)
+    const pick = (v: unknown) => (Array.isArray(v) ? (v[on ? 1 : 0] ?? v[0]) : undefined)
+    const ic = pick(e.icons)
+    const word = (w => (w === undefined ? '' : txt(w, s)))(pick(e.labels))
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const c = on ? hue(e.color, s) : ''
+    return `<button type="button" role="switch" aria-checked="${on}"${at(e, s, `k-swap${on ? ' on' : ''}${word ? '' : ' bare'}`, word)}${c ? ` style="color:${c}"` : ''}${run ? ` data-run="${esc(run)}" data-arg="${on ? 'off' : 'on'}"${e.confirm !== undefined ? ` data-confirm="${h(e.confirm, s)}"` : ''}` : ' disabled'}${word ? '' : ` aria-label="${on ? 'On' : 'Off'}"`}>${ic !== undefined ? icon(ic, s, 15) : ''}${word ? `<span>${esc(word)}</span>` : ''}</button>`
+  },
+  pagination: (e, s) => {
+    const pages = Math.min(1e6, Math.max(1, Math.round(n(e.pages, s) ?? 1)))
+    const page = Math.min(pages, Math.max(1, Math.round(n(e.page, s) ?? 1)))
+    const run = e.run !== undefined ? txt(e.run, s) : ''
+    const go = (p: number, words: string, label: string, cls: string) => `<button type="button" class="k-pg-b ${cls}"${p === page && cls !== 'arr' ? ' aria-current="page"' : ''} aria-label="${label}"${run && p >= 1 && p <= pages && p !== page ? ` data-run="${esc(run)}" data-arg="${p}"` : ' disabled'}>${words}</button>`
+    const near = s.full ? 2 : 1
+    const nums = [...new Set([1, pages, ...Array.from({ length: near * 2 + 1 }, (_, i) => page - near + i)])].filter(p => p >= 1 && p <= pages).sort((a, b) => a - b)
+    const mid = s.line ? `<span class="k-pg-n">${page}/${pages}</span>` : nums.map((p, i) => `${i && p - nums[i - 1] > 1 ? '<span class="k-pg-gap">…</span>' : ''}${go(p, String(p), `Page ${p}`, p === page ? 'pn on' : 'pn')}`).join('')
+    return `<nav${at(e, s, 'k-pg')} aria-label="Pages">${go(page - 1, '‹', 'Previous page', 'arr')}${mid}${go(page + 1, '›', 'Next page', 'arr')}</nav>`
+  },
+  menu: (e, s) => {
+    const items = itemsOf(e, s)
+    const head = (x: El) => x !== e && x.title !== undefined && x.label === undefined
+    const rows = items.filter(([x]) => !head(x)).length
+    const max = cap(e, s, 28)
+    let k = 0
+    return `<nav${at({ tip: e.tip }, s, 'k-menu')} data-rows>${items
+      .map(([x, r]) => {
+        if (head(x)) return k >= max && !s.full ? '' : `<div class="k-mn-h">${h(x.title, r)}</div>`
+        const i = k++
+        return i >= max && !s.full ? '' : menuRow(x, r, x === e ? e.tone : (x.tone ?? e.tone), ` data-row${i >= max ? ' data-extra hidden' : ''}`)
+      })
+      .join('')}${empty(e, s, rows)}${s.line ? '' : more(rows - Math.min(max, rows))}</nav>`
+  },
+  // a details: its menu over what's under it (a preview's: over the cell); in a bar, the full view
+  dropdown: (e, s) => {
+    const label = txt(e.label, s)
+    const style = ['primary', 'quiet', 'danger'].includes(String(e.style)) ? ` ${e.style}` : ''
+    const rows = (Array.isArray(e.items) ? e.items : []).filter((b): b is El => obj(b) && !hidden(b, s)).map(b => menuRow(b, s, b.tone)).join('')
+    return `<details${at({ tip: e.tip }, s, `k-dd${e.align === 'end' ? ' end' : ''}`)}><summary class="k-dd-s${style}"${s.line ? ' data-laki="full"' : ''}${label ? '' : ' aria-label="More"'}>${e.icon !== undefined ? icon(e.icon, s, 12) : ''}${label ? `<span>${esc(label)}</span>` : ''}${iconSvg('chevron', 10)}</summary><div class="k-dd-m">${rows}</div></details>`
   },
   empty: (e, s) => `<div${at(e, s, 'k-empty')}>${e.icon !== undefined ? icon(e.icon, s, 18) : ''}<div>${h(e.text ?? 'Nothing here', s)}</div>${e.action !== undefined ? button(e.action, s, true) : ''}</div>`,
 }
@@ -1153,10 +1336,10 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
   const noIcon = (v: unknown) => `icon ${v} isn't one of Laki's icons${mean(String(v), Object.keys(ICON_WORDS))} or an emoji`
   const colorOk = (v: unknown) => typeof v !== 'string' || v.includes('{{') || !!colorCss(v)
   const NEEDS: Record<string, string> = { new: 'prompt', send: 'prompt', ai: 'prompt', terminal: 'command', browse: 'url' }
-  const runs = (b: unknown, where: string) => {
+  const runs = (b: unknown, where: string, self = false) => {
     if (!obj(b)) return
     if (typeof b.run === 'string' && !b.run.includes('{{') && o.actions && !o.actions.includes(b.run)) say('error', where, `runs ${b.run}, which isn't one of widget.json's actions${mean(b.run, o.actions)}`)
-    if (b.icon !== undefined && !iconOk(b.icon)) say('warn', where, noIcon(b.icon))
+    if (!self && b.icon !== undefined && !iconOk(b.icon)) say('warn', where, noIcon(b.icon)) // an element's own: its props' check says it
     if (typeof b.do === 'string' && !b.do.includes('{{')) {
       if (!(DO as readonly string[]).includes(b.do)) say('error', where, `do: one of ${DO.join(', ')}${mean(b.do, DO)}`)
       else if (b[NEEDS[b.do]] === undefined) say('warn', where, `do ${b.do} without ${NEEDS[b.do]}: the app has nothing to ${b.do === 'browse' ? 'open' : b.do === 'terminal' ? 'run' : 'send'}`)
@@ -1180,8 +1363,10 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
       if (!kindOk(pr.kind, v)) say('error', here, `${k}: ${kindName(pr.kind)}`)
       else if (pr.kind === 'icon' && !iconOk(v)) say('warn', here, noIcon(v))
     }
-    for (const c of [el.color, ...(Array.isArray(el.colors) ? el.colors : []), ...(Array.isArray(el.series) ? el.series.map(x => (obj(x) ? x.color : undefined)) : [])]) if (!colorOk(c)) say('warn', here, `color ${c}: a tone (${TONES.join(', ')}), one of ${COLORS.join(', ')}, or a hex${mean(String(c), [...TONES, ...COLORS])}`)
-    if (type === 'button' || type === 'toggle' || type === 'segmented' || type === 'stepper') runs(el, here)
+    for (const c of [el.color, el.ring, ...(Array.isArray(el.colors) ? el.colors : []), ...(Array.isArray(el.series) ? el.series.map(x => (obj(x) ? x.color : undefined)) : [])]) if (!colorOk(c)) say('warn', here, `color ${c}: a tone (${TONES.join(', ')}), one of ${COLORS.join(', ')}, or a hex${mean(String(c), [...TONES, ...COLORS])}`)
+    if (['button', 'toggle', 'segmented', 'stepper', 'range', 'select', 'input', 'swap', 'pagination', 'menu'].includes(type)) runs(el, here, true)
+    if (type === 'menu' && Array.isArray(el.items)) el.items.forEach((b, i) => runs(b, `${here}.items[${i}]`))
+    if (type === 'swap' && Array.isArray(el.icons)) for (const v of el.icons) if (!iconOk(v)) say('warn', here, noIcon(v))
     if (type === 'form') runs(el.submit, `${here}.submit`)
     for (const k of ['action', 'submit']) if (obj(el[k]) && type !== 'form') runs(el[k], `${here}.${k}`)
     for (const k of ['actions', 'items'] as const) if (UI[type as UiType].props[k as never] && (UI[type as UiType].props as Record<string, Prop>)[k].kind === 'buttons') (Array.isArray(el[k]) ? (el[k] as unknown[]) : []).forEach((b, i) => runs(b, `${here}.${k}[${i}]`))
@@ -1207,7 +1392,7 @@ export function uiCheck(spec: unknown, data?: unknown, o: { actions?: string[] }
           const fields = new Set(items.flatMap(x => (obj(x) ? Object.keys(x) : [])))
           const outer = new Set(scopes.flatMap(sc => Object.keys(sc)))
           const skip = new Set(['each', 'items', 'empty', 'limit', 'filter', 'sort', 'kind', 'height', 'min', 'max', 'label', 'unit', 'if', 'unless', 'tip', 'series', 'colors', 'legend', 'rows', 'count', 'nested', 'open', 'wrap', ...(type === 'board' ? ['columns'] : []), ...(type === 'log' ? ['value'] : []), ...(type === 'meter' ? ['title'] : [])])
-          if (type === 'meter' || type === 'tree' || type === 'steps' || type === 'breadcrumbs' || type === 'links') skip.delete('label') // a row's name there, not a title
+          if (type === 'meter' || type === 'tree' || type === 'steps' || type === 'breadcrumbs' || type === 'links' || type === 'menu') skip.delete('label') // a row's name there, not a title
           for (const [k, val] of Object.entries(el)) {
             if (skip.has(k)) continue
             for (const r of refs(k === 'columns' && Array.isArray(val) ? val.map(c => (obj(c) ? { ...c, title: undefined } : c)) : val)) if (!NAMES.has(r) && !fields.has(r) && !outer.has(r)) say('warn', here, `${k} uses ${r}, which no item of ${path} has${mean(r, [...fields])}`)
@@ -1332,6 +1517,22 @@ const SAMPLES: Record<UiType, { spec: UiElement; data?: unknown }> = {
   commits: { spec: { type: 'commits', each: 'commits', author: '{{author}}', time: '{{at}}', href: 'https://github.com/acme/web/commit/{{sha}}' }, data: { commits: [{ sha: 'a3f9c2e81b4d7f60e2c9a1b3d5e7f9a0c2e4b6d8', message: 'Faster search on the orders page', author: 'hubot', at: '2026-10-17T08:50:00Z' }, { sha: '7b1e44d0c9a2f3e5b7d9c1a3e5f7b9d1c3e5a7f9', message: 'Fix the date picker on Safari', author: 'octocat', at: '2026-10-16T16:20:00Z' }, { sha: 'e02d9f13a5c7e9b1d3f5a7c9e1b3d5f7a9c1e3b5', message: 'Bump the API client to 3.2', author: 'monalisa', at: '2026-10-16T11:05:00Z' }] } },
   segmented: { spec: { type: 'segmented', label: 'Deploy to', options: ['dev', 'staging', 'prod'], value: '{{env}}', run: 'env', confirm: 'Point the deploys at another environment?' }, data: { env: 'staging' } },
   stepper: { spec: { type: 'stepper', label: 'Web replicas', value: '{{replicas}}', min: 1, max: 10, run: 'scale' }, data: { replicas: 3 } },
+  hero: { spec: { type: 'hero', icon: 'rocket', title: 'v{{version}} is out', text: 'Faster search, dark mode for the dashboard and {{fixes}} fixes.', color: 'purple', actions: [{ label: 'Release notes', icon: 'externalLink', style: 'primary', open: 'https://github.com/acme/web/releases/tag/v{{version}}' }, { label: 'Refresh', refresh: true, style: 'quiet' }] }, data: { version: '2.4.0', fixes: 12 } },
+  mockup: { spec: { type: 'mockup', kind: 'terminal', value: '{{out}}' }, data: { out: '$ npm test\n✓ 128 passed (4.2s)\n$ npm run deploy\nDeployed v2.4.0 to production' } },
+  filter: { spec: { type: 'filter', options: ['failing', 'passing', 'pending'], children: [{ type: 'list', each: 'prs', title: '#{{number}} {{title}}', subtitle: '{{author}}', accessories: [{ tag: '{{ci}}', tone: { failing: 'bad', passing: 'good', pending: 'warn' } }] }] }, data: { prs: PRS } },
+  rotate: { spec: { type: 'rotate', prefix: 'Now', items: ['building', 'testing', 'shipping'], suffix: '{{repo}}', size: 'lg', color: 'blue' }, data: { repo: 'acme/web' } },
+  compare: { spec: { type: 'compare', before: 'https://picsum.photos/id/1018/800/450?grayscale', after: 'https://picsum.photos/id/1018/800/450', labels: ['Before', 'After'] } },
+  skeleton: { spec: { type: 'skeleton', avatar: true, lines: 3, label: 'Loading the PRs' } },
+  radial: { spec: { type: 'row', align: 'between', children: [{ type: 'radial', value: '{{coverage}}', label: 'Coverage', color: 'green' }, { type: 'radial', value: '{{used}}', max: '{{quota}}', text: '{{used}} GB', label: 'Storage', color: 'orange' }, { type: 'radial', value: 3, max: 10, text: '3/10', label: 'Seats', size: 'sm' }] }, data: { coverage: 82, used: 41, quota: 50 } },
+  indicator: { spec: { type: 'row', gap: 'lg', children: [{ type: 'indicator', icon: 'inbox', badge: '{{unread}}', tip: 'Unread' }, { type: 'indicator', avatar: 'octocat', badge: '{{reviews}}', tone: 'warn', tip: 'Reviews waiting' }, { type: 'indicator', label: 'Deploys', dot: 'live', color: 'green' }] }, data: { unread: 12, reviews: 2, live: true } },
+  avatar: { spec: { type: 'row', gap: 'lg', children: [{ type: 'avatar', login: 'octocat', size: 'lg', shape: 'squircle', ring: 'green', state: 'online', label: 'The Octocat', text: 'On call' }, { type: 'avatar', login: 'monalisa', shape: 'hexagon' }, { type: 'avatar', name: 'Ada Byron', shape: 'diamond', state: 'away' }] } },
+  range: { spec: { type: 'range', label: 'Rollout', value: '{{rollout}}', unit: '%', step: 5, run: 'rollout', color: 'teal' }, data: { rollout: 25 } },
+  select: { spec: { type: 'select', label: 'Region', value: '{{region}}', options: [{ value: 'us-east-1', label: 'US East' }, { value: 'eu-west-1', label: 'Europe' }, { value: 'ap-south-1', label: 'Asia' }], run: 'region', confirm: 'Move the deploys to another region?' }, data: { region: 'eu-west-1' } },
+  input: { spec: { type: 'input', placeholder: 'Add a to-do…', run: 'add' } },
+  swap: { spec: { type: 'row', children: [{ type: 'swap', icons: ['bellOff', 'bell'], labels: ['Watch', 'Watching'], on: 'watching', run: 'watch', color: 'blue' }, { type: 'swap', icons: ['heart', 'heart'], on: 'liked', run: 'like', color: 'red', tip: 'Like' }] }, data: { watching: true, liked: false } },
+  pagination: { spec: { type: 'pagination', page: '{{page}}', pages: '{{pages}}', run: 'page' }, data: { page: 6, pages: 20 } },
+  menu: { spec: { type: 'menu', items: [{ title: 'Go to' }, { label: 'Board', icon: 'board', open: 'laki://board', on: true }, { label: 'Settings', icon: 'settings', open: 'laki://settings' }, { title: '{{repo}}' }, { label: 'Pull requests', icon: 'pr', badge: '{{prs}}', open: 'https://github.com/{{repo}}/pulls' }, { label: 'Deploy main', icon: 'ship', run: 'deploy', confirm: 'Deploy main to production?' }] }, data: { repo: 'acme/web', prs: 6 } },
+  dropdown: { spec: { type: 'row', align: 'between', children: [{ type: 'text', value: '{{env}}', weight: 'semibold' }, { type: 'dropdown', label: 'More', align: 'end', items: [{ label: 'Redeploy', icon: 'refresh', run: 'redeploy', confirm: 'Redeploy {{env}}?' }, { label: 'Logs', icon: 'fileText', open: 'https://dash.example.com/{{env}}/logs' }, { label: 'Roll back', icon: 'undo', run: 'rollback', tone: 'bad', confirm: 'Roll back {{env}}?' }] }] }, data: { env: 'production' } },
 }
 export const UI_SAMPLES = UI_TYPES.map(type => ({ type, group: UI[type].group, blurb: UI[type].blurb, spec: SAMPLES[type].spec, data: SAMPLES[type].data }))
 

@@ -766,7 +766,8 @@ and report through the laki skill (Settings › Agent skill) or MCP's `laki_prog
 **The rail**, like Slack's: a narrow rail on the left with *Projects*, *Board*, *Schedule* (a red dot: a run failed),
 *Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
 *AI* (when it's on) over *Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail;
-*Terminals* or *Browsers* off: no button, and that project is in Projects' list). Board and Schedule are pages
+*Terminals* or *Browsers* off: no button, and that project is in Projects' list). With labels on and more pages turned
+on than fit, the least used (Calendar, then Flows, Specs, Board) go into a ⋯ *More* menu on the rail. Board and Schedule are pages
 over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
 list shows the kind you pick, and its rail button goes back to the last workspace you had there.
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the

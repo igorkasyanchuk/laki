@@ -10,7 +10,7 @@ import { fresh, until } from './helpers.ts'
 const at = Date.parse('2026-10-17T10:00:00Z')
 
 test('UI kit: every element has a sample, and every sample draws at a 1×1 preview, a bar and in full', () => {
-  assert.equal(UI_TYPES.length, 64)
+  assert.equal(UI_TYPES.length, 80)
   assert.deepEqual(UI_SAMPLES.map(s => s.type), UI_TYPES, 'a sample per element, in order')
   for (const s of UI_SAMPLES) {
     const ctx = { data: s.data, config: {}, at }
@@ -19,7 +19,7 @@ test('UI kit: every element has a sample, and every sample draws at a 1×1 previ
       assert.match(html, /^<div class="k" data-kit="(preview|full)"/, s.type)
       assert.doesNotMatch(html, /k-chip-err/, `${s.type}: no error chip`)
     }
-    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file', 'maintenance', 'deploys', 'env', 'scale'] }), [], `${s.type}'s sample checks clean`)
+    assert.deepEqual(uiCheck(s.spec, s.data, { actions: ['review', 'deploy', 'file', 'maintenance', 'deploys', 'env', 'scale', 'rollout', 'region', 'add', 'watch', 'like', 'page', 'redeploy', 'rollback'] }), [], `${s.type}'s sample checks clean`)
   }
 })
 
@@ -488,4 +488,123 @@ test('UI kit: an extension with its refresh button and when it was fetched hidde
   assert.doesNotMatch(html, /data-laki="refresh"|checked/)
   await rig.rpc('widgetSet', { id: 'disk', hide: { refresh: false, at: false } })
   assert.equal((await rig.rpc('state')).widgets.find((x: any) => x.id === 'disk').hide, undefined, 'both on again: nothing kept')
+})
+
+test('UI kit: hero, mockup, filter, rotate, compare, skeleton, radial, indicator, avatar, range, select, input, swap, pagination, menu, dropdown', () => {
+  const draw = (spec: object, data: object = {}, o: object = { full: true }) => uiHtml(spec, { data, config: {}, at }, o)
+  const bar = { cells: [3, 0.5] }
+  // hero: its words escaped, a picture only data: or https
+  const hr = draw({ type: 'hero', title: '{{t}}', image: '{{i}}', icon: 'ship', actions: [{ label: 'Go', run: 'go' }] }, { t: '<b>', i: 'javascript:x' })
+  assert.match(hr, /<div class="k-hero-t">&lt;b&gt;<\/div>/)
+  assert.match(hr, /k-hero-ic/, 'a bad picture: the icon instead')
+  assert.doesNotMatch(hr, /javascript/)
+  // mockup: a terminal's prompts, a browser's address (a link it opens), never a bad one
+  assert.match(draw({ type: 'mockup', kind: 'terminal', value: '$ ls -la\nREADME.md' }), /<div class="cmd"><span class="k-mk-p">\$<\/span>ls -la<\/div><div>README\.md<\/div>/)
+  assert.match(draw({ type: 'mockup', url: 'https://acme.dev/x' }), /<span class="k-mk-url" data-open="https:\/\/acme\.dev\/x" title="https:\/\/acme\.dev\/x">acme\.dev\/x<\/span>/)
+  assert.doesNotMatch(draw({ type: 'mockup', url: 'javascript:alert(1)' }), /data-open/, 'its words only')
+  // filter: All on, a chip per option
+  const fl = draw({ type: 'filter', options: ['bug', { value: 'ui', label: 'Design' }], children: [{ type: 'list', each: 'r', title: '{{t}}' }] }, { r: [{ t: 'a' }] })
+  assert.deepEqual([...fl.matchAll(/data-chip="([^"]*)" aria-pressed="(\w+)">([^<]*)/g)].map(m => m.slice(1).join(':')), [':true:All', 'bug:false:bug', 'ui:false:Design'])
+  assert.match(fl, /data-filt>[^]*data-rows/)
+  // rotate: its words in turn; one word stays
+  assert.match(draw({ type: 'rotate', items: ['a', '<b>', ''], seconds: 999 }), /style="--n:2;--s:60s"><span>a<\/span><span>&lt;b&gt;<\/span>/)
+  assert.match(draw({ type: 'rotate', each: 'w' }, { w: ['solo'] }), /<b class="k-rot-1">solo<\/b>/)
+  // compare: two good pictures, else nothing to compare
+  const pic = 'https://example.com/a.png'
+  assert.match(draw({ type: 'compare', before: pic, after: 'javascript:x' }), /k-empty/)
+  assert.match(draw({ type: 'compare', before: pic, after: pic, labels: ['Old', 'New'] }), /style="height:260px"[^]*<span class="k-cmp-l r">New<\/span>[^]*<span class="k-cmp-l">Old<\/span>[^]*k-cmp-r/)
+  assert.match(draw({ type: 'compare', before: pic, after: pic, labels: ['Old'] }, {}, bar), /height:16px(?![^]*k-cmp-l)/, 'a bar: no labels')
+  // skeleton, radial
+  assert.equal([...draw({ type: 'skeleton', lines: 4, avatar: true }).matchAll(/<i class="k-sk"/g)].length, 4)
+  assert.match(draw({ type: 'radial', value: 41, max: 50, label: 'Disk' }), /aria-label="Disk: 82%"[^]*stroke-dasharray="82 100"/)
+  assert.match(draw({ type: 'radial', value: 0 }), /stroke-linecap="butt" stroke-dasharray="0 100"/)
+  // indicator: no badge at 0 or empty; a dot when it holds
+  assert.match(draw({ type: 'indicator', icon: 'inbox', badge: '{{n}}' }, { n: 3 }), /<b class="k-ind-b "><span>3<\/span><\/b>/)
+  assert.doesNotMatch(draw({ type: 'indicator', icon: 'inbox', badge: '{{n}}' }, { n: 0 }), /k-ind-b/)
+  assert.match(draw({ type: 'indicator', label: 'CI', dot: 'live' }, { live: true }), /<span class="k-ind-x box"><span>CI<\/span><\/span><i class="k-ind-d /)
+  // avatar: a login's big picture, initials, a known shape
+  assert.match(draw({ type: 'avatar', login: 'octocat', shape: 'hexagon', ring: 'green' }), /k-avt sh-hexagon ring" style="--ring:var\(--tc-green[^]*src="https:\/\/avatars\.githubusercontent\.com\/octocat\?s=200"/)
+  assert.match(draw({ type: 'avatar', name: 'Ada Byron', shape: 'blob' }), /sh-circle[^]*<span class="k-avt-i">AB<\/span>/)
+  // range and select run on change, never on a click; none to run: disabled
+  const rg = draw({ type: 'range', value: 150, max: 100, step: 5, run: 'rollout', label: 'Rollout' })
+  assert.match(rg, /<span data-rv>100<\/span>[^]*type="range" min="0" max="100" step="5" value="100" aria-label="Rollout" data-change="rollout"/)
+  assert.doesNotMatch(rg, /data-run/)
+  assert.match(draw({ type: 'range', value: 3 }), / disabled>/)
+  const sl = draw({ type: 'select', options: ['a', 'b'], value: 'z', run: 'pick' })
+  assert.match(sl, /data-change="pick"><option value="z" selected>z<\/option><option value="a">a<\/option>/, 'the one picked now, though the options lack it')
+  assert.match(draw({ type: 'select', options: ['a'] }), /disabled><option value="" selected disabled>/)
+  // input: its button takes what's typed
+  assert.match(draw({ type: 'input', placeholder: 'Add', run: 'add', clear: false }), /<input type="text" value="" placeholder="Add"[^>]*><button type="button" class="k-btn sm primary" data-run="add" data-input data-keep>/)
+  // swap: on, its arg the other way
+  assert.match(draw({ type: 'swap', icons: ['bellOff', 'bell'], on: 'w', run: 'watch' }, { w: true }), /role="switch" aria-checked="true" class="k-swap on bare"[^]*data-arg="off"/)
+  // pagination: the pages near this one, the first and last, gaps; a bar's n/m
+  const pg = (o: object, page = 6) => draw({ type: 'pagination', page, pages: 20, run: 'page' }, {}, o)
+  const nums = (html: string) => [...html.matchAll(/class="k-pg-b pn[^"]*"[^>]*>(\d+)<|k-pg-gap/g)].map(m => m[1] ?? '…').join(' ')
+  assert.equal(nums(pg({ full: true })), '1 … 4 5 6 7 8 … 20')
+  assert.equal(nums(pg({ cells: [2, 1] })), '1 … 5 6 7 … 20')
+  assert.match(pg(bar), /<span class="k-pg-n">6\/20<\/span>/)
+  assert.match(pg({ full: true }), /aria-label="Previous page" data-run="page" data-arg="5"[^]*aria-label="Next page" data-run="page" data-arg="7"/)
+  assert.match(pg({ full: true }, 1), /aria-label="Previous page" disabled/)
+  // menu: headings, the current row, a badge; dropdown: its items, in a bar the full view
+  const mn = draw({ type: 'menu', items: [{ title: 'Go' }, { label: 'Board', on: true, open: 'laki://board' }, { label: 'PRs', badge: '{{n}}', run: 'prs' }, { label: 'Nothing' }] }, { n: 4 })
+  assert.match(mn, /<div class="k-mn-h">Go<\/div><button type="button" class="k-mn-i on" data-open="laki:\/\/board" aria-current="true" data-row>/)
+  assert.match(mn, /data-run="prs" data-row>[^]*<span class="k-badge">4<\/span>/)
+  assert.match(mn, /class="k-mn-i" disabled data-row><span class="k-title ">Nothing/)
+  assert.match(draw({ type: 'dropdown', items: [{ label: 'Wipe', confirm: 'Sure?' }] }), /class="k-mn-i" disabled>/, 'a confirm with nothing to do: disabled')
+  assert.deepEqual(uiCheck({ type: 'menu', limit: 3, empty: 'None', items: [{ label: 'a' }] }), [])
+  assert.equal(uiCheck({ type: 'input', icon: 'nope', run: 'a' }).length, 1, 'a bad icon said once')
+  const dd = { type: 'dropdown', label: 'More', items: [{ label: 'Redeploy', run: 'redeploy' }, { label: 'Hidden', run: 'x', if: 'no' }] }
+  assert.match(draw(dd), /<details class="k-dd"><summary class="k-dd-s"><span>More<\/span>[^]*<div class="k-dd-m"><button[^>]*data-run="redeploy"/)
+  assert.doesNotMatch(draw(dd), /Hidden/)
+  assert.match(draw(dd, {}, bar), /<summary class="k-dd-s" data-laki="full">/)
+  // the checker: their runs, a swap's icons, a ring's color
+  const pr = uiCheck({ type: 'stack', children: [{ type: 'range', run: 'nope' }, { type: 'swap', icons: ['bell', 'nope'] }, { type: 'menu', items: [{ label: 'x', run: 'gone' }] }, { type: 'avatar', ring: 'nocolor' }] }, undefined, { actions: ['go'] })
+  assert.deepEqual(pr.map(p => `${p.level} ${p.where.replace(/.*\(/, '(')}`), ['error (range)', 'warn (swap)', 'error (menu).items[0]', 'warn (avatar)'])
+})
+
+test('UI kit: a filter chip, an input, a slider and a pick, as clicks and keys', () => {
+  const sent: any[] = []
+  const on: Record<string, (e: any) => void> = {}
+  uiBehave({ addEventListener: (t: string, f: any) => (on[t] = f), removeEventListener: () => {} }, m => (sent.push(m), Promise.resolve()))
+  // chips: the rows with its words; clicked again, all
+  const text = (data: string) => ({ nodeType: 3, data })
+  const row = (w: string) => ({ nodeType: 1, localName: 'div', childNodes: [text(w)], hidden: false, hasAttribute: () => false })
+  const rows = [row('Fix login: failing'), row('Search: passing')]
+  const rowsBox = { hasAttribute: () => false, querySelector: () => null, querySelectorAll: (q: string) => (q === '[data-row]' ? rows : []) }
+  const chip = (v: string) => ({ v, attrs: { 'aria-pressed': 'false' } as Record<string, string>, classList: { list: new Set<string>(), contains(c: string) { return this.list.has(c) }, toggle(c: string, x: boolean) { x ? this.list.add(c) : this.list.delete(c) } }, getAttribute(k: string) { return k === 'data-chip' ? this.v : null }, setAttribute(k: string, x: string) { this.attrs[k] = x } })
+  const chips = [chip(''), chip('failing')]
+  const filt = { querySelectorAll: (q: string) => (q === '[data-chip]' ? chips : q === '[data-rows]' ? [rowsBox] : []) }
+  const press = (c: ReturnType<typeof chip>) => on.click({ target: { closest: (q: string) => (q === '[data-chip]' ? { ...c, closest: () => filt, classList: c.classList, getAttribute: c.getAttribute.bind(c) } : null) }, preventDefault() {} })
+  press(chips[1])
+  assert.deepEqual(rows.map(r => r.hidden), [false, true])
+  assert.deepEqual(chips.map(c => c.attrs['aria-pressed']), ['false', 'true'])
+  press(chips[1])
+  assert.deepEqual(rows.map(r => r.hidden), [false, false], 'the same chip again: every row')
+  assert.deepEqual(chips.map(c => c.attrs['aria-pressed']), ['true', 'false'])
+  // an input's button: the typed words as its arg, the box emptied once it ran; nothing typed: nothing runs
+  const box = { value: '  Buy milk ', focus() { this.focused = true }, focused: false }
+  const attrs: Record<string, string> = { 'data-run': 'add', 'data-input': '' }
+  const btn: any = { textContent: 'Add', getAttribute: (k: string) => attrs[k] ?? null, hasAttribute: (k: string) => k in attrs, setAttribute: (k: string, v: string) => (attrs[k] = v), removeAttribute: (k: string) => delete attrs[k], matches: (q: string) => q === '[data-run]', closest: (q: string) => (q === '[data-inbox]' ? { querySelector: () => box } : q.includes('[data-run]') ? btn : null), click: () => on.click({ target: btn, preventDefault() {} }) }
+  on.keydown({ key: 'Enter', target: { localName: 'input', closest: () => ({ querySelector: () => btn }) }, preventDefault() {} })
+  assert.deepEqual(sent.pop(), { laki: 'run', action: 'add', arg: 'Buy milk', label: 'Add', confirm: undefined })
+  return Promise.resolve().then(() => {
+    assert.equal(box.value, '')
+    on.click({ target: btn, preventDefault() {} })
+    assert.equal(sent.length, 0)
+    assert.ok(box.focused)
+    // a slider let go, an option picked: their action with the value
+    on.change({ target: { closest: () => ({ value: 40, getAttribute: (k: string) => ({ 'data-change': 'rollout', 'aria-label': 'Rollout' })[k] ?? null }) } })
+    assert.deepEqual(sent, [{ laki: 'run', action: 'rollout', arg: '40', label: 'Rollout', confirm: undefined }])
+  })
+})
+
+test('UI kit: a slider whose run is declined goes back to its value', async () => {
+  const on: Record<string, (e: any) => void> = {}
+  uiBehave({ addEventListener: (t: string, f: any) => (on[t] = f), removeEventListener: () => {} }, () => Promise.resolve(false))
+  const rv = { textContent: '40' }
+  const t: any = { localName: 'input', value: '40', defaultValue: '25', getAttribute: (k: string) => (k === 'data-change' ? 'rollout' : null), closest: (q: string) => (q === '[data-change]' ? t : { querySelector: () => rv }) }
+  on.change({ target: t })
+  await new Promise(r => setTimeout(r, 0))
+  assert.equal(t.value, '25')
+  assert.equal(rv.textContent, '25')
 })

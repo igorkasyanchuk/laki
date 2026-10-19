@@ -2731,7 +2731,7 @@ export function App() {
     ...(calOn ? [{ key: 'calendar', icon: 'calendar' as const, label: 'Calendar', on: dialog === 'calendar', tip: `Calendar (experimental): scheduled tasks and reminders${calSoon ? ` · ${calSoon} rang` : ''}`, run: toCal, n: calSoon }] : []),
     ...RAIL.slice(1).filter(([k]) => railOf(k) === k).map(kind => ({ key: kind[0], kind })),
   ]
-  const over = railWords && railPages.length + 1 > RAIL_FIT ? RAIL_MORE.filter(k => railPages.some(x => x.key === k)).slice(0, railPages.length + 1 - (RAIL_FIT - 1)) : []
+  const over = (o => (o.length > 1 ? o : []))(railWords && railPages.length + 1 > RAIL_FIT ? RAIL_MORE.filter(k => railPages.some(x => x.key === k)).slice(0, railPages.length + 1 - (RAIL_FIT - 1)) : []) // one alone: More would save no room
   const railKept = railPages.filter(x => !over.includes(x.key))
   const railMore = railPages.filter((x): x is Extract<RailPage, { run: () => void }> => over.includes(x.key) && 'run' in x)
   const railBar = rail && sideOpen && (

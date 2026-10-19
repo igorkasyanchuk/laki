@@ -11,6 +11,12 @@ version it builds, with the date. -->
   (its page lists them, with Revoke) or **Deny**, as a dialog and a notification.
 - Rename an extension from its page: click its name.
 - Thin, rounded scrollbars everywhere, Settings included.
+- 16 new UI kit elements, after DaisyUI's: hero, mockup (browser, window, terminal, phone), filter (chips that keep
+  the rows with their words), rotate (words that take turns), compare (two pictures, a divider to drag), skeleton,
+  radial, indicator, avatar (sizes, shapes, a ring), range (a slider), select, input (a box and a button), swap,
+  pagination, menu and dropdown.
+- The rail with labels puts its least used pages (Calendar, Flows, Specs, Board) in a ⋯ More menu once they don't fit.
+- Fixes: ⌘P no longer leaves an empty window.
 
 ## 0.20.0 · Oct 19, 2026
 
