@@ -13,7 +13,7 @@ import { highlight } from './highlight'
 import { Markdown } from './MarkdownView'
 import { SourceField, WidgetCard, type WidgetsApi } from './Settings'
 import { ask, escapes, Icon, IconButton, Page } from './ui'
-import { CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
+import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
 export const half = (d: number) => (d === 0.5 ? '½' : String(d))
@@ -149,9 +149,9 @@ export const CELLS: [number, number][] = [
   [1, 0.5],
   [1, 1],
   [2, 1],
-  [3, 1],
-  [3, 2],
-  [3, 4],
+  [4, 1],
+  [4, 2],
+  [4, 4],
 ]
 // as a Desk tile shows it: its full view when it has one (room for a long table or list), else its preview (sample: a fixture by name too)
 export function DeskTile({ w, api, sample, note }: { w: WidgetView; api: WidgetApi; sample: boolean | string; note?: string }) {
@@ -250,7 +250,7 @@ function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetA
               <CellButton w={w} api={api} />
             </div>
           ) : (
-            <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : place === 'panel' ? { width: 320, height: 300 } : desk ? { width: 400, height: 260 } : { width: w.size[0] * 92, height: w.size[1] * 64 }}>
+            <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : place === 'panel' ? { width: 320, height: 300 } : desk ? { width: 400, height: 260 } : { width: w.size[0] * CELL_W, height: w.size[1] * 64 }}>
               <WidgetBody key={`${made}`} w={w} full={desk && !!w.full} api={api} sample={made} cells={bar ? [w.size[0], 0.5] : desk ? [3, 4] : w.size} />
             </div>
           )}
@@ -282,7 +282,7 @@ function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetA
         <div className="ext-stage ext-places">
           <div>
             <span className="muted small">Sidebar · {cell[0]}×{half(cell[1])}</span>
-            <div className="widget ext-tile" style={{ width: cell[0] * 92, height: cell[1] * 64 }}>
+            <div className="widget ext-tile" style={{ width: cell[0] * CELL_W, height: cell[1] * 64 }}>
               {w.button ? <CellButton w={w} api={api} /> : <WidgetBody key={`${made}`} w={w} full={false} api={api} sample={made} cells={cell} />}
             </div>
           </div>

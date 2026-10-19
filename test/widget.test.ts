@@ -92,7 +92,7 @@ test('widgets: found in folders, fetched on schedule into storage, rendered, set
       ['hide', 'list', 'Hide with labels'],
     ],
   )
-  assert.deepEqual(builtin.size, [3, 1])
+  assert.deepEqual(builtin.size, [4, 1])
   assert.equal(builtin.view, 'l')
   assert.equal(v.widgetHome, join(rig.data, 'widgets'))
 
@@ -108,7 +108,7 @@ test('widgets: found in folders, fetched on schedule into storage, rendered, set
   await rig.rpc('widgetSet', { id: 'hello', on: true })
   let w = await until(() => find(rig, 'hello').then(w => w?.at && w), 'the first fetch')
   assert.equal(w.on, true)
-  assert.deepEqual(w.size, [3, 1], 'clamped to the grid')
+  assert.deepEqual(w.size, [4, 1], 'clamped to the grid')
   assert.equal(w.error, undefined)
   assert.equal(await rig.rpc('widgetRender', { id: 'hello' }), '<style>.x{}</style>hi world')
   assert.equal(await rig.rpc('widgetRender', { id: 'hello', full: true }), '<style>.x{}</style>world full')
@@ -369,13 +369,13 @@ test('widgets that come with Laki: My PRs, Links', async t => {
 test('widget sizes: half a cell down is kept (a thin line), other fractions round; Links comes as one', async t => {
   const rig = await fresh(t)
   const links = async () => (await rig.rpc('state')).widgets.find((w: { id: string }) => w.id === 'links')
-  assert.deepEqual((await links()).size, [3, 0.5], 'Links: a line across')
+  assert.deepEqual((await links()).size, [4, 0.5], 'Links: a line across')
   await rig.rpc('widgetSet', { id: 'links', size: [2, 0.7] })
   assert.deepEqual((await links()).size, [2, 1])
   await rig.rpc('widgetSet', { id: 'links', size: [1, 0.5] })
   assert.deepEqual((await links()).size, [1, 0.5])
   await rig.rpc('widgetSet', { id: 'links', size: [9, 0] })
-  assert.deepEqual((await links()).size, [3, 1], 'clamped to the grid')
+  assert.deepEqual((await links()).size, [4, 1], 'clamped to the grid')
 })
 
 test('extensions Laki AI writes: in its own folder only, saved off, read back; never over another folder’s', async t => {

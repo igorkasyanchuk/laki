@@ -19,7 +19,7 @@ export const widgetFormat = () => `## widget.json
 {
   "name": "PRs with conflicts",
   "description": "One line: what it shows (Settings › Extensions shows it).",
-  "size": [3, 1],
+  "size": [4, 1],
   "every": 5,
   "place": "side",
   "config": {
@@ -51,7 +51,7 @@ export const widgetFormat = () => `## widget.json
 - \`sample\` (**required** with a \`fetch\`, a \`script\`, a file, a URL or an AI source): made-up data in exactly the shape the data takes, realistic and
   varied (one of each state it shows: a failing one, an approved one…): the user sees it before it ever runs
   (\`window.laki.sample\` is true then, and its buttons do nothing). \`sampleConfig\`: settings for that preview.
-- \`size\`: cells [across 1–3, down 0.5 or 1–4]; a cell is about 70×64 px, 0.5 a line 29 px tall. \`every\`: minutes
+- \`size\`: cells [across 1–4, down 0.5 or 1–4]; a cell is about 60×64 px (a 240 px sidebar, 4 cells across), 0.5 a line 29 px tall. \`every\`: minutes
   between fetches (default ${WIDGET_EVERY}). \`view\`: the full view's size, \`s\`, \`m\` (default) or \`l\`. The user can change them.
 - \`place\`: one or a list: \`side\` (the sidebar's grid, the default), \`top\` or \`status\` (a bar: a line high, design it
   ½ high), \`rail\` or \`foot\` (a button, below), \`desk\` (a Desk tile, its full view when it has one), \`panel\` (a

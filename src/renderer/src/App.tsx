@@ -1,11 +1,11 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type Account, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { type Account, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, InfoTab, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
+import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
@@ -1834,6 +1834,11 @@ export function App() {
   const prFix = (w: WorkspaceView, what: FixWhat) => call('prFix', { ws: w.id, what }).then(() => toast('Sent to the agent'), () => {})
   // GitHub asked again now, not at the next scan (every settings.prScan minutes)
   const refreshPR = () => call('prRefresh').then(() => done('PR status: fresh from GitHub'), () => {})
+  // the PR section's Labels: the repo's, and one put on or taken off (gh pr edit, as you)
+  const labelApi = (w: WorkspaceView): LabelApi => ({
+    list: () => call<PRLabel[]>('prLabels', { ws: w.id }),
+    set: (label, on) => void call('prLabel', { ws: w.id, label, on }).then(() => done(on ? `Labeled PR #${w.pr?.number}: ${label}` : `Took ${label} off PR #${w.pr?.number}`), () => {}),
+  })
   // right click on the status bar's PR
   // Approve / Close / Merge: gh as you, once you say so (merge: the checks and review in the question, and whether
   // GitHub deletes the branch)
@@ -3075,6 +3080,7 @@ export function App() {
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
               onAct={(act, method) => prAct(ws, act, method)}
+              onLabel={labelApi(ws)}
               root={artsIn === ws.id ? 'artifacts' : 'ws'}
               onRoot={(r: FilesRoot) => setArtsIn(r === 'artifacts' ? ws.id : null)}
               ext={shownWidgets.filter(w => w.on && placesOf(w).includes('panel')).map(w => ({ id: `ext:${w.id}` as const, label: w.name, icon: <ExtGlyph w={w} size={14} />, body: <WidgetPanel w={w} api={widgetApi} /> }))}
@@ -3085,6 +3091,7 @@ export function App() {
                 onToggle={(k, v) => setAuto(ws, k, v)}
                 onFix={what => prFix(ws, what)}
                 onAct={(act, method) => prAct(ws, act, method)}
+                onLabel={labelApi(ws)}
                 onRename={() => setDialog({ renameWs: ws.id })}
                 onAttach={attachable(ws) ? () => setDialog({ attachPr: ws.id }) : undefined}
                 onCopy={copy}

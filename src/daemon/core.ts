@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
@@ -3321,7 +3321,7 @@ function reviewersOf(j: { reviews?: { author?: { login?: string }; state?: strin
   const changes = by('CHANGES_REQUESTED')
   return { ...(approved.length && { approved }), ...(changes.length && { changes }) }
 }
-const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,reviews,comments,mergeable,mergeStateStatus,additions,deletions,body,updatedAt,statusCheckRollup'
+const PR_FIELDS = 'number,state,url,title,author,isDraft,headRefOid,baseRefName,reviewDecision,reviews,comments,mergeable,mergeStateStatus,additions,deletions,body,updatedAt,labels,statusCheckRollup'
 // you on someone else's PR: your last say approves it; you commented (a comment, a review's comments, an ask for changes)
 function yoursOn(j: { author?: { login?: string }; reviews?: { author?: { login?: string }; state?: string }[]; comments?: { author?: { login?: string } }[] }, me: string, approved?: string[]) {
   if (!me || j.author?.login === me) return {}
@@ -3400,6 +3400,7 @@ async function scanPR(ws: Workspace) {
       deletions: j.deletions,
       body: typeof j.body === 'string' ? j.body.slice(0, 4000) : undefined,
       updated: j.updatedAt,
+      labels: Array.isArray(j.labels) && j.labels.length ? j.labels.map((l: PRLabel) => labelOf({ name: l.name, color: l.color })) : undefined, // the menu has their words
     }
   } catch (e) {
     wsLog(ws, `PR: gh pr view ${ws.prUrl ?? ws.branch}: ${firstLine(e)}`)
@@ -4705,12 +4706,53 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
   return {}
 }
 
+// a PR's repo as gh's -R takes it, from its URL (host/owner/repo)
+const repoOf = (pr: PR) => (u => `${u.host}/${u.pathname.split('/').slice(1, 3).join('/')}`)(new URL(pr.url))
+const LABEL_COLOR = /^[0-9a-f]{6}$/i // GitHub's; anything else isn't put in the page's CSS
+const labelOf = (l: { name?: unknown; color?: unknown; description?: unknown }): PRLabel => ({ name: String(l.name ?? ''), ...(LABEL_COLOR.test(String(l.color)) && { color: String(l.color) }), ...(typeof l.description === 'string' && l.description && { description: l.description }) })
+const repoLabels = new Map<string, { at: number; list: PRLabel[] }>() // by repo: the PR section's Labels menu, kept a minute (one made on GitHub shows soon)
+// prLabels: the labels of the PR's repo (gh label list), for the PR section's Labels menu
+export async function prLabels(ref: string) {
+  const ws = findWs(ref)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  const repo = repoOf(pr)
+  const kept = repoLabels.get(repo)
+  if (kept && Date.now() - kept.at < 60e3) return kept.list
+  const { stdout } = await exec(ws, 'gh', ['label', 'list', '-R', repo, '--json', 'name,color,description', '--limit', '500'], { timeout: 20000 }).catch(e => {
+    throw new Error(ghSays(e, repo))
+  })
+  const list = (JSON.parse(stdout || '[]') as object[]).map(labelOf).filter(l => l.name)
+  repoLabels.set(repo, { at: Date.now(), list })
+  return list
+}
+// prLabel: a label put on the PR or taken off (gh pr edit, -R off this worktree as merge), shown at once, then a scan.
+// ponytail: gh splits --add-label and --remove-label at commas, so a label with one in its name is GitHub's to set
+export async function prLabel(o: { ws: string; label: string; on: boolean }) {
+  const ws = findWs(o.ws)
+  const pr = prs.get(ws.id)
+  if (!pr) throw new Error(`${ws.id} has no PR`)
+  const name = typeof o.label === 'string' ? o.label.trim() : ''
+  if (!name) throw new Error('which label?')
+  if (name.includes(',')) throw new Error(`gh splits a label at its commas: put ${name} on or off on GitHub`)
+  const repo = repoOf(pr)
+  await exec(ws, 'gh', ['pr', 'edit', `--${o.on ? 'add' : 'remove'}-label=${name}`, '-R', repo, '--', pr.url], { timeout: 30000 }).catch(e => {
+    throw new Error(/label/i.test(String(e.stderr)) ? `gh: ${String(e.stderr).trim().split('\n')[0]}` : ghSays(e, `PR #${pr.number}`)) // a label it hasn't: gh's words, not "PR not found"
+  })
+  const now = prs.get(ws.id) ?? pr // a scan may have put a fresh one there meanwhile
+  const rest = (now.labels ?? []).filter(l => l.name !== name)
+  const label = o.on ? (repoLabels.get(repo)?.list.find(l => l.name === name) ?? { name }) : undefined
+  now.labels = label ? [...rest, { name, ...(label.color && { color: label.color }) }] : rest.length ? rest : undefined
+  changed()
+  void scanPRs()
+  return { labels: now.labels ?? [] }
+}
+
 // gh pr merge by the PR's URL. -R (its repo, from the URL) keeps gh off this worktree's git: without it,
 // --delete-branch also checks out the default branch here and deletes the local one. GitHub deletes the head branch
 // (not a fork's). Then a scan, a moment later: this may run inside one (autoPR)
 async function merge(ws: Workspace, pr: PR, how: MergeMethod, deleteBranch: boolean) {
-  const u = new URL(pr.url)
-  const repo = `${u.host}/${u.pathname.split('/').slice(1, 3).join('/')}`
+  const repo = repoOf(pr)
   await exec(ws, 'gh', ['pr', 'merge', `--${how}`, ...(deleteBranch ? ['--delete-branch'] : []), '-R', repo, '--', pr.url], { timeout: 60000 }).catch(e => {
     throw new Error(ghSays(e, `PR #${pr.number}`))
   })

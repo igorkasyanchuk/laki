@@ -9,12 +9,12 @@ import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetSt
 import { Modal } from './panels'
 import { CHARTS, colorCss, COLORS, DO, TONES, UI_EXAMPLES, UI_GROUPS, uiHtml, UI_SAMPLES, type UiElement, type UiGroup, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
-import { clean } from './Widgets'
+import { CELL_W, clean } from './Widgets'
 
 const SIZES: [string, [number, number] | null][] = [
   ['1×1', [1, 1]],
-  ['3×1', [3, 1]],
-  ['3×2', [3, 2]],
+  ['4×1', [4, 1]],
+  ['4×2', [4, 2]],
   ['Full', null],
 ]
 
@@ -45,7 +45,7 @@ function lookOf(k: StarterKind): Look {
   try {
     if (f['fixtures/sample.json']) data = JSON.parse(f['fixtures/sample.json'])
   } catch {}
-  const size: [number, number] = [Math.min(3, m.size?.[0] ?? 3), Math.min(3, m.size?.[1] ?? 2)]
+  const size: [number, number] = [Math.min(4, m.size?.[0] ?? 4), Math.min(3, m.size?.[1] ?? 2)]
   const one = !f['widget.json'] ? Object.values(f)[0] : undefined
   if (one) return { data, size, code: one.split('\n').slice(0, 9).join('\n') }
   if (m.place === 'rail' || m.place === 'foot' || (!m.ui && !f['widget.html'])) return { data, size, button: { icon: m.icon ?? 'panel', label: render(m.label ?? '', data as Record<string, unknown>), badge: render(m.badge ?? '', data as Record<string, unknown>) } }
@@ -61,7 +61,7 @@ export function StarterPicker({ onPick, onClose }: { onPick: (k: StarterKind) =>
           <button key={k} type="button" className="starter-card" onClick={() => onPick(k)}>
             <span className="starter-look" inert>
               {l.ui ? (
-                <span className="widget ext-tile" style={{ width: l.size[0] * 92, height: l.size[1] * 64 }}>
+                <span className="widget ext-tile" style={{ width: l.size[0] * CELL_W, height: l.size[1] * 64 }}>
                   <KitBody spec={l.ui} data={l.data} cells={l.size} ws={l.ws ? SAMPLE_WS : undefined} />
                 </span>
               ) : l.button ? (
@@ -110,7 +110,7 @@ function KitCard({ it, pick, onPick, copy }: { it: Item; pick: string; onPick: (
         <span className="muted small kit-blurb">{it.blurb}</span>
       </div>
       <div className="ext-stage kit-stage">
-        <div className="widget ext-tile" style={cells ? { width: cells[0] * 92, height: cells[1] * 64 } : { width: '100%', maxHeight: 360, overflow: 'auto' }}>
+        <div className="widget ext-tile" style={cells ? { width: cells[0] * CELL_W, height: cells[1] * 64 } : { width: '100%', maxHeight: 360, overflow: 'auto' }}>
           <KitBody spec={it.spec} data={it.data} cells={cells} />
         </div>
         <div className="kit-status">
@@ -362,7 +362,7 @@ export function UiKitPage({ back, onClose, copy, icons }: { back: string; onClos
   const shown = found.filter(it => !only || it.tag === only)
   const examples = only ? [] : EXAMPLES.filter(match)
   const count = (g: string) => found.filter(it => it.tag === g).length
-  const card = (it: Item) => <KitCard key={it.key} it={it} pick={size[it.key] ?? (it.full ? 'Full' : '3×2')} onPick={n => setSize(x => ({ ...x, [it.key]: n }))} copy={copy} />
+  const card = (it: Item) => <KitCard key={it.key} it={it} pick={size[it.key] ?? (it.full ? 'Full' : '4×2')} onPick={n => setSize(x => ({ ...x, [it.key]: n }))} copy={copy} />
   const m = (t: string) => <span className="mono">{t}</span>
   return (
     <Page

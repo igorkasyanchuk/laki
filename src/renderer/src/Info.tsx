@@ -1,8 +1,8 @@
 // A workspace's info panel (the ⓘ in the tab bar) and its PR in the status bar: CI, review, and the
 // switches that send failing CI or new review comments to the agent. App.tsx maps a
 // workspace to WsInfo.
-import { type MouseEvent, type ReactNode } from 'react'
-import { MERGE_METHODS, type MergeMethod, type PRPerm } from '../../shared/types'
+import { type CSSProperties, type MouseEvent, type ReactNode } from 'react'
+import { MERGE_METHODS, type MergeMethod, type PRLabel, type PRPerm } from '../../shared/types'
 import { Folded } from './MarkdownView'
 import { shortPath } from './text'
 import { type Tunnel } from './Tunnel'
@@ -29,6 +29,7 @@ export type PRInfo = {
   deletions?: number
   body?: string
   updated?: string
+  labels?: PRLabel[] // an older daemon: none
 }
 export type WsInfo = {
   id: string
@@ -62,6 +63,8 @@ export type WsInfo = {
 export type AutoKey = 'autoFix' | 'autoReview' | 'autoMerge' | 'autoLand'
 export type FixWhat = 'ci' | 'review' | 'conflict' // what prFix sends
 export type PRAct = 'approve' | 'close' | 'merge' // prAct: gh as you, after a confirm
+// the PR's labels: the repo's (prLabels), and one put on or taken off (prLabel)
+export type LabelApi = { list: () => Promise<PRLabel[]>; set: (name: string, on: boolean) => void }
 export const MERGE_WORDS: Record<MergeMethod, string> = { squash: 'Squash and merge', merge: 'Create a merge commit', rebase: 'Rebase and merge' }
 const FIXES: AutoKey[] = ['autoFix', 'autoReview', 'autoMerge']
 
@@ -259,7 +262,7 @@ const SEND: Record<FixWhat, [string, string]> = {
 
 // the PR: title, state, actions, its description, checks, and what the agent fixes (info panel, side panel)
 // threads: its open review threads (the side panel's), unknown in the info panel: Send review comments shows then
-export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach, onDetach }: { w: WsInfo; threads?: number; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onAttach?: () => void; onDetach?: () => void }) {
+export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach, onDetach, onLabel }: { w: WsInfo; threads?: number; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onAttach?: () => void; onDetach?: () => void; onLabel?: LabelApi }) {
   const pr = w.pr
   const open = pr?.state === 'OPEN'
   const can = (k: PRPerm) => w.allow?.[k] ?? k !== 'land'
@@ -289,6 +292,19 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
         ...(w.prLinked && onDetach ? [{ label: 'Not this workspace’s PR', icon: 'link', sub: 'Only related: its own PR, once opened, shows here', run: onDetach } as MenuItem] : []),
         ...(open && can('close') ? [null, { label: 'Close pull request…', icon: 'x', danger: true, run: () => onAct('close') } as MenuItem] : []),
       ]
+  // Labels: the repo's, the PR's ticked; a click puts one on or takes it off (the menu opens once they're in)
+  const labelMenu = async (e: MouseEvent<HTMLButtonElement>) => {
+    const at = e.currentTarget.getBoundingClientRect()
+    const all = await onLabel!.list().catch(() => null) // App's call says why
+    if (!all || !pr) return
+    const has = new Set(pr.labels?.map(l => l.name))
+    const repo = pr.url.replace(/\/pull\/\d+.*$/, '/labels')
+    openMenu(at, [
+      ...(all.length > 8 ? [{ filter: 'Find a label' }] : []),
+      ...all.map(l => ({ label: l.name, sub: l.description, icon: 'tag', hint: has.has(l.name) ? 'ON' : undefined, run: () => onLabel!.set(l.name, !has.has(l.name)) }) as MenuItem),
+      { label: all.length ? 'Edit labels on GitHub' : 'No labels yet: make some on GitHub', icon: 'github', foot: true, run: () => onOpen(repo) },
+    ])
+  }
   // Send now: what there is to send, by hand (a linked PR, with no switches: each named)
   const send = (what: FixWhat, named = false) => {
     if (!pr || !(what === 'ci' ? pr.checks === 'fail' : what === 'review' ? (threads ?? 1) > 0 : pr.conflict)) return null
@@ -335,6 +351,21 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
             {pr.updated && <span>updated {ago(pr.updated)}</span>}
           </div>
           <Reviewers pr={pr} />
+          {(!!pr.labels?.length || onLabel) && (
+            <div className="pr-labels">
+              {pr.labels?.map(l => (
+                <span key={l.name} className="pr-label" style={l.color ? ({ '--lc': `#${l.color}` } as CSSProperties) : undefined}>
+                  {l.name}
+                </span>
+              ))}
+              {onLabel && (
+                <button className="pr-label-add" aria-label="Labels" data-tip="Put a label on it or take one off (gh pr edit)" onClick={labelMenu}>
+                  <Icon name="tag" />
+                  {!pr.labels?.length && 'Label'}
+                </button>
+              )}
+            </div>
+          )}
           {/* GitHub's order: Merge first (green once it could go in), Approve beside it, the PR on GitHub at the end and
               closing, rare and lasting, in ⋯; each asks first (App's prAct) */}
           <div className="pr-acts">
@@ -406,6 +437,7 @@ export function InfoTab(p: {
   onPrimary?: (url: string) => void // a related PR as its PR
   onUnrelate?: (url: string) => void // off the related list
   onDetach?: () => void // its PR, only linked, to related
+  onLabel?: LabelApi // its PR's labels
 }) {
   const { w } = p
   return (
@@ -499,7 +531,7 @@ export function InfoTab(p: {
           ))}
         </section>
 
-        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onAttach={p.onAttach} onDetach={p.onDetach} />
+        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onAttach={p.onAttach} onDetach={p.onDetach} onLabel={p.onLabel} />
       </div>
   )
 }

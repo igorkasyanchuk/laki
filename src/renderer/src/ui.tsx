@@ -479,9 +479,11 @@ function Menu({ anchor, items: all, align, first, beside, onBack, onEnter, onClo
 
 // [the open menu (render it somewhere), open(event, items, align)]: under the clicked element, or at the
 // pointer for a right click (contextmenu)
-export function useMenu(): [ReactNode, (e: MouseEvent, items: MenuItem[], align?: 'left' | 'right') => void] {
+// a click opens it at its button; a rect: there (a menu whose items came after an await, the click's target gone)
+export function useMenu(): [ReactNode, (e: MouseEvent | DOMRect, items: MenuItem[], align?: 'left' | 'right') => void] {
   const [m, setM] = useState<{ anchor: DOMRect; items: MenuItem[]; align: 'left' | 'right'; first?: boolean } | null>(null)
-  const open = (e: MouseEvent, items: MenuItem[], align: 'left' | 'right' = 'left') => {
+  const open = (e: MouseEvent | DOMRect, items: MenuItem[], align: 'left' | 'right' = 'left') => {
+    if (e instanceof DOMRect) return setM({ anchor: e, items, align })
     e.stopPropagation()
     e.preventDefault()
     const anchor = e.type === 'contextmenu' ? new DOMRect(e.clientX, e.clientY - 4, 0, 0) : (e.currentTarget as HTMLElement).getBoundingClientRect()

@@ -231,7 +231,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       {
         id: str('its id, from laki_extensions'),
         places: { type: 'array', items: { type: 'string', enum: [...WIDGET_PLACES] }, description: 'every place it shows in; [] puts back its own (widget.json)' },
-        size: str('cells across x down, e.g. 2x1: across 1-3, down 0.5-4 (halves)'),
+        size: str('cells across x down, e.g. 2x1: across 1-4, down 0.5-4 (halves)'),
         every: { type: 'number', description: 'minutes between fetches, 1-1440' },
         view: { type: 'string', enum: ['s', 'm', 'l'], description: 'its full view: small, medium or large' },
         hide: { type: 'object', properties: { refresh: { type: 'boolean' }, at: { type: 'boolean' } }, description: 'true hides its refresh button (refresh) or when it was fetched (at); false shows it again' },

@@ -538,6 +538,8 @@ export type Status = 'running' | 'waiting' | 'idle' | 'exited'
 
 export type Check = { name: string; state: 'pass' | 'fail' | 'pending' | 'skip'; url?: string; took?: number } // took: seconds, a finished one's
 
+// a GitHub label: color as GitHub keeps it, 6 hex digits (none: anything else)
+export type PRLabel = { name: string; color?: string; description?: string }
 // checks: all of them in one word; list: each one. head: the commit the checks ran on.
 export type PR = {
   number: number
@@ -562,6 +564,7 @@ export type PR = {
   deletions?: number
   body?: string
   updated?: string
+  labels?: PRLabel[] // its labels (no description: the Labels menu has the repo's)
 }
 
 // runAt: when its turn began (the daemon's clock), while it runs or waits
@@ -594,7 +597,7 @@ export type Proc = { pid: number; cmd: string; own?: boolean } // own: an agent'
 export type Doctor = { git: boolean; gh: 'missing' | 'out' | 'in'; cloudflared?: boolean; idb?: boolean; agents: { id: Agent; found: boolean }[] } // idb: laki screen's simulator hands
 
 // a widget (daemon/widgets.ts): a folder with widget.json and widget.html; on: in the sidebar, fetching every `every`
-// minutes (none: no fetch command or script); size: cells, 1–3 across the sidebar's grid by 1–4 down; full: it has a
+// minutes (none: no fetch command or script); size: cells, 1–4 across the sidebar's grid by 1–4 down; full: it has a
 // full view (a dialog); js: its page has scripts, so it runs in a sandboxed frame; config: its settings; at, error:
 // the last fetch; rev: changes on each reload
 // a widget's setting (widget.json config): its kind (text, number, bool: an on/off, choice: one of choices, list: words
@@ -665,5 +668,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 90
+export const API = 91
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

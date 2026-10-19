@@ -35,7 +35,7 @@ A Laki extension. Its data comes from \`fetch.sh\` (now: \`fixtures/sample.json\
 // a starter of a UI kit look: widget.json with its ui, the fetch, the fixtures, the README
 function kit(o: { spec: unknown; data: unknown; empty: unknown; more: Record<string, unknown>; real: string; size?: [number, number]; actions?: Record<string, string>; place?: string; extra?: Record<string, unknown> }) {
   return (id: string, name: string): Files => ({
-    'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Made from a starter: change its fetch and its ui', every: 5, size: o.size ?? [3, 2], ...(o.place && { place: o.place }), fetch: 'sh fetch.sh', ...o.extra, ui: o.spec, ...(o.actions && { actions: o.actions }), sample: o.data }),
+    'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Made from a starter: change its fetch and its ui', every: 5, size: o.size ?? [4, 2], ...(o.place && { place: o.place }), fetch: 'sh fetch.sh', ...o.extra, ui: o.spec, ...(o.actions && { actions: o.actions }), sample: o.data }),
     'fetch.sh': fetchSh(o.real),
     'fixtures/sample.json': json(o.data),
     'fixtures/empty.json': json(o.empty),
@@ -107,7 +107,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
     title: 'A note',
     blurb: 'Markdown you type on its card, or from a file or a URL: lists, links, pictures',
     files: (id, name) => ({
-      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Markdown: its text on its card (Data: Static), or a file or a URL', size: [3, 2], source: { kind: 'static', text: NOTE }, ui: { type: 'markdown', value: '{{text}}' }, sample: { text: NOTE } }),
+      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Markdown: its text on its card (Data: Static), or a file or a URL', size: [4, 2], source: { kind: 'static', text: NOTE }, ui: { type: 'markdown', value: '{{text}}' }, sample: { text: NOTE } }),
       'fixtures/sample.json': json({ text: NOTE }),
       ...variants({ todo: { text: '## Today\n\n- [x] Review #412\n- [ ] Answer the API question\n- [ ] Deploy the docs\n- [ ] 1:1 at 15:00' }, table: { text: '## On call\n\n| Week | Who |\n|---|---|\n| 42 | octocat |\n| 43 | hubot |\n| 44 | monalisa |' }, links: { text: '## Links\n\n![octocat](https://avatars.githubusercontent.com/octocat?s=48) [Runbook](https://example.com/runbook) · [Status](https://status.example.com) · [Dashboards](https://example.com/grafana)' } }),
       'README.md': `# ${name}\n\nA Laki extension that shows Markdown. Its card (Settings › Extensions) says where the text comes from: Static (typed there), File (\`~/notes/today.md\`, read each time) or URL. A file or a URL that gives JSON is data for a \`ui\` of your own instead.\n`,
@@ -117,7 +117,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
     title: 'A launcher',
     blurb: 'Buttons that start Laki things: a workspace, a prompt, Laki AI, a terminal, a page',
     files: (id, name) => ({
-      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Buttons with do: Laki says what each will do and asks first', size: [3, 2], config: { project: { type: 'text', label: 'Project', hint: 'Its name: where Fix a flaky test starts', default: '' } }, sampleConfig: { project: 'web' }, ui: LAUNCH }),
+      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'Buttons with do: Laki says what each will do and asks first', size: [4, 2], config: { project: { type: 'text', label: 'Project', hint: 'Its name: where Fix a flaky test starts', default: '' } }, sampleConfig: { project: 'web' }, ui: LAUNCH }),
       'README.md': `# ${name}\n\nA Laki extension of buttons that ask Laki to do things (\`do\`): \`new\` (a workspace, its agent on \`prompt\`), \`send\` (\`prompt\` to the workspace's agent), \`ai\` (\`prompt\` to Laki AI), \`terminal\` (\`command\`), \`browse\` (\`url\`). Laki shows what and asks before each.\n`,
     }),
   },
@@ -136,13 +136,13 @@ export const STARTERS: Record<StarterKind, Starter> = {
   form: {
     title: 'A form',
     blurb: 'Fields and a button: an action gets them as JSON',
-    files: kit({ spec: { type: 'stack', children: [{ type: 'heading', value: 'New issue', level: 3 }, sample('form').spec, { type: 'text', value: 'Last: {{last}}', muted: true, if: 'last' }] }, data: { last: '' }, empty: {}, more: { filed: { last: '#512 Login loops on Safari' }, urgent: { last: '#513 Checkout returns 500 (urgent)' }, long: { last: '#514 The CSV export drops every row after the first thousand when a filter is on, on every browser we tried' } }, size: [3, 3], real: 'echo \'{"last": ""}\'', actions: { file: `# $WIDGET_ARG: the form's fields as JSON ({"title": …, "urgent": …, "team": …})\n${toast('Would file')}` } }),
+    files: kit({ spec: { type: 'stack', children: [{ type: 'heading', value: 'New issue', level: 3 }, sample('form').spec, { type: 'text', value: 'Last: {{last}}', muted: true, if: 'last' }] }, data: { last: '' }, empty: {}, more: { filed: { last: '#512 Login loops on Safari' }, urgent: { last: '#513 Checkout returns 500 (urgent)' }, long: { last: '#514 The CSV export drops every row after the first thousand when a filter is on, on every browser we tried' } }, size: [4, 3], real: 'echo \'{"last": ""}\'', actions: { file: `# $WIDGET_ARG: the form's fields as JSON ({"title": …, "urgent": …, "team": …})\n${toast('Would file')}` } }),
   },
   panel: {
     title: 'A JS page',
     blurb: 'A script of your own that draws with the UI kit (laki.mount)',
     files: (id, name) => ({
-      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'A JS page: widget.html’s script draws it with laki.mount', every: 5, size: [3, 2], fetch: 'sh fetch.sh', sample: sample('stats').data }),
+      'widget.json': json({ $schema: WIDGET_SCHEMA_URL, name, description: 'A JS page: widget.html’s script draws it with laki.mount', every: 5, size: [4, 2], fetch: 'sh fetch.sh', sample: sample('stats').data }),
       'widget.html': `<template preview><div id="app"></div></template>
 <template full><div id="app"></div></template>
 <script>
@@ -167,7 +167,7 @@ export const STARTERS: Record<StarterKind, Starter> = {
     blurb: 'Per workspace: the selected one’s branch, PR, port and path, and a link to its server',
     files: kit({
       extra: { scope: 'workspace' },
-      size: [3, 2],
+      size: [4, 2],
       spec: {
         type: 'stack',
         children: [
@@ -216,7 +216,7 @@ done
           name,
           description: 'Notes your agents add with its add tool',
           every: 5,
-          size: [3, 2],
+          size: [4, 2],
           fetch: 'sh fetch.sh',
           actions: {
             add: { run: 'sh add.sh', tool: { description: 'Add a note to the Notes list the user sees in Laki', input: { text: { type: 'string', description: 'The note: one short line' } }, required: ['text'], ask: 'first' } },

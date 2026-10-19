@@ -1,7 +1,7 @@
 {
   "name": "Links",
   "description": "Sites you open often, a click away in your browser: Linear, New Relic, lunch.",
-  "size": [3, 0.5],
+  "size": [4, 0.5],
   "config": {
     "links": {
       "type": "list",

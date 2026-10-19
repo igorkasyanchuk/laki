@@ -2,7 +2,7 @@
   "name": "My PRs",
   "description": "Your open pull requests in a repo (or someone's): how many, drafts, conflicts and up to 3 labels you count; a click groups them: conflicts, failing CI, changes asked, approved, in review, drafts.",
   "size": [
-    3,
+    4,
     1
   ],
   "every": 5,

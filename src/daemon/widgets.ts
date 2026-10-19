@@ -12,7 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { AI_SOURCE_EVERY, BUTTON_PLACES, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { reservedIn, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
-import { actionCmd, actionMenu, aiActOf, manifestCheck, needsSample, SECRET, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
+import { actionCmd, actionMenu, aiActOf, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
@@ -313,7 +313,7 @@ function oneFile(d: string, file: string): (Manifest & { seconds?: number }) | s
   if (tag('scope')) m.scope = tag('scope')
   const place = tag('place')
   if (place) m.place = place.includes(',') ? place.split(',').map(x => x.trim()) : place
-  const size = /^([1-3])\s*x\s*(0?\.5|[1-4])$/i.exec(tag('size') ?? '')
+  const size = /^([1-4])\s*x\s*(0?\.5|[1-4])$/i.exec(tag('size') ?? '')
   if (size) m.size = [Number(size[1]), Number(size[2])]
   m.every = unit === 'h' ? Number(n) * 60 : unit === 'm' ? Number(n) : Math.max(1, Math.round(Number(n) / 60))
   if (unit === 's') m.seconds = Number(n)
@@ -488,9 +488,10 @@ const clickOf = (w: Entry) => (typeof w.m.click === 'string' && w.m.actions && O
 
 const clamp = (n: unknown, lo: number, hi: number, def: number) => (Number.isFinite(Number(n)) ? Math.min(hi, Math.max(lo, Math.round(Number(n)))) : def)
 const down = (n: unknown) => (Number(n) === 0.5 ? 0.5 : clamp(n, 1, 4, 1)) // cells down: half a cell too (a line of links)
+const ACROSS = SIZES_ACROSS.length // the sidebar's grid, cells across
 const sizeOf = (w: Entry): [number, number] => {
   const [a, b] = w.s.size ?? w.m.size ?? [1, 1]
-  return [clamp(a, 1, 3, 1), down(b)]
+  return [clamp(a, 1, ACROSS, 1), down(b)]
 }
 const everyOf = (w: Entry) => (sourceOf(w).kind === 'ai' ? clamp(w.s.every ?? w.m.every, 15, 1440, AI_SOURCE_EVERY) : clamp(w.s.every ?? w.m.every, 1, 1440, WIDGET_EVERY)) // an agent's run costs: every 15 minutes at most
 const onOf = (w: Entry) => !!w.s.on // every extension starts off: Settings › Extensions turns it on
@@ -706,7 +707,7 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   if (o.on !== undefined) s.on = !!o.on
   if (o.on === false) ungrant(w.id), stopAgents(w.id) // off: its tools' Always go, its agents stop
   if (o.source !== undefined) stopAgents(w.id, true) // an answer for the source it had would land over the new one's (its actions run on)
-  if (o.size) s.size = [clamp(o.size[0], 1, 3, 1), down(o.size[1])]
+  if (o.size) s.size = [clamp(o.size[0], 1, ACROSS, 1), down(o.size[1])]
   if (o.every !== undefined) s.every = clamp(o.every, 1, 1440, WIDGET_EVERY)
   if (o.view !== undefined) s.view = isSize(o.view) ? o.view : undefined
   const badPlace = o.place === undefined ? undefined : (Array.isArray(o.place) ? o.place : [o.place]).find(x => !isPlace(x)) // a typo would put back widget.json's

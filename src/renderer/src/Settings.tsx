@@ -1856,7 +1856,7 @@ export type WidgetsApi = {
 }
 const ASK_SAYS = { always: 'asks every time', first: 'asks once per workspace', never: 'runs without asking' }
 
-const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3].map(a => [a, d] as [number, number])) // ½ down: a thin line
+const SIZES: [number, number][] = [0.5, 1, 2, 3, 4].flatMap(d => [1, 2, 3, 4].map(a => [a, d] as [number, number])) // ½ down: a thin line
 const PLACES: [WidgetPlace, string, string][] = [
   ['side', 'Sidebar', 'In the sidebar, above its buttons'],
   ['top', 'Top bar', 'In the top bar, left of its buttons: a line high'],
@@ -2305,7 +2305,7 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours, onAgent }: { api: W
     <>
       <h2>Extensions</h2>
       <p className="muted">
-        Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 3 cells across, a line high in the top bar or the status bar, or buttons on the rail and in the sidebar's foot (an icon, a label, a count, a click that runs something): each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
+        Small live pages (also called widgets or plugins) in the sidebar, above its buttons, in a grid 4 cells across, a line high in the top bar or the status bar, or buttons on the rail and in the sidebar's foot (an icon, a label, a count, a click that runs something): each a folder with widget.json (its name, size, settings and the command that fetches its data, on a
         schedule) and widget.html (what it shows, and its full view, a click away). A click on one opens its page: a preview (with made-up data too), its settings and Laki AI to change it. New extension makes one with Laki AI, or gives you the prompt for any AI chat; an agent with the Extension creator skill (Agent skill) makes them too.
       </p>
       {api.kit && (

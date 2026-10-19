@@ -278,7 +278,11 @@ export function RowMarks({ widgets, ws, api }: { widgets: WidgetView[]; ws: stri
   )
 }
 
-// the sidebar's widgets: a grid 3 cells across, each widget its size in cells, plain (no tiles, no head); with the Desk off
+// a sidebar cell's width where an extension is previewed (Settings, the studio, the UI kit): the grid's 4 across the
+// default 240 px sidebar
+export const CELL_W = 60
+
+// the sidebar's widgets: a grid 4 cells across, each widget its size in cells, plain (no tiles, no head); with the Desk off
 // (experimental), one placed only there too: else it would show nowhere
 export function WidgetGrid({ widgets, api, desk }: { widgets: WidgetView[]; api: WidgetApi; desk?: boolean }) {
   const [parked, load] = useParked()

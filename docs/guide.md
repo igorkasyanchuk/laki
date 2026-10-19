@@ -87,7 +87,7 @@ changing it: [AGENTS.md](../AGENTS.md).
   many as you like; each shows as a bar over the bottom buttons (⏸ pauses it) and then rings: a sound and a dialog,
   or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
-- **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar (a grid 3 cells
+- **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar (a grid 4 cells
   across), in the top bar, the status bar or on My Desk, or buttons on the rail and the sidebar's foot: a count, a
   chart, a table, each fed by a command, a script, a file, a URL or an agent, with a full view a click away (below:
   Extensions). Two come with Laki: *Links* and *My PRs*; *Remix* copies any one to change, and Laki AI (Settings ›
@@ -594,7 +594,9 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
   (Esc drops the picks); a file's right click has *Revert this file…* (binaries and images too). Each revert's toast
   has *Undo*; nothing is staged, and a file that changed since you looked is refused (refresh Changes). With an agent at
   work in the workspace, Laki asks first: it may write the file again.
-- *Review*: the PR: its title, state, author and size; *Merge* ▾, *Approve*, GitHub and ⋯; its description,
+- *Review*: the PR: its title, state, author and size; its labels, and the tag button beside them: the repository's
+  labels, a click puts one on or takes it off (as you, by `gh pr edit`; Info's PR has it too); *Merge* ▾, *Approve*,
+  GitHub and ⋯; its description,
   rendered, a few lines of it until *Show more*; its checks, failing first, each with how long it ran and a click to its
   log; *Let the agent fix*: the *failing CI* / *review comments* / *conflicts* switches, each with *Send now* when
   there's something to send. Then the review threads as cards (from reviewers with write access and bots: what the
@@ -796,7 +798,7 @@ bar left of its buttons, the status bar's right end, a tab of the right panel (�
 bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, in the sidebar's foot)
 or in the sidebar's foot (beside Video, Meme and Timer) it's a button: its icon (one of Laki's or an emoji), its label,
 a badge with a count and a tooltip, which its fetch keeps up to date in the background, and a click that runs one of
-its actions (none: its full view, or a fetch now). One with no preview of its own is a button wherever it sits. In the sidebar they sit at the bottom, above its buttons, in a grid 3 cells across (a cell is 64 px tall, or
+its actions (none: its full view, or a fetch now). One with no preview of its own is a button wherever it sits. In the sidebar they sit at the bottom, above its buttons, in a grid 4 cells across (a cell is 64 px tall, or
 half that: ½, a thin line, like *Links*, its sites as plain words with a rule between them, wrapping when they don't fit),
 plain values on the sidebar (no tiles; Settings › Extensions turns them on and off). A click on one opens its full view in a dialog, small, medium or large (its *view* in
 Settings › Extensions: large for wide tables; ↻ fetches now, the sliders its settings).

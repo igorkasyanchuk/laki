@@ -7,7 +7,7 @@ import { highlight } from './highlight'
 import { PanelHandle } from './Panes'
 import { Folded, Markdown } from './MarkdownView'
 import type { MergeMethod } from '../../shared/types'
-import { ago, type AutoKey, Avatar, type FixWhat, type PRAct, PRSection, type WsInfo } from './Info'
+import { ago, type AutoKey, Avatar, type FixWhat, type LabelApi, type PRAct, PRSection, type WsInfo } from './Info'
 import { type actionsFor, csvSep, parseCsv, parseSize, previewAddr, previewUrl, type RunAction, SIZES, splitRows, toCsv } from './text'
 import { ask, escapes, Icon, IconButton, type IconName, type MenuItem, useMenu } from './ui'
 
@@ -602,7 +602,7 @@ function ChangesTab({ api, ws, pr, linked, onOpen }: { api: PanelApi; ws: string
   )
 }
 
-function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void }) {
+function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onLabel?: LabelApi }) {
   const pr = p.w.pr
   const [threads, err, reload] = useLoad(p.api.threads, `${p.w.id}#${pr?.number ?? ''}`, 60000)
   const said = (threads ?? []).filter(t => t.comments.length)
@@ -610,7 +610,7 @@ function ReviewTab(p: { w: WsInfo; api: PanelApi; onOpen: (url: string) => void;
   const resolved = said.filter(t => t.resolved)
   return (
     <div className="sp-body info-body">
-      <PRSection w={p.w} threads={threads ? open.length : err ? undefined : 0} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />
+      <PRSection w={p.w} threads={threads ? open.length : err ? undefined : 0} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onLabel={p.onLabel} />
       {pr && (
         <section>
           <h3>
@@ -682,6 +682,7 @@ export function SidePanel(p: {
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: FixWhat) => void
   onAct: (act: PRAct, method?: MergeMethod) => void
+  onLabel?: LabelApi // the PR's labels (Review's PR section)
   root: FilesRoot // Files': the worktree, or the Artifacts
   onRoot: (r: FilesRoot) => void
   info: ReactNode // the Info tab (Info.tsx InfoTab): the workspace's facts and PR
@@ -710,7 +711,7 @@ export function SidePanel(p: {
       {tab === 'info' && p.info}
       {tab === 'files' && <Files api={p.api} ws={p.w.id} root={p.api.artifacts ? p.root : 'ws'} onRoot={p.onRoot} />}
       {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
-      {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} />}
+      {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
       {ext && <div className="sp-ext">{ext.body}</div>}
     </div>

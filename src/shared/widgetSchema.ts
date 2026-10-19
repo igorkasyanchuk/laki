@@ -7,7 +7,7 @@ import { REPO, WIDGET_EVENTS, WIDGET_PLACES } from './types.ts'
 import { BUTTON, COMMON, type Kind, near, type Prop, UI, UI_TYPES, type UiProblem } from './widgetUi.ts'
 
 export const WIDGET_SCHEMA_URL = `${REPO.replace('https://github.com/', 'https://raw.githubusercontent.com/')}/main/docs/widget.schema.json`
-export const SIZES_ACROSS = [1, 2, 3]
+export const SIZES_ACROSS = [1, 2, 3, 4] // the sidebar's grid: 4 cells across
 export const SIZES_DOWN = [0.5, 1, 2, 3, 4]
 export const VIEWS = ['s', 'm', 'l']
 export const SPEC_TYPES = ['text', 'number', 'bool', 'choice', 'list', 'secret']
@@ -99,7 +99,7 @@ export const MANIFEST: Record<string, J> = {
   $schema: str('This schema, for your editor'),
   name: str('Its name'),
   description: str('A line about it, in Settings'),
-  size: { type: 'array', items: [{ enum: SIZES_ACROSS }, { enum: SIZES_DOWN }], minItems: 2, maxItems: 2, description: 'Cells across (1-3) and down (½, 1-4) in the sidebar; across in a bar' },
+  size: { type: 'array', items: [{ enum: SIZES_ACROSS }, { enum: SIZES_DOWN }], minItems: 2, maxItems: 2, description: 'Cells across (1-4) and down (½, 1-4) in the sidebar; across in a bar' },
   every: { type: 'integer', minimum: 1, maximum: 1440, description: 'Minutes between fetches (5 by default)' },
   view: { enum: VIEWS, description: 'Its full view’s size: s, m (the default) or l' },
   place: { anyOf: [PLACE, { type: 'array', items: PLACE }], description: 'Where it shows at first (the user’s choice wins): one place or several' },
@@ -286,7 +286,7 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   for (const k of ['name', 'description', 'fetch', 'script', 'icon', 'label', 'badge', 'tip', 'click', 'notify'])
     if (m[k] !== undefined && typeof m[k] !== 'string') say('error', `widget.json ${k}`, `text, not ${kindOf(m[k])}`)
   if (m.size !== undefined && !(Array.isArray(m.size) && m.size.length === 2 && SIZES_ACROSS.includes(Number(m.size[0])) && SIZES_DOWN.includes(Number(m.size[1]))))
-    say('error', 'widget.json size', `[across, down]: across 1-3, down ½ (0.5) or 1-4, not ${JSON.stringify(m.size)}`)
+    say('error', 'widget.json size', `[across, down]: across 1-4, down ½ (0.5) or 1-4, not ${JSON.stringify(m.size)}`)
   if (m.every !== undefined && !(Number.isInteger(m.every) && (m.every as number) >= 1 && (m.every as number) <= 1440)) say('error', 'widget.json every', `minutes, 1 to 1440, not ${JSON.stringify(m.every)}`)
   if (m.view !== undefined && !VIEWS.includes(m.view as string)) say('error', 'widget.json view', `s, m or l, not ${JSON.stringify(m.view)}`)
   if ((Array.isArray(m.place) ? m.place : [m.place]).includes('row') && m.scope !== 'workspace') say('error', 'widget.json place', 'row is a mark on each workspace’s row: it needs "scope": "workspace"')

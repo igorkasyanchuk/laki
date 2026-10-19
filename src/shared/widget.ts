@@ -178,7 +178,7 @@ export const hasFull = (html: string) => /<template\s+full\s*>/i.test(html)
 export const hasScript = (html: string) => /<script\b/i.test(html)
 
 // the UI kit's elements (widgetUi.ts): only the theme's variables and these fallbacks, so they read in every theme.
-// .k is a container: an element adapts to the cells it has (1, 2 or 3 across); data-line: a bar's line (½ high)
+// .k is a container: an element adapts to the cells it has (1 to 4 across); data-line: a bar's line (½ high)
 export const UI_CSS = `.k { container: kit / inline-size; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
 .k [hidden] { display: none !important; }
 .k[data-kit=preview] { height: 100%; gap: 6px; padding: 4px 6px; overflow: hidden; }

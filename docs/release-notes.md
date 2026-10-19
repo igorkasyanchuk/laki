@@ -2,6 +2,13 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- GitHub labels on a pull request: the PR section (Info, Review) shows its labels, and its tag button lists the
+  repository's: a click puts one on or takes it off.
+- The sidebar's extensions sit in a grid 4 cells across instead of 3; sizes go up to 4 across, and Links, My PRs
+  and the starters take the whole row.
+
 ## 0.21.0 · Oct 19, 2026
 
 - Extensions' dialogs: up to 6 buttons styled primary, danger or quiet, a UI kit element inside (a table, a toggle,

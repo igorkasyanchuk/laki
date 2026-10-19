@@ -17,7 +17,7 @@ import { Modal } from './panels'
 import { type Img, PromptInput } from './PromptInput'
 import { extAgent, type WidgetsApi } from './Settings'
 import { escapes, Icon, Page, Switch } from './ui'
-import { CellButton, inWs, type WidgetApi, WidgetBody } from './Widgets'
+import { CELL_W, CellButton, inWs, type WidgetApi, WidgetBody } from './Widgets'
 
 type ChatData = { chat: AiMsg[]; busy: boolean; ended?: number; elsewhere?: boolean }
 type Tab = 'preview' | 'data' | 'runs' | 'check' | 'files'
@@ -363,7 +363,7 @@ function StudioPreview({ w, api, sample }: { w: WidgetView; api: WidgetApi; samp
         ) : where === 'desk' ? (
           <DeskTile w={w} api={api} sample={sample} />
         ) : (
-          <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : { width: cell[0] * 92, height: cell[1] * 64 }}>
+          <div className={`widget ext-tile ${bar ? 'in-bar' : ''}`} style={bar ? { width: `calc(${w.size[0]} * var(--widget-cell, 92px))` } : { width: cell[0] * CELL_W, height: cell[1] * 64 }}>
             <WidgetBody key={`${sample}${where}`} w={w} full={false} api={api} sample={sample} cells={bar ? [w.size[0], 0.5] : cell} />
           </div>
         )}

@@ -221,7 +221,7 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 /* the sidebar's video, over the foot: as wide as the sidebar, 16:9 */
 /* widgets (Widgets.tsx): over the foot, a grid 3 cells across; each cell a square-ish tile, a widget its size in cells */
 .widgets { flex: none; border-top: 1px solid var(--line); max-height: 50vh; }
-.widget-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); grid-auto-rows: 32px; /* a cell down is two rows (64px), Widgets.tsx' span */ overflow: auto; }
+.widget-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 32px; /* a cell down is two rows (64px), Widgets.tsx' span */ overflow: auto; }
 /* plain: no tile, the values on the sidebar, a thin line between widgets: each draws its left and top edge 1px over its
    neighbour's (the negative margin), and the grid clips the ones on its outer edge */
 .widget { position: relative; min-width: 0; overflow: hidden; margin: -1px 0 0 -1px; padding: 4px 9px; border-left: 1px solid var(--line); border-top: 1px solid var(--line); }
@@ -865,6 +865,12 @@ kbd { font-family: var(--mono); }
 .pr-title:hover { color: var(--accent-ink); }
 .pr-num { color: var(--muted); font-weight: 400; }
 .pr-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 8px; font-size: 12px; color: var(--muted); margin-top: -4px; }
+/* the PR's labels: GitHub's color as a dot (its fill could be unreadable on any theme), the theme's text */
+.pr-labels { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.pr-label { display: inline-flex; align-items: center; gap: 5px; padding: 1px 8px; border: 1px solid var(--line); border-radius: 999px; font-size: 11.5px; line-height: 18px; }
+.pr-label::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: var(--lc, var(--muted)); }
+.pr-label-add { display: inline-flex; align-items: center; gap: 4px; padding: 1px 8px; border-radius: 999px; font-size: 11.5px; line-height: 18px; color: var(--muted); }
+.pr-label-add:hover { color: var(--fg); }
 /* who reviewed it: a row per kind (Info.tsx Reviewers) */
 .pr-reviewers { display: flex; flex-direction: column; gap: 3px; font-size: 12px; margin-top: -4px; }
 .pr-rv { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 8px; }

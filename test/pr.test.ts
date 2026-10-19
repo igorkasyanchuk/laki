@@ -325,6 +325,37 @@ test('approve or close the PR: gh as you, by its URL; refused with none, when no
   await assert.rejects(act('close'), /PR #9 is closed/)
 })
 
+test('labels: the PR\'s from its scan (a color GitHub wouldn\'t give: none), the repo\'s kept a while, one put on or taken off by gh pr edit', async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), 'no pull requests found')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await assert.rejects(rig.rpc('prLabels', { ws: ws.id }), /has no PR/)
+  await assert.rejects(rig.rpc('prLabel', { ws: ws.id, label: 'bug', on: true }), /has no PR/)
+  const bug = { name: 'bug', color: 'd73a4a', description: "Something isn't working" }
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 9, state: 'OPEN', url: 'https://github.com/o/r/pull/9', labels: [{ id: 'L1', ...bug }, { name: 'odd', color: 'red;}' }], statusCheckRollup: [] }))
+  const pr = await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+  assert.deepEqual(pr.labels, [{ name: 'bug', color: 'd73a4a' }, { name: 'odd' }])
+  writeFileSync(join(gh, 'labels.json'), JSON.stringify([bug, { name: 'docs', color: '0075ca', description: '' }]))
+  const all = await rig.rpc('prLabels', { ws: ws.id })
+  assert.deepEqual(all, [bug, { name: 'docs', color: '0075ca' }])
+  rmSync(join(gh, 'labels.json'))
+  assert.deepEqual(await rig.rpc('prLabels', { ws: ws.id }), all) // kept: gh asked once
+  const log = () => readFileSync(rig.env.FAKE_LOG, 'utf8')
+  assert.equal(log().split('gh label list -R github.com/o/r --json name,color,description --limit 500\n').length, 2)
+  // shown at once, with the repo's color; the scan after it is GitHub's word
+  assert.deepEqual(await rig.rpc('prLabel', { ws: ws.id, label: ' docs ', on: true }), { labels: [{ name: 'bug', color: 'd73a4a' }, { name: 'odd' }, { name: 'docs', color: '0075ca' }] })
+  assert.match(log(), /gh pr edit --add-label=docs -R github.com\/o\/r -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+  await rig.rpc('prLabel', { ws: ws.id, label: 'bug', on: false })
+  assert.match(log(), /gh pr edit --remove-label=bug -R github.com\/o\/r -- https:\/\/github.com\/o\/r\/pull\/9\n/)
+  await assert.rejects(rig.rpc('prLabel', { ws: ws.id, label: ' ', on: true }), /which label/)
+  for (const on of [true, false]) await assert.rejects(rig.rpc('prLabel', { ws: ws.id, label: 'a, b', on }), /gh splits a label at its commas: put a, b on or off on GitHub/)
+  writeFileSync(join(gh, 'refuse'), "could not add label: 'nope' not found")
+  await assert.rejects(rig.rpc('prLabel', { ws: ws.id, label: 'nope', on: true }), /'nope' not found/)
+})
+
 test('merge: gh pr merge by the way picked (kept as the project\'s next), -R off this worktree; the project\'s switches allow each act; merge when green once per head, only allowed', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH
