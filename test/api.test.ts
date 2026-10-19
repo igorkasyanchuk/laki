@@ -1,7 +1,7 @@
 // The daemon's API beyond the happy paths: errors, projects, tabs, workspaces, files, open in, ship, start.
 import assert from 'node:assert/strict'
 import { execFileSync, spawnSync } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { request } from 'node:http'
 import { join } from 'node:path'
 import { test } from 'node:test'
@@ -837,6 +837,9 @@ test('Artifacts: the files in a workspace storage folder, hidden ones not counte
   const w = await rig.rpc('wsNew', { project: p.id, preset: 'shell' })
   const ws = async () => (await rig.rpc('state')).workspaces.find((x: any) => x.id === w.id)
   const dir = await until(async () => (await ws()).storage, 'its storage folder')
+  // yours alone: the storage folder, and state.json (settings' env, the webhook's URL)
+  assert.equal(statSync(dir).mode & 0o777, 0o700)
+  assert.equal(statSync(join(rig.data, 'state.json')).mode & 0o777, 0o600)
   assert.equal((await ws()).artifacts, undefined)
   mkdirSync(join(dir, 'shots', '.cache'), { recursive: true })
   mkdirSync(join(dir, '.git'))

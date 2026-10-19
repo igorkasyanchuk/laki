@@ -134,7 +134,7 @@ export function load() {
 }
 
 export function save() {
-  const fd = openSync(statePath + '.tmp', 'w')
+  const fd = openSync(statePath + '.tmp', 'w', 0o600) // settings' env, the webhook's URL: yours alone
   try {
     writeFileSync(fd, JSON.stringify(state, null, 2))
     fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
@@ -821,7 +821,7 @@ export function storageOf(ws: Workspace) {
     save()
   }
   try {
-    mkdirSync(ws.storage, { recursive: true })
+    mkdirSync(ws.storage, { recursive: true, mode: 0o700 }) // what agents keep for you: yours alone
   } catch (e) {
     log(`storage ${ws.storage}: ${(e as Error).message}`)
   }
