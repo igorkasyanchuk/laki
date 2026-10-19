@@ -1829,7 +1829,7 @@ function SkillSection({ api }: { api: SkillApi }) {
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from
+  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
   desk?: boolean // Desk is on (experimental): a place too
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
@@ -2055,7 +2055,29 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
         <Switch on={w.on} onChange={on => void api.set(w.id, { on })} tip={w.on ? 'On: turn it off' : 'Off: turn it on'} />
         <div className="wc-title">
           <span className="wc-name">
-            <b>{w.name}</b>
+            {w.builtin || w.oneFile ? (
+              <b data-tip={w.builtin ? 'Comes with Laki: Remix it to rename a copy' : 'One file: its name is its <laki.name> tag'}>{w.name}</b>
+            ) : (
+              // its name, written in widget.json as you leave the field; empty: its id
+              <input
+                key={w.name}
+                className="wc-name-input"
+                aria-label="Its name"
+                data-tip="Its name: click to change it"
+                defaultValue={w.name}
+                maxLength={60}
+                size={Math.max(4, w.name.length)}
+                spellCheck={false}
+                onKeyDown={e => (enter(e), e.key === 'Escape' && e.currentTarget.value !== w.name && ((e.currentTarget.value = w.name), e.currentTarget.blur(), e.preventDefault()))} // Esc: as it was (unchanged: the page's Esc)
+                onInput={e => (e.currentTarget.size = Math.max(4, e.currentTarget.value.length))}
+                onBlur={e => {
+                  const el = e.target
+                  const v = el.value.trim()
+                  if (v !== w.name && (v || w.name !== w.id)) void api.set(w.id, { name: v }).catch(() => (el.value = w.name)) // refused: as it was (the toast says why)
+                  else el.value = w.name
+                }}
+              />
+            )}
             {w.builtin && <span className="tag-soft" data-tip="Comes with Laki">built-in</span>}
             {w.scope === 'workspace' && <span className="tag-soft" data-tip="An instance per workspace, its own data">per workspace</span>}
           </span>
@@ -2164,6 +2186,20 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           <div className="wc-opts">
             {options.map(o => (
               <WidgetOptionField key={o.key} o={o} value={w.config[o.key] ?? ''} onSet={v => void api.set(w.id, { config: { [o.key]: v } })} />
+            ))}
+          </div>
+        </WcSec>
+      )}
+      {!!w.allowed?.length && (
+        <WcSec title="Its agent may use" hint="Tools you allowed with Always when its agent asked; Revoke: it asks again">
+          <div className="wc-tools">
+            {w.allowed.map(t => (
+              <span key={t} className="tag-soft">
+                <code>{t}</code>
+                <button type="button" className="link" data-tip="It asks you again" onClick={() => void api.set(w.id, { allow: w.allowed!.filter(x => x !== t) })}>
+                  Revoke
+                </button>
+              </span>
             ))}
           </div>
         </WcSec>

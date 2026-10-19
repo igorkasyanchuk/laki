@@ -43,8 +43,10 @@ export const widgetFormat = () => `## widget.json
   \`{ "kind": "ai", "prompt": "Sum up #eng on Slack since yesterday: decisions, questions for me", "tools": "mcp__slack" }\`:
   an agent makes its data (Settings › Extensions' agent profile, claude or codex; \`"profile"\` names another), with the
   user's own MCP servers (Slack, Linear, Gmail…) and the tools named in \`tools\` (claude's, comma-separated: it may use
-  them unasked, the rest are refused). It's told to change nothing and to end with the data as a json block in the
-  shape of \`sample\` (none: \`{ text }\` in Markdown). Every hour unless \`every\` says (15 at least: each run costs).
+  them unasked; for any other, Laki asks the user: Allow once, Always, Deny). A server's tools are \`mcp__<server>\` as
+  claude names it: a claude.ai connector's \`mcp__claude_ai_<Name>\` (\`mcp__claude_ai_Slack\`); unsure, leave
+  \`tools\` out and the user allows each as it asks. Never \`claude -p\` in a fetch: nothing could ask. It's told to
+  change nothing and to end with the data as a json block in the shape of \`sample\` (none: \`{ text }\` in Markdown). Every hour unless \`every\` says (15 at least: each run costs).
   The way to give the user a summary of what an MCP server reaches, with no API key or script.
 - \`sample\` (**required** with a \`fetch\`, a \`script\`, a file, a URL or an AI source): made-up data in exactly the shape the data takes, realistic and
   varied (one of each state it shows: a failing one, an approved one…): the user sees it before it ever runs
@@ -179,7 +181,7 @@ ${examples()}
   HTML). Inline everything; draw a canvas at a fixed size.
 `
 
-// how Laki AI makes one (ai.ts' SYSTEM: questions first); desk: the Desk's Build with Laki AI, so not where it sits
+// how Laki AI makes one (ai.ts' SYSTEM: questions first)
 const howMake = () =>
   `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from (a command, a file, a URL, or text I type), where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (its ui from the UI kit, with a sample in widget.json: its preview). It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
 

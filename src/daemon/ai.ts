@@ -475,9 +475,11 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
 // through aiComplete, or claude -p / codex exec with nothing but the prompt (their preset's account and env, as the
 // chat's); logged among Laki AI's calls. agent: an extension's AI source, that agent with the user's own config (its
 // MCP servers; claude's tools: the ones it may use unasked, its other asks refused; codex's sandbox read-only), 10 minutes
-export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; name?: string; stop?: string; signal?: AbortSignal }): Promise<string> {
+export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; perm?: string; name?: string; stop?: string; signal?: AbortSignal }): Promise<string> {
   const s = state.settings?.ai ?? {}
   const agent = !!o.preset // an extension's: the preset's model, effort, env and account; the user's own config
+  // perm: that extension's id: claude asks you for a tool it may not use unasked in the app, not in a hook's (laki mcp's
+  // laki_permission beside the user's own servers: widgets.ts widgetPermission)
   const backend: AiBackend = o.preset?.agent ?? s.backend ?? 'openrouter'
   if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text
   const pre = o.preset ?? presetOf(backend)
@@ -486,7 +488,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
   const call: AiCall = { at: Date.now(), backend, model: model || backend, in: 0, out: 0, ms: 0, tools: 0, ok: false, ask: o.ask.slice(0, 120) }
   const args =
     backend === 'claude'
-      ? ['-p', '--output-format', 'json', ...(agent ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '']), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
+      ? ['-p', '--output-format', 'json', ...(agent ? (o.tools ? ['--allowedTools', o.tools] : []) : ['--tools', '']), ...(agent && o.perm ? ['--mcp-config', JSON.stringify({ mcpServers: { laki_ask: mcpWith({ LAKI_PERM_EXT: o.perm }) } }), '--permission-prompt-tool', 'mcp__laki_ask__laki_permission'] : []), '--append-system-prompt', o.system, ...(model ? ['--model', model] : []), ...effort, '--', o.prompt]
       : ['exec', '--json', '--skip-git-repo-check', ...(agent ? [] : ['--ignore-user-config']), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
   mkdirSync(home, { recursive: true })
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)) }
@@ -566,8 +568,9 @@ function dataUrl(path: string) {
 }
 
 // `laki mcp` as an MCP server for a CLI agent: this daemon's (LAKI_HOME), through node or Electron as node
-// perm: claude's, whose --permission-prompt-tool is laki mcp's laki_permission (codex has none)
-const mcpServer = (perm = false) => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, LAKI_AI: '1', ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(perm && { LAKI_AI_PERM: '1' }), ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
+// perm: claude's, whose --permission-prompt-tool is laki mcp's laki_permission (codex has none); mcpWith: any env of laki mcp's
+const mcpWith = (env: Record<string, string>) => ({ command: cliArgv[0], args: [...cliArgv.slice(1), 'mcp'], env: { LAKI_HOME: dir, ...env, ...(process.versions.electron && { ELECTRON_RUN_AS_NODE: '1' }) } })
+const mcpServer = (perm = false) => mcpWith({ LAKI_AI: '1', ...(skilled() && { LAKI_AI_SKILL: '1' }), ...(perm && { LAKI_AI_PERM: '1' }) })
 
 // Settings › AI's preset of the agent (an account of its own: CLAUDE_CONFIG_DIR, CODEX_HOME…): its env, over Settings'
 // env as a tab of it gets; its args are a tab's, not used here

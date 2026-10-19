@@ -6,7 +6,8 @@ fs.appendFileSync(process.env.FAKE_LOG || '/dev/null', JSON.stringify({ bin: 'cl
 // -p (Laki's AI): stream-json, one laki_state call through the --mcp-config server; "fail…" fails, "slow…" waits;
 // a brainstorm writes its ideas.md
 // -p --output-format json (an extension's AI source, aiOnce): one result; "fail…" fails, "words…" has no json block,
-// "slow…" waits (a Stop ends it)
+// "slow…" waits (a Stop ends it); "slackread…": a tool it may not use unasked, asked through --permission-prompt-tool
+// (an extension's laki_ask server), what the user said in its data
 if (args[0] === '-p' && args[args.indexOf('--output-format') + 1] === 'json') {
   const prompt = args[args.length - 1]
   const tools = args.includes('--allowedTools') ? args[args.indexOf('--allowedTools') + 1] : ''
@@ -16,6 +17,13 @@ if (args[0] === '-p' && args[args.indexOf('--output-format') + 1] === 'json') {
   if (prompt.startsWith('slow')) return setTimeout(() => {}, 60000)
   if (prompt.startsWith('data')) return done('Done.\n\n```json\n{"data": {"n": 9}}\n```')
   if (prompt.startsWith('toast')) return done('```json\n{"toast": "sent"}\n```')
+  if (prompt.startsWith('slackread')) {
+    const tool = 'mcp__claude_ai_Slack__slack_read_channel', said = said => done(`\`\`\`json\n${JSON.stringify({ text: said, tools })}\n\`\`\``)
+    if (tools.split(/[ ,]+/).includes(tool)) return said('allowed')
+    if (!args.includes('--permission-prompt-tool')) return said('refused')
+    const via = args[args.indexOf('--permission-prompt-tool') + 1]
+    return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki_ask, via.replace(/^mcp__laki_ask__/, ''), { tool_name: tool, input: { channel: 'eng' } }).then(t => said(JSON.parse(t).behavior))
+  }
   return done(`Found it.\n\n\`\`\`json\n{"text": "draft"}\n\`\`\`\n\nThe data:\n\n\`\`\`json\n${JSON.stringify({ text: prompt, tools, account: process.env.TEST_ACCOUNT ?? '' })}\n\`\`\`\n`)
 }
 // -p with neither (a script's own headless run, the Pull main starter's): a merge stopped on conflicts takes theirs and

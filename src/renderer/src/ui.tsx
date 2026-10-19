@@ -86,7 +86,9 @@ export const ask = (title: string, o: { text?: string; ok?: string; danger?: boo
   new Promise<boolean>(done =>
     asker ? asker({ title, text: o.text, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
   )
-export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string) => new Promise<number>(done => (asker ? asker({ title, text, buttons, check, done, tag }) : done(-1)))
+// one asked before AskHost is there (an extension's ask as the window opens) waits for it, not a no
+let early: Asking[] = []
+export const choose = (title: string, text: string | undefined, buttons: Choice[], check?: Check, tag?: string) => new Promise<number>(done => (a => (asker ? asker(a) : early.push(a)))({ title, text, buttons, check, done, tag }))
 // a line typed in the app's own dialog (an extension action's ask): the text, or null for Cancel, Esc or outside
 export const askText = (title: string, o: { text?: string; ok?: string; placeholder?: string } = {}) =>
   new Promise<string | null>(done => {
@@ -96,7 +98,7 @@ export const askText = (title: string, o: { text?: string; ok?: string; placehol
   })
 // unchoose: closes the dialog choose showed with that tag, as none (-1): answered elsewhere (a tool's notification)
 let closer: ((tag: string) => void) | null = null
-export const unchoose = (tag: string) => closer?.(tag)
+export const unchoose = (tag: string) => ((early = early.filter(x => (x.tag === tag ? (x.done(-1), false) : true))), closer?.(tag))
 
 export function AskHost() {
   const [a, setA] = useState<Asking | null>(null)
@@ -137,6 +139,7 @@ export function AskHost() {
       setA(next)
     }
     closer = t => void (cur.current?.a.tag === t && close(-1))
+    early.splice(0).forEach(asker)
     const f = (e: KeyboardEvent) => onKey.current(e)
     window.addEventListener('keydown', f, true) // before the terminal and the page under it
     return () => {

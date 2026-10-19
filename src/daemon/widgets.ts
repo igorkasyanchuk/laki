@@ -32,7 +32,7 @@ type Manifest = { name?: string; description?: string; size?: [number, number]; 
 // sample: made-up data in the shape its fetch prints (sampleConfig: settings for it), for a preview before it runs (widgetRender sample)
 // what's stored per widget: the user's choices over the manifest's (config: each setting as text), and the last fetch
 // (at: when it ran; error: why it failed); net: its page may reach https sites (the user's switch, never widget.json's)
-type Store = { fails?: number; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string } // told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
+type Store = { fails?: number; source?: WidgetSource; on?: boolean; size?: [number, number]; every?: number; view?: string; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; data?: unknown; at?: number; error?: string; by?: 'ai'; aiMay?: number; mock?: string; told?: string; allow?: string[] } // allow: claude tools its agent may use unasked (Always, when it asked: widgetPermission); told: what its notify last said (keep); by: Laki AI wrote it (widgetWrite); aiMay: when Edit with Laki AI let it rewrite the user's own, once (AI_MAY); mock: data put there by hand (widgetMock: a fixture's name, or edited), not fetched
 // preview: widget.html has one; face: its button's words, filled from the last data (faceOf)
 type Face = { label?: string; badge?: string; tip?: string }
 type Entry = { id: string; dir: string; file?: string; builtin: boolean; dev: boolean; devError?: string; m: Manifest; full: boolean; js: boolean; preview: boolean; face: Face; s: Omit<Store, 'data'>; inst: Map<string, InstMeta>; fixtures: string[] } // fixtures: fixtures/<name>.json at its scan, made-up data to preview it with // inst: a scope workspace one's instances (by workspace id), their last fetch // dev: in a folder laki widget dev linked; devError: why its files don't read now (the last good version runs on)
@@ -548,6 +548,8 @@ export const widgetsView = (): WidgetView[] =>
     description: w.m.description,
     dir: w.dir,
     builtin: w.builtin || undefined,
+    oneFile: !!w.file || undefined,
+    allowed: w.s.allow,
     on: onOf(w),
     size: sizeOf(w),
     every: fetches(w) && sourceOf(w).kind !== 'static' ? everyOf(w) : undefined,
@@ -686,11 +688,11 @@ export function widgetsOff() {
 const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
 // agent: an agent's change (MCP's laki_extension_set, Laki AI's too; laki widget set in an agent's tab): where it shows,
 // its size, every, view, hide and plain settings; never on, network access, its source or a secret: those are the user's
-export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; from?: { ws?: string; tab?: string }; agent?: boolean }) {
+export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; name?: string; allow?: string[]; from?: { ws?: string; tab?: string }; agent?: boolean }) {
   const w = find(o.id)
   if (o.agent === true || agentCaller(o.from)) {
     if (o.on === true) throw new Error('only you can turn an extension on (Settings › Extensions)') // its code would run unlooked at
-    if (o.net === true || o.source !== undefined || o.ai) throw new Error(`only you can change ${o.net === true ? 'its network access' : o.ai ? 'who edits it' : 'its source'} (Settings › Extensions)`)
+    if (o.net === true || o.source !== undefined || o.ai || o.allow !== undefined) throw new Error(`only you can change ${o.net === true ? 'its network access' : o.ai ? 'who edits it' : o.allow !== undefined ? 'the tools its agent may use' : 'its source'} (Settings › Extensions)`)
     const secret = Object.keys(o.config ?? {}).find(k => optionsOf(w).some(x => x.key === k && x.type === 'secret'))
     if (secret) throw new Error(`${secret} is a secret: only you set it (Settings › Extensions)`)
   }
@@ -723,6 +725,10 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
     s.source = src
     if (src) s.mock = undefined // its own data from now on, not sample data
   }
+  if (o.allow !== undefined) {
+    if (!Array.isArray(o.allow) || o.allow.some(t => typeof t !== 'string' || !TOOL_NAME.test(t))) throw new Error('allow: tool names')
+    s.allow = o.allow.length ? [...new Set(o.allow)] : undefined
+  }
   if (o.config) {
     const opts = new Map(optionsOf(w).map(x => [x.key, x]))
     const given = Object.entries(o.config).filter(([k]) => opts.has(k)).map(([k, v]) => [k, textOf(opts.get(k)!, v)])
@@ -751,7 +757,27 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
   const asked = o.source !== undefined && sourceOf(w).kind === 'ai'
   if (onOf(w) && (o.on || o.config || o.source !== undefined)) refetch(w, asked ? 'manual' : 'settings', asked ? 'its prompt changed' : undefined, () => true)
   streamSync() // off: a stream ends
+  if (o.name !== undefined && rename(w, o.name)) scanWidgets() // its new name everywhere, nothing fetched
   return widgetsView().find(x => x.id === w.id)
+}
+// its name, written in widget.json (the page's name field; empty: its id): one of your folders' only (a built-in: Remix it;
+// one file: its <laki.name> tag), the studio's Undo first as for any edit
+function rename(w: Entry, name: unknown) {
+  if (typeof name !== 'string' || name.trim().length > 60) throw new Error('a name, up to 60 characters')
+  if (w.builtin) throw new Error(`${w.m.name || w.id} comes with Laki: Remix it to rename a copy`)
+  if (w.file) throw new Error(`${w.m.name || w.id} is one file: rename it in its <laki.name> tag`)
+  const p = join(w.dir, 'widget.json')
+  if (!statOf(p)?.isFile()) throw new Error('its widget.json is a link there: rename it in its folder')
+  const m = manifestOf(w.dir)
+  if (typeof m === 'string') throw new Error(m)
+  const t = name.trim()
+  if ((m.name ?? '') === t) return false
+  if (t) m.name = t
+  else delete m.name
+  if (w.dir === join(widgetHome(), w.id)) snapshot(w.id, w.dir)
+  writeFileSync(p, JSON.stringify(m, null, 2) + '\n') // ponytail: its own spacing goes; Laki's (and Laki AI's) are 2 already
+  wLog(w, `renamed: ${t || w.id}`)
+  return true
 }
 
 // what turning one on starts, in words, its command or prompt as a code block (a code span breaks on its backticks or
@@ -961,7 +987,7 @@ async function sourceText(w: Entry, src: WidgetSource, x?: Workspace) {
     const prompt = at(src.prompt ?? '')
     if (!prompt) throw new Error('no prompt: say what it should find')
     const preset = agentOf(src)
-    const out = await agentRun(w.id, true, (signal, stop) => aiOnce({ preset, tools: src.tools, prompt, system: aiSystem(w), ask: `extension ${w.id}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (AI)`, stop, signal }))
+    const out = await agentRun(w.id, true, (signal, stop) => aiOnce({ preset, tools: allowedOf(w, src.tools), perm: w.id, prompt, system: aiSystem(w), ask: `extension ${w.id}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (AI)`, stop, signal }))
     return lastJson(out) // ponytail: no block, its words as { text }
   }
   if (src.kind === 'file') {
@@ -1010,7 +1036,7 @@ async function aiAnswer(w: Entry, action: string, a: { prompt: string; tools?: s
   if (!prompt) throw new Error(`${action}: no prompt`)
   const system = `You answer "${action}", a button of "${w.m.name || w.id}", an extension (a small view) in Laki, the app the user runs coding agents in. Do what the prompt asks with the tools you have (their MCP servers among them); change nothing it doesn't ask you to. No one answers questions: decide yourself. Answer in a few short lines of plain text: the user reads it in a small dialog. Or end with a \`\`\`json block: { "toast": "…" }, { "modal": { "title", "text" } }, or { "data": … } (the extension's new data, in the shape of what it shows now).`
   const preset = agentOf(a as WidgetSource)
-  return agentRun(w.id, false, (signal, stop) => aiOnce({ preset, tools: a.tools, prompt, system, ask: `extension ${w.id} · ${action}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (${action})`, stop, signal }))
+  return agentRun(w.id, false, (signal, stop) => aiOnce({ preset, tools: allowedOf(w, a.tools), perm: w.id, prompt, system, ask: `extension ${w.id} · ${action}: ${prompt}`, name: `Extension · ${w.m.name || w.id} (${action})`, stop, signal }))
 }
 // what an AI source's agent is told: find, change nothing, end with the data in the shape its views read (the sample's)
 const aiSystem = (w: Entry) => {
@@ -1410,18 +1436,54 @@ async function approve(w: Entry, action: string, o: { description: string; ask: 
   const def = w.m.actions?.[action]
   const ai = aiActOf(def)
   const req = randomBytes(8).toString('hex')
-  broadcast({ ev: 'toolAsk', req, widget: w.id, action, name: w.m.name || w.id, ...o, command: actionCmd(def) ?? `an agent answers: ${ai?.prompt ?? ''}`, ws: o.ws || undefined })
-  const how = await new Promise<string>(ok => {
-    const timer = setTimeout(() => (asking.delete(req), ok('none')), toolWait())
-    asking.set(req, allow => (clearTimeout(timer), asking.delete(req), ok(allow)))
-  })
-  broadcast({ ev: 'toolDone', req }) // the other windows' dialogs close
+  const how = await answered({ ev: 'toolAsk', req, widget: w.id, action, name: w.m.name || w.id, ...o, command: actionCmd(def) ?? `an agent answers: ${ai?.prompt ?? ''}`, ws: o.ws || undefined })
   if (how === 'none') throw new Error(`${w.m.name || w.id} ${action}: no answer: not run`)
   if (how === 'deny') throw new Error(`${w.m.name || w.id} ${action}: denied`)
   const now = widgets.get(w.id)?.m.actions
   if (JSON.stringify(now && Object.hasOwn(now, action) ? now[action] : undefined) !== JSON.stringify(def)) throw new Error(`${w.m.name || w.id} ${action}: its command changed while you were asked: not run`)
   return how
 }
+// an ask sent to the app's windows (and to each one that connects while it waits: widgetAsks), the first answer
+// (widgetToolAnswer), 'none' past LAKI_TOOL_WAIT; then the other windows' dialogs close
+const asks = new Map<string, { ev: string; req: string }>()
+async function answered(msg: { ev: string; req: string; [k: string]: unknown }) {
+  const { req } = msg
+  asks.set(req, msg)
+  broadcast(msg)
+  const how = await new Promise<string>(ok => {
+    const timer = setTimeout(() => (asking.delete(req), ok('none')), toolWait())
+    asking.set(req, allow => (clearTimeout(timer), asking.delete(req), ok(allow)))
+  })
+  asks.delete(req)
+  broadcast({ ev: 'toolDone', req })
+  return how
+}
+export const widgetAsks = (c: { send: (m: unknown) => void }) => asks.forEach(m => c.send(m)) // a window that opened (or came back) meanwhile
+// an AI source's or action's claude asking for a tool it may not use unasked (aiOnce's --permission-prompt-tool: laki
+// mcp's laki_permission, LAKI_PERM_EXT): asked in the app as a tool call is (toolAsk with perm) and as a notification.
+// Always: that tool unasked in its runs from now on (the store's allow; its page lists them, Revoke). Nobody there, no
+// answer or a deny: it goes on without it
+export async function widgetPermission(p: { ext?: unknown; tool?: unknown; input?: unknown }): Promise<{ allow: boolean; message?: string }> {
+  const w = find(String(p.ext ?? ''))
+  const tool = String(p.tool ?? '')
+  if (!TOOL_NAME.test(tool)) throw new Error('a tool’s name') // it goes into --allowedTools: never an option, nor two names
+  if (readStore(w.id).allow?.includes(tool)) return { allow: true }
+  if (!clients.size) return { allow: false, message: "Laki's window isn't open, so nobody could allow it: do without it, and say so." }
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), widget: w.id, name: w.m.name || w.id, perm: tool, input: p.input ?? {}, ask: 'first' })
+  wLog(w, `its agent asked for ${tool}: ${how === 'none' ? 'no answer' : how}`)
+  if (how === 'always') {
+    const s = readStore(w.id)
+    s.allow = [...new Set([...(s.allow ?? []), tool])]
+    writeStore(w.id, s)
+    const cur = widgets.get(w.id)
+    if (cur) cur.s = { ...cur.s, allow: s.allow }
+    changed()
+  }
+  return how === 'once' || how === 'always' ? { allow: true } : { allow: false, message: how === 'deny' ? 'The user said no: do without it, and say so.' : 'No one answered: do without it, and say so.' }
+}
+const TOOL_NAME = /^\w[\w.-]{0,199}$/ // claude's: Bash, WebFetch, mcp__claude_ai_Slack__slack_read_channel
+// the tools an AI source's or action's agent may use unasked: widget.json's (or the source's) and the ones allowed since
+const allowedOf = (w: Entry, tools?: string) => [tools, ...(readStore(w.id).allow ?? [])].filter(Boolean).join(',') || undefined
 // the app's answer (its dialog, a notification's button): once, always, or deny
 export function widgetToolAnswer(o: { req: string; allow: string }) {
   const f = asking.get(String(o.req))

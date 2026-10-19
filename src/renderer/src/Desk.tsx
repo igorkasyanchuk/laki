@@ -367,7 +367,7 @@ function DeskBuild({ onBuild, onClose }: { onBuild: (a: DeskAsk) => void; onClos
   const attach = async (fs: File[]) => {
     setErr('')
     for (const f of fs) {
-      const t = f.size > FILE_BYTES ? null : await f.text().catch(() => null)
+      const t = f.size > FILE_BYTES ? null : await f.text().catch(() => '\u0000')
       if (t === null || t.includes('\u0000')) setErr(`${f.name}: ${t === null ? 'over 1 MB' : 'not a text file'}; screenshots and text files only`)
       else setFiles(x => [...x.filter(y => y.name !== f.name), { name: f.name, text: t }])
     }

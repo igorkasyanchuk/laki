@@ -292,6 +292,9 @@ export class Line<T extends { req: string }> {
   add(t: T) {
     this.items.push(t)
   }
+  has(req: string) {
+    return this.items.some(x => x.req === req)
+  }
   drop(req: string) {
     const i = this.items.findIndex(x => x.req === req)
     if (i >= 0) this.items.splice(i, 1)

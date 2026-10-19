@@ -109,7 +109,7 @@ setting's `required` and the view's `missing`, the `panel` and `row` places (a r
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
 `widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`; 86: workflows' `agent-ask` wait (`turnWaits`, `flowAnswer` through `answer`), a
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
-(`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`. A
+(`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -229,6 +229,8 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
 - widgets (below): `widgetRender` (`id`, `full`: the filled HTML, a JS widget's as a whole page; null: no such
   view; `sample`: filled with widget.json's `sample` and `sampleConfig` over its settings, `at` two minutes ago,
   `sample: true`), `widgetSet` (`on`, `size`, `every`, `view`, `config`: each setting as text, made what its kind takes;
+  `name`: written in widget.json (`rename`: 60 characters, empty drops it; not a built-in's nor one file's; the studio's
+  `snapshot` first, then `scanWidgets`, nothing fetched), `WidgetCard`'s name field;
   `ai`: the Extension page's chat sets it before each ask, one of the user's in `widgetHome()` (else refused) gets the
   store's `aiMay` (an hour), which lets `widgetWrite` rewrite it; `agent`, or `from` an agent's tab: MCP's and Laki AI's
   `laki_extension_set`, `laki widget set` (`place`, `size`, `every`, `view`, `hide`, plain settings as `key=value`):
@@ -1242,7 +1244,12 @@ An AI source (`ai`: `prompt` 16 KB, `tools` claude's names, never one starting w
 the prompt like a path, `agentOf` (its `profile`, refused when gone; else `settings.widgetAgent`, Settings › Extensions'
 *Agent profile*, `extAgent`; else the first claude preset; else plain claude), then `ai.ts` `aiOnce` `preset`: that
 preset's model, effort, env and account with the user's own config (claude `-p --output-format json --allowedTools
-<tools>`, no `--tools ''`; codex `exec` without `--ignore-user-config`, read-only), 10 minutes, its own `own` row, a line
+<tools>` (and the store's `allow`: `allowedOf`), no `--tools ''`, and `--mcp-config` with `laki_ask` beside the user's
+servers (`mcpWith`: `laki mcp` with `LAKI_PERM_EXT`, which lists only `laki_permission`) as `--permission-prompt-tool`:
+`aiPermission` with `ext` is `widgetPermission`, a `toolAsk` with `perm` (App's dialog and notification: Allow once,
+*Always for <name>*, Deny; `answered`, `LAKI_TOOL_WAIT`), Always into the store's `allow` (the view's `allowed`,
+`WidgetCard`'s *Its agent may use*, Revoke: `widgetSet` `allow`, never an agent's); no window, no answer or a deny: it
+goes on without it; codex `exec` without `--ignore-user-config`, read-only), 10 minutes, its own `own` row, a line
 in `ai-calls.jsonl` (`extension <id>: …`); `aiSystem` tells it to change nothing and answer in `sample`'s shape; the last
 ```json block is the data (none: `{ text }`). `everyOf`: `AI_SOURCE_EVERY` (60) unless set, 15 at least; `widgetCheck`
 doesn't run one. The studio's Try/Turn on sheet shows its prompt and tools instead of the fetch. Its runs and an AI

@@ -624,7 +624,7 @@ export function extNames<T extends { id: string; action: string }>(ts: T[]): Map
   for (const t of ts) n.set(base(t), (n.get(base(t)) ?? 0) + 1)
   return new Map(ts.map(t => [base(t).length > 64 || n.get(base(t))! > 1 ? `${base(t).slice(0, 57)}_${createHash('sha256').update(`${t.id}.${t.action}`).digest('hex').slice(0, 6)}` : base(t), t]))
 }
-const extTools = async (): Promise<ExtTool[]> => ((await alive()) ? conn<ExtTool[]>('widgetTools').catch(() => []) : [])
+const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && (await alive()) ? conn<ExtTool[]>('widgetTools').catch(() => []) : []) // an extension's permission server: none
 
 // light what it looked at (Settings › General › Experimental › Laki AI's glow)
 const AI_LOOKS = ['screen', 'browse']
@@ -633,17 +633,17 @@ export const aiRpc = (rpc: Rpc): Rpc => (method, params, ms) => rpc(method, AI_L
 let daemon: Promise<unknown> | undefined
 const own = process.env.LAKI_AI === '1' ? aiRpc(conn) : conn // Laki AI's claude or codex runs this laki mcp
 // Laki AI's claude -p (LAKI_AI_PERM) asks through it (--permission-prompt-tool) before a tool it may not use unasked: the user's pick in
-// the chat, as claude wants it back
+// the chat, as claude wants it back. An extension's (LAKI_PERM_EXT, its id): the app's dialog, and only this tool here
 const permission: Tool = {
   name: 'laki_permission',
   description: "Laki's own: Claude Code asks the user through it before a tool it may not use unasked. Never call it yourself.",
   inputSchema: obj({ tool_name: str('the tool'), input: { type: 'object', description: 'its input' } }, ['tool_name']),
   run: async a => {
-    const r: { allow: boolean; message?: string } = await own('aiPermission', { tool: a.tool_name, input: a.input }, 300000)
+    const r: { allow: boolean; message?: string } = await own('aiPermission', { tool: a.tool_name, input: a.input, ext: process.env.LAKI_PERM_EXT || undefined }, 300000)
     return JSON.stringify(r.allow ? { behavior: 'allow', updatedInput: a.input ?? {} } : { behavior: 'deny', message: r.message ?? 'The user said no.' })
   },
 }
-const TOOLS = [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : []), ...(process.env.LAKI_AI_PERM === '1' ? [permission] : [])]
+const TOOLS = process.env.LAKI_PERM_EXT ? [permission] : [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : []), ...(process.env.LAKI_AI_PERM === '1' ? [permission] : [])]
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool && name.startsWith('ext_')) {

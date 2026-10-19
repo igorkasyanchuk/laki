@@ -7,6 +7,10 @@ version it builds, with the date. -->
 - My Desk's **Build with AI** is a dialog now: a text area, screenshots (paste, drop, attach, or take one) and text
   files; **Build it** opens the extension studio, where Laki AI builds it.
 - The floating **Laki AI** chat resizes from its edges and corners, and keeps its size.
+- An extension's AI agent asks in Laki before a tool it may not use (a Slack read, say): **Allow once**, **Always**
+  (its page lists them, with Revoke) or **Deny**, as a dialog and a notification.
+- Rename an extension from its page: click its name.
+- Thin, rounded scrollbars everywhere, Settings included.
 
 ## 0.20.0 · Oct 19, 2026
 

@@ -186,13 +186,13 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .remind-quick { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
 .remind-quick > button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* Send later's picks: an action's name */
 .side-scroll { flex: 1; overflow-y: auto; padding: 2px 0 8px; }
-/* its scrollbar: thin, no track, a faint rounded thumb, brighter under the mouse (a look's own, aqua's, wins; Chromium
-   doesn't repaint a thumb for the list's own :hover, so it isn't hidden until then) */
-/* the same on extensions: a Desk tile, the Desk itself, a full view, the sidebar's grid (their own pages: WIDGET_CSS) */
-:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
-:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-track, :is(.desk-body, .widget-full, .widgets, .widget-body)::-webkit-scrollbar-corner { background: transparent; }
-:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 14%, transparent); border-radius: 3px; }
-:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-thumb:hover, :is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-thumb:active { background: color-mix(in srgb, var(--fg) 32%, transparent); }
+/* every scrollbar but the terminal's (xterm measures its width once): no track, a rounded thumb inset in an 8px gutter,
+   faint, brighter under the mouse or held; a look's own (aqua's, pocket's) wins. Chromium doesn't repaint a thumb for its
+   scroller's own :hover, so it isn't hidden until then. An extension's page: WIDGET_CSS */
+:not(.xterm-viewport)::-webkit-scrollbar { width: 8px; height: 8px; background: transparent; }
+:not(.xterm-viewport)::-webkit-scrollbar-track, :not(.xterm-viewport)::-webkit-scrollbar-corner { background: transparent; }
+:not(.xterm-viewport)::-webkit-scrollbar-thumb { min-width: 28px; min-height: 28px; border: 1px solid transparent; border-radius: 999px; background: color-mix(in srgb, var(--fg) 16%, transparent) padding-box; }
+:not(.xterm-viewport)::-webkit-scrollbar-thumb:hover, :not(.xterm-viewport)::-webkit-scrollbar-thumb:active { background-color: color-mix(in srgb, var(--fg) 34%, transparent); }
 .side-foot { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; height: 34px; padding: 0 6px; border-top: 1px solid var(--line); overflow: hidden; }
 /* the foot in one row: App's fit drops the last data-bare buttons' words (Settings' first) until it fits */
 :is(.side-foot[data-bare='1'] > button:nth-last-of-type(-n + 1), .side-foot[data-bare='2'] > button:nth-last-of-type(-n + 2), .side-foot[data-bare='3'] > button:nth-last-of-type(-n + 3), .side-foot[data-bare='4'] > button:nth-last-of-type(-n + 4), .side-foot[data-bare='5'] > button:nth-last-of-type(-n + 5), .side-foot[data-bare='6'] > button:nth-last-of-type(-n + 6)).labeled { width: 24px; padding: 0; }
@@ -262,6 +262,9 @@ html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state
 .wc-head { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
 .wc-title { display: flex; flex-direction: column; gap: 2px; min-width: 0; flex: 1; }
 .wc-name { display: flex; align-items: center; gap: 8px; min-width: 0; } .wc-name b { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* its name as a field: the bold text until hovered (a faint box) or typed in (the input's own focus ring) */
+.wc-name-input { min-width: 0; max-width: 100%; margin: -3px 0 -3px -6px; padding: 2px 5px; border: 1px solid transparent; border-radius: var(--rs, 6px); background: transparent; color: var(--fg); font: inherit; font-size: 14px; font-weight: 700; text-overflow: ellipsis; }
+.wc-name-input:hover:not(:focus) { border-color: var(--line); cursor: text; }
 .wc-acts { display: flex; align-items: center; gap: 2px; margin-left: auto; }
 .wc-sep { width: 1px; height: 16px; margin: 0 4px; background: var(--line); }
 .wc-desc { margin-top: -6px; }

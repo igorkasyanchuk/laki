@@ -2,7 +2,7 @@
 // card (widgetSet source) or given by widget.json; JSON is its data, anything else { text }
 import { strict as assert } from 'node:assert'
 import { createServer } from 'node:http'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { fresh, until } from './helpers.ts'
@@ -136,6 +136,65 @@ test('an AI source: the agent of Settings › Extensions (or its own profile) an
   await rig.rpc('widgetSet', { id: 'slack', source: { kind: 'ai', prompt: 'x', tools: 'Bash(git log --oneline:*)' } })
   const check = await rig.cli('widget', 'check', 'slack')
   assert.match(check.out, /not run: an agent makes its data/)
+})
+
+test("an AI source's agent asks for a tool it may not use: the app's dialog; Always keeps it, Revoke asks again", async t => {
+  const rig = await fresh(t, { env: { LAKI_TOOL_WAIT: '3000' } })
+  const dir = join(rig.data, 'widgets', 'slack')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify({ name: 'Slack', source: { kind: 'ai', prompt: 'slackread #eng', tools: 'mcp__slack' }, sample: { text: 'x' }, ui: { type: 'text', value: '{{text}}|{{tools}}' } }))
+  await rig.rpc('widgetReload')
+  const shows = (re: RegExp) => until(async () => re.test(await rig.rpc('widgetRender', { id: 'slack' })), `shows ${re}`)
+  const idle = () => until(async () => !(await find(rig, 'slack')).running, 'done')
+  const app = await rig.connect()
+  const ask = (n: number) => until(() => app.events.filter((e: any) => e.ev === 'toolAsk')[n], `ask ${n}`)
+
+  await rig.rpc('widgetSet', { id: 'slack', on: true })
+  let q = await ask(0)
+  assert.equal(q.perm, 'mcp__claude_ai_Slack__slack_read_channel')
+  assert.deepEqual([q.widget, q.name, q.input], ['slack', 'Slack', { channel: 'eng' }])
+  const call = rig.fakeLog().filter((l: any) => l.bin === 'claude' && l.args.includes('--output-format')).pop()
+  assert.equal(JSON.parse(call.args[call.args.indexOf('--mcp-config') + 1]).mcpServers.laki_ask.env.LAKI_PERM_EXT, 'slack', 'beside the user’s own servers, not instead')
+  assert.ok(!call.args.includes('--strict-mcp-config'))
+  await rig.rpc('widgetToolAnswer', { req: q.req, allow: 'deny' })
+  await shows(/^[\s\S]*deny\|mcp__slack</)
+  await until(() => app.events.some((e: any) => e.ev === 'toolDone' && e.req === q.req), 'the dialogs close')
+
+  await idle()
+  let run = rig.rpc('widgetRun', { id: 'slack' }) // a run waits on the answer
+  q = await ask(1)
+  const late = await rig.connect() // a window opened (or reloaded) while it waits: shown there too
+  await until(() => late.events.some((e: any) => e.ev === 'toolAsk' && e.req === q.req), 'the waiting ask, sent to a new window')
+  await rig.rpc('widgetToolAnswer', { req: q.req, allow: 'always' })
+  await run
+  await shows(/allow\|mcp__slack</)
+  assert.deepEqual((await find(rig, 'slack')).allowed, ['mcp__claude_ai_Slack__slack_read_channel'])
+  await rig.rpc('widgetRun', { id: 'slack' })
+  await shows(/allowed\|mcp__slack,mcp__claude_ai_Slack__slack_read_channel</) // unasked now: in --allowedTools
+  assert.equal(app.events.filter((e: any) => e.ev === 'toolAsk').length, 2)
+
+  // Revoke (the page): asked again; an agent can't widen it
+  await assert.rejects(rig.rpc('widgetSet', { id: 'slack', allow: ['Bash'], agent: true }), /only you can change the tools/)
+  await rig.rpc('widgetSet', { id: 'slack', allow: [] })
+  assert.equal((await find(rig, 'slack')).allowed, undefined)
+  run = rig.rpc('widgetRun', { id: 'slack' })
+  await ask(2)
+  await run // no answer: a no
+  await shows(/>deny\|mcp__slack</)
+})
+
+test("an extension's name: written in its widget.json from the page; a built-in's and one file's aren't", async t => {
+  const rig = await fresh(t)
+  const dir = join(rig.data, 'widgets', 'notes')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'widget.json'), JSON.stringify({ name: 'Notes', source: { kind: 'static', text: '{"a":1}' }, ui: { type: 'text', value: '{{a}}' } }))
+  await rig.rpc('widgetReload')
+  assert.equal((await rig.rpc('widgetSet', { id: 'notes', name: '  My notes ' })).name, 'My notes')
+  assert.equal(JSON.parse(readFileSync(join(dir, 'widget.json'), 'utf8')).name, 'My notes')
+  assert.equal((await rig.rpc('widgetSet', { id: 'notes', name: '' })).name, 'notes', 'empty: its id')
+  assert.equal(JSON.parse(readFileSync(join(dir, 'widget.json'), 'utf8')).name, undefined)
+  await assert.rejects(rig.rpc('widgetSet', { id: 'notes', name: 'x'.repeat(61) }), /up to 60/)
+  await assert.rejects(rig.rpc('widgetSet', { id: 'links', name: 'Mine' }), /comes with Laki: Remix it/)
 })
 
 test("an agent's run stops: Resources' Stop, turned off, deleted; a stopped fetch keeps its last data", async t => {

@@ -900,6 +900,8 @@ export function App() {
   // the daemon connection
   const widgetSay = useRef<WidgetApi['say']>(undefined) // an extension's event handler's toast or dialog (widget-say)
   const toolAsk = useRef<(m: Msg) => void>(undefined) // an agent wants to run an extension's tool
+  const earlyAsks = useRef<Msg[]>([]) // ones that came before the view: asked once it's drawn (widgetAsks, as a window opens)
+  useEffect(() => void (toolAsk.current && earlyAsks.current.splice(0).forEach(m => toolAsk.current!(m))))
   useEffect(() => {
     const off = api.on(m => {
       if (m.ev === 'state') setView(m.view)
@@ -910,8 +912,8 @@ export function App() {
         if (viewRef.current?.settings.notify !== false && !document.hasFocus()) notify(w?.name ?? m.widget, m.notify, '', open, viewRef.current?.settings.notifySound) // looking at Laki: the toast is enough
         toast(`${w?.name ?? m.widget}: ${m.notify}`, open, 'Open')
       } else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
-      else if (m.ev === 'toolAsk') toolAsk.current?.(m)
-      else if (m.ev === 'toolDone') toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
+      else if (m.ev === 'toolAsk') toolAsk.current ? toolAsk.current(m) : earlyAsks.current.push(m)
+      else if (m.ev === 'toolDone') (earlyAsks.current = earlyAsks.current.filter(x => x.req !== m.req)), toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
       else if (m.ev === 'problem') setProblem(m.text)
       else if (m.ev === 'pin') (setPinAsk({ left: m.left }), setProblem(undefined)) // asked: a miss before it (the link's key alone) says nothing
       else if (m.ev === 'remote') {
@@ -1578,12 +1580,24 @@ export function App() {
   // an extension's tool an agent calls (widgetToolCall): what would run, asked here and as a notification; the first
   // answer counts (widgetToolAnswer), Esc denies. Always: in this workspace from now on, for a tool that asks first
   toolAsk.current = m => {
+    if (toolLine.has(m.req)) return // sent again as the socket came back (widgetAsks)
+    type Pick = { label: string; allow: 'once' | 'always' | 'deny' }
+    const answer = (allow: string) => void api.call('widgetToolAnswer', { req: m.req, allow }).catch(() => {})
+    if (typeof m.perm === 'string') {
+      // an extension's agent (its AI source or an AI action, claude -p) asking for a tool it may not use unasked: its
+      // input as lines, Always: in its runs from now on (its page lists them)
+      const tool = m.perm.replace(/^mcp__(.+?)__(.+)$/, '$2 ($1)')
+      const lines = Object.entries((m.input ?? {}) as Record<string, unknown>).map(([k, v]) => `${k}: ${(typeof v === 'string' ? v : JSON.stringify(v)).slice(0, 300)}`)
+      const title = `${m.name} wants to use ${tool}`
+      const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, { label: `Always for ${m.name}`, allow: 'always' }, { label: 'Deny', allow: 'deny' }]
+      notify(title, lines.join(' · ').slice(0, 200) || m.perm, '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
+      toolLine.add({ req: m.req, title, text: `${lines.length ? `${lines.join('\n')}\n\n` : ''}Its agent asks while it works in the background. Always: it uses ${m.perm} unasked from now on (Revoke on its page). Deny: it goes on without it.`, picks, answer })
+      return toolShow()
+    }
     const where = m.ws ? (view?.workspaces.find(w => w.id === m.ws)?.name ?? m.ws) : ''
     const title = `${m.agent || 'An agent'} wants to run ${m.name}: ${m.action}`
     const input = m.input && Object.keys(m.input).length ? `\n\nInput: ${JSON.stringify(m.input)}` : ''
-    type Pick = { label: string; allow: 'once' | 'always' | 'deny' }
     const picks: Pick[] = [{ label: 'Allow once', allow: 'once' }, ...(m.ask === 'first' ? [{ label: where ? `Always in ${where}` : 'Always', allow: 'always' } as Pick] : []), { label: 'Deny', allow: 'deny' }]
-    const answer = (allow: string) => void api.call('widgetToolAnswer', { req: m.req, allow }).catch(() => {})
     // its click: the window, this ask on screen (the one there back in line)
     notify(title, `${m.description}${where ? ` · ${where}` : ''}`, m.tab ?? '', () => toolLine.front(m.req) && toolShow(), settings.notifySound, picks.map(p => ({ text: p.label, tool: { req: m.req, allow: p.allow } })))
     toolLine.add({ req: m.req, title, text: `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks, answer })
