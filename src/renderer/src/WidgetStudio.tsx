@@ -3,13 +3,15 @@
 // on the left; on the right its preview on sample data (fixtures/sample.json through widgetMock) over the inspector's
 // Data, Runs, Check and Files. Nothing runs by itself: Try it live's sheet says what will, then runs its fetch once
 // (widgetRun once); Turn on shows the same, then turns it on. Undo (and a turn's Undo to here) puts a version back.
-// App.tsx lazy-loads it and passes Settings' WidgetsApi and the widgets' WidgetApi.
+// first: the Desk's Build with AI, its first ask, sent as it opens. App.tsx lazy-loads it and passes Settings'
+// WidgetsApi and the widgets' WidgetApi.
 import { useEffect, useRef, useState } from 'react'
 import { type AiMsg, placesOf, type WidgetView } from '../../shared/types'
 import type { UiProblem } from '../../shared/widgetUi'
 import { STARTER_KINDS, STARTERS } from '../../shared/widgetStarters'
 import { Message, Tools, turns } from './Ai'
 import { api as daemon, bridge } from './api'
+import type { DeskAsk } from './Desk'
 import { CELLS, Check, DeskTile, half, Inspector, WHERE } from './Extension'
 import { Modal } from './panels'
 import { type Img, PromptInput } from './PromptInput'
@@ -35,6 +37,7 @@ const SHOWN: [string, string][] = [
   ['desk', 'My Desk'],
 ]
 const same = (t: string) => t
+const started = new WeakSet<object>() // a first ask sent: never again as its dialog comes back (Back, a remount)
 
 // what will run, from its files: the fetch (or its script's text, or the one file), each action's command
 type Runs = { fetch?: string; script?: [string, string]; actions: [string, string][]; stream?: boolean }
@@ -48,7 +51,7 @@ function runsOf(files: Record<string, string>): Runs {
   return { fetch: typeof m.fetch === 'string' ? m.fetch : undefined, script: m.script ? [m.script, files[m.script] ?? '(not found)'] : one, actions: acts, stream: m.stream === true }
 }
 
-export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: string; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; back: string; onClose: () => void }) {
+export function WidgetStudio({ id, first, widgets, cfg, api, back, onClose }: { id: string; first?: DeskAsk; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; back: string; onClose: () => void }) {
   const [cur, setCur] = useState(id)
   const w = (x => x && inWs(x, null))(widgets.find(x => x.id === cur)) // a per-workspace one: no workspace here, its sample's made-up one
   const mine = !!w && !w.builtin && !!cfg.home && w.dir === `${cfg.home}/${w.id}`
@@ -88,13 +91,13 @@ export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: str
     return () => void (on = false)
   }, [w?.id, w?.rev])
   const errors = problems.filter(p => p.level === 'error').length
-  // an ask: a new one's id from its first words; one of yours, Laki AI may rewrite (widgetSet ai: its hour's leave)
-  const ask = async (text: string, images: string[] = []) => {
+  // an ask: a new one's id from its first words (named: from those); one of yours, Laki AI may rewrite (widgetSet ai: its hour's leave)
+  const ask = async (text: string, images: string[] = [], named = text) => {
     setOops('')
     try {
       let at = cur
       if (!at) {
-        at = (await daemon.call<{ id: string }>('widgetSlug', { text })).id
+        at = (await daemon.call<{ id: string }>('widgetSlug', { text: named })).id
         setCur(at)
       }
       if (mine) await cfg.set(at, { ai: true })
@@ -162,7 +165,7 @@ export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: str
       }
     >
       <div className="studio">
-        <StudioChat chat={chat} w={w} mine={mine} ask={ask} undo={undo} err={oops} />
+        <StudioChat chat={chat} w={w} mine={mine} ask={ask} undo={undo} err={oops} first={cur === id ? first : undefined} />
         <div className="studio-main">
           {w ? (
             <>
@@ -201,7 +204,7 @@ export function WidgetStudio({ id, widgets, cfg, api, back, onClose }: { id: str
 
 // the chat: the thread (a turn's tools folded, with Undo to here once something was written after it), the composer;
 // empty: the starters and three examples
-function StudioChat({ chat, w, mine, ask, undo, err }: { chat: string; w?: WidgetView; mine: boolean; ask: (text: string, images?: string[]) => Promise<boolean>; undo: (after?: number) => void; err: string }) {
+function StudioChat({ chat, w, mine, ask, undo, err, first }: { chat: string; w?: WidgetView; mine: boolean; ask: (text: string, images?: string[], named?: string) => Promise<boolean>; undo: (after?: number) => void; err: string; first?: DeskAsk }) {
   const [d, setD] = useState<ChatData>()
   const [text, setText] = useState('')
   const [images, setImages] = useState<Img[]>([])
@@ -222,10 +225,16 @@ function StudioChat({ chat, w, mine, ask, undo, err }: { chat: string; w?: Widge
     if (el) el.scrollTop = el.scrollHeight
   }, [d?.chat.length, d?.busy])
   const busy = asking || !!d?.busy
-  const go = (t: string, imgs: string[] = []) => {
+  const go = (t: string, imgs: string[] = [], named?: string) => {
     setAsking(true)
-    return ask(t, imgs).finally(() => setAsking(false))
+    return ask(t, imgs, named).finally(() => setAsking(false))
   }
+  // the Desk's ask, once: back in the box when it fails (no key, Laki AI busy elsewhere), to send again
+  useEffect(() => {
+    if (!first || started.has(first)) return
+    started.add(first)
+    void go(first.text, first.images.map(i => i.path), first.want).then(ok => ok || (setText(first.text), setImages(first.images)))
+  }, [])
   const send = () => {
     if (saving || busy || (!text.trim() && !images.length)) return
     const sent = { text, images }

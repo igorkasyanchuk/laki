@@ -180,13 +180,8 @@ ${examples()}
 `
 
 // how Laki AI makes one (ai.ts' SYSTEM: questions first); desk: the Desk's Build with Laki AI, so not where it sits
-const howMake = (desk?: boolean) =>
-  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from (a command, a file, a URL, or text I type), ${desk ? '' : "where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), "}what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (its ui from the UI kit, with a sample in widget.json: its preview).${desk ? ' It goes on my Desk: "place": "desk" in widget.json, a tile there.' : ''} It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
-
-// the Desk's Build with Laki AI: the ask the floating chat gets
-export const widgetAsk = (want: string, desk?: boolean) => `Make me a Laki extension: ${want.trim()}
-
-${howMake(desk)}`
+const howMake = () =>
+  `Before you write anything, ask me at least 2 questions about it, one at a time with laki_ask (each with options to tap): what it shows and where its data comes from (a command, a file, a URL, or text I type), where it sits (the sidebar, the top bar, the status bar, or a button on the rail or in the sidebar's foot), what a click does, how often it refreshes. Then make it: laki_extension_guide, an example with laki_extension_read, laki_extension_write (its ui from the UI kit, with a sample in widget.json: its preview). It's saved off; I look at it and turn it on. Then I may ask for changes: write it again under the same id.`
 
 // the Extension page's Laki AI (its chat beside the preview and settings): where the user is, with each ask, for the
 // model. w: the one open there (mine: in Laki's folder, so it may rewrite it: widgetSet ai); none: New extension

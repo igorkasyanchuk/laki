@@ -33,6 +33,7 @@ contextBridge.exposeInMainWorld('laki', {
   onNewPrompt: (cb: (prompt: string) => void) => ipcRenderer.on('new-prompt', (_e, p: string) => cb(p)), // the new-workspace window's
   fitNew: (height: number) => ipcRenderer.send('new-fit', height), // its height: what the page needs
   capture: (webContentsId: number): Promise<string> => ipcRenderer.invoke('capture', webContentsId), // the preview's PNG, base64
+  shoot: (): Promise<string | null> => ipcRenderer.invoke('shoot'), // a part of the screen, a PNG in base64 (null: cancelled)
   captureRect: (r: { x: number; y: number; width: number; height: number }): Promise<string> => ipcRenderer.invoke('capture-rect', r), // the app window's own, a PNG in base64: the element picker's
   // the menu bar's screenshot (a PNG, base64, drawn on) and its note: to a new workspace's prompt
   onShot: (cb: (png: string, note?: string) => void) => {

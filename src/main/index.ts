@@ -859,7 +859,8 @@ if (!mac) app.on('browser-window-blur', () => setTimeout(() => setFront(own(Brow
 // the menu bar's screenshots: macOS's screencapture (a part: drag, or Space and a click for a window; Esc cancels; a
 // screen: its rectangle, -R in the same global points as Electron's bounds; none: the main one), then the editor window
 // (annotate) to draw on it, then the new-workspace page with it. Needs Screen Recording for Laki (macOS asks once).
-function screenshot(part: boolean, on?: Electron.Rectangle) {
+// then: where the picture goes (the editor, unless a prompt asked for it: shoot); none: cancelled
+function screenshot(part: boolean, on?: Electron.Rectangle, then: (png: string) => void = annotate, none = () => {}) {
   const file = join(tmpdir(), `laki-shot-${process.pid}-${Date.now()}.png`)
   const what = part ? ['-i'] : on ? [`-R${on.x},${on.y},${on.width},${on.height}`] : ['-m']
   shooting = true
@@ -872,10 +873,10 @@ function screenshot(part: boolean, on?: Electron.Rectangle) {
       try {
         png = readFileSync(file).toString('base64')
       } catch {
-        return // cancelled, or no permission: no file
+        return none() // cancelled, or no permission: no file
       }
       rmSync(file, { force: true })
-      annotate(png)
+      then(png)
     }), 250)
 }
 
@@ -976,6 +977,8 @@ ipcMain.handle('capture-rect', async (e, r: { x: unknown; y: unknown; width: unk
   if (!width || !height) throw new Error('nothing to capture')
   return (await win.webContents.capturePage({ x, y, width, height })).toPNG().toString('base64')
 })
+// a part of the screen for a prompt (the Desk's Build with AI): screenshot's, the PNG back in base64; null: cancelled
+ipcMain.handle('shoot', e => (!win || e.sender !== win.webContents ? null : new Promise<string | null>(done => screenshot(true, undefined, done, () => done(null)))))
 ipcMain.on('open-external', (_e, url: string) => {
   if (/^https?:\/\//.test(url)) shell.openExternal(url)
   else if (typeof url === 'string' && url.startsWith('laki:')) openLink(url) // the AI window's link to a tab: the app window, there

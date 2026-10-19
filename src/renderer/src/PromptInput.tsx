@@ -41,6 +41,7 @@ export function PromptInput(p: {
   send?: ReactNode // the toolbar's last button
   focus?: boolean // false: not focused as it mounts (its page focuses it, without scrolling)
   inserts?: { label: string; sub?: string; run: () => Promise<string | undefined> }[] // extensions' actions (show prompt): what one prints goes in at the cursor
+  files?: (fs: File[]) => void // other files too (attached, pasted, dropped): the caller's (none: images only)
 }) {
   const box = useRef<HTMLTextAreaElement>(null)
   const [err, setErr] = useState('')
@@ -80,23 +81,19 @@ export function PromptInput(p: {
     }
     p.onBusy?.(--saving.current > 0)
   }
-  const images = (l: DataTransferItemList | FileList) =>
-    Array.from(l as ArrayLike<DataTransferItem | File>)
-      .map(x => (x instanceof File ? x : x.kind === 'file' ? x.getAsFile() : null))
-      .filter((f): f is File => !!f && f.type.startsWith('image/'))
-  const paste = (e: ClipboardEvent) => {
-    const fs = images(e.clipboardData.items)
-    if (!fs.length) return // text pastes as usual
-    e.preventDefault()
-    add(fs)
+  const filesOf = (l: DataTransferItemList | FileList) => Array.from(l as ArrayLike<DataTransferItem | File>).map(x => (x instanceof File ? x : x.kind === 'file' ? x.getAsFile() : null)).filter((f): f is File => !!f)
+  // images to the daemon, other files to the caller's files (none: left out); false: nothing taken
+  const take = (l: DataTransferItemList | FileList) => {
+    const fs = filesOf(l)
+    const imgs = fs.filter(f => f.type.startsWith('image/'))
+    const rest = p.files ? fs.filter(f => !f.type.startsWith('image/')) : []
+    if (imgs.length) add(imgs)
+    if (rest.length) p.files!(rest)
+    return imgs.length + rest.length > 0
   }
+  const paste = (e: ClipboardEvent) => take(e.clipboardData.items) && e.preventDefault() // text pastes as usual
   // handled here: the default prevented tells the window's own drop (folders become projects) to keep out
-  const drop = (e: DragEvent) => {
-    const fs = images(e.dataTransfer.files)
-    if (!fs.length) return
-    e.preventDefault()
-    add(fs)
-  }
+  const drop = (e: DragEvent) => take(e.dataTransfer.files) && e.preventDefault()
   const mic = (cloud || p.dictate) && (
     <span className="mic-split">
       <button
@@ -165,9 +162,9 @@ export function PromptInput(p: {
         </div>
       )}
       <div className="prompt-tools">
-        <label className="ib" data-tip="Attach images (or paste or drop them in)">
+        <label className="ib" data-tip={p.files ? 'Attach images or files (or paste or drop them in)' : 'Attach images (or paste or drop them in)'}>
           <Icon name="plus" />
-          <input type="file" accept="image/*" multiple hidden onChange={e => (add(images(e.target.files!)), (e.target.value = ''))} />
+          <input type="file" accept={p.files ? undefined : 'image/*'} multiple hidden onChange={e => (take(e.target.files!), (e.target.value = ''))} />
         </label>
         {p.lead}
         {!p.lead && mic}

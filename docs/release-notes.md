@@ -2,6 +2,12 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- My Desk's **Build with AI** is a dialog now: a text area, screenshots (paste, drop, attach, or take one) and text
+  files; **Build it** opens the extension studio, where Laki AI builds it.
+- The floating **Laki AI** chat resizes from its edges and corners, and keeps its size.
+
 ## 0.20.0 · Oct 19, 2026
 
 - Fixes: **Always in this chat** stays with its chat when you open an earlier one; a note's pin and color follow a

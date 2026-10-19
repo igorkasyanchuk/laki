@@ -1111,8 +1111,9 @@ right click moves or removes it (its tiles go to the first tab) or gives it an i
 type or paste an emoji; *No icon*). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
 there; *Add* puts an extension on the tab you're on.
 
-**Build with AI** (with Laki AI on) asks what it should show, then hands it to Laki AI's floating chat: it asks a few
-questions and writes the extension for My Desk. It shows as a tile right away, dashed, with its made-up data and
+**Build with AI** (with Laki AI on) opens a dialog: say what it should show, add screenshots (paste, drop, + or the
+crop button: a part of the screen) and text files, then *Build it*: the extension studio opens and Laki AI writes the
+extension for My Desk. It shows as a tile right away, dashed, with its made-up data and
 *By Laki AI · off*: *Look* opens its page (what it runs, its settings), *Turn on* runs it. Ask the chat for changes
 and the tile follows; *Take it off My Desk* in a tile's ⋯ removes it.
 

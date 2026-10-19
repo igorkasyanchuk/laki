@@ -1,19 +1,24 @@
 // Desk (experimental, settings.desk; the rail's Desk, ⌘K): the extensions placed there (a place like the sidebar, and
 // any number of places at once) as tiles on a page of their own, each with its full view when it has one: an overview
 // of what's going on. Drag a tile's head to move it (onto a tab: to that tab), its corner to resize it; the order, sizes
-// and tabs are settings.deskTiles and deskTabs (none: one tab, Desk; laki.deskTab: the one shown). Build with Laki AI asks the floating chat for one placed here: it shows as a tile with its sample
-// data, off until you turn it on. App.tsx passes a DeskApi.
+// and tabs are settings.deskTiles and deskTabs (none: one tab, Desk; laki.deskTab: the one shown). Build with AI's dialog
+// (DeskBuild: what it should show, screenshots, files) opens the extension studio on it: Laki AI asks, then writes one
+// placed here, a tile with its sample data, off until you turn it on. App.tsx passes a DeskApi.
 import { type DragEvent, type PointerEvent as ReactPointerEvent, useEffect, useRef, useState } from 'react'
 import { ICONS, type IconName } from '../../shared/icons'
 import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
+import { api as daemon, bridge } from './api'
+import { Modal } from './panels'
+import { type Img, PromptInput } from './PromptInput'
 import { Icon, IconButton, isIconName, type MenuItem, ON, Page, useMenu } from './ui'
 import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export type DeskApi = WidgetApi & {
   place(id: string, places: WidgetPlace[], on?: boolean): Promise<unknown> // its places (and on: turned on with it)
   save(o: { tiles?: DeskTile[]; tabs?: DeskTab[] }): void // the tiles' order, sizes and tabs, the tabs: saved at once
-  build?: (want: string) => void // Build with Laki AI: the floating chat asked to make one for the Desk (unset: Laki AI is off)
+  build?: (a: DeskAsk) => void // Build with AI: the extension studio, its first ask this (unset: Laki AI is off)
 }
+export type DeskAsk = { want: string; text: string; images: Img[] } // what's wanted (its id's words), the ask, its screenshots
 const GAP = 10 // px between tiles, as styles.css' .desk-grid
 // a tile: placed on the Desk and on, or made there by Laki AI (off until you look: its sample shows)
 export const onDesk = (w: WidgetView) => placesOf(w).includes('desk') && (w.on || !!w.byAi)
@@ -59,8 +64,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
   const tabOf = (t: DeskTile) => (t.tab && tabList.some(x => x.id === t.tab) ? t.tab : tabList[0].id)
   const [naming, setNaming] = useState<string | null>(null) // the tab whose name is being typed
   const [over, setOver] = useState<string | null>(null) // the tab a tile is dragged over
-  const [want, setWant] = useState<string | null>(null) // Build with Laki AI's box, open
-  const build = () => api.build && want?.trim() && (api.build(want.trim()), setWant(null))
+  const [building, setBuilding] = useState(false) // Build with AI's dialog
   const here = widgets.filter(onDesk)
   // the saved order first, then any placed here since (DESK_TILE); gone ones dropped
   const tiles: DeskTile[] = [...mine.filter(t => here.some(w => w.id === t.id)), ...here.filter(w => !mine.some(t => t.id === w.id)).map(w => ({ id: w.id, ...DESK_TILE }))]
@@ -210,7 +214,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       { head: addable.length ? 'Put an extension on My Desk' : 'Every extension is here' },
       ...addable.map(w => ({ label: w.name, sub: w.description?.slice(0, 80), icon: 'plus', run: () => (save([...tiles.filter(t => t.id !== w.id), { id: w.id, ...(mine.find(t => t.id === w.id) ?? DESK_TILE), tab }]), void api.place(w.id, w.on ? [...placesOf(w), 'desk'] : ['desk'], true).catch(() => {})) }) as MenuItem), // on this tab
       null,
-      ...(api.build ? [{ label: 'Build one with Laki AI…', icon: 'ai', run: () => setWant('') } as MenuItem] : []),
+      ...(api.build ? [{ label: 'Build one with Laki AI…', icon: 'ai', run: () => setBuilding(true) } as MenuItem] : []),
       { label: 'Extensions in Settings…', icon: 'settings', run: () => api.settings() },
     ])
   const tileMenu = (e: React.MouseEvent, w: WidgetView) =>
@@ -240,7 +244,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
         <>
           {(ws => ws.length > 0 && <IconButton icon="refresh" title="Fetch this tab's now" onClick={() => ws.forEach(w => void api.run(w.id, w.here ?? undefined).catch(() => {}))} />)(here.filter(w => shown.some(t => t.id === w.id) && w.on && w.every !== undefined && w.here !== null))}
           {api.build && (
-            <button type="button" className={want !== null ? 'on' : ''} onClick={() => setWant(w => (w === null ? '' : null))}>
+            <button type="button" onClick={() => setBuilding(true)}>
               <Icon name="ai" size={12} /> Build with AI
             </button>
           )}
@@ -251,16 +255,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       }
     >
       {menu}
-      {want !== null && (
-        <form className="desk-build" onSubmit={e => (e.preventDefault(), build())}>
-          <Icon name="ai" />
-          <input autoFocus value={want} onChange={e => setWant(e.target.value)} onKeyDown={e => e.key === 'Escape' && (e.preventDefault(), setWant(null))} placeholder="What should it show? e.g. my open Sentry issues, by count" />
-          <button type="submit" className="primary" disabled={!want.trim()}>
-            Build it
-          </button>
-          <span className="muted small">Laki AI asks a few questions in its chat, then puts it here with made-up data: off until you turn it on. Ask it for changes until you like it.</span>
-        </form>
-      )}
+      {building && api.build && <DeskBuild onBuild={a => (setBuilding(false), api.build!(a))} onClose={() => setBuilding(false)} />}
       {(here.length > 0 || savedTabs.length > 0) && (
         <div className="desk-tabs" role="tablist" aria-label="Desk tabs">
           {tabList.map(t =>
@@ -301,8 +296,8 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
             <button type="button" className="primary" onClick={addMenu}>
               <Icon name="plus" size={12} /> Add an extension
             </button>
-            {api.build && want === null && (
-              <button type="button" onClick={() => setWant('')}>
+            {api.build && (
+              <button type="button" onClick={() => setBuilding(true)}>
                 <Icon name="ai" size={12} /> Build one with Laki AI
               </button>
             )}
@@ -351,5 +346,96 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
         </div>
       )}
     </Page>
+  )
+}
+
+// Build with AI: what it should show and where from, with screenshots (pasted, dropped, attached, or taken: a part of
+// the screen) and files (text: each goes in the ask, cut at FILE_MAX); Build it opens the extension studio on it
+const FILE_MAX = 20_000 // characters of a file in the ask
+const FILE_BYTES = 1_000_000 // a file bigger than this isn't read
+const fence = (t: string) => '`'.repeat(Math.max(3, ...[...t.matchAll(/`+/g)].map(m => m[0].length + 1))) // longer than any run of backticks in it
+export const deskAsk = (want: string, files: { name: string; text: string }[]) =>
+  [want.trim(), 'It goes on my Desk ("place": "desk"): a tile there.', ...files.map(f => (c => `Attached: ${f.name}\n${fence(c)}\n${c}\n${fence(c)}`)(f.text.length > FILE_MAX ? `${f.text.slice(0, FILE_MAX)}\n… (cut: ${f.text.length} characters in all)` : f.text))].join('\n\n')
+
+function DeskBuild({ onBuild, onClose }: { onBuild: (a: DeskAsk) => void; onClose: () => void }) {
+  const [text, setText] = useState('')
+  const [images, setImages] = useState<Img[]>([])
+  const [files, setFiles] = useState<{ name: string; text: string }[]>([])
+  const [saving, setSaving] = useState(false)
+  const [err, setErr] = useState('')
+  const save = (data: string, ext: string) => daemon.call<string>('imageSave', { data, ext })
+  const attach = async (fs: File[]) => {
+    setErr('')
+    for (const f of fs) {
+      const t = f.size > FILE_BYTES ? null : await f.text().catch(() => null)
+      if (t === null || t.includes('\u0000')) setErr(`${f.name}: ${t === null ? 'over 1 MB' : 'not a text file'}; screenshots and text files only`)
+      else setFiles(x => [...x.filter(y => y.name !== f.name), { name: f.name, text: t }])
+    }
+  }
+  const shoot = async () => {
+    setErr('')
+    try {
+      const png = await bridge!.shoot!()
+      if (!png) return // cancelled
+      const path = await save(png, 'png')
+      setImages(x => [...x, { path, url: `data:image/png;base64,${png}` }])
+    } catch (e) {
+      setErr(`The screenshot: ${(e as Error).message}`)
+    }
+  }
+  const ok = !saving && !!text.trim()
+  const build = () => ok && onBuild({ want: text.trim(), text: deskAsk(text, files), images })
+  return (
+    <Modal title="Build an extension with Laki AI" wide onClose={onClose}>
+      <form className="form desk-build" onSubmit={e => (e.preventDefault(), build())}>
+        <div className="nw-card nw-composer">
+          <PromptInput
+            value={text}
+            onChange={setText}
+            images={images}
+            onImages={setImages}
+            save={save}
+            files={fs => void attach(fs)}
+            dictate={bridge?.dictate}
+            dictationSettings={bridge?.dictationSettings}
+            onSubmit={build}
+            onBusy={setSaving}
+            rows={7}
+            placeholder={'What should it show, and where does it come from? e.g. the PRs posted in Slack’s #general-squad-3 and #engr-prs, each with its review state, since the last run.\n\nPaste or drop screenshots and files here.'}
+            tools={
+              bridge?.shoot && (
+                <button type="button" className="ib" aria-label="Take a screenshot" data-tip="Take a screenshot: drag over a part of the screen (Space, then a click: a window)" onClick={() => void shoot()}>
+                  <Icon name="crop" />
+                </button>
+              )
+            }
+          />
+        </div>
+        {files.length > 0 && (
+          <div className="desk-files" aria-label="Attached files">
+            {files.map(f => (
+              <span key={f.name} className="tag" data-tip={`${f.text.length.toLocaleString()} characters${f.text.length > FILE_MAX ? `: the first ${FILE_MAX.toLocaleString()} go` : ''}`}>
+                <Icon name="file" size={11} /> {f.name}
+                <button type="button" className="link" aria-label={`Remove ${f.name}`} onClick={() => setFiles(x => x.filter(y => y !== f))}>
+                  ×
+                </button>
+              </span>
+            ))}
+          </div>
+        )}
+        {err && <p className="warn small">{err}</p>}
+        <p className="muted small">The extension studio opens with it: Laki AI asks a few questions, then puts it on My Desk with made-up data, off until you turn it on. Ask it for changes there until you like it.</p>
+        <div className="buttons">
+          <span className="muted small">⌘⏎</span>
+          <span className="spacer" />
+          <button type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button type="submit" className="primary" disabled={!ok}>
+            <Icon name="ai" size={12} /> Build it
+          </button>
+        </div>
+      </form>
+    </Modal>
   )
 }

@@ -11,7 +11,7 @@ import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, Setti
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
 import { CalendarPage } from './Calendar'
-import { DeskPage, onDesk } from './Desk'
+import { type DeskAsk, DeskPage, onDesk } from './Desk'
 import { VoiceBar, withImages } from './PromptInput'
 import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
@@ -20,7 +20,6 @@ import { UiKitPage } from './UiKit'
 import { Glyph as ExtGlyph, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetPanel, WidgetStrip } from './Widgets'
 import type { WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
-import { widgetAsk } from '../../shared/widgetGuide'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
@@ -52,15 +51,19 @@ function PeekGlow({ tab, onDone }: { tab?: string; onDone: () => void }) {
   const on = !!r?.width && !!r.height && [[0.5, 0.5], [0.1, 0.1], [0.9, 0.1], [0.1, 0.9], [0.9, 0.9]].some(([fx, fy]) => at(r.left + r.width * fx, r.top + r.height * fy))
   return <div className={`ai-peek ${on ? '' : 'whole'}`} style={on ? { left: r!.left, top: r!.top, width: r!.width, height: r!.height } : undefined} onAnimationEnd={e => e.animationName === 'ai-peek' && onDone()} aria-hidden />
 }
-// the floating Laki AI chat, dragged by its head (not its buttons) anywhere over the main area; where it was left is
-// laki.aiFloatAt (right and bottom, px), held inside the area as it changes size; a double-click on the head puts it back
+// the floating Laki AI chat, dragged by its head (not its buttons) anywhere over the main area, resized by its edges and
+// corners; where it was left is laki.aiFloatAt (right and bottom, px), held inside the area as it changes size, and its
+// size laki.aiFloatSize (CSS keeps it inside the area); a double-click on the head puts both back
 type FloatAt = { right: number; bottom: number }
+type FloatSize = { width: number; height: number }
+const GRIPS = ['t', 'b', 'l', 'r', 'tl', 'tr', 'bl', 'br']
 function AiFloat({ children }: { children: ReactNode }) {
   const box = useRef<HTMLDivElement>(null)
   const [at, setAt] = useState<FloatAt | null>(() => load<FloatAt | null>('laki.aiFloatAt', null))
-  const atRef = useRef(at)
-  atRef.current = at
-  const [moving, setMoving] = useState(false)
+  const [size, setSize] = useState<FloatSize | null>(() => load<FloatSize | null>('laki.aiFloatSize', null))
+  const now = useRef({ at, size })
+  now.current = { at, size }
+  const [moving, setMoving] = useState('') // moving, or sizing-<grip>: the cursor everywhere meanwhile
   // 8px inside its area at least, so its head stays in reach
   const fit = (p: FloatAt): FloatAt => {
     const el = box.current
@@ -80,29 +83,51 @@ function AiFloat({ children }: { children: ReactNode }) {
     const t = e.target as Element
     return !!t.closest('.ai-win-head') && !t.closest('button, a, input, select, textarea')
   }
-  const down = (e: React.PointerEvent) => {
-    if (e.button !== 0 || !head(e) || !box.current?.offsetParent) return
+  // a drag: its moves and release come here even over a frame or outside the window; then where it is, and its size, kept
+  const track = (e: React.PointerEvent, how: string, move: (m: PointerEvent, area: DOMRect, r: DOMRect) => void) => {
+    const el = box.current
+    if (e.button !== 0 || !el?.offsetParent) return
     e.preventDefault() // no text selected on the way
-    box.current.setPointerCapture(e.pointerId) // its moves and release come here even over a frame or outside the window
-    const area = (box.current.offsetParent as HTMLElement).getBoundingClientRect()
-    const r = box.current.getBoundingClientRect()
-    const from = { x: e.clientX, y: e.clientY, right: area.right - r.right, bottom: area.bottom - r.bottom }
-    const move = (m: PointerEvent) => (setMoving(true), setAt(fit({ right: from.right - (m.clientX - from.x), bottom: from.bottom - (m.clientY - from.y) })))
+    e.stopPropagation()
+    el.setPointerCapture(e.pointerId)
+    const area = (el.offsetParent as HTMLElement).getBoundingClientRect()
+    const r = el.getBoundingClientRect()
+    const go = (m: PointerEvent) => (setMoving(how), move(m, area, r))
     const up = () => {
-      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointermove', go)
       window.removeEventListener('pointerup', up)
       window.removeEventListener('pointercancel', up)
-      setMoving(false)
-      if (atRef.current) store('laki.aiFloatAt', atRef.current)
+      setMoving('')
+      if (now.current.at) store('laki.aiFloatAt', now.current.at)
+      if (now.current.size) store('laki.aiFloatSize', now.current.size)
     }
-    window.addEventListener('pointermove', move)
+    window.addEventListener('pointermove', go)
     window.addEventListener('pointerup', up)
     window.addEventListener('pointercancel', up)
   }
-  const reset = (e: React.MouseEvent) => head(e) && (setAt(null), store('laki.aiFloatAt', undefined))
+  const onHead = useRef(false) // the press was on the head: a double-click's target is the box itself (the pointer was captured)
+  const down = (e: React.PointerEvent) =>
+    (onHead.current = head(e)) &&
+    track(e, 'moving', (m, area, r) => setAt(fit({ right: area.right - r.right - (m.clientX - e.clientX), bottom: area.bottom - r.bottom - (m.clientY - e.clientY) })))
+  // an edge or a corner: its far side stays where it is
+  const grab = (e: React.PointerEvent, g: string) =>
+    (onHead.current = false) ||
+    track(e, `sizing-${g}`, (m, area, r) => {
+      const dx = m.clientX - e.clientX
+      const dy = m.clientY - e.clientY
+      const keep = (v: number, lo: number, hi: number) => Math.round(Math.max(lo, Math.min(v, hi)))
+      const w = g.includes('l') ? keep(r.width - dx, 320, r.right - area.left - 8) : g.includes('r') ? keep(r.width + dx, 320, area.right - r.left - 8) : r.width
+      const h = g.includes('t') ? keep(r.height - dy, 280, r.bottom - area.top - 8) : g.includes('b') ? keep(r.height + dy, 280, area.bottom - r.top - 8) : r.height
+      setSize({ width: Math.round(w), height: Math.round(h) })
+      if (g.includes('r') || g.includes('b')) setAt({ right: Math.round(area.right - r.right - (g.includes('r') ? w - r.width : 0)), bottom: Math.round(area.bottom - r.bottom - (g.includes('b') ? h - r.height : 0)) })
+    })
+  const reset = () => onHead.current && (setAt(null), setSize(null), store('laki.aiFloatAt', undefined), store('laki.aiFloatSize', undefined))
   return (
-    <div ref={box} className={`ai-float ${moving ? 'moving' : ''}`} style={at ?? undefined} onPointerDown={down} onDoubleClick={reset}>
+    <div ref={box} className={`ai-float ${moving}`} style={{ ...at, ...size }} onPointerDown={down} onDoubleClick={reset}>
       {children}
+      {GRIPS.map(g => (
+        <div key={g} className={`ai-grip ${g}`} onPointerDown={e => grab(e, g)} aria-hidden />
+      ))}
     </div>
   )
 }
@@ -138,7 +163,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -3147,7 +3172,7 @@ export function App() {
         ))(extOf(dialog))}
         {(s => s && (
           <Suspense fallback={<Waiting title="Extension studio" onClose={() => setDialog(s.back ?? null)} />}>
-            <WidgetStudio key={s.studio || 'new'} id={s.studio} widgets={view.widgets ?? []} cfg={extCfg} api={widgetApi} back={backWord(s.back)} onClose={() => setDialog(s.back ?? null)} />
+            <WidgetStudio key={s.studio || 'new'} id={s.studio} first={s.first} widgets={view.widgets ?? []} cfg={extCfg} api={widgetApi} back={backWord(s.back)} onClose={() => setDialog(s.back ?? null)} />
           </Suspense>
         ))(settings.ai?.on ? studioOf(dialog) : undefined)}
         {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}
@@ -3163,7 +3188,7 @@ export function App() {
             api={{
               ...widgetApi,
               place: (id, place, on) => call('widgetSet', { id, place, ...(on !== undefined && { on }) }),
-              build: settings.ai?.on ? want => (settings.ai?.float === false ? setDialog('ai') : setAiFloat(true), void api.call('aiAsk', { text: widgetAsk(want, true) }).catch(fail)) : undefined, // the floating chat: questions, then it writes it; the Desk shows it
+              build: settings.ai?.on ? first => setDialog({ studio: '', back: 'desk', first }) : undefined, // the studio, its first ask Build with AI's: it writes one placed on the Desk
               save: o => void call('settingsSet', { ...(o.tiles && { deskTiles: o.tiles }), ...(o.tabs && { deskTabs: o.tabs }) }).catch(() => {}),
             }}
             onClose={() => setDialog(null)}

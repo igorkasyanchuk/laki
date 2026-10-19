@@ -1431,7 +1431,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       the workspace (the click: its first tab) and toasts *Open*; one due while the app was closed rings as it opens.
     - `laki.previewSize`: Preview's size (`{ w, h }`, null: the panel's).
     - `laki.aiFloatAt`: where the floating Laki AI chat was dragged (App's `AiFloat`: `right` and `bottom` in px, held
-      8px inside the main area as it changes size; a double-click on its head drops it).
+      8px inside the main area as it changes size; a double-click on its head drops it and the size); `laki.aiFloatSize`:
+      its size, from its edges and corners (`.ai-grip`s; the window clips, so they reach past the round corners).
     - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
     - `laki.newDraft`: the new-workspace page's draft (`Draft`: the form, images, race, template), saved as it changes
       while something's typed, dropped as it's made (back if that fails) or *Clear*ed; `laki.scheduleDraft`: Scheduled
@@ -1794,8 +1795,10 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   capture at the next move, no pointerup) all bring, or the window's blur or Esc: the size kept); a tile shows the full view when there is
   one (`WidgetBody` `full`), else the preview; Add: the others, turned on with `desk` added; *Take it off*: its only
   place goes to `side`, off. Laki AI's off ones placed here show too (`byAi`), dashed, with their sample and
-  `.desk-off` (*Look*: its page, *Turn on*). *Build with AI* (`DeskApi.build`, App: the floating chat, or the AI page
-  with `ai.float` false; `widgetAsk(want, true)`: `place: desk`); `whereNow` names the Desk's tiles by id. `pending`
+  `.desk-off` (*Look*: its page, *Turn on*). *Build with AI* (`DeskBuild`, a `Modal`: `PromptInput` with `files`, text files
+  inlined by `deskAsk` (`FILE_MAX`), a screenshot through main's `shoot` IPC (`screenshot` with `then`); `DeskApi.build`:
+  App's `{ studio: '', back: 'desk', first }`, the studio's `StudioChat` sends `first` once (`started`), back in the box
+  if it fails); `whereNow` names the Desk's tiles by id. `pending`
   (and `pendingTabs`): the tiles and tabs just saved (`DeskApi.save`, one `settingsSet`), shown until the settings
   bring them back.
 - **`Picker.tsx`**: development mode's element picker (the rail's *Pick*, `data-rail="picker"`, else the side head's

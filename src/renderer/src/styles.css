@@ -1516,6 +1516,13 @@ html.away .ai-float { animation-play-state: running !important; } /* paused at i
 .ai-float .ai-win-head { cursor: grab; } /* App's AiFloat: dragged by its head */
 .ai-float .ai-win-head :is(button, a) { cursor: pointer; }
 .ai-float.moving, .ai-float.moving * { cursor: grabbing !important; user-select: none; }
+.ai-float { max-width: calc(100% - 16px); max-height: calc(100% - 16px); overflow: visible; } /* a size of its own (App's AiFloat) stays inside the area; its window clips, so the grips reach past the round corners */
+.ai-float > .ai-window { overflow: hidden; border-radius: calc(var(--rs, 12px) + 3px); }
+.ai-grip { position: absolute; z-index: 3; } /* App's AiFloat: its edges and corners resize it */
+.ai-grip.t, .ai-grip.b { left: 12px; right: 12px; height: 8px; cursor: ns-resize; } .ai-grip.t { top: -4px; } .ai-grip.b { bottom: -4px; }
+.ai-grip.l, .ai-grip.r { top: 12px; bottom: 12px; width: 8px; cursor: ew-resize; } .ai-grip.l { left: -4px; } .ai-grip.r { right: -4px; }
+.ai-grip:is(.tl, .tr, .bl, .br) { width: 16px; height: 16px; } .ai-grip.tl { top: -5px; left: -5px; cursor: nwse-resize; } .ai-grip.br { right: -5px; bottom: -5px; cursor: nwse-resize; } .ai-grip.tr { top: -5px; right: -5px; cursor: nesw-resize; } .ai-grip.bl { bottom: -5px; left: -5px; cursor: nesw-resize; }
+.ai-float[class*='sizing-'], .ai-float[class*='sizing-'] * { user-select: none; } .ai-float:is(.sizing-t, .sizing-b) * { cursor: ns-resize !important; } .ai-float:is(.sizing-l, .sizing-r) * { cursor: ew-resize !important; } .ai-float:is(.sizing-tl, .sizing-br) * { cursor: nwse-resize !important; } .ai-float:is(.sizing-tr, .sizing-bl) * { cursor: nesw-resize !important; }
 @media (prefers-reduced-motion: reduce) { .ai-fab, .ai-window::before { transition: none; } .ai-float, .ai-shimmer, .ai-window .ai-mark::after { animation: none; } }
 /* Laki AI's glow (experimental): what it looked at, lit once by a turning rainbow edge and a soft inner light */
 @property --peek-a { syntax: '<angle>'; inherits: false; initial-value: 0deg; }
@@ -2245,10 +2252,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .narrow .studio-chat { border-right: none; border-bottom: 1px solid var(--line); }
 
 /* the Desk's Build with Laki AI, and a tile Laki AI made: off, with its sample, until you look */
-.page-body > .desk-build { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0 0 14px; padding: 10px 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line)); border-radius: calc(var(--rs, 8px) + 2px); background: color-mix(in srgb, var(--accent) 6%, var(--panel)); }
-.desk-build > svg { color: var(--accent-ink); }
-.desk-build > input { flex: 1; min-width: 220px; }
-.desk-build > .small { flex-basis: 100%; }
+.desk-build .nw-composer { margin: 0; }
+.desk-files { display: flex; flex-wrap: wrap; gap: 6px; } .desk-files .tag { display: inline-flex; align-items: center; gap: 5px; } .desk-files .link { padding: 0 2px; line-height: 1; }
 .desk-tile.off { border-style: dashed; }
 .desk-tile.off .desk-body { opacity: 0.85; }
 .ext-desk-spot { flex-basis: 100%; display: flex; flex-direction: column; gap: 4px; min-width: 0; } .ext-desk { width: min(100%, 560px); height: 340px; } .ext-desk .desk-head { cursor: default; }
