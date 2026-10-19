@@ -1508,7 +1508,7 @@ export function App() {
       if (s.toast) done(s.toast)
       const m = s.modal
       if (m)
-        void choose(m.title, m.text, m.buttons).then(i => {
+        void choose(m.title, m.text, m.buttons.map(b => ({ label: b.label, primary: b.style === 'primary', danger: b.style === 'danger' }))).then(i => {
           const b = m.buttons[i]
           if (b?.run) void widgetApi.action(id, b.run, b.arg ?? '', b.label, ws)
           else if (b?.open && /^laki:\/\//i.test(b.open)) setLink(b.open)

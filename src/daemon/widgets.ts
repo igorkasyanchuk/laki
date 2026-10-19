@@ -1117,7 +1117,7 @@ export async function widgetAction(o: { id: string; action: string; arg?: string
     } else if (!ai && fetches(w) && live) soon({ id: w.id, reason: /^[\w.-]{1,40}$/.test(o.action) ? `action:${o.action}` : 'manual', ws: x?.id }) // fetching already: once more after it
     // into the prompt: its JSON's insert, else (insert: true) all it printed, an agent's words too
     const insert = typeof j?.insert === 'string' ? j.insert : actionMenu(o.action, def)?.insert && !j ? out.trim() : undefined
-    const say = (j && sayOf(j)) ?? (ai && insert === undefined && !(j && 'data' in j) ? { modal: { title: `${w.m.name || w.id} · ${o.action}`, text: out.trim().slice(0, 2000), buttons: [{ label: 'OK', primary: true }] } } : undefined) // an agent's words: a dialog
+    const say = (j && sayOf(j)) ?? (ai && insert === undefined && !(j && 'data' in j) ? { modal: { title: `${w.m.name || w.id} · ${o.action}`, text: out.trim().slice(0, 2000), buttons: [{ label: 'OK', style: 'primary' as const }] } } : undefined) // an agent's words: a dialog
     return { ok: true, ...(say ?? { out: lastLine(out) }), ...(ev?.full && { stdout: out }), ...(insert !== undefined && { insert: insert.slice(0, INSERT_MAX) }) }
   } catch (e) {
     const f = e as Failed
@@ -1227,7 +1227,7 @@ async function handle(id: string, j: Job) {
       if (!r.ok) wLog(w, `event ${j.name}: not fetched: ${r.error}`)
     } else {
       const r = await widgetAction({ id, action: j.h, ws: j.ws }, `event:${j.name}`, ev)
-      if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: id, ws: j.ws, toast: r.toast, modal: r.modal })
+      if (r.ok && (r.toast || r.modal || r.close)) broadcast({ ev: 'widget-say', widget: id, ws: j.ws, toast: r.toast, modal: r.modal, close: r.close })
     }
   } finally {
     rmSync(file, { force: true })
@@ -1424,7 +1424,7 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
   const why = `${ws || 'no workspace'}${from.tab ? `/${from.tab}` : ''}${from.agent ? ` (${from.agent})` : ''}, allowed ${how}`
   if (ws) devLog(`ws:${ws}`, `${w.m.name || w.id}: tool ${o.action} (${why})`)
   const r = await widgetAction({ id: w.id, action: o.action, arg: JSON.stringify(input), ws: x?.id }, `tool:${o.action}`, { env, stdin: JSON.stringify(input), why, full: true })
-  if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: w.id, ws: x?.id, toast: r.toast, modal: r.modal })
+  if (r.ok && (r.toast || r.modal || r.close)) broadcast({ ev: 'widget-say', widget: w.id, ws: x?.id, toast: r.toast, modal: r.modal, close: r.close })
   const output = (r.stdout ?? '').slice(0, TOOL_OUT)
   return r.ok ? { ok: true, output } : { ok: false, output, error: r.error }
 }
@@ -1514,7 +1514,7 @@ export async function widgetUse(o: { id: string; action?: string; arg?: string; 
   const ws = scoped(w) ? wsOf(w, o.ws)?.id : undefined
   if (o.action) {
     const r = await widgetAction({ id: w.id, action: o.action, arg: o.arg, ws })
-    if (r.ok && (r.toast || r.modal)) broadcast({ ev: 'widget-say', widget: w.id, ws, toast: r.toast, modal: r.modal })
+    if (r.ok && (r.toast || r.modal || r.close)) broadcast({ ev: 'widget-say', widget: w.id, ws, toast: r.toast, modal: r.modal, close: r.close })
     return { ok: r.ok, error: r.error, name, out: r.out }
   }
   if (streaming(w)) return { ok: true, name, data: dataOf(w).data } // its live line: a run would restart it

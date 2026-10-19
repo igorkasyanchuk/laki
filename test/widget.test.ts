@@ -8,9 +8,9 @@ import { fresh, type Rig, until } from './helpers.ts'
 test('widget toasts and modals: sayOf keeps what the app can show', () => {
   assert.equal(sayOf(null), null)
   assert.equal(sayOf({ toast: '  ' }), null, 'nothing to show')
-  assert.deepEqual(sayOf({ toast: 'hi', modal: { text: 'x' } }), { toast: 'hi', modal: { title: '', text: 'x', buttons: [{ label: 'OK', primary: true }] } }, 'no buttons: OK')
-  const m = sayOf({ modal: { title: 'T', buttons: [...Array(6)].map((_, i) => ({ label: `b${i}`, open: i ? 'laki://ws/a' : 'file:///etc', primary: 'yes' })) } })!.modal!
-  assert.equal(m.buttons.length, 4, 'four at most')
+  assert.deepEqual(sayOf({ toast: 'hi', modal: { text: 'x' } }), { toast: 'hi', modal: { title: '', text: 'x', buttons: [{ label: 'OK', style: 'primary' }] } }, 'no buttons: OK')
+  const m = sayOf({ modal: { title: 'T', buttons: [...Array(8)].map((_, i) => ({ label: `b${i}`, open: i ? 'laki://ws/a' : 'file:///etc', primary: 'yes' })) } })!.modal!
+  assert.equal(m.buttons.length, 6, 'six at most')
   assert.deepEqual(m.buttons.slice(0, 2), [{ label: 'b0' }, { label: 'b1', open: 'laki://ws/a' }])
   assert.equal(sayOf({ modal: { title: 'T', buttons: [{ label: 'Go', run: 'open', arg: 42 }] } })!.modal!.buttons[0].arg, '42', 'a number as its text')
   assert.match(pageOf('', {}), /toast: text => say/)

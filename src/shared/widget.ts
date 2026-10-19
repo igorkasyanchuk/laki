@@ -505,12 +505,24 @@ button.danger { color: var(--error, #f7768e); } button.sm { padding: 1px 7px; fo
 .empty { color: var(--muted, #7a8294); text-align: center; padding: 10px; }
 ${UI_CSS}`
 
-// what a widget asks the app to show (`laki.toast`, `laki.modal` in a JS widget's page, or an action that prints it
-// as JSON): a toast, bottom right, and a dialog with buttons, each running one of its actions (arg), opening a link
-// (http(s), mailto, laki://) or only closing it; none: OK. Anything else is dropped.
-export type WidgetButton = { label: string; run?: string; arg?: string; open?: string; primary?: boolean }
-export type WidgetSay = { toast?: string; modal?: { title: string; text?: string; buttons: WidgetButton[] } }
+// what a widget asks the app to show (`laki.toast`, `laki.modal`, `laki.close` in a JS widget's page, or an action that
+// prints it as JSON): a toast, bottom right, and a dialog: its words, a UI kit element drawn over its own data (its
+// buttons run the extension's actions), and up to 6 buttons, each running one of its actions (arg), opening a link
+// (http(s), mailto, laki://) or only closing it (style primary, danger or quiet; close false: it stays, 'done': once
+// the action is done); none: OK, [] none. An id: a later dialog with it is drawn in its place; close (true, or that
+// id) closes it. Anything else is dropped.
+export type WidgetButton = { label: string; run?: string; arg?: string; open?: string; style?: 'primary' | 'danger' | 'quiet'; close?: false | 'done' }
+export type SayModal = { id?: string; title: string; text?: string; ui?: Record<string, unknown>; data?: unknown; size?: 's' | 'm' | 'l'; buttons: WidgetButton[] }
+export type WidgetSay = { toast?: string; modal?: SayModal; close?: true | string }
 const text = (v: unknown, max: number) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : undefined)
+const fits = (v: unknown, max: number) => {
+  try {
+    return JSON.stringify(v).length <= max
+  } catch {
+    return false
+  }
+}
+const STYLES = ['primary', 'danger', 'quiet']
 export function sayOf(x: unknown): WidgetSay | null {
   if (!x || typeof x !== 'object' || Array.isArray(x)) return null
   const o = x as Record<string, unknown>
@@ -518,10 +530,15 @@ export function sayOf(x: unknown): WidgetSay | null {
   const m = o.modal && typeof o.modal === 'object' && !Array.isArray(o.modal) ? (o.modal as Record<string, unknown>) : undefined
   const buttons = (Array.isArray(m?.buttons) ? m.buttons : [])
     .filter((b): b is Record<string, unknown> => !!b && typeof b === 'object' && !!text(b.label, 40))
-    .slice(0, 4)
-    .map(b => ({ label: text(b.label, 40)!, run: text(b.run, 100), arg: typeof b.arg === 'string' || typeof b.arg === 'number' ? String(b.arg).slice(0, 2000) : undefined, open: [text(b.open, 2000)].find(u => u && /^(https?:|mailto:|laki:\/\/)/i.test(u)), primary: b.primary === true || undefined }))
-  const modal = m && (text(m.title, 120) || text(m.text, 2000)) ? { title: text(m.title, 120) ?? '', text: text(m.text, 2000), buttons: buttons.length ? buttons : [{ label: 'OK', primary: true }] } : undefined
-  return toast || modal ? JSON.parse(JSON.stringify({ toast, modal })) : null // without the undefined fields
+    .slice(0, 6)
+    .map(b => ({ label: text(b.label, 40)!, run: text(b.run, 100), arg: typeof b.arg === 'string' || typeof b.arg === 'number' ? String(b.arg).slice(0, 2000) : undefined, open: [text(b.open, 2000)].find(u => u && /^(https?:|mailto:|laki:\/\/)/i.test(u)), style: STYLES.includes(String(b.style)) ? b.style : b.primary === true ? 'primary' : undefined, close: b.close === false ? false : b.close === 'done' ? 'done' : undefined }))
+  const ui = m && m.ui && typeof m.ui === 'object' && !Array.isArray(m.ui) && typeof (m.ui as Record<string, unknown>).type === 'string' && fits(m.ui, 64_000) ? m.ui : undefined
+  const none = Array.isArray(m?.buttons) && !m.buttons.length // [] : no buttons, the ✕ and Esc close it
+  const modal = m && (text(m.title, 120) || text(m.text, 2000) || ui)
+    ? { id: text(m.id, 60), title: text(m.title, 120) ?? '', text: text(m.text, 2000), ui, data: ui && m.data !== undefined && fits(m.data, 512_000) ? m.data : undefined, size: ['s', 'm', 'l'].includes(String(m.size)) ? m.size : undefined, buttons: buttons.length || none ? buttons : [{ label: 'OK', style: 'primary' }] }
+    : undefined
+  const close = o.close === true ? true : text(o.close, 60)
+  return toast || modal || close ? JSON.parse(JSON.stringify({ toast, modal, close })) : null // without the undefined fields
 }
 
 // what a click in a widget does, for a template widget's shadow root (Widgets.tsx) and a JS page (pageOf embeds it as
