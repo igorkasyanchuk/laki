@@ -17,8 +17,8 @@ import { ProjectPage, type ProjectTab } from './Project'
 import { BirdPage } from './Bird'
 import { BoardPage } from './Board'
 import { UiKitPage } from './UiKit'
-import { Glyph as ExtGlyph, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetPanel, WidgetStrip } from './Widgets'
-import type { WidgetSay } from '../../shared/widget'
+import { Glyph as ExtGlyph, inWs, RowMarks, type WidgetApi, WidgetButtons, WidgetDialog, WidgetGrid, WidgetModal, WidgetPanel, WidgetStrip } from './Widgets'
+import type { SayModal, WidgetSay } from '../../shared/widget'
 import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
 import { type ExtTab, ExtensionPage } from './Extension'
@@ -899,6 +899,8 @@ export function App() {
 
   // the daemon connection
   const widgetSay = useRef<WidgetApi['say']>(undefined) // an extension's event handler's toast or dialog (widget-say)
+  const [extModal, setExtModal] = useState<{ wid: string; ws?: string; m: SayModal; n: number } | null>(null) // an extension's own dialog (WidgetModal); n: its key, kept by a say with its id
+  const extN = useRef(0)
   const toolAsk = useRef<(m: Msg) => void>(undefined) // an agent wants to run an extension's tool
   const earlyAsks = useRef<Msg[]>([]) // ones that came before the view: asked once it's drawn (widgetAsks, as a window opens)
   useEffect(() => void (toolAsk.current && earlyAsks.current.splice(0).forEach(m => toolAsk.current!(m))))
@@ -911,7 +913,7 @@ export function App() {
         const open = () => setDialog(w?.full ? { widget: m.widget } : { extension: m.widget })
         if (viewRef.current?.settings.notify !== false && !document.hasFocus()) notify(w?.name ?? m.widget, m.notify, '', open, viewRef.current?.settings.notifySound) // looking at Laki: the toast is enough
         toast(`${w?.name ?? m.widget}: ${m.notify}`, open, 'Open')
-      } else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal }, m.ws)
+      } else if (m.ev === 'widget-say') widgetSay.current?.(m.widget, { toast: m.toast, modal: m.modal, close: m.close }, m.ws)
       else if (m.ev === 'toolAsk') toolAsk.current ? toolAsk.current(m) : earlyAsks.current.push(m)
       else if (m.ev === 'toolDone') (earlyAsks.current = earlyAsks.current.filter(x => x.req !== m.req)), toolLine.drop(m.req) && toolOn === m.req && unchoose(m.req) // answered elsewhere: out of line
       else if (m.ev === 'problem') setProblem(m.text)
@@ -1500,19 +1502,19 @@ export function App() {
       clearTimeout(noteTimer.current)
       setNote({ text: `${what}…`, busy: true }) // something is happening, until it says what
       return api.call<{ ok: boolean; out?: string; error?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
-        r => (!r.ok ? (toast(`${what} failed: ${r.error}`), false as const) : r.toast || r.modal ? (setNote(null), widgetApi.say(id, r, ws)) : done(r.out || `${what}: done`)),
+        r => (!r.ok ? (toast(`${what} failed: ${r.error}`), false as const) : r.toast || r.modal || r.close ? (setNote(null), widgetApi.say(id, r, ws)) : done(r.out || `${what}: done`)),
         e => (toast(`${what} failed: ${(e as Error).message}`), false as const), // false: the kit's slider, pick or box goes back
       )
     },
+    // a toast; a close (true: its dialog, else the one with that id) before a dialog: one with the shown one's id is
+    // drawn in its place, any other replaces it
     say: (id, s, ws) => {
       if (s.toast) done(s.toast)
-      const m = s.modal
-      if (m)
-        void choose(m.title, m.text, m.buttons.map(b => ({ label: b.label, primary: b.style === 'primary', danger: b.style === 'danger' }))).then(i => {
-          const b = m.buttons[i]
-          if (b?.run) void widgetApi.action(id, b.run, b.arg ?? '', b.label, ws)
-          else if (b?.open && /^laki:\/\//i.test(b.open)) setLink(b.open)
-          else if (b?.open) openExternal(b.open)
+      if (s.close || s.modal)
+        setExtModal(x => {
+          const cur = x && x.wid === id && (s.close === true || (s.close && x.m.id === s.close)) ? null : x
+          if (!s.modal) return cur
+          return { wid: id, ws, m: s.modal, n: cur?.wid === id && s.modal.id && cur.m.id === s.modal.id ? cur.n : ++extN.current }
         })
     },
     do: (w, c, label) => widgetDo(w, c, label),
@@ -3169,6 +3171,7 @@ export function App() {
             />
           ))(sharing ? byId(sharing) : undefined)}
         {(w => w && <WidgetDialog w={w} api={widgetApi} onClose={() => setDialog(dialog && typeof dialog === 'object' && 'widget' in dialog ? (dialog.back ?? null) : null)} />)(dialog && typeof dialog === 'object' && 'widget' in dialog ? shownWidgets.find(x => x.id === dialog.widget) : undefined)}
+        {(w => w && extModal && <WidgetModal key={extModal.n} w={w} ws={extModal.ws} m={extModal.m} api={widgetApi} onClose={m => setExtModal(x => (!m || x?.m === m ? null : x))} />)(extModal ? view.widgets?.find(x => x.id === extModal.wid) : undefined)}
         {(e => e && (
           <ExtensionPage
             key={e.extension}

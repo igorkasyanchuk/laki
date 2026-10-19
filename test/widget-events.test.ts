@@ -24,7 +24,7 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
     name: 'Events',
     fetch: 'printf \'{"n": "%s"}\' "$LAKI_REFRESH_REASON"',
     on: { 'turn.done': 'got', 'turn.waiting': 'refresh' },
-    actions: { got: `cat > "${home}/got.json"; cp "$LAKI_EVENT_FILE" "${home}/file.json"; printf '{"data": {"said": "%s"}, "toast": "seen"}' "$LAKI_EVENT"` },
+    actions: { got: `cat > "${home}/got.json"; cp "$LAKI_EVENT_FILE" "${home}/file.json"; printf '{"data": {"said": "%s"}, "toast": "seen", "close": "prog"}' "$LAKI_EVENT"` },
   })
   make(rig, 'mine', { name: 'Mine', scope: 'workspace', fetch: 'echo "{}"', on: { 'turn.done': 'mark' }, actions: { mark: `touch "${home}/mark-$LAKI_WORKSPACE"` } })
   make(rig, 'slow', { name: 'Slow', on: { 'turn.done': 'q' }, actions: { q: `sleep 0.3; cat >> "${home}/q.log"; echo >> "${home}/q.log"` } })
@@ -48,7 +48,7 @@ test('events: a turn runs a handler with the event on stdin, its data and toast;
   assert.deepEqual([got.ws.id, got.ws.branch, got.tab.id, got.tab.agent], [a.id, a.branch, ta.id, 'claude'])
   assert.deepEqual(JSON.parse(readFileSync(join(home, 'file.json'), 'utf8')), got)
   assert.deepEqual(await until(() => dataOf(rig, 'ev').then(d => d?.said && d)), { said: 'turn.done' })
-  await until(() => app.events.find(e => e.ev === 'widget-say' && e.widget === 'ev' && e.toast === 'seen'), "the toast, to the app's window")
+  await until(() => app.events.find(e => e.ev === 'widget-say' && e.widget === 'ev' && e.toast === 'seen' && e.close === 'prog'), "the toast and the close, to the app's window")
   const runs = (await rig.rpc('widgetRuns', { id: 'ev' })).runs
   assert.equal(runs.find((r: any) => r.action === 'got').reason, 'event:turn.done')
   // per workspace: only its own workspace's, in that instance

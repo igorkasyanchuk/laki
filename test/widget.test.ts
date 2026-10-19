@@ -13,7 +13,18 @@ test('widget toasts and modals: sayOf keeps what the app can show', () => {
   assert.equal(m.buttons.length, 6, 'six at most')
   assert.deepEqual(m.buttons.slice(0, 2), [{ label: 'b0' }, { label: 'b1', open: 'laki://ws/a' }])
   assert.equal(sayOf({ modal: { title: 'T', buttons: [{ label: 'Go', run: 'open', arg: 42 }] } })!.modal!.buttons[0].arg, '42', 'a number as its text')
+  // a rich one: an id, a kit element over its own data, a size, styles and when a button closes it
+  const ui = { type: 'table', each: 'rows', columns: [{ value: '{{n}}' }] }
+  assert.deepEqual(sayOf({ modal: { id: 'deploy', ui, data: { rows: [{ n: 1 }] }, size: 'l', buttons: [{ label: 'A', style: 'danger', close: false }, { label: 'B', run: 'go', close: 'done' }, { label: 'C', style: 'loud', close: 'yes' }] } }), { modal: { id: 'deploy', title: '', ui, data: { rows: [{ n: 1 }] }, size: 'l', buttons: [{ label: 'A', style: 'danger', close: false }, { label: 'B', run: 'go', close: 'done' }, { label: 'C' }] } })
+  assert.equal(sayOf({ modal: { title: 'T', ui: { rows: [] }, data: 1, size: 'xl' } })!.modal!.ui, undefined, 'a ui without a type: dropped, and its data and an unknown size with it')
+  assert.deepEqual(sayOf({ modal: { title: 'T', ui: { type: 'stat', big: 'x'.repeat(70_000) } } }), { modal: { title: 'T', buttons: [{ label: 'OK', style: 'primary' }] } }, 'a ui over 64 KB: dropped')
+  assert.deepEqual(sayOf({ modal: { title: 'T', buttons: [] } })!.modal!.buttons, [], '[]: no buttons, the ✕ only')
+  assert.equal(sayOf({ modal: { ui: { type: 'stat', value: '1' } } })!.modal!.title, '', 'a ui alone is a dialog')
+  assert.deepEqual(sayOf({ close: true }), { close: true })
+  assert.deepEqual(sayOf({ close: 'deploy', modal: { id: 'next', title: 'Next' } }), { close: 'deploy', modal: { id: 'next', title: 'Next', buttons: [{ label: 'OK', style: 'primary' }] } }, 'a close and a modal together')
+  assert.equal(sayOf({ close: false }), null)
   assert.match(pageOf('', {}), /toast: text => say/)
+  assert.match(pageOf('', {}), /close: id => say\(\{ laki: 'say', close: id === undefined \? true : String\(id\) \}\)/)
 })
 
 test('widget templates: values escaped, each, if, unless, helpers, views', () => {
@@ -225,7 +236,7 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   widget(
     rig,
     'js',
-    { name: 'JS', script: 'fetch.mjs', config: { step: '2' }, actions: { say: 'echo "got $WIDGET_ARG" > said.txt; echo said it', ls: '"$LAKI_CLI" ls --json | head -c 1', fail: 'exit 1', logged: `echo working; echo '{"toast":"after a log line"}'`, tell: `echo '{"toast":"started","modal":{"title":"Done","buttons":[{"label":"Bad","open":"javascript:alert(1)"},{"label":"Again","run":"say","arg":"x"}]}}'` } },
+    { name: 'JS', script: 'fetch.mjs', config: { step: '2' }, actions: { say: 'echo "got $WIDGET_ARG" > said.txt; echo said it', ls: '"$LAKI_CLI" ls --json | head -c 1', fail: 'exit 1', logged: `echo working; echo '{"toast":"after a log line"}'`, tell: `echo '{"toast":"started","modal":{"title":"Done","buttons":[{"label":"Bad","open":"javascript:alert(1)"},{"label":"Again","run":"say","arg":"x"}]}}'`, shut: `echo '{"close":"deploy"}'` } },
     '<template preview><b id="n"></b><script>document.getElementById("n").textContent = laki.data.n</script></template>',
     { 'fetch.mjs': 'export default ({ config, last }) => ({ n: (last?.n ?? 0) + Number(config.step), end: "</script>" })' },
   )
@@ -264,6 +275,7 @@ test('widgets: a JS fetch script, a JS page served sandboxed, actions', async t 
   assert.deepEqual(await rig.rpc('widgetAction', { id: 'js', action: 'logged' }), { ok: true, toast: 'after a log line' }, 'JSON on the last line')
   assert.equal((await rig.cli('widget', 'action', 'js', 'logged')).out.trim(), 'after a log line', 'the CLI says what the app would')
   assert.deepEqual(await rig.rpc('widgetAction', { id: 'js', action: 'tell' }), { ok: true, toast: 'started', modal: { title: 'Done', buttons: [{ label: 'Bad' }, { label: 'Again', run: 'say', arg: 'x' }] } })
+  assert.deepEqual(await rig.rpc('widgetAction', { id: 'js', action: 'shut' }), { ok: true, close: 'deploy' }, 'a close alone')
   assert.match((await rig.rpc('widgetAction', { id: 'js', action: 'constructor' })).error, /has no action constructor/)
 
   // a script that throws: its message, not node's trailer

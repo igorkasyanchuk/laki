@@ -357,9 +357,36 @@ A JS page gets the kit too: `await laki.ui(spec, data)` gives its HTML, `await l
 ### Buttons and actions
 
 `<button data-run="review" data-arg="{{url}}">` runs `actions.review` with `$WIDGET_ARG`; then the extension fetches
-again. What the action prints as JSON can say more: `{"data": …}` ([its data](#an-actions-data), no fetch then), `{"toast": "Done"}`, or `{"modal": {"title", "text", "buttons"}}`
-(up to 4 buttons, each `run`ning another action, `open`ing an http(s), mailto or `laki://` link, or closing).
-`data-laki="refresh"` fetches again.
+again. What the action prints as JSON can say more: `{"data": …}` ([its data](#an-actions-data), no fetch then), `{"toast": "Done"}`, or `{"modal": …}`
+([a dialog](#dialogs)). `data-laki="refresh"` fetches again.
+
+### Dialogs
+
+An action's `{"modal": …}` (or a JS page's `laki.modal(…)`) opens a dialog of the extension's own:
+
+```json
+{"modal": {
+  "id": "deploy", "title": "Deploy to staging?", "text": "3 commits since the last one.", "size": "m",
+  "ui": {"type": "table", "each": "commits", "columns": [{"title": "Commit", "value": "{{sha}}", "mono": true}, {"title": "", "value": "{{title}}"}]},
+  "data": {"commits": [{"sha": "a1b2c3", "title": "Fix login"}]},
+  "buttons": [
+    {"label": "Cancel", "style": "quiet"},
+    {"label": "Dry run", "run": "deploy", "arg": "dry", "close": false},
+    {"label": "Deploy", "run": "deploy", "style": "primary", "close": "done"}
+  ]
+}}
+```
+
+- `title`, `text`: its words. `ui` and `data`: a [UI kit](#the-ui-kit-ui) element drawn over its own data (64 KB and
+  512 KB at most), its buttons, toggles and fields running the extension's actions as in its full view. `size`: `s`,
+  `m` (with a `ui`) or `l`.
+- `buttons`: 6 at most, each `run`ning an action (`arg`), `open`ing an http(s), mailto or `laki://` link, or only
+  closing it; `style`: `primary` (Enter), `danger` or `quiet`. A button closes the dialog first; `"close": false`
+  keeps it open while its action runs, `"close": "done"` closes it once the action is done (not when it failed).
+  None given: OK; `[]`: none, only ✕ and Esc.
+- `id`: a later `modal` with the same id is drawn in its place, so an action can update the dialog it was run from
+  (a progress, the next step). `{"close": "deploy"}` closes that one, `{"close": true}` any of the extension's own;
+  a `close` and a `modal` together close first. A JS page's `laki.close(id?)` does the same.
 
 An action can be an agent instead of a command: `"draft": { "ai": "Draft a short reply to {{arg}}", "tools":
 "mcp__slack__post_message" }`. Its prompt gets `{{arg}}`, the settings (`{{config.x}}`), the data's fields and the
@@ -387,7 +414,7 @@ A `widget.html` with a `<script>` is a JS extension: a page of its own in a sand
 | `open(url)` | a link, in the browser |
 | `expand()` | the full view |
 | `run(action, arg)` | one of its actions |
-| `toast(text)`, `modal({ title, text, buttons })` | as an action's JSON |
+| `toast(text)`, `modal({ title, text, ui, data, buttons })`, `close(id?)` | as an action's JSON ([dialogs](#dialogs)) |
 | `ui(spec, data?)`, `mount(el, spec, data?)` | the UI kit's HTML for an element, or put in `el` (both promises) |
 
 These work right after a click in the page. By default the page has no network: everything inline, its data from its

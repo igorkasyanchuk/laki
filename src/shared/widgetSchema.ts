@@ -219,7 +219,8 @@ ${fields(BUTTON)}
 ${UI_TYPES.map(t => `/** ${UI[t].blurb} */\ninterface Ui_${t} extends UiCommon {\n  type: '${t}'\n${fields(UI[t].props)}\n}`).join('\n')}
 type UiElement = ${UI_TYPES.map(t => `Ui_${t}`).join(' | ')}
 type UiSpec = UiElement | { preview?: UiElement; full?: UiElement }
-type LakiModal = { title: string; text?: string; buttons?: { label: string; run?: string; arg?: string; open?: string }[] }
+/** a dialog: its words, a UI kit element over its own data, up to 6 buttons; id: a later one with it is drawn in its place */
+type LakiModal = { id?: string; title?: string; text?: string; ui?: UiElement; data?: unknown; size?: 's' | 'm' | 'l'; buttons?: { label: string; run?: string; arg?: string; open?: string; style?: 'primary' | 'danger' | 'quiet'; /** false: open while its action runs; 'done': closed once it's done; unset: closed first */ close?: false | 'done' }[] }
 interface Laki {
   /** what its fetch printed last */
   data: any
@@ -243,6 +244,8 @@ interface Laki {
   do(cmd: { do: 'new' | 'send' | 'ai' | 'terminal' | 'browse'; prompt?: string; command?: string; url?: string; agent?: string; project?: string }, label?: string): void
   toast(text: string): void
   modal(m: LakiModal): void
+  /** close its dialog: the one with that id, else any of its own */
+  close(id?: string): void
   /** the UI kit's HTML for an element, filled from data (else the page's) */
   ui(spec: UiSpec, data?: unknown): Promise<string>
   /** the UI kit's element put in el, its buttons, links, filters and tabs working */
