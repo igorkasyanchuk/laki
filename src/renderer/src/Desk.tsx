@@ -18,7 +18,7 @@ const GAP = 10 // px between tiles, as styles.css' .desk-grid
 // a tile: placed on the Desk and on, or made there by Laki AI (off until you look: its sample shows)
 export const onDesk = (w: WidgetView) => placesOf(w).includes('desk') && (w.on || !!w.byAi)
 const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n))
-const MAIN: DeskTab = { id: 'main', name: 'Desk' } // the one tab while none are set
+const MAIN: DeskTab = { id: 'main', name: 'My Desk' } // the one tab while none are set
 const TAB_KEY = 'laki.deskTab'
 const ICON_NAMES = Object.keys(ICONS) as IconName[] // a tab's icon picker: each by its words (arrowLeft: arrow left), for the filter
 // a tab's icon may be an emoji instead, typed or pasted into the picker's box (a flag, a keycap, a ZWJ sequence)
@@ -207,7 +207,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
   const addable = widgets.filter(w => !here.includes(w))
   const addMenu = (e: React.MouseEvent) =>
     openMenu(e, [
-      { head: addable.length ? 'Put an extension on the Desk' : 'Every extension is here' },
+      { head: addable.length ? 'Put an extension on My Desk' : 'Every extension is here' },
       ...addable.map(w => ({ label: w.name, sub: w.description?.slice(0, 80), icon: 'plus', run: () => (save([...tiles.filter(t => t.id !== w.id), { id: w.id, ...(mine.find(t => t.id === w.id) ?? DESK_TILE), tab }]), void api.place(w.id, w.on ? [...placesOf(w), 'desk'] : ['desk'], true).catch(() => {})) }) as MenuItem), // on this tab
       null,
       ...(api.build ? [{ label: 'Build one with Laki AI…', icon: 'ai', run: () => setWant('') } as MenuItem] : []),
@@ -217,7 +217,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     openMenu(e, [
       ...(w.on && w.every !== undefined && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh', run: () => void api.run(w.id, w.here ?? undefined).catch(() => {}) } as MenuItem] : []),
       ...(w.full ? [{ label: 'Open its full view', icon: 'expand', run: () => api.full(w.id) } as MenuItem] : []),
-      { label: 'Its page: settings, Laki AI', icon: 'settings', run: () => api.settings(w.id) },
+      { label: 'Edit', icon: 'settings', run: () => api.settings(w.id) },
       {
         label: 'Move to tab',
         icon: 'arrowRight',
@@ -228,11 +228,11 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       },
       null,
       // its only place: off, and the sidebar's when it's on again (one Laki AI made shows here while it's off)
-      { label: 'Take it off the Desk', icon: 'x', run: () => void (placesOf(w).length > 1 ? api.place(w.id, placesOf(w).filter(p => p !== 'desk')) : api.place(w.id, ['side'], false)).catch(() => {}) },
+      { label: 'Take it off My Desk', icon: 'x', run: () => void (placesOf(w).length > 1 ? api.place(w.id, placesOf(w).filter(p => p !== 'desk')) : api.place(w.id, ['side'], false)).catch(() => {}) },
     ])
   return (
     <Page
-      title="Desk"
+      title="My Desk"
       wide
       esc={false} /* a page to stay on, as the rail's others: Esc never closes it */
       onClose={onClose}
@@ -283,7 +283,6 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
               >
                 {isIconName(t.icon) ? <Icon name={t.icon} size={13} /> : emojiOf(t.icon) && <span aria-hidden>{t.icon}</span>}
                 {t.name}
-                <span className="muted small">{tiles.filter(x => tabOf(x) === t.id).length}</span>
               </button>
             ),
           )}
@@ -293,7 +292,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       {!here.length ? (
         <div className="desk-empty">
           <Icon name="desk" size={28} />
-          <b>Your Desk is empty</b>
+          <b>My Desk is empty</b>
           <p className="muted small">
             Put extensions here (your PRs, links, ones you build with Laki AI) as tiles of any size: an overview of what's
             going on. An extension can be here and in the sidebar at once.

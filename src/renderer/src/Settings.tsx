@@ -186,7 +186,9 @@ export type AppSettings = Paint & {
   workflows?: boolean // experimental: Workflows (Workflows.tsx), off unless true
   birdView?: boolean // experimental: Bird view (Bird.tsx), every live session's screen at once, off unless true
   calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
-  desk?: boolean // experimental: Desk (Desk.tsx), extensions on a page of their own, resized there, off unless true
+  desk?: boolean // experimental: My Desk (Desk.tsx), extensions on a page of their own, resized there, off unless true
+  notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
+  history?: boolean // experimental: back and forward (App's travel): ‹ ›, ⌘[ ⌘], off unless true
   aiGlow?: boolean // experimental: Laki AI's glow (App's PeekGlow) over what it looks at, off unless true
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
@@ -1174,7 +1176,9 @@ const FIND: [string, string, string?][] = [
   ['general', 'Pick an element', 'picker inspect element hotkey shortcut key development dev mode selector screenshot'],
   ['general', 'Bird view', 'experimental overview all sessions screens preview eye running'],
   ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
-  ['general', 'Desk', 'experimental dashboard overview widgets extensions tiles resize build'],
+  ['general', 'My Desk', 'experimental desk dashboard overview widgets extensions tiles resize build'],
+  ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
+  ['general', 'Back and forward', 'experimental history back forward previous next pages navigation'],
   ['general', "Laki AI's glow", 'experimental ai glow animation computer use screen reading looking peek effect gradient'],
   ['general', 'Laki AI', 'experimental ai assistant chat turn on enable openrouter'],
   ['general', 'Voice', 'experimental voice dictation dictate speech to text cloud hold fn mic talk whisper'],
@@ -1859,7 +1863,7 @@ const PLACES: [WidgetPlace, string, string][] = [
   ['status', 'Status bar', "At the status bar's right end: a line high"],
   ['rail', 'Rail', 'A button on the rail, with its icons (no rail: the sidebar’s foot)'],
   ['foot', 'Sidebar foot', 'A button in the sidebar’s foot, beside Video, Meme and Timer'],
-  ['desk', 'Desk', 'A tile on the Desk page (experimental), sized there'],
+  ['desk', 'My Desk', 'A tile on the My Desk page (experimental), sized there'],
   ['panel', 'Right panel', 'A tab of the right panel (⌥⌘B), beside Info and Files'],
   ['row', 'Workspace rows', 'A mark on each workspace’s row in the sidebar: its badge (per workspace only)'],
 ]
@@ -2961,7 +2965,13 @@ export function SettingsPage(p: {
                   <Says title="Calendar" hint="A week or a month of scheduled tasks at their times, their runs, and reminders you, Laki AI or an agent add (laki remind). A reminder notifies as it's due. Shows the rail's Calendar and ⌘K" />
                 </Switch>
                 <Switch className="switch-row" on={s.desk === true} onChange={v => set({ desk: v })}>
-                  <Says title="Desk" hint="A page of your extensions as tiles you drag and resize: an overview of what's going on (your PRs, links, ones you build there with Laki AI). An extension can be on the Desk and in the sidebar at once. Shows the rail's Desk and ⌘K" />
+                  <Says title="My Desk" hint="A page of your extensions as tiles you drag and resize: an overview of what's going on (your PRs, links, ones you build there with Laki AI). An extension can be on My Desk and in the sidebar at once. Shows the rail's My Desk and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.notes === true} onChange={v => set({ notes: v })}>
+                  <Says title="Notes" hint="Your own notes, one list for every project: written like a Notion page (headings, checklists, tables, images, code, diagrams), each with a color, pinned or not, found by search. Shows the rail's Notes and ⌘K" />
+                </Switch>
+                <Switch className="switch-row" on={s.history === true} onChange={v => set({ history: v })}>
+                  <Says title="Back and forward" hint="‹ › at the rail's top (else the sidebar's head), ⌘[ and ⌘]: back to the pages and workspaces you were on, the last 10, as in a browser. A right click on one lists where it goes" />
                 </Switch>
                 <Switch className="switch-row" on={s.birdView === true} onChange={v => set({ birdView: v })}>
                   <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />

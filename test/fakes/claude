@@ -35,6 +35,12 @@ if (args[0] === '-p') {
   const b = prompt.startsWith('Brainstorm session') && /laki_plan_read \(project (\S+), kind brainstorm, slug (\S+)\)/.exec(prompt)
   if (b) return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki, 'laki_plan_write', { project: b[1], kind: 'brainstorm', slug: b[2], path: 'ideas.md', text: '# Two options' }).then(text =>
     out({ type: 'result', subtype: 'success', is_error: false, result: `wrote ${JSON.parse(text).path}`, session_id: session, total_cost_usd: 0.01, usage: { input_tokens: 1, output_tokens: 1 } }))
+  // "read…": a Read it may not do unasked, through --permission-prompt-tool, as the real one: what the user said, back
+  if (prompt.startsWith('read')) {
+    const via = args[args.indexOf('--permission-prompt-tool') + 1]
+    return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki, via.replace(/^mcp__laki__/, ''), { tool_name: 'Read', input: { file_path: '/etc/hosts' } }).then(text =>
+      out({ type: 'result', subtype: 'success', is_error: false, result: `${JSON.parse(text).behavior}: ${JSON.parse(text).message ?? JSON.parse(text).updatedInput.file_path}`, session_id: session, usage: {} }))
+  }
   out({ type: 'assistant', message: { content: [{ type: 'tool_use', name: 'mcp__laki__laki_state', input: {} }] } })
   return require('./mcp.cjs')(JSON.parse(args[args.indexOf('--mcp-config') + 1]).mcpServers.laki, 'laki_state', {}).then(text => {
     out({ type: 'user', message: { content: [{ type: 'tool_result', content: text }] } })

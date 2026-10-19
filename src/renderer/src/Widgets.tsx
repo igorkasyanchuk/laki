@@ -322,7 +322,7 @@ export function WidgetDialog({ w, api, onClose }: { w: WidgetView; api: WidgetAp
           <span className={`small ${w.error && !w.running ? 'warn' : 'muted'}`}>{status(w)}</span>
           <span className="spacer" />
           {w.every !== undefined && !w.hide?.refresh && <IconButton icon="refresh" title="Fetch now" onClick={() => void api.run(w.id, wsOf(w)).catch(() => {})} />}
-          <IconButton icon="settings" title="Its page: settings, preview, Laki AI" onClick={() => api.settings(w.id)} />
+          <IconButton icon="settings" title="Edit: its settings, preview, Laki AI" onClick={() => api.settings(w.id)} />
           <IconButton icon="x" title="Close (Esc)" onClick={onClose} />
         </div>
         <div className="widget-full">

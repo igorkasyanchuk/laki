@@ -374,6 +374,8 @@ ${[1, 2, 3, 4, 5, 6, 7, 8].map(i => `.k-tabs:has(> .k-tabbar > label:nth-child($
 // in the sidebar; a JS widget's page gets them in its address), a number tile, tables, links
 export const WIDGET_CSS = `:host, body { display: block; margin: 0; height: 100%; box-sizing: border-box; overflow: auto; color: var(--fg, #d5d9e3); font: 12px/1.4 var(--ui-font, -apple-system, system-ui, sans-serif); }
 * { box-sizing: border-box; }
+::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; } ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg, #d5d9e3) 14%, transparent); border-radius: 3px; } ::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--fg, #d5d9e3) 32%, transparent); }
 a { color: var(--accent, #7aa2f7); text-decoration: none; } a:hover { text-decoration: underline; }
 .tile { height: 100%; display: flex; flex-direction: column; justify-content: center; align-items: center; text-align: center; padding: 6px; gap: 2px; overflow: hidden; }
 .num { font-size: 24px; font-weight: 600; line-height: 1.1; font-variant-numeric: tabular-nums; }

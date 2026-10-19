@@ -23,6 +23,7 @@ const KEYS: [string, string][] = [
   ['⌘1…⌘9', 'go to a tab'],
   ['⌘↑ / ⌘↓', 'previous / next workspace'],
   ['⌘J', 'the next tab that needs you, in any workspace'],
+  ['⌘[ / ⌘]', 'back / forward through the pages and workspaces you were on (experimental: Settings › General › Back and forward)'],
   ['⌘L', 'send a message later: to an agent or Laki AI'],
   ['⌘⇧A', "show or hide the workspace's artifacts (the status bar's Artifacts too; click a folder to go in, ← or its path to go back; their ⋯: Finder, or the side panel's Files; right-click one to copy it)"],
   ['⌘⇧⏎', 'full screen: just the tab, or back (also the tab bar’s ⤢)'],

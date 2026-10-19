@@ -2,6 +2,23 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- **Notes** (experimental: Settings › General): your own notes, one list for every project, on the rail's Notes:
+  written like a Notion page (headings, checklists, tables, code, images, diagrams), each with a color, pinned or not,
+  found by search, with the start of its text in the list.
+- **Back and forward** (experimental): ‹ › at the rail's top, ⌘[ and ⌘], go back through the pages and workspaces you
+  were on, the last 10, as in a browser; a right click lists them.
+- **Laki AI asks before a tool it may not use**: with the claude backend, a file outside its folder (say) is a question
+  in the chat, *Allow once*, *Always in this chat* or *Deny*, where it used to give up.
+- **A new remote access PIN page**: one solid card, a ring that fills as you type the PIN and turns green as it opens,
+  and *Unlock* is always a button.
+- **Desk is My Desk**, and its tabs no longer show a count; an extension's *Its page* is now *Edit*.
+- My Desk keeps room under the last row, so a bottom tile's corner is clear of the AI button for resizing.
+- Extensions scroll with a slim scrollbar, as the sidebar does.
+- The new-workspace page keeps its top row on one line: a long project, branch or name gets cut with … instead of the
+  template and agent wrapping to a row of their own.
+
 ## 0.18.0 · Oct 19, 2026
 
 - **Workflows: tell me your way**: an End or a Show you block shows in a window, a popover in the corner, a macOS

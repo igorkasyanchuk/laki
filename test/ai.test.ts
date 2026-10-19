@@ -231,6 +231,35 @@ test('ai: claude -p and codex exec reach Laki through `laki mcp`, and go on with
   assert.ok(readFileSync(join(rig.data, 'ai-calls.jsonl'), 'utf8').split('\n').filter(Boolean).length >= 6)
 })
 
+test("ai: claude -p asks in the chat before a tool it may not use unasked; Always in this chat lets it until a new chat", async t => {
+  const rig = await fresh(t)
+  await rig.rpc('settingsSet', { ai: { on: true, backend: 'claude' } })
+  const perm = async () => (await until(async () => (await rig.rpc('aiState')).chat.find((m: any) => m.ask?.perm && m.ask.picked === undefined))) as any
+  // its ask waits on the pick: the chat says what, the buttons work while it works
+  let asking = rig.rpc('aiAsk', { text: 'read the hosts file' })
+  let m = await perm()
+  assert.match(m.text, /May I use \*\*Read\*\* on `\/etc\/hosts`/)
+  assert.deepEqual(m.ask.options, ['Allow once', 'Always in this chat', 'Deny'])
+  assert.equal((await rig.rpc('aiState')).busy, true)
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: m.ask.id, n: 1 }), { allowed: true })
+  assert.deepEqual(await asking, { text: 'allow: /etc/hosts' })
+  const args: string[] = rig.fakeLog().filter(l => l.bin === 'claude' && l.args[0] === '-p').at(-1).args
+  assert.equal(args[args.indexOf('--permission-prompt-tool') + 1], 'mcp__laki__laki_permission')
+  await assert.rejects(rig.rpc('aiAnswer', { id: m.ask.id, n: 0 }), /answered already/)
+  // for this chat: not asked again
+  assert.deepEqual(await rig.rpc('aiAsk', { text: 'read it again' }), { text: 'allow: /etc/hosts' })
+  assert.equal((await rig.rpc('aiState')).chat.filter((m: any) => m.ask?.perm).length, 1)
+  // a new chat asks again; Deny is a no, with words for it
+  await rig.rpc('aiNew')
+  asking = rig.rpc('aiAsk', { text: 'read once more' })
+  m = await perm()
+  await rig.rpc('aiAnswer', { id: m.ask.id, n: 2 })
+  assert.match((await asking).text, /^deny: The user said no/)
+  assert.equal((await rig.rpc('aiState')).chat.find((m: any) => m.ask?.perm).ask.picked, 'Deny')
+  // only while it works
+  await assert.rejects(rig.rpc('aiPermission', { tool: 'Read' }), /only while Laki AI works/)
+})
+
 test('ai: totals by day and month', () => {
   const now = new Date(2026, 9, 10, 15)
   const c = (at: Date, cost?: number) => ({ at: at.getTime(), backend: 'openrouter' as const, model: 'm', in: 10, out: 1, cost, ms: 1, tools: 0, ok: true, ask: '' })

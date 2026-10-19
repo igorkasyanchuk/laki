@@ -111,6 +111,7 @@ const staleDaemon = (v: { api?: number; built?: string }) => (v.api ?? 0) < API 
 const SpecsPage = lazy(() => import('./Specs')) // experimental, and BlockNote and React Flow with it: loaded as it opens
 const WorkflowsPage = lazy(() => import('./Workflows').then(m => ({ default: m.WorkflowsPage }))) // experimental: loaded as it opens
 const WidgetStudio = lazy(() => import('./WidgetStudio').then(m => ({ default: m.WidgetStudio }))) // Laki AI's: loaded as it opens
+const NotesPage = lazy(() => import('./Notes')) // experimental, and BlockNote with it: loaded as it opens
 // what a lazy page shows while its code loads (the first open): its frame, not the workspace under it for a moment
 const Waiting = ({ title, onClose }: { title: string; onClose: () => void }) => (
   <Page title={title} wide esc={false} onClose={onClose}>
@@ -137,12 +138,14 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
 // the Specs page (experimental): specs is a project's id, '' all; kind and slug, the one to open
 const specsOf = (d: Dialog) => (d && typeof d === 'object' && 'specs' in d ? d : undefined)
+// the Notes page (experimental): note, the one open ('': the first)
+const notesOf = (d: Dialog) => (d && typeof d === 'object' && 'note' in d ? d : undefined)
 // the Workflows page (experimental): run, the run to open
 const flowsOf = (d: Dialog) => (d && typeof d === 'object' && 'workflows' in d ? d : undefined)
 // the Settings page, in any of its forms: all of it, a project's, or a section asked for
@@ -150,8 +153,15 @@ const settingsOf = (d: Dialog) => d === 'settings' || (typeof d === 'object' && 
 // an extension's page (Extension.tsx): its id ('' a new one), and the page it goes back to
 const extOf = (d: Dialog) => (d && typeof d === 'object' && 'extension' in d ? d : undefined)
 const studioOf = (d: Dialog) => (d && typeof d === 'object' && 'studio' in d ? d : undefined)
+// back and forward (experimental, settings.history): a place is a page (or none: the workspace view) and the workspace
+// selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
+type Place = { d: Dialog; ws: string | null }
+const HISTORY_MAX = 10
+const PAGES = new Set(['settings', 'help', 'board', 'bird', 'ai', 'calendar', 'desk', 'schedules'])
+const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'studio', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
+const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))
 // the Extension page's way back, in words
-const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'Desk', calendar: 'Calendar', board: 'Board', bird: 'Bird view', schedules: 'Schedule', help: 'Help' }
+const PAGE_WORDS: Record<string, string> = { ai: 'AI', desk: 'My Desk', calendar: 'Calendar', board: 'Board', bird: 'Bird view', schedules: 'Schedule', help: 'Help' }
 const backWord = (d: Dialog | undefined) => (d && typeof d === 'object' && 'section' in d && d.section === 'widgets' ? 'Extensions' : settingsOf(d ?? null) ? 'Settings' : (typeof d === 'string' && PAGE_WORDS[d]) || 'Back')
 
 // a tab's color: its own, else its agent's ('none' turns that off)
@@ -212,50 +222,86 @@ type Opened = { ws: string; path: string; line?: number; n: number; edit?: Edit;
 const fileKey = (f: { path: string; storage?: boolean }) => `${f.storage ? 'artifact:' : ''}${f.path}`
 const wsName = (w: { id: string; name?: string }) => w.name || w.id
 // remote access's page, with Laki's PIN: the code shown in Settings › Remote access on the Mac (api.pin); a wrong one
-// counts down, the last stops remote access. A card over an aurora (styles.css' .pin-*), the PIN in six boxes over one
-// input (paste, one-time-code autofill), sent as the sixth digit is typed; a wrong one shakes them
+// counts down, the last stops remote access. One solid card (styles.css' .pin-*): Laki's mark, a lock in a ring that
+// fills a sixth per digit, the PIN in six boxes over one input (paste, one-time-code autofill), sent as the sixth digit
+// is typed; a wrong one shakes them, a right one turns the ring green with a check while the socket opens. Unlock is
+// always a button: short of six digits it says so
 const PIN_LEN = 6 // core.ts' remote PIN
 function PinForm({ left }: { left?: number }) {
   const [code, setCode] = useState('')
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
+  const [ok, setOk] = useState(false) // the PIN was right: the socket opens next
   const [over, setOver] = useState(false) // stopped: nothing more to try here
   const [shake, setShake] = useState(false)
+  const box = useRef<HTMLInputElement>(null)
   const send = (c = code) => {
-    if (busy || over || c.length < PIN_LEN) return
+    if (busy || over || ok) return
+    if (c.length < PIN_LEN) return void (setErr(`Type all ${PIN_LEN} digits`), setShake(true), box.current?.focus())
     setBusy(true)
+    setErr('')
     api.pin(c).then(
-      () => (setErr(''), setBusy(false)), // the socket opens next (or the splash says why not)
-      e => (setErr((e as Error).message), setCode(''), setShake(true), /stopped/.test((e as Error).message) && setOver(true), setBusy(false)),
+      () => (setOk(true), setBusy(false)), // the socket opens next (or the splash says why not)
+      e => (setErr((e as Error).message), setCode(''), setShake(true), /stopped/.test((e as Error).message) && setOver(true), setBusy(false), box.current?.focus()),
     )
   }
   const type = (v: string) => {
     const c = v.normalize('NFKC').replace(/\D/g, '').slice(0, PIN_LEN)
     setCode(c)
+    if (err && c) setErr('')
     if (c.length === PIN_LEN) send(c) // all of it: in at once
   }
+  const filled = ok ? PIN_LEN : code.length
   return (
-    <form className="pin-card" onSubmit={e => (e.preventDefault(), send())}>
-      <span className="pin-lock" aria-hidden>
-        <Icon name="lock" size={18} />
-      </span>
-      <h1>Remote access</h1>
+    <form className={`pin-card ${ok ? 'ok' : ''} ${over ? 'over' : ''}`} onSubmit={e => (e.preventDefault(), send())}>
+      <div className="pin-brand">
+        <img src={icon} alt="" />
+        <b>Laki</b>
+        <span className="pin-tag">
+          <Icon name="globe" size={11} /> Remote access
+        </span>
+      </div>
+      <div className="pin-ring" aria-hidden>
+        <svg viewBox="0 0 64 64">
+          <circle className="pin-track" cx="32" cy="32" r="29" />
+          <circle className="pin-fill" cx="32" cy="32" r="29" pathLength={100} style={{ strokeDashoffset: 100 - (filled / PIN_LEN) * 100 }} />
+        </svg>
+        <span key={ok ? 'ok' : over ? 'over' : 'lock'}>
+          <Icon name={ok ? 'check' : over ? 'shieldAlert' : 'lock'} size={22} />
+        </span>
+      </div>
+      <h1>{ok ? 'Unlocked' : over ? 'Remote access stopped' : 'Enter your PIN'}</h1>
       <label htmlFor="pin" className="pin-say">
-        Type the PIN Laki shows on your Mac
-        <span>Settings › Remote access</span>
+        {ok ? 'Opening Laki…' : over ? 'Start it again on your Mac for a new link.' : 'The six digits Laki shows on your Mac, in Settings › Remote access.'}
       </label>
-      <div className={`pin-boxes ${shake ? 'shake' : ''} ${err && !code ? 'bad' : ''}`} onAnimationEnd={e => e.target === e.currentTarget && setShake(false)}>
-        <input id="pin" value={code} autoFocus disabled={over} readOnly={busy} inputMode="numeric" autoComplete="one-time-code" aria-invalid={!!err} /* readOnly, not disabled: it keeps the keyboard for the next try */ onChange={e => type(e.target.value)} />
+      <div className={`pin-boxes ${shake ? 'shake' : ''} ${err && !ok ? 'bad' : ''}`} onAnimationEnd={e => e.target === e.currentTarget && setShake(false)}>
+        <input ref={box} id="pin" value={code} autoFocus disabled={over || ok} readOnly={busy} inputMode="numeric" autoComplete="one-time-code" aria-invalid={!!err} /* readOnly, not disabled: it keeps the keyboard for the next try */ onChange={e => type(e.target.value)} />
         {Array.from({ length: PIN_LEN }, (_, i) => (
           <span key={i} className={`pin-box ${i < code.length ? 'full' : ''} ${i === code.length ? 'at' : ''}`} aria-hidden>
             {code[i] ?? ''}
           </span>
         ))}
       </div>
-      <button type="submit" className="pin-go" disabled={busy || over || code.length < PIN_LEN}>
-        {busy ? 'Checking…' : 'Open Laki'} {!busy && <Icon name="arrowRight" size={15} />}
+      <button type="submit" className={`pin-go ${code.length < PIN_LEN && !busy && !ok ? 'short' : ''}`} disabled={over}>
+        {ok || busy ? (
+          <>
+            <span className="btn-spin" /> {ok ? 'Opening Laki' : 'Checking…'}
+          </>
+        ) : (
+          <>
+            Unlock <Icon name="arrowRight" size={15} />
+          </>
+        )}
       </button>
-      {err ? <div className="pin-err" role="alert">{err}</div> : left !== undefined && <div className="pin-left">{left === 1 ? 'One wrong PIN stops remote access' : `${left} wrong PINs stop remote access`}</div>}
+      <div className="pin-foot">
+        {err ? (
+          <span className="pin-err" role="alert">
+            {err}
+          </span>
+        ) : (
+          <span>{ok ? 'Your Mac, through a private link' : left === undefined ? 'Paste works too' : left === 1 ? 'One wrong PIN stops remote access' : `${left} wrong PINs stop remote access`}</span>
+        )}
+      </div>
     </form>
   )
 }
@@ -473,6 +519,41 @@ export function App() {
   const visible = tabsOf(group)
 
   useEffect(() => void localStorage.setItem('laki.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
+  // back and forward (experimental): each new place after the one you're at (what was ahead of it goes, as in a
+  // browser); a move of travel's own is that place again, not a new one
+  const historyOn = view?.settings?.history === true
+  const hist = useRef<{ at: Place[]; i: number; going?: string }>({ at: [], i: -1 })
+  const [, histDrawn] = useState(0)
+  const hereKey = JSON.stringify({ d: dialog, ws: ws?.id ?? null })
+  useEffect(() => {
+    const h = hist.current
+    if (!historyOn || !isPlace(dialog)) return
+    const going = h.going
+    h.going = undefined
+    if (going === hereKey || (h.at[h.i] && JSON.stringify(h.at[h.i]) === hereKey)) return
+    h.at = [...h.at.slice(0, h.i + 1), { d: dialog, ws: ws?.id ?? null }].slice(-(HISTORY_MAX + 1))
+    h.i = h.at.length - 1
+    histDrawn(n => n + 1)
+  }, [hereKey, historyOn])
+  // to the place at j: its workspace selected again (one gone since: the one you're in; the workspace view of one gone,
+  // or a page turned off since: skipped)
+  const travel = (j: number) => {
+    const h = hist.current
+    const by = j < h.i ? -1 : 1
+    const s = view?.settings ?? {}
+    const off = (d: Dialog) => (d === 'desk' && s.desk !== true) || (d === 'calendar' && s.calendar !== true) || (d === 'bird' && s.birdView !== true) || (d === 'ai' && !s.ai?.on) || (!!notesOf(d) && s.notes !== true) || (!!specsOf(d) && s.specs !== true) || (!!flowsOf(d) && s.workflows !== true)
+    const gone = (p: Place) => off(p.d) || (p.d === null && !!p.ws && !live.some(w => w.id === p.ws))
+    while (h.at[j] && gone(h.at[j])) j += by
+    const p = h.at[j]
+    if (!p || j === h.i) return
+    const to: Place = { d: p.d, ws: p.ws && live.some(w => w.id === p.ws) ? p.ws : (ws?.id ?? null) }
+    h.at[j] = to
+    h.i = j
+    h.going = JSON.stringify(to)
+    if (to.ws && to.ws !== ws?.id) setWsId(to.ws)
+    setDialog(to.d)
+    histDrawn(n => n + 1)
+  }
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
   const layoutsOn = (view?.api ?? 0) >= 60
@@ -1411,7 +1492,7 @@ export function App() {
         { head: w.name },
         ...(w.every !== undefined && w.on && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh' as const, run: () => void call('widgetRun', { id: w.id, ws: w.here }) }] : []),
         { label: 'Inspect', icon: 'search' as const, sub: 'its data, runs, env and files', run: () => setDialog({ extension: w.id, back: dialog, tab: 'data' }) },
-        { label: 'Its page', icon: 'settings' as const, run: () => setDialog({ extension: w.id, back: dialog }) },
+        { label: 'Edit', icon: 'settings' as const, sub: 'its place, settings and Laki AI', run: () => setDialog({ extension: w.id, back: dialog }) },
       ]),
     key: view?.widgetKey,
   }
@@ -1835,7 +1916,7 @@ export function App() {
     ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
     ...(seenSecs.length ? ['settings'] : []),
     ...['actions', 'templates', 'presets', 'remote'].filter(x => seenSecs.includes(x)),
-    ...(settings.specs || settings.workflows || settings.calendar || settings.desk || settings.birdView || settings.aiGlow || settings.ai?.on || settings.voice?.on ? ['experimental'] : []), // one turned on; else seen through Go (below)
+    ...(settings.specs || settings.workflows || settings.calendar || settings.desk || settings.notes || settings.history || settings.birdView || settings.aiGlow || settings.ai?.on || settings.voice?.on ? ['experimental'] : []), // one turned on; else seen through Go (below)
     ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
   ])
@@ -1923,6 +2004,9 @@ export function App() {
       arrowdown: () => moveWs(1),
     }
     if (/^[1-9]$/.test(k)) act[k] = () => groups[Number(k) - 1] && selectGroup(groups[Number(k) - 1])
+    // ⌘[ ⌘]: back and forward (experimental), not in a text field (an editor's indent)
+    const field = (t => !!t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && !t.classList.contains('xterm-helper-textarea'))(e.target as HTMLElement | null)
+    if (historyOn && !field && (k === '[' || k === ']')) act[k] = () => travel(hist.current.i + (k === '[' ? -1 : 1))
     if (canLater && !dialog) act.l = () => sendLater(tab?.kind === 'agent' ? tab.id : undefined)
     if (!act[k] || (e.shiftKey && k !== 'arrowup' && k !== 'arrowdown' && k !== '+')) return
     const t = e.target as HTMLElement | null // ⌘↑/⌘↓ in a text field move its cursor (xterm's own textarea isn't one)
@@ -2024,7 +2108,8 @@ export function App() {
     if (settings.workflows === true) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
     if (settings.birdView === true) a({ label: 'Bird view: every live session and its screen', icon: 'eye', run: () => setDialog('bird') })
     if (settings.calendar === true) a({ label: 'Calendar: scheduled tasks and reminders by week or month', icon: 'calendar', run: () => setDialog('calendar') })
-    if (settings.desk === true) a({ label: 'Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
+    if (settings.desk === true) a({ label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
+    if (settings.notes === true) a({ label: 'Notes: your own, for any project', icon: 'note', run: () => setDialog({ note: '' }) })
     if (settings.ai?.on) a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     if (settings.devMode) a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
     for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
@@ -2087,17 +2172,12 @@ export function App() {
   if (!view)
     return (
       <div className={`splash ${pinning ? 'pinning' : ''}`}>
-        {pinning && (
-          <div className="aurora" aria-hidden>
-            <i />
-            <i />
-            <i />
+        {!pinning && (
+          <div className="logo">
+            <img src={icon} alt="" />
+            <span className="wordmark">Laki</span>
           </div>
         )}
-        <div className="logo">
-          <img src={icon} alt="" />
-          <span className="wordmark">Laki</span>
-        </div>
         {pinning ? <PinForm left={pinAsk.left} /> : <div className="muted">{connected ? 'loading…' : 'connecting to the daemon…'}</div>}
         {problem && !connected && <div className="splash-problem">{problem}</div>}
       </div>
@@ -2477,7 +2557,9 @@ export function App() {
   const toCal = () => setDialog(d => (d === 'calendar' ? null : 'calendar'))
   const calSoon = (view?.reminders ?? []).filter(r => !r.done && r.fired).length // rung, not ticked off
   const deskOn = settings.desk === true // experimental: Settings › General
+  const notesOn = settings.notes === true // experimental: Settings › General
   const toDesk = () => setDialog(d => (d === 'desk' ? null : 'desk'))
+  const toNotes = () => setDialog(d => (notesOf(d) ? null : { note: '' }))
   const toAi = () => setDialog(d => (d === 'ai' ? null : 'ai'))
   const AI_TIP = 'AI: ask Laki to start, check and steer your agents'
   const toSettings = () => setDialog(d => (settingsOf(d) ? null : 'settings'))
@@ -2561,16 +2643,49 @@ export function App() {
     return [`On ${page}`, desk && (desk.length ? `its tiles: ${desk.join(', ')}` : 'no tiles yet'), w && `selected: ${w}`, t, screen.trim() && `the tab's screen now (its last 40 lines):\n${screen.replace(/\s+$/gm, '').slice(-5000)}`].filter(Boolean).join('; ')
   }
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
-  const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
-  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
+  const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
+  const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
+  // back and forward's buttons (experimental): the rail's top, else the sidebar's head; a right click lists where each goes
+  const placeName = (p: Place) => {
+    const d = p.d
+    const w = live.find(x => x.id === p.ws)
+    if (d === null) return w ? wsName(w) : 'the workspace'
+    if (typeof d === 'string') return d === 'settings' ? 'Settings' : PAGE_WORDS[d] ?? d
+    if ('extension' in d) return view?.widgets?.find(x => x.id === d.extension)?.name ?? 'an extension'
+    if ('studio' in d) return 'the extension studio'
+    if ('uikit' in d) return 'the UI kit'
+    if ('settings' in d || 'section' in d) return 'Settings'
+    if ('project' in d) return view?.projects.find(x => x.id === d.project)?.name ?? 'a project'
+    if ('schedules' in d) return 'Schedule'
+    if ('compare' in d) return 'Compare'
+    if ('specs' in d) return 'Specs'
+    if ('workflows' in d) return 'Flows'
+    if ('note' in d) return 'Notes'
+    return 'a page'
+  }
+  const histMenu = (e: React.MouseEvent, by: -1 | 1) => {
+    e.preventDefault()
+    const h = hist.current
+    const js = by < 0 ? h.at.slice(0, h.i).map((_, j) => j).reverse() : h.at.slice(h.i + 1).map((_, j) => h.i + 1 + j)
+    if (js.length) openMenu(e, [{ head: by < 0 ? 'Back to' : 'Forward to' }, ...js.map(j => ({ label: placeName(h.at[j]), icon: (h.at[j].d === null ? 'terminal' : 'file') as IconName, run: () => travel(j) }))])
+  }
+  const histAt = hist.current
+  const histNav = historyOn && (
+    <span className="hist-nav nodrag">
+      <IconButton icon="chevronLeft" title={histAt.at[histAt.i - 1] ? `Back to ${placeName(histAt.at[histAt.i - 1])} (⌘[; right click: more)` : 'Back (⌘[)'} disabled={histAt.i < 1} onClick={() => travel(histAt.i - 1)} onContextMenu={e => histMenu(e, -1)} />
+      <IconButton icon="chevronRight" title={histAt.at[histAt.i + 1] ? `Forward to ${placeName(histAt.at[histAt.i + 1])} (⌘])` : 'Forward (⌘])'} disabled={histAt.i >= histAt.at.length - 1} onClick={() => travel(histAt.i + 1)} onContextMenu={e => histMenu(e, 1)} />
+    </span>
+  )
   const railBar = rail && sideOpen && (
     <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }}>
+      {histNav}
       {kindButton(RAIL[0])}
       {railButton('board', 'board', 'Board', dialog === 'board', BOARD_TIP, toBoard)}
       {railButton('schedules', 'clock', 'Schedule', schedulesFor !== undefined, `${schedTip}${runFailed ? ' · a run failed' : ''}`, toSchedules, runFailed && <span className="rail-dot bad" />)}
       {specsOn && railButton('specs', 'spec', 'Specs', !!specsOf(dialog), SPECS_TIP, toSpecs)}
       {flowsOn && railButton('workflows', 'flow', 'Flows', !!flowsOf(dialog), FLOWS_TIP, toFlows, flowsAsk > 0 && <span className="rail-count">{flowsAsk}</span>)}
-      {deskOn && railButton('desk', 'desk', 'Desk', dialog === 'desk', 'Desk (experimental): your extensions as tiles', toDesk)}
+      {deskOn && railButton('desk', 'desk', 'My Desk', dialog === 'desk', 'My Desk (experimental): your extensions as tiles', toDesk)}
+      {notesOn && railButton('notes', 'note', 'Notes', !!notesOf(dialog), 'Notes (experimental): yours, for any project', toNotes)}
       {calOn && railButton('calendar', 'calendar', 'Calendar', dialog === 'calendar', `Calendar (experimental): scheduled tasks and reminders${calSoon ? ` · ${calSoon} rang` : ''}`, toCal, calSoon > 0 && <span className="rail-count">{calSoon}</span>)}
       {RAIL.slice(1).filter(([k]) => railOf(k) === k).map(kindButton)}
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
@@ -2599,6 +2714,7 @@ export function App() {
       <aside className="sidebar" hidden={!sideOpen || listOff} data-style={sideStyle} style={{ width: sideW, ...phVars(settings.projectLook), ...sideVars(settings.sideLook) }} {...phAttrs(settings.projectLook)}>
         <div className="side-head drag">
           <IconButton icon="sidebar" title="Hide sidebar (⌘B)" onClick={() => setSideOpen(false)} />
+          {!railBar && histNav}
           <span className="spacer" />
           <IconButton icon="filter" title={find ? 'Stop filtering' : 'Filter the workspaces: by name, branch or PR; the ones that need you, working, with a PR'} on={!!find} onClick={() => setFind(f => (f ? null : { q: '' }))} />
           <IconButton icon="plus" title="Add a project, a terminal or a browser" tip={false} onClick={e => openMenu(e, addMenu())} />
@@ -3037,6 +3153,13 @@ export function App() {
             onClose={() => setDialog(null)}
           />
         )}
+        {(o =>
+          o &&
+          notesOn && (
+            <Suspense fallback={<Waiting title="Notes" onClose={() => setDialog(null)} />}>
+              <NotesPage id={o.note} api={{ call: (m, p) => api.call(m, p) }} onOpen={note => setDialog({ note })} onClose={() => setDialog(null)} />
+            </Suspense>
+          ))(notesOf(dialog))}
         {dialog === 'calendar' && calOn && (
           <CalendarPage
             schedules={view.schedules ?? []}

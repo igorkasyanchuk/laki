@@ -108,7 +108,8 @@ a decide's `route:`, an llm's `json:`, `phone:` on popup and end, the view's `fl
 setting's `required` and the view's `missing`, the `panel` and `row` places (a row's instances fetched for every live
 workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `ask`, `confirm`, `insert`, `view`),
 `widgetAction` `ctx` (`ws`, `tab`, `file`) and its `insert`; 85: `screen` `all`, a skill's `foreign`; 86: workflows' `agent-ask` wait (`turnWaits`, `flowAnswer` through `answer`), a
-block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`). A
+block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
+(`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -670,7 +671,7 @@ takes the tunnel's URL as an Origin, and that token only with it (a client with 
 for `POST /pin` only (`remotePin`, main.ts: from the tunnel's origin; `{ token }` says `need`, `{ token, pin }` gives
 `access`, which `remoteToken` is); a wrong PIN counts `left` down from `settings.remoteTries` (1-10, `REMOTE_TRIES` 2), the
 last stops it and broadcasts `remote` (App: a toast and a notification). The page (`api.ts`) asks `/pin` before its
-first connect (`pinNeed`), and App's splash shows `PinForm` (`api.pin`: the access token kept as the tab's token). The page (`api.ts` `whyNot`), when its socket won't open twice: a
+first connect (`pinNeed`), and App's splash shows `PinForm` (`api.pin`: the access token kept as the tab's token; one solid card, `.pin-*`: Laki's mark, a lock in a ring filling a sixth per digit, green with a check once it's right; *Unlock* always a button, short of six digits it says so). The page (`api.ts` `whyNot`), when its socket won't open twice: a
 `fetch` of itself that redirects is Cloudflare's sign-in run out (a reload signs in again, once per 30 s), a 401/403 from
 `/rpc` is a dead link, no answer or a 5xx is the Mac out of reach; App shows it on the splash and in the status bar
 (the `problem` event). Retries back off to 10 s. `page` serves the HTML `no-store`, so a tab brought back or Back
@@ -745,7 +746,10 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
   (`aiKey`), never in state.json, the view or `aiState` (only whether there is one). Model: `models.openrouter`, else
   `AI_MODEL`;
 - `claude`: `claude -p --output-format stream-json --verbose --mcp-config <laki mcp, LAKI_HOME> --strict-mcp-config
-  --tools Read --allowedTools mcp__laki --append-system-prompt …`, `--resume` its `session_id` the next time; cost:
+  --tools Read --allowedTools mcp__laki --permission-prompt-tool mcp__laki__laki_permission --append-system-prompt …`
+  (a Read outside its folder: `laki mcp`'s `laki_permission`, `LAKI_AI` only, waits on `aiPermission`: a chat message
+  with `ask.perm`, `AI_PERM`'s buttons, live while it works (`Message`); `aiAnswer` resolves it, *Always in this chat* keeps
+  the tool in the thread's `allowed` until `fresh`; none in `PERM_WAIT` or the ask's end: deny), `--resume` its `session_id` the next time; cost:
   the result's `total_cost_usd`; `ai.efforts` (`effortArgs`, `EFFORTS`; `aiOnce` too): claude's `--effort`, codex's
   `-c model_reasoning_effort`;
 - `codex`: `codex exec [resume <thread>] --json --skip-git-repo-check --ignore-user-config (its MCP servers) -c sandbox_mode="read-only"
@@ -821,6 +825,18 @@ page. A spec's *Copy for a prompt* (`shared/plans.ts` `planRef`) copies `Spec: <
 MCP's `laki_plans`, `laki_plan_read` (with `file`: one of its files' text, `planFile`), `laki_plan_new`, `laki_plan_write`
 (`BRAINSTORM_OUTPUT`: what to write). A plan's chat (`ai.ts` `aboutPlan`) puts its title, README.md (12k characters, read
 at each ask) and its files' names into the instructions. Tested in `test/plans.test.ts`.
+
+### Notes
+
+Experimental (`settings.notes`, Settings › General › *Experimental*; off: no rail button or ⌘K item, and every `note*`
+method refuses). `daemon/notes.ts`: one list for every project, `<data>/notes/<id>.json` (`Note`: title, `color` of
+`TAB_COLORS`, `pinned`, BlockNote's `blocks`, `md`: their Markdown, `created`, `at`), pasted files in `<data>/notes/<id>/`
+(`noteUpload`: `files/<name>`, `-2` when taken; `noteFile`: an image as a data URL). `noteList` (`q`: every word in its
+title or `md`) gives `NoteItem`s, pinned first, then `at` (a title or text change; a pin or a color doesn't), each a
+`preview` (`plain`: Markdown's marks out). The renderer's `Notes.tsx` (App's `lazy`, dialog `{ note: id ('': the
+first) }`, the rail's Notes and ⌘K; `listOff`): `Page` with the list (`.notes-side`: search, `.notes-dot` color filter,
+`.note-row`s, a right click: pin, color, delete) and `NoteEdit` (title, color, pin, delete; Specs' `SpecEditor`, saved
+600 ms after a change and as it unmounts). Tested in `test/notes.test.ts`.
 
 ### Workflows
 
@@ -1460,6 +1476,11 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - A PR's author's picture (`Avatar`, Info.tsx: `avatars.githubusercontent.com/<login>`, the CSP's `img-src`: https) before
     the row's PR mark and in the PR section, unless it's `mine`.
   - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
+  - Back and forward (experimental, `settings.history`): `hist` (a ref: `Place`s, `{ d: dialog, ws }`, `HISTORY_MAX`
+    back) gets each new place (`isPlace`: a page, `PAGES`/`PAGE_KEYS`, or none; a dialog over them isn't one), what was
+    ahead dropped; `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
+    page, `going` so that isn't a new place. `histNav` (‹ ›, a right click: `histMenu`, `placeName`) at the rail's top,
+    else after the side head's hide button; ⌘[ ⌘] outside a text field.
   - `toast(text, undo?, label?, ok?)`: one message at a time (a newer one restarts the timer; `ok`: done, a check
     and no red); `archive` asks `wsArchive` with
     `ifClean` first and offers Undo (`wsRestore`); a dirty one is confirmed (an older daemon's always is). Deleting a
@@ -1755,7 +1776,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   rail's count: rung reminders not ticked off. `Page` `esc={false}`; `.cal-bar` on the page (‹ *Today* ›, the title,
   Week / Month, *+ Reminder*); a day's click: `sel`, `aside.cal-side` (that day's tasks, runs and reminders, *Remind me
   this day*). App.tsx passes a `CalendarApi`.
-- **`Desk.tsx`**: Desk (experimental, `settings.desk`; the rail's Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
+- **`Desk.tsx`**: My Desk (the user's word; the code's is Desk: experimental, `settings.desk`; the rail's My Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
   among their `places` as tiles in a 12-column grid (`DESK_COLS`, rows `DESK_ROW`), `settings.deskTiles` their order and
   sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
   `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;
@@ -1853,6 +1874,8 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/daemon/widgets.ts` | widgets: folders, storage, fetch on schedule, actions, a JS widget's page |
 | `src/daemon/share.ts` | shared tabs: transcripts as what was said, its Markdown and the view-only page |
 | `src/daemon/memory.ts` | memory's compaction: learned memories through Laki AI's model, every few days or when full, its log |
+| `src/daemon/notes.ts` | notes (experimental): one JSON file each, their pasted files, the list with search |
+| `src/renderer/src/Notes.tsx` | the Notes page: the list with search and colors, the open note in BlockNote (SpecEditor) |
 | `src/daemon/plans.ts` | specs and brainstorms (experimental): their folders, the editor's save, files, agents' output, a prototype's page |
 | `src/renderer/src/Specs.tsx` | the Specs & Brainstorms page; `SpecEditor.tsx` (BlockNote), `diagram.tsx` (React Flow), `specmd.ts` (blocks → Markdown), `plans.css`: ported from specdrop |
 | `src/shared/plans.ts` | specs' and brainstorms' words for agents: the prompts, what a brainstorm writes, the diagram format |

@@ -15,7 +15,7 @@ import { SourceField, WidgetCard, type WidgetsApi } from './Settings'
 import { ask, escapes, Icon, IconButton, Page } from './ui'
 import { CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
-export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On the Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
+export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
 export const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
 export type ExtTab = 'overview' | 'data' | 'runs' | 'env' | 'files' | 'check'
@@ -302,7 +302,7 @@ function Preview({ w, api, cfg, spot = 0, field }: { w: WidgetView; api: WidgetA
             <span className="muted small">tip: {w.tip ?? w.name}</span>
           </div>
           <div className="ext-desk-spot">
-            <span className="muted small">Desk tile · {w.full ? 'its full view' : 'its preview'}, room for a long table or list</span>
+            <span className="muted small">My Desk tile · {w.full ? 'its full view' : 'its preview'}, room for a long table or list</span>
             <DeskTile w={w} api={api} sample={made} note={sample ? 'made-up data' : undefined} />
           </div>
         </div>
@@ -781,7 +781,7 @@ function Start({ ai, home, onAiSettings }: { ai: boolean; home?: string; onAiSet
           <Icon name="panel" size={22} />
         </span>
         <h2>New extension</h2>
-        <p className="muted">A small live page in Laki: in the sidebar, a bar, on the rail or the Desk, fed by a command or a script on a schedule.</p>
+        <p className="muted">A small live page in Laki: in the sidebar, a bar, on the rail or My Desk, fed by a command or a script on a schedule.</p>
         <ol className="ext-steps">
           {steps.map(([t, s], i) => (
             <li key={t}>

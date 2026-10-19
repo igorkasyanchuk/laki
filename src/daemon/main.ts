@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
-import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiQuestion, aiState, aiStop, aiTick, voiceText } from './ai.ts'
+import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
@@ -16,6 +16,7 @@ import { refreshSkills, skills, skillSet } from './skill.ts'
 import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './accounts.ts'
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
+import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload } from './notes.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
 import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
@@ -214,6 +215,7 @@ const api: Record<string, Handler> = {
   aiAsk: p => aiAsk(p, (method, params) => call(method, params) as Promise<any>), // Laki's own AI: its tools call this API here
   aiState: p => aiState(p), // chat: a spec's or brainstorm's (planChat), else the AI page's
   aiQuestion: p => aiQuestion(p), // the skill's laki_ask and laki_remove: a question with buttons, only while an ask works
+  aiPermission: p => aiPermission(p), // laki mcp's laki_permission (claude -p's permission prompt): Allow / Deny in the chat, waited for
   aiAnswer: p => aiAnswer(p, (method, params) => call(method, params) as Promise<any>), // the AI page's buttons: a removal is done here, on Yes
   aiNew: p => aiNew(p), // the AI page's: the chat it ends kept among the earlier ones (aiChats)
   aiChats: () => aiChats(),
@@ -317,6 +319,13 @@ const api: Record<string, Handler> = {
   widgetDev: p => widgetDev(p), // laki widget dev: link, unlink, list
   widgetNew: p => widgetNew(p), // laki widget new, Settings › Extensions › New ▾: a starter, yours, on
   widgetCheck: p => widgetCheck(p), // laki widget check, the inspector's Check (run: its fetch once), MCP's (never runs)
+  noteList: p => noteList(p), // notes (experimental): notes.ts
+  noteGet: p => noteGet(p),
+  noteNew: p => noteNew(p),
+  noteSave: p => noteSave(p),
+  noteRm: p => noteRm(p),
+  noteUpload: p => noteUpload(p),
+  noteFile: p => noteFile(p),
   planList: p => planList(p), // specs and brainstorms (experimental): plans.ts
   planNew: p => planNew(p),
   planGet: p => planGet(p),

@@ -86,48 +86,59 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .splash .logo img { width: 96px; height: 96px; filter: drop-shadow(0 12px 28px rgba(255, 122, 69, 0.22)); }
 .splash-problem { max-width: 420px; margin: 8px 16px 0; padding: 10px 14px; text-align: center; color: var(--fg); background: var(--panel); border: 1px solid var(--waiting); border-radius: var(--radius); }
 .splash .wordmark { padding-left: 0.14em; } /* the spacing after the last letter, matched before the first */
-/* the remote page's PIN (App's PinForm): an aurora behind, a faint grid fading out, a card with a gradient edge, the PIN
-   in six boxes (one input over them: paste and one-time-code autofill work), a gradient button. The brand's orange
-   (the mark's dot), the accent and a violet; light themes too */
-.splash.pinning { position: relative; overflow-y: auto; isolation: isolate; justify-content: safe center; gap: 22px; padding: 24px 16px; } /* scrolls: a phone's keyboard leaves little room */
-.splash.pinning::before { content: ''; position: fixed; inset: 0; z-index: -1; background-image: linear-gradient(color-mix(in srgb, var(--fg) 6%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fg) 6%, transparent) 1px, transparent 1px); background-size: 44px 44px; mask-image: radial-gradient(ellipse 70% 60% at 50% 45%, #000, transparent 75%); }
-.aurora { position: fixed; inset: 0; z-index: -2; overflow: hidden; pointer-events: none; opacity: 0.55; }
-/* soft circles by gradient, not blur: a filter would be painted again every frame */
-.aurora i { position: absolute; width: 70vmax; height: 70vmax; border-radius: 50%; background: radial-gradient(closest-side, var(--c), transparent); will-change: transform; animation: aurora 20s ease-in-out infinite alternate; }
-.aurora i:nth-child(1) { --c: #ff7a45; left: -26vmax; top: -30vmax; }
-.aurora i:nth-child(2) { --c: var(--accent); right: -28vmax; top: -2vmax; animation-duration: 24s; animation-delay: -8s; }
-.aurora i:nth-child(3) { --c: #8b5cf6; left: 2vmax; bottom: -38vmax; animation-duration: 28s; animation-delay: -14s; }
-@keyframes aurora { 50% { transform: translate(7vmax, 5vmax) scale(1.15); } to { transform: translate(-5vmax, 9vmax) scale(0.9); } }
-.splash.pinning .logo { gap: 10px; }
-.splash.pinning .logo img { width: 84px; height: 84px; filter: drop-shadow(0 16px 40px rgba(255, 122, 69, 0.4)); animation: pin-float 6s ease-in-out infinite; }
-.splash.pinning .wordmark { font-size: 24px; background: linear-gradient(100deg, var(--fg) 30%, #ff9a6b 60%, color-mix(in srgb, var(--accent) 80%, var(--fg))); -webkit-background-clip: text; background-clip: text; color: transparent; }
-@keyframes pin-float { 50% { transform: translateY(-6px); } }
-.pin-card { position: relative; display: flex; flex-direction: column; align-items: center; gap: 12px; width: min(380px, 100%); padding: 26px 24px 20px; text-align: center; border-radius: var(--rs, 22px); background: linear-gradient(180deg, color-mix(in srgb, var(--panel) 94%, transparent), color-mix(in srgb, var(--panel) 82%, transparent)); box-shadow: 0 30px 80px -24px rgba(0, 0, 0, 0.55), inset 0 1px 0 color-mix(in srgb, var(--fg) 8%, transparent); }
-.pin-card::before { content: ''; position: absolute; inset: 0; border-radius: inherit; padding: 1px; pointer-events: none; background: linear-gradient(140deg, rgba(255, 122, 69, 0.75), color-mix(in srgb, var(--fg) 10%, transparent) 38%, color-mix(in srgb, var(--fg) 10%, transparent) 62%, color-mix(in srgb, var(--accent) 75%, transparent)); -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0); -webkit-mask-composite: xor; mask-composite: exclude; }
-.pin-lock { display: grid; place-items: center; width: 40px; height: 40px; border-radius: var(--rs, 12px); color: #fff; background: linear-gradient(135deg, #ff7a45, #8b5cf6); box-shadow: 0 10px 26px -8px rgba(255, 122, 69, 0.7); }
-.pin-card h1 { margin: 2px 0 0; font-size: 19px; font-weight: 650; letter-spacing: -0.01em; }
-.pin-say { display: flex; flex-direction: column; gap: 2px; font-size: 13.5px; line-height: 1.45; color: var(--fg); }
-.pin-say span { font-size: 12px; color: var(--muted); }
-.pin-boxes { position: relative; display: flex; gap: 8px; margin: 6px 0 4px; }
+/* the remote page's PIN (App's PinForm): one solid card on the theme's background, a soft light from above and a faint
+   dot grid; Laki's mark and Remote access at its top, a lock in a ring that fills a sixth per digit, the PIN in six boxes
+   (one input over them: paste and one-time-code autofill work), the accent's button. It rises in as it opens; a wrong PIN
+   shakes the boxes, a right one turns the ring green with a check. The theme's colors: light themes too */
+.splash.pinning { position: relative; overflow-y: auto; isolation: isolate; justify-content: safe center; padding: 24px 16px; background: var(--bg); } /* scrolls: a phone's keyboard leaves little room */
+.splash.pinning::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; background: radial-gradient(ellipse 60% 45% at 50% -5%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%), radial-gradient(color-mix(in srgb, var(--fg) 9%, transparent) 1px, transparent 1.5px) 0 0 / 22px 22px; mask-image: linear-gradient(#000 0 0), radial-gradient(ellipse 75% 70% at 50% 40%, #000, transparent 80%); mask-composite: intersect; }
+.pin-card { display: flex; flex-direction: column; align-items: center; gap: 14px; width: min(400px, 100%); padding: 0 28px 22px; text-align: center; border: 1px solid color-mix(in srgb, var(--fg) 12%, var(--line)); border-radius: calc(var(--rs, 14px) + 6px); background: var(--panel); box-shadow: 0 1px 0 color-mix(in srgb, var(--fg) 6%, transparent) inset, 0 24px 60px -20px rgba(0, 0, 0, 0.5), 0 2px 6px rgba(0, 0, 0, 0.12); animation: pin-rise 0.55s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.pin-card > * { animation: pin-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards; }
+.pin-card > :nth-child(2) { animation-delay: 0.08s; } .pin-card > :nth-child(3) { animation-delay: 0.13s; } .pin-card > :nth-child(4) { animation-delay: 0.17s; }
+.pin-card > :nth-child(5) { animation-delay: 0.21s; } .pin-card > :nth-child(n + 6) { animation-delay: 0.25s; }
+@keyframes pin-rise { from { opacity: 0; transform: translateY(8px); } }
+html.away :is(.pin-card, .pin-card > *, .pin-ring > span) { animation-play-state: running !important; } /* paused at its first frame it would stay unseen */
+.pin-brand { align-self: stretch; display: flex; align-items: center; gap: 8px; margin: 0 -28px 6px; padding: 12px 16px; border-bottom: 1px solid var(--line); font-size: 14px; }
+.pin-brand img { width: 24px; height: 24px; }
+.pin-tag { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; color: var(--muted); background: color-mix(in srgb, var(--fg) 6%, transparent); }
+.pin-ring { position: relative; display: grid; place-items: center; width: 72px; height: 72px; color: var(--accent-ink); }
+.pin-ring > svg { position: absolute; inset: 0; transform: rotate(-90deg); }
+.pin-ring > svg circle { fill: none; stroke-width: 3; }
+.pin-track { stroke: color-mix(in srgb, var(--fg) 10%, transparent); }
+.pin-fill { stroke: var(--accent); stroke-linecap: round; stroke-dasharray: 100; transition: stroke-dashoffset 0.3s cubic-bezier(0.16, 1, 0.3, 1), stroke 0.3s; }
+.pin-ring > span { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 50%; background: color-mix(in srgb, var(--accent) 14%, transparent); animation: pin-pop 0.3s ease-out; }
+.pin-card.ok .pin-ring { color: #16a34a; } .pin-card.ok .pin-fill { stroke: #22c55e; } .pin-card.ok .pin-ring > span { background: color-mix(in srgb, #22c55e 16%, transparent); }
+.pin-card.over .pin-ring { color: var(--error); } .pin-card.over .pin-ring > span { background: color-mix(in srgb, var(--error) 14%, transparent); }
+.pin-card h1 { margin: 0; font-size: 20px; font-weight: 650; letter-spacing: -0.015em; }
+.pin-say { max-width: 300px; margin-top: -6px; font-size: 13px; line-height: 1.5; color: var(--muted); }
+.pin-boxes { position: relative; display: flex; gap: 8px; margin: 6px 0 2px; }
 .pin-boxes input { position: absolute; inset: 0; z-index: 1; width: 100%; height: 100%; padding: 0; border: 0; outline: 0; background: transparent; color: transparent; caret-color: transparent; font-size: 16px; cursor: text; }
+.pin-boxes input:disabled { cursor: default; }
 .pin-boxes input::selection { background: transparent; }
-.pin-box { display: grid; place-items: center; width: clamp(36px, 11vw, 46px); aspect-ratio: 4 / 5; border-radius: var(--rs, 12px); font: 600 24px var(--mono); color: var(--fg); background: color-mix(in srgb, var(--bg) 65%, transparent); border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent); transition: border-color 0.15s, box-shadow 0.15s; }
-.pin-box:nth-of-type(4) { margin-left: 8px; } /* 3 + 3, as Settings shows it */
-.pin-box.full { border-color: color-mix(in srgb, var(--accent) 55%, transparent); animation: pin-pop 0.18s ease-out; }
-.pin-boxes:focus-within .pin-box.at { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 28%, transparent); }
-.pin-boxes:focus-within .pin-box.at::after { content: ''; width: 2px; height: 45%; border-radius: 1px; background: var(--accent); animation: pin-caret 1s steps(1) infinite; }
-.pin-boxes.bad .pin-box { border-color: color-mix(in srgb, var(--error) 70%, transparent); }
-.pin-boxes.shake { animation: pin-shake 0.4s; }
-@keyframes pin-pop { from { transform: scale(0.9); } }
+.pin-box { display: grid; place-items: center; width: clamp(38px, 11vw, 48px); height: clamp(48px, 14vw, 58px); border-radius: var(--rs, 12px); font: 600 24px var(--mono); color: var(--fg); background: var(--bg); border: 1px solid color-mix(in srgb, var(--fg) 14%, var(--line)); transition: border-color 0.15s, box-shadow 0.15s, background 0.15s; }
+.pin-box:nth-of-type(4) { margin-left: 10px; } /* 3 + 3, as Settings shows it */
+.pin-boxes:not(:focus-within):hover .pin-box { border-color: color-mix(in srgb, var(--fg) 28%, var(--line)); }
+.pin-box.full { border-color: color-mix(in srgb, var(--accent) 55%, var(--line)); background: color-mix(in srgb, var(--accent) 6%, var(--bg)); animation: pin-pop 0.18s ease-out; }
+.pin-boxes:focus-within .pin-box.at { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 26%, transparent); }
+.pin-boxes:focus-within .pin-box.at::after { content: ''; width: 2px; height: 42%; border-radius: 1px; background: var(--accent); animation: pin-caret 1s steps(1) infinite; }
+.pin-boxes.bad .pin-box { border-color: color-mix(in srgb, var(--error) 70%, var(--line)); }
+.pin-card > .pin-boxes.shake { animation: pin-shake 0.4s; } /* not its rise's delay */
+.pin-card.ok .pin-box { border-color: color-mix(in srgb, #22c55e 60%, var(--line)); }
+@keyframes pin-pop { from { transform: scale(0.88); } }
 @keyframes pin-caret { 50% { opacity: 0; } }
 @keyframes pin-shake { 20%, 60% { transform: translateX(-8px); } 40%, 80% { transform: translateX(8px); } }
-.pin-go { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 44px; padding: 0 16px; border: 0; border-radius: var(--rs, 12px); font-size: 15px; font-weight: 650; color: #fff; background: linear-gradient(120deg, #c2410c, #9333ea 55%, #6d28d9) 0 0 / 200% 100%; box-shadow: 0 12px 30px -12px rgba(194, 65, 12, 0.8); transition: background-position 0.4s, transform 0.1s, opacity 0.2s; cursor: pointer; }
-.pin-go:hover:not(:disabled) { background-position: 100% 0; }
+.pin-go { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; height: 44px; padding: 0 16px; border: 1px solid var(--accent); border-radius: var(--rs, 12px); font-size: 15px; font-weight: 650; color: var(--accent-fg); background: var(--accent); box-shadow: 0 10px 24px -12px color-mix(in srgb, var(--accent) 80%, transparent); transition: filter 0.15s, transform 0.1s, opacity 0.2s; cursor: pointer; }
+.pin-go:hover:not(:disabled) { filter: brightness(1.08); }
 .pin-go:active:not(:disabled) { transform: translateY(1px); }
-.pin-go:disabled { opacity: 0.45; box-shadow: none; cursor: default; }
-.pin-left { padding: 3px 10px; border-radius: 999px; font-size: 12px; color: var(--muted); background: color-mix(in srgb, var(--fg) 6%, transparent); }
-.pin-err { font-size: 13px; color: var(--error); }
-@media (prefers-reduced-motion: reduce) { .aurora i, .splash.pinning .logo img, .pin-box.full, .pin-boxes.shake, .pin-boxes:focus-within .pin-box.at::after { animation: none; } }
+.pin-go:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.pin-go.short { opacity: 0.55; box-shadow: none; }
+.pin-go.short:hover { opacity: 0.75; }
+.pin-go:disabled { opacity: 0.4; box-shadow: none; cursor: default; }
+.pin-go .btn-spin { margin: 0; }
+.pin-card.ok .pin-go { border-color: #16a34a; background: #16a34a; color: #fff; }
+.pin-foot { min-height: 18px; font-size: 12px; color: var(--muted); }
+.pin-err { color: var(--error); }
+@media (prefers-reduced-motion: reduce) { .pin-card, .pin-card > *, .pin-ring > span, .pin-box.full, .pin-card > .pin-boxes.shake, .pin-boxes:focus-within .pin-box.at::after { animation: none; } .pin-fill { transition: none; } }
 
 .app { display: flex; height: 100%; position: relative; }
 .sidebar { width: 240px; flex: none; background: var(--side); border-right: 1px solid var(--line); display: flex; flex-direction: column; }
@@ -154,6 +165,11 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .rail-dot.bad { background: var(--error); }
 /* the rail's quick access: a line, then the pinned workspaces (initials in their color), terminals and browsers, bare as
    the buttons above */
+/* back and forward (experimental): ‹ › at the rail's top, else after the sidebar head's hide button */
+.hist-nav { display: inline-flex; flex: none; gap: 0; }
+.hist-nav .ib { width: 24px; height: 24px; padding: 0; }
+.hist-nav .ib:disabled { opacity: 0.35; background: none; }
+.rail .hist-nav { margin-bottom: 4px; }
 .rail-sep { flex: none; width: 32px; height: 1px; margin: 6px 0; background: color-mix(in srgb, var(--fg) 22%, transparent); }
 .rail-mark { font: 700 12px/1 var(--ui-font); letter-spacing: 0.02em; }
 .rail-pin .rail-icon { color: var(--tab-c, inherit); } /* initials or a terminal's or browser's icon in its color */
@@ -172,10 +188,11 @@ select:not([multiple], [size], :disabled):hover { --muted: var(--fg); }
 .side-scroll { flex: 1; overflow-y: auto; padding: 2px 0 8px; }
 /* its scrollbar: thin, no track, a faint rounded thumb, brighter under the mouse (a look's own, aqua's, wins; Chromium
    doesn't repaint a thumb for the list's own :hover, so it isn't hidden until then) */
-:is(.side-scroll, .ai-thread)::-webkit-scrollbar { width: 6px; background: transparent; }
-:is(.side-scroll, .ai-thread)::-webkit-scrollbar-track { background: transparent; }
-:is(.side-scroll, .ai-thread)::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 14%, transparent); border-radius: 3px; }
-:is(.side-scroll, .ai-thread)::-webkit-scrollbar-thumb:hover, :is(.side-scroll, .ai-thread)::-webkit-scrollbar-thumb:active { background: color-mix(in srgb, var(--fg) 32%, transparent); }
+/* the same on extensions: a Desk tile, the Desk itself, a full view, the sidebar's grid (their own pages: WIDGET_CSS) */
+:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar { width: 6px; height: 6px; background: transparent; }
+:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-track, :is(.desk-body, .widget-full, .widgets, .widget-body)::-webkit-scrollbar-corner { background: transparent; }
+:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--fg) 14%, transparent); border-radius: 3px; }
+:is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-thumb:hover, :is(.side-scroll, .ai-thread, .desk-body, .page-body:has(> .desk-grid), .widget-full, .widgets, .widget-body)::-webkit-scrollbar-thumb:active { background: color-mix(in srgb, var(--fg) 32%, transparent); }
 .side-foot { flex: none; display: flex; align-items: center; gap: 2px; min-width: 0; height: 34px; padding: 0 6px; border-top: 1px solid var(--line); overflow: hidden; }
 /* the foot in one row: App's fit drops the last data-bare buttons' words (Settings' first) until it fits */
 :is(.side-foot[data-bare='1'] > button:nth-last-of-type(-n + 1), .side-foot[data-bare='2'] > button:nth-last-of-type(-n + 2), .side-foot[data-bare='3'] > button:nth-last-of-type(-n + 3), .side-foot[data-bare='4'] > button:nth-last-of-type(-n + 4), .side-foot[data-bare='5'] > button:nth-last-of-type(-n + 5), .side-foot[data-bare='6'] > button:nth-last-of-type(-n + 6)).labeled { width: 24px; padding: 0; }
@@ -647,7 +664,19 @@ html.away .voice-bar { animation-play-state: running !important; } /* paused at 
 .nw-top .nw-pick.quiet { cursor: default; }
 .nw-top .nw-pick.quiet:hover { background: none; color: var(--muted); }
 .nw-top .nw-pick.on { background: var(--hover); color: var(--fg); }
-.nw-top-end { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; }
+.nw-top-end { display: inline-flex; align-items: center; gap: 2px; margin-left: auto; min-width: 0; }
+/* one row, never a lonely second one: the project, the name and the base give way, their words cut with … (the name's
+   first); the short picks, the template and the agent keep theirs */
+.nw-top { flex-wrap: nowrap; }
+.nw-top > *, .nw-top-end, .nw-top-end > * { flex-shrink: 0; }
+.nw-top .nw-pick > span { min-width: 0; }
+.nw-top .nw-pick > .icon-svg, .nw-top .nw-base > .ib { flex: none; }
+.nw-top > :first-child { flex-shrink: 1; min-width: 7em; }
+.nw-top > .nw-base { flex-shrink: 1; min-width: 6em; }
+.nw-top > label.nw-base { flex-shrink: 6; }
+.nw-top-end .nw-pick { max-width: 170px; }
+.nw-top .nw-base .nw-chip-input { flex: 0 1 auto; min-width: 3ch; text-overflow: ellipsis; }
+.narrow .nw-top { flex-wrap: wrap; } /* a phone's: each a finger's size, as many rows as it takes */
 .nw-base { cursor: text; }
 .form label.nw-pick { flex-direction: row; gap: 4px; color: var(--muted); font-size: 12.5px; }
 .nw-base:focus-within { background: var(--hover); color: var(--fg); }
@@ -1317,6 +1346,43 @@ input.color-pick { width: 44px; height: 31px; padding: 2px 3px; flex: none; curs
 .ai-chat-row:hover .ai-chat-rm, .ai-chat-rm:focus-visible { opacity: 1; }
 .ai-chats-none { padding: 6px 10px; }
 .narrow .ai-chats { display: none; } /* a phone: the chat alone */
+/* Notes (experimental, Notes.tsx): the list on the left as the sidebar is (search, colors, a row per note: its color's
+   bar, title, two lines of its text, when), the open note on the right as a page, BlockNote's editor under its title */
+.page-body.wide:has(> .notes) { padding: 0; overflow: hidden; }
+.page-body > .notes { flex: 1; min-height: 0; margin: 0; max-width: none; display: flex; }
+.notes-side { flex: none; width: 290px; display: flex; flex-direction: column; min-height: 0; border-right: 1px solid var(--line); background: var(--side); }
+.notes-find { align-items: center; gap: 6px; margin: 10px 10px 6px; padding: 0 8px; height: 30px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); color: var(--muted); }
+.notes-find:focus-within { border-color: var(--accent); }
+.notes-find input { flex: 1; min-width: 0; height: 100%; padding: 0 22px 0 0; border: none; background: none; box-shadow: none; outline: none; color: var(--fg); }
+.notes-colors { display: flex; flex-wrap: wrap; gap: 6px; padding: 2px 12px 8px; }
+.notes-dot { width: 14px; height: 14px; padding: 0; border: 2px solid transparent; border-radius: 50%; background: var(--tab-c); background-clip: padding-box; box-shadow: 0 0 0 1px color-mix(in srgb, var(--fg) 14%, transparent); }
+.notes-dot:hover { transform: scale(1.15); background: var(--tab-c) padding-box; } /* over button:hover, its clip kept */
+.notes-dot.on { box-shadow: 0 0 0 2px var(--side), 0 0 0 3.5px var(--tab-c); }
+.notes-list { flex: 1; min-height: 0; overflow-y: auto; padding: 2px 6px 12px; }
+.notes-none { padding: 8px 8px; }
+.note-row { position: relative; display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 10px 8px 14px; border: none; border-radius: var(--radius); background: none; text-align: left; color: var(--fg); }
+.note-row::before { content: ''; position: absolute; left: 4px; top: 10px; bottom: 10px; width: 3px; border-radius: 2px; background: var(--tab-c, transparent); }
+.note-row:hover { background: var(--hover); }
+.note-row.on { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.note-row-head { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.note-row-head b { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; font-weight: 600; }
+.note-row-head .icon-svg { flex: none; color: var(--muted); }
+.note-prev { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; font-size: 12px; line-height: 1.4; color: var(--muted); }
+.note-when { font-size: 11px; color: color-mix(in srgb, var(--muted) 80%, transparent); }
+.note-edit { flex: 1; min-width: 0; overflow-y: auto; padding: 28px 40px 80px; }
+.note-page { max-width: 860px; margin: 0 auto; }
+.note-head { display: flex; align-items: center; gap: 4px; }
+.note-title { flex: 1; min-width: 0; height: auto; padding: 0; border: none; background: none; box-shadow: none; outline: none; font-size: 28px; font-weight: 700; letter-spacing: -0.015em; color: var(--fg); }
+.note-title::placeholder { color: color-mix(in srgb, var(--muted) 60%, transparent); }
+.note-color { flex: none; width: 18px; height: 18px; margin: 0 6px; padding: 0; border-radius: 50%; border: 1px dashed color-mix(in srgb, var(--fg) 30%, transparent); background: var(--tab-c, transparent); }
+.note-color[style] { border: 1px solid color-mix(in srgb, var(--fg) 14%, transparent); }
+.note-meta { margin: 6px 0 18px; }
+.note-empty { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; max-width: 420px; margin: 0 auto; padding: 24px; text-align: center; }
+.note-empty > .icon-svg { color: var(--accent-ink); }
+.narrow .page-body > .notes { flex-direction: column; }
+.narrow .notes-side { width: auto; max-height: 38%; border-right: none; border-bottom: 1px solid var(--line); }
+.narrow .note-edit { padding: 16px 16px 60px; }
+.narrow .note-edit .editor-wrap { margin: 0 -8px; }
 .ai-thumbs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .ai-thumb { padding: 0; border: 1px solid var(--line); border-radius: var(--rs, 8px); overflow: hidden; background: var(--bg); cursor: zoom-in; line-height: 0; }
 .ai-thumb img { width: 96px; height: 72px; object-fit: cover; display: block; }
@@ -2003,6 +2069,7 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .desk-head > .small { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
 .desk-body { position: relative; flex: 1; min-height: 0; overflow: auto; padding: 10px 12px; }
 .desk-body .widget-frame { height: 100%; }
+.page-body:has(> .desk-grid) { padding-bottom: 96px; } /* a bottom tile's corner clear of the AI button (.ai-fab), so it resizes */
 .desk-size { position: absolute; right: 0; bottom: 0; z-index: 2; width: 18px; height: 18px; cursor: nwse-resize; touch-action: none; background: linear-gradient(135deg, transparent 50%, color-mix(in srgb, var(--muted) 60%, transparent) 50% 58%, transparent 58% 70%, color-mix(in srgb, var(--muted) 60%, transparent) 70% 78%, transparent 78%); }
 .desk-dims { position: absolute; right: 20px; bottom: 4px; padding: 1px 6px; border-radius: var(--rs, 4px); background: var(--accent); color: var(--accent-fg, #fff); font: 11px var(--mono); }
 .desk-empty { display: flex; flex-direction: column; align-items: center; gap: 10px; max-width: 420px; margin: 80px auto; text-align: center; }

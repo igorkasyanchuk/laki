@@ -88,10 +88,10 @@ changing it: [AGENTS.md](../AGENTS.md).
   or a notification (Settings › General › Timers), and pauses, plays or closes the
   video, or runs a command, if you like. Its *Stopwatch* counts up instead: start or pause, reset, close.
 - **Extensions** (also called widgets: one and the same): small live pages at the bottom of the sidebar (a grid 3 cells
-  across), in the top bar, the status bar or on the Desk, or buttons on the rail and the sidebar's foot: a count, a
+  across), in the top bar, the status bar or on My Desk, or buttons on the rail and the sidebar's foot: a count, a
   chart, a table, each fed by a command, a script, a file, a URL or an agent, with a full view a click away (below:
   Extensions). Two come with Laki: *Links* and *My PRs*; *Remix* copies any one to change, and Laki AI (Settings ›
-  Extensions › *New ▾*, or the Desk's *Build with AI*) or the *Extension creator* agent skill makes more.
+  Extensions › *New ▾*, or My Desk's *Build with AI*) or the *Extension creator* agent skill makes more.
 - **A video while you work**: the play button at the bottom of the sidebar asks for a YouTube link (a video, a
   short, a playlist; `t=` starts it there) and plays it there, with YouTube's own controls; ✕ closes it.
 
@@ -500,8 +500,10 @@ through such a question: *Yes, remove…* is yours to press, and Laki does it. A
 (*a clock with the time in New York*) and it writes one in Laki's extensions folder, saved off: its fetch runs commands,
 so you look and turn it on in Settings › Extensions (*by Laki AI* on its row), or it asks you in the chat, with what it
 runs, and *Yes, turn it on* does it; the chat on an extension's page has it rewrite one of yours the same way. It
-also arranges any extension for you: *put My PRs on the Desk*, a size, how often it fetches, a setting. It never archives or deletes
-workspaces, ships or merges, and it does nothing until you ask. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
+also arranges any extension for you: *put My PRs on My Desk*, a size, how often it fetches, a setting. It never archives or deletes
+workspaces, ships or merges, and it does nothing until you ask. With the claude backend, when it wants a tool it may not
+use on its own (reading a file outside its folder), it asks in the chat while it works: *Allow once*, *Always in this
+chat* (that tool, until *New chat*) or *Deny*; no answer in about 5 minutes is a no. It reads like a chat: ⏎ asks (⇧⏎ a new line), the tools a turn ran fold
 into one line you can open, a pasted image is a thumbnail (a click shows it big), *Stop* ends an ask, *New chat* starts
 over. The chat it ends stays in the page's sidebar (the last 100): a click takes one up again (its claude or codex session
 goes on), the trash deletes it. A workspace or tab it names is a link: a click
@@ -787,7 +789,7 @@ Extensions (also called widgets or plugins: one and the same) are small live pag
 [extensions.md](extensions.md).
 
 Where each one shows is its own (Settings › Extensions › the extension: *Sidebar*, *Top bar*, *Status bar*, *Rail*,
-*Sidebar foot*, *Desk*, *Right panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
+*Sidebar foot*, *My Desk*, *Right panel* or *Workspace rows*, one or several): the sidebar's grid (the default), the top
 bar left of its buttons, the status bar's right end, a tab of the right panel (⌥⌘B), or a mark on each workspace's row
 (a per-workspace one: its count for that workspace, its tip on hover); the
 bars are a line high, as wide as its cells across. On the rail (among its icons; with no rail, in the sidebar's foot)
@@ -838,12 +840,12 @@ Every extension, yours too, starts off: turn it on in Settings › Extensions. T
 
 My PRs takes *Only with labels* (any of them; empty: all) and *Hide with labels* (`wip`, `do-not-merge`).
 
-Each extension has a **page of its own**: a click on its row in Settings › Extensions (or ⚙ in its full view, *Its
-page* on a Desk tile). It shows how it looks where it sits, and its full view, either live or with **made-up data**
+Each extension has a **page of its own**: a click on its row in Settings › Extensions (or ⚙ in its full view, *Edit*
+on a My Desk tile or in its right click). It shows how it looks where it sits, and its full view, either live or with **made-up data**
 (*Sample*: what its `widget.json` gives as `sample`, so you see it before it ever runs; every one with a fetch has
 one), its settings under them, and Laki AI's chat beside them: say what to change and it rewrites the extension (one
 of yours, in Laki's folder), saved off until you turn it on, the preview showing each version. The crumb at the top,
-or Esc, goes back where you came from (Settings, the Desk).
+or Esc, goes back where you came from (Settings, My Desk).
 
 *Edit* at its top goes to its settings, lit. Its **Data** tab says where the data comes from (its fetch, a text, a
 file, a URL), shows the data, and its examples (its sample and each `fixtures/*.json`: *Show it with this*); the
@@ -1097,9 +1099,9 @@ workspace it's about if any. Laki AI and agents add them too, when you ask
 `laki_reminder`). As one is due Laki notifies you (a toast too, *Open* goes to its workspace); one due while Laki was
 closed rings as it opens. Tick it off when it's done; the rail's count is the ones that rang and aren't.
 
-### Desk (experimental)
+### My Desk (experimental)
 
-Turn it on in Settings › General › *Experimental*; the rail's Desk (⌘K too) opens it: your extensions as tiles, an
+Turn it on in Settings › General › *Experimental*; the rail's My Desk (⌘K too) opens it: your extensions as tiles, an
 overview of what's going on. *Add* puts one there (it can stay in the sidebar too: Settings › Extensions' place menu
 ticks every place it shows in). Drag a tile's head onto another to move it, its corner to resize it; Laki keeps the
 layout. A tile shows the extension's full view when it has one. Esc doesn't close it: it's a page to stay on.
@@ -1110,9 +1112,27 @@ type or paste an emoji; *No icon*). Drag a tile's head onto a tab, or pick a til
 there; *Add* puts an extension on the tab you're on.
 
 **Build with AI** (with Laki AI on) asks what it should show, then hands it to Laki AI's floating chat: it asks a few
-questions and writes the extension for the Desk. It shows as a tile right away, dashed, with its made-up data and
+questions and writes the extension for My Desk. It shows as a tile right away, dashed, with its made-up data and
 *By Laki AI · off*: *Look* opens its page (what it runs, its settings), *Turn on* runs it. Ask the chat for changes
-and the tile follows; *Take it off the Desk* in a tile's ⋯ removes it.
+and the tile follows; *Take it off My Desk* in a tile's ⋯ removes it.
+
+### Notes (experimental)
+
+Turn it on in Settings › General › *Experimental*; the rail's Notes (⌘K too) opens your notes: one list for every
+project, kept in Laki's data folder (`notes/`). The list on the left has a search box (every word, in a note's title or
+text), a dot per color in use (a click shows only those), and each note's color, title, the start of its text and when
+it changed, pinned ones first, then the newest edit. A right click on one pins it, colors it or deletes it. The note
+on the right is written like a Notion page, the same editor as specs: type `/` for headings, lists, checklists,
+tables, code, quotes, images (paste or drop them in) and diagrams. It saves as you type. *New note* starts one (in
+the color you're showing only).
+
+### Back and forward (experimental)
+
+Turn it on in Settings › General › *Experimental*. ‹ › at the rail's top (without the rail: after the sidebar head's
+hide button), or ⌘[ and ⌘], go back and forward through the pages (My Desk, Board, Settings, an extension's page,
+Specs…) and workspaces you were on, the last 10, as in a browser: open an extension's settings from My Desk, and ‹
+brings My Desk back. A right click on either lists where it goes. Dialogs (⌘K, a rename) aren't steps; a workspace
+removed since is skipped.
 
 ### Laki AI's glow (experimental)
 
@@ -1161,6 +1181,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘J | the next tab that needs you (waiting first, then done unseen), across workspaces |
+| ⌘[ / ⌘] | back / forward through the pages and workspaces you were on (experimental: Back and forward) |
 | ⌘L | send a message later: to an agent of the workspace or Laki AI |
 | ⌘⇧A | show / hide the workspace's artifacts over the status bar |
 | ⌘⇧⏎ | full screen: just the tab's content (no rail, sidebar, tab bar, panels or status bar), the window full screen too; again (or the faint ⤡ in the corner) brings it all back. Also the tab bar's ⤢ |

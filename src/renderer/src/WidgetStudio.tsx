@@ -32,7 +32,7 @@ const SHOWN: [string, string][] = [
   ['top', 'Top bar'],
   ['status', 'Status bar'],
   ['button', 'Button'],
-  ['desk', 'Desk'],
+  ['desk', 'My Desk'],
 ]
 const same = (t: string) => t
 

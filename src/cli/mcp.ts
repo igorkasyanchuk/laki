@@ -632,7 +632,18 @@ export const aiRpc = (rpc: Rpc): Rpc => (method, params, ms) => rpc(method, AI_L
 
 let daemon: Promise<unknown> | undefined
 const own = process.env.LAKI_AI === '1' ? aiRpc(conn) : conn // Laki AI's claude or codex runs this laki mcp
-const TOOLS = [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : [])]
+// Laki AI's claude -p asks through it (--permission-prompt-tool) before a tool it may not use unasked: the user's pick in
+// the chat, as claude wants it back
+const permission: Tool = {
+  name: 'laki_permission',
+  description: "Laki's own: Claude Code asks the user through it before a tool it may not use unasked. Never call it yourself.",
+  inputSchema: obj({ tool_name: str('the tool'), input: { type: 'object', description: 'its input' } }, ['tool_name']),
+  run: async a => {
+    const r: { allow: boolean; message?: string } = await own('aiPermission', { tool: a.tool_name, input: a.input }, 300000)
+    return JSON.stringify(r.allow ? { behavior: 'allow', updatedInput: a.input ?? {} } : { behavior: 'deny', message: r.message ?? 'The user said no.' })
+  },
+}
+const TOOLS = [...tools(own, process.env.LAKI_WORKSPACE || undefined, process.env.LAKI_AI === '1' ? 'Laki AI' : undefined), ...(process.env.LAKI_AI_SKILL === '1' ? skillTools(own) : []), ...(process.env.LAKI_AI === '1' ? [permission] : [])]
 async function call(name: string, args: unknown) {
   const tool = TOOLS.find(t => t.name === name)
   if (!tool && name.startsWith('ext_')) {

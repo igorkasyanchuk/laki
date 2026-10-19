@@ -10,7 +10,7 @@ import { randomBytes } from 'node:crypto'
 import { appendFileSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join, sep } from 'node:path'
 import { aiRpc, type Rpc, skillTools, SKILL, type Tool, tools } from '../cli/mcp.ts'
-import { AI_ACTS, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View, EFFORTS, type Preset } from '../shared/types.ts'
+import { AI_ACTS, AI_PERM, AI_MODEL, VOICE_MODEL, AI_CONTEXT_MAX as CONTEXT_MAX, AI_STEPS, type AiAct, type AiBackend, type AiCall, type AiMsg, type AiPast, aiTotals, type View, EFFORTS, type Preset } from '../shared/types.ts'
 import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
@@ -170,7 +170,7 @@ const VOICE_AGAIN = (process.env.LAKI_VOICE_AGAIN ?? '1000,2500').split(',').map
 
 // resume: claude's session, codex's thread, by sessionKey: the next ask goes on with it. at: the last message.
 // ended: a spec's or brainstorm's chat unused PLAN_CHAT_IDLE: the next ask starts it again, empty
-type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string } // about: a widget chat's brief for this ask (aboutWidget)
+type Thread = { id: string; file: string; chat: AiMsg[]; resume: Record<string, string | undefined>; at: number; ended?: number; about?: string; allowed?: Set<string> } // about: a widget chat's brief for this ask (aboutWidget); allowed: the tools Always in this chat let its agent use
 const threads = new Map<string, Thread>()
 // ponytail: one ask at a time across every chat (laki_ask's aiQuestion finds its chat by it); a lock per chat, and the
 // chat's id through laki mcp's env, if brainstorms in parallel are wanted
@@ -185,6 +185,7 @@ function thread(id = ''): Thread {
     j = JSON.parse(readFileSync(file, 'utf8'))
   } catch {}
   const t: Thread = { id, file, chat: Array.isArray(j.chat) ? j.chat : [], resume: j.resume ?? {}, at: Number(j.at) || Date.now(), ended: j.ended }
+  for (const m of t.chat) if (m.ask?.perm && m.ask.picked === undefined) m.ask.picked = 'Not answered' // its agent ended with the daemon
   if (id && !t.ended && t.chat.length && Date.now() - t.at > PLAN_CHAT_IDLE) t.ended = t.at + PLAN_CHAT_IDLE // ran out while the daemon wasn't looking
   threads.set(id, t)
   return t
@@ -197,7 +198,7 @@ function changed(t: Thread) {
   broadcast({ ev: 'ai', of: t.id, chat: t.chat, busy: busy?.id === t.id, ended: t.ended })
 }
 const say = (t: Thread, role: AiMsg['role'], text: string, images?: string[]) => (t.chat.push({ role, text, at: (t.at = Date.now()), ...(images?.length && { images }) }), changed(t))
-const fresh = (t: Thread) => ((t.chat = []), (t.resume = {}), (t.ended = undefined), (t.at = Date.now()))
+const fresh = (t: Thread) => ((t.chat = []), (t.resume = {}), (t.ended = undefined), (t.at = Date.now()), (t.allowed = undefined))
 
 export function aiNew(p: { chat?: string } = {}) {
   const t = thread(p.chat)
@@ -356,6 +357,7 @@ export async function aiAsk(p: { text?: string; images?: string[]; chat?: string
   } finally {
     Object.assign(call, { model: r.model, in: r.in, out: r.out, cost: r.cost, tools: r.calls, ms: Date.now() - t0 })
     busy = null
+    for (const done of perms.values()) done(-1) // its agent is gone: nothing waits on them
     try {
       appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
     } catch {}
@@ -619,7 +621,7 @@ async function claude(o: Opts) {
   const sk = sessionKey('claude')
   const resume = o.t.resume
   const prompt = o.images.length ? `${o.ask}\n\nImages (read them): ${o.images.join(' ')}` : o.ask
-  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...effortArgs('claude'), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
+  const args = ['-p', '--output-format', 'stream-json', '--verbose', '--mcp-config', JSON.stringify({ mcpServers: { laki: mcpServer() } }), '--strict-mcp-config', '--tools', 'Read', ...(o.images.length ? ['--add-dir', join(dir, 'images')] : []), '--allowedTools', 'mcp__laki', '--permission-prompt-tool', 'mcp__laki__laki_permission', '--append-system-prompt', system(o.t), ...(model ? ['--model', model] : []), ...effortArgs('claude'), ...(resume[sk] ? ['--resume', resume[sk]] : []), '--', prompt]
   const r = o.r
   let failed = ''
   await cli(o, 'claude', args, j => {
@@ -716,6 +718,12 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   const m = chat.find(m => m.ask?.id === p.id)
   if (!m?.ask) throw new Error('no such question: a new chat started since')
   if (m.ask.picked !== undefined) throw new Error('answered already')
+  if (m.ask.perm) {
+    const done = perms.get(m.ask.id)
+    if (!done || AI_PERM[Number(p.n)] === undefined) throw new Error(done ? 'no such option' : 'it waits no more: ask again')
+    done(Number(p.n))
+    return { allowed: Number(p.n) < 2 }
+  }
   if (t.ended) throw new Error('this chat ended: Continue it, or ask again') // a pick would start a new chat without the question
   if (chat.slice(chat.indexOf(m) + 1).some(x => x.role === 'user')) throw new Error('a newer ask came since: ask again') // its context is gone
   if (busy) throw new Error(busy.id === t.id ? 'the AI is still on the last ask' : 'Laki AI is busy in another chat: wait for it, or stop it')
@@ -779,6 +787,39 @@ async function remove(a: AiAct, rpc: Rpc) {
   if (!p?.memory?.some(m => m.id === a.id)) throw new Error('not in that project’s memory any more')
   return rpc('projectSet', { id: p.id, memory: p.memory.filter(m => m.id !== a.id) })
 }
+
+// ---------- its agent asking to use a tool (claude -p's --permission-prompt-tool: laki mcp's laki_permission)
+
+// claude's Read outside its folder, say: a question in the chat while the ask works, AI_PERM's buttons, its tool call
+// waiting on the pick (Always in this chat: that tool unasked until a new chat); no pick in PERM_WAIT, or the ask ends: no
+const PERM_WAIT = 280000 // under the MCP call's 5 minutes (MCP_TOOL_TIMEOUT)
+const perms = new Map<string, (n: number) => void>() // a waiting ask's id: its pick (-1: none)
+export function aiPermission(p: { tool?: unknown; input?: unknown }): Promise<{ allow: boolean; message?: string }> | { allow: boolean } {
+  if (!busy) throw new Error('only while Laki AI works on an ask')
+  const t = thread(busy.id)
+  const tool = String(p.tool ?? '').replace(/^mcp__/, '').slice(0, 100)
+  if (!tool) throw new Error('a tool')
+  if (t.allowed?.has(tool)) return { allow: true }
+  const i = (p.input && typeof p.input === 'object' ? p.input : {}) as Record<string, unknown>
+  const what = String(i.file_path ?? i.path ?? i.command ?? i.url ?? i.pattern ?? (Object.keys(i).length ? JSON.stringify(i) : '')).slice(0, 300)
+  const id = randomBytes(6).toString('hex')
+  const m: AiMsg = { role: 'ai', text: `May I use **${tool}**${what ? ` on \`${what.replace(/`/g, "'")}\`` : ''}? ${PERM_WHY}`, at: (t.at = Date.now()), ask: { id, options: [...AI_PERM], perm: true } }
+  t.chat.push(m)
+  changed(t)
+  return new Promise(resolve => {
+    const done = (n: number) => {
+      clearTimeout(timer)
+      perms.delete(id)
+      m.ask!.picked = AI_PERM[n] ?? 'Not answered'
+      if (n === 1) (t.allowed ??= new Set()).add(tool)
+      changed(t)
+      resolve(n === 0 || n === 1 ? { allow: true } : { allow: false, message: n === 2 ? 'The user said no: do without it, or ask them another way.' : 'The user did not answer: do without it.' })
+    }
+    const timer = setTimeout(() => done(-1), PERM_WAIT)
+    perms.set(id, done)
+  })
+}
+const PERM_WHY = 'It needs your OK: Laki AI may use only its laki tools unasked.'
 
 // ---------- the call log
 

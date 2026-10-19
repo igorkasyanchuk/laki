@@ -366,8 +366,10 @@ export type Settings = {
   birdView?: boolean // experimental (Settings › General): the eye beside Help, every live session's screen at once, off unless true
   calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // experimental (Settings › General): the rail's Desk, extensions placed there as tiles, off unless true
+  notes?: boolean // experimental (Settings › General): the rail's Notes, your own notes (daemon/notes.ts), off unless true
+  history?: boolean // experimental (Settings › General): back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), off unless true
   deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
-  deskTabs?: DeskTab[] // the Desk's tabs in order (none: one, Desk)
+  deskTabs?: DeskTab[] // My Desk's tabs in order (none: one, My Desk)
   aiGlow?: boolean // experimental (Settings › General): a glow over what Laki AI looks at (a tab's pane, else the window), off unless true
   planTemplates?: PlanTemplate[] // the Specs page's Templates (unset: PLAN_TEMPLATES, shared/plans.ts)
   remoteMail?: string // the one email remote access lets in
@@ -459,8 +461,10 @@ export const AI_CONTEXT_MAX = 8000 // Your instructions' characters
 // the AI page's conversation: what you asked (images: their paths), its answers, each tool it ran, a failure
 export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: number; images?: string[]; ask?: AiAsk }
 // a question Laki AI asked (laki_ask, or before a removal): its options as buttons, picked: the answer given. act: what a
-// Yes removes: only the user's click does it (the daemon's aiAnswer), never the AI itself
-export type AiAsk = { id: string; options: string[]; picked?: string; act?: AiAct }
+// Yes removes: only the user's click does it (the daemon's aiAnswer), never the AI itself. perm: its agent asks to use a
+// tool (claude's permission prompt, ai.ts' aiPermission), answered while it works: AI_PERM's options
+export type AiAsk = { id: string; options: string[]; picked?: string; act?: AiAct; perm?: boolean }
+export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
 export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget'] as const // widget: turning an extension on, the rest a removal
 export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string }
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
@@ -661,5 +665,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 87
+export const API = 88
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL
