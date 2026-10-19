@@ -34,3 +34,31 @@ test('a meme: Reddit first (NSFW skipped), not one shown already, the mirror whe
   mirror = false
   await assert.rejects(rig.rpc('meme'), /no meme this time/)
 })
+
+test('a meme\'s picture: one redirected off https, or past 8 MB without saying so, is skipped', async t => {
+  let big = true
+  const server = createServer((req, res) => {
+    const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`
+    const json = (b: unknown) => res.writeHead(200, { 'content-type': 'application/json' }).end(JSON.stringify(b))
+    const post = (title: string, file: string) => ({ data: { title, url: `${base}/${file}`, permalink: `/r/memes/comments/${file}`, author: 'ann' } })
+    const hot = req.url?.match(/^\/r\/(\w+)\/hot\.json/)?.[1]
+    if (hot) return json({ data: { children: hot === 'memes' ? [post('moved', 'm.png'), post('big', 'b.png')] : [] } })
+    if (req.url?.startsWith('/gimme/')) return json({ memes: [] })
+    if (req.url === '/m.png') return res.writeHead(302, { location: `http://localhost:${(server.address() as { port: number }).port}/ok.png` }).end() // not the fake's own: as if plain http
+    if (req.url === '/b.png') {
+      if (!big) return res.writeHead(200, { 'content-type': 'image/png' }).end(Buffer.from('pic'))
+      res.writeHead(200, { 'content-type': 'image/png' }) // chunked: no content-length
+      const mb = Buffer.alloc(1 << 20)
+      for (let i = 0; i < 9; i++) res.write(mb)
+      return res.end()
+    }
+    if (req.url === '/ok.png') return res.writeHead(200, { 'content-type': 'image/png' }).end(Buffer.from('pic'))
+    res.writeHead(404).end()
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void server.close())
+  const rig = await fresh(t, { env: { LAKI_MEME_API: `http://127.0.0.1:${(server.address() as { port: number }).port}` } })
+  await assert.rejects(rig.rpc('meme'), /no meme this time/)
+  big = false
+  assert.equal((await rig.rpc('meme')).title, 'big')
+})

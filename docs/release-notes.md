@@ -11,6 +11,8 @@ version it builds, with the date. -->
   the workspaces' storage folders are yours alone (0600, 0700).
 - Security: the installed app ignores development settings in its environment, and a page inside it (an extension, an
   artifact) gets no permission beyond full screen and copying.
+- Workflows' webhooks go to https URLs only (plain http to this Mac) and don't follow redirects: a 3xx is the
+  answer.
 
 ## 0.21.0 · Oct 19, 2026
 

@@ -767,6 +767,8 @@ function hookSend(b: Block, vars: Record<string, string>, envs: Record<string, s
   const urlOf = (e: Record<string, string>) => (q0 < 0 ? fill(tpl, { ...vars, ...e }) : `${fill(tpl.slice(0, q0), { ...vars, ...e })}?${fill(tpl.slice(q0 + 1), { ...enc, ...e })}`).trim()
   const url = urlOf(env)
   if (!/^https?:\/\/\S+$/i.test(url)) throw new Error(`${b.url}: not an http(s) URL`)
+  // what it sends holds env's secrets and the run's answers: plain http only to this Mac (a relay of yours, tests')
+  if (!/^(https:|http:\/\/(127\.0\.0\.1|localhost|\[::1\])([:/?#]|$))/i.test(url)) throw new Error(`${b.url}: an https URL (http only to this Mac)`)
   const method = b.method ?? 'POST'
   const headers: Record<string, string> = {}
   for (const h of b.headers ?? []) {
@@ -797,7 +799,7 @@ function hookSend(b: Block, vars: Record<string, string>, envs: Record<string, s
     for (let n = 1; ; n++) {
       let res: Response | undefined
       try {
-        res = await fetch(url, { method, headers, body, signal, redirect: 'follow' })
+        res = await fetch(url, { method, headers, body, signal, redirect: 'manual' }) // a 3xx is its answer: the body and headers go nowhere else
       } catch (e) {
         if (signal.aborted || n >= TRIES) throw e
       }

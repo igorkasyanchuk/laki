@@ -870,10 +870,10 @@ blocks: `$SHELL -lc` in the workspace with its env (`PORT`, `LAKI_WORKSPACE`, `L
 `steps.<id>.data` and each top field `steps.<id>.<field>` (`ANSWER_MAX` each), an off one or a failed fetch the error exit. Save blocks (`keep`): text, `from` (a file or folder of the workspace, realpath inside it, `cpSync`) or `link` (http(s),
 `<file>.url`), into `storageOf`. AI call blocks (`llm`): `ai.ts`' `aiComplete` (one OpenRouter `/chat/completions`, no tools, `model` or
 Settings' OpenRouter model, logged in `ai-calls.jsonl` as `<workflow> · <block>`), the answer `steps.<id>.answer`.
-Webhook blocks (`hook`): `fill` the URL (http(s)) and `header:` lines with the run's variables and `env.NAME` (Settings'
+Webhook blocks (`hook`): `fill` the URL (https; http only to 127.0.0.1, localhost, [::1]) and `header:` lines with the run's variables and `env.NAME` (Settings'
 and the project's env; the log masks them, shows the URL without its query), the body `from` a workspace file (realpath
 inside it, 10 MB, `Blob`), the text (a JSON template's values escaped), else `task` and `steps.*` as JSON; `steps.<id>.status`,
-`.output`, ok on 2xx; 429, 5xx and network errors again (`TRIES` 3, after `Retry-After` up to 30 s, else 2 s, 6 s).
+`.output`, ok on 2xx (a 3xx is the answer: `redirect: 'manual'`); 429, 5xx and network errors again (`TRIES` 3, after `Retry-After` up to 30 s, else 2 s, 6 s).
 All three via `request` (`calls`: an `AbortController` per run, `kill0` aborts, `timeout` 2 min) and `sent` (a `Send`'s
 `Got`: exit, vars, outs). An llm with `out:` asks for `response_format` json; `system`, `temperature` go along.
 Decision blocks (`decide`): `aiDecide` (POST `<api without /v1>/alpha/decisions`, `apiQuestions`: yes/no is the API's
