@@ -2,6 +2,11 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## 0.20.0 · Oct 19, 2026
+
+- Fixes: **Always in this chat** stays with its chat when you open an earlier one; a note's pin and color follow a
+  right click in the list; **Back** skips the extension studio while Laki AI is off.
+
 ## 0.19.0 · Oct 19, 2026
 
 - **Notes** (experimental: Settings › General): your own notes, one list for every project, on the rail's Notes:
