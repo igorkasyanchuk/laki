@@ -3,12 +3,12 @@
 
 import { WIDGET_EVENTS } from './types.ts'
 import { WIDGET_SCHEMA_URL } from './widgetSchema.ts'
-import { CHARTS, COLORS, DO, TONES, UI, UI_EXAMPLES, UI_SAMPLES } from './widgetUi.ts'
+import { CHARTS, COLORS, DO, TONES, UI, UI_EXAMPLES, UI_GROUPS, UI_SAMPLES } from './widgetUi.ts'
 
 export const WIDGET_EVERY = 5 // minutes between fetches when widget.json doesn't say
 
 // the UI kit's catalog, from its table: each element's props in a line, then its sample
-const catalog = () => UI_SAMPLES.map(s => `- \`${s.type}\` (${Object.keys(UI[s.type].props).join(', ') || 'no props'}): ${s.blurb}\n  \`${JSON.stringify(s.spec)}\``).join('\n')
+const catalog = () => UI_SAMPLES.map((s, i) => `${s.group !== UI_SAMPLES[i - 1]?.group ? `${i ? '\n' : ''}**${s.group}**: ${UI_GROUPS[s.group]}\n` : ''}- \`${s.type}\` (${Object.keys(UI[s.type].props).join(', ') || 'no props'}): ${s.blurb}\n  \`${JSON.stringify(s.spec)}\``).join('\n')
 // a few of the kit's examples: every chart kind, Laki's commands, a layout of a few elements
 const examples = () => UI_EXAMPLES.filter(x => x.title !== 'Colors').map(x => `- ${x.title}: \`${JSON.stringify(x.spec)}\``).join('\n')
 

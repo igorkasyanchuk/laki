@@ -3,7 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { bytes, dur, num, pageOf, pct, render, uiBehave } from '../src/shared/widget.ts'
-import { CHARTS, chartPoints, colorCss, COLORS, near, TONES, uiCheck, UI_EXAMPLES, uiHtml, UI_SAMPLES, UI_TYPES } from '../src/shared/widgetUi.ts'
+import { CHARTS, chartPoints, colorCss, COLORS, near, TONES, uiCheck, UI_EXAMPLES, UI_GROUPS, uiHtml, UI_SAMPLES, UI_TYPES } from '../src/shared/widgetUi.ts'
 import { tools } from '../src/cli/mcp.ts'
 import { fresh, until } from './helpers.ts'
 
@@ -12,6 +12,7 @@ const at = Date.parse('2026-10-17T10:00:00Z')
 test('UI kit: every element has a sample, and every sample draws at a 1×1 preview, a bar and in full', () => {
   assert.equal(UI_TYPES.length, 100)
   assert.deepEqual(UI_SAMPLES.map(s => s.type), UI_TYPES, 'a sample per element, in order')
+  assert.deepEqual([...new Set(UI_SAMPLES.map(s => s.group))], Object.keys(UI_GROUPS), 'the table by group: each has elements, together, in order')
   for (const s of UI_SAMPLES) {
     const ctx = { data: s.data, config: {}, at }
     for (const o of [{ cells: [1, 1] as [number, number] }, { cells: [3, 0.5] as [number, number] }, { full: true }]) {

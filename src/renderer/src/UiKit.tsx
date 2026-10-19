@@ -7,7 +7,7 @@ import { ICON_GROUPS, ICONS, type IconName } from '../../shared/icons'
 import { render, uiBehave, WIDGET_CSS } from '../../shared/widget'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../../shared/widgetStarters'
 import { Modal } from './panels'
-import { CHARTS, colorCss, COLORS, DO, TONES, UI_EXAMPLES, uiHtml, UI_SAMPLES, type UiElement, type UiSpec } from '../../shared/widgetUi'
+import { CHARTS, colorCss, COLORS, DO, TONES, UI_EXAMPLES, UI_GROUPS, uiHtml, UI_SAMPLES, type UiElement, type UiGroup, type UiSpec } from '../../shared/widgetUi'
 import { escapes, Icon, Page } from './ui'
 import { clean } from './Widgets'
 
@@ -100,7 +100,6 @@ function KitCard({ it, pick, onPick, copy }: { it: Item; pick: string; onPick: (
     <section className="ext-card kit-card" id={`kit-${it.key}`}>
       <div className="ext-card-head kit-card-head">
         <b className={it.tag === 'Example' ? '' : 'mono'}>{it.title}</b>
-        <span className="tag">{it.tag}</span>
         <div className="seg" role="tablist" aria-label="Size">
           {SIZES.map(([n]) => (
             <button key={n} role="tab" aria-selected={pick === n} className={pick === n ? 'on' : ''} onClick={() => onPick(n)}>
@@ -347,6 +346,7 @@ function ColorView({ copy }: { copy: (text: string) => void }) {
 export function UiKitPage({ back, onClose, copy, icons }: { back: string; onClose: () => void; copy: (text: string) => void; icons?: boolean }) {
   const [view, setView] = useState<'kit' | 'type' | 'colors' | 'icons'>(icons ? 'icons' : 'kit')
   const [q, setQ] = useState('')
+  const [only, setOnly] = useState<UiGroup | ''>('')
   const [size, setSize] = useState<Record<string, string>>({})
   const closeRef = useRef(onClose)
   closeRef.current = onClose
@@ -358,8 +358,10 @@ export function UiKitPage({ back, onClose, copy, icons }: { back: string; onClos
   }, [])
   const words = q.trim().toLowerCase().split(/\s+/).filter(Boolean)
   const match = (it: Item) => words.every(w => `${it.title} ${it.tag} ${it.blurb} ${JSON.stringify(it.spec)}`.toLowerCase().includes(w))
-  const shown = ITEMS.filter(match)
-  const examples = EXAMPLES.filter(match)
+  const found = ITEMS.filter(match)
+  const shown = found.filter(it => !only || it.tag === only)
+  const examples = only ? [] : EXAMPLES.filter(match)
+  const count = (g: string) => found.filter(it => it.tag === g).length
   const card = (it: Item) => <KitCard key={it.key} it={it} pick={size[it.key] ?? (it.full ? 'Full' : '3×2')} onPick={n => setSize(x => ({ ...x, [it.key]: n }))} copy={copy} />
   const m = (t: string) => <span className="mono">{t}</span>
   return (
@@ -404,8 +406,21 @@ export function UiKitPage({ back, onClose, copy, icons }: { back: string; onClos
           <input className="kit-find" value={q} onChange={e => setQ(e.target.value)} placeholder="Find an element or example: chart, pie, button…" spellCheck={false} autoFocus />
         </div>
         {!shown.length && !examples.length && <p className="muted">Nothing matches.</p>}
-        {!!shown.length && <h3 className="kit-h">Elements · {shown.length}</h3>}
-        <div className="kit-grid">{shown.map(card)}</div>
+        <div className="kit-groups" role="group" aria-label="Show one group">
+          {(['', ...Object.keys(UI_GROUPS)] as (UiGroup | '')[]).map(g => (
+            <button key={g} type="button" aria-pressed={only === g} className={`${only === g ? 'on' : ''}${g && only !== g && !count(g) ? ' none' : ''}`} data-tip={g ? UI_GROUPS[g] : undefined} onClick={() => setOnly(only === g ? '' : g)}>
+              {g || 'All'} <span className="muted">{g ? count(g) : found.length}</span>
+            </button>
+          ))}
+        </div>
+        {(Object.keys(UI_GROUPS) as UiGroup[]).map(g => (l => !!l.length && (
+          <section key={g} className="kit-group">
+            <h3 className="kit-h">
+              {g} · {l.length} <span className="muted small">{UI_GROUPS[g]}</span>
+            </h3>
+            <div className="kit-grid">{l.map(card)}</div>
+          </section>
+        ))(shown.filter(it => it.tag === g)))}
         {!!examples.length && <h3 className="kit-h">Examples · {examples.length}</h3>}
         <div className="kit-grid">{examples.map(card)}</div>
       </div>}

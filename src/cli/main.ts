@@ -100,7 +100,7 @@ function kit(type?: string) {
   if (!type)
     return out(
       UI_SAMPLES.map(s => ({ type: s.type, group: s.group, blurb: s.blurb, props: props(s.type).map(p => p.name) })),
-      [`Laki's UI kit: widget.json's "ui", one element or { "preview": …, "full": … }. Each element takes ${Object.keys(COMMON).join(', ')} too.`, '', ...UI_SAMPLES.map(s => `${s.group.padEnd(8)} ${s.type.padEnd(10)} ${s.blurb}`), '', 'laki widget kit <element>: its props and a sample; laki widget kit icons: every icon'].join('\n'),
+      [`Laki's UI kit: widget.json's "ui", one element or { "preview": …, "full": … }. Each element takes ${Object.keys(COMMON).join(', ')} too.`, '', ...UI_SAMPLES.map(s => `${s.group.padEnd(10)} ${s.type.padEnd(12)} ${s.blurb}`), '', 'laki widget kit <element>: its props and a sample; laki widget kit icons: every icon'].join('\n'),
     )
   const s = UI_SAMPLES.find(x => x.type === type)
   if (!s) throw new Error(`no element ${type}: ${Object.keys(UI).join(', ')}`)

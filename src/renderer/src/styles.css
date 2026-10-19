@@ -2216,6 +2216,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .narrow .kit-hero { flex-wrap: wrap; }
 .kit-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 520px), 1fr)); gap: 14px; }
 .kit-card .ext-card-head { flex-wrap: wrap; } .kit-card-head .seg { margin-left: auto; } .kit-blurb { flex-basis: 100%; min-width: 0; }
+.kit-groups { display: flex; flex-wrap: wrap; gap: 6px; } .kit-groups > button { height: 26px; padding: 0 10px; border-radius: 999px; font-size: 12px; } .kit-groups > button.on { border-color: var(--accent); color: var(--accent-ink, var(--accent)); background: color-mix(in srgb, var(--accent) 12%, transparent); } .kit-groups > button.none { opacity: 0.45; }
+.kit-h .small { margin-left: 6px; font-weight: 400; }
 .kit-notes { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 3px; line-height: 1.5; } .kit-h { margin: 18px 0 8px; font-size: 13px; }
 .kit-stage { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 0; padding: 20px 16px; }
 .kit-status { display: flex; align-items: center; gap: 8px; max-width: 100%; }

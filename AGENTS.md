@@ -1090,7 +1090,9 @@ widget's page in Chrome (headless `--screenshot`).
 
 The UI kit (`shared/widgetUi.ts`; the SDK's words: `docs/extensions.md` › The UI kit): widget.json's `ui`, one element
 (both views; the full one without row limits) or `{ preview, full }`; a view widget.html has wins (`widgetRender`'s
-`own`), `ui` fills the other (`uiTree`; scan's `full`/`preview` count it). `UI` (each type's group, blurb, `rows`: it
+`own`), `ui` fills the other (`uiTree`; scan's `full`/`preview` count it). `UI` (each type's group of
+`UI_GROUPS`, by kind: Layout, Navigation, Text, Code, Numbers, Charts, Status, Lists, Media, People, Developer, Buttons,
+Inputs, the table in that order: the gallery's sections and chips; blurb, `rows`: it
 repeats rows itself with `each`, and its props: the guide's catalog, `laki widget kit`, the checker), `COMMON` (`if`,
 `unless`, `each`, `tip`, `tone`: `hidden`, on items and accessories too), `uiHtml(spec, ctx, { full, cells })` (only
 `esc`'d values in fixed markup; strings are `fill`'s templates over `{ …data, data, config, at, error, full }`, a path
