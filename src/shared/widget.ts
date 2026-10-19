@@ -539,6 +539,12 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     const open = box.hasAttribute('data-open')
     box.querySelectorAll('[data-row]').forEach((x: any) => (x.hidden = q ? !said(x).toLowerCase().includes(q) : x.hasAttribute('data-extra') && !open))
     box.querySelectorAll('[data-group]').forEach((g: any) => (g.hidden = !g.querySelector('[data-row]:not([hidden])')))
+    // a heading among its rows (a menu's): shown while a row up to the next one is
+    box.querySelectorAll('[data-sect]').forEach((hd: any) => {
+      let x = hd.nextElementSibling
+      while (x && !x.hasAttribute('data-sect') && !(x.hasAttribute('data-row') && !x.hidden)) x = x.nextElementSibling
+      hd.hidden = !x || x.hasAttribute('data-sect')
+    })
     const more = box.querySelector('[data-more]')
     if (more) more.hidden = !!q
   }
@@ -623,7 +629,8 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
   const change = (e: any) => {
     const t = e.target && e.target.closest ? e.target.closest('[data-change]') : null
     if (!t) return
-    const p: any = send({ laki: 'run', action: t.getAttribute('data-change'), arg: String(t.value), label: t.getAttribute('aria-label') || '', confirm: t.getAttribute('data-confirm') || undefined })
+    const pick = t.localName === 'select' ? (t.selectedOptions?.[0]?.textContent ?? '').trim() : `${t.getAttribute('aria-label') || ''} ${t.value}`.trim() // its confirm's and note's words
+    const p: any = send({ laki: 'run', action: t.getAttribute('data-change'), arg: String(t.value), label: pick, confirm: t.getAttribute('data-confirm') || undefined })
     // declined or failed: back to what the data says (a done one is drawn again from the new data)
     const back = () => {
       if (t.localName === 'select') for (const o of t.options) o.selected = o.defaultSelected
@@ -631,7 +638,14 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
       const v = t.closest('.k-range')?.querySelector('[data-rv]')
       if (v) v.textContent = t.value
     }
-    if (p && typeof p.then === 'function') p.then((ok: unknown) => ok === false && back(), back)
+    if (!p || typeof p.then !== 'function') return
+    t.disabled = true // one run at a time: a second pick meanwhile would race it
+    p.then((ok: unknown) => ok === false && back(), back).finally(() => (t.disabled = false))
+  }
+  // a dropdown left for somewhere else, the rest of the app too: closed
+  const blur = (e: any) => {
+    const dd = e.target && e.target.closest ? e.target.closest('details.k-dd[open]') : null
+    if (dd && !(e.relatedTarget && dd.contains(e.relatedTarget))) dd.open = false
   }
   // Enter in an input's box clicks its button
   const key = (e: any) => {
@@ -644,7 +658,7 @@ export function uiBehave(root: { addEventListener: (t: string, f: (e: any) => vo
     const t = e.target
     if (t && t.open && t.matches && t.matches('details.k-dd') && t.closest('[data-kit="full"]')) t.querySelector('.k-dd-m')?.scrollIntoView({ block: 'nearest' })
   }
-  const on: [string, (e: any) => void, boolean?][] = [['click', click], ['input', input], ['change', change], ['keydown', key], ['toggle', toggle, true]]
+  const on: [string, (e: any) => void, boolean?][] = [['click', click], ['input', input], ['change', change], ['keydown', key], ['toggle', toggle, true], ['focusout', blur]]
   for (const [k, f, c] of on) (root as any).addEventListener(k, f, c)
   return () => on.forEach(([k, f, c]) => (root as any).removeEventListener(k, f, c))
 }

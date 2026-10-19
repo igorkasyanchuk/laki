@@ -1313,10 +1313,12 @@ per element. After DaisyUI's: hero (`--hero`, a glow), mockup (browser, window, 
 drawn only), rotate (`k-rot`: `steps()` over the words, no slide), compare (DaisyUI's diff: a CSS `resize` grip scaled
 up and see-through over the divider, no script; `.k-cmp` a container), skeleton (`k-shim`), radial, indicator, avatar
 (shapes by `border-radius` or `clip-path`, a ring as its padding), range and select (`data-change`: `uiBehave`'s `change`
-runs them, never a click; a range's `[data-rv]` follows it), input (`data-inbox`, its button's `data-input`: the
+runs them, never a click, disabled while it runs, back to the data's value when declined or failed: App's `action` gives
+false; a range's `[data-rv]` follows it), input (`data-inbox`, its button's `data-input`: the
 typed words as the arg, Enter clicks it, cleared once it ran unless `data-keep`; a JS page's busy cleared by `done`
-too), swap, pagination (`pn`, not `num`: `WIDGET_CSS`'s), menu (`menuRow`, shared with dropdown) and dropdown (a
-`<details>`; `uiBehave` closes one at a click outside it or in its menu, scrolls a full view's menu into sight; a
+too), swap, pagination (`pn`, not `num`: `WIDGET_CSS`'s), menu (`menuRow`, shared with dropdown; its headings `data-sect`,
+which `sift` hides with no row under them shown) and dropdown (a `<details>`; `uiBehave` closes one at a click outside
+it or in its menu, or as the focus leaves it (`focusout`: the rest of the app too), scrolls a full view's menu into sight; a
 preview's covers the cell, a bar's opens the full view). The app's CSP takes `img-src https:` (the kit's images,
 Markdown's pictures). The guide tool's `max`: 50,000. Starters `note` (a static source) and `launcher` (`do` buttons).
 

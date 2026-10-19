@@ -1500,8 +1500,8 @@ export function App() {
       clearTimeout(noteTimer.current)
       setNote({ text: `${what}…`, busy: true }) // something is happening, until it says what
       return api.call<{ ok: boolean; out?: string; error?: string } & WidgetSay>('widgetAction', { id, action, arg, ws }).then(
-        r => (!r.ok ? toast(`${what} failed: ${r.error}`) : r.toast || r.modal ? (setNote(null), widgetApi.say(id, r, ws)) : done(r.out || `${what}: done`)),
-        e => toast(`${what} failed: ${(e as Error).message}`),
+        r => (!r.ok ? (toast(`${what} failed: ${r.error}`), false as const) : r.toast || r.modal ? (setNote(null), widgetApi.say(id, r, ws)) : done(r.out || `${what}: done`)),
+        e => (toast(`${what} failed: ${(e as Error).message}`), false as const), // false: the kit's slider, pick or box goes back
       )
     },
     say: (id, s, ws) => {

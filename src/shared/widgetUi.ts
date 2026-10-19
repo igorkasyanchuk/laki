@@ -1153,7 +1153,7 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     const a = txt(e.before, s).trim()
     const b = txt(e.after, s).trim()
     if (!imageOk(a) || !imageOk(b)) return empty(e, s, 0)
-    const tall = Math.round(Math.min(2000, Math.max(16, n(e.height, s) ?? (s.line ? 16 : s.full ? 260 : s.cells[1] * 64 - 12))))
+    const tall = s.line ? 16 : Math.round(Math.min(2000, Math.max(16, n(e.height, s) ?? (s.full ? 260 : s.cells[1] * 64 - 12)))) // a bar's line: 16 whatever its height
     const [l1, l2] = [0, 1].map(i => (Array.isArray(e.labels) && e.labels[i] !== undefined && !s.line ? txt(e.labels[i], s) : ''))
     return `<div${at({ tip: e.tip }, s, 'k-cmp')} style="height:${tall}px"><div class="k-cmp-a"><img src="${esc(b)}" alt="${esc(l2 || 'After')}">${l2 ? `<span class="k-cmp-l r">${esc(l2)}</span>` : ''}</div><div class="k-cmp-b"><img src="${esc(a)}" alt="${esc(l1 || 'Before')}">${l1 ? `<span class="k-cmp-l">${esc(l1)}</span>` : ''}</div><i class="k-cmp-h" aria-hidden="true"></i><div class="k-cmp-r" title="Drag to compare"></div></div>`
   },
@@ -1243,9 +1243,10 @@ const R: Record<UiType, (e: El, s: S) => string> = {
     let k = 0
     return `<nav${at({ tip: e.tip }, s, 'k-menu')} data-rows>${items
       .map(([x, r]) => {
-        if (head(x)) return k >= max && !s.full ? '' : `<div class="k-mn-h">${h(x.title, r)}</div>`
+        if (head(x)) return k >= max && !s.full ? '' : `<div class="k-mn-h" data-sect${k >= max ? ' data-extra hidden' : ''}>${h(x.title, r)}</div>` // past the cut: hidden with its rows
         const i = k++
-        return i >= max && !s.full ? '' : menuRow(x, r, x === e ? e.tone : (x.tone ?? e.tone), ` data-row${i >= max ? ' data-extra hidden' : ''}`)
+        const row = x === e && e.label === undefined ? { ...e, label: '{{label}}' } : x // over each: a row's label by default
+        return i >= max && !s.full ? '' : menuRow(row, r, x === e ? e.tone : (x.tone ?? e.tone), ` data-row${i >= max ? ' data-extra hidden' : ''}`)
       })
       .join('')}${empty(e, s, rows)}${s.line ? '' : more(rows - Math.min(max, rows))}</nav>`
   },

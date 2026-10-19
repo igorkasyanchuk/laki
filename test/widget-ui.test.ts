@@ -547,11 +547,16 @@ test('UI kit: hero, mockup, filter, rotate, compare, skeleton, radial, indicator
   assert.match(pg({ full: true }, 1), /aria-label="Previous page" disabled/)
   // menu: headings, the current row, a badge; dropdown: its items, in a bar the full view
   const mn = draw({ type: 'menu', items: [{ title: 'Go' }, { label: 'Board', on: true, open: 'laki://board' }, { label: 'PRs', badge: '{{n}}', run: 'prs' }, { label: 'Nothing' }] }, { n: 4 })
-  assert.match(mn, /<div class="k-mn-h">Go<\/div><button type="button" class="k-mn-i on" data-open="laki:\/\/board" aria-current="true" data-row>/)
+  assert.match(mn, /<div class="k-mn-h" data-sect>Go<\/div><button type="button" class="k-mn-i on" data-open="laki:\/\/board" aria-current="true" data-row>/)
   assert.match(mn, /data-run="prs" data-row>[^]*<span class="k-badge">4<\/span>/)
   assert.match(mn, /class="k-mn-i" disabled data-row><span class="k-title ">Nothing/)
   assert.match(draw({ type: 'dropdown', items: [{ label: 'Wipe', confirm: 'Sure?' }] }), /class="k-mn-i" disabled>/, 'a confirm with nothing to do: disabled')
   assert.deepEqual(uiCheck({ type: 'menu', limit: 3, empty: 'None', items: [{ label: 'a' }] }), [])
+  // past a full view's limit a heading is hidden with its rows; over each, a row's label by default
+  const cut = { type: 'menu', limit: 1, items: [{ label: 'a', run: 'x' }, { title: 'Later' }, { label: 'b', run: 'x' }] }
+  assert.match(draw({ preview: cut, full: cut }), /<div class="k-mn-h" data-sect data-extra hidden>Later/)
+  assert.match(draw({ type: 'menu', each: 'l', open: '{{url}}' }, { l: [{ label: 'Docs', url: 'https://acme.dev' }] }), /<span class="k-title ">Docs<\/span>/)
+  assert.match(draw({ type: 'compare', before: 'https://example.com/a.png', after: 'https://example.com/a.png', height: 300 }, {}, { cells: [3, 0.5] }), /height:16px/, 'a bar: one line, whatever its height')
   assert.equal(uiCheck({ type: 'input', icon: 'nope', run: 'a' }).length, 1, 'a bad icon said once')
   const dd = { type: 'dropdown', label: 'More', items: [{ label: 'Redeploy', run: 'redeploy' }, { label: 'Hidden', run: 'x', if: 'no' }] }
   assert.match(draw(dd), /<details class="k-dd"><summary class="k-dd-s"><span>More<\/span>[^]*<div class="k-dd-m"><button[^>]*data-run="redeploy"/)
@@ -594,7 +599,7 @@ test('UI kit: a filter chip, an input, a slider and a pick, as clicks and keys',
     assert.ok(box.focused)
     // a slider let go, an option picked: their action with the value
     on.change({ target: { closest: () => ({ value: 40, getAttribute: (k: string) => ({ 'data-change': 'rollout', 'aria-label': 'Rollout' })[k] ?? null }) } })
-    assert.deepEqual(sent, [{ laki: 'run', action: 'rollout', arg: '40', label: 'Rollout', confirm: undefined }])
+    assert.deepEqual(sent, [{ laki: 'run', action: 'rollout', arg: '40', label: 'Rollout 40', confirm: undefined }])
   })
 })
 
@@ -604,7 +609,17 @@ test('UI kit: a slider whose run is declined goes back to its value', async () =
   const rv = { textContent: '40' }
   const t: any = { localName: 'input', value: '40', defaultValue: '25', getAttribute: (k: string) => (k === 'data-change' ? 'rollout' : null), closest: (q: string) => (q === '[data-change]' ? t : { querySelector: () => rv }) }
   on.change({ target: t })
+  assert.equal(t.disabled, true, 'one run at a time')
   await new Promise(r => setTimeout(r, 0))
   assert.equal(t.value, '25')
   assert.equal(rv.textContent, '25')
+  assert.equal(t.disabled, false)
+  // a dropdown: the focus gone elsewhere closes it; to its own menu, it stays
+  const dd: any = { open: true, contains: (x: unknown) => x === inMenu }
+  const inMenu = {}
+  const summary = { closest: () => dd }
+  on.focusout({ target: summary, relatedTarget: inMenu })
+  assert.equal(dd.open, true)
+  on.focusout({ target: summary, relatedTarget: null })
+  assert.equal(dd.open, false)
 })
