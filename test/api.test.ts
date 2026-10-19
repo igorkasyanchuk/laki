@@ -336,7 +336,7 @@ test('daemon start: a stale lock is taken over; from the app, the login shell\'s
   // a login shell whose profile adds /login/bin (only the PATH probe sees it: tabs show what the daemon took)
   const sh = join(rig.home, 'login-sh')
   writeFileSync(sh, `#!/bin/sh\ncase "$2" in *__LAKI__*) PATH="$PATH:/login/bin" ;; esac\nexec '${rig.env.SHELL}' "$@"\n`, { mode: 0o755 })
-  Object.assign(rig.env, { SHELL: sh, LAKI_FROM_APP: '1', LAKI_DEV_ORIGIN: 'http://127.0.0.1:5199' })
+  Object.assign(rig.env, { SHELL: sh, LAKI_FROM_APP: '1', LAKI_DEV_ORIGIN: 'http://127.0.0.1:5199,https://evil.example' })
   await rig.start()
   assert.equal(readFileSync(join(rig.data, 'daemon.lock'), 'utf8'), String(rig.info().pid))
   const p = await rig.rpc('projectAdd', { path: rig.repo })
@@ -348,6 +348,7 @@ test('daemon start: a stale lock is taken over; from the app, the login shell\'s
   assert.equal(await c.call('ping'), 'pong')
   c.close()
   await assert.rejects(connect(rig, 'http://localhost:5199'))
+  await assert.rejects(connect(rig, 'https://evil.example')) // only this Mac's: a site in the env isn't let in
 })
 
 test('tunnels: cloudflared missing, a protected tunnel, a public one, refusals, cloudflared failing, stop while starting, gone with the workspace and the daemon', async t => {

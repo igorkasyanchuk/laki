@@ -2584,7 +2584,7 @@ export function SettingsPage(p: {
         const j = JSON.parse(t)
         const v = j?.laki === 'settings' ? j.settings : undefined
         if (!v || typeof v !== 'object' || Array.isArray(v)) throw new Error("it isn't a file Export made")
-        const { ok, bad } = importable(v)
+        const { ok, bad } = importable(v, s)
         paint(ok)
         setMoved(`Imported ${f.name}${bad.length ? `, without ${bad.join(', ')}: not what Laki keeps there now` : ''}`)
       })

@@ -71,7 +71,10 @@ export async function meme(): Promise<Meme> {
         if (seen.length > 500) seen.shift()
         const r = await fetch(m.url, { headers: { 'user-agent': UA }, signal: AbortSignal.timeout(10000) }).catch(e => ((why = (e as Error).message), null))
         const type = (r?.headers.get('content-type') ?? '').split(';')[0]
-        if (!r?.ok || !safe(r.url) || !type.startsWith('image/') || Number(r.headers.get('content-length')) > MAX) continue // redirected: still https
+        if (!r?.ok || !safe(r.url) || !type.startsWith('image/') || Number(r.headers.get('content-length')) > MAX) {
+          void r?.body?.cancel().catch(() => {}) // its connection let go now, not at GC
+          continue // redirected: still https
+        }
         const parts: Buffer[] = []
         let size = 0
         for await (const b of r.body ?? []) {

@@ -16,7 +16,8 @@ import type { View } from '../shared/types.ts'
 if (app.isPackaged) delete process.env.ELECTRON_RENDERER_URL, delete process.env.LAKI_DEV_ORIGIN
 const dev = !!process.env.ELECTRON_RENDERER_URL
 // the app's own pages, its windows' (built: file:, nothing else loads one), not a site or a frame inside them
-const appPage = (url: string | undefined) => !!url && url.startsWith(dev ? process.env.ELECTRON_RENDERER_URL! : 'file:')
+const devOrigin = dev ? new URL(process.env.ELECTRON_RENDERER_URL!).origin : ''
+const appPage = (url: string | undefined) => !!url && (dev ? URL.canParse(url) && new URL(url).origin === devOrigin : url.startsWith('file:'))
 const fromApp = (e: Electron.IpcMainEvent | Electron.IpcMainInvokeEvent) => e.sender.getType() === 'window' && e.senderFrame === e.sender.mainFrame && appPage(e.senderFrame?.url)
 // scripts/pack-smoke.sh's: a screenshot of the window 3s after load, the notifications as posted. Switches, not env:
 // none reach a launch from Finder or the Dock
@@ -153,10 +154,11 @@ app.whenReady().then(() => {
     s.setPermissionCheckHandler((_wc, perm) => PREVIEW_OK.has(perm))
   }
   // the app's own session (its windows, and the frames in them: an extension's page, an artifact, the video): the
-  // microphone for its own pages (Settings › Voice's cloud), full screen and a clipboard write for any, nothing else
-  const ok = (perm: string, url?: string) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write' || (perm === 'media' && appPage(url))
-  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ok(perm, d.requestingUrl || wc.getURL())))
-  session.defaultSession.setPermissionCheckHandler((wc, perm, _origin, d) => ok(perm, d.requestingUrl || wc?.getURL()))
+  // microphone (not the camera) for its own pages (Settings › Voice's cloud), full screen and a clipboard write for
+  // any, nothing else
+  const ok = (perm: string, url?: string, video?: boolean) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write' || (perm === 'media' && !video && appPage(url))
+  session.defaultSession.setPermissionRequestHandler((wc, perm, cb, d) => cb(ok(perm, d.requestingUrl || wc.getURL(), 'mediaTypes' in d && !!d.mediaTypes?.includes('video'))))
+  session.defaultSession.setPermissionCheckHandler((wc, perm, _origin, d) => ok(perm, d.requestingUrl || wc?.getURL(), d.mediaType === 'video'))
   // Browsers: Chrome's user agent without Laki's and Electron's names (sites that turn away an app's web view)
   const b = session.fromPartition(BROWSER)
   b.setUserAgent((chromeUA = b.getUserAgent().replace(/ (laki|Laki|Electron)\/\S+/g, '')))
@@ -175,7 +177,7 @@ const daemon = () =>
   ensureDaemon({
     ELECTRON_RUN_AS_NODE: '1',
     LAKI_FROM_APP: '1',
-    ...(dev ? { LAKI_DEV_ORIGIN: new URL(process.env.ELECTRON_RENDERER_URL!).origin } : {}),
+    ...(dev ? { LAKI_DEV_ORIGIN: devOrigin } : {}),
   })
 
 // where the window was left (window.json in userData): its bounds out of maximized and full screen, and whether it

@@ -4,7 +4,7 @@ import { type ChildProcess, execFile, execFileSync, spawn } from 'node:child_pro
 import { createHash, randomBytes, randomInt, randomUUID, timingSafeEqual } from 'node:crypto'
 import { chmod, copyFile, readdir, readFile, rm, stat, symlink } from 'node:fs/promises'
 import { askOf } from '../shared/ask.ts'
-import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, type Dirent, existsSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { accessSync, chmodSync, closeSync, constants as fsConstants, copyFileSync, type Dirent, existsSync, fchmodSync, fsyncSync, lstatSync, mkdirSync, openSync, readSync, readdirSync, readFileSync, readlinkSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { homedir, hostname, tmpdir, userInfo } from 'node:os'
 import { basename, dirname, extname, isAbsolute, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -111,7 +111,7 @@ export function load() {
       }
     }
     try {
-      if (existsSync(statePath)) copyFileSync(statePath, statePath + '.bak') // the last state that loaded
+      if (existsSync(statePath)) copyFileSync(statePath, statePath + '.bak'), chmodSync(statePath + '.bak', 0o600) // the last state that loaded
     } catch (e) {
       log(`state.json.bak: ${(e as Error).message}`)
     }
@@ -136,6 +136,7 @@ export function load() {
 export function save() {
   const fd = openSync(statePath + '.tmp', 'w', 0o600) // settings' env, the webhook's URL: yours alone
   try {
+    fchmodSync(fd, 0o600) // one a crash left keeps its mode otherwise
     writeFileSync(fd, JSON.stringify(state, null, 2))
     fsyncSync(fd) // on disk before the rename: a crash then leaves the old file or the new one, never an empty one
   } finally {
@@ -822,6 +823,7 @@ export function storageOf(ws: Workspace) {
   }
   try {
     mkdirSync(ws.storage, { recursive: true, mode: 0o700 }) // what agents keep for you: yours alone
+    chmodSync(ws.storage, 0o700) // one made before (the mode above is only a new folder's)
   } catch (e) {
     log(`storage ${ws.storage}: ${(e as Error).message}`)
   }

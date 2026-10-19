@@ -86,7 +86,8 @@ try {
 
 const token = randomBytes(32).toString('hex')
 // Browsers always send Origin on a WebSocket; node clients (CLI, hooks, Electron main) send none.
-const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN ? process.env.LAKI_DEV_ORIGIN.split(',') : [])])
+// LAKI_DEV_ORIGIN: a dev renderer's, on this Mac only (launchctl setenv reaches a daemon the CLI starts too)
+const origins = new Set(['file://', ...(process.env.LAKI_DEV_ORIGIN?.split(',').filter(o => /^http:\/\/(127\.0\.0\.1|localhost):\d+$/.test(o)) ?? [])])
 // remote access (core.ts) adds its page's origin and its own token while it runs
 const originOk = (o: string | undefined) => o === undefined || origins.has(o) || (!!o && o === core.remoteOrigin())
 const { same } = core
