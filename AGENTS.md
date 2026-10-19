@@ -747,7 +747,7 @@ fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backe
   `AI_MODEL`;
 - `claude`: `claude -p --output-format stream-json --verbose --mcp-config <laki mcp, LAKI_HOME> --strict-mcp-config
   --tools Read --allowedTools mcp__laki --permission-prompt-tool mcp__laki__laki_permission --append-system-prompt …`
-  (a Read outside its folder: `laki mcp`'s `laki_permission`, `LAKI_AI` only, waits on `aiPermission`: a chat message
+  (a Read outside its folder: `laki mcp`'s `laki_permission`, `LAKI_AI_PERM` only (claude's), waits on `aiPermission`: a chat message
   with `ask.perm`, `AI_PERM`'s buttons, live while it works (`Message`); `aiAnswer` resolves it, *Always in this chat* keeps
   the tool in the thread's `allowed` until `fresh`; none in `PERM_WAIT` or the ask's end: deny), `--resume` its `session_id` the next time; cost:
   the result's `total_cost_usd`; `ai.efforts` (`effortArgs`, `EFFORTS`; `aiOnce` too): claude's `--effort`, codex's
