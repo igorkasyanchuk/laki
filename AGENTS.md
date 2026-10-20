@@ -1147,7 +1147,7 @@ widget's right click (`WidgetApi.menu`, App's: Fetch now, Inspect, Its page) and
 
 Starters, the schema, the checker, one file (Part 3; `test/widget-check.test.ts`): `shared/widgetStarters.ts` `STARTERS`
 (`STARTER_KINDS`; each `files(id, name)`: widget.json with `$schema`, `fetch.sh` that cats `fixtures/sample.json`, the
-real fetch in its comments, `fixtures/empty.json` and three more made-up variants (`variants`; not launcher's nor onefile's), a README; `panel`'s `laki.d.ts`; `onefile`'s `<id>.5m.sh`). `widgetNew`:
+real fetch in its comments, `fixtures/empty.json` and three more made-up variants (`variants`; not launcher's nor onefile's), a README; `panel`'s `laki.d.ts`; `onefile`'s `<id>.5m.sh`; `context`'s three menu actions, no fetch, `summary.sh`, `file-stats.sh`, `branch-note.sh`). `widgetNew`:
 the id slugged and made unique (`taken`: a widget, a store, a folder or file of it), `<data>/widgets/<id>` (`dir`: an
 empty folder of yours; `onefile` in the folder itself), the store `on`, fetched (reason manual, why made); the CLI's `new`,
 Settings' *New ▾* (`WidgetsApi.make`: App opens its page on Overview; `ExtensionPage`'s `seen`: one not in the view yet isn't

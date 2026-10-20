@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A *Context* starter (`laki widget new Context --kind context`): actions in ⌘K, a file's right click and the prompt's
+  Insert menu, to copy from.
 - Extensions can come with a repo (`.laki/extensions/`): off until you look at what they run, off again when the repo
   changes them, and shown only in that project's workspaces.
 - Gates: an extension's action can hold a ship, a merge or an archive with its reason (`"gate"` in widget.json); you

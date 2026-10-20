@@ -882,7 +882,7 @@ may move one, resize it and change a plain setting with `laki widget set`, never
 `laki widget dev` from one leaves the folder's extensions off, and `laki widget action` from one asks you first.
 
 To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
-button, a form, a JS page, *Pull main* or one file; it runs at once on sample data, and its page opens), or `laki widget new
+button, a form, a JS page, *Pull main*, *Context* (actions in ⌘K and the right-click menus) or one file; it runs at once on sample data, and its page opens), or `laki widget new
 "Deploys" --kind table`. Its card's *Data* says where its data comes from: its fetch, a text you type (JSON, or a
 Markdown note), a file, a URL, or *AI*: an agent finds it with your own MCP servers and sums it up, every hour (a
 prompt such as *"What's new in #eng on Slack since yesterday: decisions, questions for me"*, the tools it may use
@@ -1596,7 +1596,7 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, onefile
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, context, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
 laki widget what <id>                                   # what turning it on runs, and its hash: laki widget on <id> --seen <hash>

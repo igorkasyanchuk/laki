@@ -602,6 +602,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `stream` | a command that runs all along: a line of JSON every 2 s, shown as it comes |
 | `tool` | *A tool for agents*: notes your agents add with its `add` tool (asked once per workspace), a Clear button |
 | `pullmain` | *Pull main*: per workspace, a status bar button that merges the base branch in (below) |
+| `context` | *Context*: actions where you work, in ⌘K (Alt+Cmd+U), a file's right click and the prompt's Insert menu (below) |
 | `onefile` | one script, `<id>.5m.sh` (below) |
 
 Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its
@@ -625,6 +626,20 @@ badge how many commits the base branch (origin's, or `$LAKI_BASE`) has that the 
 `claude -p` gets only the tools `TOOLS` names (read and edit files, git, the usual test commands), and runs in the
 background: an action has 2 minutes. As it ends it pushes its last line (`laki widget push --merge '{"last": …}'`), which
 `"notify": "{{last}}"` shows as a notification and a toast. Its prompt is `prompt()` at the top of `pull.sh`.
+
+### Context
+
+`laki widget new "Context" --kind context` is the one to copy for [actions where you work](#actions-where-you-work-show-key):
+a *Context* button in the status bar, no fetch, and three actions, each told where you are (`$LAKI_PATH`,
+`$LAKI_BRANCH`, `$LAKI_FILE`, `$LAKI_TAB`, all of it as JSON in `$LAKI_CTX`):
+
+| action | where | what |
+|---|---|---|
+| `summary` | ⌘K, Alt+Cmd+U | a toast: the branch and how many files changed (*Pick a workspace first* without one) |
+| `file-stats` | a text file's right click in Files (`match`) | `{"data": …}`: lines, words, bytes and its most used words; `"view": true` opens its full view |
+| `branch-note` | the prompt's Insert menu, a tab's right click | `"insert": true`: *Branch X, N files changed: a, b, c* goes into the prompt, unsent |
+
+Plain `sh`, `awk` and `git`: no jq or node.
 
 ## Check
 
