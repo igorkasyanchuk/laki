@@ -57,6 +57,8 @@ const again = new Set<string>() // asked to fetch while fetching (settings chang
 type AgentRun = { c: AbortController; fetch: boolean } // fetch: its source's, else an action's
 const agents = new Map<string, Set<AgentRun>>()
 async function agentRun<T>(id: string, fetch: boolean, f: (signal: AbortSignal, stop: string) => Promise<T>): Promise<T> {
+  const w = widgets.get(id)
+  if (w) trusted(w)
   const c = new AbortController()
   const l = agents.get(id) ?? new Set()
   const run = { c, fetch }
@@ -136,6 +138,7 @@ function readJson<T>(p: string): T | undefined {
 }
 const readStore = (id: string): Store => readJson<Store>(storePath(id)) ?? {}
 function writeStore(id: string, s: Store) {
+  masks.delete(id) // its settings may have changed: masked anew
   const p = storePath(id)
   mkdirSync(dirname(p), { recursive: true })
   writeFileSync(`${p}.tmp`, JSON.stringify(s))
@@ -150,6 +153,7 @@ const secretsPath = () => join(dir, 'widget-secrets.json')
 const readSecrets = () => readJson<Record<string, Record<string, string>>>(secretsPath()) ?? {}
 const secretsOf = (id: string) => readSecrets()[id] ?? {}
 function setSecrets(id: string, f: (s: Record<string, string>) => void) {
+  masks.delete(id)
   const all = readSecrets()
   const s = { ...all[id] }
   f(s)
@@ -390,6 +394,7 @@ function moveSecrets(id: string, m: Manifest): Store {
 export function scanWidgets() {
   const before = new Map(widgets)
   widgets.clear()
+  masks.clear() // widget.json's settings read again
   rev++
   const dev = devRoots()
   // yours first, then the repos' (<project>.<id>: never over yours), then Laki's own
@@ -444,7 +449,7 @@ function untrust(e: Entry) {
 const repoWatchers = new Map<string, FSWatcher>()
 function watchRepos() {
   const roots = repoRoots().map(r => r.root)
-  for (const [r, w] of repoWatchers) if (!roots.includes(r)) (w.close(), repoWatchers.delete(r))
+  for (const [r, w] of repoWatchers) if (!roots.includes(r) || !existsSync(r)) (w.close(), repoWatchers.delete(r)) // gone (a branch without it): watched again once a scan finds it
   for (const r of roots) {
     if (repoWatchers.has(r) || !existsSync(r)) continue
     let timer: NodeJS.Timeout | undefined
@@ -940,7 +945,19 @@ type Failed = Error & { stderr?: string; stdout?: string; exit?: number }
 // it failed (with its stderr and exit code). stdin: an event's JSON (a handler's); else nothing to read
 const timeout = () => Number(process.env.LAKI_WIDGET_TIMEOUT_MS) || 120_000 // tests' shorter
 const execs = new Set<ChildProcess>() // running now: widgetsStop ends them
+// a repo's extension runs only as you said yes to it: its files changed since (a pull, before the watch's scan) turn it
+// off here, before anything of the new runs (dirHash: cached by the files' times and sizes)
+function trusted(w: Entry) {
+  if (!w.project || w.s.trusted === dirHash(w)) return
+  if (w.s.on) untrust(w)
+  throw new Error(`${w.m.name || w.id} changed in ${projName(w)}'s repo: off until you look`)
+}
 function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>, stdin = '', ms?: number) {
+  try {
+    trusted(w)
+  } catch (e) {
+    return Promise.reject(Object.assign(e as Error, { stderr: '' }))
+  }
   return new Promise<Ran>((ok, no) => {
     const t = ms ?? timeout()
     const p = execGroup(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: t, maxBuffer: MAX_OUT, stdin }, (e, stdout, stderr) => {
@@ -985,10 +1002,15 @@ const errAt = new Map<string, number>() // its last error line's time (Settings'
 let flushing: NodeJS.Timeout | undefined
 // a line's own level: debug:, info:, warn: or error: at its start (taken off), else info
 const leveled = (t: string): [LogLevel, string] => (m => (m ? [m[1].toLowerCase() as LogLevel, t.slice(m[0].length)] : ['info', t]))(/^(debug|info|warn|error):\s?/i.exec(t))
+const masks = new Map<string, (t: string) => string>() // each one's, until its secrets or settings are written again
 function masker(w: Entry) {
+  const m = masks.get(w.id)
+  if (m) return m
   const c = configOf(w, true)
   const vals = [...new Set([...Object.values(secretsOf(w.id)), ...optionsOf(w).filter(o => o.type === 'secret' || SECRET.test(o.key)).map(o => c[o.key])])].filter(v => typeof v === 'string' && v.length >= 4).sort((a, b) => b.length - a.length)
-  return (t: string) => vals.reduce((x, v) => x.split(v).join('••••'), t)
+  const f = (t: string) => vals.reduce((x, v) => x.split(v).join('••••'), t)
+  masks.set(w.id, f)
+  return f
 }
 function readLog(id: string): WidgetLogLine[] {
   const out: WidgetLogLine[] = []
@@ -1124,7 +1146,7 @@ export async function widgetRun(o: { id: string; reason?: string; why?: string; 
   const meta = metaOf(w, x?.id)
   const reason = typeof o.reason === 'string' && (RUN_REASONS.includes(o.reason) || /^(action|event):[\w.-]{1,40}$/.test(o.reason)) ? o.reason : 'manual'
   const once = o.once === true && !onOf(w)
-  if (!onOf(w) && !once && !(force && w.s.by !== 'ai')) return { ok: false, error: OFF(w) }
+  if (!onOf(w) && (w.project || (!once && !(force && w.s.by !== 'ai')))) return { ok: false, error: w.project ? `${OFF(w)}: it comes with ${projName(w)}'s repo, look at what it runs (laki widget what ${w.id})` : OFF(w) } // a repo's: never once, unlooked
   if (!fetches(w)) return { ok: false, error: `${w.id} has no fetch or script: give it a source (static, file or url)` }
   const src = sourceOf(w)
   if (once && streaming(w)) return { ok: false, error: 'a stream runs only while it is on' }
@@ -1589,6 +1611,11 @@ function streamSync(now = Date.now()) {
 function startStream(w: Entry) {
   const was = streams.get(w.id)
   if (was?.p || was?.timer) return
+  try {
+    trusted(w)
+  } catch {
+    return
+  }
   const script = w.m.script ? resolve(w.dir, w.m.script) : undefined
   if (script && !script.startsWith(w.dir + '/')) return
   const st: Stream = was ?? { restarts: 0, wait: 1, err: '' }
@@ -2394,14 +2421,14 @@ export async function widgetCheck(o: { id?: string; dir?: string; run?: boolean;
     const ps = await checkOne(x, !!o.run, o.ws || undefined, !!agentCaller(o.from))
     problems.push(...(srcs.length > 1 ? ps.map(p => ({ ...p, where: `${idOf(x)}: ${p.where}` })) : ps))
   }
-  return { id: srcs.length === 1 ? idOf(srcs[0]) : undefined, problems }
+  return { id: srcs.length === 1 ? ([...widgets.values()].find(w => pathOf(w) === pathOf(srcs[0]))?.id ?? idOf(srcs[0])) : undefined, problems }
 }
 // what a scope workspace one should use of its workspace, somewhere in its fetch, its files or its ui
 const WS_USE = /\$\{?(LAKI_(WORKSPACE|WORKSPACE_NAME|PROJECT|BRANCH|BASE|PATH|PR|STORAGE_FOLDER|WIDGET_WS)|PORT)\b|\bworkspace\b/
 async function checkOne(x: Source, run: boolean, ws?: string, agent = false): Promise<UiProblem[]> {
   const out: UiProblem[] = []
   const say = (level: UiProblem['level'], where: string, text: string) => out.push({ level, where, text })
-  const id = idOf(x)
+  const id = [...widgets.values()].find(w => pathOf(w) === pathOf(x))?.id ?? idOf(x) // a repo's is <project>.<id>
   const head = x.file ?? 'widget.json'
   let m: Record<string, unknown>
   if (x.file) {
@@ -2478,6 +2505,7 @@ async function checkOne(x: Source, run: boolean, ws?: string, agent = false): Pr
     if (!w || pathOf(w) !== pathOf(x)) say('warn', 'fetch', `not run: Laki doesn't have this one (laki widget dev ${pathOf(x)} links it)`)
     else if (!onOf(w) && w.s.by === 'ai') say('warn', 'fetch', "not run: Laki AI wrote it and it's off: turn it on first")
     else if (!onOf(w) && agent) say('warn', 'fetch', "not run: it's off, and an agent asked: the user turns it on first")
+    else if (!onOf(w) && w.project) say('warn', 'fetch', `not run: it comes with ${projName(w)}'s repo and it's off: look at what it runs first (laki widget what ${w.id})`)
     else if (scoped(w) && !ws) say('warn', 'fetch', 'not run: per workspace, which one? (--ws <id>)')
     else if (streaming(w)) say('warn', 'fetch', 'not run: it streams (laki widget dev prints its lines as they come)')
     else if (sourceOf(w).kind === 'ai') say('warn', 'fetch', 'not run: an agent makes its data, and each run costs (Run now on its page runs it)')

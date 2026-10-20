@@ -4760,9 +4760,9 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
   if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
   if (o.act === 'merge') {
     const how = MERGE_METHODS.includes(o.method!) ? o.method! : 'squash'
-    if (proj && proj.config?.mergeMethod !== how) (proj.config = { ...proj.config, mergeMethod: how }), save(), changed()
     const h = await gated('merge', ws, o)
     if (h) return h
+    if (proj && proj.config?.mergeMethod !== how) (proj.config = { ...proj.config, mergeMethod: how }), save(), changed()
     await merge(ws, pr, how, o.deleteBranch !== false)
     return {}
   }

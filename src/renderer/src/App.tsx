@@ -1159,9 +1159,9 @@ export function App() {
   }
   // an extension's gates on a ship, a merge or an archive: Checking… while they run; a hold says what held it, then
   // Do it anyway (asked first) or the agent's fix. f(force) makes the call; undefined: failed (the toast says), or not done
-  const gatesOn = (step: Gate) => (view?.widgets ?? []).some(x => x.on && x.gates?.includes(step))
+  const gatesOn = (step: Gate, w?: WorkspaceView) => (view?.widgets ?? []).some(x => x.on && x.gates?.includes(step) && (!x.project || x.project === w?.project)) // a repo's: its project's only
   const gated = async <T,>(w: WorkspaceView, step: Gate, f: (force?: boolean) => Promise<T>): Promise<T | undefined> => {
-    if (gatesOn(step)) toast('Checking…')
+    if (gatesOn(step, w)) toast('Checking…')
     const r = await f()
     const held = (r as { held?: GateHeld[] } | null | undefined)?.held
     if (!held) return r
@@ -1178,7 +1178,7 @@ export function App() {
   const archive = async (w: WorkspaceView) => {
     const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there: ask
     let forced = false
-    const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive') && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
+    const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive', w) && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
     const r = old ? { dirty: -1 } : await gated(w, 'archive', go(true))
     if (r === undefined) return // the toast says why, or it wasn't done
     if (r?.dirty) {
@@ -3264,7 +3264,7 @@ export function App() {
             tabs={settings.deskTabs}
             api={{
               ...widgetApi,
-              place: (id, place, on) => call('widgetSet', { id, place, ...(on !== undefined && { on }) }),
+              place: (id, place, on) => (on ? extCfg.set(id, { place, on }) : call('widgetSet', { id, place, ...(on !== undefined && { on }) })), // on: a repo's sheet first
               build: settings.ai?.on ? first => setDialog({ studio: '', back: 'desk', first }) : undefined, // the studio, its first ask Build with AI's: it writes one placed on the Desk
               save: o => void call('settingsSet', { ...(o.tiles && { deskTiles: o.tiles }), ...(o.tabs && { deskTabs: o.tabs }) }).catch(() => {}),
             }}
@@ -3429,12 +3429,13 @@ export function App() {
               keep: async (winner, losers) => {
                 if (!(await ask(`Keep ${wsName(winner)}?`, { text: `${losers.map(wsName).join(', ')} ${losers.length === 1 ? 'is' : 'are'} archived: tabs stop and worktrees go (the branches stay).`, ok: 'Archive the others', danger: true }))) return
                 const gone: string[] = []
+                const held: string[] = []
                 await busyWith(losers.map(w => w.id), 'archiving', async () => {
-                  for (const w of losers) if (await call<{ held?: GateHeld[] } | null>('wsArchive', { id: w.id }).then(r => !r?.held, () => false)) gone.push(w.id) // held by a gate: it stays
+                  for (const w of losers) if (await call<{ held?: GateHeld[] } | null>('wsArchive', { id: w.id }).then(r => (r?.held && held.push(`${wsName(w)} (${r.held.map(h => h.why).join('; ')})`), !r?.held), () => false)) gone.push(w.id) // held by a gate: it stays
                 })
                 setWsId(winner.id)
                 setDialog(null)
-                toast(`Kept ${wsName(winner)}, archived ${gone.length}`, () => gone.reduce((p, id) => p.then(() => call('wsRestore', { id })), Promise.resolve<unknown>(undefined)).then(() => setWsId(winner.id), () => {}))
+                toast(`Kept ${wsName(winner)}, archived ${gone.length}${held.length ? `; a gate held ${held.join(', ')}` : ''}`, () => gone.reduce((p, id) => p.then(() => call('wsRestore', { id })), Promise.resolve<unknown>(undefined)).then(() => setWsId(winner.id), () => {}))
               },
             }}
           />
