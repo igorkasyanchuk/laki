@@ -9,10 +9,10 @@ import { randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
-import { agentVars, findAction, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
+import { agentVars, findAction, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, widgetEvent, widgetUse } from './widgets.ts'
 
@@ -179,6 +179,8 @@ function decide(r: FlowRun, b: Block, exit: string, why: string, you = false) {
   if (r.decisions.length > 300) r.decisions.splice(0, r.decisions.length - 300)
 }
 const touch = () => (save(), changed())
+// an agent block's agent: its preset's (claude, codex, a command…), else the name as it is
+const agentOf = (preset?: string) => presets().find(p => p.name === (preset || 'claude'))?.agent ?? (preset || 'claude')
 
 // what {{…}} fills: the run's own, the workspace's, its PR's (now)
 function varsOf(r: FlowRun): Record<string, string> {
@@ -208,6 +210,18 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   const wf = flowFind({ id: o.workflow, source: o.source, project: o.project })
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
   if (o.by === 'agent' && wf.byAgent) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from Laki's Workflows, once they've read and saved it`)
+  // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
+  for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
+    const ag = agentOf(b.agent)
+    if (isAgent(ag))
+      try {
+        modelCheck(ag, b.model, b.effort, permOf(wf, b, ag), b.fast)
+      } catch (e) {
+        throw new Error(`${wf.name} can't run: ${blockName(b)}: ${(e as Error).message}`)
+      }
+  }
+  const bypass = bypassIn(wf, b => agentOf(b.agent)).map(blockName)
+  if (o.by === 'agent' && bypass.length) throw new Error(`${wf.name} runs an agent that never asks (bypass permissions: ${bypass.join(', ')}): start it yourself`)
   const proj = findProject(o.project)
   if (proj.kind) throw new Error('workflows run in a project: Terminals and Browsers have none')
   if (wf.where === 'worktree' && proj.git === false) throw new Error(`${proj.name} isn't a git repository: ${wf.name} runs in a worktree (runs in: main works there)`)
@@ -225,6 +239,7 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   runs().push(r)
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}`)
+  if (r.dry && bypass.length) say(r, `dry run: ${bypass.join(', ')} would run with bypass permissions (never asks)`)
   if (queue) {
     say(r, `queued: ${busy} going (at once: ${atOnce})${ahead ? `, ${ahead} ahead of it` : ''}`)
     touch()
@@ -472,7 +487,9 @@ function agent(r: FlowRun, b: Block) {
   const vars = varsOf(r)
   const prompt = [...[action && stamp(action.text, Date.now()), b.text].filter(t => t?.trim()).map(t => fill(t!, vars)), b.out?.length ? outAsk(b.out) : b.json && jsonAsk].filter(Boolean).join('\n\n')
   const preset = b.agent || 'claude'
-  if (presets().find(p => p.name === preset)?.agent === 'command') throw new Error(`${preset} is a command, not an agent: it doesn't say when it's done`)
+  const ag = agentOf(preset)
+  if (ag === 'command') throw new Error(`${preset} is a command, not an agent: it doesn't say when it's done`)
+  const perm = permOf(r.flow, b, ag), fast = b.fast || undefined // addTab checks them, and keeps them for restarts and resumes
   // session: run (the run's tab of that agent), new (a tab of its own), or another block's tab
   const key = b.session === 'new' ? undefined : b.session && b.session !== 'run' ? b.session : `run:${preset}`
   let tab = key ? alive(r.tabs[key]) : r.tries?.[b.id] ? alive(r.tabs[b.id]) : undefined // a try again: its own tab, session new too
@@ -482,7 +499,8 @@ function agent(r: FlowRun, b: Block) {
     // this workflow's runs in this project: another repo's chat is no session of this one
     const before = runs().filter(x => x !== r && x.project === r.project && runOf(x, { id: r.workflow, source: r.source, project: r.project }) && x.tabs[key]).sort((a, b) => b.started - a.started)[0]
     const t = before && tabOf(before.tabs[key])
-    if (t?.workspace === ws.id && isLive(t) && !runs().some(x => x !== r && live(x) && Object.values(x.tabs).includes(t.id))) tab = t
+    // its mode as the block's now (the file changed since: a fork in the block's)
+    if (t?.workspace === ws.id && isLive(t) && t.perm === perm && !!t.fast === !!fast && !runs().some(x => x !== r && live(x) && Object.values(x.tabs).includes(t.id))) tab = t
     else forkOf = t?.resumeId ?? before?.resume?.[key]
   }
   // a tab that just started (a restart resumed it) takes typing once it's drawn: it printed, then half a second quiet
@@ -493,8 +511,9 @@ function agent(r: FlowRun, b: Block) {
     queued = !!send(tab.id, prompt).queued // after the turn under way: until it's typed in, a turn's end isn't ours
     say(r, `${blockName(b)}: to ${tab.name}${queued ? ' (queued: it was busy)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   } else {
-    tab = addTab(ws.id, { preset, prompt, model: b.model, effort: b.effort, forkOf, name: key === `run:${preset}` ? undefined : blockName(b) })
-    say(r, `${blockName(b)}: a new ${preset} tab, ${tab.name}${forkOf ? ' (the last run’s chat, forked)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
+    tab = addTab(ws.id, { preset, prompt, model: b.model, effort: b.effort, perm, fast, forkOf, name: key === `run:${preset}` ? undefined : blockName(b) })
+    const mode = permWords(perm, fast, ag)
+    say(r, `${blockName(b)}: a new ${preset} tab, ${tab.name}${mode ? ` (${mode})` : ''}${forkOf ? ' (the last run’s chat, forked)' : ''}${action ? ` · ${action.name}` : ''}`, prompt)
   }
   r.tabs[b.id] = tab.id
   if (key) r.tabs[key] = tab.id
@@ -1107,7 +1126,7 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (wf.problems.length) { no(wf.problems[0]); continue }
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
-    if (agent && wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? '')))) { no('an agent sent the event, and it runs commands, a webhook or outward actions'); continue }
+    if (agent && (bypassIn(wf, x => agentOf(x.agent)).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
     if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && r.ws === ws.id)))) { no('its own run sent it'); continue }
     out.flows.push(wf.id)
     flowStart({ workflow: wf.id, source: wf.source, project: ws.project, task: name, trigger: `event ${name}`, event: payload }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))

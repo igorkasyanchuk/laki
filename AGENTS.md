@@ -112,7 +112,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
-`chat`, `aiState` without `elsewhere`. A
+`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -857,7 +857,7 @@ first) }`, the rail's Notes and ⌘K; `listOff`): `Page` with the list (`.notes-
 Experimental (`settings.workflows`, Settings › General › *Experimental*; off: no rail button, foot button or ⌘K item,
 the view has no `flows`, and every `flow*` method refuses). `shared/workflow.ts`: the model (`BLOCKS`, each kind's
 `EXITS`, a choice's and an ask's options as exits, `max` per block), the file (`parse`/`toFile`: `# Name`, a
-description, `runs in: · session: · at once: · turns: · on:` (`on`: an event, `eventOk`, that starts a run), a `## id` per block, its first kind key, `> ` text, `- label →
+description, `runs in: · session: · at once: · turns: · perm: · on:` (`on`: an event, `eventOk`, that starts a run; `perm`: its agent blocks' permission mode), a `## id` per block, its first kind key, `> ` text, `- label →
 id`, `next:`/`ok:`… lines, `max: 3 → id`, `at: x,y`), `check` (no start, an exit to no block, nothing leads to a block,
 no way out, a loop with no `max` and no ask: Tarjan's; a case's `caseProblems`), `fill` (`{{name}}`), `choice` (*If / else*, `if:` the same
 key: one test, two options) and `case` (`branchOf`/`branchLabel`: each option's label is its test, `[var] contains|matches|equals
@@ -871,7 +871,13 @@ live one (`queued`: while the prompt is in the tab's queue, a turn's end is an e
 in the same workspace, else `forkOf` its `resume`); a tab that just started waits until drawn (`Session.born`, quiet
 500 ms; a run block waits for the setup script, `settingUp`); `use`: an agent action by its slug, else its name
 (`findAction` over Settings' and the project's own `config.actions`, the app's as Run ▾ has them; not a shell's), its
-text stamped and first, the block's after. Core's `turnEnds` (in `turn()`'s idle/done/failed) ends the block 900 ms later (after core's
+text stamped and first, the block's after. An agent block's `perm` and `fast` (`permOf`: its own, else the head's `perm`,
+none for an agent without modes) go to `addTab`, which keeps them on the tab for restarts and resumes; `flowStart` runs
+core's `modelCheck` on each agent block with its preset's agent (`agentOf`) before any workspace; `check` (offline)
+names an unknown mode, a mode or fast mode an agent id lacks, and blocks sharing a tab (`tabKey`: session run of one
+agent, or `session: <block>`) in different modes; a shared session's last tab in another mode is forked, not reused.
+`bypassIn`: `flowStart` `by: 'agent'` and an agent's event refuse a workflow with a bypassPermissions block; StartRun
+names them in red, a dry run's log too. Core's `turnEnds` (in `turn()`'s idle/done/failed) ends the block 900 ms later (after core's
 `deliver`): this turn's answer as `steps.<id>.answer`, a
 `failed` turn the error exit, a usage limit `paused` (`wait.kind` limit) until `watchLimits`'s continue ends a turn. Run
 blocks: `$SHELL -lc` in the workspace with its env (`PORT`, `LAKI_WORKSPACE`, `LAKI_FLOW`, `LAKI_STORAGE_FOLDER`,

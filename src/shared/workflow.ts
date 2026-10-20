@@ -3,7 +3,7 @@
 // after a restart. One Markdown file per workflow, none to start with: yours (<data>/workflows/<id>.md) or a project's
 // (.laki/workflows/<id>.md in its repo). This file is the format both sides share: parse, toFile, check.
 
-import { eventOk, WIDGET_EVENTS } from './types.ts'
+import { type Agent, eventOk, FAST, isAgent, PERMS, WIDGET_EVENTS } from './types.ts'
 
 export const BLOCKS = ['start', 'agent', 'llm', 'decide', 'run', 'choice', 'case', 'ask', 'popup', 'action', 'wait', 'save', 'webhook', 'extension', 'end'] as const
 export type BlockKind = (typeof BLOCKS)[number]
@@ -81,6 +81,8 @@ export type Block = {
   method?: (typeof METHODS)[number] // webhook (unset: POST)
   headers?: string[] // webhook: Name: value, {{env.NAME}} for a secret
   effort?: string
+  perm?: string // agent: how freely it acts (PERMS' id; unset: the workflow's perm:, else the agent's own, which asks)
+  fast?: boolean // agent: fast mode (claude, codex: FAST)
   session?: string // agent: run (the run's agent tab, the default), new, or a block's id (its tab)
   cmd?: string // run
   timeout?: number // agent, run, wait, llm, decide, webhook: minutes
@@ -105,7 +107,7 @@ export type Block = {
   modal?: boolean // popup: false, no window (its notification or card only); end: true, a window with its words
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
 }
-export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main'; session: 'new' | 'shared'; runs?: number; turns?: number; on?: string; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk)
+export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; on?: string; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own
 export type WorkflowSource = 'yours' | 'project'
 export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean } // the list's; byAgent: an agent wrote it (MCP), not saved by the user since
 
@@ -141,6 +143,22 @@ const VAR_LINE = /^var\s+([A-Za-z_][\w-]{0,40})\s*:\s?(.*)$/
 export const varsFill = (own?: Record<string, string>, global?: Record<string, string>) => Object.fromEntries(Object.entries({ ...global, ...own }).filter(([k]) => VAR_NAME.test(k)).map(([k, v]) => [`vars.${k}`, String(v ?? '')]))
 const clip = (s: string, n = 120) => (s.length > n ? `${s.slice(0, n - 1)}…` : s)
 export const blockName = (b: Block) => b.name || (b.kind === 'start' ? 'Start' : b.id)
+
+// an agent block's permission mode: its own, else the workflow's (none for an agent that has no modes: gemini, grok,
+// opencode); agent: its preset's agent where that's known (the daemon's), else the preset's name
+export const PERM_IDS = [...new Set(Object.values(PERMS).flatMap(l => (l ?? []).map(p => p[0])))]
+export const permOf = (wf: Pick<Workflow, 'perm'>, b: Block, agent = b.agent || 'claude') => b.perm ?? (isAgent(agent) && !PERMS[agent] ? undefined : wf.perm)
+// a mode in a block's words (accept edits · fast), as the new-workspace page names it
+export const permWords = (perm?: string, fast?: boolean, agent = 'claude') => [perm && ((PERMS[agent as Agent] ?? PERMS.claude)!.find(p => p[0] === perm)?.[1].toLowerCase() ?? perm), fast && 'fast'].filter(Boolean).join(' · ')
+// the blocks whose agent never asks (bypassPermissions): an agent can't start the workflow (agentOf: a preset's agent)
+export const bypassIn = (wf: Workflow, agentOf?: (b: Block) => string) => wf.blocks.filter(b => b.kind === 'agent' && permOf(wf, b, agentOf?.(b)) === 'bypassPermissions')
+// the tab an agent block's prompt goes to in a run: its own (session new), another block's (session: <id>), else the
+// run's tab of its agent
+function tabKey(by: Map<string, Block>, b: Block, seen = new Set<string>()): string {
+  if (b.session === 'new') return `own:${b.id}`
+  const to = b.session && b.session !== 'run' ? by.get(b.session) : undefined
+  return to?.kind === 'agent' && !seen.has(to.id) ? tabKey(by, to, seen.add(b.id)) : `run:${b.agent || 'claude'}`
+}
 
 // a decision's ways out when it routes on a question: its answers (yes and no, a choice's options, a score's levels by
 // number; label: as the canvas says it), each kept as an option (- yes → block)
@@ -213,12 +231,13 @@ export function parse(text: string, id = ''): { workflow: Workflow; problems: st
       const v = VAR_LINE.exec(line) // var NAME: value
       if (v) return void ((wf.vars ??= {})[v[1]] = v[2].trim())
       const kv = pairs(line)
-      if (kv.length && kv.every(([k]) => ['runs in', 'session', 'at once', 'turns', 'on'].includes(k))) {
+      if (kv.length && kv.every(([k]) => ['runs in', 'session', 'at once', 'turns', 'perm', 'on'].includes(k))) {
         for (const [k, v] of kv) {
           if (k === 'runs in') v in WHERES ? (wf.where = v as Workflow['where']) : problems.push(`${at}: runs in: ${Object.keys(WHERES).join(' or ')}`)
           else if (k === 'session') v in SESSIONS ? (wf.session = v as Workflow['session']) : problems.push(`${at}: session: new or shared`)
           else if (k === 'at once') wf.runs = num(v, at, problems)
           else if (k === 'on') wf.on = v || undefined
+          else if (k === 'perm') wf.perm = v || undefined
           else wf.turns = num(v, at, problems)
         }
       } else desc.push(line.trim())
@@ -320,6 +339,8 @@ function set(b: Block, k: string, v: string, at: string, problems: string[]) {
     }
     case 'header': return void (/^[\w-]+:\s?\S/.test(v) ? (b.headers ??= []).push(v) : problems.push(`${at}: header: Name: value`))
     case 'effort': return void (b.effort = v || undefined)
+    case 'perm': return void (b.perm = v || undefined)
+    case 'fast': return void (b.fast = yes(v) || undefined)
     case 'session': return void (b.session = v || undefined)
     case 'run': return void (b.cmd = v)
     case 'timeout': return void (b.timeout = num(v.replace(/\s*min(utes)?$/, ''), at, problems, TIMEOUT_MAX))
@@ -362,14 +383,14 @@ const one = (s = '') => s.replace(/\s*\n\s*/g, ' ') // a field on one line: a ne
 export function toFile(wf: Workflow): string {
   const L = [`# ${one(wf.name)}`]
   if (wf.desc) L.push(one(wf.desc))
-  L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`, wf.on && `on: ${one(wf.on)}`].filter(Boolean).join(' · '))
+  L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`, wf.perm && `perm: ${wf.perm}`, wf.on && `on: ${one(wf.on)}`].filter(Boolean).join(' · '))
   for (const [k, v] of Object.entries(wf.vars ?? {})) if (VAR_NAME.test(k)) L.push(`var ${k}: ${one(v)}`)
   for (const b of wf.blocks) {
     L.push('', `## ${b.id}`)
     if (b.name && b.name !== b.id) L.push(`name: ${one(b.name)}`)
     switch (b.kind) {
       case 'start': L.push(`input: ${b.input ?? 'task'}`); if (b.inputs?.length) L.push(`inputs: ${b.inputs.map(inputText).join(', ')}`); break
-      case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
+      case 'agent': L.push([`agent: ${b.agent || 'claude'}`, b.model && `model: ${b.model}`, b.effort && `effort: ${b.effort}`, b.perm && `perm: ${b.perm}`, b.fast && 'fast: yes', b.session && b.session !== 'run' && `session: ${b.session}`, b.use && `use: ${one(b.use)}`, b.json && 'json: yes'].filter(Boolean).join(' · ')); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'llm': L.push(`llm: ${b.model ?? ''}`.trimEnd()); if (b.system) L.push(`system: ${one(b.system)}`); if (b.temperature !== undefined) L.push(`temperature: ${b.temperature}`); if (b.json !== undefined) L.push(`json: ${b.json ? 'yes' : 'no'}`); if (b.timeout) L.push(`timeout: ${b.timeout}`); break
       case 'decide':
         L.push([`decide: ${b.model ?? ''}`.trimEnd(), b.sure !== undefined && `sure: ${b.sure}`, b.timeout && `timeout: ${b.timeout}`].filter(Boolean).join(' · '))
@@ -414,6 +435,7 @@ export function check(wf: Workflow): string[] {
   if (!start) return ['no start block (## start)']
   if (wf.on && !eventOk(wf.on)) out.push(`on: ${wf.on} isn't an event (${WIDGET_EVENTS.join(', ')}, custom.<name> or custom.*)`)
   if (wf.blocks.filter(b => b.kind === 'start').length > 1) out.push('more than one start block')
+  if (wf.perm && !PERM_IDS.includes(wf.perm)) out.push(`the workflow's permission mode ${wf.perm}? ${PERM_IDS.join(', ')}`)
   if (wf.blocks.length > MAX_BLOCKS) return [...out, `${wf.blocks.length} blocks: ${MAX_BLOCKS} at most`] // the walks below recurse: not over thousands
   for (const b of wf.blocks) {
     for (const e of exitsOf(b)) if (e.to && !by.has(e.to)) out.push(`${blockName(b)}: ${e.name} goes to ${e.to}, which isn't a block`)
@@ -422,6 +444,14 @@ export function check(wf: Workflow): string[] {
     if (b.kind === 'case') out.push(...caseProblems(b))
     if (b.kind === 'agent' && !b.text?.trim() && !b.use?.trim()) out.push(`${blockName(b)} has no prompt (or agent action)`)
     if (b.kind === 'run' && !b.cmd?.trim()) out.push(`${blockName(b)} has no command`)
+    if (b.kind !== 'agent' && (b.perm !== undefined || b.fast !== undefined)) out.push(`${blockName(b)}: perm: and fast: are for agent blocks`)
+    if (b.kind === 'agent') {
+      // offline: an agent's own name is checked, a preset's waits for the run (flowStart)
+      const ag = b.agent || 'claude'
+      if (b.perm && !PERM_IDS.includes(b.perm)) out.push(`${blockName(b)}: permission mode ${b.perm}? ${PERM_IDS.join(', ')}`)
+      else if (b.perm && isAgent(ag) && !PERMS[ag]?.some(p => p[0] === b.perm)) out.push(`${blockName(b)}: ${ag} has no permission modes`)
+      if (b.fast && isAgent(ag) && !FAST[ag]) out.push(`${blockName(b)}: ${ag} has no fast mode`)
+    }
     if (b.kind === 'llm' && !b.text?.trim()) out.push(`${blockName(b)} has no prompt`)
     if (b.kind === 'decide') out.push(...decideProblems(b))
     if (b.kind === 'webhook' && !/^(https?:\/\/|\{\{)\S+$/i.test(b.url?.trim() ?? '')) out.push(`${blockName(b)}: webhook: an http(s) URL`)
@@ -442,6 +472,14 @@ export function check(wf: Workflow): string[] {
     if (b.kind === 'save' && b.from && b.link) out.push(`${blockName(b)}: a file or a link, not both`)
     if (b.kind === 'agent' && b.session && !['run', 'new'].includes(b.session) && by.get(b.session)?.kind !== 'agent') out.push(`${blockName(b)}: session ${b.session} isn't an agent block`)
     if (wf.where === 'main' && ((b.kind === 'action' && ['ship', 'approve', 'merge'].includes(b.action ?? '')) || b.kind === 'wait')) out.push(`${blockName(b)} needs a PR: runs in: worktree`) // a folder's own workspace has no PR of its own
+  }
+  // blocks that share a tab start it once, in the first one's mode: another mode there needs a tab of its own
+  const first = new Map<string, Block>()
+  for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
+    const k = tabKey(by, b)
+    const a = first.get(k)
+    if (!a) first.set(k, b)
+    else if ((permOf(wf, a) ?? '') !== (permOf(wf, b) ?? '') || !!a.fast !== !!b.fast) out.push(`${blockName(b)} shares ${blockName(a)}'s tab, which starts in ${permWords(permOf(wf, a), a.fast) || "the agent's own mode"}: give ${blockName(b)} session: new for ${permWords(permOf(wf, b), b.fast) || "the agent's own mode"}`)
   }
   // inputs: names, kinds, defaults; and every {{inputs.x}} (or a choice's or case's inputs.x) one of them
   const inputs = start.inputs ?? []
@@ -767,12 +805,12 @@ export const WORKFLOW_FORMAT = `A Laki workflow is one Markdown file: a graph of
 # <Name>
 <one line: what it does>
 
-runs in: worktree|main · session: new|shared · at once: 3 · turns: 30 · on: <event> (at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
+runs in: worktree|main · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · on: <event> (perm: every agent block's permission mode unless it says its own, below; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
 var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:
 - ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked. Its inputs, besides the task, on one line: "inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m" (name[?][:kind][=default]; kinds text (the default), number, branch, choice(a|b|…); ? optional): each is {{inputs.<name>}}, asked for as the run starts (laki_workflow_run's inputs); a scheduled run takes the defaults.
-- agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed).
+- agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · perm: auto|acceptEdits|plan|bypassPermissions · fast: yes · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed). perm: how freely it acts (claude and codex; unset: the head's perm:, else the agent's own, which asks, and an unattended run stops at its first permission prompt): ${PERM_IDS.map(id => `${id} (${PERMS.claude!.find(p => p[0] === id)![2].replace(/;/g, ',')})`).join(', ')}; codex's are its sandbox and approvals in the same spirit (plan: read only). An agent can't start a workflow with a bypassPermissions block. fast: yes is fast mode (claude, codex: more speed, more usage). Blocks sharing a tab (session run of the same agent, or session: <block>) need the same perm and fast: the tab starts once.
 - run: <shell command> (in the run's folder; timeout: <minutes>). Exits ok (exit 0), fail. {{steps.<id>.output}}: its last lines.
 - ask: <question>, show: <text with {{vars}}>, then options "- <label> → <block>". Waits for the user; what they type is {{answer}}.
 - choice: <variable or block id> contains|matches|equals "<text>", or <variable> >=|<=|>|< <number> (if/else; "if:" is the same), then two options: the first when it holds, the second when not.

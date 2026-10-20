@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: an Agent block can say how freely its agent acts (auto, accept edits, plan, bypass) and use fast mode;
+  the workflow's head sets one for all its agents. A workflow whose agent never asks is yours to start, not an agent's.
 - A *Context* starter (`laki widget new Context --kind context`): actions in ⌘K, a file's right click and the prompt's
   Insert menu, to copy from.
 - Extensions can come with a repo (`.laki/extensions/`): off until you look at what they run, off again when the repo

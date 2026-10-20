@@ -1038,6 +1038,14 @@ question with its choices as buttons (*1. Yes*, *2. Yes, and don't ask again*, *
 the run*; a pick answers it in the tab, and the run goes on. Answered in the tab instead, the run goes on by itself.
 The tab's notification is the only one.
 
+An Agent block can say how freely its agent acts (*How freely it acts*, `perm: acceptEdits` in the file), as the
+new-workspace page does: *Auto mode*, *Accept edits*, *Plan mode* (codex: read only) or *Bypass permissions*, and
+*Fast mode* (claude and codex). Unset, it takes the workflow's (its settings' *How freely its agents act*, `perm:` in
+its head), else the agent's own, which asks first: an unattended run then waits at the first permission prompt. Blocks
+that share a tab need the same mode, since the tab starts once (give one *A tab of its own*). A workflow with a block
+that never asks (bypass permissions) is yours to start: an agent can't (Laki AI, `laki_workflow_run`, an agent's
+event), and *Run* says which blocks.
+
 An Agent block gives its turn an hour (*Timeout*, `timeout: 30` in minutes): past it, Laki presses Esc in its tab and
 the block takes its *error* way. Time the run waits for you or for a usage limit doesn't count. An agent that prints
 nothing for 10 minutes while it works gets one line typed into its tab (*Laki here: nothing printed for 10 minutes.

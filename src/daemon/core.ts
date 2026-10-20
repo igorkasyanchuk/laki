@@ -1318,7 +1318,7 @@ function presetCheck(preset?: string, cmd?: string) {
 
 // a model and effort for an agent's flags: a name (it goes on the command line, quoted), an effort it takes; a
 // permission mode it has (PERMS), fast mode where there is one
-function modelCheck(agent: string, model?: string, effort?: string, perm?: string, fast?: boolean) {
+export function modelCheck(agent: string, model?: string, effort?: string, perm?: string, fast?: boolean) {
   const perms = PERMS[agent as Agent]
   if (perm && !perms?.some(p => p[0] === perm)) throw new Error(perms ? `permission mode ${perm}? ${perms.map(p => p[0]).join(', ')}` : `${agent} has no permission modes here`)
   if (fast && !FAST[agent as Agent]) throw new Error(`${agent} has no fast mode`)

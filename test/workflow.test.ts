@@ -1200,6 +1200,77 @@ test('workflow inputs: the line reads back, check names a bad one, a run fills t
   assert.ok((await rig.rpc('scheduleSet', { project: p.id, workflow: 'fix', prompt: 'x', when: 'every day at 9am' })).id)
 })
 
+const MODES = `# Modes
+Nightly, unattended.
+
+runs in: worktree · session: new · turns: 30 · perm: acceptEdits
+
+## start
+input: task
+next: plan
+
+## plan
+agent: claude · perm: plan · fast: yes · session: new
+> plan {{task}}
+next: build
+
+## build
+agent: claude
+> build {{task}}
+next: done
+
+## done
+end: success
+`
+
+test('workflow permission modes: perm and fast per agent block and the head’s default, checked offline and before a workspace; the agent’s flags; bypass is yours to start', async t => {
+  const { workflow, problems } = parse(MODES, 'modes')
+  assert.deepEqual(problems, [])
+  assert.deepEqual(check(workflow), [])
+  assert.equal(toFile(workflow), MODES, 'round trip')
+  assert.equal(workflow.perm, 'acceptEdits')
+  assert.deepEqual([workflow.blocks[1].perm, workflow.blocks[1].fast], ['plan', true])
+  // a bad mode, a mode the agent hasn't, two blocks in one tab with different modes
+  const bad = (s: string) => check(parse(MODES.replace('agent: claude · perm: plan · fast: yes · session: new', s)).workflow)
+  assert.deepEqual(bad('agent: claude · perm: yolo · session: new'), ['plan: permission mode yolo? auto, acceptEdits, plan, bypassPermissions'])
+  assert.deepEqual(bad('agent: gemini · perm: auto · fast: yes'), ['plan: gemini has no permission modes', 'plan: gemini has no fast mode'])
+  assert.deepEqual(bad('agent: claude · perm: plan'), ["build shares plan's tab, which starts in plan mode: give build session: new for accept edits"])
+  assert.deepEqual(check(parse(MODES.replace('perm: acceptEdits', 'perm: yolo')).workflow), ["the workflow's permission mode yolo? auto, acceptEdits, plan, bypassPermissions"])
+  assert.deepEqual(bad('agent: gemini'), [], 'the head’s mode skips an agent that has none')
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'modes', text: MODES })
+  const run = await rig.rpc('flowStart', { workflow: 'modes', project: p.id, task: 'x' })
+  const r = await until(async () => {
+    const x = await rig.rpc('flowGet', { id: run.id })
+    return x.status === 'done' && x
+  }, 'done', 20000)
+  const tabs = (await rig.rpc('state')).tabs
+  const tab = (id: string) => tabs.find((x: any) => x.id === r.tabs[id])
+  assert.deepEqual([tab('plan').perm, tab('plan').fast], ['plan', true])
+  assert.deepEqual([tab('build').perm, tab('build').fast], ['acceptEdits', undefined], 'the head’s default')
+  const mode = (id: string) => (a => a[a.indexOf('--permission-mode') + 1])(rig.fakeLog().find(l => l.bin === 'claude' && l.tab === r.tabs[id]).args)
+  assert.equal(mode('plan'), 'plan')
+  assert.equal(mode('build'), 'acceptEdits')
+  assert.ok(r.log.some((l: string) => /plan: a new claude tab, .* \(plan mode · fast\)/.test(l)), r.log.join('\n'))
+
+  // a preset whose agent hasn't the mode: refused before any workspace
+  await rig.rpc('settingsSet', { presets: [{ name: 'claude', agent: 'claude' }, { name: 'gem', agent: 'gemini' }] })
+  await rig.rpc('flowSave', { id: 'gem', text: MODES.replace('agent: claude · perm: plan · fast: yes · session: new', 'agent: gem · perm: plan') })
+  const before = (await rig.rpc('state')).workspaces.length
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'gem', project: p.id, task: 'x' }), /Modes can't run: plan: gemini has no permission modes/)
+  assert.equal((await rig.rpc('state')).workspaces.length, before, 'no workspace made')
+
+  // bypass: an agent (MCP, Laki AI) can't start it; you can; a dry run says it
+  await rig.rpc('flowSave', { id: 'yolo', text: MODES.replace('perm: acceptEdits', 'perm: bypassPermissions') })
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'yolo', project: p.id, task: 'x', by: 'agent' }), /Modes runs an agent that never asks \(bypass permissions: build\): start it yourself/)
+  const dry = await rig.rpc('flowStart', { workflow: 'yolo', project: p.id, task: 'x', dry: true })
+  assert.ok((await rig.rpc('flowGet', { id: dry.id })).log.some((l: string) => /dry run: build would run with bypass permissions/.test(l)))
+  await rig.rpc('flowStop', { id: dry.id })
+})
+
 // the paths a user hits first: a restart mid turn, a usage limit, real PR checks, an agent's tab closed
 const AGENT = (agent: string, prompt: string) => `# Agent
 One turn.
@@ -1437,5 +1508,5 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   const ag = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
   r = await rig.rpc('widgetEmit', { name: 'deploy', ws: ws.id, from: { tab: ag.id } })
   assert.deepEqual(r.flows, [])
-  assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook or outward actions'))
+  assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'))
 })
