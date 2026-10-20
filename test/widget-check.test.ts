@@ -17,7 +17,7 @@ const errors = (ps: any[]) => ps.filter(p => p.level === 'error')
 
 test('starters: each kind made through the CLI is on, checks out with its fetch, and shows its fixture', async t => {
   const rig = await fresh(t)
-  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'stream' && k !== 'launcher' && k !== 'pullmain' /* per workspace, a stream: widget-ws and widget-events tests (Pull main: below); the launcher: no data, below */)) {
+  for (const kind of STARTER_KINDS.filter(k => k !== 'workspace' && k !== 'stream' && k !== 'launcher' && k !== 'pullmain' && k !== 'context' /* per workspace, a stream: widget-ws and widget-events tests (Pull main, Context: below); the launcher: no data, below */)) {
     const made = await rig.cli('widget', 'new', `My ${kind}`, '--kind', kind)
     assert.equal(made.code, 0, made.err)
     const id = `my-${kind}`
@@ -95,6 +95,43 @@ test('the Pull main starter: per workspace, a button; git merges the base in, co
   await until(() => rig.tab(b.id), 'its agent')
   assert.match((await pull(b.id)).toast ?? '', /^(Asked the agent to merge main|The agent merges main after its turn)$/)
   await until(async () => (await rig.screen(b.id)).includes('Bring the latest of main'), 'the prompt typed into the agent')
+})
+
+test('the Context starter: its three menus, each told where you are; check passes', async t => {
+  const rig = await fresh(t)
+  const made = await rig.cli('widget', 'new', 'Context', '--kind', 'context')
+  assert.equal(made.code, 0, made.err)
+  const check = await rig.cli('widget', 'check', 'context')
+  assert.equal(check.code, 0, check.out + check.err)
+  assert.doesNotMatch(check.out, /✗|!/)
+  const w = await find(rig, 'context')
+  assert.deepEqual([w.on, w.place, w.label, w.button], [true, 'status', 'Context', true])
+  const menus = Object.fromEntries(w.menus.map((m: any) => [m.action, m]))
+  assert.deepEqual(menus.summary.show, ['palette'])
+  assert.equal(menus.summary.key, 'Alt+Cmd+U')
+  assert.deepEqual([menus['file-stats'].show, menus['file-stats'].view], [['file'], true])
+  assert.deepEqual([menus['branch-note'].show, menus['branch-note'].insert], [['prompt', 'tab'], true])
+  assert.match(await rig.rpc('widgetRender', { id: 'context', full: true, sample: true }), /src\/checkout\.ts[\s\S]*214[\s\S]*order/)
+
+  // no workspace: says so
+  const act = (action: string, ctx?: object) => rig.rpc('widgetAction', { id: 'context', action, ...(ctx && { ctx }) })
+  assert.equal((await act('summary')).toast, 'Pick a workspace first')
+  assert.equal((await act('branch-note')).toast, 'Pick a workspace first')
+  assert.equal((await act('file-stats')).toast, 'Pick a file first')
+
+  // a workspace with two files changed, one of them read
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  mkdirSync(join(ws.path, 'docs'))
+  writeFileSync(join(ws.path, 'docs', 'notes.md'), 'The cart holds the order.\nThe order has a total; the cart has items.\n')
+  writeFileSync(join(ws.path, 'README.md'), 'changed\n')
+  assert.equal((await act('summary', { ws: ws.id })).toast, `${ws.branch}: 2 files changed`)
+  const stats = await act('file-stats', { ws: ws.id, file: 'docs/notes.md' })
+  assert.ok(stats.ok, stats.error)
+  const data = (await find(rig, 'context')).data ?? JSON.parse(readFileSync(join(rig.data, 'widget-data', 'context.json'), 'utf8')).data
+  assert.deepEqual(data, { path: 'docs/notes.md', lines: 2, words: 14, bytes: 69, top: [{ word: 'the', count: 4 }, { word: 'order', count: 2 }, { word: 'has', count: 2 }, { word: 'cart', count: 2 }, { word: 'total', count: 1 }, { word: 'items', count: 1 }, { word: 'holds', count: 1 }] })
+  const note = await act('branch-note', { ws: ws.id })
+  assert.equal(note.insert, `Branch ${ws.branch}, 2 files changed: README.md, docs/`)
 })
 
 test('the schema: docs/widget.schema.json in step, every manifest key and UI element in it', () => {

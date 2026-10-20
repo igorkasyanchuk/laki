@@ -18,7 +18,7 @@ import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload } from './notes.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -170,7 +170,7 @@ const api: Record<string, Handler> = {
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
   wsPeek: p => core.wsPeek(p.id), // what Delete would take with it (the app's question)
-  wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean }),
+  wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean, force: p.force === true, from: p.from }), // { held }: a gate said no (force: yours only)
   doctor: () => core.doctor(),
   wsFan: p => core.wsFan(core.byCaller(p)),
   answer: p => core.answer(p),
@@ -250,7 +250,7 @@ const api: Record<string, Handler> = {
   skills: () => skills(),
   skillSet: p => skillSet(p),
   prComment: p => core.prComment(p),
-  prAct: p => core.prAct(p),
+  prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   prLabels: p => core.prLabels(p.ws),
   prLabel: p => core.prLabel(p),
   prThreads: p => core.prThreads(p.ws),
@@ -287,7 +287,7 @@ const api: Record<string, Handler> = {
   tabWake: p => core.wake(p.tab), // a pane already on it: a look doesn't attach again
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
-  ship: p => core.ship(p.ws, p.message),
+  ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: p => core.screen(p.target, p.lines, p.by, p.all === true),
   input: (p, c) => core.input(p.tab, p.data, c),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
@@ -306,6 +306,10 @@ const api: Record<string, Handler> = {
   tunnelTick: p => core.tunnelTick(p.now), // tests move the clock
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
+  widgetLogs: p => widgetLogs(p), // the Logs tab (every 2 s, from its cursor), laki widget logs, MCP's laki_extension_logs
+  widgetLog: p => widgetLog(p), // laki widget log, a JS page's laki.log: nothing while its log is off
+  widgetLogClear: p => widgetLogClear(p), // the Logs tab's Clear
+  widgetWhat: p => widgetWhat(String(p.id)), // what turning one on runs, in words, and its files' hash (widgetSet's seen): laki widget what, the turn-on sheet
   widgetRun: p => widgetRun(p),
   widgetRm: async p => (r => (aiForget(`widget:${p.id}`), r))(await widgetRm(p)), // Settings' Delete: to the trash (Undo: widgetRestore); never MCP's nor Laki AI's; its studio chat with it, once it's gone
   widgetRestore: p => widgetRestore(p), // Undo of a delete, laki widget restore
@@ -323,7 +327,9 @@ const api: Record<string, Handler> = {
   widgetTick: p => widgetTick(p.now), // tests move the clock
   widgetTrashTidy: p => widgetTrashTidy(p.now), // tests move the clock
   widgetPush: p => widgetPush(p),
-  widgetTools: () => widgetTools(),
+  widgetEmit: p => widgetEmit(p), // laki widget emit, MCP's laki_extension_emit: custom.<name>
+  widgetEvents: () => widgetEvents(), // laki widget events: the last 50, what each reached
+  widgetTools: p => widgetTools({ ws: p.ws }), // ws: the caller's workspace (a repo's only in its project's)
   widgetToolCall: p => widgetToolCall(p),
   widgetToolAnswer: p => widgetToolAnswer(p),
   widgetGrantRm: p => widgetGrantRm(p),

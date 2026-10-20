@@ -884,7 +884,7 @@ may move one, resize it and change a plain setting with `laki widget set`, never
 `laki widget dev` from one leaves the folder's extensions off, and `laki widget action` from one asks you first.
 
 To start one: Settings › Extensions › *New ▾* (a starter: a number, a list, a table, a chart, a note, a launcher, a
-button, a form, a JS page, *Pull main* or one file; it runs at once on sample data, and its page opens), or `laki widget new
+button, a form, a JS page, *Pull main*, *Context* (actions in ⌘K and the right-click menus) or one file; it runs at once on sample data, and its page opens), or `laki widget new
 "Deploys" --kind table`. Its card's *Data* says where its data comes from: its fetch, a text you type (JSON, or a
 Markdown note), a file, a URL, or *AI*: an agent finds it with your own MCP servers and sums it up, every hour (a
 prompt such as *"What's new in #eng on Slack since yesterday: decisions, questions for me"*, the tools it may use
@@ -906,9 +906,27 @@ the workspace is deleted and stays while it's archived. `--ws <workspace>` picks
 
 Extensions can answer what happens (`"on": { "turn.done": "an action" }` in widget.json: an agent's turn ending or
 asking something, a PR's checks failing or passing, a merge, a new or archived workspace, a scheduled run, the app
-opening): the action gets the event as JSON on stdin. One can **stream** (`"stream": true`: its command runs all along,
+opening, a ship, a workflow's end, a usage limit, a new tab, a port starting to listen): the action gets the event as
+JSON on stdin. Your own events go out with `laki widget emit deploy.done '{"sha": "abc"}'` (`custom.deploy.done`, or
+`custom.*` for all of them), and `laki widget events` lists what was sent lately and what each reached. One can **stream** (`"stream": true`: its command runs all along,
 each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
 (a cron job, a git hook, CI).
+
+**Gates**: an extension's action with `"gate": ["ship", "merge", "archive"]` runs before Laki does that to a
+workspace; `{"ok": false, "why": …}` holds it (*Not shipped*, with why), and you can *Do it anyway* or ask the agent to
+fix it. Merge when green held waits for a push; `laki ship` exits 1 with the reasons (`--force`: yours, never an
+agent's). Its Settings card says *Can hold: ship, merge*.
+
+**From the repo**: a project's `.laki/extensions/` holds its team's extensions (`laki widget new "Deploys" --dir
+.laki/extensions/deploys`, then commit it). They're listed under *From <project>* as `<project>.<id>`, off: turning one
+on shows what it runs first, and a change in the repo turns it off again (*changed*) until you look. They show and run
+only in that project's workspaces; their settings stay yours, on this Mac.
+
+**Logs**, off until you turn them on (Settings › Extensions › *Keep logs for every extension*, or one's *Keep a log*):
+Laki's lines about it, each run with how long it took and its exit code, and what it wrote to stderr (a line starting
+`warn:` or `error:` gets that level), secrets masked. Its page's **Logs** tab follows them (filters, *Copy*, *Clear*,
+*Show in Finder*); `laki widget logs <id> -f` does in a terminal, and `laki widget log <id> <text>` adds a line from a
+script.
 
 An extension's action can be a **tool for your agents** (`"tool"` on it in widget.json: what it does, its input, when
 to ask): agents list them with `laki widget tools`, call one with `laki widget tool <id> <action> '<json>'` or through
@@ -972,6 +990,12 @@ A prototype runs in a sandboxed frame: no requests out, never the app or your fi
 Turn them on in Settings › General › *Experimental*; the rail's *Flows* opens them (⌘K too). The page lists your
 workflows and their runs, like Scheduled tasks; a click opens one, and the breadcrumbs go back. Esc doesn't close it:
 it stays open while runs go (✕ does).
+
+A workflow can start by itself on an event (*Starts on* in its settings, `on: pr.merged` in its file): any extension
+event, or one of your own (`custom.deploy.done`, `laki widget emit`). The run goes in the event's workspace's project,
+its task the event's name, its fields as `{{event.ws.branch}}`, `{{event.data.sha}}`. It doesn't start for an event
+with no workspace, for a workflow an agent wrote (until you save it), or for an agent's event when it runs commands (a run or
+extension block), a webhook or outward actions; `laki widget events` says why.
 
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
 happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,
@@ -1577,9 +1601,14 @@ laki widget action <id> <action> [arg]                  # run one of its buttons
 laki widget kit [element] [--json]                      # the UI kit's elements: each one's props and sample
 laki widget dev [folder]                                # dev mode: your extension's folder linked, on, watched; its runs as they come
 laki widget dev --off <id|folder> | --list              # unlink one | the linked folders
-laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, onefile
+laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, context, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
+laki widget what <id>                                   # what turning it on runs, and its hash: laki widget on <id> --seen <hash>
+laki widget logs <id> [-n 100] [-f] [--level error]     # its log (when it keeps one); -f follows it
+laki widget emit <name> [json | -] [--ws <ws>]          # an event of your own (custom.<name>): extensions and workflows on it run
+laki widget events                                      # the last 50 events, and what each reached
+laki widget log <id> [--level warn] <text>              # a line in its log, from a script or a hook
 laki widget tools [--json]                              # the extensions' tools for agents, their input and when to use them
 laki widget tool <id> <action> [json] [--ws <ws>]       # call one (asked first unless the tool says never)
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers

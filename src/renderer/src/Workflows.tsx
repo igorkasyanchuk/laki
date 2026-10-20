@@ -6,7 +6,7 @@
 // close the page: it stays open while runs go. The engine is the daemon's (daemon/workflow.ts). Loaded as the page
 // opens (App's lazy import).
 import { type ChangeEvent, Fragment, type PointerEvent as PE, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { findAction, mergeActions, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
+import { findAction, mergeActions, WIDGET_EVENTS, type Preset, type Project, type RunAction, type WorkspaceView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, flowVars, VAR_NAME, QTYPE_INFO, renameBlock, routesOf, workflowAsk, BAD_EXITS, BLOCK_NAMES, DECIDE_MODELS, type DecideQ, fromApi, NUM_TESTS, QTYPES, SURE, blockName, branchLabel, branchOf, type Block, type BlockKind, check, EXITS, exitsOf, FLOW_ENDED, type FlowRun, type FlowView, flowView, MAX_BLOCKS, optioned, parse, RESULTS, runOf, SESSIONS, TESTS, toFile, WAITS, WHERES, METHODS, OUT_KINDS, OUT_NAME, OUT_TAKEN, RETRY_KINDS, RETRY_MAX, RUNS_AT_ONCE, inputsOf, inputText, type Shown, type Workflow, type WorkflowItem, type WorkflowSource } from '../../shared/workflow'
 import { pageNow } from './api'
@@ -333,7 +333,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
 // a field whose text goes through the workflow's Markdown and back (parse trims it and joins its lines; a number left
 // empty is its default): what's typed stays as typed while it has the focus, or a space before the next word, a new
 // line or an emptied number would be gone as it's typed. A value changed elsewhere meanwhile (the File tab) wins
-function Typed({ area, value, onText, ...rest }: { area?: boolean; value: string | number; onText: (v: string) => void; rows?: number; placeholder?: string; disabled?: boolean; 'aria-label'?: string; type?: string; min?: number; max?: number; className?: string }) {
+function Typed({ area, value, onText, ...rest }: { area?: boolean; value: string | number; onText: (v: string) => void; rows?: number; placeholder?: string; disabled?: boolean; 'aria-label'?: string; type?: string; min?: number; max?: number; className?: string; list?: string }) {
   const [typed, setTyped] = useState<string | null>(null)
   const was = useRef<string | null>(null) // the value as the last keystroke left it
   const now = String(value)
@@ -975,7 +975,7 @@ function FileEdit({ text, onText }: { text: string; onText: (t: string) => void 
   )
 }
 
-const FORMAT_HELP =`\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30\`.
+const FORMAT_HELP =`\`# Name\`, a line saying what it does, then \`runs in: worktree|main · session: new|shared · at once: 3 · turns: 30 · on: pr.merged\` (on: an event that starts a run by itself, its fields as \`{{event.…}}\`; optional).
 
 A \`## id\` per block. Its first key says its kind: \`input: task\` (start), \`agent: claude · model: opus · effort: high · session: run|new|<block> · json: yes\` (JSON mode: its answer the JSON it ends with), \`run: npm test\`, \`ask: Build it?\` with \`show:\`, \`choice: steps.review.answer contains "LGTM"\` (if / else: two options), \`case: steps.classify.answer\` with branches \`- equals "only_specs" → id\`, \`- steps.size.output equals "0" → id\`, \`- else → id\` (the first that holds; else last), \`action: ship|approve|merge|dev|archive\` (\`ask first: no\`), \`wait: checks\`, \`save: notes.md\` (its text as \`>\` lines, or \`from: a/file\`, or \`link: {{pr.url}}\`), \`llm: anthropic/claude-sonnet-4.5\` (one OpenRouter call, its prompt as \`>\` lines; empty: Settings › AI's model; \`json: yes\`: its answer one JSON object, the default with \`out:\`), \`webhook: https://…\` with \`method: POST\`, \`header: Authorization: Bearer {{env.TOKEN}}\` lines and its body as \`>\` lines (or \`from: a/file\`; none: the run's variables as JSON), \`decide: typesafe/jev-1.13 · sure: 0.7\` (an AI decision: the state as \`>\` lines, then \`question: urgent · yes/no|choice|score · what it asks\` lines (\`noul\` is yes/no), each with indented \`  yes: …\` / \`  <option>: …\` / \`  - <level>\` lines; each answer is \`{{steps.<id>.<name>}}\` with \`.p\` and \`.confidence\`; \`route: urgent\` then \`- <answer> → id\` lines: a way out per answer, a score's by its level's number), \`popup: Done\`, \`notify: yes\`, \`popover: yes\`, \`modal: no\`, \`phone: yes\` (a window in Laki, its body as \`>\` lines: HTML or Markdown; a corner card; a macOS notification), \`end: success|stopped|failed · notify: yes · popover: yes · modal: yes · phone: yes\` (its \`>\` lines: what they say; \`phone\`: a push too, Settings › Phone pushes). A case's branch may also be \`- steps.triage.urgent.p >= 0.8 → id\` or \`- js: num('steps.triage.urgency') >= 2 → id\` (vars, num(name), json(name)). \`out: title, summary\` on an agent, llm, run or webhook block: what it gives the blocks after it, \`{{steps.<id>.title}}\` (an agent or an llm ends its answer with a JSON object of them; a command's output or a response is one). An agent block's \`use: <slug>\` sends one of Run ▾'s agent actions (its slug: Settings › Actions), the \`>\` lines after it.
 
@@ -1007,6 +1007,11 @@ function Inspector({ wf, id, presets, actions, exts, edit, onPick, api, project,
             <label>Agent turns per run</label>
             <Typed type="number" min={1} max={99} value={wf.turns ?? 30} onText={v => edit(w => void (w.turns = Number(v) || undefined))} />
           </div>
+        </div>
+        <div className="wf-field">
+          <label>Starts on</label>
+          <Typed list="wf-events" placeholder="only when you start it (or an event: pr.merged, custom.deploy…)" value={wf.on ?? ''} onText={v => edit(w => void (w.on = v.trim() || undefined))} />
+          <datalist id="wf-events">{[...WIDGET_EVENTS, 'custom.*'].map(e => <option key={e} value={e} />)}</datalist>
         </div>
       </div>
     )

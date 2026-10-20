@@ -27,7 +27,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki screen shot [app] | windows            a screenshot of the iOS Simulator, or of an app's window (its PNG's path)
   laki screen tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe
                                               the simulator's hands, in points (needs idb); describe: its elements
-  laki diff <ws> | run <ws> [test|lint|format|deploy] | ship <ws> -m <message>
+  laki diff <ws> | run <ws> [test|lint|format|deploy] | ship <ws> -m <message> [--force]
                                               run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
                                               a hidden browser on the workspace's localhost (the app must be open);
@@ -42,6 +42,12 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
+  laki widget what <id>                       what turning it on runs, and its files' hash
+  laki widget on <id> --seen <hash>           on only while its files are the ones laki widget what showed
+  laki widget logs <id> [-n 100] [-f] [--level error] [--ws <ws>] [--json]  its log (when it keeps one): -f follows it
+  laki widget log <id> [--level warn] [--ws <ws>] <text…>  a line in its log (a hook, cron): exits 0, nothing written while it's off
+  laki widget emit <name> [json | -] [--ws <ws>]  an event of your own, custom.<name>: extensions and workflows on it run
+  laki widget events                          the last 50 events, and what each reached
   laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value…]
         where it shows, its size, how often it fetches, its full view, what it hides, its settings
   laki widget render <id> [--full] [--ws <ws>]  the HTML it shows now, filled from its data
@@ -49,7 +55,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget kit [element|icons] [--json]    the UI kit (widget.json's "ui"): its elements, one's props and a sample, or every icon
   laki widget dev [folder]                    dev mode: link your extension's folder (on, watched), then its runs as they come
   laki widget dev --off <id|folder> | --list  unlink one | the linked folders
-  laki widget new <name> [--kind <k>] [--dir <folder>]  a starter (number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, onefile), on
+  laki widget new <name> [--kind <k>] [--dir <folder>]  a starter (number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, context, onefile), on
   laki widget push <id> [json | -] [--ws <ws>] [--merge]  its data from a cron job, a git hook, CI: no fetch (stdin with -)
   laki widget tools [--json]                  the extensions' tools for agents: each one's input and when to use it
   laki widget tool <id> <action> [json] [--ws <ws>]  call one: Laki asks you first, unless it says never; its output back
@@ -134,7 +140,7 @@ prints the page's text. In a tab, <ws> is its own.
 
   laki run a1b2
   laki run a1b2 test`,
-  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh).
+  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh). An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
 
   laki ship a1b2 -m "Add CSV export"`,
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes

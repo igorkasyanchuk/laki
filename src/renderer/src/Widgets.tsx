@@ -24,7 +24,8 @@ export type WidgetApi = {
   say: (id: string, s: WidgetSay, ws?: string) => void // a toast, a dialog with buttons
   do: (w: WidgetView, cmd: UiDo, label?: string) => Promise<unknown> | void // a Laki command (a button's do, laki.do): said and asked first; true once done
   settings: (id?: string, key?: string) => void // its page (Extension.tsx), key: at that setting; none: Settings › Extensions
-  menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page
+  menu?: (w: WidgetView, e: MouseEvent) => void // its right click: Fetch now, Inspect, its page, Logs
+  log?: (id: string, text: string, ws?: string) => void // a JS page's laki.log: its log (widgetLog; nothing while off)
   key?: string // the daemon's key for JS widgets' pages
 }
 
@@ -145,6 +146,7 @@ export function WidgetBody({ w, full, api, sample, cells }: { w: WidgetView; ful
       const m = e.data as Record<string, unknown>
       if (m.laki === 'ui') return win?.postMessage({ laki: 'ui', req: m.req, html: uiHtml(m.spec, m.ctx && typeof m.ctx === 'object' ? (m.ctx as Record<string, unknown>) : {}, { full, cells: now.current.cells }) }, '*')
       if (m.laki === 'close' && full) return api.close()
+      if (m.laki === 'log') return sample || api.log?.(w.id, String(m.text ?? '').slice(0, 2048), wsOf(w)) // any time, as a page's console: 50 a second at most (the daemon's)
       const ok = !sample && document.activeElement === frame.current && navigator.userActivation?.isActive !== false // made-up data: its buttons and links do nothing
       const done = ok ? act(m, w, full, api) : undefined
       if (m.laki === 'run') void Promise.resolve(done).finally(() => win?.postMessage({ laki: 'done', action: m.action, arg: String(m.arg ?? '') }, '*')) // its button works again

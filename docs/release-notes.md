@@ -4,6 +4,19 @@ version it builds, with the date. -->
 
 ## Next
 
+- A *Context* starter (`laki widget new Context --kind context`): actions in ⌘K, a file's right click and the prompt's
+  Insert menu, to copy from.
+- Extensions can come with a repo (`.laki/extensions/`): off until you look at what they run, off again when the repo
+  changes them, and shown only in that project's workspaces.
+- Gates: an extension's action can hold a ship, a merge or an archive with its reason (`"gate"` in widget.json); you
+  can do it anyway, or send the agent its fix. Merge when green waits on them too.
+- More events for extensions: a ship's end, a workflow's end, a usage limit, a new tab, a port starting to listen. Send
+  your own with `laki widget emit <name>`; a workflow can start on any of them (`on:` in its head).
+- Extensions keep logs, off until you turn them on (Settings › Extensions for all, or one's *Keep a log*): Laki's lines,
+  each run and its stderr, secrets masked. Its page's **Logs** tab follows them; `laki widget logs <id> -f` too, and
+  `laki widget log` adds a line from a script.
+- Extensions: a Yes holds only for the files you were shown. Laki AI's *Turn on*, the studio's and a tool's ask refuse
+  when the extension changed while you were asked (Laki AI asks again). `laki widget what <id>` says what it runs.
 - Security: an extension's HTML can't add a web view, and every web view runs with web security on.
 - Security: Laki's daemon answers only requests addressed to it (127.0.0.1, localhost, or remote access's link), so
   a web page can't reach it by renaming itself (DNS rebinding).

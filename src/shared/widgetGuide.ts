@@ -71,6 +71,9 @@ export const widgetFormat = () => `## widget.json
 - Its env: \`$WIDGET_<NAME>\` per setting (\`repo\`: \`$WIDGET_REPO\`; an on/off \`1\` or empty, a list comma-joined; quote
   them), \`$LAKI_WIDGET_CONFIG\` (all of them, typed JSON), \`$LAKI_WIDGET_FILE\` (its storage: the last \`data\`),
   \`$LAKI_CLI\` (the laki command: \`"$LAKI_CLI" ls --json\`).
+- Logs (the user turns them on): stderr is its log, a line each; start one with \`debug:\`, \`info:\`, \`warn:\` or
+  \`error:\` for its level. A \`script\` logs with \`console.error\` (stdout is its data); a JS page with \`laki.log(…)\`;
+  anything with \`"$LAKI_CLI" widget log <id> --level warn <text>\` (nothing happens while its log is off).
 - \`actions\`: commands its buttons run by name, the button's arg as \`$WIDGET_ARG\` (never paste it into the command);
   then it fetches again. Its output's last line is a toast, or print JSON: \`{"toast": "Done"}\`, \`{"modal": {"title",
   "text", "buttons": [{"label", "run", "arg", "open", "style", "close"}]}}\` (6 buttons at most; \`open\`: http(s), mailto,
@@ -98,6 +101,15 @@ export const widgetFormat = () => `## widget.json
 - \`"on": { "turn.done": "<action>" | "refresh" }\`: events it answers, the event as JSON on stdin (and
   \`$LAKI_EVENT_FILE\`, \`$LAKI_EVENT\` its name): ${WIDGET_EVENTS.join(', ')}. Each has \`event\`, \`at\`, \`ws\`
   (\`{ id, name, project, branch, pr }\`), \`tab\` and its own fields (\`turn.done\`: \`last\`; \`pr.*\`: \`pr: { number, url, title }\`).
+  Events of your own: \`"$LAKI_CLI" widget emit deploy.done '{"sha": "abc"}'\` sends \`custom.deploy.done\` (\`data\`,
+  \`from\`); \`"custom.deploy.done"\` or \`"custom.*"\` in \`on\` answers it (never the extension that sent it).
+- Gates: \`"actions": { "tests": { "run": "./check.sh", "gate": ["ship", "merge", "archive"] } }\` runs before Laki
+  ships, merges or archives a workspace, \`{ gate, ws, pr, stat, by }\` on stdin, \`$LAKI_GATE\` the step; it prints
+  \`{"ok": true}\` or \`{"ok": false, "why": "…", "fix": "a prompt for the agent"}\` to hold it. 30 s at most; an error or
+  no answer lets the step go ahead (print \`ok: false\` yourself to block), except Merge when green. Command actions only.
+- For a team: put it in the repo's \`.laki/extensions/<id>/\` (\`laki widget new <name> --dir .laki/extensions/<id>\`) and
+  commit it. Each teammate's Laki lists it as \`<project>.<id>\`, off until they look at what it runs, and off again when
+  it changes; it shows and runs only in that project's workspaces.
 - An action that prints \`{"data": …}\` sets the data (\`"merge": true\`: over it) instead of a fetch.
 - \`"stream": true\`: its fetch runs all along, each line of JSON it prints its data (a script: an async generator,
   each \`yield\`); global only, no \`every\`. \`laki widget push <id> '<json>'\` sets its data from outside.
