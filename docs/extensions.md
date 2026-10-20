@@ -747,6 +747,35 @@ Each extension's chat is kept beside its settings (`<data>/widget-data/widget:<i
 it; an extension's page talks in the same chat. Without Laki AI, *New ▾ › With Laki AI…* opens a page whose *Copy the
 prompt* gives any AI chat the whole format with what you typed.
 
+## Share with your team
+
+A repo can ship its team's extensions in `.laki/extensions/`, as it ships workflows in `.laki/workflows/`: clone it, add
+it to Laki, and the team's deploy board is there. Make one there with
+
+```bash
+laki widget new "Deploys" --kind table --dir .laki/extensions/deploys
+```
+
+and commit it. Folders and one-file extensions both work.
+
+- **Its id** is `<project>.<id>` (`shop-web.deploys`), so it never covers yours or another project's.
+- **Off until you look.** It always starts off. Turning it on (Settings › Extensions › *From shop-web*) shows what it
+  runs first: its fetch, its actions' commands, its scripts' text, the events it answers, its settings and what it can
+  hold; *Turn on in shop-web* turns on exactly that. From the CLI: `laki widget what shop-web.deploys`, then
+  `laki widget on shop-web.deploys --seen <hash>`.
+- **Off again when it changes.** Any change to its files in the repo (a pull, a branch switched in the project's
+  folder) turns it off and marks it *changed*: its streams and agents stop, its tools' *Always* go, and you get a toast
+  and a notification. Its page says what changed; turning it on shows you again.
+- **Only in its project.** It shows in the sidebar, the bars, the panel, the rows, the rail and the foot only while a
+  workspace of that project is selected; on the Desk it's named *Deploys · shop-web*. Its ⌘K items, menus and keys,
+  events, gates and tools for agents are that project's only (`app.open` and `custom.*` events with no workspace too).
+- **The repo's files, your settings.** Its settings and secrets are yours, kept in `<data>`, never in the repo. It
+  can't be deleted, rewritten or edited here (change it in the repo); *Remix* copies it into yours. Removing the project
+  hides it; its settings stay.
+- Agents never turn it on, nor clear *changed*.
+- It's read from the project's own folder: a branch's change to `.laki/extensions` in a worktree shows once it reaches
+  that folder. A project on an SSH host isn't read.
+
 ## Managing them
 
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
@@ -776,6 +805,8 @@ prompt* gives any AI chat the whole format with what you typed.
 - A fetch and an action are shell commands on your Mac, like a script you run: only turn on what you trust. One that
   Laki AI wrote is saved off and tagged *by Laki AI*.
 - A gate holds a ship, a merge or an archive; only you can do it anyway (an agent's `force` is refused).
+- A repo's extension (`.laki/extensions`) is off until you look at what it runs, and off again when its files change
+  there ([Share with your team](#share-with-your-team)).
 - An agent's tool call shows you the command and its input before it runs, unless the tool says `never` or you chose
   *Always* in that workspace.
 - A Yes holds only for the files you were shown. Laki AI's *Turn on …?*, the studio's *Turn on*, a tool's ask and its

@@ -915,6 +915,11 @@ workspace; `{"ok": false, "why": …}` holds it (*Not shipped*, with why), and y
 fix it. Merge when green held waits for a push; `laki ship` exits 1 with the reasons (`--force`: yours, never an
 agent's). Its Settings card says *Can hold: ship, merge*.
 
+**From the repo**: a project's `.laki/extensions/` holds its team's extensions (`laki widget new "Deploys" --dir
+.laki/extensions/deploys`, then commit it). They're listed under *From <project>* as `<project>.<id>`, off: turning one
+on shows what it runs first, and a change in the repo turns it off again (*changed*) until you look. They show and run
+only in that project's workspaces; their settings stay yours, on this Mac.
+
 **Logs**, off until you turn them on (Settings › Extensions › *Keep logs for every extension*, or one's *Keep a log*):
 Laki's lines about it, each run with how long it took and its exit code, and what it wrote to stderr (a line starting
 `warn:` or `error:` gets that level), secrets masked. Its page's **Logs** tab follows them (filters, *Copy*, *Clear*,

@@ -107,6 +107,9 @@ export const widgetFormat = () => `## widget.json
   ships, merges or archives a workspace, \`{ gate, ws, pr, stat, by }\` on stdin, \`$LAKI_GATE\` the step; it prints
   \`{"ok": true}\` or \`{"ok": false, "why": "…", "fix": "a prompt for the agent"}\` to hold it. 30 s at most; an error or
   no answer lets the step go ahead (print \`ok: false\` yourself to block), except Merge when green. Command actions only.
+- For a team: put it in the repo's \`.laki/extensions/<id>/\` (\`laki widget new <name> --dir .laki/extensions/<id>\`) and
+  commit it. Each teammate's Laki lists it as \`<project>.<id>\`, off until they look at what it runs, and off again when
+  it changes; it shows and runs only in that project's workspaces.
 - An action that prints \`{"data": …}\` sets the data (\`"merge": true\`: over it) instead of a fetch.
 - \`"stream": true\`: its fetch runs all along, each line of JSON it prints its data (a script: an async generator,
   each \`yield\`); global only, no \`every\`. \`laki widget push <id> '<json>'\` sets its data from outside.

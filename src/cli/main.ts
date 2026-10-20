@@ -441,7 +441,7 @@ async function main() {
       const ws = typeof flags.ws === 'string' ? flags.ws : undefined // a per-workspace one's instance
       if (sub === 'ls') {
         const list: WidgetView[] = (await rpc('state')).widgets ?? []
-        const line = (w: WidgetView) => `${w.id}  ${w.on ? 'on ' : 'off'}  ${w.size.join('×')}  ${w.every ? `every ${w.every}m` : 'no fetch'}${w.scope ? '  per workspace' : ''}  ${w.error ? `✗ ${w.error}` : w.at ? '✓' : ''}  ${w.dir}`
+        const line = (w: WidgetView) => `${w.id}  ${w.on ? 'on ' : 'off'}  ${w.size.join('×')}  ${w.every ? `every ${w.every}m` : 'no fetch'}${w.scope ? '  per workspace' : ''}${w.project ? `  from ${w.project}${w.changed ? ' (changed: off until you look)' : ''}` : ''}  ${w.error ? `✗ ${w.error}` : w.at ? '✓' : ''}  ${w.dir}`
         return out(list, list.map(line).join('\n') || 'no widgets')
       }
       if (sub === 'reload') return out(await rpc('widgetReload'), 'reloaded')
@@ -450,8 +450,8 @@ async function main() {
       if (sub === 'new') {
         const name = rest.slice(1).join(' ')
         if (!name) throw new Error(`usage: laki widget new <name> [--kind ${STARTER_KINDS.join('|')}] [--dir <folder>]`)
-        const r: { id: string; dir: string; found: boolean } = await rpc('widgetNew', { name, kind: typeof flags.kind === 'string' ? flags.kind : undefined, dir: typeof flags.dir === 'string' ? resolve(flags.dir) : undefined }, 130000)
-        return out(r, [`made ${r.id} in ${r.dir}${r.found ? ': on, in Settings › Extensions' : ''}`, 'next:', `  laki widget dev ${r.dir}   reloads it as you save, prints each fetch`, `  laki widget check ${r.found ? r.id : r.dir}   says what's wrong with it`].join('\n'))
+        const r: { id: string; dir: string; found: boolean; repo?: boolean } = await rpc('widgetNew', { name, kind: typeof flags.kind === 'string' ? flags.kind : undefined, dir: typeof flags.dir === 'string' ? resolve(flags.dir) : undefined }, 130000)
+        return out(r, [`made ${r.id} in ${r.dir}${r.repo ? `: the repo's, off until you look (laki widget what ${r.id})` : r.found ? ': on, in Settings › Extensions' : ''}`, 'next:', `  laki widget dev ${r.dir}   reloads it as you save, prints each fetch`, `  laki widget check ${r.found ? r.id : r.dir}   says what's wrong with it`].join('\n'))
       }
       if (sub === 'check') {
         const at = id === undefined ? resolve('.') : existsSync(id) ? resolve(id) : undefined
@@ -494,7 +494,7 @@ async function main() {
       if (sub === 'tools') {
         // what agents may call: each extension's actions with a tool, and its AGENTS.md
         type T = { tool: string; name: string; description: string; ask: string; scope?: string; agents?: string; input: { properties: Record<string, { type: string; enum?: unknown[]; description?: string }>; required: string[] } }
-        const list: T[] = await rpc('widgetTools')
+        const list: T[] = await rpc('widgetTools', { ws: process.env.LAKI_WORKSPACE })
         const field = (t: T, k: string, f: T['input']['properties'][string]) => `  ${k}: ${f.type === 'array' ? 'string[]' : f.type}${f.enum ? ` (${f.enum.join('|')})` : ''}${t.input.required.includes(k) ? ', required' : ''}${f.description ? ` · ${f.description}` : ''}`
         return out(list, list.map(t => [`${t.tool}  ${t.description}  (${t.name}${t.scope ? ', per workspace' : ''}, asks ${t.ask === 'always' ? 'every time' : t.ask})`, ...Object.entries(t.input.properties).map(([k, f]) => field(t, k, f)), ...(t.agents ? t.agents.split('\n').map(l => `  │ ${l}`) : [])].join('\n')).join('\n\n') || 'no tools: an extension that is on with an action that has a "tool"')
       }

@@ -303,7 +303,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     name: 'laki_extension_tools',
     description: "Tools the user's extensions give agents: each one's name (id.action), what it does, its input, whether Laki asks the user first, and the extension's notes on when to use it (agents). Call one with laki_extension_call.",
     inputSchema: obj({}),
-    run: () => rpc('widgetTools'),
+    run: () => rpc('widgetTools', { ws: from }), // a repo's: only for its project's workspaces
   },
   {
     name: 'laki_extension_call',
@@ -640,7 +640,7 @@ export function extNames<T extends { id: string; action: string }>(ts: T[]): Map
   for (const t of ts) n.set(base(t), (n.get(base(t)) ?? 0) + 1)
   return new Map(ts.map(t => [base(t).length > 64 || n.get(base(t))! > 1 ? `${base(t).slice(0, 57)}_${createHash('sha256').update(`${t.id}.${t.action}`).digest('hex').slice(0, 6)}` : base(t), t]))
 }
-const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && (await alive()) ? conn<ExtTool[]>('widgetTools').catch(() => []) : []) // an extension's permission server: none
+const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && (await alive()) ? conn<ExtTool[]>('widgetTools', { ws: process.env.LAKI_WORKSPACE }).catch(() => []) : []) // an extension's permission server: none
 
 // light what it looked at (Settings › General › Experimental › Laki AI's glow)
 const AI_LOOKS = ['screen', 'browse']

@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions can come with a repo (`.laki/extensions/`): off until you look at what they run, off again when the repo
+  changes them, and shown only in that project's workspaces.
 - Gates: an extension's action can hold a ship, a merge or an archive with its reason (`"gate"` in widget.json); you
   can do it anyway, or send the agent its fix. Merge when green waits on them too.
 - More events for extensions: a ship's end, a workflow's end, a usage limit, a new tab, a port starting to listen. Send

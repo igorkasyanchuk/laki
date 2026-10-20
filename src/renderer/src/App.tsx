@@ -1483,7 +1483,7 @@ export function App() {
   // extensions' actions offered where you work (widget.json's show and key: WidgetMenu), of the ones on: a place's, a
   // workspace's (not a terminal's, a browser's or a host's: no extensions there), a file's by match
   const extWs = (x?: WorkspaceView | null) => (x && !x.archived && !x.host && !view?.projects.find(p => p.id === x.project)?.kind ? x : undefined)
-  const extOn = (x?: WorkspaceView | null) => (view?.widgets ?? []).filter(w => w.on && (w.scope !== 'workspace' || extWs(x)))
+  const extOn = (x?: WorkspaceView | null) => (view?.widgets ?? []).filter(w => w.on && (w.scope !== 'workspace' || extWs(x)) && (!w.project || w.project === x?.project)) // a repo's: its project's only
   const extMenus = (show: string, x?: WorkspaceView | null, file?: string) => extOn(x).flatMap(w => (w.menus ?? []).filter(m => m.show.includes(show) && (!file || !m.match?.length || m.match.some(g => globMatch(g, file)))).map(m => ({ w, m })))
   const keyText = (k: string) => k.replace('Ctrl+', '⌃').replace('Alt+', '⌥').replace('Shift+', '⇧').replace('Cmd+', '⌘')
   const hereCtx = (): WidgetCtx => (x => ({ ws: x?.id, tab: x && tab?.workspace === x.id ? tab.id : undefined }))(extWs(ws))
@@ -1630,12 +1630,32 @@ export function App() {
     toolLine.add({ req: m.req, title, text: `${m.description}\n\n$ ${m.command}${input}${where ? `\n\nIn ${where}` : ''}`, picks, answer })
     toolShow()
   }
+  // a repo's extension turned on: what it runs, the settings it needs, what it can hold; the files hash shown, or none
+  const repoSheet = async (w: WidgetView) => {
+    const what = await call<{ name: string; text: string; hash: string }>('widgetWhat', { id: w.id }).catch(e => (toast(String(e?.message ?? e)), null))
+    if (!what) return
+    const proj = view?.projects.find(p => p.id === w.project)?.name ?? w.project
+    const needs = w.options.filter(x => x.required || x.type === 'secret').map(x => `${x.label || x.key}${x.type === 'secret' ? ' (a secret, kept on this Mac)' : ''}${x.required ? ', needed' : ''}`)
+    const text = [`It comes with ${proj}'s repo (.laki/extensions)${w.changed ? ', and its files changed there since you turned it on' : ''}.`, what.text.replace(/^`{3,}$/gm, '').replace(/\n{3,}/g, '\n\n'), needs.length ? `Its settings: ${needs.join('; ')}.` : '', 'It shows and runs only in its workspaces.'].filter(Boolean).join('\n\n')
+    return (await choose(`Turn on ${what.name}?`, text, [{ label: 'Cancel' }, { label: `Turn on in ${proj}`, primary: true }])) === 1 ? what.hash : undefined
+  }
   // Settings › Extensions' and the Extension page's: each one's settings, page, folder, logs
   const extCfg: WidgetsApi = {
     list: view?.widgets ?? [],
     home: view?.widgetHome,
-    // turned on with a setting it needs still empty: its page, at that field
-    set: (id, o) => call<WidgetView>('widgetSet', { id, ...o }).then(r => (o.on && r?.missing?.length && setDialog({ extension: id, back: extOf(dialog)?.extension === id ? extOf(dialog)!.back : dialog, edit: r.missing[0] }), r)),
+    // turned on with a setting it needs still empty: its page, at that field; a repo's (.laki/extensions) shows what
+    // it runs first (repoSheet), on only for the files shown
+    set: async (id, o) => {
+      const rw = view?.widgets?.find(x => x.id === id)
+      if (o.on && !o.seen && rw?.project) {
+        const seen = await repoSheet(rw)
+        if (!seen) return
+        o = { ...o, seen }
+      }
+      const r = await call<WidgetView>('widgetSet', { id, ...o })
+      if (o.on && r?.missing?.length) setDialog({ extension: id, back: extOf(dialog)?.extension === id ? extOf(dialog)!.back : dialog, edit: r.missing[0] })
+      return r
+    },
     desk: settings.desk === true,
     agents: (view?.presets ?? []).filter(p => !p.off && (p.agent === 'claude' || p.agent === 'codex')).map(p => ({ name: p.name, agent: p.agent })),
     agent: settings.widgetAgent,
@@ -2192,7 +2212,7 @@ export function App() {
     if (settings.notes === true) a({ label: 'Notes: your own, for any project', icon: 'note', run: () => setDialog({ note: '' }) })
     if (settings.ai?.on) a({ label: 'AI: ask Laki to work your agents, and what it cost', icon: 'ai', run: () => setDialog('ai') })
     if (settings.devMode) a({ label: "Release notes: what's new in Laki", icon: 'file', run: () => setDialog({ section: 'notes' }) })
-    for (const w of view?.widgets ?? []) if (w.on && w.full) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
+    for (const w of view?.widgets ?? []) if (w.on && w.full && (!w.project || w.project === ws?.project)) a({ label: `Extension: ${w.name}`, icon: 'panel', run: () => setDialog({ widget: w.id }) })
     a({ label: 'Extensions (plugins): settings, reload, delete', icon: 'panel', run: () => setDialog({ section: 'widgets' }) })
     if (settings.ai?.on) a({ label: 'New extension…: make one with Laki AI in the studio', icon: 'plus', run: () => setDialog({ studio: '' }) })
     a({ label: 'Resources: memory and CPU by tab', icon: 'memory', run: () => setDialog({ section: 'resources' }) })
@@ -2343,7 +2363,7 @@ export function App() {
             <span className="del">−{short(w.stat.del)}</span>
           </span>
         )}
-        <RowMarks widgets={view.widgets ?? []} ws={w.id} api={widgetApi} />
+        <RowMarks widgets={(view.widgets ?? []).filter(x => !x.project || x.project === w.project)} ws={w.id} api={widgetApi} />
         {w.muted && (
           <span className="ws-mark">
             <Icon name="bellOff" size={11} />
@@ -2723,6 +2743,8 @@ export function App() {
     return [`On ${page}`, desk && (desk.length ? `its tiles: ${desk.join(', ')}` : 'no tiles yet'), w && `selected: ${w}`, t, screen.trim() && `the tab's screen now (its last 40 lines):\n${screen.replace(/\s+$/gm, '').slice(-5000)}`].filter(Boolean).join('; ')
   }
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
+  const ownWidgets = shownWidgets.filter(w => !w.project || w.project === ws?.project) // a repo's (.laki/extensions): only while a workspace of its project is selected
+  const deskWidgets = shownWidgets.map(w => (w.project ? { ...w, name: `${w.name} · ${view.projects.find(p => p.id === w.project)?.name ?? w.project}` } : w)) // the Desk: every one, a repo's named with its project
   const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
   // back and forward's buttons (experimental): the rail's top, else the sidebar's head; a right click lists where each goes
@@ -2784,7 +2806,7 @@ export function App() {
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
       {railPins.map(pinButton)}
       {planPins.map(planButton)}
-      <WidgetButtons widgets={shownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} />
+      <WidgetButtons widgets={ownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} />
       <span className="spacer" />
       {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
       {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
@@ -2920,7 +2942,7 @@ export function App() {
             onClose={() => setWatch(w.id, () => null)}
           />
         ))}
-        <WidgetGrid widgets={shownWidgets} api={widgetApi} desk={settings.desk === true} />
+        <WidgetGrid widgets={ownWidgets} api={widgetApi} desk={settings.desk === true} />
         {!onboard.off && onboardDone.size < STEPS.length && dialog !== 'onboard' && <OnboardBar done={STEPS.filter(x => onboardDone.has(x.id)).length} onOpen={() => setDialog('onboard')} onOff={() => setOnboard(o => ({ ...o, off: true }))} />}
         <div className="side-foot" ref={fitFoot}>{/* pinned under the projects, in one row: words dropped from the right as they don't fit */}
           {!rail && ( // the rail layout has them on its rail
@@ -2935,7 +2957,7 @@ export function App() {
           <IconButton icon="youtube" title="Watch a YouTube video while you work" label={labels ? 'Video' : undefined} on={!!video} onClick={() => setDialog('video')} />
           {settings.fun !== false && <IconButton icon="smile" title="A random meme from Reddit, for a break (off: Settings › Appearance)" label={labels ? 'Meme' : undefined} on={dialog === 'fun'} onClick={() => setDialog(d => (d === 'fun' ? null : 'fun'))} />}
           <IconButton icon="timer" title="Timers: a countdown, then a sound and a dialog or a notification (and the video paused, played or closed, if you like); or a stopwatch" label={labels ? 'Timer' : undefined} on={timers.length + watches.length > 0} onClick={e => openMenu(e, startMenu())} />
-          <WidgetButtons widgets={shownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={labels} />
+          <WidgetButtons widgets={ownWidgets} api={widgetApi} places={rail ? ['foot'] : ['foot', 'rail'] /* no rail: its widgets here */} look="foot" words={labels} />
           {!rail && (
             <>
               <span className="spacer" />
@@ -2953,7 +2975,7 @@ export function App() {
           {!sideOpen && <IconButton icon="sidebar" title="Show sidebar (⌘B)" className="nodrag side-show" onClick={() => setSideOpen(true)} />}
           {tabsAt === 'top' && tabList}
           <span className="spacer" />
-          <WidgetStrip widgets={shownWidgets} api={widgetApi} place="top" />
+          <WidgetStrip widgets={ownWidgets} api={widgetApi} place="top" />
           {ws && <IconButton icon="maximize" title="Full screen: just this tab (⌘⇧⏎)" className="nodrag" onClick={() => toggleFull(true)} />}
           {ws && (ws.browser !== undefined || project?.kind === 'shells') && ( // a page or a terminal: no files, PR, preview or scripts to show
             <div className="actions nodrag">
@@ -3111,7 +3133,7 @@ export function App() {
               onLabel={labelApi(ws)}
               root={artsIn === ws.id ? 'artifacts' : 'ws'}
               onRoot={(r: FilesRoot) => setArtsIn(r === 'artifacts' ? ws.id : null)}
-              ext={shownWidgets.filter(w => w.on && placesOf(w).includes('panel')).map(w => ({ id: `ext:${w.id}` as const, label: w.name, icon: <ExtGlyph w={w} size={14} />, body: <WidgetPanel w={w} api={widgetApi} /> }))}
+              ext={ownWidgets.filter(w => w.on && placesOf(w).includes('panel')).map(w => ({ id: `ext:${w.id}` as const, label: w.name, icon: <ExtGlyph w={w} size={14} />, body: <WidgetPanel w={w} api={widgetApi} /> }))}
               info={
                 <InfoTab
                 w={infoOf(ws)}
@@ -3236,7 +3258,7 @@ export function App() {
         {picking && <Picker copy={copy} widgets={view?.widgets} onClose={() => setPicking(false)} />}
         {dialog === 'desk' && deskOn && (
           <DeskPage
-            widgets={shownWidgets}
+            widgets={deskWidgets}
             wsName={ws && wsHere ? wsName(ws) : undefined}
             tiles={settings.deskTiles}
             tabs={settings.deskTabs}
@@ -3599,7 +3621,7 @@ export function App() {
             </button>
           )}
           {!connected && <span className="warn" data-tip={problem}>{problem ? 'not connected: hover for why' : 'reconnecting…'}</span>}
-          <WidgetStrip widgets={shownWidgets} api={widgetApi} place="status" />
+          <WidgetStrip widgets={ownWidgets} api={widgetApi} place="status" />
         </div>
         )}
         {aiFab && (

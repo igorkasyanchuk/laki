@@ -81,6 +81,11 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
             <span className="muted">›</span>
             <b className="crumb here">{name}</b>
           </nav>
+          {w?.repo && (
+            <span className="tag" data-tip="It comes with the repo: its files are the repo's, its settings yours">
+              From {w.repo}'s .laki/extensions
+            </span>
+          )}
           {w && (
             <button className="sm ext-edit" data-tip="Its settings: where it shows, its size, its data, its options" onClick={() => (setTab('overview'), setSpot(n => n + 1))}>
               <Icon name="pencil" size={12} /> Edit
@@ -363,6 +368,17 @@ function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg
           Reload
         </button>
       </div>
+      {w.changed && !w.on && (
+        <div className="ext-note bad">
+          <Icon name="conflict" />
+          <span className="grow">
+            <b>Its files changed in {w.repo}'s repo:</b> off until you look at what it runs now
+          </span>
+          <button className="sm" onClick={() => void cfg.set(w.id, { on: true }).catch(() => {})}>
+            Look…
+          </button>
+        </div>
+      )}
       {w.devError && (
         <div className="ext-note bad">
           <Icon name="conflict" />
@@ -730,7 +746,7 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
   const lines = useMemo(() => (md ? [] : highlight(sel, text)), [sel, text, md])
   const edit = draft?.path === sel ? draft : null
   const dirty = !!edit && edit.text !== edit.was
-  const why = w.builtin ? 'It comes with Laki: Remix it to change a copy' : UNSHOWN.test(text) ? 'Too big or not text: open its folder to edit it' : !cfg.save ? 'Not here' : ''
+  const why = w.builtin ? 'It comes with Laki: Remix it to change a copy' : w.repo ? `It's ${w.repo}'s (.laki/extensions): change it there, or Remix it` : UNSHOWN.test(text) ? 'Too big or not text: open its folder to edit it' : !cfg.save ? 'Not here' : ''
   const leave = async () => !dirty || (await ask('Discard your changes?', { text: `${sel} has changes you haven't saved.`, ok: 'Discard', danger: true }))
   const pick = async (f: string) => f !== sel && (await leave()) && (setDraft(null), setErr(''), onSel(f))
   const stop = async () => (await leave()) && (setDraft(null), setErr(''))
@@ -766,8 +782,8 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
                 {busy ? 'Saving…' : 'Save'}
               </button>
             </>
-          ) : w.builtin && cfg.remix ? (
-            <button className="sm" data-tip="It comes with Laki: a copy of it to change, yours" onClick={() => void cfg.remix!(w.id).catch(e => setErr(String(e?.message ?? e)))}>
+          ) : (w.builtin || w.repo) && cfg.remix ? (
+            <button className="sm" data-tip={`It comes with ${w.repo ? `${w.repo}'s repo` : 'Laki'}: a copy of it to change, yours`} onClick={() => void cfg.remix!(w.id).catch(e => setErr(String(e?.message ?? e)))}>
               <Icon name="copy" size={12} /> Remix it…
             </button>
           ) : (

@@ -2237,8 +2237,9 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
 
 // the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its page
 function WidgetList({ api }: { api: WidgetsApi }) {
-  const mine = api.list.filter(w => !w.builtin)
+  const mine = api.list.filter(w => !w.builtin && !w.project)
   const theirs = api.list.filter(w => w.builtin)
+  const repos = [...new Set(api.list.flatMap(w => (w.project ? [w.project] : [])))] // a repo's (.laki/extensions): a group each
   const [menu, openMenu] = useMenu()
   const [starters, setStarters] = useState(false)
   // New ▾: Laki AI's page (the studio), or a starter picked from their previews (one that runs at once on sample data,
@@ -2263,6 +2264,11 @@ function WidgetList({ api }: { api: WidgetsApi }) {
       >
         {mine.length ? list(mine) : <p className="muted small">None yet: New starts one from a starter, or describes one to Laki AI (or gives you the prompt for any AI chat).</p>}
       </Group>
+      {repos.map(p => (ws => (
+        <Group key={p} title={`From ${ws[0].repo ?? p}`} hint="Its repo's .laki/extensions: shown only in its workspaces; turning one on shows what it runs first, and a change there turns it off">
+          {list(ws)}
+        </Group>
+      ))(api.list.filter(w => w.project === p)))}
       {!!theirs.length && <Group title="Built in" hint="Ones that come with Laki: turn on the ones you like">{list(theirs)}</Group>}
     </>
   )
@@ -2283,6 +2289,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               )}
               <span className="sched-tags">
                 {w.builtin && <span className="tag">built-in</span>}
+                {w.changed && !w.on && <span className="tag tag-closed" data-tip="Its files changed in the repo: off until you look">changed</span>}
                 {w.dev && <span className={`tag ${w.devError ? 'bad' : ''}`} data-tip={w.devError ? `Last good version kept: ${w.devError}` : 'Linked by laki widget dev: your folder, watched'}>dev</span>}
                 {w.mock && <span className="tag" data-tip="Its inspector put sample data there: Live fetches again">sample data</span>}
                 {(ps => (ps.length > 1 || ps[0] !== 'side') && <span className="tag">{ps.map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' · ')}</span>)(placesOf(w))}

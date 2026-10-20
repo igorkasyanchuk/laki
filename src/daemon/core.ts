@@ -894,6 +894,7 @@ function projectPush(p: Project) {
   for (let n = 2; state.projects.some(x => x.id === p.id); n++) p.id = `${base}-${n}`
   state.projects.push(p)
   save()
+  if (!p.kind && !p.host) scanWidgets() // its .laki/extensions
   changed()
   return p
 }
@@ -910,6 +911,7 @@ export function projectRm(ref: string) {
   if (state.settings?.railPlans) state.settings.railPlans = state.settings.railPlans.filter(x => x.project !== p.id) // and its specs' rail pins
   if (p.host && !state.projects.some(x => x.host === p.host)) void hosts.get(p.host)?.then(h => h.master.kill(), () => {}) // its host's last
   save()
+  if (!p.kind && !p.host) scanWidgets() // its .laki/extensions go from the list (their stores stay)
   changed()
 }
 
