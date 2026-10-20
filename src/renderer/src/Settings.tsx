@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { type Account, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -178,6 +178,7 @@ export type AppSettings = Paint & {
   widgetDirs?: string[] // folders of widgets, besides Laki's own
   widgetAgent?: string // the claude or codex profile an AI source runs (unset: the first claude one)
   widgetHours?: string // when they fetch on their own: 9am-9pm weekdays (unset: always)
+  widgetLogs?: boolean // every extension keeps a log (each one's own Keep a log otherwise)
   devMode?: boolean // an event log per workspace and widget (⋯ › Logs)
   pickerKey?: string // the element picker's hotkey (unset: PICKER_KEY; '': none)
   hotkeyOn?: boolean // the global hotkey (unset: on)
@@ -1155,6 +1156,7 @@ const FIND: [string, string, string?][] = [
   ['skill', 'Extension creator', 'agent skill widgets laki-widget make extension ai'],
   ['widgets', 'Extensions', 'sidebar widgets plugins folder reload fetch schedule delete remove uninstall top bar status bar where place network internet https'],
   ['widgets', 'More folders', 'extensions widgets'],
+  ['widgets', 'Keep logs for every extension', 'extensions widgets log logs debug stderr errors'],
   ['general', 'Progress on tabs', 'percent estimate completion laki progress LAKI_PROGRESS'],
   ['general', 'Show progress', 'percent sidebar tab both'],
   ['general', 'Progress in the sidebar', 'percent line bar row'],
@@ -1829,7 +1831,7 @@ function SkillSection({ api }: { api: SkillApi }) {
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
+  set: (id: string, p: { on?: boolean; seen?: string; log?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
   desk?: boolean // Desk is on (experimental): a place too
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
@@ -1839,7 +1841,9 @@ export type WidgetsApi = {
   reload: () => Promise<unknown>
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
-  logs?: (id: string) => void // development mode's: its fetches and actions
+  logs?: (id: string) => void // its page's Logs tab
+  allLogs?: boolean // settings.widgetLogs: every extension keeps a log
+  log?: { read: (id: string, o: { since?: number; limit?: number; level?: string; src?: string; ws?: string }) => Promise<{ on: boolean; lines: WidgetLogLine[]; next: number }>; clear: (id: string) => Promise<unknown>; reveal: (id: string) => void } // its log: read from a cursor, Clear, Show in Finder
   kit?: (icons?: boolean) => void // the UI kit's page: its elements and their samples; icons: its icon gallery
   runs?: (id: string, ws?: string) => Promise<WidgetRuns> // the inspector's: its runs, env, fixtures
   mock?: (id: string, o: { data?: unknown; fixture?: string; off?: boolean; ws?: string }) => Promise<unknown> // sample data by hand, or Live again
@@ -2024,7 +2028,7 @@ export function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
 
 // an extension's settings in titled blocks (Where it shows, Updates, its own, Tools for agents), a row each: what it is
 // and what it does on the left, its control on the right
-const WcSec = ({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) => (
+const WcSec = ({ title, hint, children }: { title: string; hint?: string; children?: ReactNode }) => (
   <section className="wc-sec">
     <div className="wc-sec-head">
       <b>{title}</b>
@@ -2087,7 +2091,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           {api.studio && !w.builtin && !!api.home && w.dir === `${api.home}/${w.id}` && <IconButton icon="ai" title="Edit with Laki AI: the studio" onClick={() => api.studio!(w.id)} />}
           {api.remix && <IconButton icon="copy" title="Remix: a copy of it to change, yours" onClick={() => void api.remix!(w.id)} />}
           {api.folder && <IconButton icon="folder" title="Its folder: open in…" onClick={e => api.folder!(w.id, e)} />}
-          {api.logs && <IconButton icon="file" title="Logs: its fetches and actions (development mode)" onClick={() => api.logs!(w.id)} />}
+          {api.logs && <IconButton icon="file" title={w.log ? 'Its log: what it did, its runs and stderr' : 'Its log (off: Keep a log turns it on)'} onClick={() => api.logs!(w.id)} />}
           {api.rm && !w.builtin && (
             <>
               <span className="wc-sep" />
@@ -2141,7 +2145,7 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
           </>
         )}
       </WcSec>
-      {(fetches || w.js) && (
+      {
         <WcSec title="Updates">
           {fetches && (
             <WcRow title="Fetch every" hint="How often it gets new data, while Laki's window is open">
@@ -2179,8 +2183,11 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
               )}
             </div>
           )}
+          <Switch className="switch-row" on={!!w.keepLog} onChange={log => void api.set(w.id, { log })}>
+            <Says title="Keep a log" hint={api.allLogs ? 'Settings › Extensions keeps one for every extension now' : 'What it did, each run and its stderr, in a file of its own (1 MB, then a second). Its page’s Logs tab shows it'} />
+          </Switch>
         </WcSec>
-      )}
+      }
       {options.length > 0 && (
         <WcSec title="Its settings" hint="What its widget.json asks for; each change fetches again">
           <div className="wc-opts">
@@ -2203,6 +2210,9 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             ))}
           </div>
         </WcSec>
+      )}
+      {!!w.gates?.length && (
+        <WcSec title={`Can hold: ${w.gates.join(', ')}`} hint="Its gate runs before Laki does that to a workspace; a no holds it, and you can do it anyway" />
       )}
       {!!w.tools?.length && (
         <WcSec title="Tools for agents" hint="Agents run these through laki widget tool and MCP">
@@ -2227,8 +2237,9 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
 
 // the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its page
 function WidgetList({ api }: { api: WidgetsApi }) {
-  const mine = api.list.filter(w => !w.builtin)
+  const mine = api.list.filter(w => !w.builtin && !w.project)
   const theirs = api.list.filter(w => w.builtin)
+  const repos = [...new Set(api.list.flatMap(w => (w.project ? [w.project] : [])))] // a repo's (.laki/extensions): a group each
   const [menu, openMenu] = useMenu()
   const [starters, setStarters] = useState(false)
   // New ▾: Laki AI's page (the studio), or a starter picked from their previews (one that runs at once on sample data,
@@ -2253,6 +2264,11 @@ function WidgetList({ api }: { api: WidgetsApi }) {
       >
         {mine.length ? list(mine) : <p className="muted small">None yet: New starts one from a starter, or describes one to Laki AI (or gives you the prompt for any AI chat).</p>}
       </Group>
+      {repos.map(p => (ws => (
+        <Group key={p} title={`From ${ws[0].repo ?? p}`} hint="Its repo's .laki/extensions: shown only in its workspaces; turning one on shows what it runs first, and a change there turns it off">
+          {list(ws)}
+        </Group>
+      ))(api.list.filter(w => w.project === p)))}
       {!!theirs.length && <Group title="Built in" hint="Ones that come with Laki: turn on the ones you like">{list(theirs)}</Group>}
     </>
   )
@@ -2273,11 +2289,13 @@ function WidgetList({ api }: { api: WidgetsApi }) {
               )}
               <span className="sched-tags">
                 {w.builtin && <span className="tag">built-in</span>}
+                {w.changed && !w.on && <span className="tag tag-closed" data-tip="Its files changed in the repo: off until you look">changed</span>}
                 {w.dev && <span className={`tag ${w.devError ? 'bad' : ''}`} data-tip={w.devError ? `Last good version kept: ${w.devError}` : 'Linked by laki widget dev: your folder, watched'}>dev</span>}
                 {w.mock && <span className="tag" data-tip="Its inspector put sample data there: Live fetches again">sample data</span>}
                 {(ps => (ps.length > 1 || ps[0] !== 'side') && <span className="tag">{ps.map(p => PLACES.find(x => x[0] === p)?.[1] ?? p).join(' · ')}</span>)(placesOf(w))}
                 {w.net && <span className="tag" data-tip="Its page may reach https sites">network</span>}
                 {w.byAi && <span className="tag" data-tip="Laki AI wrote it; it was saved off: look at what it runs (its folder) before turning it on">by Laki AI</span>}
+                {w.log && (bad => <span className={`tag ${bad ? 'tag-closed' : ''}`} data-tip={bad ? 'An error in its log in the last hour: its page’s Logs' : 'It keeps a log: its page’s Logs'}>log</span>)(!!w.logErr && Date.now() - w.logErr < 3600e3)}
                 <span className="tag">
                   {w.size[0]}×{w.size[1] === 0.5 ? '½' : w.size[1]}
                 </span>
@@ -2298,7 +2316,7 @@ function WidgetList({ api }: { api: WidgetsApi }) {
   }
 }
 
-function WidgetsSection({ api, dirs, onDirs, hours, onHours, onAgent }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void; hours: string; onHours: (h: string) => void; onAgent: (name: string) => void }) {
+function WidgetsSection({ api, dirs, onDirs, hours, onHours, onAgent, onLogs }: { api: WidgetsApi; dirs: string[]; onDirs: (d: string[]) => void; hours: string; onHours: (h: string) => void; onAgent: (name: string) => void; onLogs: (on: boolean) => void }) {
   const [busy, setBusy] = useState(false)
   const read = hours.trim() ? parseHours(hours) : null
   return (
@@ -2344,6 +2362,11 @@ function WidgetsSection({ api, dirs, onDirs, hours, onHours, onAgent }: { api: W
           </label>
         </Group>
       )}
+      <Group title="Logs">
+        <Switch className="switch-row" on={!!api.allLogs} onChange={onLogs}>
+          <Says title="Keep logs for every extension" hint="What each one did, its runs and their stderr, in a file of its own (secrets masked): its page's Logs tab, laki widget logs. Off: only the ones whose own Keep a log is on" />
+        </Switch>
+      </Group>
       <Group title="Folders">
         <div className="muted small">
           Laki's own: <span className="mono">{api.home}</span>
@@ -3545,7 +3568,7 @@ export function SettingsPage(p: {
             </>
           )}
           {sec === 'skill' && p.skill && <SkillSection api={p.skill} />}
-          {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} onAgent={widgetAgent => set({ widgetAgent })} />}
+          {sec === 'widgets' && p.widgets && <WidgetsSection api={p.widgets} dirs={s.widgetDirs ?? []} onDirs={widgetDirs => set({ widgetDirs })} hours={s.widgetHours ?? ''} onHours={widgetHours => set({ widgetHours })} onAgent={widgetAgent => set({ widgetAgent })} onLogs={widgetLogs => set({ widgetLogs })} />}
           {sec === 'remote' && p.remote && (
             <RemoteSection
               api={p.remote}

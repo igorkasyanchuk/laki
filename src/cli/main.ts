@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -18,8 +18,8 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide'])
-const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'merge'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level'])
+const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'merge', 'force'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
 for (let i = 0; i < argv.length; i++) {
@@ -27,6 +27,7 @@ for (let i = 0; i < argv.length; i++) {
   const k = a.replace(/^-+/, '')
   if (!textOnly && a === '--') textOnly = true
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
+  else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
 }
@@ -373,7 +374,12 @@ async function main() {
       return out(t, `started ${t.name} (${t.id})`)
     }
     case 'ship': {
-      const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message })
+      // --force: past the extensions' gates; yours only (the daemon refuses it from an agent's tab)
+      const t = await rpc('ship', { ws: rest[0], message: flags.m || flags.message, force: !!flags.force, from: caller() })
+      if (t.held) {
+        out(t, ['Not shipped:', ...t.held.map((h: GateHeld) => `  ${h.name}: ${h.why}${h.fix ? `\n    fix: ${h.fix.split('\n')[0]}` : ''}`), 'laki ship --force does it anyway (you, not an agent)'].join('\n'))
+        process.exit(1)
+      }
       return out(t, `shipping in tab ${t.name} (${t.id})`)
     }
     case 'schedule': {
@@ -435,7 +441,7 @@ async function main() {
       const ws = typeof flags.ws === 'string' ? flags.ws : undefined // a per-workspace one's instance
       if (sub === 'ls') {
         const list: WidgetView[] = (await rpc('state')).widgets ?? []
-        const line = (w: WidgetView) => `${w.id}  ${w.on ? 'on ' : 'off'}  ${w.size.join('×')}  ${w.every ? `every ${w.every}m` : 'no fetch'}${w.scope ? '  per workspace' : ''}  ${w.error ? `✗ ${w.error}` : w.at ? '✓' : ''}  ${w.dir}`
+        const line = (w: WidgetView) => `${w.id}  ${w.on ? 'on ' : 'off'}  ${w.size.join('×')}  ${w.every ? `every ${w.every}m` : 'no fetch'}${w.scope ? '  per workspace' : ''}${w.project ? `  from ${w.project}${w.changed ? ' (changed: off until you look)' : ''}` : ''}  ${w.error ? `✗ ${w.error}` : w.at ? '✓' : ''}  ${w.dir}`
         return out(list, list.map(line).join('\n') || 'no widgets')
       }
       if (sub === 'reload') return out(await rpc('widgetReload'), 'reloaded')
@@ -444,8 +450,8 @@ async function main() {
       if (sub === 'new') {
         const name = rest.slice(1).join(' ')
         if (!name) throw new Error(`usage: laki widget new <name> [--kind ${STARTER_KINDS.join('|')}] [--dir <folder>]`)
-        const r: { id: string; dir: string; found: boolean } = await rpc('widgetNew', { name, kind: typeof flags.kind === 'string' ? flags.kind : undefined, dir: typeof flags.dir === 'string' ? resolve(flags.dir) : undefined }, 130000)
-        return out(r, [`made ${r.id} in ${r.dir}${r.found ? ': on, in Settings › Extensions' : ''}`, 'next:', `  laki widget dev ${r.dir}   reloads it as you save, prints each fetch`, `  laki widget check ${r.found ? r.id : r.dir}   says what's wrong with it`].join('\n'))
+        const r: { id: string; dir: string; found: boolean; repo?: boolean } = await rpc('widgetNew', { name, kind: typeof flags.kind === 'string' ? flags.kind : undefined, dir: typeof flags.dir === 'string' ? resolve(flags.dir) : undefined }, 130000)
+        return out(r, [`made ${r.id} in ${r.dir}${r.repo ? `: the repo's, off until you look (laki widget what ${r.id})` : r.found ? ': on, in Settings › Extensions' : ''}`, 'next:', `  laki widget dev ${r.dir}   reloads it as you save, prints each fetch`, `  laki widget check ${r.found ? r.id : r.dir}   says what's wrong with it`].join('\n'))
       }
       if (sub === 'check') {
         const at = id === undefined ? resolve('.') : existsSync(id) ? resolve(id) : undefined
@@ -455,7 +461,12 @@ async function main() {
         if (bad) process.exitCode = 1
         return
       }
-      if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on', from: caller() }), `${id} ${sub}`)
+      // what turning it on runs, and its files' hash: laki widget on <id> --seen <hash> holds only for those files
+      if (sub === 'what') {
+        const r: { name: string; on: boolean; text: string; hash: string } = await rpc('widgetWhat', { id })
+        return out(r, `${r.name} (${r.on ? 'on' : 'off'})\n\n${r.text}\n\nlaki widget on ${id} --seen ${r.hash}`)
+      }
+      if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on', ...(sub === 'on' && typeof flags.seen === 'string' && { seen: flags.seen }), from: caller() }), `${id} ${sub}`)
       if (sub === 'set') {
         // where it shows, its size, every, view, what it hides and its settings (key=value): an agent's too, never on
         if (!id) throw new Error('usage: laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value …]')
@@ -483,7 +494,7 @@ async function main() {
       if (sub === 'tools') {
         // what agents may call: each extension's actions with a tool, and its AGENTS.md
         type T = { tool: string; name: string; description: string; ask: string; scope?: string; agents?: string; input: { properties: Record<string, { type: string; enum?: unknown[]; description?: string }>; required: string[] } }
-        const list: T[] = await rpc('widgetTools')
+        const list: T[] = await rpc('widgetTools', { ws: process.env.LAKI_WORKSPACE })
         const field = (t: T, k: string, f: T['input']['properties'][string]) => `  ${k}: ${f.type === 'array' ? 'string[]' : f.type}${f.enum ? ` (${f.enum.join('|')})` : ''}${t.input.required.includes(k) ? ', required' : ''}${f.description ? ` · ${f.description}` : ''}`
         return out(list, list.map(t => [`${t.tool}  ${t.description}  (${t.name}${t.scope ? ', per workspace' : ''}, asks ${t.ask === 'always' ? 'every time' : t.ask})`, ...Object.entries(t.input.properties).map(([k, f]) => field(t, k, f)), ...(t.agents ? t.agents.split('\n').map(l => `  │ ${l}`) : [])].join('\n')).join('\n\n') || 'no tools: an extension that is on with an action that has a "tool"')
       }
@@ -501,6 +512,58 @@ async function main() {
         process.stdout.write(r.output)
         if (!r.ok) (console.error(`✗ ${r.error}`), (process.exitCode = 1))
         return
+      }
+      // a line in its log from a hook or a cron job: never fails a script (its log off: nothing written, exit 0)
+      if (sub === 'log') {
+        const text = [action, ...arg].filter(x => x !== undefined).join(' ')
+        if (!id || !text.trim()) throw new Error('usage: laki widget log <id> [--level debug|info|warn|error] [--ws <workspace>] <text…>')
+        try {
+          const r: { kept: boolean; note?: string } = await rpc('widgetLog', { id, text, level: typeof flags.level === 'string' ? flags.level : undefined, ws })
+          if (r.note) console.error(r.note)
+          return json ? out(r) : undefined
+        } catch (e) {
+          return void console.error(`laki widget log: ${(e as Error).message}`)
+        }
+      }
+      // its log: the last -n lines (100), -f following it as lines come
+      if (sub === 'logs') {
+        if (!id) throw new Error('usage: laki widget logs <id> [-n 100] [-f] [--level error] [--ws <workspace>] [--json]')
+        type R = { on: boolean; lines: WidgetLogLine[]; next: number; file: string }
+        const q = { id, level: typeof flags.level === 'string' ? flags.level : undefined, ws }
+        const show = (l: WidgetLogLine) => console.log(json ? JSON.stringify(l) : `${new Date(l.at).toLocaleTimeString([], { hour12: false })} ${l.level.padEnd(5)} ${l.src}${l.ws ? ` (${l.ws})` : ''}  ${l.text}`)
+        let r: R = await rpc('widgetLogs', { ...q, limit: Math.max(1, Number(flags.n) || 100) })
+        if (!r.lines.length && !flags.f) console.error(r.on ? 'nothing logged yet' : `no log: it's off (Settings › Extensions › ${id} › Keep a log)`)
+        r.lines.forEach(show)
+        while (flags.f) {
+          await new Promise(f => setTimeout(f, 1000))
+          const since = r.next
+          r = await rpc('widgetLogs', { ...q, since })
+          if (r.next < since) r = await rpc('widgetLogs', { ...q, since: 0 }) // cleared and begun again
+          r.lines.forEach(show)
+        }
+        return
+      }
+      if (sub === 'emit') {
+        // an event of your own: custom.<name>, its data as an argument or on stdin (-); from an extension's command, its
+        // LAKI_WIDGET and the event it handles (LAKI_EVENT_HOPS: a loop stops)
+        if (!id) throw new Error('usage: laki widget emit <name> [json | -] [--ws <workspace>]')
+        const text = action === '-' ? await new Promise<string>(r => {
+          let s = ''
+          process.stdin.on('data', d => (s += d)).on('end', () => r(s)).on('error', () => r(s))
+        }) : [action, ...arg].filter(x => x !== undefined).join(' ')
+        let data: unknown
+        try {
+          data = text.trim() ? JSON.parse(text) : undefined
+        } catch {
+          throw new Error(`not JSON: ${text.trim().slice(0, 80)}`)
+        }
+        const r = await rpc('widgetEmit', { name: id, data, ws: ws ?? process.env.LAKI_WORKSPACE, from: { ...caller(), widget: process.env.LAKI_WIDGET }, hops: process.env.LAKI_EVENT_HOPS })
+        return out(r, r.ok ? `${r.event}: ${[...r.widgets, ...r.flows.map((f: string) => `workflow ${f}`)].join(', ') || 'nothing answers it'}` : `✗ ${r.dropped}`)
+      }
+      if (sub === 'events') {
+        const r = (await rpc('widgetEvents', {})) as EventSent[]
+        const line = (e: EventSent) => [new Date(e.at).toLocaleTimeString(), e.event, e.ws && `ws ${e.ws}`, e.from?.widget && `from ${e.from.widget}`, e.from?.agent && `by ${e.from.agent}`, e.hops && `${e.hops} hops`, `→ ${[...e.widgets, ...e.flows.map(f => `workflow ${f}`)].join(', ') || 'nothing'}`, ...(e.refused ?? []).map(x => `✗ ${x}`)].filter(Boolean).join('  ')
+        return out(r, r.map(line).join('\n') || 'no events yet')
       }
       if (sub === 'push') {
         // its data from a cron job, a git hook, CI: JSON as an argument, or on stdin (- or none)
@@ -543,7 +606,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws, from: caller() }, 300000) // an agent's: you may be asked first
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
+      throw new Error('usage: laki widget [ls] | reload | what <id> | on <id> [--seen <hash>] | off|run <id> | logs <id> [-n 100] [-f] [--level l] | log <id> [--level l] <text> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
     }
     case 'ai': {
       const [sub] = rest

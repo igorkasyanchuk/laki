@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, type Gate, type GateHeld, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
+import { type GateBy, gatesKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -894,6 +894,7 @@ function projectPush(p: Project) {
   for (let n = 2; state.projects.some(x => x.id === p.id); n++) p.id = `${base}-${n}`
   state.projects.push(p)
   save()
+  if (!p.kind && !p.host) scanWidgets() // its .laki/extensions
   changed()
   return p
 }
@@ -910,6 +911,7 @@ export function projectRm(ref: string) {
   if (state.settings?.railPlans) state.settings.railPlans = state.settings.railPlans.filter(x => x.project !== p.id) // and its specs' rail pins
   if (p.host && !state.projects.some(x => x.host === p.host)) void hosts.get(p.host)?.then(h => h.master.kill(), () => {}) // its host's last
   save()
+  if (!p.kind && !p.host) scanWidgets() // its .laki/extensions go from the list (their stores stay)
   changed()
 }
 
@@ -1356,6 +1358,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
     save()
     throw e
   }
+  widgetEvent('tab.new', { kind: tab.kind }, ws.id, tab)
   return tab
 }
 
@@ -1585,9 +1588,10 @@ export function apps() {
 
 // open a workspace's (or a project's) folder, or a file in it, in an app; 'editor' is the one in Settings, 'default'
 // macOS's for the file
-export async function openIn(o: { ws?: string; project?: string; widget?: string; app: string; file?: string }) {
-  const file = !!(o.file && o.ws)
-  const path = file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
+// log: an extension's log file (its Logs tab's Show in Finder)
+export async function openIn(o: { ws?: string; project?: string; widget?: string; log?: boolean; app: string; file?: string }) {
+  const file = !!(o.file && o.ws) || !!(o.widget && o.log)
+  const path = o.widget && o.log ? widgetLogFile(o.widget) : file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
   const s = state.settings ?? {}
   const app = o.app === 'editor' ? s.editor || 'cursor' : o.app
   const fail = (e: any) => {
@@ -1983,7 +1987,7 @@ function rmStorage(ws: Workspace) {
 
 // wsArchive is wsRm that keeps the workspace's record (branch, agents' resume ids) for wsRestore.
 // ifClean: only with nothing uncommitted (archiving removes the worktree, and that with it), else how many paths are
-export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
+export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts = {}): Promise<{ dirty?: number; held?: GateHeld[] } | undefined> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('only worktree workspaces can be archived')
   if (ws.host) await hostUp(ws.host) // else teardown leaves the worktree there, and Restore fails on it
@@ -1991,6 +1995,8 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
     const dirty = (await git(ws, '--no-optional-locks', 'status', '--porcelain')).split('\n').filter(Boolean).length
     if (dirty) return { dirty }
   }
+  const h = await gated('archive', ws, o)
+  if (h) return h
   await teardown(ws)
   ws.archived = true
   ws.archivedAt = Date.now()
@@ -2147,6 +2153,7 @@ export function restoreAll() {
       t.again = undefined
       try {
         const s = spawnTab(t, { resume: true, cwd: a?.cwd })
+        restoredAt.set(t.id, Date.now())
         if (a?.cmd) bringBack(s, a.cmd, !!a.run)
       } catch (e) {
         console.error(`restore ${t.id}:`, (e as Error).message)
@@ -2508,8 +2515,13 @@ function checkLimit(tab: Tab, text: string) {
   if (!t && tab.preset === 'codex' && s && (t = limitReset(s.screenText(8, r.seen), now))) r.seen = s.lineCount()
   // a time gone by: "9am" at noon is tomorrow's, but "3pm" read at 15:00:01 has just reset
   if (t && t <= now) t = now.getTime() - t.getTime() < 5 * 60e3 ? now : new Date(t.getTime() + 86400000)
-  if (t) r.limit = t.getTime()
+  if (!t) return
+  // limit.hit once per limit: a turn's end clears r.limit first, and "in 2 hours" read again is the same one
+  if (Math.abs((limitSent.get(tab.id) ?? 0) - t.getTime()) > 60_000) widgetEvent('limit.hit', { agent: tab.preset, until: t.getTime() }, tab.workspace, tab)
+  limitSent.set(tab.id, t.getTime())
+  r.limit = t.getTime()
 }
+const limitSent = new Map<string, number>() // ponytail: a closed tab's stays (a number each)
 
 export const RESUME_AFTER = 60_000
 
@@ -2722,14 +2734,19 @@ export async function artifactList(ref: string) {
 // status bar's ↗, the menus). What it starts through its shell tool (a dev server) is the workspace's
 const SHELLS = /^-?(?:ba|z|fi|da|k|tc|c)?sh$/
 const BROWSER = /chrom|firefox|webkit|msedge|headless/i
+// a port of a tab brought back at start, in its first minute: noted, no port.open (it listened before the restart).
+// ponytail: a minute; a server that takes longer to come back is new to extensions
+const restoredAt = new Map<string, number>()
+const RESTORED_QUIET = 60_000
 export async function scanPorts() {
   syncBranches()
   void scanArtifacts()
   const root = new Map<number, string>()
+  const rootTab = new Map<number, string>() // each pid's tab (the tree it's under)
   const agents: number[] = [] // agent tabs' pids
   for (const [id, s] of sessions) {
     const t = state.tabs.find(t => t.id === id)
-    if (t && !s.exited) root.set(s.pty.pid, t.workspace), t.kind === 'agent' && agents.push(s.pty.pid)
+    if (t && !s.exited) root.set(s.pty.pid, t.workspace), rootTab.set(s.pty.pid, t.id), t.kind === 'agent' && agents.push(s.pty.pid)
   }
   const next = new Map<string, number[]>()
   const nextProcs = new Map<string, Record<number, Proc>>()
@@ -2750,11 +2767,12 @@ export async function scanPorts() {
     }
     agents.forEach(mine)
     const owner = new Map<number, string>()
-    const walk = (pid: number, ws: string) => {
+    const walk = (pid: number, ws: string, tab: string) => {
       owner.set(pid, ws)
-      for (const k of kids.get(pid) ?? []) if (!owner.has(k)) walk(k, ws)
+      rootTab.set(pid, tab)
+      for (const k of kids.get(pid) ?? []) if (!owner.has(k)) walk(k, ws, tab)
     }
-    for (const [pid, ws] of root) walk(pid, ws)
+    for (const [pid, ws] of root) walk(pid, ws, rootTab.get(pid)!)
     const out = await run('lsof', ['-nP', '-a', '-p', [...owner.keys()].join(','), '-iTCP', '-sTCP:LISTEN', '-Fpcn']).then(
       r => r.stdout,
       e => String(e.stdout ?? ''),
@@ -2774,6 +2792,17 @@ export async function scanPorts() {
       }
     }
   }
+  // a port newly listening in a workspace
+  for (const [w, list] of next)
+    for (const port of list)
+      if (!ports.get(w)?.includes(port)) {
+        const p = nextProcs.get(w)?.[port]
+        const tab = p && rootTab.get(p.pid)
+        if (tab && Date.now() - (restoredAt.get(tab) ?? 0) < RESTORED_QUIET) continue
+        const x = state.workspaces.find(v => v.id === w)
+        const name = x && (projectConfig(x).ports as Record<string, unknown> | undefined)?.[port]
+        widgetEvent('port.open', { port, pid: p?.pid, command: p?.cmd, ...(typeof name === 'string' && { name }) }, w)
+      }
   if (JSON.stringify([...next, ...nextProcs]) !== JSON.stringify([...ports, ...procs])) {
     ports.clear()
     procs.clear()
@@ -3458,11 +3487,13 @@ async function archiveMerged(ws: Workspace, pr: PR) {
   if (tabsOf(ws.id).some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return wsLog(ws, 'archive on merge: not now, an agent is at work')
   if ((await git(ws, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return wsLog(ws, 'archive on merge: no, commits past the PR\'s head') // unpushed (or git can't tell)
   ws.autoArchived = pr.number // before: wsArchive saves it
-  const r = await wsArchive(ws.id, { ifClean: true }).catch(e => {
+  const r = await wsArchive(ws.id, { ifClean: true, by: 'auto' }).catch(e => {
     ws.autoArchived = undefined // failed: the next scan tries again
     throw e
   })
   if (r?.dirty) return void ((ws.autoArchived = undefined), wsLog(ws, 'archive on merge: no, uncommitted changes'))
+  // held: not again for this PR (its gates would run at every scan); ponytail: you archive it
+  if (r?.held) return void (log(`archive on merge ${ws.id}: held by ${r.held.map(h => h.name).join(', ')}`), wsLog(ws, `archive on merge: held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}`))
   log(`archived ${ws.id}: PR #${pr.number} merged`)
   broadcast({ ev: 'archived', ws: ws.id, name: ws.name || ws.id, pr: pr.number })
 }
@@ -3534,12 +3565,16 @@ async function autoPR(ws: Workspace, pr: PR) {
     const proj = state.projects.find(p => p.id === ws.project)
     // its agent at work (a review just sent, a fix under way): a push may come, so not under it
     const working = tabsOf(ws.id).some(t => tracked(t) && isLive(t) && (rtOf(t.id).status === 'running' || !!t.queue?.length))
-    const not = !prAllows(proj?.config, 'land') ? "off in the project's settings" : working ? 'its agent is working: a push may come' : pr.draft ? 'a draft' : pr.checks !== 'pass' ? `checks ${pr.checks || 'none yet'}` : pr.conflict !== false ? (pr.conflict ? 'conflicts' : 'GitHub is still working out whether it merges') : pr.review && pr.review !== 'APPROVED' ? `review ${pr.review}` : pr.ready === false ? 'GitHub blocks it still (a required check or review to come, or behind its base)' : pr.head === f.land ? `tried ${pr.head?.slice(0, 7)} already` : ''
+    const not = !prAllows(proj?.config, 'land') ? "off in the project's settings" : working ? 'its agent is working: a push may come' : pr.draft ? 'a draft' : pr.checks !== 'pass' ? `checks ${pr.checks || 'none yet'}` : pr.conflict !== false ? (pr.conflict ? 'conflicts' : 'GitHub is still working out whether it merges') : pr.review && pr.review !== 'APPROVED' ? `review ${pr.review}` : pr.ready === false ? 'GitHub blocks it still (a required check or review to come, or behind its base)' : pr.head === f.land && !(f.held && f.held !== gatesKey(f.held.split(',').map(x => x.split(':')[0]))) ? `tried ${pr.head?.slice(0, 7)} already` : ''
     if (not) wsLog(ws, `merge when green: not yet, ${not}`)
     else {
       f.land = pr.head // once per head commit: a failure waits for a push (or a click)
+      f.held = undefined
       const how = proj?.config?.mergeMethod ?? 'squash'
-      await merge(ws, pr, how, true).then(
+      const h = await gated('merge', ws, { by: 'auto' })
+      // held: over to you once per head, until a push or one of its gates' extensions changes
+      if (h) (f.held = gatesKey([...new Set(h.held.map(x => x.widget))])), overToYou(ws, `Merge when green held: ${h.held.map(x => `${x.name}: ${x.why}`).join('; ')}`)
+      else await merge(ws, pr, how, true).then(
         () => (log(`merged ${ws.id}: PR #${pr.number} (${how}), green`), wsLog(ws, `merge when green: merged (${how})`)),
         e => (wsLog(ws, `merge when green: failed: ${e.message}`), overToYou(ws, `Merge when green failed: ${e.message}`)),
       )
@@ -4468,6 +4503,7 @@ function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<
   state.tabs.push(tab)
   save()
   spawnTab(tab, { cmd, env })
+  widgetEvent('tab.new', { kind }, ws.id, tab)
   return tab
 }
 
@@ -4481,10 +4517,27 @@ export function runDev(ref: string, script?: string) {
   return script ? replaceTab(ws.id, 'script', cmd, undefined, script as RunScript) : replaceTab(ws.id, 'dev', cmd)
 }
 
-export function ship(ref: string, message: string) {
+// gates (widgets.ts widgetGates) before a ship, a merge or an archive: { held } when one says no. force does it anyway:
+// yours only, an agent's is refused (agentCaller); by: who does it (an agent's tab says agent itself)
+export type GateOpts = { force?: boolean; by?: GateBy; from?: { ws?: unknown; tab?: unknown } }
+async function gated(step: Gate, ws: Workspace, o: GateOpts) {
+  const agent = !!agentCaller(o.from)
+  if (o.force && agent) throw new Error(`only the user can ${step} it anyway: an agent never overrides a gate`)
+  if (o.force) return wsLog(ws, `${step}: gates skipped, you said do it anyway`)
+  const pr = prs.get(ws.id)
+  const stat = stats.get(ws.id)
+  const held = await widgetGates(step, ws, agent ? 'agent' : (o.by ?? 'you'), { pr: pr && { number: pr.number, url: pr.url, title: pr.title, state: pr.state, checks: pr.checks, review: pr.review }, stat: stat && { add: stat.add, del: stat.del, files: stat.files } })
+  if (!held.length) return
+  wsLog(ws, `${step}: held by ${held.map(h => `${h.name} (${h.why})`).join(', ')}`)
+  return { held }
+}
+
+export async function ship(ref: string, message: string, o: GateOpts = {}): Promise<Tab | { held: GateHeld[] }> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
   if (!message?.trim()) throw new Error('a commit message is needed')
+  const h = await gated('ship', ws, o)
+  if (h) return h
   const script = [
     'set -e',
     'git add -A',
@@ -4493,9 +4546,12 @@ export function ship(ref: string, message: string) {
     'gh pr view "$LAKI_BRANCH" --json url -q .url 2>/dev/null || gh pr create --fill',
   ].join('\n')
   const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch })
-  sessions.get(tab.id)!.onExit = () => {
+  sessions.get(tab.id)!.onExit = code => {
     changed()
-    scanPRs()
+    void scanPRs().finally(() => {
+      const pr = prs.get(ws.id)
+      widgetEvent('ship.done', { ok: code === 0, exit: code, ...(pr && { pr: { url: pr.url, number: pr.number } }) }, ws.id, tab)
+    })
   }
   return tab
 }
@@ -4694,7 +4750,7 @@ export async function prComment(o: { ws: string; path: string; line: number; sid
 // prAct: the PR approved, closed or merged (the side panel's buttons, the status bar's menu, after a confirm), by gh
 // as you, when the project's settings allow it (prAllows); a merge's way becomes the project's next default. Then a
 // scan, for its new state
-export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge'; method?: MergeMethod; deleteBranch?: boolean }) {
+export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge'; method?: MergeMethod; deleteBranch?: boolean } & GateOpts) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
@@ -4704,6 +4760,8 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
   if (pr.state !== 'OPEN') throw new Error(`PR #${pr.number} is ${pr.state.toLowerCase()}`)
   if (o.act === 'merge') {
     const how = MERGE_METHODS.includes(o.method!) ? o.method! : 'squash'
+    const h = await gated('merge', ws, o)
+    if (h) return h
     if (proj && proj.config?.mergeMethod !== how) (proj.config = { ...proj.config, mergeMethod: how }), save(), changed()
     await merge(ws, pr, how, o.deleteBranch !== false)
     return {}

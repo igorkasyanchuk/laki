@@ -282,12 +282,28 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     inputSchema: obj({ id: str('its id, from laki_extensions') }, ['id']),
     run: a => rpc('widgetCheck', { id: a.id, run: false }),
   },
+  {
+    name: 'laki_extension_logs',
+    description: "An extension's log, newest last: what Laki did with it (fetches, actions, events, refusals), each run's end and its stderr, its stream's lines. Read-only, for debugging one you write. Empty while its log is off (the user's switch: Settings › Extensions › Keep a log).",
+    inputSchema: obj({ id: str('its id, from laki_extensions'), lines: { type: 'number', description: 'how many, newest last (default 100, at most 1000)' }, level: { type: 'string', enum: ['debug', 'info', 'warn', 'error'], description: 'at least this level' } }, ['id']),
+    max: 30000,
+    run: async a => {
+      const r = (await rpc('widgetLogs', { id: a.id, limit: Math.min(1000, Number(a.lines) || 100), level: a.level })) as { on: boolean; lines: { at: number; level: string; src: string; text: string; ws?: string }[] }
+      return { on: r.on, lines: r.lines.map(l => `${new Date(l.at).toISOString()} ${l.level} ${l.src}${l.ws ? ` (${l.ws})` : ''}: ${l.text}`) }
+    },
+  },
+  {
+    name: 'laki_extension_emit',
+    description: "Send an event of your own, custom.<name>, with data: the user's extensions and workflows that answer it (on: custom.<name> or custom.*) run. Say done with it, not to ask for anything. Laki marks it as an agent's: a workflow that runs commands, a webhook or outward actions won't start on it.",
+    inputSchema: obj({ name: str('custom.<name> or <name>: letters, digits, . _ -'), data: { type: 'object', description: 'its data (64 KB at most)' }, ws: str('the workspace it is about (default: yours)') }, ['name']),
+    run: a => rpc('widgetEmit', { name: a.name, data: a.data, ws: a.ws ?? from, from: { ws: from, tab: process.env.LAKI_TAB }, ...(who && { ai: true }) }),
+  },
   // the user's extensions' tools (an action with a tool): listed, and called (the user may be asked first)
   {
     name: 'laki_extension_tools',
     description: "Tools the user's extensions give agents: each one's name (id.action), what it does, its input, whether Laki asks the user first, and the extension's notes on when to use it (agents). Call one with laki_extension_call.",
     inputSchema: obj({}),
-    run: () => rpc('widgetTools'),
+    run: () => rpc('widgetTools', { ws: from }), // a repo's: only for its project's workspaces
   },
   {
     name: 'laki_extension_call',
@@ -624,7 +640,7 @@ export function extNames<T extends { id: string; action: string }>(ts: T[]): Map
   for (const t of ts) n.set(base(t), (n.get(base(t)) ?? 0) + 1)
   return new Map(ts.map(t => [base(t).length > 64 || n.get(base(t))! > 1 ? `${base(t).slice(0, 57)}_${createHash('sha256').update(`${t.id}.${t.action}`).digest('hex').slice(0, 6)}` : base(t), t]))
 }
-const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && (await alive()) ? conn<ExtTool[]>('widgetTools').catch(() => []) : []) // an extension's permission server: none
+const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && (await alive()) ? conn<ExtTool[]>('widgetTools', { ws: process.env.LAKI_WORKSPACE }).catch(() => []) : []) // an extension's permission server: none
 
 // light what it looked at (Settings › General › Experimental › Laki AI's glow)
 const AI_LOOKS = ['screen', 'browse']

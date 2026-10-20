@@ -149,17 +149,18 @@ export async function fresh(t: TestContext, o: { setup?: string; config?: object
 export async function connect(rig: { info(): { port: number; token: string } }, origin?: string, token?: string) {
   const { port, token: tk } = rig.info()
   const ws = new WebSocket(`ws://127.0.0.1:${port}/ws?token=${token ?? tk}`, origin ? { origin } : {})
-  await new Promise((res, rej) => {
-    ws.once('open', res)
-    ws.once('error', rej)
-  })
   let seq = 0
   const waiting = new Map<number, (m: any) => void>()
   const events: any[] = []
+  // before open: what the daemon sends as it connects (a due reminder) can come in the handshake's packet
   ws.on('message', raw => {
     const m = JSON.parse(String(raw))
     if (m.id !== undefined && !m.ev) waiting.get(m.id)?.(m) // an event with an id (a workflow run's) is still an event, as api.ts reads it
     else events.push(m)
+  })
+  await new Promise((res, rej) => {
+    ws.once('open', res)
+    ws.once('error', rej)
   })
   return {
     ws,

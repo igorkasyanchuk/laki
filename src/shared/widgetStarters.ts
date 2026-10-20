@@ -79,7 +79,7 @@ const LAUNCH = {
   ],
 }
 
-export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'note', 'launcher', 'button', 'form', 'panel', 'workspace', 'stream', 'tool', 'pullmain', 'onefile'] as const
+export const STARTER_KINDS = ['number', 'list', 'table', 'chart', 'note', 'launcher', 'button', 'form', 'panel', 'workspace', 'stream', 'tool', 'pullmain', 'context', 'onefile'] as const
 export type StarterKind = (typeof STARTER_KINDS)[number]
 
 export const STARTERS: Record<StarterKind, Starter> = {
@@ -387,6 +387,120 @@ To change it:
 - What \`claude -p\` may do unasked: \`TOOLS\` beside it; add your test command (\`Bash(bin/rails test:*)\`).
 - Another way: a case of its own in \`pull.sh\`, and its name in widget.json's \`how\` choices.
 - \`laki widget check ${id} --ws <workspace>\`: what's wrong with it, its fetch run in that workspace.
+`,
+      }
+    },
+  },
+  context: {
+    title: 'Context',
+    blurb: 'Actions in ⌘K, a file’s and a tab’s right click and the prompt’s Insert menu, each told where you are',
+    files: (id, name) => {
+      const stats = { path: 'src/checkout.ts', lines: 214, words: 806, bytes: 7431, top: [{ word: 'order', count: 31 }, { word: 'cart', count: 22 }, { word: 'total', count: 17 }, { word: 'price', count: 12 }, { word: 'return', count: 11 }] }
+      return {
+        'widget.json': json({
+          $schema: WIDGET_SCHEMA_URL,
+          name,
+          description: 'Actions where you work: ⌘K (Alt+Cmd+U), a file’s right click, a tab’s and the prompt’s Insert menu',
+          place: 'status',
+          icon: 'code',
+          label: 'Context',
+          tip: 'Its last file stats: right click a file in Files › File stats',
+          actions: {
+            summary: { run: 'sh summary.sh', title: 'Workspace summary', show: ['palette'], key: 'Alt+Cmd+U' },
+            'file-stats': { run: 'sh file-stats.sh', title: 'File stats', show: ['file'], match: ['*.md', '*.txt', '*.ts', '*.tsx', '*.js', '*.json', '*.css', '*.html', '*.py', '*.rb', '*.go', '*.rs', '*.sh', '*.yml', '*.yaml'], view: true },
+            'branch-note': { run: 'sh branch-note.sh', title: 'Branch note', show: ['prompt', 'tab'], insert: true },
+          },
+          ui: {
+            full: {
+              type: 'stack',
+              children: [
+                { type: 'header', icon: 'file', title: '{{path}}', subtitle: 'Right click a file in Files › File stats', if: 'path' },
+                { type: 'empty', text: 'No file yet: right click one in Files › File stats', unless: 'path' },
+                { type: 'stats', items: [{ value: '{{lines}}', label: 'lines' }, { value: '{{words}}', label: 'words' }, { value: '{{bytes}}', label: 'bytes' }], if: 'path' },
+                { type: 'table', each: 'top', columns: [{ title: 'Word', value: '{{word}}' }, { title: 'Times', value: '{{count}}', align: 'right' }], if: 'top.length' },
+              ],
+            },
+          },
+          sample: stats,
+        }),
+        'summary.sh': `#!/bin/sh
+# ⌘K › Workspace summary, or Alt+Cmd+U: the workspace you're in comes as $LAKI_PATH, $LAKI_BRANCH (and the rest:
+# $LAKI_WORKSPACE, $LAKI_PROJECT, $LAKI_BASE, $PORT), all of it as JSON in $LAKI_CTX. A toast says what it found.
+if [ -z "$LAKI_PATH" ]; then
+  echo '{"toast": "Pick a workspace first"}'
+  exit 0
+fi
+n=$(git -C "$LAKI_PATH" status --porcelain 2>/dev/null | wc -l | tr -d ' ')
+[ "$n" = 1 ] && files=file || files=files
+branch=$(printf '%s' "$LAKI_BRANCH" | sed 's/[\\\\"]/\\\\&/g')
+printf '{"toast": "%s: %s %s changed"}\\n' "$branch" "$n" "$files"
+`,
+        'file-stats.sh': `#!/bin/sh
+# A file's right click in Files › File stats (the files "match" says): the file comes as $LAKI_FILE (its whole path),
+# its workspace as $LAKI_PATH. It prints {"data": …}: the extension keeps it, and "view": true opens its full view.
+f=$LAKI_FILE
+if [ -z "$f" ] || [ ! -f "$f" ]; then
+  echo '{"toast": "Pick a file first"}'
+  exit 0
+fi
+root=$(cd "$LAKI_PATH" 2>/dev/null && pwd -P) # its folder with links resolved, as $LAKI_FILE is
+rel=\${f#"$LAKI_PATH"/}
+rel=\${rel#"$root"/}
+path=$(printf '%s' "$rel" | sed 's/[\\\\"]/\\\\&/g')
+lines=$(wc -l < "$f" | tr -d ' ')
+words=$(wc -w < "$f" | tr -d ' ')
+bytes=$(wc -c < "$f" | tr -d ' ')
+top=$(tr -cs 'A-Za-z' '\\n' < "$f" | tr 'A-Z' 'a-z' | awk 'length >= 3' | sort | uniq -c | sort -rn | head -10 |
+  awk '{ printf "%s{\\"word\\": \\"%s\\", \\"count\\": %s}", (NR > 1 ? ", " : ""), $2, $1 }')
+printf '{"data": {"path": "%s", "lines": %s, "words": %s, "bytes": %s, "top": [%s]}}\\n' "$path" "$lines" "$words" "$bytes" "$top"
+`,
+        'branch-note.sh': `#!/bin/sh
+# The prompt's Insert menu and a tab's right click › Branch note: what it prints goes into the prompt ("insert": true),
+# unsent: the branch and the files changed in the workspace you're in ($LAKI_PATH, $LAKI_BRANCH).
+if [ -z "$LAKI_PATH" ]; then
+  echo '{"toast": "Pick a workspace first"}'
+  exit 0
+fi
+changed=$(git -C "$LAKI_PATH" status --porcelain 2>/dev/null | cut -c4-)
+n=$(printf '%s' "$changed" | grep -c .)
+if [ "$n" = 0 ]; then
+  echo "Branch $LAKI_BRANCH, no files changed."
+  exit 0
+fi
+[ "$n" = 1 ] && files=file || files=files
+names=$(printf '%s\\n' "$changed" | head -10 | awk '{ printf "%s%s", (NR > 1 ? ", " : ""), $0 }')
+[ "$n" -gt 10 ] && names="$names…"
+echo "Branch $LAKI_BRANCH, $n $files changed: $names"
+`,
+        'fixtures/sample.json': json(stats),
+        'fixtures/empty.json': json({ path: '', lines: 0, words: 0, bytes: 0, top: [] }),
+        ...variants({
+          readme: { path: 'README.md', lines: 48, words: 390, bytes: 2604, top: [{ word: 'laki', count: 14 }, { word: 'agent', count: 9 }, { word: 'workspace', count: 7 }] },
+          'one-line': { path: '.nvmrc', lines: 1, words: 1, bytes: 3, top: [] },
+          big: { path: 'src/daemon/core.ts', lines: 9120, words: 61204, bytes: 498311, top: [{ word: 'const', count: 2311 }, { word: 'return', count: 1702 }, { word: 'workspace', count: 655 }, { word: 'state', count: 640 }, { word: 'await', count: 512 }, { word: 'tab', count: 498 }, { word: 'string', count: 401 }, { word: 'undefined', count: 377 }, { word: 'settings', count: 290 }, { word: 'error', count: 266 }] },
+        }),
+        'README.md': `# ${name}
+
+A Laki extension of actions where you work, each told where you are. It has no fetch: its data is the last file it
+looked at. To copy from:
+
+- **Workspace summary** (\`summary\`): in ⌘K, and on Alt+Cmd+U (\`"show": ["palette"]\`, \`"key"\`). A toast: the branch
+  and how many files changed. With no workspace selected: *Pick a workspace first*.
+- **File stats** (\`file-stats\`): a file's right click in Files, for the files \`match\` names (\`"show": ["file"]\`).
+  It prints \`{"data": …}\`, which the extension keeps, and \`"view": true\` opens its full view: lines, words, bytes and
+  the words it uses most.
+- **Branch note** (\`branch-note\`): the prompt's Insert menu and a tab's right click (\`"show": ["prompt", "tab"]\`).
+  What it prints goes into the prompt, unsent (\`"insert": true\`): *Branch X, N files changed: a, b, c*.
+
+Where you are comes in its environment:
+
+- \`$LAKI_PATH\`, \`$LAKI_BRANCH\`, \`$LAKI_WORKSPACE\`, \`$LAKI_PROJECT\`, \`$LAKI_BASE\`, \`$PORT\`: the workspace;
+- \`$LAKI_FILE\`: the file you picked, its whole path (a file's menu);
+- \`$LAKI_TAB\`, \`$LAKI_TAB_NAME\`: the tab (a tab's menu);
+- \`$LAKI_CTX\`: all of it as JSON, \`{ "ws": {…}, "tab": {…}, "file": { "path", "abs" } }\`.
+
+- \`laki widget action ${id} summary\` runs one from a terminal (no workspace there: it says so).
+- \`laki widget check ${id}\`: what's wrong with it.
 `,
       }
     },

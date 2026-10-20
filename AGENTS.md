@@ -111,7 +111,7 @@ workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `as
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
-`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`. A
+`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -281,9 +281,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
   `AI_ACTS` memory/schedule/tab/todo, a removal, or widget, turning an extension on (`laki_extension_on`; its words say
   what it runs, `widgets.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
-  Yes only while it still says the same; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
+  Yes only while it still says the same and its `filesHash` is the act's `hash`, else the question again as it reads
+  now; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
   `busy`; a chat message with `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an
-  `act`'s Yes is `remove` here, or `widgetSet` `on` (the user's, no `agent`), never the AI's own);
+  `act`'s Yes is `remove` here, or `widgetSet` `on` with `seen` (the user's, no `agent`), never the AI's own);
 - specs and brainstorms (experimental, `settings.specs`; below): `planList` (`project`?), `planNew` (`project`, `kind` spec
   or brainstorm, `title`, `text`), `planGet`, `planSave` (`title`, `blocks`, `markdown`), `planFile` (`path`: text, or an
   image as a data URL), `planUpload` (`name`, `data` base64: `files/…`), `planWrite` (`path`, `text`: MCP's and Laki AI's,
@@ -847,7 +848,7 @@ first) }`, the rail's Notes and ⌘K; `listOff`): `Page` with the list (`.notes-
 Experimental (`settings.workflows`, Settings › General › *Experimental*; off: no rail button, foot button or ⌘K item,
 the view has no `flows`, and every `flow*` method refuses). `shared/workflow.ts`: the model (`BLOCKS`, each kind's
 `EXITS`, a choice's and an ask's options as exits, `max` per block), the file (`parse`/`toFile`: `# Name`, a
-description, `runs in: · session: · at once: · turns:`, a `## id` per block, its first kind key, `> ` text, `- label →
+description, `runs in: · session: · at once: · turns: · on:` (`on`: an event, `eventOk`, that starts a run), a `## id` per block, its first kind key, `> ` text, `- label →
 id`, `next:`/`ok:`… lines, `max: 3 → id`, `at: x,y`), `check` (no start, an exit to no block, nothing leads to a block,
 no way out, a loop with no `max` and no ask: Tarjan's; a case's `caseProblems`), `fill` (`{{name}}`), `choice` (*If / else*, `if:` the same
 key: one test, two options) and `case` (`branchOf`/`branchLabel`: each option's label is its test, `[var] contains|matches|equals
@@ -1146,7 +1147,7 @@ widget's right click (`WidgetApi.menu`, App's: Fetch now, Inspect, Its page) and
 
 Starters, the schema, the checker, one file (Part 3; `test/widget-check.test.ts`): `shared/widgetStarters.ts` `STARTERS`
 (`STARTER_KINDS`; each `files(id, name)`: widget.json with `$schema`, `fetch.sh` that cats `fixtures/sample.json`, the
-real fetch in its comments, `fixtures/empty.json` and three more made-up variants (`variants`; not launcher's nor onefile's), a README; `panel`'s `laki.d.ts`; `onefile`'s `<id>.5m.sh`). `widgetNew`:
+real fetch in its comments, `fixtures/empty.json` and three more made-up variants (`variants`; not launcher's nor onefile's), a README; `panel`'s `laki.d.ts`; `onefile`'s `<id>.5m.sh`; `context`'s three menu actions, no fetch, `summary.sh`, `file-stats.sh`, `branch-note.sh`). `widgetNew`:
 the id slugged and made unique (`taken`: a widget, a store, a folder or file of it), `<data>/widgets/<id>` (`dir`: an
 empty folder of yours; `onefile` in the folder itself), the store `on`, fetched (reason manual, why made); the CLI's `new`,
 Settings' *New ▾* (`WidgetsApi.make`: App opens its page on Overview; `ExtensionPage`'s `seen`: one not in the view yet isn't
@@ -1194,7 +1195,18 @@ fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.fail
 800 ms later with `askOf`'s options), `prEvents` after each `scanPR` (`prSeen` per workspace: the first scan only notes it,
 null for "no pull requests found"; `failHead`/`passHead`: checks once per head; new logins in approved/changes;
 MERGED/CLOSED as the state changes), `makeWs`'s end (`workspace.new`), `wsArchive`, `wsRestore`, `dropWs`
-(`workspace.removed`, every way one goes), `runSchedule` (`schedule.ran`), main.ts' first client (`app.open`). Its
+(`workspace.removed`, every way one goes), `runSchedule` (`schedule.ran`), main.ts' first client (`app.open`), `ship`'s
+tab's `onExit` after a `scanPRs` (`ship.done`: `ok`, `exit`, `pr`), workflow.ts `finish` (`flow.ended`), `checkLimit`
+(`limit.hit`, once per limit: `limitSent`, a reset within a minute the same), `addTab` and `replaceTab` (`tab.new`; not
+`restoreAll`'s), `scanPorts` (`port.open`: a port not in the last scan's, `rootTab` its tab; a tab `restoredAt` in its
+first `RESTORED_QUIET` minute only notes). `widgetEmit` (`laki widget emit`, MCP's `laki_extension_emit`): `custom.<name>`
+(`CUSTOM_EVENT`), `data` (`EVENT_MAX`), `from` (`widget`: the CLI's `LAKI_WIDGET`; `tab`; `agent`: `agentCaller`'s, or
+`ai` Laki AI's), `hops` (the handler's `LAKI_EVENT_HOPS` + 1, past `HOPS_MAX` 3 dropped and logged); `handlerOf`:
+`on[name]`, else `on['custom.*']`; never to `from.widget`. `sent` (`SENT_MAX` 50, `EventSent`: what each reached,
+`refused`) is `widgetEvents` (`laki widget events`). `eventHooks.flows` (workflow.ts): workflows with `on` (`listening`,
+read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the
+event's workspace's project, a project's own in its project only; refused: no workspace, problems, `byAgent`, an
+agent's event to one with run, webhook, extension or `OUTWARD` blocks, the event of its own run. Its
 payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
 `EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
 its workspace's, live) gets a `Job` in `queues` (`QUEUE_MAX` 20, the oldest dropped and logged), `drain` runs one at a
@@ -1354,8 +1366,25 @@ action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPE
 first, a scope workspace one takes the caller's; `first` without a grant (`state.widgetGrants[ws]`, `<id>.<action>`; '':
 no workspace) or `always` broadcasts `toolAsk` (`req`, the command, input, ws, tab, agent; refused with no client) and
 waits `LAKI_TOOL_WAIT` (2 min) for `widgetToolAnswer` (`once`, `always`, `deny`; the first counts), then `toolDone`;
-`always` keeps the grant (`grantKey`: `<id>.<action>#<hash>`, sha256 of its command and the extension's own files, so an edit, one made while
+`always` keeps the grant (`grantKey`: `<id>.<action>#<hash>`, sha256 of its command and `filesHash`, so an edit, one made while
 Laki was closed too, asks again; the view's from a size-and-time cache, a call's read fresh; grants without `#` dropped at `load`).
+Logs (widgets.ts' logs section, `test/widget-logs.test.ts`): `logOn` (`settings.widgetLogs`, the store's `log` through
+`widgetSet` (refused from an agent), or `dev`); `xlog` (`WidgetLogLine`: `n`, `at`, `level` (`LOG_LEVELS`; an info line
+of a run's own text takes its `debug:`… prefix: `leveled`), `src`, `text` (2 KB, `masker`: secrets' and `SECRET`-named
+settings' values of 4 characters or more as ••••), `ws`) into `pending`, `flushLogs` every 500 ms and at
+`widgetsStop`: `<data>/widget-data/<id>.log`, 0600, past `LOG_MAX` (1 MB; `LAKI_WIDGET_LOG_MAX`: tests') renamed to
+`.log.1`. Written: `wLog` (Laki's, `src: laki`; a function only when logged), `ran`'s line and the run's stderr
+(`LOG_RUN`, 64 KB, its end), a stream's other stdout lines and stderr as they come, `aiLog` (`aiOnce`'s `onCall`:
+seconds, cost, the answer's size), `widgetLog` (`laki widget log`, `cli`; a JS page's `laki.log`, `page`; `LOG_RATE`
+50 a second; off: `{ kept: false }`). `widgetLogs` (`since`: the cursor, `n`; `level` at least, `src`, `ws`, `limit`;
+`next`) for Extension.tsx' `Logs` tab (every 2 s, the filters its own, `cfg.log`), `laki widget logs [-n] [-f]`, MCP's
+`laki_extension_logs`, `aboutWidget`'s last 30 warnings. `widgetLogClear`; `widgetLogFile` for `openIn` `log`. `keptOf`
+takes both files to the trash. `errAt` is the view's `logErr` (Settings' red `log` tag).
+`filesHash` (widgets.ts): the extension's own files (top level, fixtures) and what it runs from outside them (the store's
+source, its actions, `on`, `stream`, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`),
+`widgetFiles` too (read first, so a change while they're read can't match), `widgetSet` `on` with `seen` refuses another
+(the studio's TrySheet, `laki widget on --seen`), `toolAsk` carries it and `approve` compares it after the answer (*its
+files changed while you were asked*: not run, no Always).
 `approve` (the ask) is shared with `widgetAction`'s `from`: core's `agentCaller` (`from.tab` an agent tab, or a shell tab in
 `shellAgents`; `laki new`'s `byCaller` too) makes a tool's action a `widgetToolCall` (its arg as JSON input) and any other
 ask each time (`ask: 'always'`: no Always); `widgetSet` `on: true` from one is refused, `widgetDev` from one links but leaves
@@ -1368,6 +1397,39 @@ tools|tool`; MCP's `laki_extension_tools`, `laki_extension_call` and an `ext_<id
 with a daemon up: `alive`); Laki AI has them as MCP's; `LAKI_NOTE` names them while one is on (`TOOLS_NOTE`).
 `manifestCheck` checks each tool and warns at `never` with an outward command; `checkOne` at a missing or long
 `AGENTS.md`. The `tool` starter. Tested in `test/widget-tools.test.ts`.
+
+Gates (widgets.ts' gates section, `test/widget-gates.test.ts`): an object action's `gate` (`GATES`: ship, merge,
+archive; `widgetSchema.ts` `gateOf`, a command action's only: `manifestCheck` refuses it on an AI action or an unknown
+step). Core's `gated(step, ws, GateOpts)`, before `ship` (async now: main.ts, workflow.ts, the CLI, App), `prAct`'s
+merge, `autoPR`'s Merge when green and `wsArchive` (after `ifClean`'s dirty check; `archiveMerged`'s and a workflow's
+too; not `wsRm`, not `archivedTidy`): `force` skips them, refused from `agentCaller` (the CLI's `--force` in an agent's
+tab too); `by` you, agent (`agentCaller`), auto, workflow. `widgetGates`: every on extension's gates for the step (a
+scoped one where `instOk`), `GATE_MAX` 8 together, `gateWait` 30 s (`LAKI_GATE_MS`: tests'), `exec` with stdin and
+`LAKI_EVENT_FILE` `{ gate, ws: wsInfo, pr, stat, by }`, `LAKI_GATE`, `wsEnv`; a run `gate:<step>` in its Runs and log.
+`{"ok": false, "why", "fix"}` is a `GateHeld`; an error, a timeout or no `ok` goes ahead (`wLog` error, a `widget-say`
+toast) unless `by` is auto: then held. Each hold `gate.held`. Held: `{ held }` back (App's `gated`: *Checking…* while
+`gatesOn`, then `choose` *Not shipped*… with *Do it anyway* (`ask`, then `force`) and *Ask the agent to fix it* (`send`
+`whenIdle`, the fixes) when one has a `fix` and the workspace a live agent tab); `autoPR`: `overToYou` once, `f.land`
+the head and `f.held` its gates' `gatesKey` (on, `filesHash`), tried again when that changes; `archiveMerged`: logged,
+`autoArchived` kept; a workflow's block: its error way, `steps.<id>.output` the reasons. The view's `gates` (Settings'
+*Can hold*), `widgetWhat`'s text.
+
+Repo extensions (`test/widget-repo.test.ts`): `repoRoots` (each project not `kind` nor `host`: `<path>/.laki/extensions`,
+its own folder, not a worktree's: ponytail) between yours and `BUILTIN` in `scanWidgets`, each an `Entry` with `project`
+and the id `<project>.<id>`; `watchRepos` (`fs.watch` recursive, 1 s, then `scanWidgets`; closed by `widgetsStop`), and
+core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
+(`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
+`trusted` is `dirHash` (every file under the folder, `filesUnder` `all`: hidden ones and node_modules too, 2000 at most; `repoShown` counts the ones it doesn't show), and a scan that finds an on one with
+another hash calls `untrust` (off, `changed`, `stopStream`, `stopAgents`, `ungrant`, a warn line, a `widget-say`
+`notify`). `inProj` keeps it to its project: `wsOf` (refused elsewhere), `ctxOf`, `instView`, `shownIn`, `widgetEvent`
+(no workspace: `app.open` and `custom.*` only), `widgetGates`, `widgetTools` (`ws`: MCP's `ext_*` by
+`$LAKI_WORKSPACE`; none: no repo's) and `widgetToolCall`. `repoSays` refuses `widgetRm`, `widgetWrite`,
+`widgetFileSave` and a rename; Remix's id drops the project. `widgetNew` in a repo's folder writes no store (off) and
+returns its `<project>.<id>`. The renderer: App's `ownWidgets` (every place but the Desk, whose `deskWidgets` name it
+`· <project>`), `extOn` and RowMarks by the workspace's project, ⌘K's *Extension:* items; `repoSheet` in
+`WidgetsApi.set` (on without `seen`: `widgetWhat`, its needed and secret settings, *Turn on in <project>*); Settings'
+*From <project>* groups and a *changed* tag; the page's *From <project>'s .laki/extensions* tag, the changed banner
+(*Look…*), Files read-only with Remix.
 
 The studio (`WidgetStudio.tsx`, App's lazy dialog `{ studio: id ('' a new one), back }`, only while `ai.on`; `WidgetsApi`
 `studio`, `remix`, `undo`, `tryOnce`; entries: New ▾ › Make with Laki AI (`page('')` too), a row's and `WidgetCard`'s ✨

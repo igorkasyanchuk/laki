@@ -101,28 +101,42 @@
     "on": {
       "type": "object",
       "propertyNames": {
-        "enum": [
-          "turn.done",
-          "turn.failed",
-          "turn.waiting",
-          "pr.opened",
-          "pr.checks.failed",
-          "pr.checks.passed",
-          "pr.review",
-          "pr.merged",
-          "pr.closed",
-          "workspace.new",
-          "workspace.archived",
-          "workspace.restored",
-          "workspace.removed",
-          "schedule.ran",
-          "app.open"
+        "anyOf": [
+          {
+            "enum": [
+              "turn.done",
+              "turn.failed",
+              "turn.waiting",
+              "pr.opened",
+              "pr.checks.failed",
+              "pr.checks.passed",
+              "pr.review",
+              "pr.merged",
+              "pr.closed",
+              "workspace.new",
+              "workspace.archived",
+              "workspace.restored",
+              "workspace.removed",
+              "schedule.ran",
+              "app.open",
+              "ship.done",
+              "flow.ended",
+              "limit.hit",
+              "tab.new",
+              "port.open",
+              "gate.held",
+              "custom.*"
+            ]
+          },
+          {
+            "pattern": "^custom\\.[a-z0-9][a-z0-9._-]{0,40}$"
+          }
         ]
       },
       "additionalProperties": {
         "type": "string"
       },
-      "description": "Events it answers: { \"turn.done\": \"one of its actions\" | \"refresh\" }; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT"
+      "description": "Events it answers: { \"turn.done\": \"one of its actions\" | \"refresh\" }, custom.<name> (laki widget emit) or custom.* for every one of those; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT"
     },
     "stream": {
       "type": "boolean",
@@ -259,6 +273,17 @@
                 "type": "boolean",
                 "description": "Its full view opens after it runs: a file opener (show file, its data from what it prints as { \"data\" })"
               },
+              "gate": {
+                "type": "array",
+                "items": {
+                  "enum": [
+                    "ship",
+                    "merge",
+                    "archive"
+                  ]
+                },
+                "description": "Steps it can hold: before Laki ships, merges or archives a workspace it runs, the step’s facts as JSON on stdin; { \"ok\": false, \"why\", \"fix\" } holds it (the user may do it anyway). Command actions only"
+              },
               "tool": {
                 "type": "object",
                 "additionalProperties": false,
@@ -392,7 +417,7 @@
           }
         ]
       },
-      "description": "Commands its buttons run by name, with $WIDGET_ARG: a command, { \"run\", \"tool\" } (agents may call it), or { \"ai\": a prompt } (an agent answers it); what one prints as JSON may say { \"toast\" }, { \"modal\" }, { \"data\" } or { \"insert\" }. title, show, match, key, ask, confirm, insert and view offer it in the palette, menus, a shortcut and the prompt, with $LAKI_CTX (the workspace, tab or file it was picked on)"
+      "description": "Commands its buttons run by name, with $WIDGET_ARG: a command, { \"run\", \"tool\" } (agents may call it), or { \"ai\": a prompt } (an agent answers it); what one prints as JSON may say { \"toast\" }, { \"modal\" }, { \"data\" } or { \"insert\" }. title, show, match, key, ask, confirm, insert and view offer it in the palette, menus, a shortcut and the prompt, with $LAKI_CTX (the workspace, tab or file it was picked on); gate: the steps it can hold (ship, merge, archive)"
     },
     "notify": {
       "type": "string",

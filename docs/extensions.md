@@ -168,9 +168,27 @@ when it has them) and its own fields, 64 KB at most:
 | `workspace.archived`, `workspace.restored`, `workspace.removed` | as named | |
 | `schedule.ran` | a scheduled task ran or failed | `task: { id, name }`, `ok`, `what` |
 | `app.open` | Laki's window comes back | |
+| `ship.done` | a workspace's Ship ends | `ok`, `exit` (its code), `pr: { url, number }` when there is one by then |
+| `flow.ended` | a workflow's run ends | `run`, `workflow: { id, name }`, `status`, `why` |
+| `limit.hit` | an agent hits a usage limit (once per limit) | `agent`, `until` (ms) |
+| `tab.new` | a tab is opened (not the ones brought back as Laki starts) | `kind` (agent, shell, dev, script, ship) |
+| `port.open` | a port starts listening in a workspace (once each time) | `port`, `pid`, `command`, `name` (`.laki.json`'s `ports`) |
+| `gate.held` | a [gate](#gates-an-actions-gate) held a ship, a merge or an archive | `gate`, `widget`, `why` |
+| `custom.<name>` | `laki widget emit <name>` (below) | `data`, `from: { widget, tab, agent }` |
 
 PR events come from Laki's PR scans: the first scan after the daemon starts only notes where each PR is, so a restart
-replays nothing. What an action prints can set the data (below); its `toast` or `modal` shows in the app while its
+replays nothing; so do ports a tab brought back at start listens on in its first minute. `laki widget events` lists
+the last 50 events, and which extensions and workflows each reached (or why a workflow didn't start).
+
+### Events of your own (`laki widget emit`)
+
+`laki widget emit deploy.done '{"sha": "abc"}' [--ws <id>]` (or the JSON on stdin with `-`; MCP's
+`laki_extension_emit`) sends `custom.deploy.done` with that `data` (64 KB at most; a name of letters, digits, `.`, `_`,
+`-`). `"on": { "custom.deploy.done": "refresh" }` answers it, `"custom.*"` every custom event. From an extension's own
+command (`"$LAKI_CLI" widget emit …`) `from.widget` says which, and it never gets its own; an agent's says
+`from.agent`. An emit made while handling an event is a hop more: past 3 hops it's dropped, and said in its log.
+
+A workflow can start on any of these (`on: custom.deploy.done` in its head): see the guide's Workflows. What an action prints can set the data (below); its `toast` or `modal` shows in the app while its
 window is open.
 
 ### An action's data
@@ -216,6 +234,33 @@ An extension that's off refuses it. A git hook that counts today's commits in an
 laki widget push commits "{\"today\": $(git log --since=midnight --oneline | wc -l)}" >/dev/null 2>&1 || true
 ```
 
+## Gates (an action's `gate`)
+
+An action can hold a step: before Laki ships, merges or archives a workspace, each gate for that step runs, and any
+that says no holds it, with its reason.
+
+```json
+{ "actions": { "tests": { "run": "./check.sh", "gate": ["ship", "merge"] } } }
+```
+
+- It gets `{ gate, ws, pr, stat, by }` on stdin and in `$LAKI_EVENT_FILE` (`pr`: number, url, title, state, checks,
+  review, or null; `stat`: add, del, files, or null; `by`: you, agent, auto (Merge when green, archive on merge) or
+  workflow), `$LAKI_GATE` the step, and the workspace's env (`$LAKI_WORKSPACE`, `$LAKI_BRANCH`, `$LAKI_PATH`…).
+- It prints `{"ok": true}`, or `{"ok": false, "why": "the tests fail", "fix": "Make the tests pass"}` (`fix`: a prompt
+  for the agent, optional).
+- Gates run together, 8 at most for a step, 30 s each, only while the extension is on; a per-workspace one with its
+  workspace's instance. A command action only: an agent's action can't be one (each run costs, and it's slow).
+- **An error or no answer within 30 s:** the step goes ahead, and Laki says so (a toast, a line in its log). A gate
+  that should block on its own error prints `ok: false` itself. Merge when green and archive on merge, which nobody
+  watches, are held instead.
+- **Held:** the app says *Not shipped* (*Not merged*, *Not archived*), a line per gate, with *Do it anyway* (asked
+  first) and, when a gate gave a `fix` and the workspace has an agent, *Ask the agent to fix it*. `laki ship` prints the
+  reasons and exits 1; `--force` does it anyway. Doing it anyway is yours only: an agent's is refused.
+- Merge when green held: over to you once per head commit, tried again after a push or once the gate's extension
+  changes. Archive on merge held: skipped, and said in the workspace's log. A workflow's action block takes its error
+  way, the reasons as `{{steps.<id>.output}}`. Each hold sends `gate.held`.
+- Not gated: deleting a workspace, and archived workspaces' clean-up.
+
 ## Tools for agents (an action's `tool`)
 
 An action can be a tool your agents call: a deploy, a ticket, a note, a query. Give it a `tool` with what it does and
@@ -241,8 +286,9 @@ its input; `run` is its command, as a plain action's string is:
 - `ask`: `first` (the default) asks you once per workspace (*Always in …* in the dialog; Settings › Extensions lists
   each grant with *Revoke*), `always` every call, `never` not at all (the checker warns when its command looks outward:
   a push, a merge, a deploy). Laki's window must be open to ask; no answer in 2 minutes refuses it. *Always* is for
-  that command and the extension's files as they are: an edit (even while Laki is closed) asks again. Turning the
-  extension off, or changing its commands, takes the grants back.
+  that command and the extension's files as they are: an edit (even while Laki is closed) asks again. A file changed
+  while you're asked isn't run, and no *Always* is kept. Turning the extension off, or changing its commands, takes
+  the grants back.
 - `AGENTS.md` in its folder says when to use its tools (4 KB at most); agents see it with the list.
 - Agents get them through `laki widget tools` (the list) and `laki widget tool <id> <action> '<json>'` (a call, in
   their workspace), and in MCP as `ext_<id>_<action>` tools (with `laki_extension_tools` and `laki_extension_call`);
@@ -425,6 +471,7 @@ A `widget.html` with a `<script>` is a JS extension: a page of its own in a sand
 | `run(action, arg)` | one of its actions |
 | `toast(text)`, `modal({ title, text, ui, data, buttons })`, `close(id?)` | as an action's JSON ([dialogs](#dialogs)) |
 | `ui(spec, data?)`, `mount(el, spec, data?)` | the UI kit's HTML for an element, or put in `el` (both promises) |
+| `log(...args)` | a line in its [log](#logs) (src `page`), any time; 50 a second, 2 KB a line at most |
 
 These work right after a click in the page. By default the page has no network: everything inline, its data from its
 fetch. **Network access** (a switch per extension in Settings › Extensions, off until you turn it on) lets its page
@@ -555,6 +602,7 @@ laki widget new "Deploys" --dir ~/code/deploys  # a folder of yours (empty or ne
 | `stream` | a command that runs all along: a line of JSON every 2 s, shown as it comes |
 | `tool` | *A tool for agents*: notes your agents add with its `add` tool (asked once per workspace), a Clear button |
 | `pullmain` | *Pull main*: per workspace, a status bar button that merges the base branch in (below) |
+| `context` | *Context*: actions where you work, in ⌘K (Alt+Cmd+U), a file's right click and the prompt's Insert menu (below) |
 | `onefile` | one script, `<id>.5m.sh` (below) |
 
 Each runs at once with no network: its `fetch.sh` prints `fixtures/sample.json`, with a real one (gh, curl) in its
@@ -578,6 +626,20 @@ badge how many commits the base branch (origin's, or `$LAKI_BASE`) has that the 
 `claude -p` gets only the tools `TOOLS` names (read and edit files, git, the usual test commands), and runs in the
 background: an action has 2 minutes. As it ends it pushes its last line (`laki widget push --merge '{"last": …}'`), which
 `"notify": "{{last}}"` shows as a notification and a toast. Its prompt is `prompt()` at the top of `pull.sh`.
+
+### Context
+
+`laki widget new "Context" --kind context` is the one to copy for [actions where you work](#actions-where-you-work-show-key):
+a *Context* button in the status bar, no fetch, and three actions, each told where you are (`$LAKI_PATH`,
+`$LAKI_BRANCH`, `$LAKI_FILE`, `$LAKI_TAB`, all of it as JSON in `$LAKI_CTX`):
+
+| action | where | what |
+|---|---|---|
+| `summary` | ⌘K, Alt+Cmd+U | a toast: the branch and how many files changed (*Pick a workspace first* without one) |
+| `file-stats` | a text file's right click in Files (`match`) | `{"data": …}`: lines, words, bytes and its most used words; `"view": true` opens its full view |
+| `branch-note` | the prompt's Insert menu, a tab's right click | `"insert": true`: *Branch X, N files changed: a, b, c* goes into the prompt, unsent |
+
+Plain `sh`, `awk` and `git`: no jq or node.
 
 ## Check
 
@@ -645,12 +707,37 @@ Its page's tabs show them:
 | Overview | its preview where it sits (*Live* or *Sample*, with a picker of its samples), everywhere else (any sidebar size, the bars, as a button), its full view and settings; the head's *Edit* goes to the settings |
 | Data | where its data comes from (its fetch, a text, a file, a URL); its last data as JSON: edit it and *Apply* to see it with that data, *Live* fetches again; its examples (widget.json's `sample`, each `fixtures/<name>.json`): *Show it with this*, or *Use as its data* |
 | Runs | the runs, newest first; a click shows one's stderr |
+| Logs | its [log](#logs), following as lines come; filters by level, source, words and workspace; *Copy*, *Clear*, *Show in Finder* |
 | Env | what its fetch gets (`WIDGET_*`, `LAKI_*`, `PATH`); a setting named like a token, secret, key or password masked |
 | Files | its folder's files: *Edit*, then *Save* (⌘S); JSON is checked first, it reloads at once, and the studio's *Undo* has the version before. One that comes with Laki: *Remix it…* makes a copy to change |
 | Check | *Check* above: *Check again*, *Check with a fetch* |
 
 Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.
 A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/inspect`, opens the Data tab.
+
+## Logs
+
+Off by default. Settings › Extensions › *Keep logs for every extension*, or one's own *Keep a log* (its settings'
+*Updates*; a dev-linked one keeps one while linked), turns it on; only you set them, never an agent. While it's on,
+`<data>/widget-data/<id>.log` (JSON lines, yours alone, 1 MB then a second file) keeps:
+
+- Laki's own lines about it (`src: laki`): fetches, actions, events, sample data, refusals, tool calls, stream restarts;
+  a failure is `error`;
+- a line at the end of each run (`fetch`, `action:<name>`, `stream`, `tool:<name>`, `push`): why, how long, its exit
+  code and size;
+- the run's stderr, whole (64 KB of it): a line that starts with `debug:`, `info:`, `warn:` or `error:` gets that level
+  (the prefix taken off), any other is `info`. A `script` logs with `console.error` (its stdout is its data);
+- a stream's lines that aren't JSON, and its stderr;
+- an AI source's or AI action's run: the profile, its prompt's start, seconds, cost and the answer's size;
+- lines you add: `laki widget log <id> [--level warn] [--ws <id>] <text…>` (hooks, cron; it exits 0 and writes nothing
+  while the log is off) and a JS page's `laki.log(...)`.
+
+Every secret's value, and every setting's whose name says token, secret, key or password, is `••••` before a line is
+written. See it on its page's **Logs** tab (or a right click › *Logs*), with `laki widget logs <id> [-n 100] [-f]
+[--level error] [--ws <id>] [--json]`, or MCP's `laki_extension_logs` (the studio's Laki AI gets the last warnings and
+errors). Settings' list tags the ones that keep one (`log`, red after an error in the last hour). Turning it off keeps
+the file until *Clear*; *Delete* takes it to the trash with the extension (*Undo* brings it back); a remix starts
+without one.
 
 ## The studio
 
@@ -675,6 +762,35 @@ Each extension's chat is kept beside its settings (`<data>/widget-data/widget:<i
 it; an extension's page talks in the same chat. Without Laki AI, *New ▾ › With Laki AI…* opens a page whose *Copy the
 prompt* gives any AI chat the whole format with what you typed.
 
+## Share with your team
+
+A repo can ship its team's extensions in `.laki/extensions/`, as it ships workflows in `.laki/workflows/`: clone it, add
+it to Laki, and the team's deploy board is there. Make one there with
+
+```bash
+laki widget new "Deploys" --kind table --dir .laki/extensions/deploys
+```
+
+and commit it. Folders and one-file extensions both work.
+
+- **Its id** is `<project>.<id>` (`shop-web.deploys`), so it never covers yours or another project's.
+- **Off until you look.** It always starts off. Turning it on (Settings › Extensions › *From shop-web*) shows what it
+  runs first: its fetch, its actions' commands, its scripts' text, the events it answers, its settings and what it can
+  hold; *Turn on in shop-web* turns on exactly that. From the CLI: `laki widget what shop-web.deploys`, then
+  `laki widget on shop-web.deploys --seen <hash>`.
+- **Off again when it changes.** Any change to its files in the repo (a pull, a branch switched in the project's
+  folder) turns it off and marks it *changed*: its streams and agents stop, its tools' *Always* go, and you get a toast
+  and a notification. Its page says what changed; turning it on shows you again.
+- **Only in its project.** It shows in the sidebar, the bars, the panel, the rows, the rail and the foot only while a
+  workspace of that project is selected; on the Desk it's named *Deploys · shop-web*. Its ⌘K items, menus and keys,
+  events, gates and tools for agents are that project's only (`app.open` and `custom.*` events with no workspace too).
+- **The repo's files, your settings.** Its settings and secrets are yours, kept in `<data>`, never in the repo. It
+  can't be deleted, rewritten or edited here (change it in the repo); *Remix* copies it into yours. Removing the project
+  hides it; its settings stay.
+- Agents never turn it on, nor clear *changed*.
+- It's read from the project's own folder: a branch's change to `.laki/extensions` in a worktree shows once it reaches
+  that folder. A project on an SSH host isn't read.
+
 ## Managing them
 
 - Settings › Extensions: each one's switch; a click opens its page: the preview (live or with its sample), its place,
@@ -689,7 +805,8 @@ prompt* gives any AI chat the whole format with what you typed.
   *Extension* block: fetched, its data as `{{steps.<id>.<field>}}`) use the ones that are turned on.
 - The Desk's *Build with AI*: a dialog (what it shows, screenshots, text files), then the extension studio, where Laki AI makes one for the Desk; it shows as a tile at once, with its
   sample, off until you turn it on.
-- The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget render <id> [--full]`,
+- The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget what <id>` (what
+  turning it on runs, and the hash `laki widget on <id> --seen <hash>` takes), `laki widget logs|log <id>` ([logs](#logs)), `laki widget render <id> [--full]`,
   `laki widget action <id> <action> [arg]`, `laki widget new <name> [--kind <k>] [--dir <folder>]`, `laki widget check
   [id|folder] [--no-run]`, `laki widget kit [element]`, `laki widget dev [folder]`, `laki widget trash`, `laki widget
   restore <trash-id>`.
@@ -702,8 +819,14 @@ prompt* gives any AI chat the whole format with what you typed.
 
 - A fetch and an action are shell commands on your Mac, like a script you run: only turn on what you trust. One that
   Laki AI wrote is saved off and tagged *by Laki AI*.
+- A gate holds a ship, a merge or an archive; only you can do it anyway (an agent's `force` is refused).
+- A repo's extension (`.laki/extensions`) is off until you look at what it runs, and off again when its files change
+  there ([Share with your team](#share-with-your-team)).
 - An agent's tool call shows you the command and its input before it runs, unless the tool says `never` or you chose
   *Always* in that workspace.
+- A Yes holds only for the files you were shown. Laki AI's *Turn on …?*, the studio's *Turn on*, a tool's ask and its
+  *Always* each keep a hash of everything the extension runs (its files, its source, its actions, events and stream,
+  network access); if any of it changes before your Yes, nothing runs: Laki AI asks again with what it says now.
 - A template extension is sanitized (no scripts, frames, forms, `on…` attributes, or links other than http(s) and
   mailto). A JS one runs in a sandboxed frame with an opaque origin, `default-src 'none'`, and only the network you allow.
 - Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data; its secrets in

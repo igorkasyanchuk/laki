@@ -3,8 +3,8 @@
 // place and as its full view, its settings, and Laki AI's chat beside them to make or change it; the inspector's tabs
 // (Data, Runs, Env, Files, Check) beside Overview; closing goes back where it was opened from. id '': a new one, which the
 // page follows once Laki AI writes it. App.tsx passes the Settings' WidgetsApi and the widgets' WidgetApi.
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { type AiSettings, placesOf, type WidgetRuns, type WidgetView } from '../../shared/types'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { type AiSettings, LOG_LEVELS, placesOf, type WidgetLogLine, type WidgetRuns, type WidgetView } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { widgetHere, widgetPrompt } from '../../shared/widgetGuide'
 import type { UiProblem } from '../../shared/widgetUi'
@@ -12,17 +12,18 @@ import { AiPage } from './Ai'
 import { highlight } from './highlight'
 import { Markdown } from './MarkdownView'
 import { SourceField, WidgetCard, type WidgetsApi } from './Settings'
-import { ask, escapes, Icon, IconButton, Page } from './ui'
+import { ask, escapes, Icon, IconButton, Page, Switch } from './ui'
 import { CELL_W, CellButton, Glyph, inWs, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export const WHERE: Record<string, string> = { side: 'In the sidebar', top: 'In the top bar', status: 'In the status bar', rail: 'On the rail', foot: "In the sidebar's foot", desk: 'On My Desk', panel: 'In the right panel', row: 'On each workspace’s row' }
 export const half = (d: number) => (d === 0.5 ? '½' : String(d))
 
-export type ExtTab = 'overview' | 'data' | 'runs' | 'env' | 'files' | 'check'
+export type ExtTab = 'overview' | 'data' | 'runs' | 'logs' | 'env' | 'files' | 'check'
 const TABS: [ExtTab, string][] = [
   ['overview', 'Overview'],
   ['data', 'Data'],
   ['runs', 'Runs'],
+  ['logs', 'Logs'],
   ['env', 'Env'],
   ['files', 'Files'],
   ['check', 'Check'],
@@ -80,6 +81,11 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
             <span className="muted">›</span>
             <b className="crumb here">{name}</b>
           </nav>
+          {w?.repo && (
+            <span className="tag" data-tip="It comes with the repo: its files are the repo's, its settings yours">
+              From {w.repo}'s .laki/extensions
+            </span>
+          )}
           {w && (
             <button className="sm ext-edit" data-tip="Its settings: where it shows, its size, its data, its options" onClick={() => (setTab('overview'), setSpot(n => n + 1))}>
               <Icon name="pencil" size={12} /> Edit
@@ -93,7 +99,7 @@ export function ExtensionPage({ id, tab: first, edit, widgets, cfg, api, ai, wor
           {w ? (
             <>
               <InspectHead w={w} cfg={cfg} tab={tab} setTab={setTab} spots={spots} setAt={setAt} />
-              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} spot={spot} field={edit} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
+              {tab === 'overview' ? <Preview w={w} api={api} cfg={cfg} spot={spot} field={edit} /> : tab === 'check' ? <Check w={w} cfg={cfg} /> : tab === 'logs' ? <Logs w={w} cfg={cfg} spots={spots} copy={api.copy} /> : <Inspector w={w} cfg={cfg} tab={tab} draft={draft} setDraft={setDraft} />}
             </>
           ) : cur ? (
             <p className="muted small">Reading…</p>
@@ -362,6 +368,17 @@ function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg
           Reload
         </button>
       </div>
+      {w.changed && !w.on && (
+        <div className="ext-note bad">
+          <Icon name="conflict" />
+          <span className="grow">
+            <b>Its files changed in {w.repo}'s repo:</b> off until you look at what it runs now
+          </span>
+          <button className="sm" onClick={() => void cfg.set(w.id, { on: true }).catch(() => {})}>
+            Look…
+          </button>
+        </div>
+      )}
       {w.devError && (
         <div className="ext-note bad">
           <Icon name="conflict" />
@@ -374,13 +391,127 @@ function InspectHead({ w, cfg, tab, setTab, spots, setAt }: { w: WidgetView; cfg
   )
 }
 
+// Logs: its log, the newest line at the bottom, following as lines come (read from its cursor every 2 s); filtered by
+// level (at least), where it came from, words, and whose (a per-workspace one); Copy, Clear, Show in Finder. Off: what
+// it kept before, dimmed, and the switch
+function Logs({ w, cfg, spots, copy }: { w: WidgetView; cfg: WidgetsApi; spots: { id: string; name: string }[]; copy: (t: string) => void }) {
+  const [lines, setLines] = useState<WidgetLogLine[]>([])
+  const [on, setOn] = useState(true)
+  const [err, setErr] = useState('')
+  const [level, setLevel] = useState('')
+  const [src, setSrc] = useState('')
+  const [q, setQ] = useState('')
+  const [ws, setWs] = useState('')
+  const next = useRef(0)
+  const box = useRef<HTMLDivElement>(null)
+  const stick = useRef(true) // at the bottom: it stays there as lines come
+  const [read, setRead] = useState(0)
+  useEffect(() => {
+    let live = true
+    let reading = false // one read at a time: two from the same cursor would show its lines twice
+    next.current = 0
+    setLines([])
+    const get = () =>
+      !reading &&
+      (reading = true) &&
+      cfg.log?.read(w.id, { since: next.current, limit: 2000 }).finally(() => (reading = false)).then(
+        r => {
+          if (!live) return
+          setOn(r.on)
+          setErr('')
+          if (r.next < next.current) return void ((next.current = 0), setLines([])) // cleared: from the top next time
+          next.current = r.next
+          if (r.lines.length) setLines(l => [...l, ...r.lines].slice(-5000))
+        },
+        e => live && setErr(String(e?.message ?? e)),
+      )
+    void get()
+    const t = setInterval(get, 2000)
+    return () => ((live = false), clearInterval(t))
+  }, [w.id, read])
+  useLayoutEffect(() => void (box.current && stick.current && (box.current.scrollTop = box.current.scrollHeight)), [lines, level, src, q, ws])
+  const min = (LOG_LEVELS as readonly string[]).indexOf(level)
+  const words = q.trim().toLowerCase()
+  const shown = lines.filter(l => (min < 0 || LOG_LEVELS.indexOf(l.level) >= min) && (!src || l.src === src || l.src.startsWith(`${src}:`)) && (!ws || l.ws === ws) && (!words || `${l.src} ${l.text}`.toLowerCase().includes(words)))
+  const srcs = [...new Set(lines.map(l => l.src.split(':')[0]))].sort()
+  const asText = (l: WidgetLogLine) => `${new Date(l.at).toISOString()} ${l.level} ${l.src}${l.ws ? ` (${l.ws})` : ''} ${l.text}`
+  const name = (id?: string) => (id ? (spots.find(s => s.id === id)?.name ?? id) : '')
+  const clear = async () => (await ask(`Clear ${w.name}'s log?`, { text: 'Every line it kept goes.', ok: 'Clear', danger: true })) && cfg.log?.clear(w.id).then(() => setRead(n => n + 1))
+  return (
+    <section className="ext-card">
+      <div className="ext-card-head">
+        <b>Logs</b>
+        <span className="muted small">{on ? 'what it did, each run and its stderr, newest at the bottom' : 'off: nothing is kept'}</span>
+        <span className="grow" />
+        <button className="sm" disabled={!shown.length} onClick={() => copy(shown.map(asText).join('\n'))}>
+          <Icon name="copy" size={12} /> Copy
+        </button>
+        <button className="sm" disabled={!lines.length} onClick={() => void clear()}>
+          Clear
+        </button>
+        <button className="sm" data-tip="Its log file, in Finder" onClick={() => cfg.log?.reveal(w.id)}>
+          <Icon name="folder" size={12} /> Show in Finder
+        </button>
+      </div>
+      {!on && (
+        <div className="ext-note">
+          <span className="grow">
+            <b>Logging is off.</b> {lines.length ? 'The lines below are from before.' : ''}
+          </span>
+          <Switch on={!!w.keepLog} onChange={log => void cfg.set(w.id, { log })}>
+            Keep a log
+          </Switch>
+        </div>
+      )}
+      <div className="ext-log-bar">
+        <select className="sm" value={level} aria-label="Level" onChange={e => setLevel(e.target.value)}>
+          <option value="">Every level</option>
+          {LOG_LEVELS.slice(1).map(l => (
+            <option key={l} value={l}>
+              {l} and up
+            </option>
+          ))}
+        </select>
+        <select className="sm" value={src} aria-label="From" onChange={e => setSrc(e.target.value)}>
+          <option value="">From anything</option>
+          {srcs.map(x => (
+            <option key={x} value={x}>
+              {x === 'laki' ? 'Laki' : x}
+            </option>
+          ))}
+        </select>
+        {w.scope && (
+          <select className="sm" value={ws} aria-label="Whose" onChange={e => setWs(e.target.value)}>
+            <option value="">Every workspace</option>
+            {spots.map(s => (
+              <option key={s.id} value={s.id}>
+                {s.name}
+              </option>
+            ))}
+          </select>
+        )}
+        <input className="sm grow" type="search" placeholder="Search" value={q} onChange={e => setQ(e.target.value)} />
+      </div>
+      {err && <p className="warn small">{err}</p>}
+      <div ref={box} className={`ext-log mono ${on ? '' : 'off'}`} onScroll={e => (stick.current = e.currentTarget.scrollHeight - e.currentTarget.scrollTop - e.currentTarget.clientHeight < 24)}>
+        {!shown.length && <p className="muted small">{lines.length ? 'No line matches.' : on ? 'Nothing logged yet.' : 'No log kept.'}</p>}
+        {shown.map(l => (
+          <div key={l.n} className={`ext-log-line lv-${l.level}`}>
+            <span className="muted">{hm(l.at)}</span> <b>{l.level}</b> <span className="muted">{l.src}{l.ws ? ` · ${name(l.ws)}` : ''}</span> {l.text}
+          </div>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 const hm = (at: number) => new Date(at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
 const bytes = (b: number) => (b < 1024 ? `${b} B` : b < 1 << 20 ? `${(b / 1024).toFixed(1)} KB` : `${(b / (1 << 20)).toFixed(1)} MB`)
 
 // the inspector's tabs: Data (its JSON, editable: Apply keeps it as sample data; a fixture; Live), Runs (newest first,
 // a click shows its stderr), Env (what a fetch is given, secrets masked), Files (and its folder). Read again as its
 // data or files change, and every 2 s while Runs shows
-export function Inspector({ w, cfg, tab, ...kept }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check'>; draft?: Draft | null; setDraft?: (d: Draft | null) => void }) {
+export function Inspector({ w, cfg, tab, ...kept }: { w: WidgetView; cfg: WidgetsApi; tab: Exclude<ExtTab, 'overview' | 'check' | 'logs'>; draft?: Draft | null; setDraft?: (d: Draft | null) => void }) {
   const [own, setOwn] = useState<Draft | null>(null) // the studio's: no page to keep it across tabs
   const [draft, setDraft] = kept.setDraft ? [kept.draft ?? null, kept.setDraft] : [own, setOwn]
   const [x, setX] = useState<WidgetRuns | null>(null)
@@ -618,7 +749,7 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
   const lines = useMemo(() => (md ? [] : highlight(sel, text)), [sel, text, md])
   const edit = draft?.path === sel ? draft : null
   const dirty = !!edit && edit.text !== edit.was
-  const why = w.builtin ? 'It comes with Laki: Remix it to change a copy' : UNSHOWN.test(text) ? 'Too big or not text: open its folder to edit it' : !cfg.save ? 'Not here' : ''
+  const why = w.builtin ? 'It comes with Laki: Remix it to change a copy' : w.repo ? `It's ${w.repo}'s (.laki/extensions): change it there, or Remix it` : UNSHOWN.test(text) ? 'Too big or not text: open its folder to edit it' : !cfg.save ? 'Not here' : ''
   const leave = async () => !dirty || (await ask('Discard your changes?', { text: `${sel} has changes you haven't saved.`, ok: 'Discard', danger: true }))
   const pick = async (f: string) => f !== sel && (await leave()) && (setDraft(null), setErr(''), onSel(f))
   const stop = async () => (await leave()) && (setDraft(null), setErr(''))
@@ -654,8 +785,8 @@ function FileView({ w, cfg, files, sel, onSel, draft, setDraft, onSaved }: { w: 
                 {busy ? 'Saving…' : 'Save'}
               </button>
             </>
-          ) : w.builtin && cfg.remix ? (
-            <button className="sm" data-tip="It comes with Laki: a copy of it to change, yours" onClick={() => void cfg.remix!(w.id).catch(e => setErr(String(e?.message ?? e)))}>
+          ) : (w.builtin || w.repo) && cfg.remix ? (
+            <button className="sm" data-tip={`It comes with ${w.repo ? `${w.repo}'s repo` : 'Laki'}: a copy of it to change, yours`} onClick={() => void cfg.remix!(w.id).catch(e => setErr(String(e?.message ?? e)))}>
               <Icon name="copy" size={12} /> Remix it…
             </button>
           ) : (

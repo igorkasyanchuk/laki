@@ -15,7 +15,7 @@ import { PLAN_CHAT_IDLE } from '../shared/plans.ts'
 import { broadcast, cliArgv, dir, execGroup, own, presets, state } from './core.ts'
 import { accountEnv, accountUsed } from './accounts.ts'
 import { planGet, planOfChat } from './plans.ts'
-import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetsView, widgetWhat } from './widgets.ts'
+import { widgetChatFile, widgetCheck, widgetFiles, widgetHome, widgetLogs, widgetsView, widgetWhat } from './widgets.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 
 const keyPath = join(dir, 'ai-key')
@@ -105,6 +105,7 @@ async function aboutWidget(id: string) {
     `How an extension is made:\n${widgetFormat()}`,
     shown.length ? `Its files now:\n${shown.join('\n')}` : 'It has no files yet.',
     v && (problems.length ? `Its last check:\n${problems.map(p => `${p.level} ${p.where}: ${p.text}`).join('\n')}` : 'Its last check: no problems.'),
+    v && (l => l.length && `Its log's last warnings and errors (laki_extension_logs has more):\n${l.map(x => `${new Date(x.at).toISOString()} ${x.level} ${x.src}: ${x.text}`).join('\n')}`)(widgetLogs({ id, level: 'warn', limit: 30 }).lines),
   ].filter(Boolean).join('\n\n')
 }
 // the AI's tools: the MCP server's (laki_schedule_add too: it acts only when asked), but laki_progress and agents' memory (an agent's own; it keeps the user's with laki_memory_write),
@@ -475,13 +476,13 @@ export async function aiComplete(o: { model?: string; prompt: string; system?: s
 // through aiComplete, or claude -p / codex exec with nothing but the prompt (their preset's account and env, as the
 // chat's); logged among Laki AI's calls. agent: an extension's AI source, that agent with the user's own config (its
 // MCP servers; claude's tools: the ones it may use unasked, its other asks refused; codex's sandbox read-only), 10 minutes
-export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; perm?: string; name?: string; stop?: string; signal?: AbortSignal }): Promise<string> {
+export async function aiOnce(o: { prompt: string; system: string; ask: string; json?: boolean; preset?: Preset & { agent: 'claude' | 'codex' }; tools?: string; perm?: string; name?: string; stop?: string; signal?: AbortSignal; onCall?: (c: AiCall, answer: string) => void }): Promise<string> {
   const s = state.settings?.ai ?? {}
   const agent = !!o.preset // an extension's: the preset's model, effort, env and account; the user's own config
   // perm: that extension's id: claude asks you for a tool it may not use unasked in the app, not in a hook's (laki mcp's
   // laki_permission beside the user's own servers: widgets.ts widgetPermission)
   const backend: AiBackend = o.preset?.agent ?? s.backend ?? 'openrouter'
-  if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text
+  if (backend === 'openrouter') return (await aiComplete({ prompt: o.prompt, system: o.system, json: o.json, ask: o.ask })).text // ponytail: no onCall (an extension's agent is claude or codex)
   const pre = o.preset ?? presetOf(backend)
   const model = agent ? o.preset!.model : s.models?.[backend]
   const effort = effortArgs(backend, agent ? (o.preset!.effort ?? '') : undefined)
@@ -492,6 +493,7 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
       : ['exec', '--json', '--skip-git-repo-check', ...(agent ? [] : ['--ignore-user-config']), '-c', 'sandbox_mode="read-only"', '-c', `developer_instructions=${JSON.stringify(o.system)}`, ...(model ? ['-m', model] : []), ...effort, '--', o.prompt]
   mkdirSync(home, { recursive: true })
   const env = { ...process.env, ...state.settings?.env, ...pre?.env, ...accountEnv(pre?.account ?? accountUsed(backend)) }
+  let answer = ''
   try {
     const out = await new Promise<string>((ok, no) => {
       // a group of its own: a stop or a timeout ends its MCP servers and tools too
@@ -518,12 +520,13 @@ export async function aiOnce(o: { prompt: string; system: string; ask: string; j
     }
     if (!text) throw new Error(`${backend}: no answer`)
     call.ok = true
-    return text
+    return (answer = text)
   } catch (e) {
     call.error = (e as Error).message
     throw e
   } finally {
     call.ms = Date.now() - call.at
+    o.onCall?.(call, answer) // an extension's log: its seconds, cost and answer
     try {
       appendFileSync(callsPath, JSON.stringify(call) + '\n', { mode: 0o600 })
     } catch {}
@@ -699,11 +702,12 @@ async function codex(o: Opts) {
 export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct }) {
   if (!busy) throw new Error('only while Laki AI works on an ask')
   const t = thread(busy.id) // the chat whose ask is at work
-  const act = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
+  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
   if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
+  if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
   const text = act ? (on ? turnOn(act, on.text) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
   const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : [`Yes, remove ${act.label}`, 'No, keep it']) : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
@@ -743,11 +747,18 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   say(t, 'user', pick)
   const on = act.kind === 'widget'
   if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : `Kept ${act.label}.`), { kept: true }
+  // only what they were shown: its files may have changed since (an agent's write, a save, a source set). Then the
+  // question again, as it reads now
+  const now = on ? widgetWhat(act.id) : undefined
+  if (now && (turnOn(act, now.text) !== m.text || now.hash !== act.hash)) {
+    const why = 'it changed since you were asked: ask again'
+    say(t, 'error', `${act.label}: ${why}`)
+    if (!now.on) t.chat.push({ role: 'ai', text: turnOn(act, now.text), at: (t.at = Date.now()), ask: { id: randomBytes(6).toString('hex'), options: m.ask.options, act: { ...act, hash: now.hash } } }), changed(t)
+    throw new Error(why)
+  }
   try {
-    if (on) {
-      // only what they were shown: its files may have changed since (an agent's write, a save)
-      if (turnOn(act, widgetWhat(act.id).text) !== m.text) throw new Error('it changed since you were asked: ask again')
-      await rpc('widgetSet', { id: act.id, on: true }) // the user's pick: no agent's
+    if (now) {
+      await rpc('widgetSet', { id: act.id, on: true, seen: now.hash }) // the user's pick: no agent's
       say(t, 'ai', `Turned on ${act.label}.`)
       return { on: true }
     }
