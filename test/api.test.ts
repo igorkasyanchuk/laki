@@ -585,12 +585,15 @@ test('diff size, archive only when clean, the first-run checks', async t => {
   writeFileSync(join(ws.path, 'blob.bin'), Buffer.from([0, 1, 2, 10, 10])) // binary: no lines
   assert.deepEqual(await until(async () => ((s => s?.files === 3 && s)(await stat())), 'the stat'), { add: 4, del: 0, files: 3, dirty: 3 })
   assert.deepEqual(await rig.rpc('wsArchive', { id: ws.id, ifClean: true }), { dirty: 3 }) // not archived: it'd lose them
+  assert.deepEqual(await rig.rpc('wsPeek', { id: ws.id }), { dirty: 3, ahead: 0, unpushed: 0 }) // what Delete's question says
   assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === ws.id).archived, undefined)
   execFileSync('git', ['add', '-A'], { cwd: ws.path })
   execFileSync('git', ['commit', '-qm', 'work'], { cwd: ws.path, env: rig.env }) // its author: Linux has no user@host.local to fall back on
   await until(async () => (await stat())?.dirty === 0, 'committed') // still +4 against the base
   assert.deepEqual(await stat(), { add: 4, del: 0, files: 3, dirty: 0 })
+  assert.deepEqual(await rig.rpc('wsPeek', { id: ws.id }), { dirty: 0, ahead: 1, unpushed: 1 }) // a commit of its own, on no remote
   assert.equal(await rig.rpc('wsArchive', { id: ws.id, ifClean: true }), null)
+  assert.deepEqual(await rig.rpc('wsPeek', { id: ws.id }), {}) // archived: no folder to ask
   await until(async () => (await stat()) === undefined, 'no stat once archived')
   await rig.rpc('settingsSet', { diffStat: false })
   await rig.rpc('wsRestore', { id: ws.id })

@@ -15,7 +15,7 @@ import { DiagramView } from './diagram'
 import { Markdown } from './MarkdownView'
 import './plans.css'
 import { ReadDiagram, SpecEditor, useEscape } from './SpecEditor'
-import { type Img, PromptInput } from './PromptInput'
+import { type Img, PromptInput, useDraft } from './PromptInput'
 import { normalizeDiagram } from './specmd'
 import { shortPath } from './text'
 import { ask, Icon, IconButton, keep, load as stored, type MenuItem, Page, useMenu } from './ui'
@@ -386,30 +386,20 @@ function PlanView({ at, api, projectName, onTitle, onSaved, onGone }: { at: Ref;
   )
 }
 
-type ChatData = { chat: AiMsg[]; busy: boolean; elsewhere: boolean; ended?: number }
+type ChatData = { chat: AiMsg[]; busy: boolean; ended?: number }
 // a brainstorm's own chat with Laki AI, beside it: the thread, the composer; kept mounted while hidden, so its ask is followed
 function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidden: boolean; chat: string; plan: Plan; api: SpecsApi; err: string; ask: (text: string, images?: string[]) => Promise<boolean>; onBusy: (b: boolean) => void; onClose: () => void }) {
   const [d, setD] = useState<ChatData>()
-  const [text, setText] = useState('')
-  const [images, setImages] = useState<Img[]>([])
+  const [text, setText, images, setImages] = useDraft(chat)
   const [saving, setSaving] = useState(false)
   const [oops, setOops] = useState('')
   const thread = useRef<HTMLDivElement>(null)
-  const busyOf = useRef<string | null>(null) // the other chat whose ask is at work, once an event names it
   const load = () => api.call<ChatData>('aiState', { chat }).then(setD, e => setOops(e.message))
   useEffect(() => {
     void load()
     return daemon.on(m => {
       if (m.ev === 'open') return void load()
-      if (m.ev !== 'ai') return
-      if (m.of === chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended, elsewhere: false }) // one ask at a time: none elsewhere
-      else {
-        // another chat's ask: this one waits for it, until that chat says it's done
-        if (m.busy) busyOf.current = m.of
-        else if (busyOf.current !== null && busyOf.current !== m.of) return
-        else busyOf.current = null
-        setD(x => x && { ...x, elsewhere: m.busy })
-      }
+      if (m.ev === 'ai' && m.of === chat) setD({ chat: m.chat, busy: m.busy, ended: m.ended }) // another chat's ask doesn't hold this one up
     })
   }, [])
   useEffect(() => onBusy(!!d?.busy), [d?.busy])
@@ -443,7 +433,7 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
         {!d?.chat.length ? (
           <div className="plan-chat-hello muted small">
             <p>Talk the idea through: Laki AI reads the brief and the project's code, and writes its options, diagrams, a mind map and prototypes into this brainstorm.</p>
-            <button disabled={!api.aiOn || !!d?.elsewhere} onClick={() => void ask(brainstormPrompt(plan))}>
+            <button disabled={!api.aiOn} onClick={() => void ask(brainstormPrompt(plan))}>
               <Icon name="ai" /> Brainstorm with Laki AI
             </button>
             {!api.aiOn && (
@@ -472,7 +462,6 @@ function PlanChat({ hidden, chat, plan, api, err, ask, onBusy, onClose }: { hidd
             <button onClick={() => api.call('aiStop', { chat })}>Stop</button>
           </div>
         )}
-        {d?.elsewhere && !d.busy && <p className="muted small">Laki AI is busy in another chat; this one waits.</p>}
       </div>
       <div className="plan-chat-dock">
         <div className={`nw-card nw-composer ai-composer ${api.aiOn ? '' : 'off'}`}>

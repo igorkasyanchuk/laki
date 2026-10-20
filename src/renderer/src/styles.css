@@ -406,6 +406,14 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .set-head h3 { margin: 0; font-size: 13px; font-weight: 600; color: var(--fg); letter-spacing: 0.01em; }
 .set-head p { line-height: 1.45; }
 .set-group > .setting-box { border: none; padding: 0; margin: -4px 0; }
+.rail-buttons { display: flex; flex-direction: column; gap: 8px; }
+.rail-items { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: var(--rs, 8px); overflow: hidden; }
+.rail-item { display: flex; align-items: center; gap: 8px; padding: 6px 10px; border-top: 1px solid var(--line); background: var(--bg); }
+.rail-item:first-child { border-top: none; }
+.rail-item.dragging { opacity: 0.45; }
+.rail-grip { width: 12px; flex: none; color: var(--muted); cursor: grab; font-size: 11px; letter-spacing: -2px; }
+.rail-items .rail-check { display: flex; flex-direction: row; align-items: center; gap: 8px; flex: 1; cursor: pointer; color: var(--fg); font-size: 13px; } /* over .form label's column */
+.rail-check input { width: auto; flex: none; margin: 0; }
 /* the global lists' note (Settings' Prompt templates, Actions): everywhere, in the accent */
 .set-scope { display: flex; align-items: baseline; gap: 10px; padding: 10px 14px; border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--line)); border-radius: calc(var(--radius) + 4px); background: color-mix(in srgb, var(--accent) 7%, transparent); font-size: 12.5px; line-height: 1.5; }
 .set-scope button.link { padding: 0; font: inherit; }
@@ -592,6 +600,10 @@ html.away *, html.away *::before, html.away *::after { animation-play-state: pau
 .ask-box { width: 400px; padding: 18px 18px 14px; gap: 6px; border-radius: var(--rs, 12px); animation: ask-in 0.14s ease-out; }
 .ask-title { font-weight: 600; font-size: 14px; line-height: 1.35; overflow-wrap: anywhere; }
 .ask-text { margin: 0; color: var(--muted); font-size: 12.5px; line-height: 1.45; overflow-wrap: anywhere; white-space: pre-wrap; max-height: 50vh; overflow: auto; } /* a widget's modal: up to 2,000 characters */
+.ask-facts { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 6px 0 0; padding: 9px 11px; border: 1px solid var(--line); border-radius: var(--rs, 8px); font-size: 12px; line-height: 1.4; }
+.ask-facts > div { display: contents; }
+.ask-facts dt { color: var(--muted); white-space: nowrap; }
+.ask-facts dd { margin: 0; min-width: 0; overflow-wrap: anywhere; }
 .ask-check { display: flex; flex-direction: row; align-items: center; justify-content: flex-start; gap: 7px; margin-top: 6px; font-size: 12.5px; cursor: pointer; }
 .ask-check input { width: auto; flex: none; margin: 0; }
 .ask-field { display: block; margin-top: 8px; }
@@ -2265,6 +2277,8 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .studio-hello > svg { color: var(--accent-ink); }
 .studio-hello p { margin: 0 0 4px; }
 .studio-starters { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.studio-left { display: flex; flex-direction: column; gap: 6px; width: 100%; margin-top: 8px; }
+.studio-left .sched-list { width: 100%; }
 .studio-example { width: 100%; text-align: left; padding: 8px 10px; border: 1px solid var(--line); border-radius: calc(var(--rs, 8px) + 2px); background: var(--panel); color: var(--fg); font-size: 12.5px; }
 .studio-example:hover:not(:disabled) { border-color: color-mix(in srgb, var(--accent) 50%, var(--line)); }
 .studio-turn { display: flex; flex-direction: column; align-items: flex-start; gap: 2px; }

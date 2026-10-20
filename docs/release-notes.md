@@ -15,6 +15,18 @@ version it builds, with the date. -->
   answer.
 - **Expose to the world** asks for how long: 1, 8 (the default) or 24 hours, or until you stop it. A tunnel left
   open stops on its own.
+- Deleting an extension asks first.
+- Deleting a workspace says what goes with it: its branch and folder, uncommitted files, commits not pushed, its PR,
+  agents at work, servers and artifacts.
+- Laki AI keeps what you typed and pasted and didn't send (text and screenshots), per chat (the AI page, the floating
+  chat, the extension studio, a brainstorm's chat, My Desk's *Build with AI*), until you send it, after a restart too.
+- Back and forward (‹ › on the rail, ⌘[ ⌘]) are on for everyone, out of experimental, and go 25 places back (was 10);
+  Settings › Appearance › Rail turns them off.
+- The rail is yours to arrange, like Slack's: Settings › Appearance › Rail picks its buttons and their order (drag
+  them), the rest go into ⋯ More; a right click on a button moves it there.
+- The extension studio goes on when you close it: Settings › Extensions › *In the studio* (and a new studio) lists
+  what Laki AI is building or you left unsaved, a click goes back to it. Laki AI works in up to 4 chats at once, so a
+  new extension (or a brainstorm) starts while another builds.
 
 ## 0.22.0 · Oct 20, 2026
 

@@ -8,7 +8,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from 'node:ht
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
-import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, voiceText } from './ai.ts'
+import { aiAnswer, aiAsk, aiChatRm, aiChats, aiContinue, aiForget, aiImage, aiKey, aiNew, aiOpen, aiPermission, aiQuestion, aiState, aiStop, aiTick, studioChatRm, studioChats, voiceText } from './ai.ts'
 import { planChat } from '../shared/plans.ts'
 import { meme } from './fun.ts'
 import * as core from './core.ts'
@@ -169,6 +169,7 @@ const api: Record<string, Handler> = {
   wsNew: p => core.wsNew(core.byCaller(p)),
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
+  wsPeek: p => core.wsPeek(p.id), // what Delete would take with it (the app's question)
   wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean }),
   doctor: () => core.doctor(),
   wsFan: p => core.wsFan(core.byCaller(p)),
@@ -312,6 +313,8 @@ const api: Record<string, Handler> = {
   widgetUndo: p => widgetUndo(p), // the studio's Undo and Undo to here
   widgetRemix: p => widgetRemix(p), // Remix: a copy of any one, yours, Laki AI may change it
   widgetSlug: p => widgetSlug(p), // the studio's first ask: a new one's id
+  studioChats: () => studioChats(), // the studio's chats, newest first: the app shows where you left off
+  studioChatRm: p => studioChatRm(p),
   widgetAction: p => widgetAction(p),
   widgetReload: () => widgetReload(),
   widgetFiles: p => widgetFiles(p),

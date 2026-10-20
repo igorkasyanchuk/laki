@@ -111,7 +111,8 @@ workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `as
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
-`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`. A
+`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per
+chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission` `chat`, `aiState` without `elsewhere`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -165,6 +166,9 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `memoryCompactLog`, `memoryTick` (every 30 minutes, Laki AI on and `settings.memoryCompact.off` unset: every
   `memoryCompact.days` (`COMPACT_DAYS`, 7; 0: only when full) since the last, or the oldest learned one, and as the learned
   ones reach `MEMORY_MAX`, unless the last run left them full: then by days); Project.tsx' Memory tab: *Compact now*, the last run, Log;
+- `wsPeek` (a worktree's `dirty`: `git status` lines, `ahead`: commits not in its base, `unpushed`: of those on no remote;
+  a git that fails, a local, archived or gone one: none of it): what App's `rmFacts` puts in the delete question (ui.tsx
+  `ask` `facts`, `.ask-facts`), waited for 1.5 s at most;
 - `wsArchive` `ifClean`: archives only with nothing uncommitted (the worktree goes, and that with it), else returns `{ dirty }`;
   `doctor` (the first-run screen's: git, `gh auth status`, `cloudflared` (optional; Welcome's ? says what for), which agents are on PATH);
 - tabs and agents: `tabNew`/`tabClose` (a tab's name: `addTab`, `freeName` numbers it; an agent tab after the
@@ -272,7 +276,7 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   `PROGRESS_NOTE`: `--append-system-prompt`, `-c developer_instructions`; the skill loads only for Laki's own tasks), and
   claude's settings allow its `progress` command;
 - Laki AI (below): `aiAsk` (`text`, `images`: paths `imageSave` gave; resolves with the answer), `aiState` (the
-  conversation, `busy`, `elsewhere`: an ask at work in another chat, `ended`, `key`: one is saved, the last 100 calls,
+  conversation, `busy`, `ended`, `key`: one is saved, the last 100 calls,
   `totals`), `aiNew`, `aiStop` (none: any chat's ask), `aiKey` (`key`; empty removes it); each takes `chat` (a spec's or
   brainstorm's, `planChat`; none: the AI page's), and `aiContinue` (an ended chat taken up again), `aiTick` (`now`: tests
   move the clock; every 10 minutes); the AI page's earlier chats: `aiChats`, `aiOpen` (`id`), `aiChatRm` (`id`); `aiImage`
@@ -741,7 +745,7 @@ it give a template of the user's that plainly fits the task when the group has n
 its extension tools (`laki_extensions`: each one's places, size, settings too, `laki_extension_guide`: `widgetFormat`, `laki_extension_read`, `laki_extension_write`, `laki_extension_check`, `laki_extension_set`: where one shows, its size, every, view, hide and plain settings, never on (the skill's `laki_extension_on` asks);
 a tool's `max` is what its result may give the model, over `TOOL_TEXT`) make extensions, saved off, and change one it
 made or one the user let it (the Extension page's chat: `widgetSet` `ai`, then `aiAsk` with `context` `widgetHere`);
-its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask at a time (`busy`); `aiStop` aborts the
+its `laki_send` (MCP's too) is `send` `agent: true`: an agent's tab only, never typed into a question it asks. Only when asked: no watching on its own. One ask per chat, `AI_AT_ONCE` (4) chats at once (`busy`: each chat's stop; `refuseBusy`, set before the first await); `aiStop` aborts the
 fetch or kills the CLI. `SYSTEM` tells it what Laki is and to act at once. Backends (`backend`, unset: openrouter):
 - `openrouter`: `POST <api>/chat/completions` (`LAKI_AI_API`: tests' fake, localhost only) with the tools as functions
   and `usage: { include: true }` (its `cost`), looping over `tool_calls` up to `steps` rounds (`AI_STEPS`, 20); the
@@ -762,9 +766,14 @@ Chats (`Thread`, `thread(id)`): `''` the AI page's (`<data>/ai-chat.json`), `pla
 brainstorm's (`shared/plans.ts` `planChat`; `plans.ts` `planOfChat`: its folder's `.chat.json`, which `filesOf` hides and
 `planWrite` refuses), `widget:<id>` the extension studio's (`widgets.ts` `widgetChatFile`: `<data>/widget-data/widget:<id>.chat.json`;
 `aboutWidget`, read at each ask into `t.about`: which one, the studio's rules, `widgetFormat()` with the kit's catalog,
-its files (`FILES_MAX`) and its check without a run), each with its messages, `resume` and `at`; `system(t)` names the spec or brainstorm. One ask at a
-time in any of them (`busy.id`; another chat's ask: "Laki AI is busy in another chat"); `aiQuestion` goes to the busy
-one. A plan's chat unused `PLAN_CHAT_IDLE` (12 hours) is `ended` (`aiTick`, or as it's read again): its ask stopped,
+its files (`FILES_MAX`) and its check without a run), each with its messages, `resume` and `at`; `system(t)` names the spec or brainstorm. One ask per
+chat, `AI_AT_ONCE` at once ("Laki AI works in n chats already"); `aiQuestion` and `aiPermission` go to the chat their
+tools name (`aiRpc`'s `chat`: Laki AI's `laki mcp` gets it as `LAKI_AI_CHAT`; a thread's `asked`), else the only one at
+work (`asking`); a finished ask ends its own chat's `perms` only. The studio's chats: `studioChats` (`widget:<id>` files
+with a user message, newest `STUDIO_MAX` 30, `busy`; read, not kept in `threads`), `studioChatRm` (not while it works): the
+app's *In the studio* (Settings › Extensions, `StudioSessions`) and a new studio's *Where you left off* list those with
+no extension of the id yet, or at work; a new studio's first ask renames its dialog (`nameStudio`, `studioKey`: drawn
+once) and its history place. A plan's chat unused `PLAN_CHAT_IDLE` (12 hours) is `ended` (`aiTick`, or as it's read again): its ask stopped,
 what was said kept; the next ask starts it again empty (`fresh`), `aiContinue` keeps its session. `planRm` drops it
 (`aiForget`). The `ai` event carries `of`, the chat's id: an `id` would make it a reply. The AI page's earlier chats:
 `aiNew` on its chat keeps it first (`shelve`, once something was asked) as `<data>/ai-chats/<at>-<hex>.json` (its
@@ -1477,6 +1486,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
       8px inside the main area as it changes size; a double-click on its head drops it and the size); `laki.aiFloatSize`:
       its size, from its edges and corners (`.ai-grip`s; the window clips, so they reach past the round corners).
     - `laki.branchFull`: the status bar's branch (`.sb-branch`) whole, with its base; else short: no branch prefix, cut at 24ch, all of it in the tip.
+    - `laki.aiDrafts`: Laki AI's composers' unsent text and images (paths, shown again through `aiImage`), by chat:
+      PromptInput.tsx `useDraft` (the AI page, floating chat and AI window share `ai:<chat>`; the studio's `widget:<id>`,
+      `widget:` a new one; a brainstorm's chat; `desk:build`); kept by Reset the interface (`UI_KEEP`).
     - `laki.newDraft`: the new-workspace page's draft (`Draft`: the form, images, race, template), saved as it changes
       while something's typed, dropped as it's made (back if that fails) or *Clear*ed; `laki.scheduleDraft`: Scheduled
       tasks' open form (Cancel asks when it changed); `laki.settingsSec`: Settings' last section. Their forms don't
@@ -1523,7 +1535,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   - A PR's author's picture (`Avatar`, Info.tsx: `avatars.githubusercontent.com/<login>`, the CSP's `img-src`: https) before
     the row's PR mark and in the PR section, unless it's `mine`.
   - ⌘J (`nextNeed`): the next tab of `needsYou` (the Dock count's rule), waiting ones first, in sidebar order.
-  - Back and forward (experimental, `settings.history`): `hist` (a ref: `Place`s, `{ d: dialog, ws }`, `HISTORY_MAX`
+  - Back and forward (`settings.history`, on unless false; Settings › Appearance › Rail): `hist` (a ref: `Place`s, `{ d: dialog, ws }`, `HISTORY_MAX`
     back) gets each new place (`isPlace`: a page, `PAGES`/`PAGE_KEYS`, or none; a dialog over them isn't one), what was
     ahead dropped; `travel(j)` selects its workspace (gone: the one you're in; a gone one's workspace view skipped) and
     page, `going` so that isn't a new place. `histNav` (‹ ›, a right click: `histMenu`, `placeName`) at the rail's top,
@@ -1573,7 +1585,9 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
     `data-bare`, icons only, `railW` 52), `railShells` and `railBrowsers` (off: `railOf` makes that kind `projects`, no
     button, its project in Projects' list; `rawKind` still gives a pin its icon and leaves out *Run ›*). With words, past
     `RAIL_FIT` buttons above the pins, `RAIL_MORE`'s (calendar, workflows, specs, board: the least used first) go into a
-    ⋯ More menu, lit while its page is open.
+    ⋯ More menu, lit while its page is open. `settings.railOrder` and `railHide` (Settings › Appearance › Rail's
+    `RailField`: `RAIL_ITEMS`' boxes, an HTML5 drag; `railSorted`; AI fixed at the foot): the order and the ones put
+    into More; a right click on the rail (`railMenu`) moves one there, More's foot shows them all again or opens it.
 - **Phones** (`App.tsx`, `useMedia`): `narrow` (≤640px, under the window's minWidth) puts `.narrow` on `.app` (styles.css' last block: the
   sidebar as a drawer, one pane per tab, panels and pages over the main area, terminal font at most 11px);
   `touch` (`pointer: coarse`) shows `KeyBar` (Esc, Tab, ⇧Tab, ⌃C, arrows, ⏎ to the focused pane, ⌨ focuses

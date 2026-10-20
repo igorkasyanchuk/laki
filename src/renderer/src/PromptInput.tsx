@@ -2,12 +2,45 @@
 // after the text, and the agent opens them), and voice: macOS dictation, or Settings › Voice's cloud (voice.ts). Its
 // toolbar, as Claude's: + (images), the mic and its ⌄ (start, the microphone and language, or Voice's settings), then
 // tools (the caller's pickers) on the right. App.tsx passes in how the daemon saves an image and how dictation starts.
-import { type ReactNode, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
-import { openExternal } from './api'
-import { Icon, useMenu } from './ui'
+import { type ReactNode, useEffect, useRef, useState, type ClipboardEvent, type DragEvent, type KeyboardEvent } from 'react'
+import { api, openExternal } from './api'
+import { Icon, keep, load, useMenu } from './ui'
 import { cloudVoice, useVoice, voiceStart, voiceStop } from './voice'
 
 export type Img = { path: string; url: string } // saved file, and a data: URL for its thumbnail
+
+// a Laki AI composer's unsent text and pasted images, per chat (laki.aiDrafts, by key; images as their paths, shown again
+// through aiImage, one no longer kept left out): back as the chat opens again, after a restart too, until sent or emptied
+type Draft = { text: string; images?: string[] }
+type Held = { key: string; text: string; images: Img[]; ready: boolean } // ready: its images are back (nothing written till then)
+const DRAFTS = 'laki.aiDrafts'
+const stored = (key: string): Draft => load<Record<string, Draft>>(DRAFTS, {})[key] ?? { text: '' }
+const held = (key: string): Held => (d => ({ key, text: d.text ?? '', images: [], ready: !d.images?.length }))(stored(key))
+export function useDraft(key: string) {
+  const [h, setH] = useState(() => held(key))
+  const cur = h.key === key ? h : held(key) // another chat in the same box: its own draft
+  useEffect(() => {
+    if (h.key !== key) setH(held(key))
+    const paths = stored(key).images ?? []
+    if (!paths.length) return
+    let on = true
+    void Promise.all(paths.map(path => api.call<string>('aiImage', { path }).then(url => ({ path, url }), () => null))).then(
+      got => on && setH(x => (x.key === key ? { ...x, images: [...got.filter((i): i is Img => !!i), ...x.images], ready: true } : x)),
+    )
+    return () => void (on = false)
+  }, [key])
+  useEffect(() => {
+    if (h.key !== key || !h.ready) return
+    const all = load<Record<string, Draft>>(DRAFTS, {})
+    if (h.text.trim() || h.images.length) all[key] = { text: h.text, ...(h.images.length && { images: h.images.map(i => i.path) }) }
+    else delete all[key]
+    keep(DRAFTS, Object.keys(all).length ? all : undefined)
+  }, [h])
+  const mine = (x: Held) => (x.key === key ? x : held(key))
+  const setText = (text: string) => setH(x => ({ ...mine(x), text }))
+  const setImages = (f: Img[] | ((imgs: Img[]) => Img[])) => setH(x => (y => ({ ...y, images: typeof f === 'function' ? f(y.images) : f, ready: true }))(mine(x)))
+  return [cur.text, setText, cur.images, setImages] as const
+}
 
 // the prompt the agent gets
 export const withImages = (text: string, imgs: { path: string }[]) => [text.trim(), imgs.map(i => i.path).join('\n')].filter(Boolean).join('\n\n')

@@ -9,7 +9,7 @@ import { ICONS, type IconName } from '../../shared/icons'
 import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, placesOf, type WidgetPlace, type WidgetView } from '../../shared/types'
 import { api as daemon, bridge } from './api'
 import { Modal } from './panels'
-import { type Img, PromptInput } from './PromptInput'
+import { type Img, PromptInput, useDraft } from './PromptInput'
 import { Icon, IconButton, isIconName, type MenuItem, ON, Page, useMenu } from './ui'
 import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 
@@ -358,8 +358,7 @@ export const deskAsk = (want: string, files: { name: string; text: string }[]) =
   [want.trim(), 'It goes on my Desk ("place": "desk"): a tile there.', ...files.map(f => (c => `Attached: ${f.name}\n${fence(c)}\n${c}\n${fence(c)}`)(f.text.length > FILE_MAX ? `${f.text.slice(0, FILE_MAX)}\n… (cut: ${f.text.length} characters in all)` : f.text))].join('\n\n')
 
 function DeskBuild({ onBuild, onClose }: { onBuild: (a: DeskAsk) => void; onClose: () => void }) {
-  const [text, setText] = useState('')
-  const [images, setImages] = useState<Img[]>([])
+  const [text, setText, images, setImages] = useDraft('desk:build')
   const [files, setFiles] = useState<{ name: string; text: string }[]>([])
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
@@ -384,7 +383,7 @@ function DeskBuild({ onBuild, onClose }: { onBuild: (a: DeskAsk) => void; onClos
     }
   }
   const ok = !saving && !!text.trim()
-  const build = () => ok && onBuild({ want: text.trim(), text: deskAsk(text, files), images })
+  const build = () => ok && (onBuild({ want: text.trim(), text: deskAsk(text, files), images }), setText(''), setImages([]))
   return (
     <Modal title="Build an extension with Laki AI" wide onClose={onClose}>
       <form className="form desk-build" onSubmit={e => (e.preventDefault(), build())}>
@@ -401,7 +400,7 @@ function DeskBuild({ onBuild, onClose }: { onBuild: (a: DeskAsk) => void; onClos
             onSubmit={build}
             onBusy={setSaving}
             rows={7}
-            placeholder={'What should it show, and where does it come from? e.g. the PRs posted in Slack’s #general-squad-3 and #engr-prs, each with its review state, since the last run.\n\nPaste or drop screenshots and files here.'}
+            placeholder={'What should it show, and where does it come from? e.g. the PRs posted in a Slack channel, each with its review state, since the last run.\n\nPaste or drop screenshots and files here.'}
             tools={
               bridge?.shoot && (
                 <button type="button" className="ib" aria-label="Take a screenshot" data-tip="Take a screenshot: drag over a part of the screen (Space, then a click: a window)" onClick={() => void shoot()}>

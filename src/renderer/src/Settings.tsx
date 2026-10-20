@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { type Account, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { type Account, type StudioChat, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -188,7 +188,7 @@ export type AppSettings = Paint & {
   calendar?: boolean // experimental: Calendar (Calendar.tsx), scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // experimental: My Desk (Desk.tsx), extensions on a page of their own, resized there, off unless true
   notes?: boolean // experimental: Notes (Notes.tsx), your own notes, the rail's Notes, off unless true
-  history?: boolean // experimental: back and forward (App's travel): ‹ ›, ⌘[ ⌘], off unless true
+  history?: boolean // back and forward (App's travel): ‹ ›, ⌘[ ⌘], on unless false
   aiGlow?: boolean // experimental: Laki AI's glow (App's PeekGlow) over what it looks at, off unless true
   progress?: boolean // LAKI_PROGRESS=1 for agents: their laki progress on the tab
   progressAt?: 'tab' | 'sidebar' | 'both' // where that percent shows (unset: tab)
@@ -196,6 +196,8 @@ export type AppSettings = Paint & {
   railLabels?: boolean // the rail's words under its icons (unset: on)
   railShells?: boolean // the rail's Terminal (unset: on)
   railBrowsers?: boolean // the rail's Browser (unset: on)
+  railOrder?: string[] // its buttons' order (RAIL_ITEMS' keys)
+  railHide?: string[] // its buttons in ⋯ More
   sideStyle?: SideStyle // the sidebar's rows
   memory?: Memory[] // Global memory: the user's rules for every project's agents
   memoryCompact?: { off?: boolean; days?: number } // agents' learned memories compacted by Laki AI on their own (daemon/memory.ts)
@@ -1178,7 +1180,7 @@ const FIND: [string, string, string?][] = [
   ['general', 'Calendar', 'experimental reminders follow-ups week month scheduled tasks dates'],
   ['general', 'My Desk', 'experimental desk dashboard overview widgets extensions tiles resize build'],
   ['general', 'Notes', 'experimental notes notebook notion editor write pages memo colors search'],
-  ['general', 'Back and forward', 'experimental history back forward previous next pages navigation'],
+  ['appearance', 'Back and forward', 'rail history back forward previous next pages navigation'],
   ['general', "Laki AI's glow", 'experimental ai glow animation computer use screen reading looking peek effect gradient'],
   ['general', 'Laki AI', 'experimental ai assistant chat turn on enable openrouter'],
   ['general', 'Voice', 'experimental voice dictation dictate speech to text cloud hold fn mic talk whisper'],
@@ -1671,7 +1673,7 @@ function RemoteSection({ api, opts, set }: { api: RemoteApi; opts: RemoteOpts; s
 export type SkillInfo = { agent: string; skill?: string; name: string; path: string; state: 'missing' | 'installed' | 'outdated'; foreign?: boolean; mcp?: string; mcpIn?: string } // mcpIn: a config file the lines go in; skill: laki (none: an older daemon's) or laki-widget
 // how an app reads and writes its skill; app: its name, for the text
 // what Reset the interface keeps of this viewer's: what you made (timers, stopwatches, drafts). Get started shows again
-const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft']
+const UI_KEEP = ['laki.timers', 'laki.watches', 'laki.newDraft', 'laki.scheduleDraft', 'laki.aiDrafts']
 
 // Settings › Agents & profiles' accounts (the daemon's accounts.ts): who each signs in as, and what to do with them
 export type AccountsApi = { load: () => Promise<AccountView[]>; usage: () => Promise<AgentUsage[]>; add: (agent: AccountAgent, name: string) => Promise<Account>; rename: (id: string, name: string) => Promise<unknown>; remove: (a: AccountView) => Promise<unknown>; login: (a: AccountView) => Promise<unknown> }
@@ -1835,7 +1837,9 @@ export type WidgetsApi = {
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
   run: (id: string, ws?: string) => Promise<unknown> // ws: a per-workspace one's instance (WidgetView.here)
   stop?: (id: string) => Promise<unknown> // its agents' runs (an AI source's, an AI action's) stopped: WidgetView.agent
-  rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, for good (asked first here)
+  rm?: (id: string) => Promise<unknown> // Delete: its folder and settings, to the trash (asked first; Undo brings it back)
+  chats?: StudioChat[] // the studio's sessions with nothing made yet, or at work: where you left off (Laki AI on)
+  chatRm?: (id: string) => Promise<unknown> // a session let go of (asked first)
   reload: () => Promise<unknown>
   page: (id: string) => void // its own page (Extension.tsx): preview, settings, Laki AI's chat; '': a new one
   folder?: (id: string, e: MouseEvent<HTMLButtonElement>) => void // its folder's Open in menu
@@ -2225,6 +2229,96 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
   )
 }
 
+// the studio's sessions where you left off (nothing made of them yet, or Laki AI at work): a click goes back to the
+// chat, ✕ lets one go; skip: the one open here
+export function StudioSessions({ api, skip }: { api: WidgetsApi; skip?: string }) {
+  const chats = (api.chats ?? []).filter(c => c.id !== skip)
+  if (!chats.length || !api.studio) return null
+  return (
+    <div className="sched-list studio-sessions">
+      {chats.map(c => (
+        <div key={c.id} className="sched-row">
+          <span className="sched-icon">
+            <Icon name="ai" />
+          </span>
+          <button type="button" className="sched-main" data-tip="Back to its chat with Laki AI" onClick={() => api.studio!(c.id)}>
+            <span className="sched-name">{api.list.find(w => w.id === c.id)?.name ?? c.title}</span>
+            <span className="sched-tags">{c.busy ? <span className="tag tag-open">Laki AI is working…</span> : <span className="tag">{ago(c.at)}</span>}</span>
+          </button>
+          {api.chatRm && !c.busy && (
+            <span className="sched-acts">
+              <IconButton icon="trash" title="Delete this session: its chat goes" onClick={() => void api.chatRm!(c.id)} />
+            </span>
+          )}
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// the rail's buttons after Projects (Settings › Appearance › Rail, Slack's way: which show, in what order; the rest
+// go into its ⋯ More): key, words, icon; when: what has it there at all. AI stays at the rail's foot
+type RailHas = { specs?: boolean; workflows?: boolean; desk?: boolean; notes?: boolean; calendar?: boolean; railShells?: boolean; railBrowsers?: boolean; ai?: { on?: boolean } }
+export const RAIL_ITEMS: { key: string; label: string; icon: IconName; when?: (s: RailHas) => boolean }[] = [
+  { key: 'board', label: 'Board', icon: 'board' },
+  { key: 'schedules', label: 'Schedule', icon: 'clock' },
+  { key: 'specs', label: 'Specs', icon: 'spec', when: s => s.specs === true },
+  { key: 'workflows', label: 'Flows', icon: 'flow', when: s => s.workflows === true },
+  { key: 'desk', label: 'My Desk', icon: 'desk', when: s => s.desk === true },
+  { key: 'notes', label: 'Notes', icon: 'note', when: s => s.notes === true },
+  { key: 'calendar', label: 'Calendar', icon: 'calendar', when: s => s.calendar === true },
+  { key: 'shells', label: 'Terminal', icon: 'terminal', when: s => s.railShells !== false },
+  { key: 'browsers', label: 'Browser', icon: 'globe', when: s => s.railBrowsers !== false },
+  { key: 'ai', label: 'AI', icon: 'ai', when: s => !!s.ai?.on },
+]
+// in the order set (one not in it, a page turned on since: after them, in RAIL_ITEMS' order)
+export const railSorted = <T extends { key: string }>(xs: T[], order: string[] = []) => {
+  const at = (k: string) => (i => (i < 0 ? order.length + RAIL_ITEMS.findIndex(x => x.key === k) : i))(order.indexOf(k))
+  return [...xs].sort((a, b) => at(a.key) - at(b.key))
+}
+
+// the rail's buttons: a box each (off: in ⋯ More), dragged into an order; AI keeps its place at the foot
+function RailField({ s, set }: { s: AppSettings; set: (p: Partial<AppSettings>) => void }) {
+  const items = railSorted(RAIL_ITEMS.filter(x => !x.when || x.when(s as RailHas)), s.railOrder).sort((a, b) => Number(a.key === 'ai') - Number(b.key === 'ai'))
+  const hide = s.railHide ?? []
+  const [drag, setDrag] = useState<string | null>(null)
+  const drop = (on: string) => {
+    if (!drag || drag === on) return
+    const keys = railSorted(RAIL_ITEMS, s.railOrder).map(x => x.key).filter(k => k !== 'ai' && k !== drag) // every one, a page off now too: it keeps its place
+    keys.splice(keys.indexOf(on), 0, drag)
+    set({ railOrder: keys })
+  }
+  return (
+    <div className="rail-items" role="list" aria-label="The rail's buttons">
+      {items.map(x => {
+        const fixed = x.key === 'ai'
+        return (
+          <div
+            key={x.key}
+            role="listitem"
+            className={`rail-item ${drag === x.key ? 'dragging' : ''}`}
+            draggable={!fixed}
+            onDragStart={e => (e.dataTransfer.setData('text/plain', x.key), (e.dataTransfer.effectAllowed = 'move'), setDrag(x.key))}
+            onDragEnd={() => setDrag(null)}
+            onDragOver={e => !fixed && drag && (e.preventDefault(), (e.dataTransfer.dropEffect = 'move'))}
+            onDrop={e => (e.preventDefault(), drop(x.key), setDrag(null))}
+          >
+            <span className="rail-grip" data-tip={fixed ? 'At the rail’s foot' : 'Drag to move it'} aria-hidden>
+              {fixed ? '' : '⋮⋮'}
+            </span>
+            <label className="rail-check">
+              <input type="checkbox" checked={!hide.includes(x.key)} onChange={e => set({ railHide: e.target.checked ? hide.filter(k => k !== x.key) : [...hide, x.key] })} />
+              <Icon name={x.icon} />
+              {x.label}
+            </label>
+            {hide.includes(x.key) && <span className="muted small">in ⋯ More</span>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 // the widgets as Scheduled tasks' rows: name, what it is, how it's set, its switch; a click opens its page
 function WidgetList({ api }: { api: WidgetsApi }) {
   const mine = api.list.filter(w => !w.builtin)
@@ -2242,6 +2336,11 @@ function WidgetList({ api }: { api: WidgetsApi }) {
     <>
       {menu}
       {starters && api.make && <StarterPicker onClose={() => setStarters(false)} onPick={k => (setStarters(false), void api.make!(k))} />}
+      {!!api.chats?.length && api.studio && (
+        <Group title="In the studio" hint="What you're making with Laki AI that isn't saved yet, or that it works on now: a click goes back to the chat">
+          <StudioSessions api={api} />
+        </Group>
+      )}
       <Group
         title="Yours"
         hint="Ones you or Laki AI made: in Laki's folder or the folders below"
@@ -3010,9 +3109,6 @@ export function SettingsPage(p: {
                 <Switch className="switch-row" on={s.notes === true} onChange={v => set({ notes: v })}>
                   <Says title="Notes" hint="Your own notes, one list for every project: written like a Notion page (headings, checklists, tables, images, code, diagrams), each with a color, pinned or not, found by search. Shows the rail's Notes and ⌘K" />
                 </Switch>
-                <Switch className="switch-row" on={s.history === true} onChange={v => set({ history: v })}>
-                  <Says title="Back and forward" hint="‹ › at the rail's top (else the sidebar's head), ⌘[ and ⌘]: back to the pages and workspaces you were on, the last 10, as in a browser. A right click on one lists where it goes" />
-                </Switch>
                 <Switch className="switch-row" on={s.birdView === true} onChange={v => set({ birdView: v })}>
                   <Says title="Bird view" hint="Every live session at once, each with its screen as it is now: the eye beside Help. A click opens one" />
                 </Switch>
@@ -3112,11 +3208,18 @@ export function SettingsPage(p: {
               </div>
               </Group>
               <Group title="Rail" hint="Projects, Board, Schedule, Terminal and Browser on the left, with what needs you on each; the list beside it shows the one you pick">
+                <div className="setting-row rail-buttons">
+                  <Says title="Its buttons" hint="Tick the ones to show and drag them into an order; the others go into ⋯ More. A right click on the rail does it too" />
+                  <RailField s={s} set={set} />
+                </div>
                 <Switch className="switch-row" on={s.railShells !== false} onChange={v => set({ railShells: v })}>
                   <Says title="Terminals" hint="The rail's Terminal: your terminals in a list of their own. Off: Terminals is a project in Projects' list" />
                 </Switch>
                 <Switch className="switch-row" on={s.railBrowsers !== false} onChange={v => set({ railBrowsers: v })}>
                   <Says title="Browsers" hint="The rail's Browser: your browsers in a list of their own. Off: Browsers is a project in Projects' list" />
+                </Switch>
+                <Switch className="switch-row" on={s.history !== false} onChange={v => set({ history: v })}>
+                  <Says title="Back and forward" hint="‹ › at the rail's top (else the sidebar's head), ⌘[ and ⌘]: back to the pages and workspaces you were on, the last 25, as in a browser. A right click on one lists where it goes" />
                 </Switch>
                 <Switch className="switch-row" on={s.railLabels !== false} onChange={v => set({ railLabels: v })}>
                   <Says title="Labels" hint="Words under the rail's icons: Projects, Board, Schedule, Terminal, Browser, Settings; off: icons only, and a narrower rail" />

@@ -9,7 +9,7 @@ import { ago } from './Info'
 import { linkWorkspaces, wsLink } from './links'
 import { Markdown } from './MarkdownView'
 import { Modal } from './panels'
-import { type Img, PromptInput } from './PromptInput'
+import { type Img, PromptInput, useDraft } from './PromptInput'
 import { ask as confirm, escapes, Icon, IconButton, Page } from './ui'
 
 type AiData = { chat: AiMsg[]; busy: boolean; key: boolean; calls: AiCall[]; totals: AiTotals }
@@ -73,8 +73,7 @@ export function AiPage({
   const c = chat ? { chat } : {}
   const [d, setD] = useState<AiData>()
   const [tab, setTab] = useState<'chat' | 'calls' | 'info'>('chat')
-  const [text, setText] = useState('')
-  const [images, setImages] = useState<Img[]>([])
+  const [text, setText, images, setImages] = useDraft(`ai:${chat ?? ''}`) // the AI page's, the floating chat's and the AI window's are one
   const [saving, setSaving] = useState(false)
   const [err, setErr] = useState('')
   const end = useRef<HTMLDivElement>(null)
@@ -124,7 +123,7 @@ export function AiPage({
         }),
       )
       .catch(e => {
-        if (!/^(Laki AI is off|Laki AI is busy|ask something|the AI is still|no OpenRouter API key|not connected)/.test(e.message)) return
+        if (!/^(Laki AI is off|Laki AI is busy|Laki AI works in|ask something|the AI is still|no OpenRouter API key|not connected)/.test(e.message)) return
         setErr(e.message)
         setText(sent.text)
         setImages(sent.images)

@@ -14,12 +14,12 @@ import { api as daemon, bridge } from './api'
 import type { DeskAsk } from './Desk'
 import { CELLS, Check, DeskTile, half, Inspector, WHERE } from './Extension'
 import { Modal } from './panels'
-import { type Img, PromptInput } from './PromptInput'
-import { extAgent, type WidgetsApi } from './Settings'
+import { type Img, PromptInput, useDraft } from './PromptInput'
+import { extAgent, StudioSessions, type WidgetsApi } from './Settings'
 import { escapes, Icon, Page, Switch } from './ui'
 import { CELL_W, CellButton, inWs, type WidgetApi, WidgetBody } from './Widgets'
 
-type ChatData = { chat: AiMsg[]; busy: boolean; ended?: number; elsewhere?: boolean }
+type ChatData = { chat: AiMsg[]; busy: boolean; ended?: number }
 type Tab = 'preview' | 'data' | 'runs' | 'check' | 'files'
 const TABS: [Tab, string][] = [
   ['preview', 'Preview'],
@@ -51,7 +51,7 @@ function runsOf(files: Record<string, string>): Runs {
   return { fetch: typeof m.fetch === 'string' ? m.fetch : undefined, script: m.script ? [m.script, files[m.script] ?? '(not found)'] : one, actions: acts, stream: m.stream === true }
 }
 
-export function WidgetStudio({ id, first, widgets, cfg, api, back, onClose }: { id: string; first?: DeskAsk; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; back: string; onClose: () => void }) {
+export function WidgetStudio({ id, first, widgets, cfg, api, back, onNamed, onClose }: { id: string; first?: DeskAsk; widgets: WidgetView[]; cfg: WidgetsApi; api: WidgetApi; back: string; onNamed?: (id: string) => void; onClose: () => void }) {
   const [cur, setCur] = useState(id)
   const w = (x => x && inWs(x, null))(widgets.find(x => x.id === cur)) // a per-workspace one: no workspace here, its sample's made-up one
   const mine = !!w && !w.builtin && !!cfg.home && w.dir === `${cfg.home}/${w.id}`
@@ -99,6 +99,7 @@ export function WidgetStudio({ id, first, widgets, cfg, api, back, onClose }: { 
       if (!at) {
         at = (await daemon.call<{ id: string }>('widgetSlug', { text: named })).id
         setCur(at)
+        onNamed?.(at) // the page says which chat: Back and a reopen come here
       }
       if (mine) await cfg.set(at, { ai: true })
       await daemon.call('aiAsk', { chat: `widget:${at}`, text, images })
@@ -165,7 +166,7 @@ export function WidgetStudio({ id, first, widgets, cfg, api, back, onClose }: { 
       }
     >
       <div className="studio">
-        <StudioChat chat={chat} w={w} mine={mine} ask={ask} undo={undo} err={oops} first={cur === id ? first : undefined} />
+        <StudioChat chat={chat} w={w} mine={mine} ask={ask} undo={undo} err={oops} first={cur === id ? first : undefined} cfg={cfg} />
         <div className="studio-main">
           {w ? (
             <>
@@ -204,10 +205,9 @@ export function WidgetStudio({ id, first, widgets, cfg, api, back, onClose }: { 
 
 // the chat: the thread (a turn's tools folded, with Undo to here once something was written after it), the composer;
 // empty: the starters and three examples
-function StudioChat({ chat, w, mine, ask, undo, err, first }: { chat: string; w?: WidgetView; mine: boolean; ask: (text: string, images?: string[], named?: string) => Promise<boolean>; undo: (after?: number) => void; err: string; first?: DeskAsk }) {
+function StudioChat({ chat, w, mine, ask, undo, err, first, cfg }: { chat: string; w?: WidgetView; mine: boolean; ask: (text: string, images?: string[], named?: string) => Promise<boolean>; undo: (after?: number) => void; err: string; first?: DeskAsk; cfg: WidgetsApi }) {
   const [d, setD] = useState<ChatData>()
-  const [text, setText] = useState('')
-  const [images, setImages] = useState<Img[]>([])
+  const [text, setText, images, setImages] = useDraft(chat || 'widget:') // widget: a new one's, before its first ask names it
   const [saving, setSaving] = useState(false)
   const [asking, setAsking] = useState(false)
   const thread = useRef<HTMLDivElement>(null)
@@ -229,7 +229,7 @@ function StudioChat({ chat, w, mine, ask, undo, err, first }: { chat: string; w?
     setAsking(true)
     return ask(t, imgs, named).finally(() => setAsking(false))
   }
-  // the Desk's ask, once: back in the box when it fails (no key, Laki AI busy elsewhere), to send again
+  // the Desk's ask, once: back in the box when it fails (no key, Laki AI at work in too many chats), to send again
   useEffect(() => {
     if (!first || started.has(first)) return
     started.add(first)
@@ -268,6 +268,12 @@ function StudioChat({ chat, w, mine, ask, undo, err, first }: { chat: string; w?
                 {e}
               </button>
             ))}
+            {!chat && !!cfg.chats?.length && (
+              <div className="studio-left">
+                <b className="small">Where you left off</b>
+                <StudioSessions api={cfg} />
+              </div>
+            )}
           </div>
         ) : (
           groups.map((g, i) => {

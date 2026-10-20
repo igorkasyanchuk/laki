@@ -80,11 +80,12 @@ export function Switch({ on, onChange, tip, className = '', disabled, children }
 type Choice = { label: string; primary?: boolean; danger?: boolean }
 type Check = { label: string; on: boolean }
 type Field = { value: string; placeholder?: string }
-type Asking = { title: string; text?: string; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
+export type Fact = { label: string; value: string } // a line of ask's facts, under its text
+type Asking = { title: string; text?: string; facts?: Fact[]; buttons: Choice[]; check?: Check; field?: Field; done: (i: number) => void; tag?: string }
 let asker: ((a: Asking) => void) | null = null
-export const ask = (title: string, o: { text?: string; ok?: string; danger?: boolean } = {}) =>
+export const ask = (title: string, o: { text?: string; facts?: Fact[]; ok?: string; danger?: boolean } = {}) =>
   new Promise<boolean>(done =>
-    asker ? asker({ title, text: o.text, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
+    asker ? asker({ title, text: o.text, facts: o.facts, buttons: [{ label: 'Cancel' }, { label: o.ok ?? 'OK', primary: true, danger: o.danger }], done: i => done(i === 1) }) : done(confirm([title, o.text].filter(Boolean).join(' '))),
   )
 // one asked before AskHost is there (an extension's ask as the window opens) waits for it, not a no
 let early: Asking[] = []
@@ -154,6 +155,16 @@ export function AskHost() {
       <div className="modal ask-box" role="alertdialog" aria-modal aria-label={a.title} ref={box}>
         <div className="ask-title">{a.title}</div>
         {a.text && <p className="ask-text">{a.text}</p>}
+        {!!a.facts?.length && (
+          <dl className="ask-facts">
+            {a.facts.map(f => (
+              <div key={f.label}>
+                <dt>{f.label}</dt>
+                <dd>{f.value}</dd>
+              </div>
+            ))}
+          </dl>
+        )}
         {a.field && (
           <label className="ask-field">
             <input defaultValue={a.field.value} placeholder={a.field.placeholder} spellCheck={false} onChange={e => (a.field!.value = e.target.value)} />

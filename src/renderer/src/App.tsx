@@ -1,13 +1,13 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type Account, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { type Account, type StudioChat, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { type AutoKey, Avatar, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
+import { ago, type AutoKey, Avatar, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
 import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
-import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
+import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
 import { CalendarPage } from './Calendar'
@@ -37,7 +37,7 @@ import { applyTheme, blurred, css, LESS_CLEAR, MORE_CONTRAST, type Paint, paintK
 import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type TunnelApi } from './Tunnel'
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
-import { ask, askText, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
+import { ask, askText, AskHost, choose, unchoose, colorVar, type Fact, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -163,7 +163,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -178,10 +178,13 @@ const settingsOf = (d: Dialog) => d === 'settings' || (typeof d === 'object' && 
 // an extension's page (Extension.tsx): its id ('' a new one), and the page it goes back to
 const extOf = (d: Dialog) => (d && typeof d === 'object' && 'extension' in d ? d : undefined)
 const studioOf = (d: Dialog) => (d && typeof d === 'object' && 'studio' in d ? d : undefined)
-// back and forward (experimental, settings.history): a place is a page (or none: the workspace view) and the workspace
+// a studio's key: a new one's its dialog's own, kept as its first ask names it (key), so it isn't drawn again then
+const studioKeys = new WeakMap<object, string>()
+const studioKey = (s: { studio: string; key?: string }) => s.key ?? (s.studio || studioKeys.get(s) || (k => (studioKeys.set(s, k), k))(`new-${Math.random().toString(36).slice(2)}`))
+// back and forward (settings.history, on unless false): a place is a page (or none: the workspace view) and the workspace
 // selected; a dialog over them (⌘K, a rename, a timer) isn't one. HISTORY_MAX back, as a browser's
 type Place = { d: Dialog; ws: string | null }
-const HISTORY_MAX = 10
+const HISTORY_MAX = 25
 const PAGES = new Set(['settings', 'help', 'board', 'bird', 'ai', 'calendar', 'desk', 'schedules'])
 const PAGE_KEYS = ['schedules', 'compare', 'extension', 'uikit', 'studio', 'settings', 'section', 'project', 'specs', 'workflows', 'note']
 const isPlace = (d: Dialog) => d === null || (typeof d === 'string' ? PAGES.has(d) : PAGE_KEYS.some(k => k in d))
@@ -547,9 +550,9 @@ export function App() {
   const visible = tabsOf(group)
 
   useEffect(() => void localStorage.setItem('laki.ws', JSON.stringify(ws?.id ?? null)), [ws?.id])
-  // back and forward (experimental): each new place after the one you're at (what was ahead of it goes, as in a
+  // back and forward: each new place after the one you're at (what was ahead of it goes, as in a
   // browser); a move of travel's own is that place again, not a new one
-  const historyOn = view?.settings?.history === true
+  const historyOn = !!view && view.settings?.history !== false
   const hist = useRef<{ at: Place[]; i: number; going?: string }>({ at: [], i: -1 })
   const [, histDrawn] = useState(0)
   const hereKey = JSON.stringify({ d: dialog, ws: ws?.id ?? null })
@@ -581,6 +584,15 @@ export function App() {
     if (to.ws && to.ws !== ws?.id) setWsId(to.ws)
     setDialog(to.d)
     histDrawn(n => n + 1)
+  }
+  // a new studio's first ask names it: the dialog (and the place in the history) says which, so Back, ⌘K's way back and
+  // a reopen go to that chat, not a blank studio; its key stays, so it isn't drawn again
+  const nameStudio = (s: { studio: string; back?: Dialog; key?: string }, id: string) => {
+    const d: Dialog = { studio: id, back: s.back, key: studioKey(s) }
+    const h = hist.current
+    if (h.at[h.i] && studioOf(h.at[h.i].d)) h.at[h.i] = { ...h.at[h.i], d }
+    h.going = JSON.stringify({ d, ws: ws?.id ?? null })
+    setDialog(x => (studioOf(x) ? d : x))
   }
   useEffect(() => void localStorage.setItem('laki.tabs', JSON.stringify(tabByWs)), [tabByWs])
   useEffect(() => void localStorage.setItem('laki.groups', JSON.stringify(stored)), [stored])
@@ -1151,8 +1163,28 @@ export function App() {
       setGoing(g => Object.fromEntries(Object.entries(g).filter(([id]) => !ids.includes(id))))
     }
   }
+  // what Delete takes with it, said first, a line each: where it is, uncommitted files, commits not pushed, its PR, agents
+  // at work, servers, the storage folder's files; the daemon's git counts (wsPeek) are waited for 1.5 s at most
+  const rmFacts = async (w: WorkspaceView): Promise<Fact[]> => {
+    type Peek = { dirty?: number; ahead?: number; unpushed?: number }
+    const pk: Peek = (view?.api ?? 0) >= 93 ? await Promise.race([api.call<Peek>('wsPeek', { id: w.id }).catch(() => ({})), new Promise<Peek>(r => setTimeout(() => r({}), 1500))]) : {}
+    const n = (k: number, one: string, many = `${one}s`) => `${k} ${k === 1 ? one : many}`
+    const tabs = view?.tabs.filter(t => t.workspace === w.id && t.status !== 'exited') ?? []
+    const busy = tabs.filter(t => t.kind === 'agent' && (t.status === 'running' || t.status === 'waiting'))
+    const facts: Fact[] = [{ label: 'Project', value: view?.projects.find(p => p.id === w.project)?.name ?? '' }]
+    if (w.kind === 'worktree') facts.push({ label: 'Branch', value: `${w.branch} → ${w.base} (stays)` })
+    facts.push({ label: 'Folder', value: `${w.host ? `${w.host}:` : ''}${shortPath(w.path)}${w.kind === 'worktree' ? ' (removed)' : ' (stays)'}` })
+    if (pk.dirty !== undefined) facts.push({ label: 'Changes', value: pk.dirty ? `${n(pk.dirty, 'uncommitted file')}: lost` : 'none uncommitted' })
+    if (pk.ahead) facts.push({ label: 'Commits', value: `${n(pk.ahead, 'commit')} not in ${w.base}${pk.unpushed ? `, ${pk.unpushed} not pushed` : ', all pushed'} (on the branch)` })
+    if (w.pr) facts.push({ label: 'PR', value: `#${w.pr.number} ${w.pr.draft ? 'draft' : w.pr.state.toLowerCase()}${w.pr.title ? ` · ${w.pr.title}` : ''} (stays on GitHub)` })
+    facts.push({ label: 'Tabs', value: tabs.length ? `${n(tabs.length, 'tab')}${busy.length ? `, ${busy.length} agent${busy.length === 1 ? '' : 's'} at work: stopped` : ''}` : 'none' })
+    if (w.ports.length) facts.push({ label: 'Servers', value: `${w.ports.map(p => `:${p}`).join(', ')}: stopped` })
+    if (w.artifacts) facts.push(view?.settings?.keepStorage ? { label: 'Artifacts', value: `${n(w.artifacts, 'file')} (kept)` } : { label: 'Artifacts', value: `${n(w.artifacts, 'file')}: deleted` })
+    facts.push({ label: 'Created', value: ago(w.created) })
+    return facts
+  }
   const rmWs = async (w: WorkspaceView) => {
-    if (!(await ask(`Delete ${wsName(w)}?`, { text: `Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`, ok: 'Delete', danger: true }))) return
+    if (!(await ask(`Delete ${wsName(w)}?`, { text: `Its tabs stop${w.kind === 'worktree' ? ', the worktree is removed (the branch stays)' : ''}.`, facts: await rmFacts(w), ok: 'Delete', danger: true }))) return
     if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return // the toast says why
     done(`Deleted ${wsName(w)}${w.kind === 'worktree' && w.branch ? `: its branch ${w.branch} stays` : ''}`)
   }
@@ -1398,6 +1430,20 @@ export function App() {
     copy,
   })
   const settings = view?.settings ?? {}
+  // the extension studio's chats (studioChats, Laki AI on): where you left off, in Settings › Extensions and a new
+  // studio, again a moment after an ai event
+  const [studioChats, setStudioChats] = useState<StudioChat[]>([])
+  const aiOn = settings.ai?.on === true
+  useEffect(() => {
+    if (!aiOn || !connected) return
+    let t: ReturnType<typeof setTimeout> | undefined
+    const chats = () => void api.call<StudioChat[]>('studioChats').then(setStudioChats, () => {})
+    chats()
+    const off = api.on(m => {
+      if (m.ev === 'ai') t ??= setTimeout(() => ((t = undefined), chats()), 1500)
+    })
+    return () => (off(), clearTimeout(t))
+  }, [aiOn, connected])
   const pickKey = settings.pickerKey ?? PICKER_KEY // the element picker's hotkey ('' none)
   const hotkey = !view ? null : settings.hotkeyOn !== false ? settings.hotkey ?? HOTKEY : '' // the global hotkey (main's globalShortcut; '' none; null: no settings yet)
   useEffect(() => void (hotkey !== null && bridge?.hotkey?.(hotkey)), [hotkey])
@@ -1619,7 +1665,20 @@ export function App() {
     agent: settings.widgetAgent,
     run: (id, ws) => call('widgetRun', { id, ws }),
     stop: id => call('resourceStop', { key: `agent:${id}` }),
-    rm: id => call<{ trash: string }>('widgetRm', { id }).then(r => r && done(`Deleted ${view?.widgets?.find(w => w.id === id)?.name ?? id}`, () => void call('widgetRestore', { trash: r.trash }))), // the trash: Undo puts it back
+    // asked first, then the trash: Undo puts it back
+    rm: async id => {
+      const name = view?.widgets?.find(w => w.id === id)?.name ?? id
+      if (!(await ask(`Delete ${name}?`, { text: 'Its folder, settings and data go to the trash, and it stops running. Undo brings it back.', ok: 'Delete', danger: true }))) return
+      const r = await call<{ trash: string }>('widgetRm', { id })
+      if (r) done(`Deleted ${name}`, () => void call('widgetRestore', { trash: r.trash }))
+    },
+    // the studio's sessions: the ones with nothing made yet, and the one at work
+    chats: studioChats.filter(c => c.busy || !view?.widgets?.some(w => w.id === c.id)),
+    chatRm: async id => {
+      if (!(await ask('Delete this session?', { text: 'Its chat with Laki AI goes; nothing was saved of the extension yet.', ok: 'Delete', danger: true }))) return
+      await call('studioChatRm', { id })
+      setStudioChats(cs => cs.filter(c => c.id !== id))
+    },
     reload: () => call('widgetReload'),
     page: id => setDialog(!id && settings.ai?.on ? { studio: '', back: dialog } : { extension: id, back: dialog }), // a new one: the studio while Laki AI is on
     ...(settings.ai?.on && { studio: (id: string) => setDialog({ studio: id, back: dialog }) }),
@@ -1968,7 +2027,7 @@ export function App() {
     ...(view?.workspaces.some(w => !w.archived && !view.projects.find(p => p.id === w.project)?.kind) ? ['workspace'] : []),
     ...(seenSecs.length ? ['settings'] : []),
     ...['actions', 'templates', 'presets', 'remote'].filter(x => seenSecs.includes(x)),
-    ...(settings.specs || settings.workflows || settings.calendar || settings.desk || settings.notes || settings.history || settings.birdView || settings.aiGlow || settings.ai?.on || settings.voice?.on ? ['experimental'] : []), // one turned on; else seen through Go (below)
+    ...(settings.specs || settings.workflows || settings.calendar || settings.desk || settings.notes || settings.birdView || settings.aiGlow || settings.ai?.on || settings.voice?.on ? ['experimental'] : []), // one turned on; else seen through Go (below)
     ...(view?.widgets?.some(w => w.on) ? ['widgets'] : []), // an extension turned on, not the section only looked at
     ...(view?.projects.some(p => p.kind) ? ['shell'] : []),
   ])
@@ -2056,7 +2115,7 @@ export function App() {
       arrowdown: () => moveWs(1),
     }
     if (/^[1-9]$/.test(k)) act[k] = () => groups[Number(k) - 1] && selectGroup(groups[Number(k) - 1])
-    // ⌘[ ⌘]: back and forward (experimental), not in a text field (an editor's indent)
+    // ⌘[ ⌘]: back and forward, not in a text field (an editor's indent)
     const field = (t => !!t && (t.isContentEditable || t.tagName === 'TEXTAREA' || t.tagName === 'INPUT') && !t.classList.contains('xterm-helper-textarea'))(e.target as HTMLElement | null)
     if (historyOn && !field && (k === '[' || k === ']')) act[k] = () => travel(hist.current.i + (k === '[' ? -1 : 1))
     if (canLater && !dialog) act.l = () => sendLater(tab?.kind === 'agent' ? tab.id : undefined)
@@ -2697,7 +2756,7 @@ export function App() {
   const shownWidgets = (view.widgets ?? []).map(w => inWs(w, wsHere)) // a per-workspace one's instance in the workspace on screen
   const onPage = schedulesFor !== undefined || dialog === 'board' || (dialog === 'calendar' && calOn) || (dialog === 'desk' && deskOn) || (notesOn && !!notesOf(dialog)) || (dialog === 'bird' && settings.birdView === true) || dialog === 'ai' || !!specsOf(dialog) || !!flowsOf(dialog) || settingsOf(dialog) // the rail's lit button: the page over the main area, else the list's kind
   const listOff = rail && sideOpen && (schedulesFor !== undefined || dialog === 'board' || (calOn && dialog === 'calendar') || (deskOn && dialog === 'desk') || (notesOn && !!notesOf(dialog)) || dialog === 'ai' || (specsOn && !!specsOf(dialog)) || (flowsOn && !!flowsOf(dialog))) // the rail's Schedule and Board: a page over all but the rail
-  // back and forward's buttons (experimental): the rail's top, else the sidebar's head; a right click lists where each goes
+  // back and forward's buttons: the rail's top, else the sidebar's head; a right click lists where each goes
   const placeName = (p: Place) => {
     const d = p.d
     const w = live.find(x => x.id === p.ws)
@@ -2741,17 +2800,37 @@ export function App() {
     ...(calOn ? [{ key: 'calendar', icon: 'calendar' as const, label: 'Calendar', on: dialog === 'calendar', tip: `Calendar (experimental): scheduled tasks and reminders${calSoon ? ` · ${calSoon} rang` : ''}`, run: toCal, n: calSoon }] : []),
     ...RAIL.slice(1).filter(([k]) => railOf(k) === k).map(kind => ({ key: kind[0], kind })),
   ]
-  const over = (o => (o.length > 1 ? o : []))(railWords && railPages.length + 1 > RAIL_FIT ? RAIL_MORE.filter(k => railPages.some(x => x.key === k)).slice(0, railPages.length + 1 - (RAIL_FIT - 1)) : []) // one alone: More would save no room
-  const railKept = railPages.filter(x => !over.includes(x.key))
-  const railMore = railPages.filter((x): x is Extract<RailPage, { run: () => void }> => over.includes(x.key) && 'run' in x)
+  // the user's order and the ones they put into More (Settings › Appearance › Rail), then the ones that don't fit
+  const railHide = settings.railHide ?? []
+  const railShown = railSorted(railPages, settings.railOrder).filter(x => !railHide.includes(x.key))
+  const over = (o => (o.length > 1 ? o : []))(railWords && railShown.length + 1 > RAIL_FIT ? RAIL_MORE.filter(k => railShown.some(x => x.key === k)).slice(0, railShown.length + 1 - (RAIL_FIT - 1)) : []) // one alone: More would save no room
+  const railKept = railShown.filter(x => !over.includes(x.key))
+  type RailRun = Extract<RailPage, { run: () => void }>
+  const kindPage = ([k, label, icon]: (typeof RAIL)[number]): RailRun => (({ n, busy }) => ({ key: k, icon, label, on: railKind === k && !onPage, tip: `${label}${busy ? ' · at work' : ''}`, run: () => railTo(k), n }))(railSays(k))
+  const aiPage: RailRun = { key: 'ai', icon: 'ai', label: 'AI', on: dialog === 'ai', tip: AI_TIP, run: toAi }
+  const railMore = [...railSorted(railPages, settings.railOrder).filter(x => railHide.includes(x.key) || over.includes(x.key)), ...(settings.ai?.on && railHide.includes('ai') ? [aiPage] : [])].map(x => ('kind' in x ? kindPage(x.kind) : x))
+  // a right click on the rail: put that button into More (or back), or the whole list in Settings
+  const railMenu = (e: React.MouseEvent) => {
+    const key = (e.target as Element).closest<HTMLElement>('[data-rail]')?.dataset.rail
+    const item = RAIL_ITEMS.find(x => x.key === key)
+    e.preventDefault()
+    openMenu(e, [
+      ...(item ? [{ label: `Move ${item.label} into ⋯ More`, icon: 'more' as const, run: () => void call('settingsSet', { railHide: [...railHide, item.key] }).catch(() => {}) }] : []),
+      { label: 'Customize the rail…', icon: 'gear', sub: 'which buttons show, their order', run: () => setDialog({ section: 'appearance', spot: 'Rail' }) },
+    ])
+  }
   const railBar = rail && sideOpen && (
-    <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }}>
+    <nav className="rail drag" aria-label="Projects, the board, scheduled tasks, terminals, browsers and settings" data-bare={railWords ? undefined : ''} style={{ width: railW }} onContextMenu={e => !e.defaultPrevented && railMenu(e)}>
       {histNav}
       {kindButton(RAIL[0])}
       {railKept.map(x => ('kind' in x ? kindButton(x.kind) : railButton(x.key, x.icon, x.label, x.on, x.tip, x.run, x.n ? <span className="rail-count">{x.n}</span> : x.mark)))}
       {railMore.length > 0 &&
         railButton('more', 'more', 'More', railMore.some(x => x.on), `More: ${railMore.map(x => x.label).join(', ')}`, () => {}, (n => (n ? <span className="rail-count">{n}</span> : undefined))(railMore.reduce((a, x) => a + (x.n ?? 0), 0)), e =>
-          openMenu(e, railMore.map(x => ({ label: x.label, icon: x.icon, sub: x.tip, run: x.run, ...(x.on && { hint: 'ON' }), ...(x.n ? { pill: String(x.n), tone: 'warn' as const } : {}) }))),
+          openMenu(e, [
+            ...railMore.map(x => ({ label: x.label, icon: x.icon, sub: x.tip, run: x.run, ...(x.on && { hint: 'ON' }), ...(x.n ? { pill: String(x.n), tone: 'warn' as const } : {}) })),
+            ...(railHide.length ? [{ label: 'Show them all on the rail', icon: 'eye' as const, foot: true, run: () => void call('settingsSet', { railHide: [] }).catch(() => {}) }] : []),
+            { label: 'Customize the rail…', icon: 'gear', foot: true, run: () => setDialog({ section: 'appearance', spot: 'Rail' }) },
+          ]),
         )}
       {(railPins.length > 0 || planPins.length > 0) && <span className="rail-sep" />}
       {railPins.map(pinButton)}
@@ -2759,7 +2838,7 @@ export function App() {
       <WidgetButtons widgets={shownWidgets} api={widgetApi} places={['rail']} look="rail" words={railWords} />
       <span className="spacer" />
       {settings.devMode === true && railButton('picker', 'target', 'Pick', picking, `Pick an element: what it is, to copy into a prompt (development mode)${pickKey ? ` · ${pickKey}` : ''}`, () => setPicking(p => !p))}
-      {settings.ai?.on && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
+      {settings.ai?.on && !railHide.includes('ai') && railButton('ai', 'ai', 'AI', dialog === 'ai', AI_TIP, toAi)}
       {railButton('settings', 'gear', 'Settings', settingsOf(dialog), 'Settings (⌘,)', toSettings)}
     </nav>
   )
@@ -3199,7 +3278,7 @@ export function App() {
         ))(extOf(dialog))}
         {(s => s && (
           <Suspense fallback={<Waiting title="Extension studio" onClose={() => setDialog(s.back ?? null)} />}>
-            <WidgetStudio key={s.studio || 'new'} id={s.studio} first={s.first} widgets={view.widgets ?? []} cfg={extCfg} api={widgetApi} back={backWord(s.back)} onClose={() => setDialog(s.back ?? null)} />
+            <WidgetStudio key={studioKey(s)} id={s.studio} first={s.first} widgets={view.widgets ?? []} cfg={extCfg} api={widgetApi} back={backWord(s.back)} onNamed={id => nameStudio(s, id)} onClose={() => setDialog(s.back ?? null)} />
           </Suspense>
         ))(settings.ai?.on ? studioOf(dialog) : undefined)}
         {dialog && typeof dialog === 'object' && 'uikit' in dialog && <UiKitPage key={String(dialog.icons)} icons={dialog.icons} back={backWord(dialog.back)} copy={copy} onClose={() => setDialog(dialog.back ?? { section: 'widgets' })} />}

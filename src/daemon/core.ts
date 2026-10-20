@@ -1957,6 +1957,20 @@ export async function wsRm(ref: string) {
   save()
   changed()
 }
+// what deleting a worktree workspace takes with it, for the app's question: its uncommitted paths (the folder goes), its
+// commits not in the base and, of those, the ones on no remote (the branch keeps them); a git that fails, or a local one,
+// says nothing of it
+export async function wsPeek(ref: string) {
+  const ws = findWs(ref)
+  if (ws.kind !== 'worktree' || ws.archived || state.projects.find(p => p.id === ws.project)?.git === false || !(ws.host || existsSync(ws.path))) return {}
+  const count = (args: string[]) => git(ws, ...args).then(s => Number(s) || 0, () => undefined)
+  const [dirty, ahead, unpushed] = await Promise.all([
+    git(ws, '--no-optional-locks', 'status', '--porcelain').then(s => s.split('\n').filter(Boolean).length, () => undefined),
+    count(['rev-list', '--count', `${ws.base}..HEAD`]),
+    count(['rev-list', '--count', 'HEAD', '--not', ws.base, '--remotes']),
+  ])
+  return { dirty, ahead, unpushed }
+}
 // archived workspaces past settings.archivedDays (hourly, and as the daemon starts) are deleted, their branch kept:
 // their worktree went as they were archived. One archived before archivedAt counts from now
 export function archivedTidy(now = Date.now()) {

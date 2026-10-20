@@ -769,7 +769,9 @@ and report through the laki skill (Settings › Agent skill) or MCP's `laki_prog
 *Terminal* and *Browser*, the kinds each with a count of their tabs that need you (or a dot while one works), and
 *AI* (when it's on) over *Settings* at its bottom (Settings › Appearance › Rail › *Labels* off: icons only and a narrower rail;
 *Terminals* or *Browsers* off: no button, and that project is in Projects' list). With labels on and more pages turned
-on than fit, the least used (Calendar, then Flows, Specs, Board) go into a ⋯ *More* menu on the rail. Board and Schedule are pages
+on than fit, the least used (Calendar, then Flows, Specs, Board) go into a ⋯ *More* menu on the rail. Settings ›
+Appearance › Rail › *Its buttons* picks which show (the others go into ⋯ *More*) and, dragged, their order; a right
+click on a rail button puts it into *More*, and *More*'s *Show them all on the rail* brings them back. Board and Schedule are pages
 over the list (only the rail stays); Video, Meme and Timer stay at the list's bottom. The
 list shows the kind you pick, and its rail button goes back to the last workspace you had there.
 A workspace you go to some other way (⌘J, ⌘K, a notification, a link) shows its kind; ⌘↑/⌘↓ stay in the list, and the
@@ -875,7 +877,7 @@ or pick one of its `fixtures/*.json`, to see it with that data, *Sample data* on
 20 fetches and actions, why each ran, a click for its stderr), **Env** (what its fetch gets, tokens masked) and
 **Files**, and **Check**. A right click on an extension opens it there (*Inspect*), and so does `laki://settings/widgets/<id>/inspect`.
 
-Delete (its row's trash can) moves an extension to a trash, its settings, data, history, chat and secrets with it:
+Delete (its card's trash can, after you confirm) moves an extension to a trash, its settings, data, history, chat and secrets with it:
 *Undo* in the toast puts it back, on or off as it was; `laki widget trash` lists the last 30 days' and `laki widget
 restore <trash-id>` puts one back. An agent can't turn an extension on (`laki widget on` from its tab is refused; it
 may move one, resize it and change a plain setting with `laki widget set`, never a secret, its source or network access),
@@ -918,6 +920,9 @@ should show and Laki AI writes it beside its preview on sample data (it asks you
 *Try it live* shows what it runs and runs it once, *Undo* takes a change back, *Turn on* turns it on. A row's ✨ opens
 one of yours there. *Remix* (a row's, any one's) makes a copy that's yours to change and opens it: in the studio with
 Laki AI on, else on its page. An extension's page keeps its own chat with Laki AI, apart from the AI page's.
+Close the studio while Laki AI builds and it goes on: Settings › Extensions › *In the studio* (and a new studio's
+*Where you left off*) lists what you're making that isn't saved yet, or that it works on now; a click goes back to
+that chat, the trash can lets one go. You can start another meanwhile: Laki AI works in up to 4 chats at once.
 
 To delete one, open it in Settings › Extensions and press the trash can: it goes to the trash for 30 days (above). The
 ones that come with Laki only turn off.
@@ -939,7 +944,7 @@ the brief as it is then (edit it as you talk) and the names of its files, and it
 it needs to, so "what do you think?" is about this brainstorm. *New chat*
 starts over. A chat unused for 12 hours ends: what was said stays to read, and what you type next starts a new chat;
 *Continue it* takes the old one up again (Claude and Codex go on with their session while they still have it). Laki AI
-works on one ask at a time, in whichever chat.
+works on one ask per chat, in up to 4 chats at once.
 
 *New* ▾ starts a spec or a brainstorm, empty or from a template: its Markdown goes under the
 title (the headings, a checklist of the steps you want, questions to answer). *Edit templates…*, at the menu's foot, lists them: a name, spec or brainstorm, the Markdown, saved as you type. Laki comes with two,
@@ -1130,13 +1135,13 @@ on the right is written like a Notion page, the same editor as specs: type `/` f
 tables, code, quotes, images (paste or drop them in) and diagrams. It saves as you type. *New note* starts one (in
 the color you're showing only).
 
-### Back and forward (experimental)
+### Back and forward
 
-Turn it on in Settings › General › *Experimental*. ‹ › at the rail's top (without the rail: after the sidebar head's
+‹ › at the rail's top (without the rail: after the sidebar head's
 hide button), or ⌘[ and ⌘], go back and forward through the pages (My Desk, Board, Settings, an extension's page,
-Specs…) and workspaces you were on, the last 10, as in a browser: open an extension's settings from My Desk, and ‹
+Specs…) and workspaces you were on, the last 25, as in a browser: open an extension's settings from My Desk, and ‹
 brings My Desk back. A right click on either lists where it goes. Dialogs (⌘K, a rename) aren't steps; a workspace
-removed since is skipped.
+removed since is skipped. Settings › Appearance › Rail › *Back and forward* turns it off.
 
 ### Laki AI's glow (experimental)
 
@@ -1185,7 +1190,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | Esc | close a dialog or menu |
 | ⌘↑ / ⌘↓ | previous / next workspace |
 | ⌘J | the next tab that needs you (waiting first, then done unseen), across workspaces |
-| ⌘[ / ⌘] | back / forward through the pages and workspaces you were on (experimental: Back and forward) |
+| ⌘[ / ⌘] | back / forward through the pages and workspaces you were on, the last 25 |
 | ⌘L | send a message later: to an agent of the workspace or Laki AI |
 | ⌘⇧A | show / hide the workspace's artifacts over the status bar |
 | ⌘⇧⏎ | full screen: just the tab's content (no rail, sidebar, tab bar, panels or status bar), the window full screen too; again (or the faint ⤡ in the corner) brings it all back. Also the tab bar's ⤢ |

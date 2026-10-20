@@ -367,7 +367,7 @@ export type Settings = {
   calendar?: boolean // experimental (Settings › General): the rail's Calendar, scheduled tasks and reminders by week or month, off unless true
   desk?: boolean // experimental (Settings › General): the rail's Desk, extensions placed there as tiles, off unless true
   notes?: boolean // experimental (Settings › General): the rail's Notes, your own notes (daemon/notes.ts), off unless true
-  history?: boolean // experimental (Settings › General): back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), off unless true
+  history?: boolean // Settings › Appearance › Rail: back and forward through the pages and workspaces you went through (‹ ›, ⌘[ ⌘]), on unless false
   deskTiles?: DeskTile[] // the Desk's tiles in order, each one's size and tab (an extension placed there without one: last, DESK_TILE, the first tab)
   deskTabs?: DeskTab[] // My Desk's tabs in order (none: one, My Desk)
   aiGlow?: boolean // experimental (Settings › General): a glow over what Laki AI looks at (a tab's pane, else the window), off unless true
@@ -420,6 +420,8 @@ export type Settings = {
   railLabels?: boolean // the rail layout's words under its icons; off: icons only, a narrower rail (unset: on)
   railShells?: boolean // the rail's Terminal button; off: Terminals is a project in Projects' list (unset: on)
   railBrowsers?: boolean // the rail's Browser button; off: Browsers is a project in Projects' list (unset: on)
+  railOrder?: string[] // the rail's buttons after Projects, in this order (RAIL_ITEMS' keys; one not in it: after them)
+  railHide?: string[] // the rail's buttons put into its ⋯ More menu (Settings › Appearance › Rail, Slack's way)
   imageDays?: number // pasted images kept this many days (unset: IMAGE_DAYS)
   artifactsIn?: 'app' | 'browser' // an HTML or Markdown artifact opens in the app's viewer or the default browser (unset: app)
   memory?: Memory[] // Settings › Global memory: the user's own rules (MEMORY_MAX, never auto) for claude and codex in every project, with its memory
@@ -517,6 +519,8 @@ export const SLEEP_AFTER = 480 // minutes: an idle agent sleeps after 8 hours un
 export const IMAGE_DAYS = 30 // days a pasted image is kept (<data>/images: Laki AI's chats, prompts) unless Settings › AI says otherwise
 // an earlier chat of the AI page's (New chat keeps the one it ends): its file's name, its first ask, its last message, its messages
 export type AiPast = { id: string; title: string; at: number; n: number }
+// an extension studio's chat (widget:<id>): its first ask, its last message's time, whether Laki AI works on it now
+export type StudioChat = { id: string; title: string; at: number; busy: boolean }
 
 // a plan's limit (daemon/usage.ts): used %, when it resets (ms); note: what the % is of, for an amount (extra usage)
 export type UsageWindow = { label: string; used: number; resets?: number; note?: string }
@@ -668,5 +672,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 92
+export const API = 93
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

@@ -281,6 +281,42 @@ test('ai: laki_send reaches agents only, and never types into a question they as
   assert.deepEqual(await rig.rpc('send', { target: ws.id, text: 'later', agent: true, whenIdle: true }), { tab: agent.id, queued: 1 })
 })
 
+test("ai: chats ask at once, one ask each (AI_AT_ONCE in all); a question goes to its own chat; the studio's sessions", async t => {
+  const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
+  const or = await openrouter(t, [{ slow: true }, call('c1', 'laki_ask', { question: 'Which source?', options: ['gh', 'Slack'] }), { slow: true }, { slow: true }, { slow: true }])
+  const rig = await fresh(t, { env: { LAKI_AI_API: or.url } })
+  await rig.rpc('settingsSet', { ai: { on: true } })
+  await rig.rpc('aiKey', { key: 'sk-or-v1-abc123' })
+  const one = rig.rpc('aiAsk', { chat: 'widget:one', text: 'my open PRs' }).catch(e => e)
+  await until(() => or.hits.length === 1, 'the first ask')
+  // another studio asks while the first works: its question lands in its own chat
+  assert.deepEqual(await rig.rpc('aiAsk', { chat: 'widget:two', text: 'a world clock' }), { text: '' })
+  const two = await rig.rpc('aiState', { chat: 'widget:two' })
+  assert.deepEqual(two.chat.at(-1).ask.options, ['gh', 'Slack'])
+  assert.equal(two.busy, false)
+  assert.equal((await rig.rpc('aiState', { chat: 'widget:one' })).chat.some((m: any) => m.ask), false)
+  assert.equal((await rig.rpc('aiState', { chat: 'widget:one' })).busy, true)
+  await assert.rejects(rig.rpc('aiAsk', { chat: 'widget:one', text: 'again' }), /still on the last ask/)
+  await assert.rejects(rig.rpc('aiQuestion', { chat: 'widget:two', text: 'x', options: ['a', 'b'] }), /only while Laki AI works/)
+  // where you left off: newest first, the one at work said so
+  assert.deepEqual(
+    (await rig.rpc('studioChats')).map((c: any) => [c.id, c.title, c.busy]),
+    [['two', 'a world clock', false], ['one', 'my open PRs', true]],
+  )
+  await assert.rejects(rig.rpc('studioChatRm', { id: 'one' }), /stop it first/)
+  // at most AI_AT_ONCE chats at work
+  const more = ['widget:three', 'widget:four', ''].map(chat => rig.rpc('aiAsk', { chat, text: 'hang' }).catch(e => e))
+  await until(() => or.hits.length === 5, 'three more asks')
+  await assert.rejects(rig.rpc('aiAsk', { chat: 'widget:five', text: 'one more' }), /works in 4 chats already/)
+  assert.deepEqual(await rig.rpc('aiStop', { chat: 'widget:one' }), { stopped: true })
+  assert.match(String(await one), /stopped/)
+  assert.deepEqual(await rig.rpc('aiStop'), { stopped: true }) // the rest
+  await Promise.all(more)
+  await rig.rpc('studioChatRm', { id: 'two' })
+  assert.deepEqual((await rig.rpc('studioChats')).map((c: any) => c.id).sort(), ['four', 'one', 'three'])
+  await assert.rejects(rig.rpc('studioChatRm', { id: '../ai-key' }), /no chat/)
+})
+
 test("ai: Laki's skill asks with options, writes memory, and removes only on the user's Yes", async t => {
   const call = (id: string, name: string, args: object) => reply({ content: '', tool_calls: [{ id, type: 'function', function: { name, arguments: JSON.stringify(args) } }] })
   const or = await openrouter(t, [

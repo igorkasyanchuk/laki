@@ -628,10 +628,11 @@ const extTools = async (): Promise<ExtTool[]> => (!process.env.LAKI_PERM_EXT && 
 
 // light what it looked at (Settings › General › Experimental › Laki AI's glow)
 const AI_LOOKS = ['screen', 'browse']
-export const aiRpc = (rpc: Rpc): Rpc => (method, params, ms) => rpc(method, AI_LOOKS.includes(method) ? { ...params, by: 'ai' } : params, ms)
+// chat: the Laki AI chat whose ask runs these tools: its questions and permission asks go there (several may work at once)
+export const aiRpc = (rpc: Rpc, chat?: string): Rpc => (method, params, ms) => rpc(method, AI_LOOKS.includes(method) ? { ...params, by: 'ai' } : chat !== undefined && (method === 'aiQuestion' || method === 'aiPermission') ? { ...params, chat } : params, ms)
 
 let daemon: Promise<unknown> | undefined
-const own = process.env.LAKI_AI === '1' ? aiRpc(conn) : conn // Laki AI's claude or codex runs this laki mcp
+const own = process.env.LAKI_AI === '1' ? aiRpc(conn, process.env.LAKI_AI_CHAT) : conn // Laki AI's claude or codex runs this laki mcp, for that chat
 // Laki AI's claude -p (LAKI_AI_PERM) asks through it (--permission-prompt-tool) before a tool it may not use unasked: the user's pick in
 // the chat, as claude wants it back. An extension's (LAKI_PERM_EXT, its id): the app's dialog, and only this tool here
 const permission: Tool = {

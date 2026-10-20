@@ -245,7 +245,7 @@ test('csv: parsed and written back as it was; quotes, newlines, separators', () 
 
 test("the bubbles' initials: words without pr, issue and numbers, none the same", () => {
   assert.deepEqual(initials(['fix-cart-total']), ['FC'])
-  assert.deepEqual(initials(['pr-14162-sq3-3888-buy-fanclub', 'pr-14176-engr-1608-bound-regener', 'pr-14075-sq3-3865-resume-the-blo']), ['SB', 'EB', 'SR'])
+  assert.deepEqual(initials(['pr-14162-app-3888-buy-tickets', 'pr-14176-web-1608-bound-renderer', 'pr-14075-app-3865-resume-the-blog']), ['AB', 'WB', 'AR'])
   assert.deepEqual(initials(['dark-mode', 'dark-mode', 'dark-mode']), ['DM', 'DA', 'MO'])
   assert.deepEqual(initials(['x', 'x', 'x']), ['X', 'X2', 'X3'])
   assert.deepEqual(initials(['pr-42', '']), ['P4', '?']) // only those: all its words
