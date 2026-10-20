@@ -21,7 +21,9 @@ worktree. Agents keep running when the window is closed.
   ask a decision model yes/no, choice or score questions (a way out per answer, or asking you when it isn't sure),
 show you what a run made (a window, a popover in the corner, a macOS notification), and name outputs (`{{steps.sum.title}}`) the next blocks use; your own
 variables (`{{vars.REPO}}`), a workflow's or global. A schedule can start one, and Laki AI makes or changes one with
-you. Each run keeps its decisions and log.
+you. Each run keeps its decisions and log: run it again, or again from any block; a run in a workspace you have, its
+worktree archived when it's done, each agent block's permission mode, a deleted one in the trash for 30 days, and
+`laki flow check` for a repo's CI.
 - **Agents & profiles, accounts**: each agent's profiles (model, effort, account, flags, env), and more than one Claude
   Code or Codex sign-in: a default for new sessions, each account's plan limits, a tab restarted on another account
   with its chat. Actions, templates and scheduled prompts take `{{branch}}`, `{{path}}`, `{{pr}}` and more.

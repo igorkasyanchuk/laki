@@ -139,7 +139,10 @@ popup (a window over Laki with HTML or Markdown: a result to read) and end (\`no
 Over MCP: \`laki_workflows\` lists them and their runs (with an id: that one's whole file); \`laki_workflow_write\`
 writes one, the whole file (its description has the format and every block); to change one, take its file from
 \`laki_workflows\` with its id, edit it and write it back with the same id and project; \`laki_workflow_run\` starts a run. One you wrote runs only after the
-user reads and saves it in Laki. The CLI: \`laki flow ls\`, \`laki flow run <workflow> <project> <task>\`.
+user reads and saves it in Laki. An agent block's \`perm:\` and \`fast: yes\` (else the head's \`perm:\`) set how freely it acts;
+\`when done: keep\` keeps a run's worktree (unset: archived once it's done and clean). The CLI: \`laki flow ls\`,
+\`laki flow run <workflow> <project> <task>\` (\`--ws .\`: in this workspace, no new worktree), \`laki flow again <run>
+[--from <block>]\`, and \`laki flow check [file.md… | folder]\` after you write one (no daemon; exit 1 on a problem).
 
 ### A new session (/laki:new)
 

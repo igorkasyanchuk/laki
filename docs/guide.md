@@ -1621,6 +1621,8 @@ laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
 laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (experimental: Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
+laki flow again <run> [--from <block>] | flow trash | flow restore <trash-id>   # a run again | deleted workflows
+laki flow check [file.md… | folder]                     # check workflow files, no daemon (none: ./.laki/workflows)
 laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
 laki widget on|off|run <id> [--ws <ws>]                 # show or hide one | fetch now (--ws: a per-workspace one's instance)
 laki widget set <id> --place desk,side --size 2x1 --every 10 key=value  # where it shows, its size, schedule, settings
