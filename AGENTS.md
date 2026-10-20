@@ -112,7 +112,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
-`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`. A
+`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -865,7 +865,12 @@ key: one test, two options) and `case` (`branchOf`/`branchLabel`: each option's 
 sources (none come with Laki: yours `<data>/workflows/<id>.md`, a project's `.laki/workflows/<id>.md`; not a host's), and the
 engine. A run (`state.flows`: live ones and the last 100 ended) copies its workflow (`flow`: pinned), makes its
 workspace (`wsNew` `preset: 'none'`: a worktree named by the task, its `flow` the run's id; or `local`, the folder's
-own), then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
+own) unless it was given one: `flowStart` `ws` (id or name; `project` then the workspace's; `picked`: live, not a
+Terminals', Browsers' or host's, no run going there, checked again in `begin` for a queued one) is the run's `pick`,
+no `ws.flow` mark (that means made by the run), whatever `runs in:` says; `runs in: here` refuses to start without
+one. The status bar's `.sb-flow` also finds a live run by `r.ws`. App's `flowItems` (`flowList` as `flowFiles`
+moves): a workspace's ⋯ › *Run workflow ›* (`flowMenu`) and ⌘K's *Run workflow: <name>* open the page's StartRun
+with it fixed (dialog `start`, `FlowStartAt`); StartRun's own *Workspace* for a `here` one without. Then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
 log, 1000 entries, each a line and its detail after a newline: the prompt, the answer, the output). Agent blocks: `session` run (`tabs['run:<preset>']`), new, or another block's tab; `send` `whenIdle` to a
 live one (`queued`: while the prompt is in the tab's queue, a turn's end is an earlier turn's), else `addTab` with the prompt (a shared session: the last run's live tab
 in the same workspace, else `forkOf` its `resume`); a tab that just started waits until drawn (`Session.born`, quiet

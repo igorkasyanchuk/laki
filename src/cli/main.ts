@@ -408,7 +408,7 @@ async function main() {
     case 'flow':
     case 'flows':
     case 'workflow': {
-      // workflows (experimental): laki flow [ls] | run <workflow> <project> <task…> [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]
+      // workflows (experimental): laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]
       const [sub = 'ls', id, ...words] = rest
       const status = (r: FlowView | FlowRun) => `${r.status}${!FLOW_ENDED.includes(r.status) && r.cur ? ` at ${r.cur}` : ''}`
       if (sub === 'ls') {
@@ -420,10 +420,14 @@ async function main() {
         ].join('\n'))
       }
       if (sub === 'run') {
-        const [project, ...task] = words
-        if (!id || !project) throw new Error('usage: laki flow run <workflow> <project> <task…> [--dry] [--set name=value…]')
+        // --ws: a workspace you have (`.`: this tab's), its project unless one is named first
+        const ws = flags.ws === '.' ? process.env.LAKI_WORKSPACE : typeof flags.ws === 'string' ? flags.ws : undefined
+        if (flags.ws === '.' && !ws) throw new Error("--ws .: only in a Laki tab ($LAKI_WORKSPACE): name the workspace")
+        const named = !ws || ((await rpc('state')) as View).projects.some(p => p.id === words[0] || p.name === words[0])
+        const [project, ...task] = named ? words : [undefined, ...words]
+        if (!id || (!project && !ws)) throw new Error('usage: laki flow run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…]')
         const inputs = Object.fromEntries(sets.map(x => (x.includes('=') ? [x.slice(0, x.indexOf('=')).trim(), x.slice(x.indexOf('=') + 1)] : [x.trim(), ''])))
-        const r: FlowRun = await rpc('flowStart', { workflow: id, project, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }) }, 180000)
+        const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }) }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }
       if (sub === 'show') {
@@ -433,7 +437,7 @@ async function main() {
       }
       if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
       if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
-      throw new Error('usage: laki flow [ls] | run <workflow> <project> <task…> [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]')
+      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

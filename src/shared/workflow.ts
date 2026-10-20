@@ -17,7 +17,7 @@ export const OUTWARD = ['ship', 'approve', 'merge', 'archive'] // what others se
 export const WAITS: Record<string, string> = { checks: 'Its PR’s checks pass or fail' }
 export const TESTS = ['contains', 'matches', 'equals', '>=', '<=', '>', '<', 'js'] as const // the last five: a number's, and a case branch's own JS
 export const NUM_TESTS = ['>=', '<=', '>', '<']
-export const WHERES: Record<string, string> = { worktree: 'A new worktree per run', main: "The project's folder (its own workspace)" }
+export const WHERES: Record<string, string> = { worktree: 'A new worktree per run', main: "The project's folder (its own workspace)", here: 'A workspace you pick (its ⋯ › Run workflow)' }
 export const SESSIONS: Record<string, string> = { new: 'A new AI session per run', shared: 'One AI session for every run (claude: each run forks the last)' }
 export const RESULTS = ['success', 'stopped', 'failed'] as const
 export const METHODS = ['POST', 'PUT', 'PATCH', 'GET', 'DELETE'] as const // a webhook's
@@ -107,7 +107,7 @@ export type Block = {
   modal?: boolean // popup: false, no window (its notification or card only); end: true, a window with its words
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
 }
-export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; on?: string; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own
+export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; on?: string; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own
 export type WorkflowSource = 'yours' | 'project'
 export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean } // the list's; byAgent: an agent wrote it (MCP), not saved by the user since
 
@@ -769,6 +769,7 @@ export type FlowRun = {
   flow: Workflow // the version it started with: edits don't move a run
   project: string
   ws?: string
+  pick?: string // the workspace it was given (flowStart's ws): it runs there, made by no one (no ws.flow mark)
   where: Workflow['where']
   session: Workflow['session']
   dry?: boolean // outward actions said, not done
@@ -805,7 +806,7 @@ export const WORKFLOW_FORMAT = `A Laki workflow is one Markdown file: a graph of
 # <Name>
 <one line: what it does>
 
-runs in: worktree|main · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · on: <event> (perm: every agent block's permission mode unless it says its own, below; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
+runs in: worktree|main|here · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · on: <event> (runs in: a new worktree per run, the project's folder, or here: a workspace the user picks, which the run needs (a worktree's or a folder's run takes one too when given); perm: every agent block's permission mode unless it says its own, below; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
 var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:

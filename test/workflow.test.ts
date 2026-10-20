@@ -1348,6 +1348,45 @@ test('workflow failures: a restart mid agent block asks again; a usage limit pau
   assert.equal(r.decisions.at(-1).exit, 'error')
 })
 
+test('workflow runs in a workspace you have: none made, no mark, one run there at a time; runs in: here needs one; archived refused; the CLI’s --ws', async t => {
+  const HERE = AGENT('claude', 'review {{task}}').replace('runs in: worktree', 'runs in: here')
+  assert.equal(parse(HERE).workflow.where, 'here')
+  assert.equal(toFile(parse(HERE, 'agent').workflow), HERE, 'round trip')
+  assert.deepEqual(check(parse(HERE).workflow), [])
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'here', text: HERE })
+  await rig.rpc('flowSave', { id: 'tree', text: AGENT('claude', 'fix {{task}}') })
+  const mine = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'mine' })
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'here', project: p.id, task: 'x' }), /Agent runs in a workspace you have: pick one/)
+  const count = async () => (await rig.rpc('state')).workspaces.length
+  const before = await count()
+  // no project: the workspace's; a worktree workflow given one runs there too
+  const run = await rig.rpc('flowStart', { workflow: 'tree', ws: mine.id, task: 'x' })
+  assert.deepEqual([run.ws, run.pick, run.project], [mine.id, mine.id, p.id])
+  assert.equal(await count(), before, 'no workspace made')
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'here', ws: 'mine', task: 'y' }), /mine has a run going: Agent/)
+  const r = await until(async () => {
+    const x = await rig.rpc('flowGet', { id: run.id })
+    return x.status === 'done' && x
+  }, 'done', 15000)
+  const v = await rig.rpc('state')
+  assert.equal(v.tabs.find((x: any) => x.id === r.tabs.work).workspace, mine.id, 'its agent’s tab is there')
+  assert.equal(v.workspaces.find((w: any) => w.id === mine.id).flow, undefined, 'no workflow mark: the run didn’t make it')
+  assert.ok(r.log.some((l: string) => /in mine \(worktree, branch .*, the one you picked\)/.test(l)), r.log.join('\n'))
+
+  // the CLI: --ws by name, its project then; an archived one refused
+  const cli = await rig.cli('flow', 'run', 'here', 'go', 'on', '--ws', 'mine')
+  assert.equal(cli.code, 0, cli.err)
+  assert.match(cli.out, new RegExp(`in ${mine.id}$`, "m"))
+  const id = cli.out.split(/\s+/)[0]
+  assert.equal((await rig.rpc('flowGet', { id })).task, 'go on')
+  await until(async () => (await rig.rpc('flowGet', { id })).status === 'done', 'its run done', 15000)
+  await rig.rpc('wsArchive', { id: mine.id })
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'here', ws: mine.id, task: 'x' }), /mine is archived: restore it first/)
+})
+
 const CHECKS = `# Checks
 Waits for CI.
 

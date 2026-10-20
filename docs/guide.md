@@ -1088,7 +1088,11 @@ on the empty canvas; drag one of them to move them all. With the canvas clicked,
 ⌘A picks every block and Esc none; ⌘Z undoes a change (a deletion too) while you aren't typing in a box. *File* shows the
 same workflow as Markdown, the way agents write one (`laki_workflow_write`).
 
-*Run* asks for a project and a task. Each run works in a new worktree (a sidebar row, with a workflow mark) or the
+*Run* asks for a project and a task. Each run works in a new worktree (a sidebar row, with a workflow mark), the
+project's folder, or a workspace you have: a workspace's ⋯ (or right click) › *Run workflow ›* and ⌘K's *Run
+workflow: <name>* start one there, for a PR to review or the CI of the branch you're on (`runs in: here` in its file:
+it always needs one; `--ws <workspace>` on `laki flow run`, `.` for the tab's own). One run at a time in a workspace;
+the run leaves it as it was, no workflow mark. Otherwise each run works in a new worktree or the
 project's folder, with a new AI session or one shared with the workflow's earlier runs. Opening a PR, approving,
 merging and archiving ask you first unless the block says not to; *Dry run* says them instead of doing them. A run
 keeps the version it started with, so editing a workflow never moves one under way. Several run at once (*Runs at
@@ -1118,6 +1122,7 @@ again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
 ```bash
 laki flow                                      # workflows and runs
 laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done; --set issue=1423: an input
+laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is this tab's), not a new worktree
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
@@ -1599,7 +1604,7 @@ laki memory . | memory add . "<a line>" [--mine] | memory rm . <id>   # the proj
 laki schedule add app --when "weekdays at 9am" "triage new issues"   # a prompt on repeat
 laki schedule add app --when "daily at 2am" --where folder-new --name "Deps {{DD-MM}}" "update the deps"
 laki schedule | schedule log | schedule off <id> | schedule run <id> | schedule rm <id>
-laki flow run my-flow app "add CSV export" [--dry] [--set name=value]     # a workflow run (experimental: Workflows, below)
+laki flow run my-flow app "add CSV export" [--dry] [--set name=value] [--ws <ws|.>]     # a workflow run (experimental: Workflows, below)
 laki flow | flow show <run> | flow answer <run> <n> | flow stop <run>
 laki widget | widget reload                             # the sidebar's extensions | read their folders again, fetch
 laki widget on|off|run <id> [--ws <ws>]                 # show or hide one | fetch now (--ws: a per-workspace one's instance)

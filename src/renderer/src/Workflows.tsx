@@ -28,6 +28,8 @@ export type WorkflowsApi = {
   setGlobals?: (v: Record<string, string>) => Promise<unknown>
 }
 type Sel = { id: string; source: WorkflowSource; project?: string }
+export type FlowStartAt = Sel & { ws?: string } // the page opened on a workflow's Run sheet, in that workspace
+const WHERE_TAGS: Record<string, string> = { worktree: 'worktree', main: 'project folder', here: 'a workspace you pick' }
 type Ext = { id: string; name: string; on: boolean; every?: number } // what an extension block can fetch
 type At = { kind: 'index' } | { kind: 'wf'; sel: Sel } | { kind: 'run'; id: string }
 const W = 180
@@ -49,14 +51,22 @@ function agentActions(global: RunAction[] | undefined, projects: Project[], item
 }
 const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daemon's actions have no slug)
 
-export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string }; api: WorkflowsApi; onClose: () => void }) {
+export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt }; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
   const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : { kind: 'index' })
   const [starting, setStarting] = useState<WorkflowItem | null>(null)
+  const [startWs, setStartWs] = useState(first?.start?.ws) // Run workflow › from a workspace's menu or ⌘K: that one, fixed
+  const startIn = (w: WorkflowItem | null, ws?: string) => (setStartWs(ws), setStarting(w))
   const [allRuns, setAllRuns] = useState(false)
   const [menu, openMenu] = useMenu()
   const refresh = () => api.call<WorkflowItem[]>('flowList', {}).then(setList, () => setList([]))
   useEffect(() => void refresh(), [view.flowFiles]) // and as a file changes (Laki AI's, an agent's)
+  // opened to start one: its Run sheet once the list is in
+  const [asked, setAsked] = useState(first?.start)
+  useEffect(() => {
+    const w = asked && list?.find(x => same(asked, x))
+    if (asked && list) setAsked(undefined), w ? (w.problems.length ? setAt({ kind: 'wf', sel: w }) : startIn(w, asked.ws)) : api.toast('That workflow is gone') // one with problems: its page says them
+  }, [list])
   const [want, setWant] = useState('') // With Laki AI's
   const [making, setMaking] = useState(false) // its box, open
   // asked Laki AI for one: the workflows there were then; the first new one opens as it's written
@@ -237,14 +247,14 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                         </span>
                         <span className="sched-tags">
                           <span className="tag">{w.source === 'project' ? pname(w.project) : 'yours'}</span>
-                          <span className="tag">{w.where === 'main' ? 'project folder' : 'worktree'}</span>
+                          <span className="tag">{WHERE_TAGS[w.where]}</span>
                           <span className="tag">{w.blocks.length} blocks</span>
                           {w.byAgent && <span className="tag warn">by an agent</span>}
                           {drafts.has(keyOf(w)) && <span className="tag warn">unsaved changes</span>}
                         </span>
                       </button>
                       <span className="sched-acts">
-                        <IconButton icon="run" title={w.problems.length ? `Can't run: ${w.problems[0]}` : 'Run it'} onClick={() => (w.problems.length ? setAt({ kind: 'wf', sel: w }) : setStarting(w))} />
+                        <IconButton icon="run" title={w.problems.length ? `Can't run: ${w.problems[0]}` : 'Run it'} onClick={() => (w.problems.length ? setAt({ kind: 'wf', sel: w }) : startIn(w))} />
                         <IconButton icon="more" title="More: copy, delete" onClick={e => wfMenu(e, w)} />
                       </span>
                     </div>
@@ -315,7 +325,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
               runs={going.filter(r => runOf(r, cur))}
               onSaved={w => (refresh(), setAt({ kind: 'wf', sel: w }))}
               onRemove={() => removeWf(cur).then(y => y && (drafts.delete(keyOf(cur)), setAt({ kind: 'index' })))}
-              onRun={() => setStarting(cur)}
+              onRun={() => startIn(cur)}
               onOpenRun={id => setAt({ kind: 'run', id })}
               onCopy={() => create(intoOf(cur), cur)}
             />
@@ -324,7 +334,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
           )}
         </div>
       )}
-      {starting && <StartRun item={starting} projects={projects} api={api} onClose={() => setStarting(null)} onStarted={id => (setStarting(null), setAt({ kind: 'run', id }))} />}
+      {starting && <StartRun item={starting} projects={projects} workspaces={view.workspaces} fixed={startWs} api={api} onClose={() => startIn(null)} onStarted={id => (startIn(null), setAt({ kind: 'run', id }))} />}
       {menu}
     </Page>
   )
@@ -1765,9 +1775,14 @@ function TestBlock({ b, api, project, own }: { b: Block; api: WorkflowsApi; proj
   )
 }
 
-function StartRun({ item, projects, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
-  const ok = projects.filter(p => !p.host && (item.source !== 'project' || p.id === item.project) && (item.where === 'main' || p.git !== false))
-  const [project, setProject] = useState(item.project ?? ok[0]?.id ?? '')
+// fixed: the workspace it runs in (its ⋯ › Run workflow, ⌘K); runs in: here without one picks it here
+function StartRun({ item, projects, workspaces, fixed, api, onClose, onStarted }: { item: WorkflowItem; projects: Project[]; workspaces: WorkspaceView[]; fixed?: string; api: WorkflowsApi; onClose: () => void; onStarted: (id: string) => void }) {
+  const fix = workspaces.find(w => w.id === fixed)
+  const ok = projects.filter(p => !p.host && (item.source !== 'project' || p.id === item.project) && (item.where !== 'worktree' || p.git !== false || p.id === fix?.project))
+  const [project, setProject] = useState(fix?.project ?? item.project ?? ok[0]?.id ?? '')
+  const [ws, setWs] = useState('') // runs in: here, none fixed: one of the project's
+  const choices = workspaces.filter(w => w.project === project && !w.archived && !w.host)
+  const needsTask = item.blocks.find(b => b.kind === 'start')?.input === 'task'
   const [task, setTask] = useState('')
   const [dry, setDry] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -1785,7 +1800,7 @@ function StartRun({ item, projects, api, onClose, onStarted }: { item: WorkflowI
   const go = () => {
     setBusy(true)
     setErr('')
-    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, task, dry, ...(inputs.length && { inputs: vals }) }).then(
+    api.call<FlowRun>('flowStart', { workflow: item.id, source: item.source, project, ...((fixed || ws) && { ws: fixed || ws }), task, dry, ...(inputs.length && { inputs: vals }) }).then(
       r => onStarted(r.id),
       e => (setBusy(false), setErr((e as Error).message)),
     )
@@ -1794,18 +1809,29 @@ function StartRun({ item, projects, api, onClose, onStarted }: { item: WorkflowI
     <div className="overlay" onPointerDown={e => e.target === e.currentTarget && !busy && onClose()}>
       <form className="modal wf-start" onSubmit={e => (e.preventDefault(), go())} onKeyDown={e => e.key === 'Escape' && (e.stopPropagation(), onClose())}>
         <b>Run {item.name}</b>
-        <span className="wf-hint">{WHERES[item.where]} · {SESSIONS[item.session]}</span>
+        <span className="wf-hint">{fix ? `Runs in ${fix.name ?? fix.id}, the workspace you picked` : WHERES[item.where]} · {SESSIONS[item.session]}</span>
         <label className="wf-field">
           <span>Project</span>
-          <select value={project} onChange={e => setProject(e.target.value)} disabled={item.source === 'project'}>
+          <select value={project} onChange={e => (setProject(e.target.value), setWs(''))} disabled={item.source === 'project' || !!fix}>
             {ok.map(p => (
               <option key={p.id} value={p.id}>{p.name}</option>
             ))}
           </select>
         </label>
+        {item.where === 'here' && !fix && (
+          <label className="wf-field">
+            <span>Workspace</span>
+            <select value={ws} onChange={e => setWs(e.target.value)}>
+              <option value="">pick one</option>
+              {choices.map(w => (
+                <option key={w.id} value={w.id}>{w.name ?? w.id}</option>
+              ))}
+            </select>
+          </label>
+        )}
         <label className="wf-field">
           <span>Task</span>
-          <textarea autoFocus rows={4} value={task} placeholder="What should it work on?" onChange={e => setTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), go())} />
+          <textarea autoFocus rows={4} value={task} placeholder={needsTask ? 'What should it work on?' : 'What should it work on? (optional)'} onChange={e => setTask(e.target.value)} onKeyDown={e => e.key === 'Enter' && e.metaKey && (e.preventDefault(), go())} />
         </label>
         {inputs.map(i => {
           const v = vals[i.name] ?? ''
@@ -1843,7 +1869,7 @@ function StartRun({ item, projects, api, onClose, onStarted }: { item: WorkflowI
         {err && <span className="wf-err">{err}</span>}
         <div className="wf-start-foot">
           <button type="button" className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn primary" disabled={busy || !project || !task.trim() || missing}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
+          <button className="btn primary" disabled={busy || !project || (needsTask && !task.trim()) || missing || (item.where === 'here' && !fixed && !ws)}>{busy ? 'Starting…' : 'Run ⌘⏎'}</button>
         </div>
       </form>
     </div>
@@ -1960,7 +1986,7 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete }: {
         </div>
       )}
       {win && <ShownDialog s={{ run: r.id, name: r.flow.name, title: win.title, body: win.body }} onClose={() => setWin(null)} />}
-      {r.status === 'queued' && <div className="wf-note">Queued: {ahead ? `${ahead} ${ahead === 1 ? 'run' : 'runs'} of ${r.flow.name} ahead of it` : 'next in line'}. It starts {r.where === 'main' ? 'in the project’s folder' : 'in a worktree of its own'} once a run of it ends (at once: {r.flow.runs ?? RUNS_AT_ONCE}).</div>}
+      {r.status === 'queued' && <div className="wf-note">Queued: {ahead ? `${ahead} ${ahead === 1 ? 'run' : 'runs'} of ${r.flow.name} ahead of it` : 'next in line'}. It starts {r.pick ? 'in the workspace you picked' : r.where === 'main' ? 'in the project’s folder' : 'in a worktree of its own'} once a run of it ends (at once: {r.flow.runs ?? RUNS_AT_ONCE}).</div>}
       {r.status === 'paused' && r.wait?.kind === 'limit' && <div className="wf-note">Paused at a usage limit: it goes on when the limit resets{r.wait.until ? `, at ${new Date(r.wait.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.</div>}
       {mode === 'log' ? (
         <RunLog log={r.log} />

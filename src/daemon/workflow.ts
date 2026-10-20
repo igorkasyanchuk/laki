@@ -12,7 +12,7 @@ import { basename, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
+import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, widgetEvent, widgetUse } from './widgets.ts'
 
@@ -205,9 +205,24 @@ function eventVars(ev: unknown) {
   return out
 }
 
-export async function flowStart(o: { workflow: string; source?: WorkflowSource; project: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string>; event?: Record<string, unknown> }) {
+// a workspace a run is given (flowStart's ws: its id or name): live, a project's that keeps workflows, none going there
+function picked(ref: string, project?: string): Workspace {
+  const ws = state.workspaces.find(w => w.id === ref) ?? state.workspaces.find(w => w.name === ref && !w.archived) ?? findWs(ref)
+  const name = ws.name ?? ws.id
+  const p = state.projects.find(x => x.id === ws.project)
+  if (ws.archived) throw new Error(`${name} is archived: restore it first`)
+  if (!p || !usable(p) || ws.host) throw new Error(`${name} can't run workflows (Terminals, Browsers and SSH hosts can't)`)
+  if (project && findProject(project).id !== p.id) throw new Error(`${name} is ${p.name}'s, not ${findProject(project).name}'s`)
+  const there = runs().find(x => going(x) && x.ws === ws.id)
+  if (there) throw new Error(`${name} has a run going: ${there.flow.name}`)
+  return ws
+}
+
+export async function flowStart(o: { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string>; event?: Record<string, unknown> }) {
   on()
-  const wf = flowFind({ id: o.workflow, source: o.source, project: o.project })
+  const pick = o.ws ? picked(o.ws, o.project) : undefined
+  if (!pick && !o.project) throw new Error('which project? (or a workspace: ws)')
+  const wf = flowFind({ id: o.workflow, source: o.source, project: pick?.project ?? o.project })
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
   if (o.by === 'agent' && wf.byAgent) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from Laki's Workflows, once they've read and saved it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
@@ -222,9 +237,10 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   }
   const bypass = bypassIn(wf, b => agentOf(b.agent)).map(blockName)
   if (o.by === 'agent' && bypass.length) throw new Error(`${wf.name} runs an agent that never asks (bypass permissions: ${bypass.join(', ')}): start it yourself`)
-  const proj = findProject(o.project)
+  const proj = findProject(pick?.project ?? o.project!)
   if (proj.kind) throw new Error('workflows run in a project: Terminals and Browsers have none')
-  if (wf.where === 'worktree' && proj.git === false) throw new Error(`${proj.name} isn't a git repository: ${wf.name} runs in a worktree (runs in: main works there)`)
+  if (wf.where === 'here' && !pick) throw new Error(`${wf.name} runs in a workspace you have: pick one (its ⋯ › Run workflow, or --ws)`)
+  if (wf.where === 'worktree' && !pick && proj.git === false) throw new Error(`${proj.name} isn't a git repository: ${wf.name} runs in a worktree (runs in: main works there)`)
   const task = String(o.task ?? '').trim()
   const start = wf.blocks.find(b => b.kind === 'start')
   if (start?.input === 'task' && !task) throw new Error('what should it work on? (a task)')
@@ -236,7 +252,7 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
   const { source, project, path, text, problems, byAgent: _, ...flow } = wf
-  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   runs().push(r)
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}`)
   if (r.dry && bypass.length) say(r, `dry run: ${bypass.join(', ')} would run with bypass permissions (never asks)`)
@@ -250,18 +266,19 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   return begin(r)
 }
 
-// a run gets its workspace and enters its start
+// a run gets its workspace (the one it was given, checked again: a queued one waited; else a new worktree or the
+// folder's own) and enters its start
 async function begin(r: FlowRun) {
   let ws: Workspace
   try {
-    ws = r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow }) : await wsNew({ project: r.project, local: true, preset: 'none' })
+    ws = r.pick ? picked(r.pick) : r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow }) : await wsNew({ project: r.project, local: true, preset: 'none' })
   } catch (e) {
     finish(r, 'failed', `no workspace: ${(e as Error).message}`)
     throw e
   }
   r.ws = ws.id
-  if (r.where === 'worktree') ws.flow = r.id // its row's mark
-  say(r, `in ${ws.name ?? ws.id} (${ws.kind === 'worktree' ? `worktree, branch ${ws.branch}` : 'the project folder'})`)
+  if (r.where === 'worktree' && !r.pick) ws.flow = r.id // its row's mark: made by this run
+  say(r, `in ${ws.name ?? ws.id} (${ws.kind === 'worktree' ? `worktree, branch ${ws.branch}` : 'the project folder'}${r.pick ? ', the one you picked' : ''})`)
   enter(r, r.flow.blocks.find(b => b.kind === 'start')!)
   return r
 }

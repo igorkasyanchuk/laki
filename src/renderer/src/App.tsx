@@ -23,6 +23,8 @@ import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
+import type { FlowStartAt } from './Workflows'
+import type { WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
@@ -164,7 +166,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -1879,6 +1881,7 @@ export function App() {
     ...(w.pr?.state === 'OPEN' && !w.pr.mine && allows(w, 'approve') ? [{ label: `Approve PR #${w.pr.number}…`, icon: 'check', run: () => prAct(w, 'approve') } as MenuItem] : []),
     ...(w.pinned ? [] : groupItems(w)),
     ...runItems(w),
+    ...flowMenu(w),
     null,
     ...(w.kind === 'worktree'
       ? [
@@ -1909,6 +1912,14 @@ export function App() {
     ]
     return items.length ? [{ label: 'Move to group', icon: 'sep', key: 'g', items }] : []
   }
+  // Run workflow ›: the project's workflows and yours, a pick its Run sheet in this workspace (Workflows on; not a
+  // terminal's, a browser's, a host's or an archived one)
+  const flowsHere = (w: WorkspaceView) => flowItems.filter(f => f.source === 'yours' || f.project === w.project)
+  const flowMenu = (w: WorkspaceView): MenuItem[] =>
+    settings.workflows !== true || rawKind(w) !== 'projects' || w.host || w.archived
+      ? []
+      : [{ label: 'Run workflow', icon: 'flow', key: 'w', items: flowsHere(w).length ? flowsHere(w).map(f => ({ label: f.name, sub: f.problems[0] ?? (f.source === 'project' ? 'the project’s' : 'yours'), icon: 'flow', ...(f.problems.length && { tone: 'warn' as const }), run: () => runFlow(f, w.id) }) as MenuItem) : [{ label: 'New workflow…', icon: 'plus', run: () => setDialog({ workflows: '' }) }] }]
+  const runFlow = (f: WorkflowItem, ws?: string) => setDialog({ workflows: '', start: { id: f.id, source: f.source, project: f.project, ws } })
   // Run ›: the toolbar's Run ▾ for this workspace (its script, localhost, the agent and terminal actions), a submenu;
   // a terminal or a browser has none
   const runItems = (w: WorkspaceView): MenuItem[] => (rawKind(w) === 'projects' ? [{ label: 'Run', icon: 'run', key: 'n', items: runMenu(w) }] : [])
@@ -2088,6 +2099,9 @@ export function App() {
     setOnboard(o => ({ ...o, seen: true }))
     setDialog('onboard') // once, as it opens: everyone, this update's users too
   }, [!!view, !dialog])
+  // the workflows a workspace's Run workflow › and ⌘K offer: again as a file changes (Workflows on)
+  const [flowItems, setFlowItems] = useState<WorkflowItem[]>([])
+  useEffect(() => void (settings.workflows === true ? call<WorkflowItem[]>('flowList', {}).then(setFlowItems, () => {}) : setFlowItems([])), [settings.workflows, view?.flowFiles])
   // a page seen ticks its step: Scheduled tasks, Workflows, Settings opened at Experimental
   useEffect(() => {
     const id = schedulesOf(dialog) !== undefined ? 'schedules' : flowsOf(dialog) ? 'workflows' : dialog && typeof dialog === 'object' && 'spot' in dialog && dialog.spot === 'Experimental' ? 'experimental' : undefined
@@ -2265,6 +2279,8 @@ export function App() {
     a({ label: 'Board: every workspace by where it is, and to-dos', icon: 'board', run: () => setDialog('board') })
     if (settings.specs === true) a({ label: 'Specs & Brainstorms: requirements to implement, ideas to explore', icon: 'spec', run: () => setDialog({ specs: '' }) })
     if (settings.workflows === true) a({ label: 'Workflows: blocks Laki runs for a task, and their runs', icon: 'flow', run: () => setDialog({ workflows: '' }) })
+    // Run workflow: each one, in the selected workspace (none, or one it can't run in: the Run sheet asks)
+    if (settings.workflows === true) for (const f of ws && flowMenu(ws).length ? flowsHere(ws) : flowItems) if (!f.problems.length) a({ label: `Run workflow: ${f.name}`, icon: 'flow', hint: ws && flowMenu(ws).length ? wsName(ws) : 'workflow', run: () => runFlow(f, ws && flowMenu(ws).length ? ws.id : undefined) })
     if (settings.birdView === true) a({ label: 'Bird view: every live session and its screen', icon: 'eye', run: () => setDialog('bird') })
     if (settings.calendar === true) a({ label: 'Calendar: scheduled tasks and reminders by week or month', icon: 'calendar', run: () => setDialog('calendar') })
     if (settings.desk === true) a({ label: 'My Desk: your extensions as tiles, an overview of what is going on', icon: 'desk', run: () => setDialog('desk') })
@@ -3439,12 +3455,12 @@ export function App() {
           flowsOn && (
             <Suspense fallback={<Waiting title="Workflows" onClose={() => setDialog(null)} />}>
               <WorkflowsPage
-                key={o.run ?? ''}
+                key={o.run ?? (o.start ? JSON.stringify(o.start) : '')}
                 view={view}
                 projects={view.projects.filter(p => !p.kind)}
                 presets={view.presets.filter(p => !p.off)}
                 actions={settings.actions}
-                at={{ run: o.run }}
+                at={{ run: o.run, start: o.start }}
                 onClose={() => setDialog(null)}
                 api={{
                   call,
@@ -3647,7 +3663,7 @@ export function App() {
                       {f.block && ['running', 'waiting', 'paused'].includes(f.status) && <span className="muted"> · {f.block}</span>}
                     </span>
                   </button>
-                ))(flowsOn ? [tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's */}
+                ))(flowsOn ? ([tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) || view.flows?.find(r => r.ws === ws.id && !['done', 'stopped', 'failed'].includes(r.status))) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's; else one going in it (a workspace you picked) */}
               {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
               <span className="port-item">
                 <button

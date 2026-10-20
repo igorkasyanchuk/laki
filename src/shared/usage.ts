@@ -38,7 +38,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
                                               prompt is the run's date
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
   laki flow [ls]                             workflows (experimental: Settings › General) and their runs
-  laki flow run <workflow> <project> <task> [--dry] [--set name=value…]  start a run (--dry: a PR, approve, merge said, not done; --set: its inputs)
+  laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs)
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
@@ -154,12 +154,13 @@ late is skipped). --where: new (a worktree each run), folder, folder-new, or a w
 this workspace.
 
   laki remind "tomorrow at 9am" Check the deploy --ws .`,
-  flow: `Workflows (experimental): graphs of blocks Laki runs for a task, each run in a workspace of its own. --dry says
-what a PR, approve or merge would do instead of doing it. --set gives one of its Start's inputs (inputs: in the file),
-again for each; the ones without a default are needed.
+  flow: `Workflows (experimental): graphs of blocks Laki runs for a task, each run in a workspace of its own, or one you
+have (--ws; . is this tab's, the project then its). --dry says what a PR, approve or merge would do instead of doing it.
+--set gives one of its Start's inputs (inputs: in the file), again for each; the ones without a default are needed.
 
   laki flow ls
   laki flow run review-pr shop "Review PR #118" --dry
+  laki flow run fix-ci "Fix the failing check" --ws .
   laki flow run fix-issue shop "Fix it" --set issue=1423 --set base=main`,
   widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
 their tools, and change where one shows and its settings (laki widget set; not a secret, its source or network
