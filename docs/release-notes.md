@@ -10,6 +10,8 @@ version it builds, with the date. -->
   `runs in: here` for one that always does.
 - Workflows: **Run again** on an ended run (its task and inputs, the workflow as it is now), and a block's **Run from
   here**: on from that block in the same workspace, the agent work before it kept. `laki flow again <run> [--from]`.
+- Workflows: a deleted one goes to the trash (Undo, `laki flow restore`), and each save keeps the one before: ⋯ ›
+  **History…** to look at the last 20 and bring one back.
 - A *Context* starter (`laki widget new Context --kind context`): actions in ⌘K, a file's right click and the prompt's
   Insert menu, to copy from.
 - Extensions can come with a repo (`.laki/extensions/`): off until you look at what they run, off again when the repo

@@ -1456,6 +1456,52 @@ test('workflow Run again and Run from here: the task and inputs again on the fil
   assert.ok((await rig.rpc('flowStart', { again: first.id })).id)
 })
 
+test('workflow trash and history: a delete goes to the trash and Undo brings it back; each save keeps the one before (20); a revert; tidy after 30 days', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  const text = AGENT('claude', 'x')
+  await rig.rpc('flowSave', { id: 'gone', text })
+  const del = await rig.rpc('flowRm', { id: 'gone' })
+  assert.equal(existsSync(join(rig.data, 'workflows', 'gone.md')), false)
+  assert.deepEqual((await rig.rpc('flowTrash')).map((x: any) => [x.trash, x.id, x.name]), [[del.trash, 'gone', 'Agent']])
+  await rig.rpc('flowRestore', { trash: del.trash })
+  assert.equal(readFileSync(join(rig.data, 'workflows', 'gone.md'), 'utf8'), text, 'the same text back')
+  assert.deepEqual(await rig.rpc('flowTrash'), [])
+  // a project's goes too; its Undo with a new file of that id is refused
+  await rig.rpc('flowSave', { id: 'theirs', source: 'project', project: p.id, text })
+  const d2 = await rig.rpc('flowRm', { id: 'theirs', source: 'project', project: p.id })
+  assert.equal(existsSync(join(p.path, '.laki', 'workflows', 'theirs.md')), false)
+  await rig.rpc('flowSave', { id: 'theirs', source: 'project', project: p.id, text: '# New\n' })
+  await assert.rejects(rig.rpc('flowRestore', { trash: d2.trash }), /a workflow theirs is there now: not restored/)
+  const cli = await rig.cli('flow', 'trash')
+  assert.match(cli.out, new RegExp(`^${d2.trash}  Agent  `, 'm'))
+
+  // history: ten saves over it, ten versions (an agent's too), newest first; a revert writes one back
+  const v = (n: number) => text.replace('> x', `> version ${n}`)
+  for (let n = 1; n <= 10; n++) await rig.rpc('flowSave', { id: 'gone', text: v(n), ...(n === 5 && { by: 'agent' }) })
+  let h = await rig.rpc('flowHistory', { id: 'gone' })
+  assert.equal(h.length, 10)
+  assert.equal((await rig.rpc('flowHistory', { id: 'gone', at: h[0].at })).text, v(9))
+  assert.equal((await rig.rpc('flowHistory', { id: 'gone', at: h[9].at })).text, text)
+  assert.equal(h[0].first, '# Agent')
+  await rig.rpc('flowRevert', { id: 'gone', at: h[9].at })
+  assert.equal(readFileSync(join(rig.data, 'workflows', 'gone.md'), 'utf8'), text, 'the old text back')
+  h = await rig.rpc('flowHistory', { id: 'gone' })
+  assert.equal((await rig.rpc('flowHistory', { id: 'gone', at: h[0].at })).text, v(10), 'the one it replaced kept')
+  // past 20: the oldest goes
+  for (let n = 11; n <= 20; n++) await rig.rpc('flowSave', { id: 'gone', text: v(n) })
+  h = await rig.rpc('flowHistory', { id: 'gone' })
+  assert.equal(h.length, 20)
+  assert.equal((await rig.rpc('flowHistory', { id: 'gone', at: h[19].at })).text, v(1), 'the first save’s file went')
+
+  // tidy: past 30 days, gone for good
+  await rig.rpc('flowTrashTidy', { now: Date.now() + 29 * 86400e3 })
+  assert.equal((await rig.rpc('flowTrash')).length, 1)
+  await rig.rpc('flowTrashTidy', { now: Date.now() + 31 * 86400e3 })
+  assert.deepEqual(await rig.rpc('flowTrash'), [])
+})
+
 const CHECKS = `# Checks
 Waits for CI.
 

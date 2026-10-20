@@ -17,7 +17,7 @@ import { accountAdd, accountRm, accountSet, accountViews, usageWho } from './acc
 import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload } from './notes.ts'
-import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
+import { flowAnswer, flowTest, flowForget, flowGet, flowHistory, flowList, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy } from './workflow.ts'
 import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
@@ -359,7 +359,12 @@ const api: Record<string, Handler> = {
   },
   flowList: p => flowList(p), // workflows (experimental): workflow.ts
   flowSave: p => flowSave(p),
-  flowRm: p => flowRm(p), // the app's Delete, after its confirm
+  flowRm: p => flowRm(p), // the app's Delete: to the trash, a toast's Undo is flowRestore
+  flowRestore: p => flowRestore(p),
+  flowTrash: () => flowTrash(), // laki flow trash
+  flowTrashTidy: p => flowTrashTidy(p.now), // tests move the clock
+  flowHistory: p => flowHistory(p), // the editor's History…: its versions, or one's text (at)
+  flowRevert: p => flowRevert(p),
   flowStart: p => flowStart(p),
   flowStop: p => flowStop(p),
   flowAnswer: p => flowAnswer(p),
@@ -506,8 +511,8 @@ server.listen(Number(process.env.LAKI_PORT || 0), '127.0.0.1', () => {
   every(30000, () => widgetTick())
   every(5000, () => flowTick())
   every(600000, () => aiTick()) // a spec's or brainstorm's chat unused 12 hours ends
-  every(3600000, () => (core.imagesTidy(), core.archivedTidy(), widgetTrashTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays, deleted extensions past 30 days
-  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
+  every(3600000, () => (core.imagesTidy(), core.archivedTidy(), widgetTrashTidy(), flowTrashTidy())) // pasted images past settings.imageDays, archived workspaces past archivedDays, deleted extensions past 30 days
+  setTimeout(() => (core.archivedTidy(), widgetTrashTidy(), flowTrashTidy(), core.state.settings?.bgRefresh !== false && core.scanPRs().catch(() => {})), 2000)
 })
 
 function shutdown() {

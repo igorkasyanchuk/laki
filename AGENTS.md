@@ -112,7 +112,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
-`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`. A
+`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -876,7 +876,13 @@ with it fixed (dialog `start`, `FlowStartAt`); StartRun's own *Workspace* for a 
 `again <id>`) and `from` (`{ run, block }`: its workspace, live and not archived, as `pick`; the block in the file
 now; its `vars`, `visits`, `tabs` and `resume` copied; `first`, the block `begin` enters, a visit; the worktree's
 `ws.flow` moves to it), both `of` the old run, said in the first log line: RunView's *Run again*, a block's right
-click *Run from here*, the index row's ⋯, `laki flow again <run> [--from <block>]`. Then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
+click *Run from here*, the index row's ⋯, `laki flow again <run> [--from <block>]`. `flowRm` moves the file to
+`<data>/workflow-trash/<id>-<ms>/workflow.md` with `trash.json` (id, source, project, name, path, at); `flowTrash` lists
+them newest first, `flowRestore` (`trash`) puts one back where it was (refused when a file of its id is there now),
+`flowTrashTidy` (hourly and at start) drops them past 30 days or 20. `flowSave` keeps the file it replaces first
+(`keepOld`: `<data>/workflow-history/yours-<id>` or `project-<project>-<id>`, `<ms>.md`, not when it's the same text,
+the last 20); `flowHistory` lists them (`at`, `size`, `first`) or gives one's `text` (`at`), `flowRevert` saves one
+through `flowSave` (so the one it replaces is kept too). The CLI's `laki flow trash` and `restore`. Then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
 log, 1000 entries, each a line and its detail after a newline: the prompt, the answer, the output). Agent blocks: `session` run (`tabs['run:<preset>']`), new, or another block's tab; `send` `whenIdle` to a
 live one (`queued`: while the prompt is in the tab's queue, a turn's end is an earlier turn's), else `addTab` with the prompt (a shared session: the last run's live tab
 in the same workspace, else `forkOf` its `resume`); a tab that just started waits until drawn (`Session.born`, quiet
@@ -978,7 +984,8 @@ else the last; an HTML5 drag, `DRAG`, onto the canvas drops one there, snapped, 
 `blockMenu` over the same `picks`; `Canvas`: `geo`'s bezier arrows, drag snaps to 10; `many` (⇧/⌘-click, a box on the
 empty canvas, `band`) moved as one (`from`) and the Editor's `remove` (Delete or ⌫ while the canvas, `tabIndex` 0, has
 the keyboard; the right click's *Delete these n*; never the start), ⌘A all, Esc none; `past` (50 files) is ⌘Z outside a
-field; the head's ⋯ (and a row's on the index): *Make a copy*, *Delete…*;
+field; the head's ⋯ (and a row's on the index): *Make a copy*, *Delete* (no ask: a toast with Undo, `flowRestore`), the head's
+*History…* (`HistoryDialog`: `flowHistory`'s list, a version's text, *Put this one back*: `flowRevert`);
 `Inspector`, a case's branches as `.wf-branch` cards; File: the Markdown, `FileEdit`: highlight.ts' `highlightWorkflow`
 (the keys of `parse`, its `WHOLE` ones' values left whole; plain past `HL_MAX`) in a pre under a clear-text textarea,
 `.wf-code` holding both to one box), `StartRun`, `RunView` (the canvas' `Lit`: `taken` arrows, `live`

@@ -7,8 +7,8 @@
 import { type ChildProcess, spawn } from 'node:child_process'
 import { randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
-import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
-import { basename, join, resolve, sep } from 'node:path'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { basename, dirname, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
@@ -113,13 +113,14 @@ export function flowFind(o: Ref): WorkflowItem {
   return item(readFileSync(f.path, 'utf8'), o.id, o.source, f.project, f.path)
 }
 
-// saved as it is, problems and all (the page shows them; a run refuses them)
+// saved as it is, problems and all (the page shows them; a run refuses them); what was there goes to its history first
 export function flowSave(o: Ref & { text: string; by?: 'agent' }): WorkflowItem {
   on()
   const text = String(o.text ?? '')
   if (Buffer.byteLength(text) > MAX_FILE) throw new Error('a workflow file is 256 KB at most')
   const f = fileOf({ ...o, source: o.source ?? 'yours' })
   mkdirSync(f.d, { recursive: true })
+  keepOld(histOf({ ...o, project: f.project }), f.path, text)
   writeFileSync(f.path, text)
   markAgent(agentKey(o.source ?? 'yours', o.id, f.project), o.by === 'agent')
   flowFiles.at = Date.now()
@@ -127,15 +128,114 @@ export function flowSave(o: Ref & { text: string; by?: 'agent' }): WorkflowItem 
   return item(readFileSync(f.path, 'utf8'), o.id, o.source ?? 'yours', f.project, f.path)
 }
 
+// to the trash, a project's too (git may not have it yet): Undo is flowRestore
 export function flowRm(o: Ref) {
   on()
   const f = fileOf(o)
   if (!existsSync(f.path)) throw new Error(`no workflow ${o.id}`)
-  rmSync(f.path)
+  const at = Date.now()
+  const t = join(trashDir(), `${o.id}-${at}`)
+  mkdirSync(t, { recursive: true })
+  const name = parse(readFileSync(f.path, 'utf8'), o.id).workflow.name
+  move(f.path, join(t, 'workflow.md'))
+  writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at } satisfies Trashed))
   markAgent(agentKey(o.source ?? 'yours', o.id, f.project), false)
   flowFiles.at = Date.now()
   changed()
-  return { ok: true }
+  return { ok: true, trash: basename(t) }
+}
+
+// ---------- the trash: <data>/workflow-trash/<id>-<ms>/ (workflow.md; trash.json says what and from where), kept
+// TRASH_DAYS, the newest TRASH_MAX. History: each save keeps the file as it was, <data>/workflow-history/<yours-<id> or
+// project-<project>-<id>>/<ms>.md, the last HISTORY
+type Trashed = { id: string; source: WorkflowSource; project?: string; name: string; path: string; at: number }
+const TRASH_DAYS = 30
+const TRASH_MAX = 20
+const HISTORY = 20
+const trashDir = () => join(dir, 'workflow-trash')
+const histOf = (o: Ref) => join(dir, 'workflow-history', o.source === 'project' ? `project-${o.project}-${o.id}` : `yours-${o.id}`)
+// renamed, or copied then removed across volumes (EXDEV)
+function move(from: string, to: string) {
+  try {
+    renameSync(from, to)
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EXDEV') throw e
+    cpSync(from, to)
+    rmSync(from, { force: true })
+  }
+}
+const readJson = <T>(p: string): T | undefined => {
+  try {
+    return JSON.parse(readFileSync(p, 'utf8'))
+  } catch {}
+}
+export function flowTrash() {
+  on()
+  let names: string[] = []
+  try {
+    names = readdirSync(trashDir())
+  } catch {}
+  return names.flatMap(n => (m => (m ? [{ trash: n, ...m }] : []))(readJson<Trashed>(join(trashDir(), n, 'trash.json')))).sort((a, b) => b.at - a.at)
+}
+// Undo: back where it was; refused when a workflow of that id is there now
+export function flowRestore(o: { trash: string }) {
+  on()
+  const n = String(o.trash ?? '')
+  const m = /^[\w?-]{1,41}-\d+$/.test(n) ? readJson<Trashed>(join(trashDir(), n, 'trash.json')) : undefined
+  if (!m) throw new Error(`no ${n} in the trash: laki flow trash lists it`)
+  if (existsSync(m.path)) throw new Error(`a workflow ${m.id} is there now: not restored`)
+  mkdirSync(dirname(m.path), { recursive: true })
+  move(join(trashDir(), n, 'workflow.md'), m.path)
+  rmSync(join(trashDir(), n), { recursive: true, force: true })
+  flowFiles.at = Date.now()
+  changed()
+  return item(readFileSync(m.path, 'utf8'), m.id, m.source, m.project, m.path)
+}
+// at start and hourly: past TRASH_DAYS, and past the newest TRASH_MAX, gone for good
+export function flowTrashTidy(now = Date.now()) {
+  if (state.settings?.workflows !== true) return
+  for (const [i, e] of flowTrash().entries()) if (i >= TRASH_MAX || now - e.at > TRASH_DAYS * 86400e3) rmSync(join(trashDir(), e.trash), { recursive: true, force: true })
+}
+// the file as it was before a write (not when it's the same), the newest HISTORY kept
+function keepOld(h: string, path: string, text: string) {
+  let was: string
+  try {
+    was = readFileSync(path, 'utf8')
+  } catch {
+    return // a new one
+  }
+  if (was === text) return
+  mkdirSync(h, { recursive: true })
+  let at = Date.now()
+  while (existsSync(join(h, `${at}.md`))) at++
+  writeFileSync(join(h, `${at}.md`), was)
+  for (const x of versions(h).slice(HISTORY)) rmSync(join(h, `${x}.md`), { force: true })
+}
+const versions = (h: string) => {
+  try {
+    return readdirSync(h).filter(n => /^\d+\.md$/.test(n)).map(n => Number(n.slice(0, -3))).sort((a, b) => b - a)
+  } catch {
+    return []
+  }
+}
+// its earlier versions, newest first (at, size, first line); with at: that one's text
+export function flowHistory(o: Ref & { at?: number }) {
+  on()
+  const f = fileOf({ ...o, source: o.source ?? 'yours' })
+  const h = histOf({ ...o, project: f.project })
+  if (o.at !== undefined) {
+    if (!versions(h).includes(Number(o.at))) throw new Error(`no version of ${o.id} from then`)
+    return { at: Number(o.at), text: readFileSync(join(h, `${Number(o.at)}.md`), 'utf8') }
+  }
+  return versions(h).map(at => {
+    const text = readFileSync(join(h, `${at}.md`), 'utf8')
+    return { at, size: Buffer.byteLength(text), first: text.split('\n').find(l => l.trim())?.trim().slice(0, 120) ?? '' }
+  })
+}
+// a version back: written as a save would (the one there now goes to its history first)
+export function flowRevert(o: Ref & { at: number }) {
+  const v = flowHistory(o) as { text: string }
+  return flowSave({ id: o.id, source: o.source, project: o.project, text: v.text })
 }
 
 // ---------- runs

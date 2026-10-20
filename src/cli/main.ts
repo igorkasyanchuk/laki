@@ -431,6 +431,15 @@ async function main() {
         const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }) }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }
+      if (sub === 'trash') {
+        const list: { trash: string; id: string; name: string; path: string; at: number }[] = await rpc('flowTrash')
+        return out(list, list.map(x => `${x.trash}  ${x.name}  ${new Date(x.at).toLocaleString()}  ${x.path}`).join('\n') || 'the trash is empty')
+      }
+      if (sub === 'restore') {
+        if (!id) throw new Error('usage: laki flow restore <trash-id> (laki flow trash lists them)')
+        const w: WorkflowItem = await rpc('flowRestore', { trash: id })
+        return out(w, `restored ${w.id}${w.path ? ` in ${w.path}` : ''}`)
+      }
       if (sub === 'again') {
         // an ended run again (its task and inputs, the workflow as it is now), or --from a block: in its workspace, its state kept
         if (!id) throw new Error('usage: laki flow again <run> [--from <block>]')
@@ -444,7 +453,7 @@ async function main() {
       }
       if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
       if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
-      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | show|stop <run> | answer <run> <n> [words]')
+      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | trash | restore <trash-id> | show|stop <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

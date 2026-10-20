@@ -1077,8 +1077,10 @@ step, it writes the workflow, you read it and *Save*.
 None come with Laki: *New workflow* ▾ makes one. *From scratch*: yours (any project) or a project's (in its repo,
 `.laki/workflows/<id>.md`, to share with your team), from a start, an agent and an end (100 blocks at most). *With
 Laki AI…*: say what it should do; its chat asks you a few questions first (what starts it, its steps, where it routes,
-how it tells you), then writes it, and the workflow opens as it's written. A row's ⋯ copies or deletes it (deleting
-asks first); so does the ⋯ in a workflow's head.
+how it tells you), then writes it, and the workflow opens as it's written. A row's ⋯ copies or deletes it; so does the
+⋯ in a workflow's head. A deleted one goes to the trash for 30 days: *Undo* on the note brings it back, and so does
+`laki flow restore <id>` (`laki flow trash` lists them). Each save keeps the file it replaces (the last 20): the head's
+⋯ › *History…* shows them, newest first, and *Put this one back* saves one again.
 Laki AI and your agents (the laki skill) write them too: ask for one, read it, then *Save* it before it runs. For example: a plan
 you approve, the build, tests until they pass (at most 3 fixes), a PR, CI until green. A workflow opens on a canvas: drag blocks, pick one to change it
 on the right (its prompt, model, where each exit goes). The sidebar on the left has *Blocks* (a click adds one after the
@@ -1128,6 +1130,7 @@ laki flow                                      # workflows and runs
 laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done; --set issue=1423: an input
 laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is this tab's), not a new worktree
 laki flow again <run> [--from <block>]         # an ended run again; --from: from that block, in its workspace
+laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 

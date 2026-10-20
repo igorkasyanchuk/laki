@@ -13,6 +13,7 @@ import { pageNow } from './api'
 import { highlightWorkflow } from './highlight'
 import { Markdown } from './MarkdownView'
 import { ShownDialog } from './Shown'
+import { Modal } from './panels'
 import { ask, Icon, IconButton, type MenuItem, Page, Switch, useMenu } from './ui'
 import './workflows.css'
 
@@ -20,7 +21,7 @@ export type WorkflowsApi = {
   call: <T = any>(method: string, params?: object) => Promise<T>
   openWs: (id: string) => void
   openTab?: (ws: string, tab: string) => void // a block's session, in its workspace
-  toast: (text: string) => void
+  toast: (text: string, undo?: () => void) => void // undo: its Undo button
   phone?: boolean // Settings › Phone pushes is set up: a notify can go to the phone too
   settings?: (section: string) => void // Settings at that section
   ai?: (ask?: string) => void // the floating Laki AI chat over the page; with an ask, that sent to it
@@ -122,15 +123,14 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
     openMenu(e, [
       { label: 'Make a copy', icon: 'copy', run: () => create(intoOf(w), w) },
       null,
-      { label: 'Delete…', icon: 'trash', danger: true, run: () => void removeWf(w) },
+      { label: 'Delete', icon: 'trash', danger: true, run: () => void removeWf(w) },
     ])
-  const removeWf = async (w: WorkflowItem) => {
-    if (!(await ask(`Delete ${w.name}?`, { text: `${w.path ?? ''}\nIts runs stay on the list.`, ok: 'Delete', danger: true }))) return false
-    return api.call('flowRm', { id: w.id, source: w.source, project: w.project }).then(
-      () => (refresh(), true),
+  // to the trash at once, its toast's Undo puts it back (flowRestore); its runs stay on the list
+  const removeWf = (w: WorkflowItem) =>
+    api.call<{ trash: string }>('flowRm', { id: w.id, source: w.source, project: w.project }).then(
+      x => (refresh(), api.toast(`Deleted ${w.name}`, () => void api.call('flowRestore', { trash: x.trash }).then(refresh, e => api.toast((e as Error).message))), true),
       e => (api.toast((e as Error).message), false),
     )
-  }
   // Run again (an ended run's id) or Run from here (and a block): the new run opens
   const again = (id: string, block?: string) => api.call<FlowRun>('flowStart', block ? { from: { run: id, block } } : { again: id }).then(x => setAt({ kind: 'run', id: x.id }), e => api.toast((e as Error).message))
   const removeRun = async (r: FlowView) => {
@@ -614,6 +614,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
   const [pick, setPick] = useState<string | null>(null)
   const [many, setMany] = useState<string[]>([]) // blocks picked together (Canvas)
   const [menu, openMenu] = useMenu()
+  const [hist, setHist] = useState(false) // History…
   const parsed = useMemo(() => parse(text, item.id), [text])
   const wf = parsed.workflow
   const problems = [...parsed.problems, ...check(wf)]
@@ -773,12 +774,13 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
         {api.ai && <IconButton icon="ai" title="Change it with Laki AI: its chat knows this workflow" onClick={() => api.ai!()} />}
         <IconButton
           icon="more"
-          title="More: copy, delete"
+          title="More: copy, history, delete"
           onClick={e =>
             openMenu(e, [
               { label: 'Make a copy', icon: 'copy', run: onCopy },
+              { label: 'History…', sub: 'Earlier versions: each save keeps the one before', icon: 'clock', run: () => setHist(true) },
               null,
-              { label: 'Delete this workflow…', icon: 'trash', danger: true, run: onRemove },
+              { label: 'Delete this workflow', icon: 'trash', danger: true, run: onRemove },
             ])
           }
         />
@@ -825,6 +827,7 @@ function Editor({ item, projects, presets, actions, exts, api, runs, onSaved, on
         </div>
       )}
       {menu}
+      {hist && <HistoryDialog item={item} dirty={dirty} api={api} onClose={() => setHist(false)} onBack={w => (replace(w.text), onSaved(w))} />}
     </div>
   )
 }
@@ -969,6 +972,56 @@ function Palette({ wf, actions, presets, full, pick, onAdd, toast, edit, api }: 
         </>
       )}
     </aside>
+  )
+}
+
+// the editor's History…: the file's earlier versions (each save keeps the one before it, the last 20), one shown, Put
+// this one back (a save: the file as it is now goes to the history first)
+function HistoryDialog({ item, dirty, api, onClose, onBack }: { item: WorkflowItem; dirty: boolean; api: WorkflowsApi; onClose: () => void; onBack: (w: WorkflowItem) => void }) {
+  type V = { at: number; size: number; first: string }
+  const ref = { id: item.id, source: item.source, project: item.project }
+  const [list, setList] = useState<V[] | null>(null)
+  const [sel, setSel] = useState<number | null>(null)
+  const [text, setText] = useState('')
+  useEffect(() => void api.call<V[]>('flowHistory', ref).then(l => (setList(l), l[0] && setSel(l[0].at)), e => (api.toast((e as Error).message), setList([]))), [])
+  useEffect(() => void (sel !== null && api.call<{ text: string }>('flowHistory', { ...ref, at: sel }).then(v => setText(v.text), () => setText(''))), [sel])
+  const lines = useMemo(() => highlightWorkflow(text), [text])
+  const back = async () => {
+    if (sel === null) return
+    if (dirty && !(await ask('Put this version back?', { text: 'Your changes that aren’t saved go. The file as it is now stays in History.', ok: 'Put it back', danger: true }))) return
+    api.call<WorkflowItem>('flowRevert', { ...ref, at: sel }).then(w => (onBack(w), onClose(), api.toast('Put back: the version before it is in History')), e => api.toast((e as Error).message))
+  }
+  return (
+    <Modal title={`History · ${item.name}`} onClose={onClose} wide>
+      {list === null ? (
+        <p className="wf-hint">Loading…</p>
+      ) : !list.length ? (
+        <p className="wf-hint">No earlier versions yet: each save keeps the one before it (the last 20).</p>
+      ) : (
+        <div className="wf-hist">
+          <div className="wf-hist-list">
+            {list.map(v => (
+              <button key={v.at} className={`wf-hist-row ${v.at === sel ? 'on' : ''}`} onClick={() => setSel(v.at)}>
+                <b>{ago(v.at)}</b>
+                <span className="wf-hint">{new Date(v.at).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })} · {v.size < 1024 ? `${v.size} B` : `${Math.round(v.size / 1024)} KB`}</span>
+              </button>
+            ))}
+          </div>
+          <pre className="wf-hist-text">
+            {lines.map((l, i) => (
+              <Fragment key={i}>
+                {i > 0 && '\n'}
+                {l.map(([c, t], j) => (c ? <span key={j} className={c}>{t}</span> : t))}
+              </Fragment>
+            ))}
+          </pre>
+        </div>
+      )}
+      <div className="wf-start-foot">
+        <button className="btn" onClick={onClose}>Close</button>
+        <button className="btn primary" disabled={sel === null} onClick={back}>Put this one back</button>
+      </div>
+    </Modal>
   )
 }
 

@@ -225,3 +225,11 @@
 .wf-own-name:hover { background: var(--hover); }
 .wf-awaiting { color: var(--muted); }
 .wf-awaiting > .grow { flex: 1; font-size: 12.5px; }
+/* the editor's History…: the versions, the one picked shown */
+.wf-hist { display: grid; grid-template-columns: 180px 1fr; gap: 10px; height: min(60vh, 460px); }
+.wf-hist-list { display: flex; flex-direction: column; gap: 2px; overflow: auto; }
+.wf-hist-row { display: flex; flex-direction: column; align-items: flex-start; gap: 1px; padding: 6px 8px; border: 0; border-radius: var(--rs, 8px); background: none; color: var(--fg); text-align: left; cursor: pointer; }
+.wf-hist-row:hover { background: var(--hover); }
+.wf-hist-row.on { background: var(--sel, var(--hover)); }
+.wf-hist-text { margin: 0; padding: 8px 10px; overflow: auto; border: 1px solid var(--line); border-radius: var(--rs, 8px); font: 12px/1.5 var(--mono); white-space: pre-wrap; overflow-wrap: break-word; }
+.narrow .wf-hist { grid-template-columns: 1fr; height: auto; }

@@ -3466,7 +3466,7 @@ export function App() {
                   call,
                   openWs: id => (setDialog(null), setWsId(id)),
                   openTab: (ws, tab) => (setDialog(null), selectTab({ id: tab, workspace: ws })),
-                  toast: text => toast(text),
+                  toast: (text, undo) => toast(text, undo),
                   phone: !!settings.webhook?.url?.trim(),
                   settings: section => setDialog({ section }),
                   // Laki AI's floating chat over the page (it knows the open workflow); an ask: sent there, as you'd type it
