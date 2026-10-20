@@ -1294,28 +1294,47 @@ end: success
 end: failed
 `
 
-test('workflow failures: a restart mid agent block asks again; a usage limit pauses, its continue goes on', async t => {
+test('workflow failures: a restart mid agent block: its resumed chat told to finish, a new chat the prompt again; a usage limit pauses, its continue goes on', async t => {
   const rig = await fresh(t, { env: { FAKE_TURN_MS: '60000' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { workflows: true })
   await rig.rpc('flowSave', { id: 'agent', text: AGENT('claude', 'think {{task}}') })
+  await rig.rpc('flowSave', { id: 'other', text: AGENT('claude', 'ponder {{task}}') })
   const get = (id: string) => rig.rpc('flowGet', { id })
+  const turnOf = async (id: string, typed: string) => {
+    const tab = (await until(async () => {
+      const r = await get(id)
+      return r.wait?.kind === 'agent' && r.wait.tab
+    }, 'its turn')) as string
+    await until(async () => (await rig.screen(tab)).includes(typed), 'the prompt typed')
+    await until(() => JSON.parse(readFileSync(join(rig.data, 'state.json'), 'utf8')).tabs.find((x: any) => x.id === tab)?.resumeId, 'its chat (SessionStart)')
+    return tab
+  }
   const run = await rig.rpc('flowStart', { workflow: 'agent', project: p.id, task: 'hard' })
-  const tab = (await until(async () => {
-    const r = await get(run.id)
-    return r.wait?.kind === 'agent' && r.wait.tab
-  }, 'its turn')) as string
-  await until(async () => (await rig.screen(tab)).includes('think hard'), 'the prompt typed')
-  // its turn is cut short: Laki comes back to the block, and the agent gets the prompt again
+  const run2 = await rig.rpc('flowStart', { workflow: 'other', project: p.id, task: 'deep' })
+  await turnOf(run.id, 'think hard')
+  const tab2 = await turnOf(run2.id, 'ponder deep')
+  // their turns are cut short: Laki comes back to each block. run2's tab lost its chat meanwhile: a new one starts there
   await rig.stop()
+  const file = join(rig.data, 'state.json')
+  const st = JSON.parse(readFileSync(file, 'utf8'))
+  delete st.tabs.find((x: any) => x.id === tab2).resumeId
+  writeFileSync(file, JSON.stringify(st))
   rig.env.FAKE_TURN_MS = '300'
   await rig.start()
-  let r = await until(async () => {
-    const x = await get(run.id)
+  const done = (id: string) => until(async () => {
+    const x = await get(id)
     return x.status === 'done' && x
   }, 'done after the restart', 30000)
+  let r = await done(run.id)
   assert.ok(r.log.some((l: string) => / Laki restarted: back at work$/.test(l)))
-  assert.equal(r.vars['steps.work.answer'], 'answer: think hard')
+  assert.ok(r.log.some((l: string) => / work: its chat resumed in .+: told to finish the step$/m.test(l)), r.log.join('\n'))
+  assert.equal(r.vars['steps.work.answer'], 'answer: Laki restarted while you were on this step. Finish it, then stop.', 'the short line, not the prompt')
+  assert.equal(r.turns, 1, 'no new turn')
+  r = await done(run2.id)
+  assert.ok(r.log.some((l: string) => / work: a new chat in its tab after the restart: the whole prompt again$/m.test(l)), r.log.join('\n'))
+  assert.equal(r.vars['steps.work.answer'], 'answer: ponder deep')
+  assert.equal(r.turns, 2)
 
   // at its usage limit (StopFailure): paused, then on as the limit's continue ends a turn
   await rig.rpc('flowSave', { id: 'limit', text: AGENT('claude', 'limit {{task}}') })

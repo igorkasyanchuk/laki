@@ -33,6 +33,7 @@ const AFTER_TURN = 900 // a turn's end to the next block: core types what was qu
 const RETRY_WAIT = [10, 60] // seconds before a block's first try again, then before each later one
 const STALL = 10 * 60000 // an agent block's tab printing nothing this long while it works: a nudge, then you
 const NUDGE = `Laki here: nothing printed for ${STALL / 60000} minutes. Finish this step, or say what is blocking you.`
+const RESUMED = 'Laki restarted while you were on this step. Finish it, then stop.' // the agent's chat came back with the prompt in it
 const STALLED = ['Nudge again', 'Try again', 'Skip it', 'Stop the run'] // a stalled agent's stuck: Stop the run last (flowAnswer's)
 
 export const on = () => {
@@ -614,7 +615,22 @@ const alive = (id?: string) => {
   return t && isLive(t) ? t : undefined
 }
 
+// a tab that just started (a restart resumed it) takes typing once it's drawn: it printed, then half a second quiet
+const drawing = (id: string) => (s => !!s && Date.now() - s.born < 10000 && (Date.now() - s.born < 2000 || Date.now() - s.lastOutput < 500))(sessions.get(id))
 function agent(r: FlowRun, b: Block) {
+  // back after a restart: its tab resumed the chat that has the prompt (the same chat id), so a short line, not a turn
+  // of its own; a new chat (a tab that's gone, or one whose chat was) gets the whole prompt
+  const back = r.resumed?.block === b.id ? r.resumed : undefined
+  const same = back && alive(r.tabs[b.id])
+  if (same && back.chat && same.resumeId === back.chat) {
+    if (drawing(same.id)) return later(r, b, agent)
+    r.resumed = undefined
+    const queued = !!send(same.id, RESUMED).queued
+    say(r, `${blockName(b)}: its chat resumed in ${same.name}: told to finish the step${queued ? ' (queued: it was busy)' : ''}`, RESUMED)
+    r.wait = { kind: 'agent', tab: same.id, ...(queued && { queued: RESUMED }), since: Date.now(), used: 0 }
+    return touch()
+  }
+  if (back) (r.resumed = undefined), say(r, `${blockName(b)}: ${same ? 'a new chat in its tab' : 'its tab is gone'} after the restart: the whole prompt again`)
   if (r.turns >= (r.flow.turns ?? TURNS)) return stuck(r, b, `${r.turns} agent turns in this run`, ['Go on', 'Stop the run'])
   const ws = wsOf(r)
   if (!ws || ws.archived) throw new Error('its workspace is gone')
@@ -643,9 +659,7 @@ function agent(r: FlowRun, b: Block) {
     if (t?.workspace === ws.id && isLive(t) && t.perm === perm && !!t.fast === !!fast && !runs().some(x => x !== r && live(x) && Object.values(x.tabs).includes(t.id))) tab = t
     else forkOf = t?.resumeId ?? before?.resume?.[key]
   }
-  // a tab that just started (a restart resumed it) takes typing once it's drawn: it printed, then half a second quiet
-  const s = tab && sessions.get(tab.id)
-  if (s && Date.now() - s.born < 10000 && (Date.now() - s.born < 2000 || Date.now() - s.lastOutput < 500)) return later(r, b, agent)
+  if (tab && drawing(tab.id)) return later(r, b, agent)
   let queued = false
   if (tab) {
     queued = !!send(tab.id, prompt).queued // after the turn under way: until it's typed in, a turn's end isn't ours
@@ -1215,9 +1229,10 @@ export function flowTick(now = Date.now()) {
   next()
 }
 
-// at the daemon's start: each run back at its block. An agent's turn was cut short, so it's asked again (its tab
-// resumes its chat first); a command runs again; asks wait on
-// ponytail: the prompt goes again whole; the agent may redo work it had done
+// at the daemon's start: each run back at its block. An agent's turn was cut short: its tab resumes its chat first, and
+// agent() tells that chat to finish (RESUMED), else asks a new one again; a command runs again; asks wait on
+// ponytail: a resume that fails after RESUMED went (core drops the chat within RESUME_FAIL) is a closed tab: the
+// block's error way, not the prompt again
 let resumeLater = false
 const boot = Date.now() // runs started since were never cut short
 export function flowResume() {
@@ -1229,6 +1244,7 @@ export function flowResume() {
   for (const r of requeue) (r.status = 'queued'), say(r, 'Laki restarted before its workspace was made: queued again')
   const back = runs().filter(r => going(r) && !asks(r) && r.started < boot)
   const was = new Map(back.map(r => [r, r.cur]))
+  const chats = new Map(back.map(r => [r, tabOf(r.cur && r.tabs[r.cur])?.resumeId])) // each agent's chat now: by the time it's entered a new one may have started
   for (const r of back) say(r, `Laki restarted: back at ${blockName(blockOf(r, r.cur) ?? ({ id: '?' } as Block))}`)
   if (!back.length) return void (requeue.length && save())
   save()
@@ -1237,6 +1253,7 @@ export function flowResume() {
       const b = blockOf(r, r.cur)
       if (!live(r) || !b || asks(r) || r.cur !== was.get(r)) continue // moved on meanwhile: that block is under way
       if (r.wait?.kind === 'wait' || r.wait?.kind === 'retry') continue // flowTick
+      if (b.kind === 'agent') r.resumed = { block: b.id, chat: chats.get(r) }
       enter(r, b, true)
     }
   }, RESUME_AFTER).unref()

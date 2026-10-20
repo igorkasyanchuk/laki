@@ -772,6 +772,7 @@ export type FlowRun = {
   pick?: string // the workspace it was given (flowStart's ws): it runs there, made by no one (no ws.flow mark)
   of?: string // the run it came from: Run again's, Run from here's
   first?: string // Run from here's: the block it starts at, with its run's state
+  resumed?: { block: string; chat?: string } // a restart brought it back at this block, its agent tab's chat then: agent() sends RESUMED to that chat
   where: Workflow['where']
   session: Workflow['session']
   dry?: boolean // outward actions said, not done

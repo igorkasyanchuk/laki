@@ -112,7 +112,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
-`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`. A
+`chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -972,7 +972,10 @@ field each (a branch's from `branches`), the CLI's repeated `--set name=value` (
 `inputs`; `scheduleSet` refuses a workflow whose `inputVals()` throws (flowHooks.find gives its blocks). Wait blocks: `flowTick` (5 s) reads `prOf` (core's scan), a failure on a head
 already reported waits for a new one. An exit with no block: a bad one `stuck` (*Try again* resets the block's count
 and the turns), a good one ends the run. `flowAnswer` (`n`, `text`: `{{answer}}`). `flowForget` deletes a run (a live one finishes stopped first) and its row's mark. `flowResume` at start: each live run
-not waiting re-enters its block 8 s later (an agent's prompt sent again); with workflows off it waits for `flowTick`
+not waiting re-enters its block 8 s later; an agent block's is marked `resumed` (the block, its tab's chat id
+as Laki started), and `agent()` sends that chat, when its tab is live with the same `resumeId`, `RESUMED` (*Laki
+restarted while you were on this step. Finish it, then stop.*: no new turn) instead of its prompt, else (no chat then,
+a new one since, its tab gone) the whole prompt; either way the mark goes and the log says which; with workflows off it waits for `flowTick`
 to see them on, and only runs started before the daemon (`boot`) come back. Agents (MCP's `laki_workflow_write`, `by:
 'agent'`) mark what they write in `state.flowsByAgent` until the user saves it; `flowStart` `by: 'agent'` refuses those.
 `broadcast` `flow` (waiting, end with `notify` or a failure, show): App's notification and toast (api.ts reads a
@@ -994,8 +997,8 @@ field; the head's ⋯ (and a row's on the index): *Make a copy*, *Delete* (no as
 the one into the working block while it runs (`.wf-e.live` flowing, an `animateMotion` dot), the working block's gear badge
 (`.wf-gear`) and shimmer; reduced motion: none; the ask, decisions, state; `RunLog`: the whole log, details folded, a filter; `flowGet` again as the view's
 entry moves, every 3 s while the log shows). The CLI's `laki flow`. Tested in `test/workflow.test.ts`.
-ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on an SSH host, the prompt sent again whole
-after a restart.
+ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on an SSH host; a resume that fails after
+`RESUMED` went (core drops the chat within `RESUME_FAIL`) is a closed tab, the block's error way.
 
 ### MCP
 

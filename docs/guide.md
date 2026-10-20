@@ -1121,8 +1121,9 @@ first), after you confirm; its workspace and tabs stay. An ended run's *Run agai
 again <run>`) starts a new one with its task and inputs on the workflow as it's saved now, the point when you fixed
 the workflow. A block's right click in an ended run, *Run from here* (`--from <block>`), goes on from that block in
 the same workspace with the run's variables, so the agents before it don't run (or cost) again; once its worktree is
-archived, Restore it first (or Run again). A run stopped by a restart goes on at its block (an agent is
-asked again), one at a usage limit waits for the reset, and a block that fails with nowhere to go asks you: *Try
+archived, Restore it first (or Run again). A run stopped by a restart goes on at its block: an agent whose chat
+came back is told to finish that step (not given the whole prompt again, so it doesn't start over), one in a new chat
+gets the prompt again, one at a usage limit waits for the reset, and a block that fails with nowhere to go asks you: *Try
 again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake). `laki flow check` reads workflow files the way Laki does and
 names each problem, without Laki running, so a repo's pre-commit hook or CI can keep `.laki/workflows/` right; it
 exits 1 when one has a problem (an agent action's name and a preset's aren't known there: not checked).
