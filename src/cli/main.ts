@@ -27,6 +27,7 @@ for (let i = 0; i < argv.length; i++) {
   const k = a.replace(/^-+/, '')
   if (!textOnly && a === '--') textOnly = true
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
+  else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && a === '--from') flags.from = argv[++i] ?? '' // flow again's
   else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
@@ -408,7 +409,7 @@ async function main() {
     case 'flow':
     case 'flows':
     case 'workflow': {
-      // workflows (experimental): laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]
+      // workflows (experimental): laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | show|stop <run> | answer <run> <n> [words]
       const [sub = 'ls', id, ...words] = rest
       const status = (r: FlowView | FlowRun) => `${r.status}${!FLOW_ENDED.includes(r.status) && r.cur ? ` at ${r.cur}` : ''}`
       if (sub === 'ls') {
@@ -430,6 +431,12 @@ async function main() {
         const r: FlowRun = await rpc('flowStart', { workflow: id, project, ws, task: task.join(' '), dry: !!flags.dry, ...(sets.length && { inputs }) }, 180000)
         return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
       }
+      if (sub === 'again') {
+        // an ended run again (its task and inputs, the workflow as it is now), or --from a block: in its workspace, its state kept
+        if (!id) throw new Error('usage: laki flow again <run> [--from <block>]')
+        const r: FlowRun = await rpc('flowStart', typeof flags.from === 'string' ? { from: { run: id, block: flags.from } } : { again: id }, 180000)
+        return out(r, `${r.id}  ${status(r)}${r.ws ? `  in ${r.ws}` : ''}`)
+      }
       if (sub === 'show') {
         const r: FlowRun = await rpc('flowGet', { id })
         const ask = r.wait && 'options' in r.wait ? [`asks: ${r.wait.question}`, ...r.wait.options.map((o, n) => `  ${n}. ${o}`)] : []
@@ -437,7 +444,7 @@ async function main() {
       }
       if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
       if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
-      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | show|stop <run> | answer <run> <n> [words]')
+      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | show|stop <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

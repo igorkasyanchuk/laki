@@ -1387,6 +1387,75 @@ test('workflow runs in a workspace you have: none made, no mark, one run there a
   await assert.rejects(rig.rpc('flowStart', { workflow: 'here', ws: mine.id, task: 'x' }), /mine is archived: restore it first/)
 })
 
+const TWICE = `# Twice
+Plan, then check.
+
+runs in: worktree · session: new
+
+## start
+input: task
+inputs: who=ann
+next: plan
+
+## plan
+agent: claude
+> plan {{task}} for {{inputs.who}}
+next: check
+
+## check
+run: echo checked: {{steps.plan.answer}}
+ok: done
+fail: bad
+
+## done
+end: success
+
+## bad
+end: failed
+`
+
+test('workflow Run again and Run from here: the task and inputs again on the file as it is now; from a block in its workspace, its state kept; refused once archived', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'twice', text: TWICE })
+  const done = (id: string) => until(async () => {
+    const x = await rig.rpc('flowGet', { id })
+    return ['done', 'failed', 'stopped'].includes(x.status) && x
+  }, `run ${id} ended`, 20000)
+  const first = await done((await rig.rpc('flowStart', { workflow: 'twice', project: p.id, task: 'x', inputs: { who: 'bob' } })).id)
+  assert.equal(first.vars['steps.plan.answer'], 'answer: plan x for bob')
+
+  // Run again: the same task and inputs, the workflow as it's saved now, a new worktree
+  await rig.rpc('flowSave', { id: 'twice', text: TWICE.replace('> plan {{task}}', '> plan again {{task}}') })
+  const again = await done((await rig.rpc('flowStart', { again: first.id })).id)
+  assert.deepEqual([again.task, again.vars['inputs.who'], again.trigger, again.status], ['x', 'bob', `again ${first.id}`, 'done'])
+  assert.equal(again.vars['steps.plan.answer'], 'answer: plan again x for bob')
+  assert.notEqual(again.ws, first.ws)
+  assert.match(again.log[0], new RegExp(`\\(again: run ${first.id}\\)$`))
+
+  // Run from here: in the first run's worktree, from check: plan doesn't run again, its answer is the old run's
+  const before = rig.fakeLog().filter(l => l.bin === 'claude').length
+  await assert.rejects(rig.rpc('flowStart', { from: { run: first.id, block: 'nope' } }), /nope isn't a block of Twice now/)
+  const from = await done((await rig.rpc('flowStart', { from: { run: first.id, block: 'check' } })).id)
+  assert.equal(from.ws, first.ws, 'no new worktree')
+  assert.deepEqual(from.decisions.map((d: any) => `${d.block}:${d.exit}`), ['check:ok'], 'start and plan don’t run')
+  assert.equal(from.turns, 0, 'no agent turn')
+  assert.equal(rig.fakeLog().filter(l => l.bin === 'claude').length, before, 'no agent started')
+  assert.equal(from.vars['steps.check.output'], 'checked: answer: plan x for bob')
+  assert.equal(from.visits.plan, 1)
+  assert.match(from.log[0], new RegExp(`\\(from run ${first.id}, at check\\)$`))
+  assert.equal((await rig.rpc('state')).workspaces.find((w: any) => w.id === first.ws).flow, from.id, 'its worktree’s mark: the newest run')
+
+  // the CLI; then archived: Run from here is refused, Run again isn't
+  const cli = await rig.cli('flow', 'again', first.id, '--from', 'check')
+  assert.equal(cli.code, 0, cli.err)
+  await done(cli.out.split(/\s+/)[0])
+  await rig.rpc('wsArchive', { id: first.ws })
+  await assert.rejects(rig.rpc('flowStart', { from: { run: first.id, block: 'check' } }), /is archived: Restore it \(the sidebar's Archived\), or Run again/)
+  assert.ok((await rig.rpc('flowStart', { again: first.id })).id)
+})
+
 const CHECKS = `# Checks
 Waits for CI.
 

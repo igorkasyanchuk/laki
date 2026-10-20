@@ -218,8 +218,28 @@ function picked(ref: string, project?: string): Workspace {
   return ws
 }
 
-export async function flowStart(o: { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string>; event?: Record<string, unknown> }) {
+type Start = { workflow: string; source?: WorkflowSource; project?: string; ws?: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string>; event?: Record<string, unknown>; again?: string; from?: { run: string; block: string } }
+
+// Run again (again: an ended run's id): its workflow as the file is now (often the point: a fixed one), its project,
+// task and inputs, dry or not, its workspace for runs in: here (still live). Run from here (from: an ended run and a
+// block of the file now): a new run in its workspace (live: no new worktree), its state, entering that block
+function rerun(o: Start, old: FlowRun): Start {
+  if (live(old)) throw new Error('that run is still going: stop it first')
+  const now = flowFind({ id: old.workflow, source: old.source, project: old.project })
+  const ws = state.workspaces.find(w => w.id === old.ws)
+  const inputs = Object.fromEntries((now.blocks.find(b => b.kind === 'start')?.inputs ?? []).filter(i => `inputs.${i.name}` in old.vars).map(i => [i.name, old.vars[`inputs.${i.name}`]]))
+  const base = { ...o, workflow: old.workflow, source: old.source, project: old.project, task: old.task, dry: o.dry ?? old.dry, inputs }
+  if (!o.from) return { ...base, ws: o.ws ?? (now.where === 'here' && ws && !ws.archived ? ws.id : undefined), trigger: `again ${old.id}` }
+  if (!ws) throw new Error('its workspace is gone: Run again instead')
+  if (ws.archived) throw new Error(`its workspace ${ws.name ?? ws.id} is archived: Restore it (the sidebar's Archived), or Run again`)
+  if (!now.blocks.some(b => b.id === o.from!.block)) throw new Error(`${o.from.block} isn't a block of ${now.name} now`)
+  return { ...base, ws: ws.id, trigger: `from ${old.id} at ${o.from.block}` }
+}
+
+export async function flowStart(o: Start) {
   on()
+  const old = o.again || o.from ? flowGet({ id: String(o.again ?? o.from?.run ?? '') }) : undefined
+  if (old) o = rerun(o, old)
   const pick = o.ws ? picked(o.ws, o.project) : undefined
   if (!pick && !o.project) throw new Error('which project? (or a workspace: ws)')
   const wf = flowFind({ id: o.workflow, source: o.source, project: pick?.project ?? o.project })
@@ -253,8 +273,10 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
   const { source, project, path, text, problems, byAgent: _, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  if (old) r.of = old.id
+  if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
   runs().push(r)
-  say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}`)
+  say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}${old ? (o.from ? ` (from run ${old.id}, at ${blockName(blockOf(r, o.from.block)!)})` : ` (again: run ${old.id})`) : ''}`)
   if (r.dry && bypass.length) say(r, `dry run: ${bypass.join(', ')} would run with bypass permissions (never asks)`)
   if (queue) {
     say(r, `queued: ${busy} going (at once: ${atOnce})${ahead ? `, ${ahead} ahead of it` : ''}`)
@@ -278,8 +300,9 @@ async function begin(r: FlowRun) {
   }
   r.ws = ws.id
   if (r.where === 'worktree' && !r.pick) ws.flow = r.id // its row's mark: made by this run
-  say(r, `in ${ws.name ?? ws.id} (${ws.kind === 'worktree' ? `worktree, branch ${ws.branch}` : 'the project folder'}${r.pick ? ', the one you picked' : ''})`)
-  enter(r, r.flow.blocks.find(b => b.kind === 'start')!)
+  if (r.first && r.of && ws.flow === r.of) ws.flow = r.id // Run from here in the worktree its run made: this one's now
+  say(r, `in ${ws.name ?? ws.id} (${ws.kind === 'worktree' ? `worktree, branch ${ws.branch}` : 'the project folder'}${r.first ? ', its run’s' : r.pick ? ', the one you picked' : ''})`)
+  enter(r, (r.first && blockOf(r, r.first)) || r.flow.blocks.find(b => b.kind === 'start')!)
   return r
 }
 

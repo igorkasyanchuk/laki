@@ -131,6 +131,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
       e => (api.toast((e as Error).message), false),
     )
   }
+  // Run again (an ended run's id) or Run from here (and a block): the new run opens
+  const again = (id: string, block?: string) => api.call<FlowRun>('flowStart', block ? { from: { run: id, block } } : { again: id }).then(x => setAt({ kind: 'run', id: x.id }), e => api.toast((e as Error).message))
   const removeRun = async (r: FlowView) => {
     const live = !ended(r)
     if (!(await ask('Delete this run?', { text: `${r.task || r.name}\n${live ? 'It stops first. ' : ''}Its workspace and its agents' tabs stay.`, ok: 'Delete', danger: true }))) return false
@@ -296,7 +298,16 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                     </span>
                     <span className="sched-run-at">{ago(r.ended ?? r.started)}</span>
                     <span className="sched-acts" onClick={e => e.stopPropagation()}>
-                      <IconButton icon="trash" title="Delete this run" className="danger" onClick={() => void removeRun(r)} />
+                      <IconButton
+                        icon="more"
+                        title="More: run again, delete"
+                        onClick={e =>
+                          openMenu(e, [
+                            ...(ended(r) ? [{ label: 'Run again', sub: 'Its task and inputs, the workflow as it is now', icon: 'refresh', run: () => void again(r.id) } as MenuItem, null] : []),
+                            { label: 'Delete…', icon: 'trash', danger: true, run: () => void removeRun(r) },
+                          ])
+                        }
+                      />
                     </span>
                   </div>
                 ))}
@@ -312,7 +323,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
       ) : (
         <div className="wf-page">
           {at.kind === 'run' ? (
-            <RunView key={at.id} id={at.id} entry={run} ahead={run ? queued.filter(x => x.started < run.started && runOf(x, { id: run.workflow, source: run.source, project: run.project })).length : 0} api={api} pname={pname} ws={view.workspaces} tabs={view.tabs.map(t => t.id)} onGone={() => setAt({ kind: 'index' })} onDelete={r => removeRun(r).then(y => y && setAt({ kind: 'index' }))} />
+            <RunView key={at.id} id={at.id} entry={run} ahead={run ? queued.filter(x => x.started < run.started && runOf(x, { id: run.workflow, source: run.source, project: run.project })).length : 0} api={api} pname={pname} ws={view.workspaces} tabs={view.tabs.map(t => t.id)} onGone={() => setAt({ kind: 'index' })} onDelete={r => removeRun(r).then(y => y && setAt({ kind: 'index' }))} onAgain={again} />
           ) : cur ? (
             <Editor
               key={`${cur.source}/${cur.project}/${cur.id}`}
@@ -1878,8 +1889,9 @@ function StartRun({ item, projects, workspaces, fixed, api, onClose, onStarted }
 
 // ---------- a run: where it is, what it asks, its decisions, variables and log
 
-function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete }: { id: string; entry?: FlowView; ahead: number; api: WorkflowsApi; pname: (id?: string) => string; ws: WorkspaceView[]; tabs: string[]; onGone: () => void; onDelete: (r: FlowView) => void }) {
+function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete, onAgain }: { id: string; entry?: FlowView; ahead: number; api: WorkflowsApi; pname: (id?: string) => string; ws: WorkspaceView[]; tabs: string[]; onGone: () => void; onDelete: (r: FlowView) => void; onAgain: (id: string, block?: string) => void }) {
   const [r, setR] = useState<FlowRun | null>(null)
+  const [menu, openMenu] = useMenu()
   const [tab, setTab] = useState<'decisions' | 'state'>('decisions')
   const [mode, setMode] = useState<'blocks' | 'log'>('blocks')
   const [typed, setTyped] = useState('')
@@ -1939,6 +1951,11 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete }: {
           <button className={mode === 'log' ? 'on' : ''} onClick={() => setMode('log')}>Log {r.log.length}</button>
         </div>
         {!over && <button className="btn" onClick={stop}><Icon name="stop" size={11} /> Stop</button>}
+        {over && (
+          <button className="btn" onClick={() => onAgain(r.id)} data-tip="A new run: its task and inputs, the workflow as it is now. A block’s right click: Run from here">
+            <Icon name="refresh" size={11} /> Run again
+          </button>
+        )}
         <IconButton icon="trash" title="Delete this run" className="danger" onClick={() => onDelete(entry ?? flowView(r))} />
       </div>
       {asking && (
@@ -1986,13 +2003,14 @@ function RunView({ id, entry, ahead, api, pname, ws, tabs, onGone, onDelete }: {
         </div>
       )}
       {win && <ShownDialog s={{ run: r.id, name: r.flow.name, title: win.title, body: win.body }} onClose={() => setWin(null)} />}
+      {menu}
       {r.status === 'queued' && <div className="wf-note">Queued: {ahead ? `${ahead} ${ahead === 1 ? 'run' : 'runs'} of ${r.flow.name} ahead of it` : 'next in line'}. It starts {r.pick ? 'in the workspace you picked' : r.where === 'main' ? 'in the project’s folder' : 'in a worktree of its own'} once a run of it ends (at once: {r.flow.runs ?? RUNS_AT_ONCE}).</div>}
       {r.status === 'paused' && r.wait?.kind === 'limit' && <div className="wf-note">Paused at a usage limit: it goes on when the limit resets{r.wait.until ? `, at ${new Date(r.wait.until).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : ''}.</div>}
       {mode === 'log' ? (
         <RunLog log={r.log} />
       ) : (
       <div className="wf-split">
-        <Canvas wf={r.flow} sel={pick} onPick={setPick} lit={lit} />
+        <Canvas wf={r.flow} sel={pick} onPick={setPick} lit={lit} onMenu={over ? (e, b) => openMenu(e, [{ label: 'Run from here', sub: 'A new run in its workspace, its state kept: the blocks before it don’t run again', icon: 'run', run: () => onAgain(r.id, b) }]) : undefined} />
         <div className="wf-insp wf-runside">
           <div className="seg">
             {(['decisions', 'state'] as const).map(t => (

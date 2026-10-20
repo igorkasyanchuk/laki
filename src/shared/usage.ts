@@ -39,6 +39,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki schedule on|off|run|rm <id>            turn one on or off, run it now, delete it
   laki flow [ls]                             workflows (experimental: Settings › General) and their runs
   laki flow run <workflow> [project] <task> [--ws <ws|.>] [--dry] [--set name=value…]  start a run (--ws: in a workspace you have, no new worktree; --dry: a PR, approve, merge said, not done; --set: its inputs)
+  laki flow again <run> [--from <block>]     an ended run again (its task and inputs); --from: in its workspace, its state kept, from that block
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on

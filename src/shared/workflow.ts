@@ -770,6 +770,8 @@ export type FlowRun = {
   project: string
   ws?: string
   pick?: string // the workspace it was given (flowStart's ws): it runs there, made by no one (no ws.flow mark)
+  of?: string // the run it came from: Run again's, Run from here's
+  first?: string // Run from here's: the block it starts at, with its run's state
   where: Workflow['where']
   session: Workflow['session']
   dry?: boolean // outward actions said, not done

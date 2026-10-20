@@ -8,6 +8,8 @@ version it builds, with the date. -->
   the workflow's head sets one for all its agents. A workflow whose agent never asks is yours to start, not an agent's.
 - Workflows run in a workspace you have: its ⋯ › **Run workflow**, ⌘K's *Run workflow: …*, `laki flow run … --ws .`;
   `runs in: here` for one that always does.
+- Workflows: **Run again** on an ended run (its task and inputs, the workflow as it is now), and a block's **Run from
+  here**: on from that block in the same workspace, the agent work before it kept. `laki flow again <run> [--from]`.
 - A *Context* starter (`laki widget new Context --kind context`): actions in ⌘K, a file's right click and the prompt's
   Insert menu, to copy from.
 - Extensions can come with a repo (`.laki/extensions/`): off until you look at what they run, off again when the repo

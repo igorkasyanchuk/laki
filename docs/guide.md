@@ -1115,7 +1115,11 @@ variables, how many times each block ran). *Log* shows all of it in order, the p
 the commands' output folded under each line, with a filter and Copy. A run and its sessions link both ways: its
 workspace's status bar (or an agent tab's it sent a prompt to) shows the run and its block, a click opens it; in the run,
 an agent block's decision (or *open its session* with the block picked) opens its tab. The trash can deletes a run (one under way stops
-first), after you confirm; its workspace and tabs stay. A run stopped by a restart goes on at its block (an agent is
+first), after you confirm; its workspace and tabs stay. An ended run's *Run again* (also its row's ⋯, `laki flow
+again <run>`) starts a new one with its task and inputs on the workflow as it's saved now, the point when you fixed
+the workflow. A block's right click in an ended run, *Run from here* (`--from <block>`), goes on from that block in
+the same workspace with the run's variables, so the agents before it don't run (or cost) again; once its worktree is
+archived, Restore it first (or Run again). A run stopped by a restart goes on at its block (an agent is
 asked again), one at a usage limit waits for the reset, and a block that fails with nowhere to go asks you: *Try
 again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
 
@@ -1123,6 +1127,7 @@ again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
 laki flow                                      # workflows and runs
 laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge said, not done; --set issue=1423: an input
 laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is this tab's), not a new worktree
+laki flow again <run> [--from <block>]         # an ended run again; --from: from that block, in its workspace
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 
