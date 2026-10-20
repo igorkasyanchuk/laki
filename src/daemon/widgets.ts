@@ -689,7 +689,7 @@ export function widgetsOff() {
 const AI_MAY = 3600000 // ms: how long Edit with Laki AI's leave to rewrite one of the user's lasts
 // agent: an agent's change (MCP's laki_extension_set, Laki AI's too; laki widget set in an agent's tab): where it shows,
 // its size, every, view, hide and plain settings; never on, network access, its source or a secret: those are the user's
-export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; name?: string; allow?: string[]; from?: { ws?: string; tab?: string }; agent?: boolean }) {
+export function widgetSet(o: { id: string; seen?: string; source?: WidgetSource | null; on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; name?: string; allow?: string[]; from?: { ws?: string; tab?: string }; agent?: boolean }) {
   const w = find(o.id)
   if (o.agent === true || agentCaller(o.from)) {
     if (o.on === true) throw new Error('only you can turn an extension on (Settings › Extensions)') // its code would run unlooked at
@@ -697,6 +697,8 @@ export function widgetSet(o: { id: string; source?: WidgetSource | null; on?: bo
     const secret = Object.keys(o.config ?? {}).find(k => optionsOf(w).some(x => x.key === k && x.type === 'secret'))
     if (secret) throw new Error(`${secret} is a secret: only you set it (Settings › Extensions)`)
   }
+  // seen: the files hash of what the user was shown (the studio's Turn on): on only while it's still that
+  if (o.on === true && o.seen !== undefined && o.seen !== filesHash(w, true)) throw new Error(`${w.m.name || w.id} changed since you looked: look again`)
   const s = readStore(w.id)
   if (o.ai) {
     // Edit with Laki AI (Settings › Extensions): one of the user's in Laki's folder, which widgetWrite may then rewrite
@@ -782,9 +784,11 @@ function rename(w: Entry, name: unknown) {
 }
 
 // what turning one on starts, in words, its command or prompt as a code block (a code span breaks on its backticks or
-// lines): Laki AI's Yes / No says it (aiQuestion), and a Yes turns it on only while it still says the same (aiAnswer)
+// lines): Laki AI's Yes / No says it (aiQuestion), and a Yes turns it on only while it still says the same and its
+// files are the ones it was asked about (aiAnswer: hash, filesHash; widgetSet's seen)
 export function widgetWhat(id: string) {
   const w = find(id)
+  const hash = filesHash(w, true) // first: a change while it's read gives a hash a Yes can't match
   const src = sourceOf(w)
   const fetch = w.m.script ? `node ${w.m.script}` : w.m.fetch
   const [runs, code]: [string, string?] =
@@ -797,7 +801,7 @@ export function widgetWhat(id: string) {
   const fence = '`'.repeat(Math.max(3, ...[...(code ?? '').matchAll(/`+/g)].map(m => m[0].length + 1))) // longer than any run in it
   const events = Object.keys(w.m.on ?? {}).map(e => `\`${e.replace(/`/g, '')}\``) // its actions run on these, unclicked
   const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}`
-  return { name: w.m.name || w.id, on: onOf(w), text }
+  return { name: w.m.name || w.id, on: onOf(w), text, hash }
 }
 
 // what a failed command said last, past node's own trailer (an uncaught error ends with its version)
@@ -1358,12 +1362,13 @@ const agentsOf = (w: Entry) => {
     return undefined
   }
 }
-// an Always's key: id.action#hash, the hash over the action's command and the extension's own files (widgetFiles' list,
-// all of them, sorted), so an edit asks again, one made while Laki was closed too (sh do.sh with do.sh changed).
-// fresh: read now (a call's check), else as long as their sizes and times are the same (the view's).
-// ponytail: its folder's top level and fixtures only, not a lib/ its script sources
+// what a Yes holds for (filesHash): the extension's own files (widgetFiles' list, all of them, sorted) and what it runs
+// that lives outside them (the store's source; its actions (their commands, prompts, gates), on and stream, as read; net), so an edit asks again, one made
+// while Laki was closed too (sh do.sh with do.sh changed). Laki AI's turn-on question, widgetSet's seen, a tool's ask and
+// an Always's key (grantKey) all compare it. fresh: read now (a check), else as long as their sizes and times are the
+// same (the view's). ponytail: its folder's top level and fixtures only, not a lib/ its script sources
 const hashes = new Map<string, { sig: string; hash: string }>()
-function grantKey(w: Entry, action: string, fresh = false) {
+export function filesHash(w: Entry, fresh = false) {
   const names = (w.file ? [w.file] : [...filesIn(w.dir), ...fixturesOf(w).map(f => `fixtures/${f}.json`)]).sort()
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
@@ -1377,7 +1382,13 @@ function grantKey(w: Entry, action: string, fresh = false) {
     }
     hashes.set(w.id, (c = { sig, hash: h.digest('hex') }))
   }
-  return `${w.id}.${action}#${createHash('sha256').update(`${actionCmd(w.m.actions?.[action]) ?? ''}\0${c!.hash}`).digest('hex').slice(0, 12)}`
+  const cur = widgets.get(w.id) ?? w // its store as it is now: a source set meanwhile counts
+  const out = JSON.stringify([sourceOf(cur), cur.m.actions ?? null, cur.m.on ?? null, cur.m.stream ?? null, !!cur.s.net])
+  return createHash('sha256').update(`${c!.hash}\0${out}`).digest('hex')
+}
+// an Always's key: id.action#hash, the hash over the action's command and filesHash
+function grantKey(w: Entry, action: string, fresh = false) {
+  return `${w.id}.${action}#${createHash('sha256').update(`${actionCmd(w.m.actions?.[action]) ?? ''}\0${filesHash(w, fresh)}`).digest('hex').slice(0, 12)}`
 }
 // an extension's grants gone: off, its commands changed, Revoke (one action)
 function ungrant(id: string, action?: string, ws?: string) {
@@ -1410,7 +1421,7 @@ export async function widgetToolCall(o: { id: string; action: string; input?: un
   const x = wsOf(w, scoped(w) ? from.ws : undefined) // a scope workspace one's: the caller's, refused without one
   const ws = x?.id ?? (state.workspaces.some(v => v.id === from.ws) ? from.ws! : '') // whose Always: '' for none (Laki AI)
   const tab = from.tab ? state.tabs.find(v => v.id === from.tab) : undefined
-  const key = grantKey(w, o.action, true)
+  const key = grantKey(w, o.action, true) // before the ask: approve refuses a change since, so Always is for what was shown
   let how = t.ask === 'never' ? 'never' : 'always' // 'always': granted before
   if (t.ask === 'always' || (t.ask === 'first' && !state.widgetGrants?.[ws]?.includes(key))) {
     how = await approve(w, o.action, { description: t.description, ask: t.ask, input, ws, tab: tab?.id ?? from.tab, agent: from.agent ?? tab?.name })
@@ -1437,11 +1448,12 @@ async function approve(w: Entry, action: string, o: { description: string; ask: 
   const def = w.m.actions?.[action]
   const ai = aiActOf(def)
   const req = randomBytes(8).toString('hex')
-  const how = await answered({ ev: 'toolAsk', req, widget: w.id, action, name: w.m.name || w.id, ...o, command: actionCmd(def) ?? `an agent answers: ${ai?.prompt ?? ''}`, ws: o.ws || undefined })
+  const hash = filesHash(w, true) // what the user is shown: its files as they are now
+  const how = await answered({ ev: 'toolAsk', req, widget: w.id, action, name: w.m.name || w.id, ...o, command: actionCmd(def) ?? `an agent answers: ${ai?.prompt ?? ''}`, ws: o.ws || undefined, hash })
   if (how === 'none') throw new Error(`${w.m.name || w.id} ${action}: no answer: not run`)
   if (how === 'deny') throw new Error(`${w.m.name || w.id} ${action}: denied`)
-  const now = widgets.get(w.id)?.m.actions
-  if (JSON.stringify(now && Object.hasOwn(now, action) ? now[action] : undefined) !== JSON.stringify(def)) throw new Error(`${w.m.name || w.id} ${action}: its command changed while you were asked: not run`)
+  const now = widgets.get(w.id)
+  if (!now || filesHash(now, true) !== hash) throw new Error(`${w.m.name || w.id} ${action}: its files changed while you were asked: not run`)
   return how
 }
 // an ask sent to the app's windows (and to each one that connects while it waits: widgetAsks), the first answer
@@ -1563,13 +1575,14 @@ const filesIn = (d: string) => {
 }
 export function widgetFiles(o: { id: string }) {
   const w = find(o.id)
+  const hash = filesHash(w, true) // before they're read: a change in between gives a hash widgetSet's seen won't take
   const files: Record<string, string> = {}
   for (const n of (w.file ? [w.file] : [...filesIn(w.dir), ...fixturesOf(w).map(f => `fixtures/${f}.json`)]).slice(0, 20)) {
     const p = join(w.dir, n)
     const buf = statSync(p).size > 64 << 10 ? null : readFileSync(p)
     files[n] = !buf ? '(over 64 KB: not shown)' : buf.includes(0) ? '(binary: not shown)' : buf.toString('utf8')
   }
-  return { id: w.id, builtin: w.builtin || undefined, files }
+  return { id: w.id, builtin: w.builtin || undefined, files, hash }
 }
 
 // the inspector's Files, edited by hand: one of the files widgetFiles lists, written in place (its mode stays). was: the

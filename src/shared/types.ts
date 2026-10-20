@@ -466,7 +466,7 @@ export type AiMsg = { role: 'user' | 'ai' | 'tool' | 'error'; text: string; at: 
 export type AiAsk = { id: string; options: string[]; picked?: string; act?: AiAct; perm?: boolean }
 export const AI_PERM = ['Allow once', 'Always in this chat', 'Deny'] as const
 export const AI_ACTS = ['memory', 'schedule', 'tab', 'todo', 'widget'] as const // widget: turning an extension on, the rest a removal
-export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string }
+export type AiAct = { kind: (typeof AI_ACTS)[number]; id: string; project?: string; label: string; hash?: string } // hash: an extension's files as asked about (widgets.ts filesHash): a Yes needs them still
 // one ask's cost, in <data>/ai-calls.jsonl: tokens in and out, USD (OpenRouter's; claude -p's is Claude Code's own
 // estimate; codex: none), the tool calls it made (settings' steps: rounds of them)
 export type AiCall = { at: number; backend: AiBackend; model: string; in: number; out: number; cost?: number; ms: number; tools: number; ok: boolean; ask: string; error?: string }
@@ -668,5 +668,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 92
+export const API = 93
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

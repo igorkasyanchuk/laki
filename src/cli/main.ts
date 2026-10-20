@@ -18,7 +18,7 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'merge'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -455,7 +455,12 @@ async function main() {
         if (bad) process.exitCode = 1
         return
       }
-      if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on', from: caller() }), `${id} ${sub}`)
+      // what turning it on runs, and its files' hash: laki widget on <id> --seen <hash> holds only for those files
+      if (sub === 'what') {
+        const r: { name: string; on: boolean; text: string; hash: string } = await rpc('widgetWhat', { id })
+        return out(r, `${r.name} (${r.on ? 'on' : 'off'})\n\n${r.text}\n\nlaki widget on ${id} --seen ${r.hash}`)
+      }
+      if (sub === 'on' || sub === 'off') return out(await rpc('widgetSet', { id, on: sub === 'on', ...(sub === 'on' && typeof flags.seen === 'string' && { seen: flags.seen }), from: caller() }), `${id} ${sub}`)
       if (sub === 'set') {
         // where it shows, its size, every, view, what it hides and its settings (key=value): an agent's too, never on
         if (!id) throw new Error('usage: laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value …]')
@@ -543,7 +548,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws, from: caller() }, 300000) // an agent's: you may be asked first
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | on|off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
+      throw new Error('usage: laki widget [ls] | reload | what <id> | on <id> [--seen <hash>] | off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
     }
     case 'ai': {
       const [sub] = rest

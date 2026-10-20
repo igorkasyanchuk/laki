@@ -111,7 +111,7 @@ workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `as
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
-`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`. A
+`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -281,9 +281,10 @@ HEAD, else main or master: the new-workspace page's base unless picked), `wsNew`
   for mine, each with the workspace that has it by `prUrl` or branch), `aiQuestion` (`text`, `options` 2-6, or `act`:
   `AI_ACTS` memory/schedule/tab/todo, a removal, or widget, turning an extension on (`laki_extension_on`; its words say
   what it runs, `widgets.ts` `widgetWhat`: its command or prompt as a code block, the events that run its actions; a
-  Yes only while it still says the same; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
+  Yes only while it still says the same and its `filesHash` is the act's `hash`, else the question again as it reads
+  now; one that's on is refused), with `id`, `project`, `label`: Yes / No; only while
   `busy`; a chat message with `ask`), `aiAnswer` (`id`, `n`: the AI page's buttons; a pick is the next `aiAsk`, an
-  `act`'s Yes is `remove` here, or `widgetSet` `on` (the user's, no `agent`), never the AI's own);
+  `act`'s Yes is `remove` here, or `widgetSet` `on` with `seen` (the user's, no `agent`), never the AI's own);
 - specs and brainstorms (experimental, `settings.specs`; below): `planList` (`project`?), `planNew` (`project`, `kind` spec
   or brainstorm, `title`, `text`), `planGet`, `planSave` (`title`, `blocks`, `markdown`), `planFile` (`path`: text, or an
   image as a data URL), `planUpload` (`name`, `data` base64: `files/…`), `planWrite` (`path`, `text`: MCP's and Laki AI's,
@@ -1354,8 +1355,13 @@ action may be `{ run, tool: { description, input, required, ask } }` (`TOOL_TYPE
 first, a scope workspace one takes the caller's; `first` without a grant (`state.widgetGrants[ws]`, `<id>.<action>`; '':
 no workspace) or `always` broadcasts `toolAsk` (`req`, the command, input, ws, tab, agent; refused with no client) and
 waits `LAKI_TOOL_WAIT` (2 min) for `widgetToolAnswer` (`once`, `always`, `deny`; the first counts), then `toolDone`;
-`always` keeps the grant (`grantKey`: `<id>.<action>#<hash>`, sha256 of its command and the extension's own files, so an edit, one made while
+`always` keeps the grant (`grantKey`: `<id>.<action>#<hash>`, sha256 of its command and `filesHash`, so an edit, one made while
 Laki was closed too, asks again; the view's from a size-and-time cache, a call's read fresh; grants without `#` dropped at `load`).
+`filesHash` (widgets.ts): the extension's own files (top level, fixtures) and what it runs from outside them (the store's
+source, its actions, `on`, `stream`, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`),
+`widgetFiles` too (read first, so a change while they're read can't match), `widgetSet` `on` with `seen` refuses another
+(the studio's TrySheet, `laki widget on --seen`), `toolAsk` carries it and `approve` compares it after the answer (*its
+files changed while you were asked*: not run, no Always).
 `approve` (the ask) is shared with `widgetAction`'s `from`: core's `agentCaller` (`from.tab` an agent tab, or a shell tab in
 `shellAgents`; `laki new`'s `byCaller` too) makes a tool's action a `widgetToolCall` (its arg as JSON input) and any other
 ask each time (`ask: 'always'`: no Always); `widgetSet` `on: true` from one is refused, `widgetDev` from one links but leaves

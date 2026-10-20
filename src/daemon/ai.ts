@@ -699,11 +699,12 @@ async function codex(o: Opts) {
 export function aiQuestion(p: { text?: string; options?: unknown[]; act?: AiAct }) {
   if (!busy) throw new Error('only while Laki AI works on an ask')
   const t = thread(busy.id) // the chat whose ask is at work
-  const act = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
+  const act: AiAct | undefined = p.act && AI_ACTS.includes(p.act.kind) && typeof p.act.id === 'string' && p.act.id ? { kind: p.act.kind, id: p.act.id, project: typeof p.act.project === 'string' ? p.act.project : undefined, label: '' } : undefined
   if (act) act.label = whatOf(act) ?? '' // the thing itself, never the model's words: a Yes removes what it says
   if (act && !act.label) throw new Error(`no ${act.kind === 'widget' ? 'extension' : act.kind} ${act.id}${act.kind === 'memory' ? ' in that project' : ''}`)
   const on = act?.kind === 'widget' ? widgetWhat(act.id) : undefined // what it runs, in Laki's words, before the user picks
   if (on?.on) throw new Error(`${on.name} is on already`)
+  if (act && on) act.hash = on.hash // its files as asked about: a Yes needs them still
   const text = act ? (on ? turnOn(act, on.text) : `Remove ${act.label}?`) : String(p.text ?? '').trim().slice(0, 2000)
   if (!text) throw new Error('a question')
   const options = act ? (on ? ['Yes, turn it on', 'No, leave it off'] : [`Yes, remove ${act.label}`, 'No, keep it']) : [...new Set((Array.isArray(p.options) ? p.options : []).map(o => String(o).trim().slice(0, 200)).filter(Boolean))].slice(0, 6)
@@ -743,11 +744,18 @@ export async function aiAnswer(p: { id: string; n: number; chat?: string }, rpc:
   say(t, 'user', pick)
   const on = act.kind === 'widget'
   if (Number(p.n) !== 0) return say(t, 'ai', on ? `Left ${act.label} off.` : `Kept ${act.label}.`), { kept: true }
+  // only what they were shown: its files may have changed since (an agent's write, a save, a source set). Then the
+  // question again, as it reads now
+  const now = on ? widgetWhat(act.id) : undefined
+  if (now && (turnOn(act, now.text) !== m.text || now.hash !== act.hash)) {
+    const why = 'it changed since you were asked: ask again'
+    say(t, 'error', `${act.label}: ${why}`)
+    if (!now.on) t.chat.push({ role: 'ai', text: turnOn(act, now.text), at: (t.at = Date.now()), ask: { id: randomBytes(6).toString('hex'), options: m.ask.options, act: { ...act, hash: now.hash } } }), changed(t)
+    throw new Error(why)
+  }
   try {
-    if (on) {
-      // only what they were shown: its files may have changed since (an agent's write, a save)
-      if (turnOn(act, widgetWhat(act.id).text) !== m.text) throw new Error('it changed since you were asked: ask again')
-      await rpc('widgetSet', { id: act.id, on: true }) // the user's pick: no agent's
+    if (now) {
+      await rpc('widgetSet', { id: act.id, on: true, seen: now.hash }) // the user's pick: no agent's
       say(t, 'ai', `Turned on ${act.label}.`)
       return { on: true }
     }

@@ -18,7 +18,7 @@ import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload } from './notes.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowList, flowResume, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick } from './workflow.ts'
-import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWrite } from './widgets.ts'
+import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, widgetKey, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -305,6 +305,7 @@ const api: Record<string, Handler> = {
   tunnelTick: p => core.tunnelTick(p.now), // tests move the clock
   widgetRender: p => widgetRender(p),
   widgetSet: p => widgetSet(p),
+  widgetWhat: p => widgetWhat(String(p.id)), // what turning one on runs, in words, and its files' hash (widgetSet's seen): laki widget what, the turn-on sheet
   widgetRun: p => widgetRun(p),
   widgetRm: async p => (r => (aiForget(`widget:${p.id}`), r))(await widgetRm(p)), // Settings' Delete: to the trash (Undo: widgetRestore); never MCP's nor Laki AI's; its studio chat with it, once it's gone
   widgetRestore: p => widgetRestore(p), // Undo of a delete, laki widget restore

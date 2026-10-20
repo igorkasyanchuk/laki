@@ -241,8 +241,9 @@ its input; `run` is its command, as a plain action's string is:
 - `ask`: `first` (the default) asks you once per workspace (*Always in …* in the dialog; Settings › Extensions lists
   each grant with *Revoke*), `always` every call, `never` not at all (the checker warns when its command looks outward:
   a push, a merge, a deploy). Laki's window must be open to ask; no answer in 2 minutes refuses it. *Always* is for
-  that command and the extension's files as they are: an edit (even while Laki is closed) asks again. Turning the
-  extension off, or changing its commands, takes the grants back.
+  that command and the extension's files as they are: an edit (even while Laki is closed) asks again. A file changed
+  while you're asked isn't run, and no *Always* is kept. Turning the extension off, or changing its commands, takes
+  the grants back.
 - `AGENTS.md` in its folder says when to use its tools (4 KB at most); agents see it with the list.
 - Agents get them through `laki widget tools` (the list) and `laki widget tool <id> <action> '<json>'` (a call, in
   their workspace), and in MCP as `ext_<id>_<action>` tools (with `laki_extension_tools` and `laki_extension_call`);
@@ -689,7 +690,8 @@ prompt* gives any AI chat the whole format with what you typed.
   *Extension* block: fetched, its data as `{{steps.<id>.<field>}}`) use the ones that are turned on.
 - The Desk's *Build with AI*: a dialog (what it shows, screenshots, text files), then the extension studio, where Laki AI makes one for the Desk; it shows as a tile at once, with its
   sample, off until you turn it on.
-- The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget render <id> [--full]`,
+- The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget what <id>` (what
+  turning it on runs, and the hash `laki widget on <id> --seen <hash>` takes), `laki widget render <id> [--full]`,
   `laki widget action <id> <action> [arg]`, `laki widget new <name> [--kind <k>] [--dir <folder>]`, `laki widget check
   [id|folder] [--no-run]`, `laki widget kit [element]`, `laki widget dev [folder]`, `laki widget trash`, `laki widget
   restore <trash-id>`.
@@ -704,6 +706,9 @@ prompt* gives any AI chat the whole format with what you typed.
   Laki AI wrote is saved off and tagged *by Laki AI*.
 - An agent's tool call shows you the command and its input before it runs, unless the tool says `never` or you chose
   *Always* in that workspace.
+- A Yes holds only for the files you were shown. Laki AI's *Turn on …?*, the studio's *Turn on*, a tool's ask and its
+  *Always* each keep a hash of everything the extension runs (its files, its source, its actions, events and stream,
+  network access); if any of it changes before your Yes, nothing runs: Laki AI asks again with what it says now.
 - A template extension is sanitized (no scripts, frames, forms, `on…` attributes, or links other than http(s) and
   mailto). A JS one runs in a sandboxed frame with an opaque origin, `default-src 'none'`, and only the network you allow.
 - Its settings are kept in `<data>/widget-data/<id>.json`, next to its last data; its secrets in

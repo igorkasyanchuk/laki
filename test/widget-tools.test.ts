@@ -135,7 +135,7 @@ test('tools: listed and called, asked first per workspace or always, denied, tim
   writeFileSync(join(rig.data, 'widgets', 'g', 'widget.json'), JSON.stringify(gm))
   await rig.rpc('widgetReload')
   await answer(q.req, 'once')
-  await assert.rejects(call, /its command changed while you were asked: not run/)
+  await assert.rejects(call, /its files changed while you were asked: not run/)
 
   // the starter: an add tool, asked first, its note in the data after
   assert.equal((await rig.cli('widget', 'new', 'Notes', '--kind', 'tool')).code, 0)
@@ -332,4 +332,14 @@ test('Always is tied to the command and the files: one edited while Laki was clo
   assert.equal(app.events.filter((e: any) => e.ev === 'toolAsk').length, 1, 'asked')
   await rig.rpc('widgetGrantRm', { id: 'sh', action: 'go', ws: ws.id })
   assert.ok(!(await rig.rpc('state')).widgets.find((w: any) => w.id === 'sh').tools[0].grants.length)
+
+  // do.sh edited while the user is asked (its command the same): not run, and no Always kept
+  const c = rig.rpc('widgetToolCall', { id: 'sh', action: 'go', from: { ws: ws.id } })
+  const q = await asks(app)(1)
+  assert.match(q.hash, /^[0-9a-f]{64}$/, 'the ask says which files')
+  writeFileSync(join(rig.data, 'widgets', 'sh', 'do.sh'), 'echo three\n')
+  await rig.rpc('widgetToolAnswer', { req: q.req, allow: 'always' })
+  await assert.rejects(c, /its files changed while you were asked: not run/)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === 'sh').tools[0].grants.length, 0)
+  app.ws.close()
 })

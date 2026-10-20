@@ -387,13 +387,14 @@ function StudioPreview({ w, api, sample }: { w: WidgetView; api: WidgetApi; samp
 // then one fetch while off (widgetRun once), or on
 function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boolean; cfg: WidgetsApi; onClose: () => void; onRan: () => void; onOn: (stay: boolean) => void }) {
   const [r, setR] = useState<Runs | null>(null)
+  const [hash, setHash] = useState<string>() // its files as shown: Turn on holds only for them (widgetSet seen)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(false)
   const [stay, setStay] = useState(false)
   const ai = w.source?.kind === 'ai' ? w.source : undefined // an agent runs, not its fetch
   useEffect(() => {
-    daemon.call<{ files: Record<string, string> }>('widgetFiles', { id: w.id }).then(
-      x => setR(runsOf(x.files)),
+    daemon.call<{ files: Record<string, string>; hash?: string }>('widgetFiles', { id: w.id }).then(
+      x => (setR(runsOf(x.files)), setHash(x.hash)),
       e => setErr(String(e?.message ?? e)),
     )
   }, [w.id, w.rev])
@@ -406,7 +407,7 @@ function TrySheet({ w, on, cfg, onClose, onRan, onOn }: { w: WidgetView; on: boo
     )
   }
   // on: it fetches now (turning on drops the studio's sample data: widgetSet)
-  const turnOn = () => void cfg.set(w.id, { on: true }).then(() => onOn(stay), e => setErr(String(e?.message ?? e)))
+  const turnOn = () => void cfg.set(w.id, { on: true, seen: hash }).then(() => onOn(stay), e => setErr(String(e?.message ?? e)))
   return (
     <Modal title={on ? `Turn on ${w.name}?` : `Try ${w.name} live?`} onClose={onClose}>
       <p className="muted small">{on ? 'From now on Laki runs this on its schedule, and its buttons run their commands, as you on this Mac.' : `${ai ? 'Its agent' : 'It'} runs once, now, as you on this Mac: the preview then shows what it really gets. Nothing else runs.`}</p>

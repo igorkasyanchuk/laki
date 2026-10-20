@@ -42,6 +42,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
+  laki widget what <id>                       what turning it on runs, and its files' hash
+  laki widget on <id> --seen <hash>           on only while its files are the ones laki widget what showed
   laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value…]
         where it shows, its size, how often it fetches, its full view, what it hides, its settings
   laki widget render <id> [--full] [--ws <ws>]  the HTML it shows now, filled from its data

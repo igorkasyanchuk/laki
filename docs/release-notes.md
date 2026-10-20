@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: a Yes holds only for the files you were shown. Laki AI's *Turn on*, the studio's and a tool's ask refuse
+  when the extension changed while you were asked (Laki AI asks again). `laki widget what <id>` says what it runs.
 - Security: an extension's HTML can't add a web view, and every web view runs with web security on.
 - Security: Laki's daemon answers only requests addressed to it (127.0.0.1, localhost, or remote access's link), so
   a web page can't reach it by renaming itself (DNS rebinding).

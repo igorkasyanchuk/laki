@@ -1829,7 +1829,7 @@ function SkillSection({ api }: { api: SkillApi }) {
 export type WidgetsApi = {
   list: WidgetView[]
   home?: string // Laki's own widgets folder
-  set: (id: string, p: { on?: boolean; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
+  set: (id: string, p: { on?: boolean; seen?: string; size?: [number, number]; every?: number; view?: WidgetSize; place?: WidgetPlace | WidgetPlace[]; net?: boolean; hide?: WidgetHide; config?: Record<string, string>; ai?: boolean; source?: WidgetSource | null; name?: string; allow?: string[] }) => Promise<unknown> // seen: the files hash of what the user was shown (on only while it's that); ai: Laki AI may rewrite it (an hour); source: where its data comes from; name: widget.json's; allow: the tools its agent may use unasked
   desk?: boolean // Desk is on (experimental): a place too
   agents?: { name: string; agent: string }[] // the claude and codex profiles an AI source may run
   agent?: string // Settings › Extensions' pick of them (settings.widgetAgent)
