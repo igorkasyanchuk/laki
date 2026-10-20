@@ -655,7 +655,7 @@ function agent(r: FlowRun, b: Block) {
   const perm = permOf(r.flow, b, ag), fast = b.fast || undefined // addTab checks them, and keeps them for restarts and resumes
   // session: run (the run's tab of that agent), new (a tab of its own), or another block's tab
   const key = b.session === 'new' ? undefined : b.session && b.session !== 'run' ? b.session : `run:${preset}`
-  let tab = key ? alive(r.tabs[key]) : r.tries?.[b.id] ? alive(r.tabs[b.id]) : undefined // a try again: its own tab, session new too
+  let tab = key ? alive(r.tabs[key]) : r.tries?.[b.id] || back ? alive(r.tabs[b.id]) : undefined // a try again or a restart: its own tab, session new too
   // a shared session: the last run's tab, when it's in this workspace (runs in: main), else a fork of its chat (claude)
   let forkOf: string | undefined
   if (!tab && key === `run:${preset}` && r.session === 'shared') {
@@ -1316,7 +1316,7 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (agent && (bypassIn(wf, x => agentOf(x.agent)).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
     if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && r.ws === ws.id)))) { no('its own run sent it'); continue }
     out.flows.push(wf.id)
-    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, task: name, trigger: `event ${name}`, event: payload }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
+    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, ...(wf.where === 'here' && { ws: ws.id }), task: name, trigger: `event ${name}`, event: payload }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
   }
   return out
 }

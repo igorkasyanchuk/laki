@@ -1247,7 +1247,7 @@ first `RESTORED_QUIET` minute only notes). `widgetEmit` (`laki widget emit`, MCP
 `on[name]`, else `on['custom.*']`; never to `from.widget`. `sent` (`SENT_MAX` 50, `EventSent`: what each reached,
 `refused`) is `widgetEvents` (`laki widget events`). `eventHooks.flows` (workflow.ts): workflows with `on` (`listening`,
 read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the
-event's workspace's project, a project's own in its project only; refused: no workspace, problems, `byAgent`, an
+event's workspace's project (`runs in: here`: that workspace, `ws`), a project's own in its project only; refused: no workspace, problems, `byAgent`, an
 agent's event to one with run, webhook, extension or `OUTWARD` blocks, the event of its own run. Its
 payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
 `EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only

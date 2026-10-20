@@ -1731,6 +1731,12 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   // flow.ended: to the extensions that answer it
   const ended = await until(() => (f => existsSync(f) && JSON.parse(readFileSync(f, 'utf8')))(join(rig.env.HOME, 'ended.json')), 'flow.ended')
   assert.deepEqual([ended.run, ended.workflow, ended.status], [run.id, { id: 'deploy', name: 'Deploy' }, 'done'])
+  // runs in: here: in the event's workspace
+  await rig.rpc('flowSave', { id: 'inhere', text: `# In here\nruns in: here · on: custom.check${body}` })
+  r = await rig.rpc('widgetEmit', { name: 'check', data: { y: 'there' }, ws: ws.id })
+  assert.deepEqual(r.flows, ['inhere'])
+  const there = await until(async () => (x => x?.status === 'done' && x)((await rig.rpc('state')).flows?.find((x: any) => x.workflow === 'inhere')), 'its run done')
+  assert.deepEqual([there.ws, (await rig.rpc('flowGet', { id: there.id })).vars['steps.say.output']], [ws.id, 'got there in here'])
 
   // an agent's event: not to one that runs commands
   const ag = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
