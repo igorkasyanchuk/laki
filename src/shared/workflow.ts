@@ -177,7 +177,7 @@ export function exitsOf(b: Block): Exit[] {
     ? (b.options ?? []).map(o => ({ name: o.label, to: o.to }))
     : routes
       ? [...routes.map(r => ({ ...r, to: b.options?.find(o => o.label === r.name)?.to })), { name: 'error', to: b.to?.error, bad: true }]
-      : EXITS[b.kind].map(e => ({ name: e, to: b.to?.[e], bad: BAD_EXITS.includes(e) }))
+      : (EXITS[b.kind] ?? []).map(e => ({ name: e, to: b.to?.[e], bad: BAD_EXITS.includes(e) })) // none: a block with no kind (parse says so)
   if (b.max) l.push({ name: `after ${b.max.n}`, to: b.max.to, bad: true, max: true })
   return l
 }

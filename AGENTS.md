@@ -882,7 +882,9 @@ them newest first, `flowRestore` (`trash`) puts one back where it was (refused w
 `flowTrashTidy` (hourly and at start) drops them past 30 days or 20. `flowSave` keeps the file it replaces first
 (`keepOld`: `<data>/workflow-history/yours-<id>` or `project-<project>-<id>`, `<ms>.md`, not when it's the same text,
 the last 20); `flowHistory` lists them (`at`, `size`, `first`) or gives one's `text` (`at`), `flowRevert` saves one
-through `flowSave` (so the one it replaces is kept too). The CLI's `laki flow trash` and `restore`. Then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
+through `flowSave` (so the one it replaces is kept too). The CLI's `laki flow trash` and `restore`. `laki flow check [file.md… | folder]` (`flowCheck`, before `ensureDaemon`:
+no daemon): `parse` and `check` per file (a folder's `*.md`; none given: `./.laki/workflows`), `✓`/`✗ <name>  <file>`
+and each problem, `--json` `{file, name, problems}[]`, exit 1 on any; a `use:` slug and a preset aren't known offline. Then `enter`/`work`/`leave` per block: each exit a `decide` (block, exit, why, ms, `you`), each step a `say` (the
 log, 1000 entries, each a line and its detail after a newline: the prompt, the answer, the output). Agent blocks: `session` run (`tabs['run:<preset>']`), new, or another block's tab; `send` `whenIdle` to a
 live one (`queued`: while the prompt is in the tab's queue, a turn's end is an earlier turn's), else `addTab` with the prompt (a shared session: the last run's live tab
 in the same workspace, else `forkOf` its `resume`); a tab that just started waits until drawn (`Session.born`, quiet

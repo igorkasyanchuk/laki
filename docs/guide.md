@@ -1123,7 +1123,9 @@ the workflow. A block's right click in an ended run, *Run from here* (`--from <b
 the same workspace with the run's variables, so the agents before it don't run (or cost) again; once its worktree is
 archived, Restore it first (or Run again). A run stopped by a restart goes on at its block (an agent is
 asked again), one at a usage limit waits for the reset, and a block that fails with nowhere to go asks you: *Try
-again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake).
+again* or *Stop*. Runs go on only while Laki's daemon runs (the Mac awake). `laki flow check` reads workflow files the way Laki does and
+names each problem, without Laki running, so a repo's pre-commit hook or CI can keep `.laki/workflows/` right; it
+exits 1 when one has a problem (an agent action's name and a preset's aren't known there: not checked).
 
 ```bash
 laki flow                                      # workflows and runs
@@ -1131,6 +1133,7 @@ laki flow run my-flow app "add CSV export"     # --dry: a PR, approve, merge sai
 laki flow run fix-ci "fix the lint" --ws .     # in a workspace you have (. is this tab's), not a new worktree
 laki flow again <run> [--from <block>]         # an ended run again; --from: from that block, in its workspace
 laki flow trash | flow restore <trash-id>      # deleted workflows (30 days), one back
+laki flow check .laki/workflows               # check workflow files (a folder: each .md), no app needed: CI, a hook
 laki flow show <run> | flow answer <run> 0 "use the new API" | flow stop <run>
 ```
 

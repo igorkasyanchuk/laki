@@ -42,6 +42,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki flow again <run> [--from <block>]     an ended run again (its task and inputs); --from: in its workspace, its state kept, from that block
   laki flow show|stop <run> | answer <run> <n> [words]  a run's decisions | stop it | answer what it asks
   laki flow trash | restore <trash-id>        the workflows deleted in the last 30 days | put one back
+  laki flow check [file.md… | folder]        check workflow files, no daemon (none given: ./.laki/workflows); exit 1 on a problem
   laki widget [ls] | reload                   the sidebar's extensions | read their folders again and fetch
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
   laki widget what <id>                       what turning it on runs, and its files' hash
@@ -159,11 +160,13 @@ this workspace.
   flow: `Workflows (experimental): graphs of blocks Laki runs for a task, each run in a workspace of its own, or one you
 have (--ws; . is this tab's, the project then its). --dry says what a PR, approve or merge would do instead of doing it.
 --set gives one of its Start's inputs (inputs: in the file), again for each; the ones without a default are needed.
+check reads workflow files as Laki would and names each problem (a repo's hook or CI: it needs no daemon).
 
   laki flow ls
   laki flow run review-pr shop "Review PR #118" --dry
   laki flow run fix-ci "Fix the failing check" --ws .
-  laki flow run fix-issue shop "Fix it" --set issue=1423 --set base=main`,
+  laki flow run fix-issue shop "Fix it" --set issue=1423 --set base=main
+  laki flow check .laki/workflows/ship.md`,
   widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
 their tools, and change where one shows and its settings (laki widget set; not a secret, its source or network
 access); turning one on is the user's. Places: side, top, status, rail, foot, desk, panel, row (per workspace). To make

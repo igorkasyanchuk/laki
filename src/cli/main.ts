@@ -1,14 +1,14 @@
 // laki: the command line for the daemon. `laki hook <state>` is what agents' hooks run: it never fails or
 // blocks the agent for more than a second.
 import { execFileSync } from 'node:child_process'
-import { existsSync, readFileSync } from 'node:fs'
-import { dirname, extname, resolve } from 'node:path'
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { basename, dirname, extname, join, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
 import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type GateHeld, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
-import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
+import { blockName, check, FLOW_ENDED, parse, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
 import { describe } from '../shared/when.ts'
 import { COMMON, UI, UI_SAMPLES, type UiProblem, type UiType } from '../shared/widgetUi.ts'
 import { ICONS } from '../shared/icons.ts'
@@ -53,6 +53,23 @@ async function hook(state: string, extra?: string) {
   } catch {}
   await rpc('hook', { tab, state, payload }, 700).catch(() => {})
   process.exit(0)
+}
+
+// laki flow check [file.md… | folder]: each workflow file read and checked as Laki does (parse, then check), with no
+// daemon, so a repo's hook or CI can run it; none given: ./.laki/workflows, a folder its *.md. Exit 1 on any problem.
+// A `use:` action's slug and a preset's name aren't known here: not checked
+function flowCheck(paths: string[]) {
+  const files = (paths.length ? paths : ['.laki/workflows']).flatMap(p => {
+    if (!existsSync(p)) throw new Error(`no ${p}${paths.length ? '' : ': give a workflow file or folder'}`)
+    return statSync(p).isDirectory() ? readdirSync(p).filter(f => f.endsWith('.md')).sort().map(f => join(p, f)) : [p]
+  })
+  if (!files.length) throw new Error(`no workflows (*.md) in ${paths.join(', ') || '.laki/workflows'}`)
+  const r = files.map(file => {
+    const { workflow, problems } = parse(readFileSync(file, 'utf8'), basename(file, '.md'))
+    return { file, name: workflow.name, problems: [...problems, ...check(workflow)] }
+  })
+  out(r, r.map(x => [`${x.problems.length ? '✗' : '✓'} ${x.name}  ${x.file}`, ...x.problems.map(p => `  ${p}`)].join('\n')).join('\n'))
+  if (r.some(x => x.problems.length)) process.exitCode = 1
 }
 
 // laki widget dev [folder]: your extension's folder (this one by default) linked, on and watched; then its fetches and
@@ -207,6 +224,7 @@ async function main() {
     case 'mcp':
       return mcp() // starts the daemon at its first tool call: stdout is the protocol's
   }
+  if (['flow', 'flows', 'workflow'].includes(cmd) && rest[0] === 'check') return flowCheck(rest.slice(1))
   await ensureDaemon()
   switch (cmd) {
     case 'ls': {
@@ -453,7 +471,7 @@ async function main() {
       }
       if (sub === 'answer') return out(await rpc('flowAnswer', { id, n: Number(words[0]), text: words.slice(1).join(' ') }), 'answered')
       if (sub === 'stop') return out(await rpc('flowStop', { id }), `stopped ${id}`)
-      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | trash | restore <trash-id> | show|stop <run> | answer <run> <n> [words]')
+      throw new Error('usage: laki flow [ls] | run <workflow> [project] <task…> [--ws <ws|.>] [--dry] [--set name=value…] | again <run> [--from <block>] | check [file.md… | folder] | trash | restore <trash-id> | show|stop <run> | answer <run> <n> [words]')
     }
     case 'widget':
     case 'widgets': {

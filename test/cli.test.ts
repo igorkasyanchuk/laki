@@ -1,6 +1,6 @@
 // The laki CLI against a daemon in a temp home.
 import assert from 'node:assert/strict'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
 import { dataDir } from '../src/shared/conn.ts'
@@ -440,4 +440,30 @@ test('project memory: yours and what agents learned, 50 each, given to claude at
   const after = (await rig.rpc('state')).projects[0].memory
   assert.ok(!after.some((m: any) => m.id === id))
   assert.ok(after.some((m: any) => m.text === 'mine too' && !m.auto))
+})
+
+test('cli: flow check reads workflow files with no daemon: ✓ a good one, ✗ a bad one with its problems and exit 1, a folder each *.md, --json', async t => {
+  const rig = await fresh(t)
+  await rig.stop()
+  rmSync(join(rig.data, 'daemon.json'), { force: true })
+  const dir = join(rig.repo, '.laki', 'workflows')
+  mkdirSync(dir, { recursive: true })
+  writeFileSync(join(dir, 'good.md'), '# Good\n\n## start\nnext: ask\n\n## ask\nagent: claude\n> Say hi\nnext: end\n\n## end\nend: success\n')
+  writeFileSync(join(dir, 'bad.md'), '# Bad\n\n## start\nnext: nowhere\n\n## ask\nagent: claude\nperm: yolo\n> Say hi\nnext: start\n')
+  writeFileSync(join(dir, 'notes.txt'), 'not a workflow')
+  writeFileSync(join(dir, 'kindless.md'), '# Kindless\n\n## start\nnext: x\n\n## x\n> hi\n') // a block with no kind: named, not a crash
+  const good = await rig.cli('flow', 'check', join(dir, 'good.md'))
+  assert.equal(good.code, 0, good.err)
+  assert.equal(good.out.trim(), `✓ Good  ${join(dir, 'good.md')}`)
+  const bad = await rig.cli('flow', 'check', join(dir, 'bad.md'))
+  assert.equal(bad.code, 1)
+  assert.match(bad.out, /^✗ Bad /m)
+  assert.match(bad.out, /^ {2}Start: next goes to nowhere, which isn't a block$/m)
+  assert.match(bad.out, /^ {2}ask: permission mode yolo\? auto, acceptEdits, plan, bypassPermissions$/m)
+  const all = await rig.cli('flow', 'check', dir, '--json')
+  assert.equal(all.code, 1)
+  assert.deepEqual(JSON.parse(all.out).map((x: any) => [x.name, x.problems.length > 0]), [['Bad', true], ['Good', false], ['Kindless', true]])
+  assert.match(all.out, /x: what kind of block\?/)
+  assert.match((await rig.cli('flow', 'check', join(dir, 'gone.md'))).err, /no .*gone\.md/)
+  assert.equal(existsSync(join(rig.data, 'daemon.json')), false, 'no daemon started')
 })
