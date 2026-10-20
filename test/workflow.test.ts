@@ -1409,7 +1409,7 @@ test('workflow runs in a workspace you have: none made, no mark, one run there a
 const TWICE = `# Twice
 Plan, then check.
 
-runs in: worktree · session: new
+runs in: worktree · session: new · when done: keep
 
 ## start
 input: task
@@ -1519,6 +1519,61 @@ test('workflow trash and history: a delete goes to the trash and Undo brings it 
   assert.equal((await rig.rpc('flowTrash')).length, 1)
   await rig.rpc('flowTrashTidy', { now: Date.now() + 31 * 86400e3 })
   assert.deepEqual(await rig.rpc('flowTrash'), [])
+})
+
+const TIDY = (cmd: string, head = '') => `# Tidy
+
+runs in: worktree · session: new${head}
+
+## start
+input: task
+next: work
+
+## work
+run: ${cmd}
+ok: end
+fail: bad
+
+## end
+end: success
+
+## bad
+end: failed
+`
+
+test('workflow when done: a done run’s clean worktree archived; one with changes, a failed run, a workspace it was given and when done: keep stay, the log says which', async t => {
+  const KEEP = TIDY('echo hi', ' · when done: keep')
+  assert.equal(parse(KEEP).workflow.done, 'keep')
+  assert.equal(toFile(parse(KEEP, 'keep').workflow), KEEP, 'round trip')
+  assert.deepEqual(check(parse(TIDY('echo hi', ' · when done: later')).workflow), ['when done: later? archive or keep'])
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  await rig.rpc('flowSave', { id: 'clean', text: TIDY('echo hi') })
+  await rig.rpc('flowSave', { id: 'dirty', text: TIDY('echo x > new.txt') })
+  await rig.rpc('flowSave', { id: 'fails', text: TIDY('exit 3') })
+  await rig.rpc('flowSave', { id: 'keep', text: KEEP })
+  const mine = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'mine' })
+  const end = async (o: object, line: RegExp) => {
+    const { id } = await rig.rpc('flowStart', { task: 'x', ...o })
+    return until(async () => {
+      const r = await rig.rpc('flowGet', { id })
+      return r.log.some((l: string) => line.test(l)) && r
+    }, `${id}: ${line}`)
+  }
+  const archived = async (id: string) => (await rig.rpc('state')).workspaces.find((w: any) => w.id === id)?.archived
+  const clean = await end({ workflow: 'clean', project: p.id }, / archived: the run is done \(Restore brings it back\)$/)
+  assert.equal(clean.status, 'done')
+  assert.ok(await archived(clean.ws), 'the clean worktree archived')
+  const dirty = await end({ workflow: 'dirty', project: p.id }, / stays: 1 file not committed$/)
+  assert.equal(await archived(dirty.ws), undefined)
+  const fails = await end({ workflow: 'fails', project: p.id }, / stays: the run failed$/)
+  assert.equal(fails.status, 'failed')
+  assert.equal(await archived(fails.ws), undefined)
+  await end({ workflow: 'clean', ws: mine.id }, /mine stays: the run didn't make it$/)
+  assert.equal(await archived(mine.id), undefined)
+  const keep = await end({ workflow: 'keep', project: p.id }, / stays: when done: keep$/)
+  assert.equal(await archived(keep.ws), undefined)
 })
 
 const CHECKS = `# Checks

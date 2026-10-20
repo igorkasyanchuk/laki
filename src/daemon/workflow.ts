@@ -1181,6 +1181,29 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
   next() // its slot
+  void tidy(r)
+}
+
+// when done: archive (unset: a worktree run's) archives the worktree the run made once it ended done with nothing
+// uncommitted; one that failed or stopped, has something uncommitted, or wasn't the run's (runs in: here, a ws given,
+// the project's folder) stays. The log says which
+async function tidy(r: FlowRun) {
+  const ws = wsOf(r)
+  if (!ws || ws.archived) return
+  const name = ws.name ?? ws.id
+  const stays = (why: string) => (say(r, `${name} stays: ${why}`), touch())
+  if (r.status !== 'done') return stays(`the run ${r.status === 'failed' ? 'failed' : 'was stopped'}`)
+  if (r.flow.done === 'keep') return stays('when done: keep')
+  if (ws.flow !== r.id || ws.kind !== 'worktree') return stays("the run didn't make it") // runs in: main or here, a ws given: unset is keep
+  try {
+    const x = await wsArchive(ws.id, { ifClean: true, by: 'workflow' })
+    if (x?.dirty) return stays(`${x.dirty} file${x.dirty === 1 ? '' : 's'} not committed`)
+    if (x?.held) return stays(x.held.map(h => `${h.name}: ${h.why}`).join('; '))
+    say(r, `${name} archived: the run is done (Restore brings it back)`)
+  } catch (e) {
+    return stays((e as Error).message)
+  }
+  touch()
 }
 
 export function flowStop(o: { id: string }) {

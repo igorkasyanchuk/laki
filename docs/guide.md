@@ -1117,7 +1117,10 @@ variables, how many times each block ran). *Log* shows all of it in order, the p
 the commands' output folded under each line, with a filter and Copy. A run and its sessions link both ways: its
 workspace's status bar (or an agent tab's it sent a prompt to) shows the run and its block, a click opens it; in the run,
 an agent block's decision (or *open its session* with the block picked) opens its tab. The trash can deletes a run (one under way stops
-first), after you confirm; its workspace and tabs stay. An ended run's *Run again* (also its row's ⋯, `laki flow
+first), after you confirm; its workspace and tabs stay. When a run ends done, the worktree it made is archived once nothing is left uncommitted
+(Restore brings it back, its branch kept), so old runs don't fill the sidebar; one with changes, a failed or stopped
+run's, and a workspace it was given stay, and the run's log says which. `when done: keep` (the workflow's settings,
+*When a run is done*) keeps them all. An ended run's *Run again* (also its row's ⋯, `laki flow
 again <run>`) starts a new one with its task and inputs on the workflow as it's saved now, the point when you fixed
 the workflow. A block's right click in an ended run, *Run from here* (`--from <block>`), goes on from that block in
 the same workspace with the run's variables, so the agents before it don't run (or cost) again; once its worktree is

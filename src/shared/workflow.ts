@@ -18,6 +18,7 @@ export const WAITS: Record<string, string> = { checks: 'Its PR’s checks pass o
 export const TESTS = ['contains', 'matches', 'equals', '>=', '<=', '>', '<', 'js'] as const // the last five: a number's, and a case branch's own JS
 export const NUM_TESTS = ['>=', '<=', '>', '<']
 export const WHERES: Record<string, string> = { worktree: 'A new worktree per run', main: "The project's folder (its own workspace)", here: 'A workspace you pick (its ⋯ › Run workflow)' }
+export const DONES: Record<string, string> = { archive: 'Archive the worktree it made, when nothing is left uncommitted', keep: 'Keep its workspace' } // when done: (unset: archive for runs in: worktree, else keep)
 export const SESSIONS: Record<string, string> = { new: 'A new AI session per run', shared: 'One AI session for every run (claude: each run forks the last)' }
 export const RESULTS = ['success', 'stopped', 'failed'] as const
 export const METHODS = ['POST', 'PUT', 'PATCH', 'GET', 'DELETE'] as const // a webhook's
@@ -107,7 +108,7 @@ export type Block = {
   modal?: boolean // popup: false, no window (its notification or card only); end: true, a window with its words
   phone?: boolean // end, popup, with notify: a push to the phone too (Settings › Phone pushes)
 }
-export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; on?: string; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own
+export type Workflow = { id: string; name: string; desc?: string; where: 'worktree' | 'main' | 'here'; session: 'new' | 'shared'; runs?: number; turns?: number; perm?: string; done?: string; on?: string; vars?: Record<string, string>; blocks: Block[] } // vars: its own {{vars.NAME}} (var NAME: value lines), over Settings' flowVars; on: an event that starts a run (eventOk); perm: its agent blocks' permission mode unless one says its own; done: when done: (DONES)
 export type WorkflowSource = 'yours' | 'project'
 export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean } // the list's; byAgent: an agent wrote it (MCP), not saved by the user since
 
@@ -231,13 +232,14 @@ export function parse(text: string, id = ''): { workflow: Workflow; problems: st
       const v = VAR_LINE.exec(line) // var NAME: value
       if (v) return void ((wf.vars ??= {})[v[1]] = v[2].trim())
       const kv = pairs(line)
-      if (kv.length && kv.every(([k]) => ['runs in', 'session', 'at once', 'turns', 'perm', 'on'].includes(k))) {
+      if (kv.length && kv.every(([k]) => ['runs in', 'session', 'at once', 'turns', 'perm', 'when done', 'on'].includes(k))) {
         for (const [k, v] of kv) {
           if (k === 'runs in') v in WHERES ? (wf.where = v as Workflow['where']) : problems.push(`${at}: runs in: ${Object.keys(WHERES).join(' or ')}`)
           else if (k === 'session') v in SESSIONS ? (wf.session = v as Workflow['session']) : problems.push(`${at}: session: new or shared`)
           else if (k === 'at once') wf.runs = num(v, at, problems)
           else if (k === 'on') wf.on = v || undefined
           else if (k === 'perm') wf.perm = v || undefined
+          else if (k === 'when done') wf.done = v || undefined
           else wf.turns = num(v, at, problems)
         }
       } else desc.push(line.trim())
@@ -383,7 +385,7 @@ const one = (s = '') => s.replace(/\s*\n\s*/g, ' ') // a field on one line: a ne
 export function toFile(wf: Workflow): string {
   const L = [`# ${one(wf.name)}`]
   if (wf.desc) L.push(one(wf.desc))
-  L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`, wf.perm && `perm: ${wf.perm}`, wf.on && `on: ${one(wf.on)}`].filter(Boolean).join(' · '))
+  L.push('', [`runs in: ${wf.where}`, `session: ${wf.session}`, wf.runs && `at once: ${wf.runs}`, wf.turns && `turns: ${wf.turns}`, wf.perm && `perm: ${wf.perm}`, wf.done && `when done: ${wf.done}`, wf.on && `on: ${one(wf.on)}`].filter(Boolean).join(' · '))
   for (const [k, v] of Object.entries(wf.vars ?? {})) if (VAR_NAME.test(k)) L.push(`var ${k}: ${one(v)}`)
   for (const b of wf.blocks) {
     L.push('', `## ${b.id}`)
@@ -436,6 +438,7 @@ export function check(wf: Workflow): string[] {
   if (wf.on && !eventOk(wf.on)) out.push(`on: ${wf.on} isn't an event (${WIDGET_EVENTS.join(', ')}, custom.<name> or custom.*)`)
   if (wf.blocks.filter(b => b.kind === 'start').length > 1) out.push('more than one start block')
   if (wf.perm && !PERM_IDS.includes(wf.perm)) out.push(`the workflow's permission mode ${wf.perm}? ${PERM_IDS.join(', ')}`)
+  if (wf.done && !(wf.done in DONES)) out.push(`when done: ${wf.done}? archive or keep`)
   if (wf.blocks.length > MAX_BLOCKS) return [...out, `${wf.blocks.length} blocks: ${MAX_BLOCKS} at most`] // the walks below recurse: not over thousands
   for (const b of wf.blocks) {
     for (const e of exitsOf(b)) if (e.to && !by.has(e.to)) out.push(`${blockName(b)}: ${e.name} goes to ${e.to}, which isn't a block`)
@@ -809,7 +812,7 @@ export const WORKFLOW_FORMAT = `A Laki workflow is one Markdown file: a graph of
 # <Name>
 <one line: what it does>
 
-runs in: worktree|main|here · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · on: <event> (runs in: a new worktree per run, the project's folder, or here: a workspace the user picks, which the run needs (a worktree's or a folder's run takes one too when given); perm: every agent block's permission mode unless it says its own, below; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
+runs in: worktree|main|here · session: new|shared · at once: 3 · turns: 30 · perm: <mode> · when done: archive|keep · on: <event> (runs in: a new worktree per run, the project's folder, or here: a workspace the user picks, which the run needs (a worktree's or a folder's run takes one too when given); perm: every agent block's permission mode unless it says its own, below; when done: archive (a worktree run's default) archives the worktree a run made once it ends done with nothing uncommitted (Restore brings it back), keep keeps it; a failed or stopped run's and a workspace it was given always stay; at once: runs going together; one started past it waits its turn, queued, up to 20. on: an event that starts a run by itself in the event's workspace's project, the task its name, its fields as {{event.<path>}} ({{event.data.x}} for a custom one's data): ${WIDGET_EVENTS.join(', ')}, custom.<name> (laki widget emit) or custom.*; an event an agent sent never starts one with run: or outward blocks; a workflow an agent wrote never starts on one)
 var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; the user's global ones in Settings are {{vars.NAME}} too, the workflow's own win)
 
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:

@@ -13,6 +13,7 @@ version it builds, with the date. -->
 - Workflows: a deleted one goes to the trash (Undo, `laki flow restore`), and each save keeps the one before: ⋯ ›
   **History…** to look at the last 20 and bring one back.
 - Workflows after a restart: an agent whose chat came back is told to finish its step, not handed the whole prompt again.
+- Workflows clean up: a done run's worktree is archived when nothing is left uncommitted (`when done: keep` keeps it).
 - `laki flow check [file.md… | folder]`: a workflow file's problems without Laki running, for a hook or CI; exit 1 on one.
 - A *Context* starter (`laki widget new Context --kind context`): actions in ⌘K, a file's right click and the prompt's
   Insert menu, to copy from.
