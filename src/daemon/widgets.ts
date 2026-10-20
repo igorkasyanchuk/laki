@@ -894,7 +894,8 @@ function repoShown(w: Entry) {
       left -= cut.length
       return [`${n}:\n\n${block(cut.trimEnd())}`]
     })
-  return `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nIts files:\n\n${files.join('\n\n')}` : ''}`
+  const more = w.file ? 0 : filesUnder(w.dir, true, 2000).length - filesUnder(w.dir).length // hidden or in node_modules: not shown, but a change there turns it off too
+  return `${acts.length ? `\n\nIts actions run:\n\n${block(acts.join('\n'))}` : ''}${files.length ? `\n\nIts files:\n\n${files.join('\n\n')}` : ''}${more > 0 ? `\n\nAnd ${more} more ${more === 1 ? 'file' : 'files'}, hidden or in node_modules (not shown here).` : ''}`
 }
 
 // what a failed command said last, past node's own trailer (an uncaught error ends with its version)
@@ -1734,23 +1735,21 @@ export function filesHash(w: Entry, fresh = false) {
   return createHash('sha256').update(`${dirHash(w, fresh)}\0${out}`).digest('hex')
 }
 // its own files' hash (cached by their times and sizes): a repo's extension's trust
-// every file under its folder, relative: none hidden, no node_modules (a link as a file). ponytail: 500 at most, a
+// every file under its folder, relative, a folder's files before its subfolders (a link as a file): none hidden, no
+// node_modules; all (a repo's, whose code may sit there too): those as well, but .git. ponytail: max files at most, a
 // change past them isn't seen
-const filesUnder = (d: string, rel = '', out: string[] = []) => {
+const filesUnder = (d: string, all = false, max = 500, rel = '', out: string[] = []) => {
   let es: Dirent[] = []
   try {
     es = readdirSync(join(d, rel), { withFileTypes: true })
   } catch {}
-  for (const x of es) {
-    if (out.length >= 500 || x.name.startsWith('.') || x.name === 'node_modules') continue
-    const r = rel ? `${rel}/${x.name}` : x.name
-    if (x.isDirectory()) filesUnder(d, r, out)
-    else if (x.isFile() || x.isSymbolicLink()) out.push(r)
-  }
+  es = es.filter(x => (all ? x.name !== '.git' : !x.name.startsWith('.') && x.name !== 'node_modules'))
+  for (const x of es) if (out.length < max && !x.isDirectory() && (x.isFile() || x.isSymbolicLink())) out.push(rel ? `${rel}/${x.name}` : x.name)
+  for (const x of es) if (out.length < max && x.isDirectory()) filesUnder(d, all, max, rel ? `${rel}/${x.name}` : x.name, out)
   return out
 }
 function dirHash(w: Entry, fresh = false) {
-  const names = (w.file ? [w.file] : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
+  const names = (w.file ? [w.file] : w.project ? filesUnder(w.dir, true, 2000) : filesUnder(w.dir)).sort() // its subfolders too: a lib/ script a fetch runs
   const sig = JSON.stringify(names.map(n => (st => [n, st?.mtimeMs, st?.size])(statSync(join(w.dir, n), { throwIfNoEntry: false }))))
   let c = hashes.get(w.id)
   if (fresh || c?.sig !== sig) {

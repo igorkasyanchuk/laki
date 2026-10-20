@@ -1107,7 +1107,7 @@ eventHooks.flows = (name, payload, wsId, agent) => {
     if (wf.problems.length) { no(wf.problems[0]); continue }
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
-    if (agent && wf.blocks.some(b => b.kind === 'run' || (b.kind === 'action' && OUTWARD.includes(b.action ?? '')))) { no('an agent sent the event, and it runs commands or outward actions'); continue }
+    if (agent && wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? '')))) { no('an agent sent the event, and it runs commands, a webhook or outward actions'); continue }
     if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && r.ws === ws.id)))) { no('its own run sent it'); continue }
     out.flows.push(wf.id)
     flowStart({ workflow: wf.id, source: wf.source, project: ws.project, task: name, trigger: `event ${name}`, event: payload }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))

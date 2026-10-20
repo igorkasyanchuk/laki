@@ -1206,7 +1206,7 @@ first `RESTORED_QUIET` minute only notes). `widgetEmit` (`laki widget emit`, MCP
 `refused`) is `widgetEvents` (`laki widget events`). `eventHooks.flows` (workflow.ts): workflows with `on` (`listening`,
 read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the
 event's workspace's project, a project's own in its project only; refused: no workspace, problems, `byAgent`, an
-agent's event to one with run or `OUTWARD` blocks, the event of its own run. Its
+agent's event to one with run, webhook, extension or `OUTWARD` blocks, the event of its own run. Its
 payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
 `EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
 its workspace's, live) gets a `Job` in `queues` (`QUEUE_MAX` 20, the oldest dropped and logged), `drain` runs one at a
@@ -1419,7 +1419,7 @@ its own folder, not a worktree's: ponytail) between yours and `BUILTIN` in `scan
 and the id `<project>.<id>`; `watchRepos` (`fs.watch` recursive, 1 s, then `scanWidgets`; closed by `widgetsStop`), and
 core's `projectPush`/`projectRm` scan again (a removed one's go, their stores stay). Trust: `widgetSet` `on` needs `seen`
 (`widgetWhat`'s hash; for a repo's it adds `repoShown`: its actions' commands and its files' text, 12k), the store's
-`trusted` is `dirHash` (every file under the folder, `filesUnder`, 500 at most), and a scan that finds an on one with
+`trusted` is `dirHash` (every file under the folder, `filesUnder` `all`: hidden ones and node_modules too, 2000 at most; `repoShown` counts the ones it doesn't show), and a scan that finds an on one with
 another hash calls `untrust` (off, `changed`, `stopStream`, `stopAgents`, `ungrant`, a warn line, a `widget-say`
 `notify`). `inProj` keeps it to its project: `wsOf` (refused elsewhere), `ctxOf`, `instView`, `shownIn`, `widgetEvent`
 (no workspace: `app.open` and `custom.*` only), `widgetGates`, `widgetTools` (`ws`: MCP's `ext_*` by

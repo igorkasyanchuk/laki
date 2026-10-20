@@ -294,7 +294,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_extension_emit',
-    description: "Send an event of your own, custom.<name>, with data: the user's extensions and workflows that answer it (on: custom.<name> or custom.*) run. Say done with it, not to ask for anything. Laki marks it as an agent's: a workflow that runs commands or outward actions won't start on it.",
+    description: "Send an event of your own, custom.<name>, with data: the user's extensions and workflows that answer it (on: custom.<name> or custom.*) run. Say done with it, not to ask for anything. Laki marks it as an agent's: a workflow that runs commands, a webhook or outward actions won't start on it.",
     inputSchema: obj({ name: str('custom.<name> or <name>: letters, digits, . _ -'), data: { type: 'object', description: 'its data (64 KB at most)' }, ws: str('the workspace it is about (default: yours)') }, ['name']),
     run: a => rpc('widgetEmit', { name: a.name, data: a.data, ws: a.ws ?? from, from: { ws: from, tab: process.env.LAKI_TAB }, ...(who && { ai: true }) }),
   },

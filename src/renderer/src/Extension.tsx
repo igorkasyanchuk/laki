@@ -408,10 +408,13 @@ function Logs({ w, cfg, spots, copy }: { w: WidgetView; cfg: WidgetsApi; spots: 
   const [read, setRead] = useState(0)
   useEffect(() => {
     let live = true
+    let reading = false // one read at a time: two from the same cursor would show its lines twice
     next.current = 0
     setLines([])
     const get = () =>
-      cfg.log?.read(w.id, { since: next.current, limit: 2000 }).then(
+      !reading &&
+      (reading = true) &&
+      cfg.log?.read(w.id, { since: next.current, limit: 2000 }).finally(() => (reading = false)).then(
         r => {
           if (!live) return
           setOn(r.on)

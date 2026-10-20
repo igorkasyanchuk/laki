@@ -1437,5 +1437,5 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   const ag = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
   r = await rig.rpc('widgetEmit', { name: 'deploy', ws: ws.id, from: { tab: ag.id } })
   assert.deepEqual(r.flows, [])
-  assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands or outward actions'))
+  assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook or outward actions'))
 })

@@ -108,6 +108,17 @@ test("a repo's extension: <project>.x, off; on after a look; a change there turn
   writeFileSync(join(d, 'lib', 'run.sh'), 'echo deploy\n')
   await until(async () => (await find()).changed, 'off: lib/run.sh is new')
   assert.match((await rig.rpc('widgetWhat', { id })).text, /lib\/run\.sh:\n\n```\necho deploy\n```/)
+  await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
+  await until(async () => !(await find()).running, 'its first fetch done')
+  // a hidden file and node_modules count too (code a fetch may run), said though not shown
+  mkdirSync(join(d, 'node_modules', 'x'), { recursive: true })
+  writeFileSync(join(d, 'node_modules', 'x', 'index.js'), 'module.exports = 1\n')
+  assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo/)
+  assert.match((await rig.rpc('widgetWhat', { id })).text, /And 1 more file, hidden or in node_modules/)
+  await rig.rpc('widgetSet', { id, on: true, seen: (await rig.rpc('widgetWhat', { id })).hash })
+  await until(async () => !(await find()).running, 'its first fetch done')
+  writeFileSync(join(d, '.helper.sh'), 'echo hidden\n')
+  assert.match((await rig.rpc('widgetRun', { id })).error ?? '', /changed in .*'s repo/)
 
   // the project gone: its extensions too, their settings kept
   await rig.rpc('wsRm', { id: a.id })
