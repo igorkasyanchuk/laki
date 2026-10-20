@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- More events for extensions: a ship's end, a workflow's end, a usage limit, a new tab, a port starting to listen. Send
+  your own with `laki widget emit <name>`; a workflow can start on any of them (`on:` in its head).
 - Extensions keep logs, off until you turn them on (Settings › Extensions for all, or one's *Keep a log*): Laki's lines,
   each run and its stderr, secrets masked. Its page's **Logs** tab follows them; `laki widget logs <id> -f` too, and
   `laki widget log` adds a line from a script.

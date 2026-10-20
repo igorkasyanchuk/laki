@@ -101,6 +101,8 @@ export const widgetFormat = () => `## widget.json
 - \`"on": { "turn.done": "<action>" | "refresh" }\`: events it answers, the event as JSON on stdin (and
   \`$LAKI_EVENT_FILE\`, \`$LAKI_EVENT\` its name): ${WIDGET_EVENTS.join(', ')}. Each has \`event\`, \`at\`, \`ws\`
   (\`{ id, name, project, branch, pr }\`), \`tab\` and its own fields (\`turn.done\`: \`last\`; \`pr.*\`: \`pr: { number, url, title }\`).
+  Events of your own: \`"$LAKI_CLI" widget emit deploy.done '{"sha": "abc"}'\` sends \`custom.deploy.done\` (\`data\`,
+  \`from\`); \`"custom.deploy.done"\` or \`"custom.*"\` in \`on\` answers it (never the extension that sent it).
 - An action that prints \`{"data": …}\` sets the data (\`"merge": true\`: over it) instead of a fetch.
 - \`"stream": true\`: its fetch runs all along, each line of JSON it prints its data (a script: an async generator,
   each \`yield\`); global only, no \`every\`. \`laki widget push <id> '<json>'\` sets its data from outside.

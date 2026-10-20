@@ -616,8 +616,14 @@ export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtu
 // a stream's (widget.json's stream): running since, restarts so far, its last line, the next start after an exit
 export type WidgetStream = { running: boolean; since?: number; restarts: number; last?: string; next?: number; stopped?: boolean }
 // what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgets.ts widgetEvent)
-export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open'] as const
-export type WidgetEvent = (typeof WIDGET_EVENTS)[number]
+export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held'] as const
+// events of your own (laki widget emit): custom.<name>; "custom.*" in on: answers every one
+export const CUSTOM_EVENT = /^custom\.[a-z0-9][a-z0-9._-]{0,40}$/
+export type WidgetEvent = (typeof WIDGET_EVENTS)[number] | `custom.${string}`
+// a name on: (widget.json's, a workflow's) may take: a built-in event, a custom one, or custom.*
+export const eventOk = (e: string) => (WIDGET_EVENTS as readonly string[]).includes(e) || e === 'custom.*' || CUSTOM_EVENT.test(e)
+// the extensions and workflows an event reached (laki widget events: the last 50)
+export type EventSent = { at: number; event: string; ws?: string; from?: { widget?: string; tab?: string; agent?: string }; hops?: number; widgets: string[]; flows: string[]; refused?: string[] }
 // where an extension's data comes from: its own fetch (or script), a text typed in (JSON, else { text }), a file of this
 // Mac's or a URL (read each time it fetches: JSON, else { text }); widget.json's source is the default, the user's pick wins
 export const WIDGET_SOURCES = ['fetch', 'static', 'file', 'url', 'ai'] as const

@@ -168,9 +168,26 @@ when it has them) and its own fields, 64 KB at most:
 | `workspace.archived`, `workspace.restored`, `workspace.removed` | as named | |
 | `schedule.ran` | a scheduled task ran or failed | `task: { id, name }`, `ok`, `what` |
 | `app.open` | Laki's window comes back | |
+| `ship.done` | a workspace's Ship ends | `ok`, `exit` (its code), `pr: { url, number }` when there is one by then |
+| `flow.ended` | a workflow's run ends | `run`, `workflow: { id, name }`, `status`, `why` |
+| `limit.hit` | an agent hits a usage limit (once per limit) | `agent`, `until` (ms) |
+| `tab.new` | a tab is opened (not the ones brought back as Laki starts) | `kind` (agent, shell, dev, script, ship) |
+| `port.open` | a port starts listening in a workspace (once each time) | `port`, `pid`, `command`, `name` (`.laki.json`'s `ports`) |
+| `custom.<name>` | `laki widget emit <name>` (below) | `data`, `from: { widget, tab, agent }` |
 
 PR events come from Laki's PR scans: the first scan after the daemon starts only notes where each PR is, so a restart
-replays nothing. What an action prints can set the data (below); its `toast` or `modal` shows in the app while its
+replays nothing; so do ports a tab brought back at start listens on in its first minute. `laki widget events` lists
+the last 50 events, and which extensions and workflows each reached (or why a workflow didn't start).
+
+### Events of your own (`laki widget emit`)
+
+`laki widget emit deploy.done '{"sha": "abc"}' [--ws <id>]` (or the JSON on stdin with `-`; MCP's
+`laki_extension_emit`) sends `custom.deploy.done` with that `data` (64 KB at most; a name of letters, digits, `.`, `_`,
+`-`). `"on": { "custom.deploy.done": "refresh" }` answers it, `"custom.*"` every custom event. From an extension's own
+command (`"$LAKI_CLI" widget emit …`) `from.widget` says which, and it never gets its own; an agent's says
+`from.agent`. An emit made while handling an event is a hop more: past 3 hops it's dropped, and said in its log.
+
+A workflow can start on any of these (`on: custom.deploy.done` in its head): see the guide's Workflows. What an action prints can set the data (below); its `toast` or `modal` shows in the app while its
 window is open.
 
 ### An action's data

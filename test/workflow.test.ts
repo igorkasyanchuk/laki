@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { join } from 'node:path'
@@ -1395,4 +1395,47 @@ end: success · notify: yes · popover: yes · modal: yes
   const e = await ev('end')
   assert.deepEqual([e.text, e.modal, e.popover, e.notify], ['all done', true, true, true])
   assert.deepEqual(r.shown.map((x: any) => x.title), ['Hi x', 'Shows: done'], 'the end’s window kept with the run too')
+})
+
+test('workflows on an event: on: custom.x starts a run in the event’s project with {{event.…}}; flow.ended; the refused ones said', async t => {
+  // the file: on: in its head, read back; an unknown event is a problem
+  const wf = parse('# On\nruns in: main · on: custom.deploy\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n').workflow
+  assert.equal(wf.on, 'custom.deploy')
+  assert.match(toFile(wf), /^runs in: main · session: new · on: custom\.deploy$/m)
+  assert.deepEqual(check(wf), [])
+  assert.match(check({ ...wf, on: 'pr.merge' }).join(), /on: pr\.merge isn't an event/)
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  mkdirSync(join(rig.data, 'widgets', 'fe'), { recursive: true })
+  writeFileSync(join(rig.data, 'widgets', 'fe', 'widget.json'), JSON.stringify({ name: 'fe', on: { 'flow.ended': 'keep' }, actions: { keep: `cat > "${rig.env.HOME}/ended.json"` } }))
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 'fe', on: true })
+  const body = '\n\n## start\ninput: task\nnext: say\n\n## say\nrun: echo got {{event.data.y}} in {{event.ws.name}}\nok: e\nfail: e\n\n## e\nend: success\n'
+  await rig.rpc('flowSave', { id: 'deploy', text: `# Deploy\nruns in: main · on: custom.deploy${body}` })
+  await rig.rpc('flowSave', { id: 'theirs', text: `# Theirs\nruns in: main · on: custom.deploy${body}`, by: 'agent' })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'here' })
+
+  // no workspace: no project to run in
+  let r = await rig.rpc('widgetEmit', { name: 'deploy', data: { y: 'no' } })
+  assert.deepEqual(r.flows, [])
+  assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: the event has no workspace, so no project'))
+
+  r = await rig.rpc('widgetEmit', { name: 'deploy', data: { y: 'yes' }, ws: ws.id })
+  assert.deepEqual(r.flows, ['deploy'])
+  assert.deepEqual((await rig.rpc('widgetEvents'))[0].refused, ['theirs: an agent wrote it: save it in Workflows first'])
+  const run = await until(async () => (await rig.rpc('state')).flows?.find((x: any) => x.workflow === 'deploy'), 'a run')
+  const done = await until(async () => (x => x.status === 'done' && x)(await rig.rpc('flowGet', { id: run.id })), 'done')
+  assert.deepEqual([done.project, done.task, done.trigger], [p.id, 'custom.deploy', 'event custom.deploy'])
+  assert.equal(done.vars['steps.say.output'], 'got yes in here')
+  // flow.ended: to the extensions that answer it
+  const ended = await until(() => (f => existsSync(f) && JSON.parse(readFileSync(f, 'utf8')))(join(rig.env.HOME, 'ended.json')), 'flow.ended')
+  assert.deepEqual([ended.run, ended.workflow, ended.status], [run.id, { id: 'deploy', name: 'Deploy' }, 'done'])
+
+  // an agent's event: not to one that runs commands
+  const ag = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  r = await rig.rpc('widgetEmit', { name: 'deploy', ws: ws.id, from: { tab: ag.id } })
+  assert.deepEqual(r.flows, [])
+  assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands or outward actions'))
 })

@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type EventSent, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -537,6 +537,28 @@ async function main() {
           r.lines.forEach(show)
         }
         return
+      }
+      if (sub === 'emit') {
+        // an event of your own: custom.<name>, its data as an argument or on stdin (-); from an extension's command, its
+        // LAKI_WIDGET and the event it handles (LAKI_EVENT_HOPS: a loop stops)
+        if (!id) throw new Error('usage: laki widget emit <name> [json | -] [--ws <workspace>]')
+        const text = action === '-' ? await new Promise<string>(r => {
+          let s = ''
+          process.stdin.on('data', d => (s += d)).on('end', () => r(s)).on('error', () => r(s))
+        }) : [action, ...arg].filter(x => x !== undefined).join(' ')
+        let data: unknown
+        try {
+          data = text.trim() ? JSON.parse(text) : undefined
+        } catch {
+          throw new Error(`not JSON: ${text.trim().slice(0, 80)}`)
+        }
+        const r = await rpc('widgetEmit', { name: id, data, ws: ws ?? process.env.LAKI_WORKSPACE, from: { ...caller(), widget: process.env.LAKI_WIDGET }, hops: process.env.LAKI_EVENT_HOPS })
+        return out(r, r.ok ? `${r.event}: ${[...r.widgets, ...r.flows.map((f: string) => `workflow ${f}`)].join(', ') || 'nothing answers it'}` : `✗ ${r.dropped}`)
+      }
+      if (sub === 'events') {
+        const r = (await rpc('widgetEvents', {})) as EventSent[]
+        const line = (e: EventSent) => [new Date(e.at).toLocaleTimeString(), e.event, e.ws && `ws ${e.ws}`, e.from?.widget && `from ${e.from.widget}`, e.from?.agent && `by ${e.from.agent}`, e.hops && `${e.hops} hops`, `→ ${[...e.widgets, ...e.flows.map(f => `workflow ${f}`)].join(', ') || 'nothing'}`, ...(e.refused ?? []).map(x => `✗ ${x}`)].filter(Boolean).join('  ')
+        return out(r, r.map(line).join('\n') || 'no events yet')
       }
       if (sub === 'push') {
         // its data from a cron job, a git hook, CI: JSON as an argument, or on stdin (- or none)

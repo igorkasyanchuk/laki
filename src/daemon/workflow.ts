@@ -14,7 +14,7 @@ import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
-import { widgetUse } from './widgets.ts'
+import { eventHooks, widgetEvent, widgetUse } from './widgets.ts'
 
 const MAX_FILE = 256 << 10
 const FLOWS_KEPT = 100 // ended runs kept (live ones always)
@@ -189,7 +189,21 @@ function varsOf(r: FlowRun): Record<string, string> {
   return { ...varsFill(r.flow.vars, state.settings?.flowVars), ...agent, ...r.vars, ...(ws && { 'ws.branch': ws.branch, 'ws.path': ws.path, 'ws.id': ws.id, base: ws.base }), ...(pr && { 'pr.url': pr.url, 'pr.number': String(pr.number) }) }
 }
 
-export async function flowStart(o: { workflow: string; source?: WorkflowSource; project: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string> }) {
+// an event's fields as {{event.<path>}}: each leaf by its path, an object or list also whole (JSON), 2000 keys at most
+function eventVars(ev: unknown) {
+  const out: Record<string, string> = {}
+  const walk = (v: unknown, k: string) => {
+    if (Object.keys(out).length >= 2000) return
+    if (v && typeof v === 'object') {
+      out[k] = JSON.stringify(v)
+      for (const [kk, vv] of Object.entries(v)) walk(vv, `${k}.${kk}`)
+    } else if (v !== undefined && v !== null) out[k] = String(v)
+  }
+  walk(ev, 'event')
+  return out
+}
+
+export async function flowStart(o: { workflow: string; source?: WorkflowSource; project: string; task?: string; dry?: boolean; trigger?: string; by?: 'agent'; inputs?: Record<string, string>; event?: Record<string, unknown> }) {
   on()
   const wf = flowFind({ id: o.workflow, source: o.source, project: o.project })
   if (wf.problems.length) throw new Error(`${wf.name} can't run: ${wf.problems[0]}`)
@@ -208,7 +222,7 @@ export async function flowStart(o: { workflow: string; source?: WorkflowSource; 
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
   const { source, project, path, text, problems, byAgent: _, ...flow } = wf
-  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
+  const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   runs().push(r)
   say(r, `${wf.name}${r.dry ? ' (dry run)' : ''}: ${task || 'started'}`)
   if (queue) {
@@ -987,6 +1001,7 @@ function finish(r: FlowRun, status: FlowStatus, why: string, notify?: boolean, p
   for (const x of [...ended].sort((a, b) => (a.ended ?? 0) - (b.ended ?? 0)).slice(0, -DETAILED)) if (x.log.some(l => l.includes('\n'))) x.log = x.log.map(bare) // the ones that ended before: their lines
   touch()
   if (shows?.modal) r.shown = [...(r.shown ?? []), { at: Date.now(), block: shows.id, title: `${r.flow.name}: ${status}`, body: why }].slice(-20)
+  widgetEvent('flow.ended', { run: r.id, workflow: { id: r.workflow, name: r.flow.name }, status, why }, r.ws)
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'end', status, name: r.flow.name, text: why, notify: !!notify || status === 'failed', popover: !!shows?.popover, modal: !!shows?.modal })
   if (phone) flowPhone(r.flow.name, wsOf(r)?.name, status === 'done' ? 'is done' : status, why)
   next() // its slot
@@ -1069,4 +1084,31 @@ export const flowStopAll = () => [...new Set([...procs.keys(), ...calls.keys()])
 
 // a scheduled task's workflow (core.ts' runSchedule): its run, through this file
 flowHooks.start = o => flowStart(o)
+
+// on: <event>: the event starts a run of each workflow that waits for it, in the event's workspace's project (a
+// project's own workflow only in its project), the task the event's name. Refused (and said in laki widget events): no
+// workspace, problems, one an agent wrote, an event an agent sent to one with run: or outward blocks, a workflow's
+// event of its own run (a loop). ponytail: other chains (A's event starts B, B's starts A) stop only at the queue's 20
+const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a) // daemon.log
+let listening: { at: number; files: number; list: WorkflowItem[] } | undefined
+eventHooks.flows = (name, payload, wsId, agent) => {
+  const out = { flows: [] as string[], refused: [] as string[] }
+  if (state.settings?.workflows !== true) return out
+  if (!listening || listening.files !== flowFiles.at || Date.now() - listening.at > 10_000) listening = { at: Date.now(), files: flowFiles.at, list: flowList().filter(w => w.on) } // ponytail: the files read again every 10 s, not at each event
+  const ws = wsId ? state.workspaces.find(w => w.id === wsId) : undefined
+  for (const wf of listening.list) {
+    if (!(wf.on === name || (wf.on === 'custom.*' && name.startsWith('custom.')))) continue
+    if (wf.source === 'project' && wf.project !== ws?.project) continue // a project's own: its events only
+    const no = (why: string) => (out.refused.push(`${wf.id}: ${why}`), log(`workflow ${wf.id} on ${name}: not started: ${why}`))
+    if (!ws) { no('the event has no workspace, so no project'); continue }
+    if (wf.problems.length) { no(wf.problems[0]); continue }
+    if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
+    // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
+    if (agent && wf.blocks.some(b => b.kind === 'run' || (b.kind === 'action' && OUTWARD.includes(b.action ?? '')))) { no('an agent sent the event, and it runs commands or outward actions'); continue }
+    if (runs().some(r => r.workflow === wf.id && r.source === wf.source && (r.id === payload.run || (live(r) && r.ws === ws.id)))) { no('its own run sent it'); continue }
+    out.flows.push(wf.id)
+    flowStart({ workflow: wf.id, source: wf.source, project: ws.project, task: name, trigger: `event ${name}`, event: payload }).catch(e => log(`workflow ${wf.id} on ${name}: ${(e as Error).message}`))
+  }
+  return out
+}
 flowHooks.find = o => flowFind(o)

@@ -1356,6 +1356,7 @@ export function addTab(wsRef: string, o: { kind?: Tab['kind']; preset?: string; 
     save()
     throw e
   }
+  widgetEvent('tab.new', { kind: tab.kind }, ws.id, tab)
   return tab
 }
 
@@ -2148,6 +2149,7 @@ export function restoreAll() {
       t.again = undefined
       try {
         const s = spawnTab(t, { resume: true, cwd: a?.cwd })
+        restoredAt.set(t.id, Date.now())
         if (a?.cmd) bringBack(s, a.cmd, !!a.run)
       } catch (e) {
         console.error(`restore ${t.id}:`, (e as Error).message)
@@ -2509,8 +2511,13 @@ function checkLimit(tab: Tab, text: string) {
   if (!t && tab.preset === 'codex' && s && (t = limitReset(s.screenText(8, r.seen), now))) r.seen = s.lineCount()
   // a time gone by: "9am" at noon is tomorrow's, but "3pm" read at 15:00:01 has just reset
   if (t && t <= now) t = now.getTime() - t.getTime() < 5 * 60e3 ? now : new Date(t.getTime() + 86400000)
-  if (t) r.limit = t.getTime()
+  if (!t) return
+  // limit.hit once per limit: a turn's end clears r.limit first, and "in 2 hours" read again is the same one
+  if (Math.abs((limitSent.get(tab.id) ?? 0) - t.getTime()) > 60_000) widgetEvent('limit.hit', { agent: tab.preset, until: t.getTime() }, tab.workspace, tab)
+  limitSent.set(tab.id, t.getTime())
+  r.limit = t.getTime()
 }
+const limitSent = new Map<string, number>() // ponytail: a closed tab's stays (a number each)
 
 export const RESUME_AFTER = 60_000
 
@@ -2723,14 +2730,19 @@ export async function artifactList(ref: string) {
 // status bar's ↗, the menus). What it starts through its shell tool (a dev server) is the workspace's
 const SHELLS = /^-?(?:ba|z|fi|da|k|tc|c)?sh$/
 const BROWSER = /chrom|firefox|webkit|msedge|headless/i
+// a port of a tab brought back at start, in its first minute: noted, no port.open (it listened before the restart).
+// ponytail: a minute; a server that takes longer to come back is new to extensions
+const restoredAt = new Map<string, number>()
+const RESTORED_QUIET = 60_000
 export async function scanPorts() {
   syncBranches()
   void scanArtifacts()
   const root = new Map<number, string>()
+  const rootTab = new Map<number, string>() // each pid's tab (the tree it's under)
   const agents: number[] = [] // agent tabs' pids
   for (const [id, s] of sessions) {
     const t = state.tabs.find(t => t.id === id)
-    if (t && !s.exited) root.set(s.pty.pid, t.workspace), t.kind === 'agent' && agents.push(s.pty.pid)
+    if (t && !s.exited) root.set(s.pty.pid, t.workspace), rootTab.set(s.pty.pid, t.id), t.kind === 'agent' && agents.push(s.pty.pid)
   }
   const next = new Map<string, number[]>()
   const nextProcs = new Map<string, Record<number, Proc>>()
@@ -2751,11 +2763,12 @@ export async function scanPorts() {
     }
     agents.forEach(mine)
     const owner = new Map<number, string>()
-    const walk = (pid: number, ws: string) => {
+    const walk = (pid: number, ws: string, tab: string) => {
       owner.set(pid, ws)
-      for (const k of kids.get(pid) ?? []) if (!owner.has(k)) walk(k, ws)
+      rootTab.set(pid, tab)
+      for (const k of kids.get(pid) ?? []) if (!owner.has(k)) walk(k, ws, tab)
     }
-    for (const [pid, ws] of root) walk(pid, ws)
+    for (const [pid, ws] of root) walk(pid, ws, rootTab.get(pid)!)
     const out = await run('lsof', ['-nP', '-a', '-p', [...owner.keys()].join(','), '-iTCP', '-sTCP:LISTEN', '-Fpcn']).then(
       r => r.stdout,
       e => String(e.stdout ?? ''),
@@ -2775,6 +2788,17 @@ export async function scanPorts() {
       }
     }
   }
+  // a port newly listening in a workspace
+  for (const [w, list] of next)
+    for (const port of list)
+      if (!ports.get(w)?.includes(port)) {
+        const p = nextProcs.get(w)?.[port]
+        const tab = p && rootTab.get(p.pid)
+        if (tab && Date.now() - (restoredAt.get(tab) ?? 0) < RESTORED_QUIET) continue
+        const x = state.workspaces.find(v => v.id === w)
+        const name = x && (projectConfig(x).ports as Record<string, unknown> | undefined)?.[port]
+        widgetEvent('port.open', { port, pid: p?.pid, command: p?.cmd, ...(typeof name === 'string' && { name }) }, w)
+      }
   if (JSON.stringify([...next, ...nextProcs]) !== JSON.stringify([...ports, ...procs])) {
     ports.clear()
     procs.clear()
@@ -4469,6 +4493,7 @@ function replaceTab(wsRef: string, kind: Tab['kind'], cmd: string, env?: Record<
   state.tabs.push(tab)
   save()
   spawnTab(tab, { cmd, env })
+  widgetEvent('tab.new', { kind }, ws.id, tab)
   return tab
 }
 
@@ -4494,9 +4519,12 @@ export function ship(ref: string, message: string) {
     'gh pr view "$LAKI_BRANCH" --json url -q .url 2>/dev/null || gh pr create --fill',
   ].join('\n')
   const tab = replaceTab(ws.id, 'ship', script, { LAKI_MSG: message, LAKI_BRANCH: ws.branch })
-  sessions.get(tab.id)!.onExit = () => {
+  sessions.get(tab.id)!.onExit = code => {
     changed()
-    scanPRs()
+    void scanPRs().finally(() => {
+      const pr = prs.get(ws.id)
+      widgetEvent('ship.done', { ok: code === 0, exit: code, ...(pr && { pr: { url: pr.url, number: pr.number } }) }, ws.id, tab)
+    })
   }
   return tab
 }

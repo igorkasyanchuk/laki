@@ -111,7 +111,7 @@ workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `as
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
-`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`. A
+`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -848,7 +848,7 @@ first) }`, the rail's Notes and ⌘K; `listOff`): `Page` with the list (`.notes-
 Experimental (`settings.workflows`, Settings › General › *Experimental*; off: no rail button, foot button or ⌘K item,
 the view has no `flows`, and every `flow*` method refuses). `shared/workflow.ts`: the model (`BLOCKS`, each kind's
 `EXITS`, a choice's and an ask's options as exits, `max` per block), the file (`parse`/`toFile`: `# Name`, a
-description, `runs in: · session: · at once: · turns:`, a `## id` per block, its first kind key, `> ` text, `- label →
+description, `runs in: · session: · at once: · turns: · on:` (`on`: an event, `eventOk`, that starts a run), a `## id` per block, its first kind key, `> ` text, `- label →
 id`, `next:`/`ok:`… lines, `max: 3 → id`, `at: x,y`), `check` (no start, an exit to no block, nothing leads to a block,
 no way out, a loop with no `max` and no ask: Tarjan's; a case's `caseProblems`), `fill` (`{{name}}`), `choice` (*If / else*, `if:` the same
 key: one test, two options) and `case` (`branchOf`/`branchLabel`: each option's label is its test, `[var] contains|matches|equals
@@ -1195,7 +1195,18 @@ fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.fail
 800 ms later with `askOf`'s options), `prEvents` after each `scanPR` (`prSeen` per workspace: the first scan only notes it,
 null for "no pull requests found"; `failHead`/`passHead`: checks once per head; new logins in approved/changes;
 MERGED/CLOSED as the state changes), `makeWs`'s end (`workspace.new`), `wsArchive`, `wsRestore`, `dropWs`
-(`workspace.removed`, every way one goes), `runSchedule` (`schedule.ran`), main.ts' first client (`app.open`). Its
+(`workspace.removed`, every way one goes), `runSchedule` (`schedule.ran`), main.ts' first client (`app.open`), `ship`'s
+tab's `onExit` after a `scanPRs` (`ship.done`: `ok`, `exit`, `pr`), workflow.ts `finish` (`flow.ended`), `checkLimit`
+(`limit.hit`, once per limit: `limitSent`, a reset within a minute the same), `addTab` and `replaceTab` (`tab.new`; not
+`restoreAll`'s), `scanPorts` (`port.open`: a port not in the last scan's, `rootTab` its tab; a tab `restoredAt` in its
+first `RESTORED_QUIET` minute only notes). `widgetEmit` (`laki widget emit`, MCP's `laki_extension_emit`): `custom.<name>`
+(`CUSTOM_EVENT`), `data` (`EVENT_MAX`), `from` (`widget`: the CLI's `LAKI_WIDGET`; `tab`; `agent`: `agentCaller`'s, or
+`ai` Laki AI's), `hops` (the handler's `LAKI_EVENT_HOPS` + 1, past `HOPS_MAX` 3 dropped and logged); `handlerOf`:
+`on[name]`, else `on['custom.*']`; never to `from.widget`. `sent` (`SENT_MAX` 50, `EventSent`: what each reached,
+`refused`) is `widgetEvents` (`laki widget events`). `eventHooks.flows` (workflow.ts): workflows with `on` (`listening`,
+read again every 10 s or as `flowFiles.at` moves) start (`flowStart` `event`: `eventVars`, `{{event.<path>}}`) in the
+event's workspace's project, a project's own in its project only; refused: no workspace, problems, `byAgent`, an
+agent's event to one with run or `OUTWARD` blocks, the event of its own run. Its
 payload: `event`, `at`, `ws` (`wsInfo`'s id, name, project, branch, pr), `tab` (id, name, agent) and the fields, past
 `EVENT_MAX` (64 KB) the fields dropped (`cut`). Each extension that's on and has it in `on` (`m.on`; a scoped one only
 its workspace's, live) gets a `Job` in `queues` (`QUEUE_MAX` 20, the oldest dropped and logged), `drain` runs one at a

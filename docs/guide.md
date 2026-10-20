@@ -904,7 +904,9 @@ the workspace is deleted and stays while it's archived. `--ws <workspace>` picks
 
 Extensions can answer what happens (`"on": { "turn.done": "an action" }` in widget.json: an agent's turn ending or
 asking something, a PR's checks failing or passing, a merge, a new or archived workspace, a scheduled run, the app
-opening): the action gets the event as JSON on stdin. One can **stream** (`"stream": true`: its command runs all along,
+opening, a ship, a workflow's end, a usage limit, a new tab, a port starting to listen): the action gets the event as
+JSON on stdin. Your own events go out with `laki widget emit deploy.done '{"sha": "abc"}'` (`custom.deploy.done`, or
+`custom.*` for all of them), and `laki widget events` lists what was sent lately and what each reached. One can **stream** (`"stream": true`: its command runs all along,
 each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
 (a cron job, a git hook, CI).
 
@@ -973,6 +975,12 @@ A prototype runs in a sandboxed frame: no requests out, never the app or your fi
 Turn them on in Settings › General › *Experimental*; the rail's *Flows* opens them (⌘K too). The page lists your
 workflows and their runs, like Scheduled tasks; a click opens one, and the breadcrumbs go back. Esc doesn't close it:
 it stays open while runs go (✕ does).
+
+A workflow can start by itself on an event (*Starts on* in its settings, `on: pr.merged` in its file): any extension
+event, or one of your own (`custom.deploy.done`, `laki widget emit`). The run goes in the event's workspace's project,
+its task the event's name, its fields as `{{event.ws.branch}}`, `{{event.data.sha}}`. It doesn't start for an event
+with no workspace, for a workflow an agent wrote (until you save it), or for an agent's event when it runs commands or
+outward actions; `laki widget events` says why.
 
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
 happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,
@@ -1583,6 +1591,8 @@ laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one:
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
 laki widget what <id>                                   # what turning it on runs, and its hash: laki widget on <id> --seen <hash>
 laki widget logs <id> [-n 100] [-f] [--level error]     # its log (when it keeps one); -f follows it
+laki widget emit <name> [json | -] [--ws <ws>]          # an event of your own (custom.<name>): extensions and workflows on it run
+laki widget events                                      # the last 50 events, and what each reached
 laki widget log <id> [--level warn] <text>              # a line in its log, from a script or a hook
 laki widget tools [--json]                              # the extensions' tools for agents, their input and when to use them
 laki widget tool <id> <action> [json] [--ws <ws>]       # call one (asked first unless the tool says never)

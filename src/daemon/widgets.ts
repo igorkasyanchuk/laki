@@ -9,7 +9,7 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, WIDGET_PLACES } from '../shared/types.ts'
+import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, CUSTOM_EVENT, type EventSent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { reservedIn, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
 import { actionCmd, actionMenu, aiActOf, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
@@ -1314,22 +1314,40 @@ const hoursOf = () => (typeof state.settings?.widgetHours === 'string' && state.
 // Every extension that's on and answers it runs that action, or fetches again, with LAKI_EVENT, the event's JSON on
 // stdin and in LAKI_EVENT_FILE (deleted after) and reason event:<name>; a scope workspace one only its workspace's, in
 // that instance. One at a time per extension, QUEUE_MAX waiting (past it the oldest goes). What a handler's action says
-// (toast, modal) goes to the app's windows
+// (toast, modal) goes to the app's windows. Workflows with on: <event> start through eventHooks.flows (workflow.ts sets
+// it: no import cycle). The last SENT_MAX events are kept in memory, with what they reached (laki widget events)
 const QUEUE_MAX = 20
 const EVENT_MAX = 64 << 10
-type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo }
+const HOPS_MAX = 3 // an emit made while handling an event is one hop more: past this, dropped (a loop)
+const SENT_MAX = 50
+type Job = { name: string; json: string; h: string; ws?: string; gone?: WsInfo; hops: number }
+type From = { widget?: string; tab?: { id: string; name: string }; agent?: string }
 const queues = new Map<string, Job[]>()
 const draining = new Set<string>()
-export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = {}, ws?: string, tab?: { id: string; name: string; preset?: string }) {
-  if (![...widgets.values()].some(w => w.m.on && Object.hasOwn(w.m.on, name))) return // none answers it: nothing built
+const sent: EventSent[] = []
+export const eventHooks: { flows?: (name: string, payload: Record<string, unknown>, ws: string | undefined, agent: boolean) => { flows: string[]; refused: string[] } } = {}
+// its handler of that event: on[name], or on["custom.*"] for a custom one
+function handlerOf(w: Entry, name: string) {
+  const on = w.m.on
+  const h = !on ? undefined : Object.hasOwn(on, name) ? on[name] : name.startsWith('custom.') && Object.hasOwn(on, 'custom.*') ? on['custom.*'] : undefined
+  return typeof h === 'string' ? h : undefined
+}
+export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = {}, ws?: string, tab?: { id: string; name: string; preset?: string }, o: { from?: From; hops?: number } = {}) {
+  const hops = o.hops ?? 0
   const x = ws ? state.workspaces.find(v => v.id === ws) : undefined
   const i = x && wsInfo(x)
-  const head = { event: name, at: Date.now(), ...(i && { ws: { id: i.id, name: i.name, project: i.project, branch: i.branch, pr: i.pr } }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }) }
+  const head = { event: name, at: Date.now(), ...(i && { ws: { id: i.id, name: i.name, project: i.project, branch: i.branch, pr: i.pr } }), ...(tab && { tab: { id: tab.id, name: tab.name, agent: tab.preset } }), ...(o.from && { from: o.from }) }
+  const rec: EventSent = { at: head.at, event: name, ...(x && { ws: x.id }), ...(o.from && { from: { widget: o.from.widget, tab: o.from.tab?.id, agent: o.from.agent } }), ...(hops && { hops }), widgets: [], flows: [] }
+  sent.push(rec)
+  if (sent.length > SENT_MAX) sent.shift()
+  const flows = eventHooks.flows?.(name, { ...head, ...extra }, x?.id, !!o.from?.agent)
+  if (flows) Object.assign(rec, { flows: flows.flows }, flows.refused.length && { refused: flows.refused })
+  if (![...widgets.values()].some(w => handlerOf(w, name))) return rec // none answers it: nothing built
   let json = JSON.stringify({ ...head, ...extra })
   if (json.length > EVENT_MAX) json = JSON.stringify({ ...head, cut: true }) // ponytail: past 64 KB its own fields all go
   for (const w of widgets.values()) {
-    const h = w.m.on && Object.hasOwn(w.m.on, name) ? w.m.on[name] : undefined
-    if (typeof h !== 'string' || !onOf(w)) continue
+    const h = handlerOf(w, name)
+    if (!h || !onOf(w) || w.id === o.from?.widget) continue // never its own emits
     // its workspace's only; as one is archived or removed, that one's too (its action runs on what it was, keeps nothing)
     const going = (name === 'workspace.archived' || name === 'workspace.removed') && !!x && instOk({ ...x, archived: false })
     if (scoped(w) && !(x && (instOk(x) || going))) continue
@@ -1339,12 +1357,41 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
       wLog(w, `event ${name}: a fetch for it waits already`) // one fetch after the burst, not one per event
       continue
     }
-    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined })
+    q.push({ name, json, h, ws: at, gone: scoped(w) && going ? i : undefined, hops })
     if (q.length > QUEUE_MAX) wLog(w, `event ${q.shift()!.name}: dropped, ${QUEUE_MAX} more waiting`, 'warn')
     queues.set(w.id, q)
+    rec.widgets.push(w.id)
     void drain(w.id)
   }
+  return rec
 }
+// an event of your own (laki widget emit, MCP's laki_extension_emit): custom.<name> with data (64 KB at most), from an
+// extension's command (its LAKI_WIDGET), an agent's tab or you; hops: the event being handled when it was made (its
+// handler's LAKI_EVENT_HOPS), one more here
+export function widgetEmit(o: { name?: unknown; data?: unknown; ws?: unknown; from?: { widget?: unknown; tab?: unknown; ws?: unknown }; hops?: unknown; ai?: unknown }) {
+  const raw = String(o.name ?? '').trim()
+  const name = raw.startsWith('custom.') ? raw : `custom.${raw}`
+  if (!CUSTOM_EVENT.test(name)) throw new Error(`${raw || '(none)'}: an event's name is letters, digits, . _ - (custom.<name>, 41 at most)`)
+  const data = o.data === undefined ? {} : o.data
+  if (JSON.stringify(data).length > EVENT_MAX) throw new Error(`its data is over ${EVENT_MAX >> 10} KB`)
+  const ws = typeof o.ws === 'string' && o.ws ? state.workspaces.find(x => x.id === o.ws || x.name === o.ws) : undefined
+  if (o.ws && !ws) throw new Error(`no workspace ${o.ws}`)
+  const t = typeof o.from?.tab === 'string' ? state.tabs.find(x => x.id === o.from!.tab) : undefined
+  const agent = agentCaller(o.from) ? t?.preset ?? 'agent' : o.ai === true ? 'Laki AI' : undefined // Laki AI's counts as an agent's
+  const widget = typeof o.from?.widget === 'string' && widgets.has(o.from.widget) ? o.from.widget : undefined
+  const from: From = { ...(widget && { widget }), ...(t && { tab: { id: t.id, name: t.name } }), ...(agent && { agent }) }
+  const hops = o.hops === undefined || o.hops === '' ? 0 : (Number(o.hops) || 0) + 1
+  if (hops > HOPS_MAX) {
+    const w = widget ? widgets.get(widget) : undefined
+    if (w) wLog(w, `emit ${name}: dropped, ${hops} hops (a loop of events?)`, 'warn')
+    sent.push({ at: Date.now(), event: name, ...(ws && { ws: ws.id }), from: { widget, tab: t?.id, agent }, hops, widgets: [], flows: [], refused: [`${hops} hops: dropped`] })
+    if (sent.length > SENT_MAX) sent.shift()
+    return { ok: false, dropped: `${hops} hops: a loop of events? dropped` }
+  }
+  const rec = widgetEvent(name as WidgetEvent, { data }, ws?.id, undefined, { from, hops })
+  return { ok: true, event: name, widgets: rec.widgets, flows: rec.flows }
+}
+export const widgetEvents = () => [...sent].reverse()
 async function drain(id: string) {
   if (draining.has(id)) return
   draining.add(id)
@@ -1360,7 +1407,7 @@ async function handle(id: string, j: Job) {
   if (!w || !onOf(w)) return
   const file = join(tmpdir(), `laki-event-${randomBytes(8).toString('hex')}.json`)
   writeFileSync(file, j.json, { mode: 0o600 })
-  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file }, stdin: j.json, gone: j.gone }
+  const ev = { env: { LAKI_EVENT: j.name, LAKI_EVENT_FILE: file, LAKI_EVENT_HOPS: String(j.hops) }, stdin: j.json, gone: j.gone }
   try {
     if (j.h === 'refresh' && j.gone) wLog(w, `event ${j.name}: not fetched: ${j.gone.name} is gone, nothing to keep (an action runs on it)`)
     else if (j.h === 'refresh') {

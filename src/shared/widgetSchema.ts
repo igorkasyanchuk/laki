@@ -3,7 +3,7 @@
 // (LAKI_DTS: window.laki and the UI kit's elements, for a JS page), and manifestCheck, the checker's widget.json part
 // (widgetCheck in daemon/widgets.ts adds the files, the ui against data, the fixtures and a fetch). The ui elements'
 // words are the UI kit's own (widgetUi.ts UI), so the schema, the types, the guide and the gallery say the same.
-import { REPO, WIDGET_EVENTS, WIDGET_PLACES } from './types.ts'
+import { CUSTOM_EVENT, eventOk, REPO, WIDGET_EVENTS, WIDGET_PLACES } from './types.ts'
 import { BUTTON, COMMON, type Kind, near, type Prop, UI, UI_TYPES, type UiProblem } from './widgetUi.ts'
 
 export const WIDGET_SCHEMA_URL = `${REPO.replace('https://github.com/', 'https://raw.githubusercontent.com/')}/main/docs/widget.schema.json`
@@ -104,7 +104,7 @@ export const MANIFEST: Record<string, J> = {
   view: { enum: VIEWS, description: 'Its full view’s size: s, m (the default) or l' },
   place: { anyOf: [PLACE, { type: 'array', items: PLACE }], description: 'Where it shows at first (the user’s choice wins): one place or several' },
   scope: { enum: ['global', 'workspace'], description: 'global (the default): one for the app; workspace: one per workspace, its fetch given $LAKI_BRANCH, $PORT, $LAKI_PATH… and its ui {{workspace.branch}}' },
-  on: { type: 'object', propertyNames: { enum: [...WIDGET_EVENTS] }, additionalProperties: { type: 'string' }, description: 'Events it answers: { "turn.done": "one of its actions" | "refresh" }; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT' },
+  on: { type: 'object', propertyNames: { anyOf: [{ enum: [...WIDGET_EVENTS, 'custom.*'] }, { pattern: CUSTOM_EVENT.source }] }, additionalProperties: { type: 'string' }, description: 'Events it answers: { "turn.done": "one of its actions" | "refresh" }, custom.<name> (laki widget emit) or custom.* for every one of those; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT' },
   stream: { type: 'boolean', description: 'Its fetch runs all along: each line of JSON it prints is its data (every is ignored; global only)' },
   fetch: str('A shell command in its folder; what it prints (JSON) is its data. $WIDGET_<NAME> per setting, $LAKI_WIDGET_CONFIG, $LAKI_REFRESH_REASON'),
   script: str('Or a JS file of its folder: its default export gets { config, last, workspace } and returns the data'),
@@ -351,7 +351,7 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
   else
     for (const [e, h] of Object.entries((on ?? {}) as Record<string, unknown>)) {
       const where = `widget.json on.${e}`
-      if (!(WIDGET_EVENTS as readonly string[]).includes(e)) say('error', where, `no event ${e}${(n => (n ? ` (did you mean ${n}?)` : `: ${WIDGET_EVENTS.join(', ')}`))(near(e, WIDGET_EVENTS))}`)
+      if (!eventOk(e)) say('error', where, `no event ${e}${(n => (n ? ` (did you mean ${n}?)` : `: ${WIDGET_EVENTS.join(', ')}`))(near(e, WIDGET_EVENTS))}`)
       const src = String((m.source as { kind?: unknown } | undefined)?.kind ?? '')
       if (h === 'refresh') {
         // a fetch, a script, or a file or URL source: something to read again

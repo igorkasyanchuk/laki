@@ -101,28 +101,42 @@
     "on": {
       "type": "object",
       "propertyNames": {
-        "enum": [
-          "turn.done",
-          "turn.failed",
-          "turn.waiting",
-          "pr.opened",
-          "pr.checks.failed",
-          "pr.checks.passed",
-          "pr.review",
-          "pr.merged",
-          "pr.closed",
-          "workspace.new",
-          "workspace.archived",
-          "workspace.restored",
-          "workspace.removed",
-          "schedule.ran",
-          "app.open"
+        "anyOf": [
+          {
+            "enum": [
+              "turn.done",
+              "turn.failed",
+              "turn.waiting",
+              "pr.opened",
+              "pr.checks.failed",
+              "pr.checks.passed",
+              "pr.review",
+              "pr.merged",
+              "pr.closed",
+              "workspace.new",
+              "workspace.archived",
+              "workspace.restored",
+              "workspace.removed",
+              "schedule.ran",
+              "app.open",
+              "ship.done",
+              "flow.ended",
+              "limit.hit",
+              "tab.new",
+              "port.open",
+              "gate.held",
+              "custom.*"
+            ]
+          },
+          {
+            "pattern": "^custom\\.[a-z0-9][a-z0-9._-]{0,40}$"
+          }
         ]
       },
       "additionalProperties": {
         "type": "string"
       },
-      "description": "Events it answers: { \"turn.done\": \"one of its actions\" | \"refresh\" }; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT"
+      "description": "Events it answers: { \"turn.done\": \"one of its actions\" | \"refresh\" }, custom.<name> (laki widget emit) or custom.* for every one of those; the handler gets the event as JSON on stdin and in $LAKI_EVENT_FILE, its name as $LAKI_EVENT"
     },
     "stream": {
       "type": "boolean",
