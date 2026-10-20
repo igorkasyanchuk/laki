@@ -5,7 +5,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { dirname, extname, resolve } from 'node:path'
 import { fileURLToPath, pathToFileURL } from 'node:url'
 import { alive, daemonScript, ensureDaemon, rpc } from '../shared/conn.ts'
-import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
+import { type AiCall, type AiMsg, type AiTotals, cellsOf, DEVICE_OPS, type Memory, placesOf, REMOTE, type Remote, type Schedule, type ScheduleRun, type View, type WidgetLogLine, type WidgetRuns, type WidgetView, type Workspace } from '../shared/types.ts'
 import { helpFor, USAGE } from '../shared/usage.ts'
 import { mcp, state } from './mcp.ts'
 import { blockName, FLOW_ENDED, type FlowRun, type FlowView, type WorkflowItem } from '../shared/workflow.ts'
@@ -18,7 +18,7 @@ const argv = process.argv.slice(2)
 const flags: Record<string, string | true> = {}
 const args: string[] = []
 const sets: string[] = [] // --set name=value, again and again: a workflow run's inputs
-const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen'])
+const VALUED = new Set(['base', 'preset', 'cmd', 'prompt', 'name', 'lines', 'm', 'message', 'when', 'where', 'model', 'effort', 'issue', 'pr', 'fan', 'tab', 'image', 'ws', 'off', 'kind', 'dir', 'place', 'size', 'every', 'view', 'hide', 'seen', 'level'])
 const BOOL = new Set(['json', 'local', 'when-idle', 'full', 'dry', 'mine', 'list', 'no-run', 'merge'])
 // only known flags are flags (message text may start with "-"); after "--" everything is text
 let textOnly = false
@@ -27,6 +27,7 @@ for (let i = 0; i < argv.length; i++) {
   const k = a.replace(/^-+/, '')
   if (!textOnly && a === '--') textOnly = true
   else if (!textOnly && ['flow', 'flows', 'workflow'].includes(args[0]) && (a === '--set' || a === '-set')) sets.push(argv[++i] ?? '') // flow run's only: elsewhere it's words
+  else if (!textOnly && ['widget', 'widgets'].includes(args[0]) && (a === '-n' || a === '-f')) flags[k] = a === '-n' ? (argv[++i] ?? '') : true // laki widget logs' only: elsewhere they're words
   else if (!textOnly && args[0] !== 'hook' && a.startsWith('-') && (VALUED.has(k) || BOOL.has(k))) flags[k] = VALUED.has(k) ? (argv[++i] ?? '') : true
   else args.push(a)
 }
@@ -507,6 +508,36 @@ async function main() {
         if (!r.ok) (console.error(`✗ ${r.error}`), (process.exitCode = 1))
         return
       }
+      // a line in its log from a hook or a cron job: never fails a script (its log off: nothing written, exit 0)
+      if (sub === 'log') {
+        const text = [action, ...arg].filter(x => x !== undefined).join(' ')
+        if (!id || !text.trim()) throw new Error('usage: laki widget log <id> [--level debug|info|warn|error] [--ws <workspace>] <text…>')
+        try {
+          const r: { kept: boolean; note?: string } = await rpc('widgetLog', { id, text, level: typeof flags.level === 'string' ? flags.level : undefined, ws })
+          if (r.note) console.error(r.note)
+          return json ? out(r) : undefined
+        } catch (e) {
+          return void console.error(`laki widget log: ${(e as Error).message}`)
+        }
+      }
+      // its log: the last -n lines (100), -f following it as lines come
+      if (sub === 'logs') {
+        if (!id) throw new Error('usage: laki widget logs <id> [-n 100] [-f] [--level error] [--ws <workspace>] [--json]')
+        type R = { on: boolean; lines: WidgetLogLine[]; next: number; file: string }
+        const q = { id, level: typeof flags.level === 'string' ? flags.level : undefined, ws }
+        const show = (l: WidgetLogLine) => console.log(json ? JSON.stringify(l) : `${new Date(l.at).toLocaleTimeString([], { hour12: false })} ${l.level.padEnd(5)} ${l.src}${l.ws ? ` (${l.ws})` : ''}  ${l.text}`)
+        let r: R = await rpc('widgetLogs', { ...q, limit: Math.max(1, Number(flags.n) || 100) })
+        if (!r.lines.length && !flags.f) console.error(r.on ? 'nothing logged yet' : `no log: it's off (Settings › Extensions › ${id} › Keep a log)`)
+        r.lines.forEach(show)
+        while (flags.f) {
+          await new Promise(f => setTimeout(f, 1000))
+          const since = r.next
+          r = await rpc('widgetLogs', { ...q, since })
+          if (r.next < since) r = await rpc('widgetLogs', { ...q, since: 0 }) // cleared and begun again
+          r.lines.forEach(show)
+        }
+        return
+      }
       if (sub === 'push') {
         // its data from a cron job, a git hook, CI: JSON as an argument, or on stdin (- or none)
         if (!id) throw new Error('usage: laki widget push <id> [json | -] [--ws <workspace>] [--merge]')
@@ -548,7 +579,7 @@ async function main() {
         const r = await rpc('widgetAction', { id, action, arg: arg.join(' '), ws, from: caller() }, 300000) // an agent's: you may be asked first
         return out(r, r.ok ? r.out || [r.toast, r.modal?.title, r.modal?.text].filter(Boolean).join('\n') || 'done' : `✗ ${r.error}`) // what the app would show
       }
-      throw new Error('usage: laki widget [ls] | reload | what <id> | on <id> [--seen <hash>] | off|run <id> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
+      throw new Error('usage: laki widget [ls] | reload | what <id> | on <id> [--seen <hash>] | off|run <id> | logs <id> [-n 100] [-f] [--level l] | log <id> [--level l] <text> | render <id> [--full] | action <id> <action> [arg] [--ws <workspace>] | kit [element] | dev [folder] [--off <id|folder>] [--list] | new <name> [--kind <k>] [--dir <folder>] | check [id|folder] [--no-run] [--ws <workspace>] | push <id> [json | -] [--ws <workspace>] [--merge] | tools | tool <id> <action> [json] | remix <id> [new-id] | trash | restore <trash-id>')
     }
     case 'ai': {
       const [sub] = rest

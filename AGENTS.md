@@ -111,7 +111,7 @@ workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `as
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
-`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`. A
+`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1357,6 +1357,18 @@ no workspace) or `always` broadcasts `toolAsk` (`req`, the command, input, ws, t
 waits `LAKI_TOOL_WAIT` (2 min) for `widgetToolAnswer` (`once`, `always`, `deny`; the first counts), then `toolDone`;
 `always` keeps the grant (`grantKey`: `<id>.<action>#<hash>`, sha256 of its command and `filesHash`, so an edit, one made while
 Laki was closed too, asks again; the view's from a size-and-time cache, a call's read fresh; grants without `#` dropped at `load`).
+Logs (widgets.ts' logs section, `test/widget-logs.test.ts`): `logOn` (`settings.widgetLogs`, the store's `log` through
+`widgetSet` (refused from an agent), or `dev`); `xlog` (`WidgetLogLine`: `n`, `at`, `level` (`LOG_LEVELS`; an info line
+of a run's own text takes its `debug:`… prefix: `leveled`), `src`, `text` (2 KB, `masker`: secrets' and `SECRET`-named
+settings' values of 4 characters or more as ••••), `ws`) into `pending`, `flushLogs` every 500 ms and at
+`widgetsStop`: `<data>/widget-data/<id>.log`, 0600, past `LOG_MAX` (1 MB; `LAKI_WIDGET_LOG_MAX`: tests') renamed to
+`.log.1`. Written: `wLog` (Laki's, `src: laki`; a function only when logged), `ran`'s line and the run's stderr
+(`LOG_RUN`, 64 KB, its end), a stream's other stdout lines and stderr as they come, `aiLog` (`aiOnce`'s `onCall`:
+seconds, cost, the answer's size), `widgetLog` (`laki widget log`, `cli`; a JS page's `laki.log`, `page`; `LOG_RATE`
+50 a second; off: `{ kept: false }`). `widgetLogs` (`since`: the cursor, `n`; `level` at least, `src`, `ws`, `limit`;
+`next`) for Extension.tsx' `Logs` tab (every 2 s, the filters its own, `cfg.log`), `laki widget logs [-n] [-f]`, MCP's
+`laki_extension_logs`, `aboutWidget`'s last 30 warnings. `widgetLogClear`; `widgetLogFile` for `openIn` `log`. `keptOf`
+takes both files to the trash. `errAt` is the view's `logErr` (Settings' red `log` tag).
 `filesHash` (widgets.ts): the extension's own files (top level, fixtures) and what it runs from outside them (the store's
 source, its actions, `on`, `stream`, `net`): a Yes holds only for it. `widgetWhat` gives it (`laki widget what`),
 `widgetFiles` too (read first, so a change while they're read can't match), `widgetSet` `on` with `seen` refuses another

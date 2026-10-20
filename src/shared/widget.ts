@@ -828,6 +828,7 @@ export function pageOf(body: string, ctx: Record<string, unknown>, vars: Record<
 const say = m => parent.postMessage(m, '*')
 const uiWait = new Map()
 window.laki = { ...${json}, refresh: () => say({ laki: 'refresh' }), open: url => say({ laki: 'open', url: String(url) }), expand: () => say({ laki: 'full' }), run: (action, arg, label) => say({ laki: 'run', action: String(action), arg: arg === undefined ? '' : String(arg), label: label === undefined ? '' : String(label) }), toast: text => say({ laki: 'say', toast: String(text) }), modal: m => say({ laki: 'say', modal: m }), close: id => say({ laki: 'say', close: id === undefined ? true : String(id) }), do: (cmd, label) => say({ laki: 'do', cmd, label: label === undefined ? '' : String(label) }),
+  log: (...a) => say({ laki: 'log', text: a.map(x => (typeof x === 'string' ? x : (() => { try { return JSON.stringify(x) } catch { return String(x) } })())).join(' ').slice(0, 2048) }),
   ui: (spec, data) => new Promise(ok => { const req = uiWait.size + Math.random(); uiWait.set(req, ok); say({ laki: 'ui', req, spec, ctx: { data: data === undefined ? laki.data : data, config: laki.config, at: laki.at, error: laki.error, full: laki.full, workspace: laki.workspace } }) }),
   mount: (el, spec, data) => laki.ui(spec, data).then(html => { el.innerHTML = html }) }
 ;(${String(uiBehave)})(window, say)

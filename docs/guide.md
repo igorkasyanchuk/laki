@@ -908,6 +908,12 @@ opening): the action gets the event as JSON on stdin. One can **stream** (`"stre
 each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
 (a cron job, a git hook, CI).
 
+**Logs**, off until you turn them on (Settings › Extensions › *Keep logs for every extension*, or one's *Keep a log*):
+Laki's lines about it, each run with how long it took and its exit code, and what it wrote to stderr (a line starting
+`warn:` or `error:` gets that level), secrets masked. Its page's **Logs** tab follows them (filters, *Copy*, *Clear*,
+*Show in Finder*); `laki widget logs <id> -f` does in a terminal, and `laki widget log <id> <text>` adds a line from a
+script.
+
 An extension's action can be a **tool for your agents** (`"tool"` on it in widget.json: what it does, its input, when
 to ask): agents list them with `laki widget tools`, call one with `laki widget tool <id> <action> '<json>'` or through
 MCP, and Laki shows you the command first (once per workspace, every time, or never, as the tool says). Settings ›
@@ -1575,6 +1581,9 @@ laki widget dev --off <id|folder> | --list              # unlink one | the linke
 laki widget new <name> [--kind <k>] [--dir <folder>]     # a starter: number, list, table, chart, note, launcher, button, form, panel, workspace, stream, tool, pullmain, onefile
 laki widget check [id|folder] [--no-run] [--ws <ws>]    # what's wrong with one: widget.json, ui, fixtures, its fetch once
 laki widget push <id> [json | -] [--ws <ws>] [--merge]   # its data from a cron job, a git hook, CI (stdin with -)
+laki widget what <id>                                   # what turning it on runs, and its hash: laki widget on <id> --seen <hash>
+laki widget logs <id> [-n 100] [-f] [--level error]     # its log (when it keeps one); -f follows it
+laki widget log <id> [--level warn] <text>              # a line in its log, from a script or a hook
 laki widget tools [--json]                              # the extensions' tools for agents, their input and when to use them
 laki widget tool <id> <action> [json] [--ws <ws>]       # call one (asked first unless the tool says never)
 laki ai "what are my agents doing?"                     # ask Laki AI (Settings › AI): it acts, then answers

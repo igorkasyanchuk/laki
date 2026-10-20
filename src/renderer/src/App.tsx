@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type Account, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { type Account, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -1524,8 +1524,10 @@ export function App() {
         { head: w.name },
         ...(w.every !== undefined && w.on && w.here !== null ? [{ label: 'Fetch now', icon: 'refresh' as const, run: () => void call('widgetRun', { id: w.id, ws: w.here }) }] : []),
         { label: 'Inspect', icon: 'search' as const, sub: 'its data, runs, env and files', run: () => setDialog({ extension: w.id, back: dialog, tab: 'data' }) },
+        { label: 'Logs', icon: 'file' as const, sub: w.log ? 'what it did, its runs and stderr' : 'off: Keep a log turns it on', run: () => setDialog({ extension: w.id, back: dialog, tab: 'logs' }) },
         { label: 'Edit', icon: 'settings' as const, sub: 'its place, settings and Laki AI', run: () => setDialog({ extension: w.id, back: dialog }) },
       ]),
+    log: (id, text, ws) => void api.call('widgetLog', { id, text, ws, src: 'page' }).catch(() => {}),
     key: view?.widgetKey,
   }
   widgetSay.current = widgetApi.say
@@ -1631,7 +1633,13 @@ export function App() {
       const w = view?.widgets?.find(x => x.id === id)
       openMenu(e, [{ head: 'Open in' }, ...openInItems({ widget: id }), null, { label: 'Copy path', icon: 'copy', key: 'c', run: () => w && copy(w.dir) }])
     },
-    logs: settings.devMode ? id => setDialog({ logs: `widget:${id}`, title: `Logs · ${view?.widgets?.find(x => x.id === id)?.name ?? id}`, back: dialog }) : undefined,
+    allLogs: settings.widgetLogs === true,
+    logs: id => setDialog({ extension: id, back: extOf(dialog)?.extension === id ? extOf(dialog)!.back : dialog, tab: 'logs' }),
+    log: {
+      read: (id, o) => api.call<{ on: boolean; lines: WidgetLogLine[]; next: number }>('widgetLogs', { id, ...o }),
+      clear: id => api.call('widgetLogClear', { id }),
+      reveal: id => void call('openIn', { widget: id, log: true, app: 'finder' }),
+    },
     kit: icons => setDialog({ uikit: true, icons, back: dialog }),
     runs: (id, ws) => api.call<WidgetRuns>('widgetRuns', { id, data: true, ws }),
     mock: (id, o) => call('widgetMock', { id, ...o }),
@@ -3255,7 +3263,7 @@ export function App() {
             onTheme={theme => call('settingsSet', { theme }).catch(() => {})}
           />
         )}
-        {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.back ?? (dialog.logs.startsWith('widget:') ? { section: 'widgets' } : dialog.logs === 'new' ? { section: 'general' } : null))} />}
+        {dialog && typeof dialog === 'object' && 'logs' in dialog && <Logs title={dialog.title} load={() => api.call<LogLine[]>('logs', { key: dialog.logs })} copy={copy} onClose={() => setDialog(dialog.back ?? (dialog.logs === 'new' ? { section: 'general' } : null))} />}
         {dialog === 'fun' && <Fun load={() => api.call<Meme>('meme')} onClose={() => setDialog(null)} />}
         {dialog && typeof dialog === 'object' && 'project' in dialog && (p => p && (
           <ProjectPage

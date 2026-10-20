@@ -71,6 +71,9 @@ export const widgetFormat = () => `## widget.json
 - Its env: \`$WIDGET_<NAME>\` per setting (\`repo\`: \`$WIDGET_REPO\`; an on/off \`1\` or empty, a list comma-joined; quote
   them), \`$LAKI_WIDGET_CONFIG\` (all of them, typed JSON), \`$LAKI_WIDGET_FILE\` (its storage: the last \`data\`),
   \`$LAKI_CLI\` (the laki command: \`"$LAKI_CLI" ls --json\`).
+- Logs (the user turns them on): stderr is its log, a line each; start one with \`debug:\`, \`info:\`, \`warn:\` or
+  \`error:\` for its level. A \`script\` logs with \`console.error\` (stdout is its data); a JS page with \`laki.log(…)\`;
+  anything with \`"$LAKI_CLI" widget log <id> --level warn <text>\` (nothing happens while its log is off).
 - \`actions\`: commands its buttons run by name, the button's arg as \`$WIDGET_ARG\` (never paste it into the command);
   then it fetches again. Its output's last line is a toast, or print JSON: \`{"toast": "Done"}\`, \`{"modal": {"title",
   "text", "buttons": [{"label", "run", "arg", "open", "style", "close"}]}}\` (6 buttons at most; \`open\`: http(s), mailto,

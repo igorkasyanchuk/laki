@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions keep logs, off until you turn them on (Settings › Extensions for all, or one's *Keep a log*): Laki's lines,
+  each run and its stderr, secrets masked. Its page's **Logs** tab follows them; `laki widget logs <id> -f` too, and
+  `laki widget log` adds a line from a script.
 - Extensions: a Yes holds only for the files you were shown. Laki AI's *Turn on*, the studio's and a tool's ask refuse
   when the extension changed while you were asked (Laki AI asks again). `laki widget what <id>` says what it runs.
 - Security: an extension's HTML can't add a web view, and every web view runs with web security on.

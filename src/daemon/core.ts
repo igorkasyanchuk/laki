@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetEvent, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
+import { scanWidgets, widgetDir, widgetEvent, widgetLogFile, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -1585,9 +1585,10 @@ export function apps() {
 
 // open a workspace's (or a project's) folder, or a file in it, in an app; 'editor' is the one in Settings, 'default'
 // macOS's for the file
-export async function openIn(o: { ws?: string; project?: string; widget?: string; app: string; file?: string }) {
-  const file = !!(o.file && o.ws)
-  const path = file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
+// log: an extension's log file (its Logs tab's Show in Finder)
+export async function openIn(o: { ws?: string; project?: string; widget?: string; log?: boolean; app: string; file?: string }) {
+  const file = !!(o.file && o.ws) || !!(o.widget && o.log)
+  const path = o.widget && o.log ? widgetLogFile(o.widget) : file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
   const s = state.settings ?? {}
   const app = o.app === 'editor' ? s.editor || 'cursor' : o.app
   const fail = (e: any) => {

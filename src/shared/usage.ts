@@ -44,6 +44,8 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki widget on|off|run <id> [--ws <ws>]     show or hide one | run its fetch now (--ws: a per-workspace one's); only you turn one on
   laki widget what <id>                       what turning it on runs, and its files' hash
   laki widget on <id> --seen <hash>           on only while its files are the ones laki widget what showed
+  laki widget logs <id> [-n 100] [-f] [--level error] [--ws <ws>] [--json]  its log (when it keeps one): -f follows it
+  laki widget log <id> [--level warn] [--ws <ws>] <text…>  a line in its log (a hook, cron): exits 0, nothing written while it's off
   laki widget set <id> [--place desk,side] [--size 2x1] [--every 5] [--view s|m|l] [--hide refresh,at|none] [key=value…]
         where it shows, its size, how often it fetches, its full view, what it hides, its settings
   laki widget render <id> [--full] [--ws <ws>]  the HTML it shows now, filled from its data

@@ -426,6 +426,7 @@ A `widget.html` with a `<script>` is a JS extension: a page of its own in a sand
 | `run(action, arg)` | one of its actions |
 | `toast(text)`, `modal({ title, text, ui, data, buttons })`, `close(id?)` | as an action's JSON ([dialogs](#dialogs)) |
 | `ui(spec, data?)`, `mount(el, spec, data?)` | the UI kit's HTML for an element, or put in `el` (both promises) |
+| `log(...args)` | a line in its [log](#logs) (src `page`), any time; 50 a second, 2 KB a line at most |
 
 These work right after a click in the page. By default the page has no network: everything inline, its data from its
 fetch. **Network access** (a switch per extension in Settings › Extensions, off until you turn it on) lets its page
@@ -646,12 +647,37 @@ Its page's tabs show them:
 | Overview | its preview where it sits (*Live* or *Sample*, with a picker of its samples), everywhere else (any sidebar size, the bars, as a button), its full view and settings; the head's *Edit* goes to the settings |
 | Data | where its data comes from (its fetch, a text, a file, a URL); its last data as JSON: edit it and *Apply* to see it with that data, *Live* fetches again; its examples (widget.json's `sample`, each `fixtures/<name>.json`): *Show it with this*, or *Use as its data* |
 | Runs | the runs, newest first; a click shows one's stderr |
+| Logs | its [log](#logs), following as lines come; filters by level, source, words and workspace; *Copy*, *Clear*, *Show in Finder* |
 | Env | what its fetch gets (`WIDGET_*`, `LAKI_*`, `PATH`); a setting named like a token, secret, key or password masked |
 | Files | its folder's files: *Edit*, then *Save* (⌘S); JSON is checked first, it reloads at once, and the studio's *Undo* has the version before. One that comes with Laki: *Remix it…* makes a copy to change |
 | Check | *Check* above: *Check again*, *Check with a fetch* |
 
 Data put there by hand shows a *Sample data* chip wherever the extension is, and its schedule doesn't fetch over it.
 A right click on an extension › *Inspect*, or `laki://settings/widgets/<id>/inspect`, opens the Data tab.
+
+## Logs
+
+Off by default. Settings › Extensions › *Keep logs for every extension*, or one's own *Keep a log* (its settings'
+*Updates*; a dev-linked one keeps one while linked), turns it on; only you set them, never an agent. While it's on,
+`<data>/widget-data/<id>.log` (JSON lines, yours alone, 1 MB then a second file) keeps:
+
+- Laki's own lines about it (`src: laki`): fetches, actions, events, sample data, refusals, tool calls, stream restarts;
+  a failure is `error`;
+- a line at the end of each run (`fetch`, `action:<name>`, `stream`, `tool:<name>`, `push`): why, how long, its exit
+  code and size;
+- the run's stderr, whole (64 KB of it): a line that starts with `debug:`, `info:`, `warn:` or `error:` gets that level
+  (the prefix taken off), any other is `info`. A `script` logs with `console.error` (its stdout is its data);
+- a stream's lines that aren't JSON, and its stderr;
+- an AI source's or AI action's run: the profile, its prompt's start, seconds, cost and the answer's size;
+- lines you add: `laki widget log <id> [--level warn] [--ws <id>] <text…>` (hooks, cron; it exits 0 and writes nothing
+  while the log is off) and a JS page's `laki.log(...)`.
+
+Every secret's value, and every setting's whose name says token, secret, key or password, is `••••` before a line is
+written. See it on its page's **Logs** tab (or a right click › *Logs*), with `laki widget logs <id> [-n 100] [-f]
+[--level error] [--ws <id>] [--json]`, or MCP's `laki_extension_logs` (the studio's Laki AI gets the last warnings and
+errors). Settings' list tags the ones that keep one (`log`, red after an error in the last hour). Turning it off keeps
+the file until *Clear*; *Delete* takes it to the trash with the extension (*Undo* brings it back); a remix starts
+without one.
 
 ## The studio
 
@@ -691,7 +717,7 @@ prompt* gives any AI chat the whole format with what you typed.
 - The Desk's *Build with AI*: a dialog (what it shows, screenshots, text files), then the extension studio, where Laki AI makes one for the Desk; it shows as a tile at once, with its
   sample, off until you turn it on.
 - The CLI: `laki widget [ls]`, `laki widget reload`, `laki widget on|off|run <id>`, `laki widget what <id>` (what
-  turning it on runs, and the hash `laki widget on <id> --seen <hash>` takes), `laki widget render <id> [--full]`,
+  turning it on runs, and the hash `laki widget on <id> --seen <hash>` takes), `laki widget logs|log <id>` ([logs](#logs)), `laki widget render <id> [--full]`,
   `laki widget action <id> <action> [arg]`, `laki widget new <name> [--kind <k>] [--dir <folder>]`, `laki widget check
   [id|folder] [--no-run]`, `laki widget kit [element]`, `laki widget dev [folder]`, `laki widget trash`, `laki widget
   restore <trash-id>`.

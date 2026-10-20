@@ -282,6 +282,16 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     inputSchema: obj({ id: str('its id, from laki_extensions') }, ['id']),
     run: a => rpc('widgetCheck', { id: a.id, run: false }),
   },
+  {
+    name: 'laki_extension_logs',
+    description: "An extension's log, newest last: what Laki did with it (fetches, actions, events, refusals), each run's end and its stderr, its stream's lines. Read-only, for debugging one you write. Empty while its log is off (the user's switch: Settings › Extensions › Keep a log).",
+    inputSchema: obj({ id: str('its id, from laki_extensions'), lines: { type: 'number', description: 'how many, newest last (default 100, at most 1000)' }, level: { type: 'string', enum: ['debug', 'info', 'warn', 'error'], description: 'at least this level' } }, ['id']),
+    max: 30000,
+    run: async a => {
+      const r = (await rpc('widgetLogs', { id: a.id, limit: Math.min(1000, Number(a.lines) || 100), level: a.level })) as { on: boolean; lines: { at: number; level: string; src: string; text: string; ws?: string }[] }
+      return { on: r.on, lines: r.lines.map(l => `${new Date(l.at).toISOString()} ${l.level} ${l.src}${l.ws ? ` (${l.ws})` : ''}: ${l.text}`) }
+    },
+  },
   // the user's extensions' tools (an action with a tool): listed, and called (the user may be asked first)
   {
     name: 'laki_extension_tools',
