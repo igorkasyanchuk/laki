@@ -195,7 +195,12 @@ export function flowRestore(o: { trash: string }) {
 // at start and hourly: past TRASH_DAYS, and past the newest TRASH_MAX, gone for good
 export function flowTrashTidy(now = Date.now()) {
   if (state.settings?.workflows !== true) return
-  for (const [i, e] of flowTrash().entries()) if (i >= TRASH_MAX || now - e.at > TRASH_DAYS * 86400e3) rmSync(join(trashDir(), e.trash), { recursive: true, force: true })
+  const kept = new Set(flowTrash().filter((e, i) => i < TRASH_MAX && now - e.at <= TRASH_DAYS * 86400e3).map(e => e.trash))
+  let names: string[] = []
+  try {
+    names = readdirSync(trashDir())
+  } catch {}
+  for (const n of names) if (!kept.has(n)) rmSync(join(trashDir(), n), { recursive: true, force: true }) // one without a trash.json (cut short) too
 }
 // the file as it was before a write (not when it's the same), the newest HISTORY kept
 function keepOld(h: string, path: string, text: string) {
@@ -306,15 +311,17 @@ function eventVars(ev: unknown) {
   return out
 }
 
-// a workspace a run is given (flowStart's ws: its id or name): live, a project's that keeps workflows, none going there
-function picked(ref: string, project?: string): Workspace {
-  const ws = state.workspaces.find(w => w.id === ref) ?? state.workspaces.find(w => w.name === ref && !w.archived) ?? findWs(ref)
+// a workspace a run is given (flowStart's ws: its id or name, the project's first): live, a project's that keeps
+// workflows, no other run going or queued there (self: the run begin checks it for)
+function picked(ref: string, project?: string, self?: FlowRun): Workspace {
+  const named = state.workspaces.filter(w => w.name === ref && !w.archived)
+  const ws = state.workspaces.find(w => w.id === ref) ?? (project ? named.find(w => w.project === findProject(project).id) : undefined) ?? named[0] ?? findWs(ref)
   const name = ws.name ?? ws.id
   const p = state.projects.find(x => x.id === ws.project)
   if (ws.archived) throw new Error(`${name} is archived: restore it first`)
   if (!p || !usable(p) || ws.host) throw new Error(`${name} can't run workflows (Terminals, Browsers and SSH hosts can't)`)
   if (project && findProject(project).id !== p.id) throw new Error(`${name} is ${p.name}'s, not ${findProject(project).name}'s`)
-  const there = runs().find(x => going(x) && x.ws === ws.id)
+  const there = runs().find(x => x !== self && live(x) && (x.ws === ws.id || x.pick === ws.id))
   if (there) throw new Error(`${name} has a run going: ${there.flow.name}`)
   return ws
 }
@@ -394,7 +401,7 @@ export async function flowStart(o: Start) {
 async function begin(r: FlowRun) {
   let ws: Workspace
   try {
-    ws = r.pick ? picked(r.pick) : r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow }) : await wsNew({ project: r.project, local: true, preset: 'none' })
+    ws = r.pick ? picked(r.pick, undefined, r) : r.where === 'worktree' ? await wsNew({ project: r.project, preset: 'none', name: taskTitle(r.task, 5) || r.workflow }) : await wsNew({ project: r.project, local: true, preset: 'none' })
   } catch (e) {
     finish(r, 'failed', `no workspace: ${(e as Error).message}`)
     throw e

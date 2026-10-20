@@ -24,7 +24,7 @@ import { globMatch, pressOf } from '../../shared/widgetSchema'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
 import type { FlowStartAt } from './Workflows'
-import type { WorkflowItem } from '../../shared/workflow'
+import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
 import { HelpPage } from './Help'
@@ -3663,7 +3663,7 @@ export function App() {
                       {f.block && ['running', 'waiting', 'paused'].includes(f.status) && <span className="muted"> · {f.block}</span>}
                     </span>
                   </button>
-                ))(flowsOn ? ([tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) || view.flows?.find(r => r.ws === ws.id && !['done', 'stopped', 'failed'].includes(r.status))) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's; else one going in it (a workspace you picked) */}
+                ))(flowsOn ? ([tab?.flow, ws.flow].map(id => id && view.flows?.find(r => r.id === id)).find(Boolean) || view.flows?.find(r => r.ws === ws.id && !FLOW_ENDED.includes(r.status))) : undefined)} {/* the tab's run gone (past the 100 kept): the workspace's; else one going in it (a workspace you picked) */}
               {!project?.kind && ( // a terminal in your home folder: no $PORT of its own to show
               <span className="port-item">
                 <button
