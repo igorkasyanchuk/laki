@@ -132,7 +132,7 @@ export type Workspace = {
 
 // for one PR: the commit whose failing CI was sent, how many times in a row, the review threads sent; the commit whose
 // merge conflicts were sent, how many times in a row
-export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number; land?: string } // mine: the agent's comments (it comments as you); land: the head commit merge when green tried
+export type PRFix = { pr: number; ci?: string; tries?: number; review?: string; mine?: string[]; merge?: string; merges?: number; land?: string; held?: string } // mine: the agent's comments (it comments as you); land: the head commit merge when green tried; held: its gates' extensions as they were when they held it (widgets.ts gatesKey): changed, it's tried again
 export type FixWhat = 'ci' | 'review' | 'conflict'
 
 // what fix CI, review and fix conflicts (and the info panel's send buttons) tell the agent; settings.prPrompts
@@ -617,6 +617,10 @@ export type WidgetRuns = { runs: WidgetRun[]; env: Record<string, string>; fixtu
 export type WidgetStream = { running: boolean; since?: number; restarts: number; last?: string; next?: number; stopped?: boolean }
 // what an extension may answer (widget.json's on: { "<event>": "<action>" | "refresh" }; widgets.ts widgetEvent)
 export const WIDGET_EVENTS = ['turn.done', 'turn.failed', 'turn.waiting', 'pr.opened', 'pr.checks.failed', 'pr.checks.passed', 'pr.review', 'pr.merged', 'pr.closed', 'workspace.new', 'workspace.archived', 'workspace.restored', 'workspace.removed', 'schedule.ran', 'app.open', 'ship.done', 'flow.ended', 'limit.hit', 'tab.new', 'port.open', 'gate.held'] as const
+// gates (an action's "gate"): the steps an extension can hold; a hold: who held it and why
+export const GATES = ['ship', 'merge', 'archive'] as const
+export type Gate = (typeof GATES)[number]
+export type GateHeld = { widget: string; name: string; gate: Gate; why: string; fix?: string; icon?: string }
 // events of your own (laki widget emit): custom.<name>; "custom.*" in on: answers every one
 export const CUSTOM_EVENT = /^custom\.[a-z0-9][a-z0-9._-]{0,40}$/
 export type WidgetEvent = (typeof WIDGET_EVENTS)[number] | `custom.${string}`
@@ -638,7 +642,7 @@ export type WidgetHide = { refresh?: boolean; at?: boolean }
 export const LOG_LEVELS = ['debug', 'info', 'warn', 'error'] as const
 export type LogLevel = (typeof LOG_LEVELS)[number]
 export type WidgetLogLine = { n: number; at: number; level: LogLevel; src: string; text: string; ws?: string }
-export type WidgetView = { id: string; name: string; oneFile?: boolean; allowed?: string[]; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; actions?: string[]; menus?: WidgetMenu[]; config: Record<string, string>; options: WidgetOption[]; missing?: string[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[]; log?: boolean; keepLog?: boolean; logErr?: number } // keepLog: its own Keep a log; log: it keeps a log now (its own switch, Settings' for all, or dev-linked); logErr: its last error line's time; oneFile: <id>.<n><s|m|h>.<ext>, renamed in its tag; allowed: claude tools its agent may use unasked, allowed when it asked; history: the studio's Undo, when each kept version was taken (ms), oldest first
+export type WidgetView = { id: string; name: string; oneFile?: boolean; allowed?: string[]; source?: WidgetSource; ownFetch?: boolean; fixtures?: string[]; description?: string; dir: string; builtin?: boolean; on: boolean; size: [number, number]; every?: number; full: boolean; view: WidgetSize; place?: WidgetPlace; places?: WidgetPlace[]; net?: boolean; hide?: WidgetHide; js?: boolean; actions?: string[]; menus?: WidgetMenu[]; config: Record<string, string>; options: WidgetOption[]; missing?: string[]; at?: number; error?: string; running?: boolean; agent?: boolean; byAi?: boolean; sample?: boolean; dev?: boolean; devError?: string; mock?: string; rev: number; button?: boolean; icon?: string; label?: string; badge?: string; tip?: string; click?: string; scope?: 'workspace'; inst?: Record<string, WidgetInst>; here?: string | null; tools?: WidgetTool[]; history?: number[]; log?: boolean; keepLog?: boolean; logErr?: number; gates?: Gate[] } // gates: the steps its actions can hold; keepLog: its own Keep a log; log: it keeps a log now (its own switch, Settings' for all, or dev-linked); logErr: its last error line's time; oneFile: <id>.<n><s|m|h>.<ext>, renamed in its tag; allowed: claude tools its agent may use unasked, allowed when it asked; history: the studio's Undo, when each kept version was taken (ms), oldest first
 // an action an agent may call (its tool): Always granted in these workspaces ('': calls from none, Laki AI's)
 export type WidgetTool = { action: string; description: string; ask: 'always' | 'first' | 'never'; grants: string[] }
 // an action offered where you work (widget.json's title, show, match, key, ask, confirm, insert, view: widgetSchema.ts actionMenu)

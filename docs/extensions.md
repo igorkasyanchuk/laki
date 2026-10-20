@@ -173,6 +173,7 @@ when it has them) and its own fields, 64 KB at most:
 | `limit.hit` | an agent hits a usage limit (once per limit) | `agent`, `until` (ms) |
 | `tab.new` | a tab is opened (not the ones brought back as Laki starts) | `kind` (agent, shell, dev, script, ship) |
 | `port.open` | a port starts listening in a workspace (once each time) | `port`, `pid`, `command`, `name` (`.laki.json`'s `ports`) |
+| `gate.held` | a [gate](#gates-an-actions-gate) held a ship, a merge or an archive | `gate`, `widget`, `why` |
 | `custom.<name>` | `laki widget emit <name>` (below) | `data`, `from: { widget, tab, agent }` |
 
 PR events come from Laki's PR scans: the first scan after the daemon starts only notes where each PR is, so a restart
@@ -232,6 +233,33 @@ An extension that's off refuses it. A git hook that counts today's commits in an
 #!/bin/sh
 laki widget push commits "{\"today\": $(git log --since=midnight --oneline | wc -l)}" >/dev/null 2>&1 || true
 ```
+
+## Gates (an action's `gate`)
+
+An action can hold a step: before Laki ships, merges or archives a workspace, each gate for that step runs, and any
+that says no holds it, with its reason.
+
+```json
+{ "actions": { "tests": { "run": "./check.sh", "gate": ["ship", "merge"] } } }
+```
+
+- It gets `{ gate, ws, pr, stat, by }` on stdin and in `$LAKI_EVENT_FILE` (`pr`: number, url, title, state, checks,
+  review, or null; `stat`: add, del, files, or null; `by`: you, agent, auto (Merge when green, archive on merge) or
+  workflow), `$LAKI_GATE` the step, and the workspace's env (`$LAKI_WORKSPACE`, `$LAKI_BRANCH`, `$LAKI_PATH`…).
+- It prints `{"ok": true}`, or `{"ok": false, "why": "the tests fail", "fix": "Make the tests pass"}` (`fix`: a prompt
+  for the agent, optional).
+- Gates run together, 8 at most for a step, 30 s each, only while the extension is on; a per-workspace one with its
+  workspace's instance. A command action only: an agent's action can't be one (each run costs, and it's slow).
+- **An error or no answer within 30 s:** the step goes ahead, and Laki says so (a toast, a line in its log). A gate
+  that should block on its own error prints `ok: false` itself. Merge when green and archive on merge, which nobody
+  watches, are held instead.
+- **Held:** the app says *Not shipped* (*Not merged*, *Not archived*), a line per gate, with *Do it anyway* (asked
+  first) and, when a gate gave a `fix` and the workspace has an agent, *Ask the agent to fix it*. `laki ship` prints the
+  reasons and exits 1; `--force` does it anyway. Doing it anyway is yours only: an agent's is refused.
+- Merge when green held: over to you once per head commit, tried again after a push or once the gate's extension
+  changes. Archive on merge held: skipped, and said in the workspace's log. A workflow's action block takes its error
+  way, the reasons as `{{steps.<id>.output}}`. Each hold sends `gate.held`.
+- Not gated: deleting a workspace, and archived workspaces' clean-up.
 
 ## Tools for agents (an action's `tool`)
 
@@ -747,6 +775,7 @@ prompt* gives any AI chat the whole format with what you typed.
 
 - A fetch and an action are shell commands on your Mac, like a script you run: only turn on what you trust. One that
   Laki AI wrote is saved off and tagged *by Laki AI*.
+- A gate holds a ship, a merge or an archive; only you can do it anyway (an agent's `force` is refused).
 - An agent's tool call shows you the command and its input before it runs, unless the tool says `never` or you chose
   *Always* in that workspace.
 - A Yes holds only for the files you were shown. Laki AI's *Turn on …?*, the studio's *Turn on*, a tool's ask and its

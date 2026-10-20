@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto'
 import { runInNewContext } from 'node:vm'
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { basename, join, resolve, sep } from 'node:path'
-import { agentVars, findAction, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
+import { agentVars, findAction, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
 import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, killGroup, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
@@ -871,8 +871,11 @@ async function act(r: FlowRun, b: Block) {
   const a = b.action!
   if (r.dry && OUTWARD.includes(a)) return leave(r, b, 'ok', `dry run: would ${ACTIONS[a].toLowerCase()}`)
   try {
+    // a gate's hold (widgets.ts): its error way, the reasons as its output
+    const held = (h: GateHeld[]) => ((r.vars[`steps.${b.id}.output`] = h.map(x => `${x.name}: ${x.why}`).join('\n')), leave(r, b, 'error', `held by ${h.map(x => x.name).join(', ')}`))
     if (a === 'ship') {
-      const tab = ship(ws.id, fill(b.text || '{{task}}', varsOf(r)))
+      const tab = await ship(ws.id, fill(b.text || '{{task}}', varsOf(r)), { by: 'workflow' })
+      if ('held' in tab) return held(tab.held)
       const s = sessions.get(tab.id)!
       const then = s.onExit
       s.onExit = code => {
@@ -882,10 +885,10 @@ async function act(r: FlowRun, b: Block) {
       r.wait = { kind: 'run' }
       return touch()
     }
-    if (a === 'approve' || a === 'merge') await prAct({ ws: ws.id, act: a })
-    else if (a === 'dev') runDev(ws.id)
-    else if (a === 'archive') await wsArchive(ws.id)
-    else throw new Error(`no action ${a}`)
+    const h = a === 'approve' || a === 'merge' ? await prAct({ ws: ws.id, act: a, by: 'workflow' }) : a === 'archive' ? await wsArchive(ws.id, { by: 'workflow' }) : a === 'dev' ? runDev(ws.id) : undefined
+    if (!['approve', 'merge', 'archive', 'dev'].includes(a)) throw new Error(`no action ${a}`)
+    const no = (h as { held?: GateHeld[] } | undefined)?.held
+    if (no) return held(no)
     leave(r, b, 'ok', a === 'dev' ? 'the dev server runs' : `${a}d`)
   } catch (e) {
     leave(r, b, 'error', (e as Error).message)

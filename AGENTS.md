@@ -111,7 +111,7 @@ workspace), a widget's `menus` (an action's `title`, `show`, `match`, `key`, `as
 block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's `tab`, `used`), a run's `queued` status (`QUEUE_MAX`), a Start's `inputs` (`flowStart` `inputs`, MCP's and the CLI's `--set`); 87: `hunkUndo`, `fileUndo`, `hunkRedo`, a tab's `perm` and `fast` (`wsNew`, `tabNew`); 88: notes
 (`noteList`/`noteGet`/`noteNew`/`noteSave`/`noteRm`/`noteUpload`/`noteFile`), `aiPermission`, a chat ask's `perm`; 89: `widgetSet` `name` and `allow`, a widget's `allowed` and `oneFile`, `toolAsk` `perm` (`widgetPermission`); 90: a say's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
-`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`. A
+`tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1397,6 +1397,22 @@ tools|tool`; MCP's `laki_extension_tools`, `laki_extension_call` and an `ext_<id
 with a daemon up: `alive`); Laki AI has them as MCP's; `LAKI_NOTE` names them while one is on (`TOOLS_NOTE`).
 `manifestCheck` checks each tool and warns at `never` with an outward command; `checkOne` at a missing or long
 `AGENTS.md`. The `tool` starter. Tested in `test/widget-tools.test.ts`.
+
+Gates (widgets.ts' gates section, `test/widget-gates.test.ts`): an object action's `gate` (`GATES`: ship, merge,
+archive; `widgetSchema.ts` `gateOf`, a command action's only: `manifestCheck` refuses it on an AI action or an unknown
+step). Core's `gated(step, ws, GateOpts)`, before `ship` (async now: main.ts, workflow.ts, the CLI, App), `prAct`'s
+merge, `autoPR`'s Merge when green and `wsArchive` (after `ifClean`'s dirty check; `archiveMerged`'s and a workflow's
+too; not `wsRm`, not `archivedTidy`): `force` skips them, refused from `agentCaller` (the CLI's `--force` in an agent's
+tab too); `by` you, agent (`agentCaller`), auto, workflow. `widgetGates`: every on extension's gates for the step (a
+scoped one where `instOk`), `GATE_MAX` 8 together, `gateWait` 30 s (`LAKI_GATE_MS`: tests'), `exec` with stdin and
+`LAKI_EVENT_FILE` `{ gate, ws: wsInfo, pr, stat, by }`, `LAKI_GATE`, `wsEnv`; a run `gate:<step>` in its Runs and log.
+`{"ok": false, "why", "fix"}` is a `GateHeld`; an error, a timeout or no `ok` goes ahead (`wLog` error, a `widget-say`
+toast) unless `by` is auto: then held. Each hold `gate.held`. Held: `{ held }` back (App's `gated`: *Checking…* while
+`gatesOn`, then `choose` *Not shipped*… with *Do it anyway* (`ask`, then `force`) and *Ask the agent to fix it* (`send`
+`whenIdle`, the fixes) when one has a `fix` and the workspace a live agent tab); `autoPR`: `overToYou` once, `f.land`
+the head and `f.held` its gates' `gatesKey` (on, `filesHash`), tried again when that changes; `archiveMerged`: logged,
+`autoArchived` kept; a workflow's block: its error way, `steps.<id>.output` the reasons. The view's `gates` (Settings'
+*Can hold*), `widgetWhat`'s text.
 
 The studio (`WidgetStudio.tsx`, App's lazy dialog `{ studio: id ('' a new one), back }`, only while `ai.on`; `WidgetsApi`
 `studio`, `remix`, `undo`, `tryOnce`; entries: New ▾ › Make with Laki AI (`page('')` too), a row's and `WidgetCard`'s ✨

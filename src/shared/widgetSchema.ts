@@ -3,7 +3,7 @@
 // (LAKI_DTS: window.laki and the UI kit's elements, for a JS page), and manifestCheck, the checker's widget.json part
 // (widgetCheck in daemon/widgets.ts adds the files, the ui against data, the fixtures and a fetch). The ui elements'
 // words are the UI kit's own (widgetUi.ts UI), so the schema, the types, the guide and the gallery say the same.
-import { CUSTOM_EVENT, eventOk, REPO, WIDGET_EVENTS, WIDGET_PLACES } from './types.ts'
+import { CUSTOM_EVENT, eventOk, type Gate, GATES, REPO, WIDGET_EVENTS, WIDGET_PLACES } from './types.ts'
 import { BUTTON, COMMON, type Kind, near, type Prop, UI, UI_TYPES, type UiProblem } from './widgetUi.ts'
 
 export const WIDGET_SCHEMA_URL = `${REPO.replace('https://github.com/', 'https://raw.githubusercontent.com/')}/main/docs/widget.schema.json`
@@ -121,6 +121,7 @@ export const MANIFEST: Record<string, J> = {
           properties: {
             run: str('The command'),
             ...MENU,
+            gate: { type: 'array', items: { enum: [...GATES] }, description: 'Steps it can hold: before Laki ships, merges or archives a workspace it runs, the step’s facts as JSON on stdin; { "ok": false, "why", "fix" } holds it (the user may do it anyway). Command actions only' },
             tool: {
               type: 'object',
               additionalProperties: false,
@@ -147,7 +148,7 @@ export const MANIFEST: Record<string, J> = {
         },
       ],
     },
-    description: 'Commands its buttons run by name, with $WIDGET_ARG: a command, { "run", "tool" } (agents may call it), or { "ai": a prompt } (an agent answers it); what one prints as JSON may say { "toast" }, { "modal" }, { "data" } or { "insert" }. title, show, match, key, ask, confirm, insert and view offer it in the palette, menus, a shortcut and the prompt, with $LAKI_CTX (the workspace, tab or file it was picked on)',
+    description: 'Commands its buttons run by name, with $WIDGET_ARG: a command, { "run", "tool" } (agents may call it), or { "ai": a prompt } (an agent answers it); what one prints as JSON may say { "toast" }, { "modal" }, { "data" } or { "insert" }. title, show, match, key, ask, confirm, insert and view offer it in the palette, menus, a shortcut and the prompt, with $LAKI_CTX (the workspace, tab or file it was picked on); gate: the steps it can hold (ship, merge, archive)',
   },
   notify: str('A notification, a template over its data ("{{#if mentions}}{{mentions}} new mentions{{/if}}"): posted when it reads as something new after a fetch, not empty and not what it last said'),
   icon: str('As a button: an icon of Laki’s by name, or an emoji'),
@@ -316,7 +317,8 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
     if (isObj(c) && 'ai' in c && !('run' in c)) {
       if (typeof c.ai !== 'string' || !c.ai.trim()) say('error', where, 'ai: a prompt, what the agent answers')
       if (c.tools !== undefined && (typeof c.tools !== 'string' || /[\n\r]|^\s*-/.test(c.tools))) say('error', `${where}.tools`, 'tools by name, comma-separated (mcp__slack__post_message), no options')
-      for (const k of Object.keys(c)) if (![...['ai', 'tools', 'profile'], ...MENU_KEYS].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, [...['ai', 'tools', 'profile'], ...MENU_KEYS]))}`)
+      if ('gate' in c) say('error', `${where}.gate`, "an agent's action can't be a gate: each run costs, and it's slow (a command action)")
+      for (const k of Object.keys(c)) if (![...['ai', 'tools', 'profile', 'gate'], ...MENU_KEYS].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, [...['ai', 'tools', 'profile'], ...MENU_KEYS]))}`)
       menuCheck(where, c, say)
       continue
     }
@@ -324,8 +326,10 @@ export function manifestCheck(m: Record<string, unknown>): UiProblem[] {
       say('error', where, `a command (text), { "run": a command, "tool": … } or { "ai": a prompt }, not ${isObj(c) ? 'an object without run' : kindOf(c)}`)
       continue
     }
-    for (const k of Object.keys(c)) if (![...['run', 'tool'], ...MENU_KEYS].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, [...['run', 'tool'], ...MENU_KEYS]))}`)
+    for (const k of Object.keys(c)) if (![...['run', 'tool', 'gate'], ...MENU_KEYS].includes(k)) say('warn', where, `no key ${k}${(x => (x ? ` (did you mean ${x}?)` : ''))(near(k, [...['run', 'tool', 'gate'], ...MENU_KEYS]))}`)
     menuCheck(where, c, say)
+    if (c.gate !== undefined && !Array.isArray(c.gate)) say('error', `${where}.gate`, `a list of the steps it can hold: ${GATES.join(', ')}`)
+    for (const g of Array.isArray(c.gate) ? c.gate : []) if (!(GATES as readonly unknown[]).includes(g)) say('error', `${where}.gate`, `${JSON.stringify(g)}: one of ${GATES.join(', ')}${(n => (n ? ` (did you mean ${n}?)` : ''))(near(String(g), GATES))}`)
     if (c.tool === undefined) continue
     const t = c.tool
     if (!isObj(t)) {
@@ -393,6 +397,8 @@ export type ToolSpec = { description: string; input: Record<string, ToolField>; 
 // an action's command: the string, or the object's run
 export const actionCmd = (a: unknown) => (typeof a === 'string' ? a : isObj(a) && typeof a.run === 'string' ? a.run : undefined)
 // an action an agent answers: { "ai": a prompt, "tools", "profile" } (an AI source's agent, Settings › Extensions')
+// the steps a command action can hold (its gate)
+export const gateOf = (a: unknown): Gate[] => (isObj(a) && typeof a.run === 'string' && Array.isArray(a.gate) ? (GATES as readonly Gate[]).filter(g => (a.gate as unknown[]).includes(g)) : [])
 export const aiActOf = (a: unknown) => (isObj(a) && typeof a.ai === 'string' && typeof a.run !== 'string' ? { prompt: a.ai, ...(typeof a.tools === 'string' && { tools: a.tools }), ...(typeof a.profile === 'string' && { profile: a.profile }) } : undefined)
 // an action's tool as the daemon takes it (what check flags left out); none: not one
 export function toolOf(a: unknown): ToolSpec | undefined {

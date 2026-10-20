@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { type Account, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { type Account, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -38,6 +38,7 @@ import { type Cloudflared, portsOf, SharePop, timeLeft, TunnelButton, type Tunne
 import { type ShownPop, ShownDialog, ShownPops, type ShownWin } from './Shown'
 import { type AgentUsage, USAGE_AGENTS, UsageButton } from './Usage'
 import { ask, askText, AskHost, choose, unchoose, colorVar, Icon, IconButton, type IconName, keep as store, load, type MenuItem, moveId, ON, Page, StaleDaemon, TAB_COLORS, Tips, TurnTime, useMenu, useRowDrag, keyLabel, keyRec, HOTKEY } from './ui'
+import { isIconName } from '../../shared/icons'
 
 declare const __BUILT__: string | undefined // electron.vite.config.ts' define: the build's time, the daemon's too
 // a daemon older than this app: a lower API, or the same API from an earlier build (it outlives app updates)
@@ -1156,15 +1157,34 @@ export function App() {
     if (!(await busyWith([w.id], 'deleting', () => call('wsRm', { id: w.id }).then(() => true, () => false)))) return // the toast says why
     done(`Deleted ${wsName(w)}${w.kind === 'worktree' && w.branch ? `: its branch ${w.branch} stays` : ''}`)
   }
+  // an extension's gates on a ship, a merge or an archive: Checking… while they run; a hold says what held it, then
+  // Do it anyway (asked first) or the agent's fix. f(force) makes the call; undefined: failed (the toast says), or not done
+  const gatesOn = (step: Gate) => (view?.widgets ?? []).some(x => x.on && x.gates?.includes(step))
+  const gated = async <T,>(w: WorkspaceView, step: Gate, f: (force?: boolean) => Promise<T>): Promise<T | undefined> => {
+    if (gatesOn(step)) toast('Checking…')
+    const r = await f()
+    const held = (r as { held?: GateHeld[] } | null | undefined)?.held
+    if (!held) return r
+    const fix = held.flatMap(h => (h.fix ? [h.fix] : [])).join('\n\n')
+    const agent = !!fix && (view?.tabs ?? []).some(t => t.workspace === w.id && t.kind === 'agent' && t.status !== 'exited')
+    const words = { ship: 'shipped', merge: 'merged', archive: 'archived' }[step]
+    const n = await choose(`Not ${words}`, held.map(h => `${h.icon && !isIconName(h.icon) ? `${h.icon} ` : ''}${h.name}: ${h.why}`).join('\n'), [{ label: 'Cancel' }, ...(agent ? [{ label: 'Ask the agent to fix it', primary: true }] : []), { label: 'Do it anyway', danger: true }])
+    if (agent && n === 1) return void call('send', { target: w.id, text: fix, whenIdle: true }).then(() => toast('Sent to the agent'), () => {})
+    if (n !== (agent ? 2 : 1)) return
+    if (!(await ask(`${{ ship: 'Ship', merge: 'Merge', archive: 'Archive' }[step]} ${wsName(w)} anyway?`, { text: `Past what ${held.map(h => h.name).join(', ')} said.`, ok: 'Do it anyway', danger: true }))) return
+    return f(true)
+  }
   // archive: at once when nothing is uncommitted (Undo brings it back), else asked first: the worktree goes, with them
   const archive = async (w: WorkspaceView) => {
     const old = (view?.api ?? 0) < 12 // its daemon archives whatever is there: ask
-    const r = old ? { dirty: -1 } : await busyWith([w.id], 'archiving', () => call<{ dirty?: number } | null>('wsArchive', { id: w.id, ifClean: true }).catch(() => undefined))
-    if (r === undefined) return // the toast says why
+    let forced = false
+    const go = (ifClean: boolean) => (force?: boolean) => busyWith([w.id], gatesOn('archive') && !(forced ||= !!force) ? 'checking' : 'archiving', () => call<{ dirty?: number; held?: GateHeld[] } | null>('wsArchive', { id: w.id, ifClean, force: forced }).catch(() => undefined))
+    const r = old ? { dirty: -1 } : await gated(w, 'archive', go(true))
+    if (r === undefined) return // the toast says why, or it wasn't done
     if (r?.dirty) {
       const lost = r.dirty > 0 ? `${r.dirty} uncommitted ${r.dirty === 1 ? 'change goes' : 'changes go'} with the worktree` : 'the worktree is removed'
       if (!(await ask(`Archive ${wsName(w)}?`, { text: `Its tabs stop and ${lost} (the branch stays).`, ok: 'Archive', danger: true }))) return
-      if (!(await busyWith([w.id], 'archiving', () => call('wsArchive', { id: w.id }).then(() => true, () => false)))) return
+      if ((await gated(w, 'archive', go(false))) === undefined) return
     }
     done(`Archived ${wsName(w)}`, () => restore(w.id))
   }
@@ -1859,7 +1879,7 @@ export function App() {
       const review = (pr.review && REVIEW[pr.review]) || 'no review needed'
       const text = [pr.title, `Checks: ${ciText(pr)} · ${review}${pr.conflict ? ' · merge conflicts' : ''}`].filter(Boolean).join('\n')
       if ((await choose(`${verb} PR #${pr.number} into ${pr.base ?? 'its base'}?`, text, [{ label: 'Cancel' }, { label: MERGE_WORDS[method], primary: true }], del)) !== 1) return
-      return call('prAct', { ws: w.id, act, method, deleteBranch: del.on }).then(() => toast(`Merged PR #${pr.number}`, undefined, undefined, true), () => {})
+      return gated(w, 'merge', force => call('prAct', { ws: w.id, act, method, deleteBranch: del.on, force }).catch(() => undefined)).then(r => r !== undefined && toast(`Merged PR #${pr.number}`, undefined, undefined, true))
     }
     const close = act === 'close'
     const facts = close ? 'Without merging; it can be reopened on GitHub.' : [pr.author && `By ${pr.author}`, `Checks: ${ciText(pr)}`, pr.conflict && 'merge conflicts'].filter(Boolean).join(' · ')
@@ -3388,7 +3408,7 @@ export function App() {
                 if (!(await ask(`Keep ${wsName(winner)}?`, { text: `${losers.map(wsName).join(', ')} ${losers.length === 1 ? 'is' : 'are'} archived: tabs stop and worktrees go (the branches stay).`, ok: 'Archive the others', danger: true }))) return
                 const gone: string[] = []
                 await busyWith(losers.map(w => w.id), 'archiving', async () => {
-                  for (const w of losers) if (await call('wsArchive', { id: w.id }).then(() => true, () => false)) gone.push(w.id)
+                  for (const w of losers) if (await call<{ held?: GateHeld[] } | null>('wsArchive', { id: w.id }).then(r => !r?.held, () => false)) gone.push(w.id) // held by a gate: it stays
                 })
                 setWsId(winner.id)
                 setDialog(null)
@@ -3632,8 +3652,9 @@ export function App() {
           placeholder="Commit message"
           onClose={() => setDialog(null)}
           onSubmit={async message => {
-            selectTab(await call<TabView>('ship', { ws: ws.id, message }))
+            const t = await gated(ws, 'ship', force => call<TabView | { held: GateHeld[] }>('ship', { ws: ws.id, message, force }))
             setDialog(null)
+            if (t && 'id' in t) selectTab(t)
           }}
         />
       )}

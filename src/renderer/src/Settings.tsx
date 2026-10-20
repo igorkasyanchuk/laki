@@ -2028,7 +2028,7 @@ export function SourceField({ w, api }: { w: WidgetView; api: WidgetsApi }) {
 
 // an extension's settings in titled blocks (Where it shows, Updates, its own, Tools for agents), a row each: what it is
 // and what it does on the left, its control on the right
-const WcSec = ({ title, hint, children }: { title: string; hint?: string; children: ReactNode }) => (
+const WcSec = ({ title, hint, children }: { title: string; hint?: string; children?: ReactNode }) => (
   <section className="wc-sec">
     <div className="wc-sec-head">
       <b>{title}</b>
@@ -2210,6 +2210,9 @@ export function WidgetCard({ w, api }: { w: WidgetView; api: WidgetsApi }) {
             ))}
           </div>
         </WcSec>
+      )}
+      {!!w.gates?.length && (
+        <WcSec title={`Can hold: ${w.gates.join(', ')}`} hint="Its gate runs before Laki does that to a workspace; a no holds it, and you can do it anyway" />
       )}
       {!!w.tools?.length && (
         <WcSec title="Tools for agents" hint="Agents run these through laki widget tool and MCP">

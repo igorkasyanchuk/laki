@@ -169,7 +169,7 @@ const api: Record<string, Handler> = {
   wsNew: p => core.wsNew(core.byCaller(p)),
   quickNew: p => core.quickNew(p),
   wsRm: p => core.wsRm(p.id),
-  wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean }),
+  wsArchive: p => core.wsArchive(p.id, { ifClean: !!p.ifClean, force: p.force === true, from: p.from }), // { held }: a gate said no (force: yours only)
   doctor: () => core.doctor(),
   wsFan: p => core.wsFan(core.byCaller(p)),
   answer: p => core.answer(p),
@@ -249,7 +249,7 @@ const api: Record<string, Handler> = {
   skills: () => skills(),
   skillSet: p => skillSet(p),
   prComment: p => core.prComment(p),
-  prAct: p => core.prAct(p),
+  prAct: p => core.prAct({ ws: p.ws, act: p.act, method: p.method, deleteBranch: p.deleteBranch, force: p.force === true, from: p.from }),
   prLabels: p => core.prLabels(p.ws),
   prLabel: p => core.prLabel(p),
   prThreads: p => core.prThreads(p.ws),
@@ -286,7 +286,7 @@ const api: Record<string, Handler> = {
   tabWake: p => core.wake(p.tab), // a pane already on it: a look doesn't attach again
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
-  ship: p => core.ship(p.ws, p.message),
+  ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: p => core.screen(p.target, p.lines, p.by, p.all === true),
   input: (p, c) => core.input(p.tab, p.data, c),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),

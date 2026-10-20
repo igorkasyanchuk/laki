@@ -27,7 +27,7 @@ export const USAGE = `laki: coding agents in parallel git worktrees
   laki screen shot [app] | windows            a screenshot of the iOS Simulator, or of an app's window (its PNG's path)
   laki screen tap <x> <y> | swipe <x1> <y1> <x2> <y2> | type <text> | describe
                                               the simulator's hands, in points (needs idb); describe: its elements
-  laki diff <ws> | run <ws> [test|lint|format|deploy] | ship <ws> -m <message>
+  laki diff <ws> | run <ws> [test|lint|format|deploy] | ship <ws> -m <message> [--force]
                                               run: the run script (a dev server), or that script in a tab of its own
   laki browser [<ws>] open [url|/path] | screenshot | click <css> | fill <css> <text> | text
                                               a hidden browser on the workspace's localhost (the app must be open);
@@ -140,7 +140,7 @@ prints the page's text. In a tab, <ws> is its own.
 
   laki run a1b2
   laki run a1b2 test`,
-  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh).
+  ship: `Commits the workspace's changes with the message, pushes the branch and opens a PR (gh). An extension's gate may hold it: the reasons are printed and it exits 1; --force does it anyway (the user only: refused in an agent's tab).
 
   laki ship a1b2 -m "Add CSV export"`,
   schedule: `A prompt for an agent at the times a line of English says, while the Mac is awake (a run more than 30 minutes

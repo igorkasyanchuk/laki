@@ -9,10 +9,10 @@ import { homedir, tmpdir } from 'node:os'
 import { basename, dirname, join, resolve } from 'node:path'
 import { createInterface } from 'node:readline'
 import { fileURLToPath } from 'node:url'
-import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, CUSTOM_EVENT, type EventSent, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, WIDGET_PLACES } from '../shared/types.ts'
+import { AI_SOURCE_EVERY, BUTTON_PLACES, LOG_LEVELS, type LogLevel, type WidgetLogLine, type Preset, WIDGET_SOURCES, type WidgetSource, type Workspace, type WidgetEvent, CUSTOM_EVENT, type EventSent, type Gate, type GateHeld, type WidgetOption, type WidgetStream, type WidgetTool, type WidgetRun, type WidgetRuns, type WidgetPlace, type WidgetSize, type WidgetView, type WidgetHide, type WidgetCtx, WIDGET_PLACES } from '../shared/types.ts'
 import { fill, hasFull, hasScript, pageOf, render, sayOf, templateError, viewOf, type WidgetSay } from '../shared/widget.ts'
 import { reservedIn, uiCheck, uiHtml, type UiProblem, uiTree } from '../shared/widgetUi.ts'
-import { actionCmd, actionMenu, aiActOf, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
+import { actionCmd, actionMenu, aiActOf, gateOf, manifestCheck, needsSample, SECRET, SIZES_ACROSS, toolArgs, toolOf, toolSchema } from '../shared/widgetSchema.ts'
 import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStarters.ts'
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
@@ -585,6 +585,7 @@ export const widgetsView = (): WidgetView[] =>
     log: logOn(w) || undefined,
     keepLog: w.s.log || undefined,
     logErr: errAt.get(w.id),
+    gates: (g => (g.length ? g : undefined))([...new Set(gatesOf(w).flatMap(([, x]) => gateOf(x)))]),
     ...(w.dir === join(widgetHome(), w.id) && (h => h.length && { history: h })(historyOf(w.id))),
     dev: w.dev || undefined,
     devError: w.devError,
@@ -811,7 +812,8 @@ export function widgetWhat(id: string) {
     : ['runs nothing (no fetch)']
   const fence = '`'.repeat(Math.max(3, ...[...(code ?? '').matchAll(/`+/g)].map(m => m[0].length + 1))) // longer than any run in it
   const events = Object.keys(w.m.on ?? {}).map(e => `\`${e.replace(/`/g, '')}\``) // its actions run on these, unclicked
-  const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}`
+  const holds = [...new Set(gatesOf(w).flatMap(([, a]) => gateOf(a)))] // its gates: it can hold these
+  const text = `It ${runs}${code ? `:\n\n${fence}\n${code}\n${fence}` : '.'}${events.length ? `\n\nThese events run its actions too: ${events.join(', ')}.` : ''}${holds.length ? `\n\nIt can hold a workspace's ${holds.join(', ')}: its gate runs before each.` : ''}`
   return { name: w.m.name || w.id, on: onOf(w), text, hash }
 }
 
@@ -863,9 +865,9 @@ type Failed = Error & { stderr?: string; stdout?: string; exit?: number }
 // it failed (with its stderr and exit code). stdin: an event's JSON (a handler's); else nothing to read
 const timeout = () => Number(process.env.LAKI_WIDGET_TIMEOUT_MS) || 120_000 // tests' shorter
 const execs = new Set<ChildProcess>() // running now: widgetsStop ends them
-function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>, stdin = '') {
+function exec(w: Entry, cmd: string, args: string[], extra: Record<string, string>, stdin = '', ms?: number) {
   return new Promise<Ran>((ok, no) => {
-    const t = timeout()
+    const t = ms ?? timeout()
     const p = execGroup(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: t, maxBuffer: MAX_OUT, stdin }, (e, stdout, stderr) => {
       execs.delete(p)
       if (!e) return ok({ out: stdout, err: stderr })
@@ -889,7 +891,7 @@ function ran(id: string, r: Run, stderr?: string) {
   const [wid, ws] = id.split('@')
   const w = widgets.get(wid)
   if (!w || !logOn(w)) return
-  const src = r.reason.startsWith('tool:') ? r.reason : r.action ? `action:${r.action}` : ['stream', 'push'].includes(r.reason) ? r.reason : 'fetch'
+  const src = r.reason.startsWith('tool:') || r.reason.startsWith('gate:') ? r.reason : r.action ? `action:${r.action}` : ['stream', 'push'].includes(r.reason) ? r.reason : 'fetch'
   if (stderr?.trim()) xlog(w, 'info', src, stderr.length > LOG_RUN ? stderr.slice(-LOG_RUN) : stderr, ws)
   xlog(w, r.ok ? 'info' : 'error', src, `${r.ok ? 'ran' : 'failed'} (${r.reason}${r.why ? `: ${r.why}` : ''}) in ${r.ms} ms, exit ${r.exit ?? 0}, ${r.bytes} B${r.error ? `: ${r.error}` : ''}`.replace(/\s+/g, ' '), ws, true)
 }
@@ -1365,6 +1367,70 @@ export function widgetEvent(name: WidgetEvent, extra: Record<string, unknown> = 
   }
   return rec
 }
+// ---------- gates (an action's "gate": ["ship", "merge", "archive"]): before Laki ships, merges or archives a
+// workspace, each gate for that step runs: on, a scope workspace one only in a workspace it has (instOk), GATE_MAX at
+// most, together, gateWait each. stdin and LAKI_EVENT_FILE: { gate, ws, pr, stat, by }, LAKI_GATE the step, the
+// workspace's env. It prints { "ok": false, "why", "fix" } to hold the step. An error or no answer goes ahead, said (a
+// log line, a toast), except for an unattended step (by auto: Merge when green, archive on merge): held
+const GATE_MAX = 8
+const gateWait = () => Number(process.env.LAKI_GATE_MS) || 30_000 // tests' shorter
+export type GateBy = 'you' | 'agent' | 'auto' | 'workflow'
+const gatesOf = (w: Entry, step?: Gate) => Object.entries(w.m.actions ?? {}).filter(([, a]) => (step ? gateOf(a).includes(step) : gateOf(a).length))
+// the gates' extensions as they are now: a hold is tried again once one of them changed (Merge when green)
+export const gatesKey = (ids: string[]) => ids.map(id => (w => (w ? `${id}:${onOf(w)}:${filesHash(w)}` : `${id}:gone`))(widgets.get(id))).join(',')
+export async function widgetGates(step: Gate, x: Workspace, by: GateBy, facts: { pr: unknown; stat: unknown }): Promise<GateHeld[]> {
+  const all = [...widgets.values()].filter(w => onOf(w) && (!scoped(w) || instOk(x))).flatMap(w => gatesOf(w, step).map(([a]) => ({ w, a })))
+  if (!all.length) return []
+  for (const { w, a } of all.slice(GATE_MAX)) wLog(w, `gate ${a} (${step}): not run, ${GATE_MAX} gates at most for a step`, 'warn')
+  const input = JSON.stringify({ gate: step, ws: wsInfo(x), pr: facts.pr ?? null, stat: facts.stat ?? null, by })
+  const held: GateHeld[] = []
+  await Promise.all(
+    all.slice(0, GATE_MAX).map(async ({ w, a }) => {
+      const name = w.m.name || w.id
+      const hold = (why: string, fix?: string) => void held.push({ widget: w.id, name, gate: step, why, ...(fix && { fix }), ...(w.m.icon && { icon: w.m.icon }) })
+      const file = join(tmpdir(), `laki-gate-${randomBytes(8).toString('hex')}.json`)
+      writeFileSync(file, input, { mode: 0o600 })
+      const k = keyOf(w.id, scoped(w) ? x.id : undefined)
+      const reason = `gate:${step}`
+      const t0 = Date.now()
+      let problem: string | undefined
+      try {
+        const { out, err } = await exec(w, '/bin/sh', ['-c', actionCmd(w.m.actions![a])!], { LAKI_REFRESH_REASON: reason, ...wsEnv(w, x), LAKI_GATE: step, LAKI_EVENT_FILE: file }, input, gateWait())
+        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: true, bytes: Buffer.byteLength(out), stderr: tail(err), exit: 0 }, err)
+        const j = [out, lastLine(out)].map(t => {
+          try {
+            return JSON.parse(t ?? '') as unknown
+          } catch {
+            return undefined
+          }
+        }).find(isObj)
+        if (!j || typeof j.ok !== 'boolean') problem = `printed no {"ok": …}: ${lastLine(out) ?? 'nothing'}`
+        else if (j.ok) wLog(w, `gate ${a} (${step}, by ${by}): ok`)
+        else {
+          const why = typeof j.why === 'string' && j.why.trim() ? j.why.trim().slice(0, 2000) : 'it said no'
+          wLog(w, `gate ${a} (${step}, by ${by}): held: ${why}`, 'warn')
+          hold(why, typeof j.fix === 'string' && j.fix.trim() ? j.fix.trim().slice(0, 8000) : undefined)
+        }
+      } catch (e) {
+        const f = e as Failed
+        ran(k, { at: t0, ms: Date.now() - t0, reason, why: by, action: a, ok: false, bytes: 0, error: f.message, stderr: tail(f.stderr), exit: f.exit }, f.stderr)
+        problem = f.message
+      } finally {
+        rmSync(file, { force: true })
+      }
+      if (problem === undefined) return
+      if (by === 'auto') {
+        wLog(w, `gate ${a} (${step}) failed: ${problem}: held, nobody is watching`, 'error')
+        return hold(`its gate failed: ${problem}`)
+      }
+      wLog(w, `gate ${a} (${step}) failed: ${problem}: went ahead`, 'error')
+      broadcast({ ev: 'widget-say', widget: w.id, toast: `${name}'s gate failed: ${problem.slice(0, 120)}. Went ahead` })
+    }),
+  )
+  for (const h of held) widgetEvent('gate.held', { gate: h.gate, widget: h.widget, why: h.why }, x.id)
+  return held
+}
+
 // an event of your own (laki widget emit, MCP's laki_extension_emit): custom.<name> with data (64 KB at most), from an
 // extension's command (its LAKI_WIDGET), an agent's tab or you; hops: the event being handled when it was made (its
 // handler's LAKI_EVENT_HOPS), one more here

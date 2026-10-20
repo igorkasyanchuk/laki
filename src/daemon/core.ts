@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, type Gate, type GateHeld, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
@@ -20,7 +20,7 @@ import { chatOf, type Said, shareBody, shareMd, sharePage, transcriptOf } from '
 import { limitReset } from './limits.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
-import { scanWidgets, widgetDir, widgetEvent, widgetLogFile, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
+import { type GateBy, gatesKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetKey, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
 
 const run = promisify(execFile)
 
@@ -1985,7 +1985,7 @@ function rmStorage(ws: Workspace) {
 
 // wsArchive is wsRm that keeps the workspace's record (branch, agents' resume ids) for wsRestore.
 // ifClean: only with nothing uncommitted (archiving removes the worktree, and that with it), else how many paths are
-export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
+export async function wsArchive(ref: string, o: { ifClean?: boolean } & GateOpts = {}): Promise<{ dirty?: number; held?: GateHeld[] } | undefined> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('only worktree workspaces can be archived')
   if (ws.host) await hostUp(ws.host) // else teardown leaves the worktree there, and Restore fails on it
@@ -1993,6 +1993,8 @@ export async function wsArchive(ref: string, o: { ifClean?: boolean } = {}) {
     const dirty = (await git(ws, '--no-optional-locks', 'status', '--porcelain')).split('\n').filter(Boolean).length
     if (dirty) return { dirty }
   }
+  const h = await gated('archive', ws, o)
+  if (h) return h
   await teardown(ws)
   ws.archived = true
   ws.archivedAt = Date.now()
@@ -3483,11 +3485,13 @@ async function archiveMerged(ws: Workspace, pr: PR) {
   if (tabsOf(ws.id).some(t => tracked(t) && rtOf(t.id).status !== 'idle' && sessions.get(t.id) && !sessions.get(t.id)!.exited)) return wsLog(ws, 'archive on merge: not now, an agent is at work')
   if ((await git(ws, 'rev-list', '--count', `${pr.head}..HEAD`).catch(() => '?')) !== '0') return wsLog(ws, 'archive on merge: no, commits past the PR\'s head') // unpushed (or git can't tell)
   ws.autoArchived = pr.number // before: wsArchive saves it
-  const r = await wsArchive(ws.id, { ifClean: true }).catch(e => {
+  const r = await wsArchive(ws.id, { ifClean: true, by: 'auto' }).catch(e => {
     ws.autoArchived = undefined // failed: the next scan tries again
     throw e
   })
   if (r?.dirty) return void ((ws.autoArchived = undefined), wsLog(ws, 'archive on merge: no, uncommitted changes'))
+  // held: not again for this PR (its gates would run at every scan); ponytail: you archive it
+  if (r?.held) return void (log(`archive on merge ${ws.id}: held by ${r.held.map(h => h.name).join(', ')}`), wsLog(ws, `archive on merge: held: ${r.held.map(h => `${h.name}: ${h.why}`).join('; ')}`))
   log(`archived ${ws.id}: PR #${pr.number} merged`)
   broadcast({ ev: 'archived', ws: ws.id, name: ws.name || ws.id, pr: pr.number })
 }
@@ -3559,12 +3563,16 @@ async function autoPR(ws: Workspace, pr: PR) {
     const proj = state.projects.find(p => p.id === ws.project)
     // its agent at work (a review just sent, a fix under way): a push may come, so not under it
     const working = tabsOf(ws.id).some(t => tracked(t) && isLive(t) && (rtOf(t.id).status === 'running' || !!t.queue?.length))
-    const not = !prAllows(proj?.config, 'land') ? "off in the project's settings" : working ? 'its agent is working: a push may come' : pr.draft ? 'a draft' : pr.checks !== 'pass' ? `checks ${pr.checks || 'none yet'}` : pr.conflict !== false ? (pr.conflict ? 'conflicts' : 'GitHub is still working out whether it merges') : pr.review && pr.review !== 'APPROVED' ? `review ${pr.review}` : pr.ready === false ? 'GitHub blocks it still (a required check or review to come, or behind its base)' : pr.head === f.land ? `tried ${pr.head?.slice(0, 7)} already` : ''
+    const not = !prAllows(proj?.config, 'land') ? "off in the project's settings" : working ? 'its agent is working: a push may come' : pr.draft ? 'a draft' : pr.checks !== 'pass' ? `checks ${pr.checks || 'none yet'}` : pr.conflict !== false ? (pr.conflict ? 'conflicts' : 'GitHub is still working out whether it merges') : pr.review && pr.review !== 'APPROVED' ? `review ${pr.review}` : pr.ready === false ? 'GitHub blocks it still (a required check or review to come, or behind its base)' : pr.head === f.land && !(f.held && f.held !== gatesKey(f.held.split(',').map(x => x.split(':')[0]))) ? `tried ${pr.head?.slice(0, 7)} already` : ''
     if (not) wsLog(ws, `merge when green: not yet, ${not}`)
     else {
       f.land = pr.head // once per head commit: a failure waits for a push (or a click)
+      f.held = undefined
       const how = proj?.config?.mergeMethod ?? 'squash'
-      await merge(ws, pr, how, true).then(
+      const h = await gated('merge', ws, { by: 'auto' })
+      // held: over to you once per head, until a push or one of its gates' extensions changes
+      if (h) (f.held = gatesKey([...new Set(h.held.map(x => x.widget))])), overToYou(ws, `Merge when green held: ${h.held.map(x => `${x.name}: ${x.why}`).join('; ')}`)
+      else await merge(ws, pr, how, true).then(
         () => (log(`merged ${ws.id}: PR #${pr.number} (${how}), green`), wsLog(ws, `merge when green: merged (${how})`)),
         e => (wsLog(ws, `merge when green: failed: ${e.message}`), overToYou(ws, `Merge when green failed: ${e.message}`)),
       )
@@ -4507,10 +4515,27 @@ export function runDev(ref: string, script?: string) {
   return script ? replaceTab(ws.id, 'script', cmd, undefined, script as RunScript) : replaceTab(ws.id, 'dev', cmd)
 }
 
-export function ship(ref: string, message: string) {
+// gates (widgets.ts widgetGates) before a ship, a merge or an archive: { held } when one says no. force does it anyway:
+// yours only, an agent's is refused (agentCaller); by: who does it (an agent's tab says agent itself)
+export type GateOpts = { force?: boolean; by?: GateBy; from?: { ws?: unknown; tab?: unknown } }
+async function gated(step: Gate, ws: Workspace, o: GateOpts) {
+  const agent = !!agentCaller(o.from)
+  if (o.force && agent) throw new Error(`only the user can ${step} it anyway: an agent never overrides a gate`)
+  if (o.force) return wsLog(ws, `${step}: gates skipped, you said do it anyway`)
+  const pr = prs.get(ws.id)
+  const stat = stats.get(ws.id)
+  const held = await widgetGates(step, ws, agent ? 'agent' : (o.by ?? 'you'), { pr: pr && { number: pr.number, url: pr.url, title: pr.title, state: pr.state, checks: pr.checks, review: pr.review }, stat: stat && { add: stat.add, del: stat.del, files: stat.files } })
+  if (!held.length) return
+  wsLog(ws, `${step}: held by ${held.map(h => `${h.name} (${h.why})`).join(', ')}`)
+  return { held }
+}
+
+export async function ship(ref: string, message: string, o: GateOpts = {}): Promise<Tab | { held: GateHeld[] }> {
   const ws = findWs(ref)
   if (ws.kind !== 'worktree') throw new Error('ship works on worktree workspaces')
   if (!message?.trim()) throw new Error('a commit message is needed')
+  const h = await gated('ship', ws, o)
+  if (h) return h
   const script = [
     'set -e',
     'git add -A',
@@ -4723,7 +4748,7 @@ export async function prComment(o: { ws: string; path: string; line: number; sid
 // prAct: the PR approved, closed or merged (the side panel's buttons, the status bar's menu, after a confirm), by gh
 // as you, when the project's settings allow it (prAllows); a merge's way becomes the project's next default. Then a
 // scan, for its new state
-export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge'; method?: MergeMethod; deleteBranch?: boolean }) {
+export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge'; method?: MergeMethod; deleteBranch?: boolean } & GateOpts) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
@@ -4734,6 +4759,8 @@ export async function prAct(o: { ws: string; act: 'approve' | 'close' | 'merge';
   if (o.act === 'merge') {
     const how = MERGE_METHODS.includes(o.method!) ? o.method! : 'squash'
     if (proj && proj.config?.mergeMethod !== how) (proj.config = { ...proj.config, mergeMethod: how }), save(), changed()
+    const h = await gated('merge', ws, o)
+    if (h) return h
     await merge(ws, pr, how, o.deleteBranch !== false)
     return {}
   }

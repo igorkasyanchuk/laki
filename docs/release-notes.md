@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Gates: an extension's action can hold a ship, a merge or an archive with its reason (`"gate"` in widget.json); you
+  can do it anyway, or send the agent its fix. Merge when green waits on them too.
 - More events for extensions: a ship's end, a workflow's end, a usage limit, a new tab, a port starting to listen. Send
   your own with `laki widget emit <name>`; a workflow can start on any of them (`on:` in its head).
 - Extensions keep logs, off until you turn them on (Settings › Extensions for all, or one's *Keep a log*): Laki's lines,

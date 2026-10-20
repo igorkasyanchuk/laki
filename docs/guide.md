@@ -910,6 +910,11 @@ JSON on stdin. Your own events go out with `laki widget emit deploy.done '{"sha"
 each line of JSON it prints shown at once), and anything can put data in one with `laki widget push <id> '{"n": 3}'`
 (a cron job, a git hook, CI).
 
+**Gates**: an extension's action with `"gate": ["ship", "merge", "archive"]` runs before Laki does that to a
+workspace; `{"ok": false, "why": …}` holds it (*Not shipped*, with why), and you can *Do it anyway* or ask the agent to
+fix it. Merge when green held waits for a push; `laki ship` exits 1 with the reasons (`--force`: yours, never an
+agent's). Its Settings card says *Can hold: ship, merge*.
+
 **Logs**, off until you turn them on (Settings › Extensions › *Keep logs for every extension*, or one's *Keep a log*):
 Laki's lines about it, each run with how long it took and its exit code, and what it wrote to stderr (a line starting
 `warn:` or `error:` gets that level), secrets masked. Its page's **Logs** tab follows them (filters, *Copy*, *Clear*,
