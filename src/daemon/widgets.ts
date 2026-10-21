@@ -17,7 +17,7 @@ import { STARTER_KINDS, STARTERS, type StarterKind } from '../shared/widgetStart
 import { describeHours, inHours, parseHours } from '../shared/when.ts'
 import { WIDGET_EVERY } from '../shared/widgetGuide.ts'
 import { aiOnce } from './ai.ts'
-import { agentCaller, broadcast, inside, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, execGroup, killGroup, own, plainEnv, presets, q, save, settingsSet, state, wsVars } from './core.ts'
+import { agentCaller, agentIn, broadcast, callerAgent, inside, changed, cliArgv, cliEnv, clients, devKeep, devLog, dir, execGroup, killGroup, own, plainEnv, presets, q, save, settingsSet, state, wsVars } from './core.ts'
 
 // widget.json; config: its settings, each a default (text; a number, true/false or a list make that kind) or a Spec,
 // given to fetch as $WIDGET_<NAME>; fetch: a shell command, or script: a JS file of the widget's that Laki's node runs
@@ -1586,7 +1586,7 @@ export function widgetEmit(o: { name?: unknown; data?: unknown; ws?: unknown; fr
   const widget = typeof o.from?.widget === 'string' && widgets.has(o.from.widget) ? o.from.widget : undefined
   // Laki AI's counts as an agent's, and so does one an extension makes handling an agent's event: the daemon's own
   // handling (its handler can't drop that), else its LAKI_EVENT_AGENT. The input may add an agent, never take one off
-  const agent = agentCaller(o.from) ? t?.preset ?? 'agent' : o.ai === true ? 'Laki AI' : (widget && handling.get(widget)) || (typeof o.agent === 'string' && o.agent ? o.agent.slice(0, 40) : undefined)
+  const agent = callerAgent(o.from) ?? (o.ai === true ? 'Laki AI' : (widget && handling.get(widget)) || agentIn(o.agent))
   const from: From = { ...(widget && { widget }), ...(t && { tab: { id: t.id, name: t.name } }), ...(agent && { agent }) }
   const hops = o.hops === undefined || o.hops === '' ? 0 : (Number(o.hops) || 0) + 1
   if (hops > HOPS_MAX) {

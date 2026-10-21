@@ -90,7 +90,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
       // no template given: the group's, as the new-workspace page opened from the group starts with it (one gone since: none)
       const template = a.template || (sep?.template && (await kit(rpc, sep.project)).templates.some(t => t.name.trim().toLowerCase() === sep.template!.trim().toLowerCase()) ? sep.template : undefined)
       const prompt = template || a.action ? await promptOf(rpc, sep?.project ?? a.project, a.prompt ?? '', template, a.action, a.pr, a.base) : a.prompt
-      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, from, place, ...((template || a.action) && { vars: true }) } // a template's or an action's {{branch}}…: the daemon's
+      const o = { project: a.project, prompt, preset: a.preset, name: a.name, base: a.base, local: !!a.local, model: a.model, effort: a.effort, issue: a.issue, pr: a.pr, link: a.link, from, place, agent: who ?? 'agent', ...((template || a.action) && { vars: true }) } // a template's or an action's {{branch}}…: the daemon's
       if (!prompt && !a.issue && !a.pr) throw new Error('a prompt, an issue or a PR')
       return Array.isArray(a.presets) && a.presets.length ? rpc('wsFan', { ...o, presets: a.presets }, 120000 * a.presets.length) : rpc('wsNew', o, 120000)
     },
@@ -139,7 +139,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
     name: 'laki_new_tab',
     description: 'A new agent session (a tab) in a workspace that exists, in its folder, with a prompt: e.g. a codex review of what claude did there.',
     inputSchema: obj({ ws: str('a workspace id'), preset: str("claude, codex, gemini, grok, opencode or a preset of theirs (default: the user's default agent)"), prompt: str('what it should do'), model: str("the agent's model (default: its own)"), name: str("the tab's name, 2-4 words of what it's for, e.g. codex review (default: the agent and the prompt's first words)"), ...PLACE }, ['ws', 'prompt']),
-    run: async a => rpc('tabNew', { ws: a.ws, preset: a.preset || (await rpc<View>('state')).settings?.agent || 'claude', prompt: a.prompt, model: a.model, name: a.name || undefined, beside: a.beside || undefined, edge: a.edge, ...(from && { from }) }), // none: a shell; from an agent's: no command preset
+    run: async a => rpc('tabNew', { ws: a.ws, preset: a.preset || (await rpc<View>('state')).settings?.agent || 'claude', prompt: a.prompt, model: a.model, name: a.name || undefined, beside: a.beside || undefined, edge: a.edge, ...(from && { from }), agent: who ?? 'agent' }), // none: a shell; from an agent's: no command preset; every laki mcp caller is an agent (or Laki AI): its tab.new says so
   },
   {
     name: 'laki_attach_pr',

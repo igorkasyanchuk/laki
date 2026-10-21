@@ -398,7 +398,7 @@ async function main() {
       return out(d, d.diff)
     }
     case 'run': {
-      const t = await rpc('run', { ws: rest[0], script: rest[1] })
+      const t = await rpc('run', { ws: rest[0], script: rest[1], caller: caller() })
       return out(t, `started ${t.name} (${t.id})`)
     }
     case 'ship': {

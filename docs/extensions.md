@@ -191,7 +191,9 @@ asks you first in the app, as an agent's tool call does (*Always in <workspace>*
 it doesn't run, its log says so); a `refresh` isn't asked. What an extension emits while handling one counts as the
 agent's (Laki knows which it's handling; `$LAKI_EVENT_AGENT` tells the extension), and so does a workflow run an agent
 started, its `flow.ended`. So are `workspace.new` and `tab.new` for a workspace an agent made (`laki new` in its tab,
-MCP's `laki_new_workspace`, a run it started) and a tab it opened: a workflow that runs commands doesn't start on them. An emit made while handling an event is a hop more: past 3 hops it's dropped, and said in its log.
+MCP's `laki_new_workspace`, Laki AI's, a run it started) and a tab it opened (`laki run` and `laki ship`'s too), and
+`ship.done` and `workspace.archived` after its `laki ship` and `laki archive`: a workflow that runs commands doesn't
+start on them. An emit made while handling an event is a hop more: past 3 hops it's dropped, and said in its log.
 
 A workflow can start on any of these (`on: custom.deploy.done` in its head): see the guide's Workflows. What an action prints can set the data (below); its `toast` or `modal` shows in the app while its
 window is open.

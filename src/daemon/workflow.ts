@@ -1098,7 +1098,7 @@ async function act(r: FlowRun, b: Block) {
     // a gate's hold (widgets.ts): its error way, the reasons as its output
     const held = (h: GateHeld[]) => ((r.vars[`steps.${b.id}.output`] = h.map(x => `${x.name}: ${x.why}`).join('\n')), leave(r, b, 'error', `held by ${h.map(x => x.name).join(', ')}`))
     if (a === 'ship') {
-      const tab = await ship(ws.id, fill(b.text || '{{task}}', varsOf(r)), { by: 'workflow' })
+      const tab = await ship(ws.id, fill(b.text || '{{task}}', varsOf(r)), { by: 'workflow', agent: r.by })
       if ('held' in tab) return held(tab.held)
       const s = sessions.get(tab.id)!
       const then = s.onExit
@@ -1109,7 +1109,7 @@ async function act(r: FlowRun, b: Block) {
       r.wait = { kind: 'run' }
       return touch()
     }
-    const h = a === 'approve' || a === 'merge' ? await prAct({ ws: ws.id, act: a, by: 'workflow' }) : a === 'archive' ? await wsArchive(ws.id, { by: 'workflow' }) : a === 'dev' ? runDev(ws.id) : undefined
+    const h = a === 'approve' || a === 'merge' ? await prAct({ ws: ws.id, act: a, by: 'workflow' }) : a === 'archive' ? await wsArchive(ws.id, { by: 'workflow', agent: r.by }) : a === 'dev' ? runDev(ws.id, undefined, r.by) : undefined
     if (!['approve', 'merge', 'archive', 'dev'].includes(a)) throw new Error(`no action ${a}`)
     const no = (h as { held?: GateHeld[] } | undefined)?.held
     if (no) return held(no)
@@ -1249,7 +1249,7 @@ async function tidy(r: FlowRun) {
   if (r.dry) return stays('a dry run: archiving is said, not done')
   tidying.add(ws.id) // archive gates may take a while: no Run from here in it meanwhile (picked)
   try {
-    const x = await wsArchive(ws.id, { ifClean: true, by: 'workflow' })
+    const x = await wsArchive(ws.id, { ifClean: true, by: 'workflow', agent: r.by })
     if (x?.dirty) return stays(`${x.dirty} file${x.dirty === 1 ? '' : 's'} not committed`)
     if (x?.held) return stays(x.held.map(h => `${h.name}: ${h.why}`).join('; '))
     say(r, `${name} archived: the run is done (Restore brings it back)`)

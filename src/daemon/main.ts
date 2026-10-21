@@ -221,9 +221,9 @@ const api: Record<string, Handler> = {
   wsRestore: p => core.wsRestore(p.id),
   wsFork: p => core.wsFork(p.id),
   tabNew: ({ caller, from, ...p }) => {
-    const agent = core.callerAgent(caller) ?? (from ? 'agent' : undefined) // MCP's from alone: an agent's, its preset unknown
-    if (agent) core.agentNoCmd(p) // an agent's: no command of its own
-    const t = core.addTab(p.ws, { ...p, agent }) // its tab.new: the agent's
+    if (from || core.agentCaller(caller)) core.agentNoCmd(p) // an agent's: no command of its own
+    // its tab.new: the agent's (MCP's from alone: its preset unknown; MCP outside Laki and Laki AI say so themselves)
+    const t = core.addTab(p.ws, { ...p, agent: core.callerAgent(caller) ?? (from ? 'agent' : core.agentIn(p.agent)) })
     core.layoutPlace(t, p.beside, p.edge) // beside a pane, or the one you're on (settings.splitNew)
     return t
   },
@@ -300,7 +300,7 @@ const api: Record<string, Handler> = {
   prDiff: p => core.prDiff(p.ws),
   prFiles: p => core.prFiles(p.ws),
   prViewed: p => core.prViewed(p),
-  run: p => core.runDev(p.ws, p.script),
+  run: p => core.runDev(p.ws, p.script, core.callerAgent(p.caller)), // an agent's: its tab.new the agent's
   device: p => device(p), // laki screen's: the iOS Simulator and apps' windows
   cloudflared: (o: { ws?: string }) => core.cloudflared(o),
   usage: () => usage(core.state.settings?.usage, usageWho()),
@@ -434,7 +434,7 @@ const remoteNo = (method: string, p: any) =>
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
 const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall'])
-const CALLER = new Set(['tabNew', 'wsNew', 'flowSave', 'flowStart', 'flowTrust'])
+const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowTrust'])
 const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's
 const local = new WeakMap<core.Conn, Socket>() // a WebSocket client with no Origin: its socket
 async function whoCalls(sock: Socket, method: string, p: any) {

@@ -400,11 +400,11 @@ test("an agent's event: an action handler asks first (Always kept), a fetch does
 })
 
 test("a workspace an agent made: its workspace.new and its tabs' tab.new are the agent's, so a workflow that runs commands doesn't start on them; yours still do", async t => {
-  const rig = await fresh(t, { config: { setup: 'true' } })
+  const rig = await fresh(t, { config: { setup: 'true', run: 'sleep 30' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await rig.rpc('settingsSet', { workflows: true })
   await rig.rpc('flowSave', { id: 'cmd', text: '# Cmd\nruns in: main · on: workspace.new\n\n## start\nnext: go\n\n## go\nrun: echo hi\nok: e\nfail: e\n\n## e\nend: success\n' })
-  await rig.rpc('flowSave', { id: 'wt', text: '# Wt\nruns in: worktree\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n' })
+  await rig.rpc('flowSave', { id: 'wt', text: '# Wt\nruns in: worktree\n\n## start\ninput: task\nnext: a\n\n## a\nagent: claude\n> hi\nnext: e\n\n## e\nend: success\n' })
   const evs = async (name: string, ws: string) => (await rig.rpc('widgetEvents')).filter((e: any) => e.event === name && e.ws === ws).reverse() // oldest first
   const agentOf = (e: any) => e.from?.agent
 
@@ -432,9 +432,38 @@ test("a workspace an agent made: its workspace.new and its tabs' tab.new are the
   await rig.rpc('tabNew', { ws: ws.id, preset: 'claude', caller: { ws: ws.id, tab: tab.id }, agent: '' })
   assert.equal(agentOf((await evs('tab.new', ws.id)).at(-1)), 'claude')
 
-  // a run an agent started: the worktree it makes is the agent's
+  // a race from an agent: each of its workspaces
+  const race = await rig.rpc('wsFan', { project: p.id, prompt: 'y', name: 'race', presets: ['claude', 'codex'], caller: { ws: ws.id, tab: tab.id } })
+  for (const w of race) assert.equal(agentOf((await evs('workspace.new', w.id))[0]), 'claude', w.id)
+
+  // laki run, laki ship and laki archive from an agent's tab: their tabs' tab.new, ship.done and workspace.archived
+  const me = { ws: ws.id, tab: tab.id }
+  await rig.rpc('run', { ws: two.id, caller: me })
+  await rig.rpc('ship', { ws: two.id, message: 'm', from: me })
+  assert.deepEqual((await evs('tab.new', two.id)).slice(2).map((e: any) => agentOf(e)), ['claude', 'claude'], 'its run and ship tabs')
+  const [shipped] = await until(() => evs('ship.done', two.id).then(l => l.length && l), 'ship.done')
+  assert.equal(agentOf(shipped), 'claude')
+  await rig.rpc('wsArchive', { id: two.id, from: me })
+  assert.equal(agentOf((await evs('workspace.archived', two.id))[0]), 'claude')
+  await rig.rpc('run', { ws: ws.id })
+  assert.equal(agentOf((await evs('tab.new', ws.id)).at(-1)), undefined, 'yours')
+
+  // MCP's laki_new_workspace outside a Laki tab (no LAKI_WORKSPACE): an agent's all the same
+  const msgs = [
+    { jsonrpc: '2.0', id: 1, method: 'initialize', params: { protocolVersion: '2025-03-26', capabilities: {}, clientInfo: { name: 't', version: '1' } } },
+    { jsonrpc: '2.0', id: 2, method: 'tools/call', params: { name: 'laki_new_workspace', arguments: { project: p.id, prompt: 'z', preset: 'claude', name: 'viamcp' } } },
+  ]
+  const r = await rig.cliIn(msgs.map(m => JSON.stringify(m)).join('\n') + '\n', 'mcp')
+  assert.equal(r.code, 0, r.err)
+  const viaMcp = (await rig.rpc('state')).workspaces.find((w: any) => w.id === 'viamcp' || w.name === 'viamcp')
+  assert.ok(viaMcp, r.out)
+  assert.equal(agentOf((await evs('workspace.new', viaMcp.id))[0]), 'agent')
+
+  // a run an agent started: the worktree it makes and its agent block's tab are the agent's
   const run = await rig.rpc('flowStart', { workflow: 'wt', project: p.id, task: 'x', by: 'agent' })
   const rws = await until(async () => (await rig.rpc('flowGet', { id: run.id })).ws, "the run's worktree")
   const [byRun] = await until(() => evs('workspace.new', rws).then(l => l.length && l), 'its workspace.new')
   assert.deepEqual([agentOf(byRun), byRun.flows], ['agent', []])
+  const [blockTab] = await until(() => evs('tab.new', rws).then(l => l.length && l), "its agent block's tab")
+  assert.equal(agentOf(blockTab), 'agent')
 })

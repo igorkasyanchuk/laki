@@ -1292,8 +1292,11 @@ fields, ws?, tab?)`: `turn()` (`turn.done` with `last` and `seconds`, `turn.fail
 800 ms later with `askOf`'s options), `prEvents` after each `scanPR` (`prSeen` per workspace: the first scan only notes it,
 null for "no pull requests found"; `failHead`/`passHead`: checks once per head; new logins in approved/changes;
 MERGED/CLOSED as the state changes), `makeWs`'s end (`workspace.new`; an agent's, `from.agent`, when an agent made it:
-`NewWs.agent`, `byCaller`'s `callerAgent` (its tab's preset), a run an agent started (`r.by`), else `from` alone: `agent`;
-its setup and agent tabs' `tab.new` too, as `addTab` `agent` is for main.ts' `tabNew` from an agent and a run's agent blocks), `wsArchive`, `wsRestore`, `dropWs`
+`NewWs.agent`, `byCaller`'s `callerAgent` (its tab's preset; else what the RPC says, `agentIn`: MCP's `agent` or `Laki AI`,
+adding one, never taking one off), a run an agent started (`r.by`), else `from` alone: `agent`; its setup and agent tabs'
+`tab.new` too, as `addTab` `agent` is for main.ts' `tabNew` from an agent and a run's agent blocks, and `replaceTab`'s for
+an agent's `run` (in `CALLER`) and `ship`, whose `ship.done` is the agent's too, as `workspace.archived` is for its
+`wsArchive`; a run's ship, dev and archive pass `GateOpts.agent`; `fromAgent`), `wsArchive`, `wsRestore`, `dropWs`
 (`workspace.removed`, every way one goes), `runSchedule` (`schedule.ran`), main.ts' first client (`app.open`), `ship`'s
 tab's `onExit` after a `scanPRs` (`ship.done`: `ok`, `exit`, `pr`), workflow.ts `finish` (`flow.ended`), `checkLimit`
 (`limit.hit`, once per limit: `limitSent`, a reset within a minute the same), `addTab` and `replaceTab` (`tab.new`; not
