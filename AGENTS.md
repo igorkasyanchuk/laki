@@ -1177,7 +1177,7 @@ store), linking turns its widgets on and fetches them (`dev`, why `linked`). `wa
 `templatesError` (shared/widget.ts `templateError`, widget.html's and every `ui` string) fails, with `devError` (the
 view's; Settings' *dev* tag, the tooltip, the page's banner). `widgetsStop` at shutdown. `devKeep` (core.ts): `devLog`
 keys kept without dev mode (a dev widget's). Runs: `ran` per fetch and action (`RUNS`, 20, newest first, in memory:
-`WidgetRun`, reason `RUN_REASONS` or `action:<name>`, `why`, stderr's `tail`), `exec` keeps stderr and the exit code;
+`WidgetRun`, reason `RUN_REASONS` or `action:<name>`, `why`, stderr's `tail`), `exec` keeps stderr and the exit code (stderr, the error, a failure's stdout through `masker` as it ends);
 `$LAKI_REFRESH_REASON` (`envOf`: one env for exec and `widgetRuns`' `env`, a secret and `SECRET` setting names masked, in
 `LAKI_WIDGET_CONFIG` too); `widgetTick`'s reason `schedule`, the first client's `open`. `widgetMock` (`data`, a
 `fixture`: `fixturesOf`, `fixtures/*.json`, or `off`: fetched now): the store's `mock` (the view's; Widgets.tsx'

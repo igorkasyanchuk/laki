@@ -983,9 +983,12 @@ function exec(w: Entry, cmd: string, args: string[], extra: Record<string, strin
     const t = ms ?? timeout()
     const p = execGroup(cmd, args, { cwd: w.dir, env: envOf(w, extra), timeout: t, maxBuffer: MAX_OUT, stdin }, (e, stdout, stderr) => {
       execs.delete(p)
-      if (!e) return ok({ out: stdout, err: stderr })
+      // its secrets masked in what it said, before anything keeps or shows it (the view's error, Runs, dev's lines,
+      // devLog); its data (a fetch's stdout) is its own, as it printed it
+      const mask = masker(w)
+      if (!e) return ok({ out: stdout, err: mask(stderr) })
       const late = e.message === 'maxBuffer exceeded' ? `printed more than ${MAX_OUT >> 20} MB` : e.killed ? `timed out after ${t >= 60_000 ? `${t / 60_000} minutes` : `${t / 1000} s`}` : undefined
-      no(Object.assign(new Error(late ?? (lastLine(stderr) || lastLine(stdout) || e.message)), { stderr, stdout, exit: typeof e.code === 'number' ? e.code : undefined }))
+      no(Object.assign(new Error(mask(late ?? (lastLine(stderr) || lastLine(stdout) || e.message))), { stderr: mask(stderr), stdout: mask(stdout), exit: typeof e.code === 'number' ? e.code : undefined }))
     })
     execs.add(p)
     own(p, `Extension · ${w.m.name || w.id}`)

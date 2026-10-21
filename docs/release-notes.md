@@ -4,6 +4,7 @@ version it builds, with the date. -->
 
 ## Next
 
+- Extensions: a secret setting's value is masked (••••) in an extension's error and its Runs, not only in its log.
 - Settings' Export no longer carries remote access's and tunnels' emails or workflows' variables, and Import keeps this
   Mac's. The worktrees folder Laki makes is yours alone (0700).
 - Turning on an extension shows its `widget.json` as it is on disk now, even one changed a moment before.

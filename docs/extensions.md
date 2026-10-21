@@ -735,7 +735,7 @@ Off by default. Settings › Extensions › *Keep logs for every extension*, or 
   while the log is off) and a JS page's `laki.log(...)`.
 
 Every secret's value, and every setting's whose name says token, secret, key or password, is `••••` before a line is
-written. See it on its page's **Logs** tab (or a right click › *Logs*), with `laki widget logs <id> [-n 100] [-f]
+written, and wherever what its command printed to stderr shows: its error, Runs, `laki widget dev`. See it on its page's **Logs** tab (or a right click › *Logs*), with `laki widget logs <id> [-n 100] [-f]
 [--level error] [--ws <id>] [--json]`, or MCP's `laki_extension_logs` (the studio's Laki AI gets the last warnings and
 errors). Settings' list tags the ones that keep one (`log`, red after an error in the last hour). Turning it off keeps
 the file until *Clear*; *Delete* takes it to the trash with the extension (*Undo* brings it back); a remix starts

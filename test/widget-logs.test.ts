@@ -129,3 +129,18 @@ test('logs: laki widget log (exit 0 while off), a secret masked, laki widget log
   const rx = await rig.rpc('widgetRemix', { id: 'y' })
   assert.deepEqual((await logs(rig, rx.id)).lines, [])
 })
+
+test("a secret is masked where a failing fetch's words show: its error and its run's stderr", async t => {
+  const rig = await fresh(t)
+  make(rig, 's', { name: 'S', config: { token: { type: 'secret' } }, fetch: 'echo "warn: using $WIDGET_TOKEN" >&2; [ -n "$OK" ] && echo {} || { echo "401 for $WIDGET_TOKEN" >&2; exit 1; }' })
+  await rig.rpc('widgetReload')
+  await rig.rpc('widgetSet', { id: 's', on: true, config: { token: 'sk-live-abcd1234' } })
+  await until(async () => (x => x.error && !x.running)((await rig.rpc('state')).widgets.find((x: any) => x.id === 's')), 'its first fetch failed')
+  const r = await rig.rpc('widgetRun', { id: 's' })
+  assert.equal(r.error, '401 for ••••')
+  const w = (await rig.rpc('state')).widgets.find((x: any) => x.id === 's')
+  assert.equal(w.error, '401 for ••••')
+  const run = (await rig.rpc('widgetRuns', { id: 's' })).runs[0]
+  assert.deepEqual([run.error, run.stderr], ['401 for ••••', 'warn: using ••••\n401 for ••••'])
+  assert.doesNotMatch(JSON.stringify(await rig.rpc('state')), /abcd1234/)
+})
