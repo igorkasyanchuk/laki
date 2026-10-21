@@ -225,3 +225,54 @@ test('pushes: one per state change of a tab, done only when on, none when muted;
   await assert.rejects(rig.rpc('webhookTest', { url: 'http://example.com/x' }), /must start with https/) // the question in the clear
   await assert.rejects(rig.rpc('webhookTest', {}), /needs a URL/)
 })
+
+test("answer from the phone: a workflow's Ask you pushed with its choices, a tap answers it and the run goes on; not once the app answered; no buttons without Answer from the phone", async t => {
+  const posts: any[] = []
+  const queue: string[] = []
+  const server = createServer((req, res) => {
+    let body = ''
+    req.on('data', d => (body += d))
+    req.on('end', () => {
+      if (req.method === 'GET' && req.url?.startsWith('/topic-r1/json?poll=1')) return void res.writeHead(200).end(queue.splice(0).join('\n'))
+      posts.push({ url: req.url, body, title: req.headers.title })
+      res.writeHead(200).end()
+    })
+  })
+  await new Promise<void>(r => server.listen(0, '127.0.0.1', r))
+  t.after(() => void server.close())
+  const url = `http://127.0.0.1:${(server.address() as { port: number }).port}/topic`
+  const rig = await fresh(t)
+  const proj = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { webhook: { url, format: 'ntfy', answer: true, replyTopic: 'r1' } })
+  await rig.rpc('flowSave', { id: 'pick', text: '# Pick\nruns in: main\n\n## start\ninput: task\nnext: q\n\n## q\nask: Ship it?\nshow: {{task}}\n- Yes → y\n- No → n\n\n## y\nend: success\n\n## n\nend: stopped\n' })
+  const status = async (id: string) => (await rig.rpc('flowGet', { id })).status
+  const pushes = () => posts.filter(x => x.url === '/').map(x => JSON.parse(x.body))
+
+  const run = await rig.rpc('flowStart', { workflow: 'pick', project: proj.id, task: 'the CSV export' })
+  const j = await until(() => pushes()[0], 'the push, as JSON to the root')
+  assert.equal(j.title, 'Workflow Pick in repo asks you')
+  assert.equal(j.message, 'Ship it?\nthe CSV export\n1. Yes\n2. No')
+  assert.deepEqual(j.actions.map((a: any) => a.label), ['1. Yes', '2. No'])
+  queue.push(JSON.stringify({ event: 'message', id: 'm1', message: j.actions[0].body }))
+  await rig.rpc('phoneTick')
+  await until(async () => (await status(run.id)) === 'done', 'the tap answered Yes, the run went on')
+  assert.equal((await rig.rpc('flowGet', { id: run.id })).vars.answer, 'Yes')
+
+  // answered in the app first: the tap after it does nothing
+  const two = await rig.rpc('flowStart', { workflow: 'pick', project: proj.id, task: 'again' })
+  const k = await until(() => pushes()[1], 'its push')
+  await rig.rpc('flowAnswer', { id: two.id, n: 1 })
+  await until(async () => (await status(two.id)) === 'stopped', 'No: stopped')
+  queue.push(JSON.stringify({ event: 'message', id: 'm2', message: k.actions[0].body }))
+  await rig.rpc('phoneTick')
+  await sleep(300)
+  assert.equal(await status(two.id), 'stopped')
+
+  // without Answer from the phone: the choices as text, no buttons
+  await rig.rpc('settingsSet', { webhook: { url, format: 'ntfy' } })
+  await rig.rpc('flowStart', { workflow: 'pick', project: proj.id, task: 'plain' })
+  const plain = await until(() => posts.find(x => x.url === '/topic' && x.body.includes('plain')), 'a text push')
+  assert.equal(plain.title, 'Workflow Pick in repo asks you')
+  assert.equal(plain.body, 'Ship it?\nplain\n1. Yes\n2. No')
+  assert.equal(pushes().length, 2, 'no JSON with actions')
+})

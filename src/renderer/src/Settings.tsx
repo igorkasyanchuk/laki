@@ -319,7 +319,7 @@ function WebhookSection({ w, onChange: put, test }: { w: Webhook; onChange: (w: 
         >
           <Says
             title="Answer from the phone"
-            hint={`A tap picks that choice in the agent's menu, as a key press here would: it can allow a command or an edit. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? `ntfy: taps come back on a reply topic, signed by this Mac. ${tapOk ? 'Keep your topic hard to guess, with an access token.' : `${ANSWER_WHY}.`}` : 'Slack and JSON: the choices as text only.'}`}
+            hint={`A tap picks that choice in an agent's question and a workflow's (its Ask you, a confirm, a stuck block), as a click here would: it can allow a command or an edit; typed answers only in Laki. Laki listens only while a pushed question waits (every 5 s, a day at most) and only while the same menu is on screen. ${format === 'telegram' ? "Telegram: taps from your bot's chat only." : format === 'ntfy' ? `ntfy: taps come back on a reply topic, signed by this Mac. ${tapOk ? 'Keep your topic hard to guess, with an access token.' : `${ANSWER_WHY}.`}` : 'Slack and JSON: the choices as text only.'}`}
           />
         </Switch>
         {w.answerOff && !w.answer && <p className="warn small">Laki turned this off as it updated: {ANSWER_WHY}, then turn it on again.</p>}

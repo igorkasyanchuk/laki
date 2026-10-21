@@ -4038,7 +4038,7 @@ function phone(tab: Tab, kind: 'waiting' | 'done', text: string) {
     const s = sessions.get(tab.id)
     if (kind === 'waiting' && (rtOf(tab.id).status !== 'waiting' || !s || s.exited)) return
     const ask = kind === 'waiting' ? askOf(s!.screenText(16)) : undefined
-    const nonce = ask && w.answer && answerOk(w) && w.detail !== 'titles' && (w.format === 'telegram' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined
+    const nonce = ask && nonceFor(w)
     if (nonce) awaiting.set(nonce, { tab: tab.id, key: JSON.stringify(ask!.options), until: Date.now() + 864e5 }), listen(w)
     pushTo(w, { event: kind, workspace: ws?.name || tab.workspace, tab: tab.id, agent: tab.name, question: question || undefined, options: ask?.options, nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${tab.id}: ${e.message}`))
   }
@@ -4058,10 +4058,15 @@ function tapKey() {
   return tapKeyIs
 }
 
-// Answer from the phone (webhook.answer): a push with buttons leaves its nonce here, with the tab and its choices as
-// pushed, until a tap answers it, the tab stops waiting or asks something else, or a day goes by. While any is here,
-// phoneTick asks Telegram or ntfy for taps every 5 s; none: it stops
-const awaiting = new Map<string, { tab: string; key: string; until: number }>()
+// Answer from the phone (webhook.answer): a push with buttons leaves its nonce here, with the tab (or a workflow run,
+// flow) and its choices as pushed, until a tap answers it, the tab or run stops waiting or asks something else, or a day
+// goes by. While any is here, phoneTick asks Telegram or ntfy for taps every 5 s; none: it stops
+const awaiting = new Map<string, { tab?: string; flow?: string; key: string; until: number }>()
+// a push's nonce: its buttons, only with Answer from the phone where taps can come back (answerOk)
+const nonceFor = (w: Webhook) => (w.answer && answerOk(w) && w.detail !== 'titles' && (w.format === 'telegram' || ((w.format ?? 'ntfy') === 'ntfy' && w.replyTopic)) ? randomBytes(8).toString('hex') : undefined)
+// still asking what it pushed: a tab's menu on screen, a run's wait (workflow.ts' waitKey)
+const stillAsks = (a: { tab?: string; flow?: string; key: string }) =>
+  a.flow ? flowHooks.waitKey?.(a.flow) === a.key : !!a.tab && state.tabs.some(t => t.id === a.tab) && rtOf(a.tab).status === 'waiting'
 let tapCursor = '' // replies()'s: Telegram's next update, ntfy's last message (a unix time at first)
 let tapTimer: NodeJS.Timeout | undefined
 let tapping = false
@@ -4076,7 +4081,7 @@ function listen(w: Webhook) {
 export async function phoneTick() {
   if (tapping) return
   const w = state.settings?.webhook
-  for (const [k, a] of awaiting) if (a.until < Date.now() || !state.tabs.some(t => t.id === a.tab) || rtOf(a.tab).status !== 'waiting') awaiting.delete(k)
+  for (const [k, a] of awaiting) if (a.until < Date.now() || !stillAsks(a)) awaiting.delete(k)
   if (!awaiting.size || !w?.answer || !w.url) return void (clearInterval(tapTimer), (tapTimer = undefined), awaiting.clear())
   if (tapFor !== `${w.format}|${w.url}`) tapStart(w)
   tapping = true
@@ -4088,6 +4093,18 @@ export async function phoneTick() {
       const a = awaiting.get(tap.nonce)
       if (!a) continue
       awaiting.delete(tap.nonce)
+      if (a.flow) {
+        // a run's choice: its wait as pushed (0-based in flowAnswer)
+        if (flowHooks.waitKey?.(a.flow) !== a.key || !flowHooks.answer) continue
+        const label = (JSON.parse(a.key) as string[])[tap.n - 1]
+        if (label === undefined) continue
+        await flowHooks.answer({ id: a.flow, n: tap.n - 1 }).then(
+          () => log(`answered run ${a.flow} from the phone: ${label}`),
+          e => log(`answer from the phone, run ${a.flow}: ${(e as Error).message}`),
+        )
+        continue
+      }
+      if (!a.tab) continue
       const s = sessions.get(a.tab)
       const now = s && !s.exited && rtOf(a.tab).status === 'waiting' ? askOf(s.screenText(16)) : undefined
       const o = now && JSON.stringify(now.options) === a.key ? now.options.find(x => x.n === tap.n) : undefined
@@ -4110,6 +4127,18 @@ export function flowPhone(name: string, ws: string | undefined, what: string, te
   const w = state.settings?.webhook
   if (!w?.url?.trim()) return
   pushTo(w, { event: 'done', workspace: ws ?? 'Laki', tab: '', agent: `Workflow ${name}`, title: `Workflow ${name}${ws ? ` in ${ws}` : ''} ${what}`, question: text.slice(0, 500) }).catch(e => log(`push ${name}: ${e.message}`))
+}
+// a workflow's Ask you, confirm, stuck or unsure decision (workflow.ts' ask, unsure): a waiting push like a tab's, its
+// choices as text, and buttons with Answer from the phone (a tap is flowHooks.answer; ponytail: ntfy shows the first 3);
+// typed words ({{answer}}) only in the app. An agent's question in a run isn't one: its tab pushed it
+export function flowAsk(run: { id: string; name: string; ws?: string }, question: string, options: string[], show?: string) {
+  const w = state.settings?.webhook
+  const ws = run.ws ? state.workspaces.find(x => x.id === run.ws) : undefined
+  if (!w?.url?.trim() || w.waiting === false || ws?.muted) return
+  const nonce = options.length ? nonceFor(w) : undefined
+  if (nonce) awaiting.set(nonce, { flow: run.id, key: JSON.stringify(options), until: Date.now() + 864e5 }), listen(w)
+  const where = ws ? ws.name || ws.id : undefined
+  pushTo(w, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })), nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${run.name}: ${e.message}`))
 }
 // Settings' Send test: the webhook as the page has it, answered (not fired and forgotten)
 export const webhookTest = (w: Webhook) => pushTo(w ?? {}, { event: 'test', workspace: '', tab: '', agent: 'Laki' }).then(() => true)
@@ -5465,7 +5494,7 @@ const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 
 // workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again
 export const flowFiles = { at: 0 }
 // workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
-export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' | 'builtin'; where: string; blocks: FlowBlock[] } } = {} // what a client sets: the daemon works out the rest
+export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' | 'builtin'; where: string; blocks: FlowBlock[] }; waitKey?: (id: string) => string | undefined; answer?: (o: { id: string; n: number }) => Promise<unknown> } = {} // what a client sets: the daemon works out the rest
 
 export function scheduleSet(o: ScheduleIn): Schedule {
   const old = o.id ? findSchedule(o.id) : undefined

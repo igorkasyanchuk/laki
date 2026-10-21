@@ -13,7 +13,7 @@ import { fileURLToPath } from 'node:url'
 import { agentVars, eventOk, findAction, flowsOn, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
 import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchLabel, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, PAUSE_AFTER, STATS_RECENT, statsView, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowHeard, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
+import { addTab, answer as coreAnswer, broadcast, changed, ciLogs, dir, findProject, flowAsk, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, eventWs, HOPS_MAX, widgetEvent, widgetUse } from './widgets.ts'
 import { readCapped } from '../shared/conn.ts'
@@ -1029,6 +1029,7 @@ function unsure(r: FlowRun, b: Block, names: string[]) {
   say(r, `asks you: ${q.ask}`, odds)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: q.ask })
+  flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, `${blockName(b)}: ${q.ask}`, options, r.wait && 'show' in r.wait ? r.wait.show : undefined)
 }
 
 // a webhook: its URL, headers and body filled ({{env.NAME}} too: Settings' and the project's env, never kept in the
@@ -1200,6 +1201,7 @@ function ask(r: FlowRun, kind: 'ask' | 'confirm' | 'stuck', question: string, sh
   say(r, `asks you: ${question}`, show)
   touch()
   broadcast({ ev: 'flow', id: r.id, ws: r.ws, kind: 'waiting', name: r.flow.name, text: question })
+  flowAsk({ id: r.id, name: r.flow.name, ws: r.ws }, question, options, show)
 }
 function stuck(r: FlowRun, b: Block, why: string, options = ['Try again', 'Stop the run'], more?: { tab: string; used: number }) {
   if (!live(r)) return
@@ -1596,3 +1598,6 @@ export async function flowEvent(o: Ref & { event?: string; payload?: Record<stri
   return { ...res, run: run.id }
 }
 flowHooks.find = o => flowFind(o)
+// Answer from the phone (core's phoneTick): what a run waits on now (its choices), and a tap's answer
+flowHooks.waitKey = id => (r => (r?.status === 'waiting' && r.wait && 'options' in r.wait && r.wait.kind !== 'agent-ask' ? JSON.stringify(r.wait.options) : undefined))(runs().find(x => x.id === id))
+flowHooks.answer = o => flowAnswer(o)

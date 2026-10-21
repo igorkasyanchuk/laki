@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Phone pushes: a workflow's questions (*Ask you*, a confirm, a stuck block, an unsure decision) reach the phone, and
+  *Answer from the phone* puts a button per choice on them.
 - Workflows: *Run* › *As if on an event* tries one with the last event heard or a sample, showing its variables and
   *Only when* tests first (`laki flow run --event`); its settings list the last 5 events and why each didn't start it.
 - Workflows: six templates come with Laki (fix CI, review a PR, feature to PR, triage an issue, nightly dependency

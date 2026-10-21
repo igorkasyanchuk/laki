@@ -1664,7 +1664,9 @@ or its path, opens it, or shows it in Finder. The strip's ⋯ has *Show in
   has, so a made-up one is ignored): a tap picks that choice, as a key press would, so it can allow a command. On
   ntfy it needs a topic only you can read: your own ntfy server, or ntfy.sh with an access token (`?auth=…` in the
   URL); a plain ntfy.sh topic can't answer, and an upgrade turned it off where it was on (Settings says why). Laki asks Telegram or ntfy for taps every 5 seconds only while a pushed
-  question waits (a day at most), and a tap counts only while the same menu is still on screen.
+  question waits (a day at most), and a tap counts only while the same menu is still on screen. A workflow's questions
+  come too (its *Ask you*, a confirm before a PR or a merge, a stuck block, a decision it isn't sure of), with a button
+  per choice the same way, counted only while the run still asks the same; a typed answer needs Laki.
 - *Pull requests*: how often Laki checks PRs (every minute by default), how many tries in a row *fix CI* and *fix
   conflicts* get (3), the review bots whose comments *review* sends (any app can be a bot: others are skipped), and the
   prompts the PR switches send (above, in
