@@ -1093,8 +1093,9 @@ function hostTab(ws: Workspace, tab: Tab, o: SpawnOpts, hookKey: string) {
     const h = await hostUp(ws.host!)
     await readHostCfgs(ws, false) // after a daemon restart: its env and setup
     const prompt = await toHost(ws.host!, h, o.prompt)
-    const cmd = tab.kind === 'shell' ? undefined : (o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, prompt, !!o.resume, hostHooks(h.dir)) : tab.cmd || 'true'))
-    const env = { ...lakiEnv(ws, tab, o.env, h.dir), LAKI_HOOK: hookKey }
+    const a = tab.kind === 'agent' && o.cmd === undefined ? agentCmd(tab, prompt, !!o.resume, hostHooks(h.dir)) : undefined
+    const cmd = tab.kind === 'shell' ? undefined : (o.cmd ?? a?.cmd ?? (tab.cmd || 'true'))
+    const env = { ...lakiEnv(ws, tab, { ...o.env, ...a?.env }, h.dir), LAKI_HOOK: hookKey } // its values exported here, where q is right
     const script = hostScript(ws, env, cmd === undefined ? 'exec "$SHELL" -l' : `exec "$SHELL" -lic ${q(cmd)}`, ['rm -f "$0"', 'LAKI_TTY=$(tty) && export LAKI_TTY'])
     await sshIn(ws.host!, `umask 077 && mkdir -p ${q(`${h.dir}/run`)} && cat > ${q(`${h.dir}/run/${key}.sh`)}`, script)
     await spaced(ws.host!)
@@ -1207,7 +1208,15 @@ function lakiEnv(ws: Workspace, tab: Tab, extra: Record<string, string> = {}, ho
   }
 }
 
-function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = localHooks): string {
+// an agent's command line, and its values: a plain word goes in as it is, anything else in the tab's env (LAKI_ARG_n)
+// named as "$LAKI_ARG_n", which sh, bash, zsh and fish all expand whole and never read as code (fish reads \' inside
+// single quotes as an escape: q's quoting would let a prompt out). ponytail: the values are in the agent's environment
+// and its children's
+const PLAIN = /^[A-Za-z0-9_@+=:,./-]+$/
+function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = localHooks): { cmd: string; env: Record<string, string> } {
+  const env: Record<string, string> = {}
+  let n = 0
+  const arg = (s: string) => (PLAIN.test(s) ? s : ((env[`LAKI_ARG_${n}`] = s), `"$LAKI_ARG_${n++}"`))
   const pr = presetOf(tab)
   const again = resume && tab.resumeId // its chat, again
   let argv: string[]
@@ -1235,7 +1244,7 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
     argv = again ? ['opencode', '--session', again] : ['opencode']
     if (ask.length) ask = ['--prompt', ...ask] // its positional is a folder
   } else {
-    return (pr?.agent === 'command' && pr.cmd?.trim()) || tab.cmd || 'true'
+    return { cmd: (pr?.agent === 'command' && pr.cmd?.trim()) || tab.cmd || 'true', env }
   }
   // the tab's model and effort (only claude and codex take one: EFFORTS), after the preset's args: picked for this
   // workspace, they win over a preset's own
@@ -1244,7 +1253,7 @@ function agentCmd(tab: Tab, prompt: string | undefined, resume: boolean, h = loc
   const effort = tab.effort || (EFFORTS[tab.preset as Agent]?.includes(pr?.effort ?? '') ? pr!.effort : undefined)
   const flags = [...(model ? [tab.preset === 'claude' ? '--model' : '-m', model] : []), ...(effort ? (tab.preset === 'claude' ? ['--effort', effort] : ['-c', `model_reasoning_effort=${JSON.stringify(effort)}`]) : []), ...permArgs(tab.preset, tab.perm), ...(tab.fast && tab.preset === 'codex' ? ['-c', 'service_tier="fast"'] : [])] // claude's fast: its settings file
   // a preset's args go in as written (a shell runs the line), before the prompt
-  return [argv.map(q).join(' '), pr?.args?.trim(), flags.map(q).join(' '), ask.map(q).join(' ')].filter(Boolean).join(' ')
+  return { cmd: [argv.map(arg).join(' '), pr?.args?.trim(), flags.map(arg).join(' '), ask.map(arg).join(' ')].filter(Boolean).join(' '), env }
 }
 
 type SpawnOpts = { cmd?: string; prompt?: string; resume?: boolean; env?: Record<string, string>; cwd?: string }
@@ -1257,15 +1266,20 @@ export function spawnTab(tab: Tab, o: SpawnOpts = {}) {
   let file = shell
   let args: string[]
   const hookKey = ws.host ? randomBytes(12).toString('hex') : undefined // what its hooks' escape codes carry (hostTab)
+  let argEnv: Record<string, string> | undefined // an agent's values (agentCmd)
   if (ws.host) [file, args] = ['/bin/sh', ['-c', wait + hostTab(ws, tab, o, hookKey!)]]
   else if (tab.kind === 'shell') args = ['-l']
-  else args = ['-lic', wait + (o.cmd ?? (tab.kind === 'agent' ? agentCmd(tab, o.prompt, !!o.resume) : tab.cmd || 'true'))]
+  else {
+    const a = tab.kind === 'agent' && o.cmd === undefined ? agentCmd(tab, o.prompt, !!o.resume) : undefined
+    argEnv = a?.env
+    args = ['-lic', wait + (o.cmd ?? a?.cmd ?? (tab.cmd || 'true'))]
+  }
   sessions.get(tab.id)?.kill()
   asleep.delete(tab.id)
   // its account (claude, codex on this Mac): kept from its first start, so a restart or a resume stays on it
   const account = ws.host ? undefined : accountFor(tab, presetOf(tab)?.account)
   if (account !== tab.account) (tab.account = account), save()
-  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, o.env), ...lastSize })
+  const s = new Session(tab.id, file, args, { cwd: ws.host ? dir : o.cwd && statSync(o.cwd, { throwIfNoEntry: false })?.isDirectory() ? o.cwd : ws.path, env: childEnv(ws, tab, { ...o.env, ...argEnv }), ...lastSize })
   wsLog(ws, () => `${tab.name}: ${[file, ...args].join(' ').slice(0, 600)} (in ${ws.host ? `${ws.host}:` : ''}${ws.path})`) // what it runs, as a shell line
   sessions.set(tab.id, s)
   const born = Date.now()
@@ -2450,8 +2464,9 @@ export function varsIn(tab: Tab, text: string) {
   const ws = state.workspaces.find(w => w.id === tab.workspace)
   if (!ws || !text.includes('{{')) return text
   const vars = wsVars(ws, tab)
-  // a shell runs what it's typed: a value it would read as code (a branch named a;$(…), a tab's name) goes in quoted
-  if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@%+=:,./-]+$/.test(v)) vars[k] = q(v)
+  // a shell runs what it's typed: a value it would read as code (a branch named a;$(…), a tab's name) goes in quoted,
+  // as the tab's own shell reads it (fish: \ and ' escaped inside single quotes; a host's: POSIX)
+  if (tab.kind === 'shell') for (const [k, v] of Object.entries(vars)) if (v && !/^[\w@+=:,./-]+$/.test(v)) vars[k] = !ws.host && basename(shell) === 'fish' ? `'${v.replace(/[\\']/g, '\\$&')}'` : q(v)
   return fillVars(text, vars)
 }
 

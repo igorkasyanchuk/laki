@@ -756,7 +756,7 @@ test('a folder: Create with an agent makes another session beside its own (none:
   assert.ok(said.includes(`${p.id}: ${own.id} is the folder's own workspace: another one beside it`), said.join('\n'))
   assert.ok(said.some((l: string) => l.startsWith(`${p.id}: agent: claude`)), said.join('\n'))
   const mine = (await rig.rpc('logs', { key: `ws:${next.id}` })).map((l: { text: string }) => l.text)
-  assert.ok(mine.some((l: string) => l.startsWith('claude: ') && l.includes("-lic 'claude' '--settings'") && l.includes('--plugin-dir') && l.endsWith('/notes)')), mine.join('\n'))
+  assert.ok(mine.some((l: string) => l.startsWith('claude: ') && l.includes('-lic claude --settings ') && l.includes('--plugin-dir') && l.endsWith('/notes)')), mine.join('\n'))
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'nope' }))
   assert.ok((await rig.rpc('logs', { key: 'new' })).some((l: { text: string }) => l.text.startsWith(`${p.id}: failed: `)), 'a failure says why')
 })

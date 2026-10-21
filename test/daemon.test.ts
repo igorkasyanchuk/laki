@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
-import { test } from 'node:test'
+import { type TestContext, test } from 'node:test'
 import { API } from '../src/shared/types.ts'
 import { connect, fresh, sleep, until } from './helpers.ts'
 
@@ -80,6 +80,32 @@ test(".laki.json's trust: untrusted, its setup and env wait; trusting runs them;
   writeFileSync(sp, JSON.stringify(st))
   await rig.start()
   assert.equal((await proj()).cfgWait, undefined)
+})
+
+// a prompt that would break out of POSIX quoting under fish (\' is an escape there) reaches the agent as typed
+const SLY = "fix it \\';echo pwned >> \"$HOME/pwned\";#"
+async function slyPrompt(t: TestContext, env?: Record<string, string>) {
+  const rig = await fresh(t, env && { env })
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { devMode: true }) // the workspace's log has each tab's command line
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', prompt: SLY })
+  const run = await until(() => existsSync(rig.env.FAKE_LOG) && rig.fakeLog().find(l => l.bin === 'claude'), 'claude up')
+  assert.equal(run.args.at(-1), SLY)
+  // the shell's line names it ("$LAKI_ARG_n"); the prompt itself isn't in it
+  const line = (await rig.rpc('logs', { key: `ws:${ws.id}` })).map((l: { text: string }) => l.text).find((l: string) => l.includes(' claude '))
+  assert.match(line, /"\$LAKI_ARG_\d+"/)
+  assert.ok(!line.includes("';echo"), line)
+  assert.match(run.args[run.args.indexOf('--append-system-prompt') + 1], /Laki/) // the note, whole
+  await sleep(500)
+  assert.ok(!existsSync(join(rig.home, 'pwned')), 'nothing ran')
+}
+test("an agent's prompt goes in as an env var, never shell-quoted: one ending in \\';echo pwned;# reaches claude unchanged", async t => {
+  await slyPrompt(t)
+})
+test('the same through real fish (skipped without it)', async t => {
+  const fish = ['/opt/homebrew/bin/fish', '/usr/local/bin/fish', '/usr/bin/fish'].find(f => existsSync(f))
+  if (!fish) return t.skip('fish is not installed')
+  await slyPrompt(t, { SHELL: fish })
 })
 
 test('single instance: a second daemon exits', async t => {

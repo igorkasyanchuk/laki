@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- An agent's prompt reaches it through an environment variable, never quoted into a shell line: a prompt can't break
+  out under fish. Variables typed into a fish shell tab are quoted fish's way.
 - Workflows: a project's workflow that came with the repo (or changed since) starts on an event, a schedule or an
   agent's ask only once you Save it in its editor or *Trust it…*. Your own Start still runs it. A repo workflow you
   used before this version: save it once.

@@ -388,7 +388,7 @@ pane the newest focused window is on). `layoutMove` (beside another pane, or non
 
 `shared/types.ts` `AGENT_VARS`/`agentVars`: `{{workspace}}`, `{{branch}}`, `{{path}}`, `{{port}}`, `{{pr}}` (its URL),
 `{{project}}`, `{{base}}`, `{{storage}}`, `{{tab}}`, `{{agent}}`, `{{date}}`, `{{time}}`, filled by `core.ts` `varsIn`
-(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in `q`-quoted) where the caller says `vars`: `send` (before a queue), `addTab`'s
+(`fillVars`: only these names; a missing value stays; into a shell tab, one that isn't plain characters goes in quoted for the tab's shell: fish's way under fish, else `q`) where the caller says `vars`: `send` (before a queue), `addTab`'s
 prompt, `wsNew`'s (the new-workspace page with a template, Run ▾'s actions, MCP's `laki_run_action` and
 `laki_new_workspace` with a template or an action, scheduled runs). A message as typed never. Workflows add them under
 their own (`varsOf`). Settings' chips under an action or a template list them.
@@ -440,7 +440,10 @@ Queries (DA, DSR/CPR, DECRQM, DECRQSS, XTVERSION, OSC color) are answered exactl
 
 ### Agents and hooks
 
-Commands run as `$SHELL -lic '<cmd>'`. The environment adds:
+Commands run as `$SHELL -lic '<cmd>'`. An agent's values (its prompt, Laki's note, paths, flags: `agentCmd`) are
+never quoted into that line: a plain word (`PLAIN`) goes in as it is, anything else in the tab's env as `LAKI_ARG_n`,
+named `"$LAKI_ARG_n"` (sh, bash, zsh and fish expand it whole; fish reads `\'` inside single quotes as an escape); on an
+SSH host the generated `/bin/sh` script exports them. A preset's `args` stay as written. The environment adds:
 - `TERM=xterm-256color`, `COLORTERM=truecolor`, `LAKI_APP=true`;
 - an agent's `FORCE_HYPERLINK=1` (claude's links as OSC 8; an env may say 0; not shells': piped output would get
   them): `Session` snapshots keep them (`keepLinks`: the serialize addon drops them);
