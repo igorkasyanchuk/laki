@@ -233,6 +233,8 @@ test('workspaces: a bad base, what only worktrees do, a failed restore, a gone b
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', base: 'no-such-branch' }), /git worktree add failed: fatal: invalid reference: no-such-branch/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'opt', base: '--orphan' }), /base --orphan\? a branch, not an option/)
+  assert.ok(!(await rig.rpc('state')).workspaces.some((w: any) => w.name === 'opt'), 'nothing made')
   const local = await rig.rpc('wsNew', { project: p.id, local: true, preset: 'none' })
   await assert.rejects(rig.rpc('wsArchive', { id: local.id }), /only worktree workspaces can be archived/)
   await assert.rejects(rig.rpc('ship', { ws: local.id, message: 'x' }), /ship works on worktree workspaces/)

@@ -1754,6 +1754,7 @@ export async function wsNew(o: NewWs): Promise<Workspace> {
 async function makeWs(o: NewWs, step: (text: string) => void): Promise<Workspace> {
   const proj = findProject(o.project)
   if (o.from) agentNoCmd(o) // an agent's (the CLI in its tab, MCP)
+  if (o.base?.trim().startsWith('-')) throw new Error(`base ${o.base.trim()}? a branch, not an option`) // git worktree add would read it as one
   const preset = o.preset || (o.cmd?.trim() ? 'custom' : state.settings?.agent || 'claude')
   if (preset !== 'none') presetCheck(preset, o.cmd)
   const agent = presetNamed(preset)?.agent ?? preset
