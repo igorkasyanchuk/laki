@@ -2,6 +2,18 @@
 "## Next" (add that heading above the newest version if it isn't there). `npm run dmg` turns "## Next" into the
 version it builds, with the date. -->
 
+## Next
+
+- The Simulator tab takes your keyboard: click its screen and type (a paste, Return, Delete and the arrows too; Esc lets
+  go).
+- Settings › Simulators › *Devices*: every iPhone and iPad simulator and Android virtual device on this Mac, with
+  *Start* and *Stop*. Each workspace keeps the device it shows, and the window button floats one over every app.
+- Settings › Appearance › *Animations*: High, Low (as before) or None.
+- My Desk's tabs take a color (right click): their icon in it, else a dot.
+- `/laki:extension` in Claude Code tabs makes or changes a Laki extension, as `/laki:new` starts a session.
+- 12 more achievements (54): an action, a project's own template and action, a reviewed file, a file edited in Laki,
+  the global hotkey, a bubble's click, Resources, the Simulators, an experimental feature, a meme and a video.
+
 ## 0.24.0 · Oct 21, 2026
 
 - *Screenshot to Laki AI* (Settings › General › Global hotkey, off by default): ⌃⌥⌘S from any app, or the menu bar's

@@ -266,6 +266,9 @@ function create() {
   else win.loadFile(fileURLToPath(new URL('../renderer/index.html', import.meta.url)))
 }
 
+// an achievement only main sees (shared/achievements.ts): App's earn, as for a call
+const earn = (id: 'hotkey' | 'bubble') => win?.webContents.send('earn', id)
+
 function show(tab?: string) {
   if (!win) {
     pendingTab = tab ?? null
@@ -309,7 +312,7 @@ function bindKey(which: Key, label: unknown, fn: () => void) {
   trayMenu() // its items show the keys
   return a ? keys[which] === a : !label // false: another app (or the other hotkey) has them, or they can't be a global hotkey
 }
-ipcMain.handle('hotkey', (e, label: unknown) => from(e) && bindKey('open', label, () => (app.focus({ steal: true }), show())))
+ipcMain.handle('hotkey', (e, label: unknown) => from(e) && bindKey('open', label, () => (app.focus({ steal: true }), show(), earn('hotkey'))))
 // Screenshot to Laki AI's keys ('' none); false: it's off (no menu bar item either)
 ipcMain.handle('shot-hotkey', (e, label: unknown) => from(e) && ((shotOn = label !== false), bindKey('shot', shotOn ? label : '', shotAsk)))
 app.on('will-quit', () => globalShortcut.unregisterAll())
@@ -701,6 +704,7 @@ ipcMain.handle('procs', e => {
   if (newWin && !newWin.isDestroyed()) add(newWin.webContents.getOSProcessId(), 'New workspace window')
   if (aiW && !aiW.isDestroyed()) add(aiW.webContents.getOSProcessId(), 'Laki AI window')
   for (const w of tabWins.values()) if (!w.isDestroyed()) add(w.webContents.getOSProcessId(), 'Floating tab')
+  for (const w of simWins.values()) if (!w.isDestroyed()) add(w.webContents.getOSProcessId(), 'Floating simulator')
   return out
 })
 ipcMain.on('proc-stop', (e, what: unknown) => {
@@ -732,7 +736,7 @@ ipcMain.on('floater-size', (e, len: number, up?: boolean) => {
   } else if (up && stackFrom) (home = stackFrom), (stackFrom = null) // not saved: a drag saves where it is
   snap(false, now)
 })
-ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab)))
+ipcMain.on('floater-open', (e, tab: string) => floater && e.sender === floater.webContents && typeof tab === 'string' && (app.focus({ steal: true }), show(tab), earn('bubble')))
 // the +'s actions, from the stack in the drop or the menu beside it: New task (the new-workspace page, in a window of its
 // own), Ask Laki AI (the AI page, in one too), the menu bar's screenshots; Say it from the menu: the bar opens its window
 // (the stack's opens it itself)
@@ -801,6 +805,18 @@ ipcMain.on('tab-float', (e, tab: unknown, on: unknown) => {
   tabWins.set(tab, w)
   w.on('closed', () => tabWins.get(tab) === w && (tabWins.delete(tab), floating()))
   floating()
+})
+
+// the side panel's simulator floated out (its window button): that device alone (?window=sim), one window per device,
+// its screenshots to the workspace it was floated from
+const simWins = new Map<string, BrowserWindow>()
+ipcMain.on('sim-float', (e, device: unknown, ws: unknown) => {
+  if (e.sender !== win?.webContents || typeof device !== 'string' || !/^(ios|android):\w[\w.:-]{0,199}$/.test(device) || typeof ws !== 'string' || !/^[\w-]{0,64}$/.test(ws)) return
+  const had = simWins.get(device)
+  if (had && !had.isDestroyed()) return void had.focus()
+  const w = panelWin({ window: 'sim', device, ws }, 400, 820, { minWidth: 240, minHeight: 320 })
+  simWins.set(device, w)
+  w.on('closed', () => simWins.get(device) === w && simWins.delete(device))
 })
 
 // a page of the renderer alone in a panel over every app, Space and full-screen app, in the middle of the screen the

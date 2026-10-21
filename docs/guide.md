@@ -633,7 +633,12 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
 - *Simulator*: a booted iOS Simulator, an Android emulator or a phone on `adb` (USB debugging), its screen live in the
   panel (a few frames a second). A click taps, a drag swipes, the box types into it (Enter sends; empty, Return), and
   the buttons press Home, Back and Apps (Android) and Lock; the camera puts a screenshot's path into the agent's prompt.
-  With several running, pick one in its menu. It's off until **Settings › Simulators** turns it on, for every project;
+  A click on the screen also gives it your keyboard: letters, a paste, Return, Delete and the arrows go to the device
+  (⌘ keys stay Laki's; Esc lets go). With several running, pick one in its menu: each workspace keeps its own, so two
+  worktrees can watch two simulators. The window button floats it in a window of its own, over every app (one per
+  device; its camera goes to that workspace's agent). The tablet button opens **Settings › Simulators › Devices**:
+  every iPhone and iPad simulator this Mac has and every Android virtual device, running first, each with *Start* or
+  *Stop* (more of them: Xcode › Window › Devices and Simulators, or Android Studio's Device Manager). It's off until **Settings › Simulators** turns it on, for every project;
   a project's settings (*Simulator*) can turn it on or off for that project alone. Settings › Simulators also checks what this Mac has, each missing piece with the command to run (*Check again* after):
   - iOS: Xcode (`xcode-select` pointing at it, not the Command Line Tools alone), its license accepted
     (`sudo xcodebuild -license accept && sudo xcodebuild -runFirstLaunch`), an iOS runtime
@@ -644,7 +649,7 @@ until the agent's next run renews it. Settings › Appearance turns each agent o
     or a phone with USB debugging on).
 
   Nothing running: the tab says why and what to start (a phone that waits for you to allow USB debugging, by name),
-  and *What's needed…* opens that page.
+  and *Start a device…* opens that page.
 
 **File preview:** a Markdown file (`.md`) shows rendered (headings, lists, tables, code, links: they open in your
 browser; a ```` ```mermaid ```` block as its diagram, PR descriptions too) or *Raw* (its lines, numbered); the switch is
@@ -795,6 +800,8 @@ opencode; none named: claude) has the agent write the task up as a prompt and st
 project (`laki new .`), with that agent; it doesn't do the task itself. Laki gives its Claude Code tabs this command
 through a plugin of its own (`--plugin-dir`, nothing written to `~/.claude`); other agents with the laki skill
 installed (Settings › Agent skill) take `/laki:new …` in a prompt the same way. Not in SSH hosts' tabs.
+`/laki:extension <what it shows or does>`, from the same plugin, makes or changes a Laki extension: the extension
+creator's guide, with its `laki widget` commands allowed.
 
 With *Progress on tabs* on (Settings › General), Claude and Codex tabs started from then on are told to report how
 far along their task is every 20–30 seconds (`laki progress 40 "writing tests"`; Claude may run it without asking):
@@ -1194,9 +1201,9 @@ tall as its screen, and each workspace is tinted with its color (its group's, el
 
 ### Achievements
 
-42 small things to do, one action each: a quick tour of Laki, grouped by area (Getting started, Agents, Git & PRs,
-Workspaces, Power user, Extensions & AI, Experimental), each group with its progress. The trophy at the status bar's end
-shows how many you have (*6/42*); a click, ⌘K › *Achievements* or `laki://achievements` opens the list. Each says what
+54 small things to do, one action each: a quick tour of Laki, grouped by area (Getting started, Agents, Git & PRs,
+Workspaces, Power user, Extensions & AI, Experimental, Just for fun), each group with its progress. The trophy at the
+status bar's end shows how many you have (*6/54*); a click, ⌘K › *Achievements* or `laki://achievements` opens the list. Each says what
 to do and has *Show me*, which takes you where it's done. One unlocks as you do it, with a small toast; only what you do
 from now on counts, not what was there before. A card's ✕ hides one you don't need (*Hidden* brings it back), and *Turn
 off* (or Settings › Achievements) hides them all: no trophy, nothing unlocks. They're kept with Laki's settings, and
@@ -1224,8 +1231,8 @@ keeps each tile's place and size. A tile shows the extension's full view when it
 page to stay on.
 
 **Tabs** keep tiles apart (Work, Team, Home): + beside them adds one (type its name), a double-click renames it, a
-right click moves or removes it (its tiles go to the first tab, under the tiles there) or gives it an icon (*Icon…*:
-type to find one, or type or paste an emoji; *No icon*). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
+right click moves or removes it (its tiles go to the first tab, under the tiles there), gives it an icon (*Icon…*:
+type to find one, or type or paste an emoji; *No icon*) or a color (its icon in it, else a dot before its name). Drag a tile's head onto a tab, or pick a tile's ⋯ › *Move to tab*, to move it
 there; *Add* puts an extension on the tab you're on.
 
 **Build with AI** (with Laki AI on) opens a dialog: say what it should show, add screenshots (paste, drop, + or the
@@ -1374,7 +1381,8 @@ lit for a moment.
   over the terminal font's scaling; ⌘+ / ⌘− / ⌘0 change it while Settings or Help is open), *Accent color* (over the theme's: the
   selected row, buttons, the cursor; text on it black or white, whichever reads), *Corners* (square to very round,
   over the theme's: every corner it draws, its selected row, buttons and dialogs too; pills and circles stay round), *Tabs* (top by default; bottom, under the terminals, or a column left or right of them; a phone
-  keeps them on top), *Project names in the sidebar* (font,
+  keeps them on top), *Animations* (*Low* by default; *High*: pages, dialogs, menus and lists come in with a little
+  motion, buttons give when pressed; *None*: nothing moves, spinners stand still), *Project names in the sidebar* (font,
   case, letter spacing, size and weight, each the theme's unless you pick one), *The sidebar* (its guide line: none by
   default, or thin, thick, dashed, dotted, big dots, accent, accent dots; *Diff size in the sidebar*, off; the line between projects: a line, dashed, dotted,
   double or nothing; the indent, row height, text size and icon size, each the theme's unless you pick one; the style:

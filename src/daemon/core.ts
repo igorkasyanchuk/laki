@@ -249,10 +249,13 @@ export function cliRemove() {
 }
 
 // /laki:new in claude tabs: a plugin Laki loads with --plugin-dir (agentCmd; this Mac's only: a host has no laki CLI),
-// its one command a new session for a task: a new workspace in this project (laki new .) with the agent named
-const LAKI_CLI = `/usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')}`
+// its commands: new, a new session for a task: a new workspace in this project (laki new .) with the agent named; and
+// those other modules add (pluginFiles: skill.ts' /laki:extension, the extension guide, which core can't import)
+export const LAKI_CLI = `/usr/bin/env ${[...cliEnv, `LAKI_HOME=${dir}`, ...cliArgv].map(q).join(' ')}`
+export const pluginFiles: (() => Record<string, string>)[] = []
 const claudePlugin = (): Record<string, string> => ({
-  'claude-plugin/.claude-plugin/plugin.json': JSON.stringify({ name: 'laki', description: "Laki's commands for its tabs: /laki:new", author: { name: 'Laki' } }, null, 2),
+  ...Object.assign({}, ...pluginFiles.map(f => f())),
+  'claude-plugin/.claude-plugin/plugin.json': JSON.stringify({ name: 'laki', description: "Laki's commands for its tabs: /laki:new, /laki:extension", author: { name: 'Laki' } }, null, 2),
   'claude-plugin/commands/new.md': `---
 description: A new Laki session for a task, in a workspace of its own in this project, with codex, claude or another agent
 argument-hint: <the task> [with codex | claude | gemini | grok | opencode]

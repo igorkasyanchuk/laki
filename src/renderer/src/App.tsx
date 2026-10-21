@@ -1,5 +1,5 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type SimCheck, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type AchievementsKept, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
@@ -1410,6 +1410,7 @@ export function App() {
     toPrompt: text => intoAgent(w.id, text),
     sim: p => api.call('sim', p),
     setup: () => setDialog({ section: 'simulator' }),
+    float: bridge?.floatSim && (device => bridge!.floatSim!(device, w.id)),
     menu: (e, path, dir) => openMenu(e, fileMenu(w, path, dir)),
     undoHunk: async (path, hunk, lines, then) => {
       if (!(await revertOk(w))) return false
@@ -1546,14 +1547,16 @@ export function App() {
   }, [view])
   useEffect(() => void (dialog && pageEarns(typeof dialog === 'string' ? dialog : settingsOf(dialog) ? 'settings' : Object.keys(dialog)[0]).forEach(earn)), [dialog])
   useEffect(() => void (find && earn('filter')), [!!find])
-  // Changes on screen, once it wasn't: not the panel as it was left when Laki started
-  const onChanges = panelShown && panelTab === 'changes' && !!ws
-  const changesWas = useRef<boolean>(undefined)
+  // Changes or the Simulator on screen, once it wasn't: not the panel as it was left when Laki started
+  const onTab = panelShown && ws ? panelTab : ''
+  const tabWas = useRef<string>(undefined)
   useEffect(() => {
     if (!view) return
-    if (onChanges && changesWas.current === false) earn('changes')
-    changesWas.current = onChanges
-  }, [onChanges, !view])
+    const id = ({ changes: 'changes', device: 'simTab' } as Record<string, string>)[onTab]
+    if (id && tabWas.current !== undefined && tabWas.current !== onTab) earn(id)
+    tabWas.current = onTab
+  }, [onTab, !view])
+  useEffect(() => void bridge?.onEarn?.(id => earnRef.current(id)), []) // main's: the global hotkey, a bubble's click
   // the extension studio's chats (studioChats, Laki AI on): where you left off, in Settings › Extensions and a new
   // studio, again a moment after an ai event
   const [studioChats, setStudioChats] = useState<StudioChat[]>([])
@@ -3414,7 +3417,10 @@ export function App() {
             presets={view.presets}
             apps={apps}
             onClose={() => setDialog(null)}
-            onSection={id => setSeenSecs(l => (l.includes(id) ? l : [...l, id]))}
+            onSection={id => {
+              setSeenSecs(l => (l.includes(id) ? l : [...l, id]))
+              if (id === 'resources' || id === 'simulator') earn(id === 'resources' ? 'resources' : 'simTab')
+            }}
             onSave={({ achievements: _, ...s }) => {
               // achievements: App's own (earn), never this page's copy from when it opened; a profile: the list longer than the one in use
               if (s.presets && s.presets.length > (settings.presets ?? view.presets).length) earn('profile')
@@ -3432,7 +3438,7 @@ export function App() {
             webhookTest={w => api.call('webhookTest', w)}
             cli={{ state: () => api.call('cliState'), install: () => api.call('cliInstall'), remove: () => api.call('cliRemove') }}
             uiReset={() => api.call('uiReset')}
-            simulator={() => api.call<{ checks: SimCheck[] }>('sim', { op: 'check' }).then(r => r.checks)}
+            simulator={p => api.call('sim', p)}
             resources={{
               load: () => api.call<Resources>('resources'),
               tabs: view.tabs,
@@ -4000,6 +4006,7 @@ export function App() {
               throw new Error('not YouTube') // the dialog stays open
             }
             setVideo({ src, play: true, at: Date.now() })
+            earn('video')
             setSideOpen(true) // asked for from ⌘K with the sidebar hidden: shown, not just heard
             setDialog(null)
           }}

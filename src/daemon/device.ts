@@ -4,12 +4,12 @@
 // frontmost one by the app's name (CoreGraphics' window list through JXA, then screencapture -l), and windows, what's
 // open. A screenshot goes to images/ (imageSave) and comes back as its path, as the agent browser's does.
 // ponytail: the first booted simulator only (no --udid); an app's frontmost window only
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
 import { promisify } from 'node:util'
-import { DEVICE_OPS, SIM_OPS, type SimCheck } from '../shared/types.ts'
+import { DEVICE_OPS, SIM_OPS, type SimCheck, type SimDev } from '../shared/types.ts'
 import { imageSave, onPath } from './core.ts'
 
 const run = promisify(execFile)
@@ -198,7 +198,7 @@ async function droidChecks(): Promise<SimCheck[]> {
   const bin = sdkTool('platform-tools/adb')
   const out = [check('android', 'adb', 'adb', !!bin, bin === 'adb' ? 'on PATH' : bin ?? "not on PATH, nor in Android Studio's SDK: install Android Studio (its SDK has it), or", 'brew install android-platform-tools')]
   const emu = sdkTool('emulator/emulator')
-  const avds = emu ? await run(emu, ['-list-avds'], { timeout: 15000 }).then(r => r.stdout.split('\n').map(l => l.trim()).filter(l => l && !/^(INFO|WARNING|ERROR)\b/.test(l)), () => []) : []
+  const avds = emu ? await avdsOf(emu) : []
   out.push(check('android', 'emulator', 'An emulator', avds.length > 0, avds.join(', ') || (emu ? 'no virtual device yet' : "the emulator isn't installed (a phone on USB works too)"), emu ? 'Android Studio › Device Manager › Create virtual device' : 'Android Studio › SDK Manager › SDK Tools › Android Emulator', true))
   if (!bin) return out
   const d = await droidDevices().catch(e => new Error((e as Error).message))
@@ -207,6 +207,69 @@ async function droidChecks(): Promise<SimCheck[]> {
   const q = (s: string) => (/^[\w./-]+$/.test(s) ? s : `'${s.replace(/'/g, "'\\''")}'`) // a command to paste in a shell
   return [...out, check('android', 'device', 'A device running', d.ready.length > 0, says || 'none now: start an emulator, or plug in a phone with USB debugging on', emu && avds[0] && `${q(emu)} -avd ${q(avds[0])}`, true)]
 }
+// Android Studio's virtual devices, by name (the emulator's own log lines left out)
+const avdsOf = (emu: string) => run(emu, ['-list-avds'], { timeout: 15000 }).then(r => r.stdout.split('\n').map(l => l.trim()).filter(l => l && !/^(INFO|WARNING|ERROR)\b/.test(l)), () => [] as string[])
+
+// Settings › Simulators' Devices: every iOS Simulator this Mac has (simctl's available ones, iPhones and iPads, iOS
+// runtimes only) and every Android virtual device, each running or not, running first, then the newest iOS; start boots
+// one (simctl boot: no Simulator window, the panel shows it; the emulator -avd, left running on its own, as Android
+// Studio's), stop shuts it down (simctl shutdown; adb emu kill)
+const AVD_ID = /^avd:(\w[\w.-]{0,199})$/
+const verOf = (r = '') => r.replace(/^\D+/, '').split('.').map(Number)
+async function simDevices(): Promise<{ devices: SimDev[]; why: string[] }> {
+  const why: string[] = []
+  const ios = async () => {
+    if (process.platform !== 'darwin') return []
+    const r = await simctl(['list', 'devices', 'available', '-j']).catch(e => Promise.reject(new Error(`xcrun simctl: ${said(e)}`)))
+    const out: SimDev[] = []
+    for (const [rt, ds] of Object.entries(JSON.parse(r.stdout).devices as Record<string, { udid: string; name: string; state: string }[]>)) {
+      const v = /SimRuntime\.iOS-([\d-]+)$/.exec(rt)?.[1] // not watchOS, tvOS or visionOS
+      if (v) for (const d of ds) out.push({ id: `ios:${d.udid}`, name: d.name, os: 'ios', runtime: `iOS ${v.replace(/-/g, '.')}`, on: d.state === 'Booted' })
+    }
+    return out
+  }
+  const droid = async () => {
+    const emu = sdkTool('emulator/emulator')
+    if (!emu) return []
+    const [avds, live] = await Promise.all([avdsOf(emu), droidDevices().then(d => d.ready, () => [])])
+    return avds.map((a): SimDev => ({ id: `avd:${a}`, name: a.replace(/_/g, ' '), os: 'android', on: live.some(d => /^emulator-\d+$/.test(d.serial) && d.name === a.replace(/_/g, ' ')) }))
+  }
+  const [i, d] = await Promise.allSettled([ios(), droid()])
+  if (i.status === 'rejected') why.push(`iOS: ${(i.reason as Error).message}`)
+  if (d.status === 'rejected') why.push(`Android: ${(d.reason as Error).message}`)
+  const devices = [...(i.status === 'fulfilled' ? i.value : []), ...(d.status === 'fulfilled' ? d.value : [])]
+  const newer = (a: SimDev, b: SimDev) => {
+    const [x, y] = [verOf(a.runtime), verOf(b.runtime)]
+    for (let k = 0; k < Math.max(x.length, y.length); k++) if ((x[k] ?? 0) !== (y[k] ?? 0)) return (y[k] ?? 0) - (x[k] ?? 0)
+    return 0
+  }
+  devices.sort((a, b) => +b.on - +a.on || (a.os === b.os ? newer(a, b) : a.os === 'ios' ? -1 : 1) || a.name.localeCompare(b.name, undefined, { numeric: true }))
+  return { devices, why }
+}
+async function power(op: 'start' | 'stop', id: string) {
+  const avd = AVD_ID.exec(id)
+  if (avd) {
+    if (op === 'start') {
+      const emu = sdkTool('emulator/emulator')
+      if (!emu) throw new Error("the Android emulator isn't installed: Android Studio › Settings › Languages & Frameworks › Android SDK › SDK Tools")
+      spawn(emu, ['-avd', avd[1]], { detached: true, stdio: 'ignore' }).on('error', () => {}).unref()
+      return { ok: true }
+    }
+    const name = avd[1].replace(/_/g, ' ')
+    const d = (await droidDevices()).ready.find(x => /^emulator-\d+$/.test(x.serial) && x.name === name)
+    if (d) await adb(d.serial, ['emu', 'kill'], 10000)
+    return { ok: true }
+  }
+  const d = deviceOf(id)
+  if (d.os !== 'ios') throw new Error('start and stop: an iOS Simulator (ios:<udid>) or an Android virtual device (avd:<name>)')
+  // a first boot can take a minute
+  await run('xcrun', ['simctl', op === 'start' ? 'boot' : 'shutdown', d.id], { timeout: 120000 }).catch(e => {
+    const m = said(e)
+    if (!/current state: (Booted|Shutdown)/i.test(m)) throw new Error(`xcrun simctl: ${m}`) // already as asked
+  })
+  return { ok: true }
+}
+
 const deviceOf = (id: unknown) => {
   const m = SIM_ID.exec(String(id ?? ''))
   if (!m) throw new Error('which device? ios:<udid> or android:<serial>, from sim list')
@@ -222,13 +285,16 @@ const frac = (v: unknown, what: string) => {
 // adb shell's words go through the device's sh: the text single-quoted, its spaces input text's %s
 // ponytail: a literal %s in the text arrives as a space (input text's own escape)
 const droidText = (t: string) => `'${t.replace(/'/g, "'\\''").replace(/ /g, '%s')}'`
-const DROID_KEYS: Record<string, string> = { home: 'KEYCODE_HOME', back: 'KEYCODE_BACK', apps: 'KEYCODE_APP_SWITCH', lock: 'KEYCODE_POWER', enter: 'KEYCODE_ENTER', delete: 'KEYCODE_DEL' }
-const IOS_KEYS: Record<string, string[]> = { home: ['button', 'HOME'], lock: ['button', 'LOCK'], enter: ['key', '40'], delete: ['key', '42'] } // HID codes: Return, Backspace
+const DROID_KEYS: Record<string, string> = { home: 'KEYCODE_HOME', back: 'KEYCODE_BACK', apps: 'KEYCODE_APP_SWITCH', lock: 'KEYCODE_POWER', enter: 'KEYCODE_ENTER', delete: 'KEYCODE_DEL', left: 'KEYCODE_DPAD_LEFT', right: 'KEYCODE_DPAD_RIGHT', up: 'KEYCODE_DPAD_UP', down: 'KEYCODE_DPAD_DOWN' }
+// HID codes: Return, Backspace, the arrows
+const IOS_KEYS: Record<string, string[]> = { home: ['button', 'HOME'], lock: ['button', 'LOCK'], enter: ['key', '40'], delete: ['key', '42'], right: ['key', '79'], left: ['key', '80'], down: ['key', '81'], up: ['key', '82'] }
 
 export async function sim(p: { op: string; device?: string; x?: unknown; y?: unknown; x2?: unknown; y2?: unknown; text?: string; key?: string }) {
   const op = p.op as (typeof SIM_OPS)[number]
   if (!SIM_OPS.includes(op)) throw new Error(`sim: ${p.op}? one of ${SIM_OPS.join(', ')}`)
   if (op === 'check') return { checks: (await Promise.all([iosChecks(), droidChecks()])).flat() }
+  if (op === 'devices') return simDevices()
+  if (op === 'start' || op === 'stop') return power(op, String(p.device ?? ''))
   if (op === 'list') {
     const devices: { id: string; name: string; os: 'ios' | 'android' }[] = []
     const why: string[] = [] // what keeps one kind (or one phone) from being listed

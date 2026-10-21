@@ -274,8 +274,11 @@ export const RUN_SCRIPTS = ['test', 'lint', 'format', 'deploy'] as const
 export const DEVICE_OPS = ['shot', 'windows', 'tap', 'swipe', 'type', 'describe'] as const
 // the side panel's Simulator (daemon/device.ts' sim): booted iOS Simulators and adb's Android devices, a frame of one, a
 // screenshot for an agent (shot: its path, an iOS one in points), input (keys: device.ts' IOS_KEYS, DROID_KEYS), and
-// check: what this Mac has of what each needs (Settings › Simulators)
-export const SIM_OPS = ['list', 'frame', 'shot', 'tap', 'swipe', 'type', 'key', 'check'] as const
+// check: what this Mac has of what each needs (Settings › Simulators); devices: every iOS Simulator and Android virtual
+// device, running or not, which start and stop boot and shut down (Settings › Simulators' Devices)
+export const SIM_OPS = ['list', 'frame', 'shot', 'tap', 'swipe', 'type', 'key', 'check', 'devices', 'start', 'stop'] as const
+// one of sim devices': ios:<udid> or avd:<name>; runtime: an iOS one's (iOS 27.0)
+export type SimDev = { id: string; name: string; os: 'ios' | 'android'; runtime?: string; on: boolean }
 // one thing a simulator needs: ok, else fix (a command to run, or where to click); warn: it works without it, in part
 // (idb: no taps), or it's what runs now (none booted)
 export type SimCheck = { os: 'ios' | 'android'; id: string; label: string; ok: boolean; says: string; fix?: string; warn?: boolean }
@@ -420,6 +423,7 @@ export type Settings = {
   worktrees?: string // where new worktrees go: <it>/<project>/<workspace> (unset: <data>/worktrees; a project's own folder wins)
   syncBase?: '' | 'origin' | 'ff' // a new worktree's base fetched from origin first: origin, start off origin's copy (your branch untouched); ff, your branch fast-forwarded to it when it can be, else origin's (unset or '': off, the local branch as it is)
   tabsAt?: 'top' | 'bottom' | 'left' | 'right' // where the tabs are (unset: top)
+  motion?: 'high' | 'low' | 'none' // Appearance's Animations (themes.ts' Paint, html[data-motion]): more of them, the usual (unset), or none
   prPrompts?: Partial<Record<FixWhat, string>> // over PR_PROMPTS (unset or blank: the default)
   prScan?: number // minutes between PR checks (unset: PR_SCAN)
   bgRefresh?: boolean // PR checks on their own (each prScan minutes, a turn's end); off: only Refresh PR status (unset: on)
@@ -544,7 +548,7 @@ export const REMINDERS_MAX = 500 // past it the oldest rung ones go
 // x, y: its cell, columns from the left and rows from the top, 0 first (none: the first spot it fits, deskLayout)
 export type DeskTile = { id: string; w: number; h: number; tab?: string; x?: number; y?: number } // tab: a DeskTab's id (none, or one gone: the first tab)
 // a tab of the Desk: its tiles apart from the others' (none set: one tab, Desk); icon: one of the app's by name or an emoji, before its name
-export type DeskTab = { id: string; name: string; icon?: string }
+export type DeskTab = { id: string; name: string; icon?: string; color?: string } // color: TAB_COLORS', its icon in it, else a dot
 export const DESK_COLS = 12
 export const DESK_ROW = 40
 export const DESK_TILE: Omit<DeskTile, 'id'> = { w: 4, h: 6 }
@@ -755,5 +759,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 102
+export const API = 103
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

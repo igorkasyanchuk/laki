@@ -48,8 +48,9 @@ worktree archived when it's done, each agent block's permission mode, a deleted 
   a Viewed box per file, the same as GitHub's; revert a hunk, picked lines or a whole file, with Undo), review threads, and a preview of the dev
   server that sends screenshots or a clicked element (selector, HTML, CSS, a screenshot) to the agent. Agents can
   drive a browser of their own on it (`laki browser`). The Simulator (Settings › Simulators turns it on and checks what
-  this Mac has): a booted iOS Simulator, an Android emulator or a phone live in the panel, a click to tap, a drag to
-  swipe, a screenshot into the agent's prompt.
+  this Mac has, and starts and stops its iPhones, iPads and Android emulators): one live in the panel, a click to tap,
+  a drag to swipe, your keyboard to type, a screenshot into the agent's prompt; a device per workspace, or floated over
+  every app.
 - **Artifacts**: a folder per workspace, outside the repo, for what its agents make for you (screenshots, reports; in
   folders of their own, which you open and back out of) and links to what they publish (Claude artifacts, sites, gists:
   kept on their own as an agent publishes them; a page an agent made elsewhere on this Mac too, as a `file:///` link): counted in the status bar, a gallery of previews (links first,

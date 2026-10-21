@@ -37,7 +37,8 @@ export type PanelApi = {
   saveImage: (base64png: string) => Promise<string> // its path, for a prompt
   toPrompt: (text: string) => Promise<unknown> // into the workspace's agent's prompt, no Enter: the user finishes it
   sim: <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T> // the Simulator tab's: the daemon's sim
-  setup?: () => void // Settings › Simulators: what a simulator needs on this Mac
+  setup?: () => void // Settings › Simulators: what a simulator needs on this Mac, the devices to start
+  float?: (device: string) => void // the Simulator tab's device in a window of its own (Electron's)
   menu: (e: MouseEvent, path: string, dir: boolean) => void // right click on a file or folder: Open in…
   // Changes › Here's Revert: a hunk (lines: indexes into its body, none: all of it) or a whole file back to the base,
   // then a toast whose Undo is redo; then: after the revert and after its Undo (a refresh)
@@ -718,7 +719,7 @@ export function SidePanel(p: {
       {tab === 'changes' && <ChangesTab key={p.w.id} api={p.api} ws={p.w.id} pr={p.w.pr} linked={p.w.prLinked} onOpen={p.onOpen} />}
       {tab === 'review' && <ReviewTab w={p.w} api={p.api} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onLabel={p.onLabel} />}
       {tab === 'preview' && <PreviewTab key={p.w.id} w={p.w} api={p.api} onOpen={p.onOpen} />}
-      {tab === 'device' && <DeviceTab api={p.api} />}
+      {tab === 'device' && <DeviceTab api={p.api} ws={p.w.id} />}
       {ext && <div className="sp-ext">{ext.body}</div>}
     </div>
   )
@@ -726,31 +727,64 @@ export function SidePanel(p: {
 
 // Simulator: a booted iOS Simulator or an Android emulator (or a phone on adb) in the panel, a frame after another while
 // it shows (the daemon's sim; one asked for as the last comes, not while the window is hidden). A click is a tap, a drag
-// a swipe, the box types (Enter sends it; on an empty box, Return), the buttons press Home, Back, Lock…; the camera puts a screenshot's
-// path into the agent's prompt. iOS input needs idb, as laki screen's
+// a swipe, the box types (Enter sends it; on an empty box, Return), and so does the Mac's keyboard while the screen has
+// the focus (a click on it; Esc lets go): letters, a paste, Return, Delete and the arrows, the letters typed meanwhile
+// sent as one; the buttons press Home, Back, Lock…; the camera puts a screenshot's path into the agent's prompt. iOS
+// input needs idb, as laki screen's. Each workspace keeps the device picked in it (two worktrees, two simulators; one
+// never picked: the last picked anywhere); the window button floats one (main's simWins: ?window=sim, NewWindow.tsx'
+// SimWindow, which shows that device only)
 // ponytail: a few frames a second and a third of a second for a tap; a stream with live touches is the next step
 type SimDevice = { id: string; name: string; os: 'ios' | 'android' }
+export type SimTabApi = Pick<PanelApi, 'sim' | 'setup' | 'float'> & { toPrompt?: PanelApi['toPrompt'] }
 const SIM_PICK = 'laki.sim' // the device picked last
+const SIM_PICKS = 'laki.sims' // each workspace's
 const SIM_GAP = 250 // ms at least between frames
+const SIM_KEYS: Record<string, string> = { Enter: 'enter', Backspace: 'delete', ArrowLeft: 'left', ArrowRight: 'right', ArrowUp: 'up', ArrowDown: 'down' } // the Mac's keys, the daemon's
 const SIM_KEY_WORDS: [key: string, label: string, icon: IconName, android?: boolean][] = [
   ['home', 'Home', 'home'],
   ['back', 'Back', 'back', true],
   ['apps', 'Apps', 'layers', true],
   ['lock', 'Lock', 'lock'],
 ]
-function DeviceTab({ api }: { api: PanelApi }) {
+export function DeviceTab({ api, ws, only }: { api: SimTabApi; ws?: string; only?: string /* the floating window's device */ }) {
   const [list, setList] = useState<{ devices: SimDevice[]; why: string[] } | null>(null)
-  const [pick, setPick] = useState(() => localStore(SIM_PICK) ?? '')
+  const [last, setLast] = useState(() => localStore(SIM_PICK) ?? '')
+  const [picks, setPicks] = useState<Record<string, string>>(() => {
+    try {
+      return JSON.parse(localStore(SIM_PICKS) ?? '{}') ?? {}
+    } catch {
+      return {}
+    }
+  })
+  const pick = only ?? ((ws && picks[ws]) || last)
   const [frame, setFrame] = useState('')
   const [err, setErr] = useState('') // the frames'
   const [said, setSaid] = useState('') // input's: a frame coming doesn't clear it
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false) // input on its way
+  const [keys, setKeys] = useState(false) // the screen has the focus: the keyboard types into the device
+  const [sent, setSent] = useState(false) // the floating window's camera: in the agent's prompt (the app's own says so with a toast)
+  useEffect(() => {
+    if (!sent) return
+    const t = setTimeout(() => setSent(false), 3000)
+    return () => clearTimeout(t)
+  }, [sent])
   const img = useRef<HTMLImageElement>(null)
   const down = useRef<{ x: number; y: number } | null>(null)
+  const queue = useRef<({ op: 'type'; text: string } | { op: 'key'; key: string })[]>([])
+  const draining = useRef(false)
   const look = () => (setList(null), api.sim<{ devices: SimDevice[]; why: string[] }>({ op: 'list' }).then(setList, e => setList({ devices: [], why: [String(e?.message ?? e)] })))
   useEffect(() => void look(), [])
-  const dev = list?.devices.find(d => d.id === pick) ?? list?.devices[0]
+  // one started or stopped meanwhile (Settings › Simulators' Devices, Xcode, Android Studio): the list again 5 s after
+  // the last came (a slow adb never piles them up)
+  useEffect(() => {
+    let on = true
+    let t: ReturnType<typeof setTimeout>
+    const again = () => (t = setTimeout(() => void (document.hidden ? Promise.resolve() : api.sim<{ devices: SimDevice[]; why: string[] }>({ op: 'list' }).then(r => on && setList(l => (JSON.stringify(l) === JSON.stringify(r) ? l : r)), () => {})).finally(() => on && again()), 5000))
+    again()
+    return () => ((on = false), clearTimeout(t))
+  }, [])
+  const dev = list?.devices.find(d => d.id === pick) ?? (only ? undefined : list?.devices[0])
   useEffect(() => {
     if (!dev) return
     let on = true
@@ -774,7 +808,14 @@ function DeviceTab({ api }: { api: PanelApi }) {
     void next()
     return () => ((on = false), clearTimeout(t), document.removeEventListener('visibilitychange', next))
   }, [dev?.id])
-  const choose = (id: string) => (setPick(id), localStore(SIM_PICK, id))
+  const choose = (id: string) => {
+    setLast(id)
+    localStore(SIM_PICK, id)
+    if (!ws) return
+    const all = { ...picks, [ws]: id }
+    setPicks(all)
+    localStore(SIM_PICKS, JSON.stringify(all))
+  }
   const send = (p: { op: string; [k: string]: unknown }) => {
     if (!dev) return Promise.resolve(false)
     setBusy(true)
@@ -802,10 +843,34 @@ function DeviceTab({ api }: { api: PanelApi }) {
   }
   const toAgent = () =>
     dev &&
+    api.toPrompt &&
     api
       .sim<{ path: string }>({ op: 'shot', device: dev.id })
-      .then(r => api.toPrompt(`A screenshot of the ${dev.name} ${dev.os === 'ios' ? 'simulator' : 'emulator'}: ${r.path}`))
-      .catch(e => setSaid(String(e?.message ?? e)))
+      .then(r => api.toPrompt!(`A screenshot of the ${dev.name} ${dev.os === 'ios' ? 'simulator' : 'emulator'}: ${r.path}`))
+      .then(() => only && setSent(true), e => setSaid(String(e?.message ?? e)))
+  // keys on the screen, one call at a time and in order; what's typed while one is on its way goes as one
+  const drain = async () => {
+    if (draining.current) return
+    draining.current = true
+    while (queue.current.length) if (!(await send(queue.current.shift()!))) queue.current = [] // the rest would land out of place
+    draining.current = false
+  }
+  const put = (p: { op: 'type'; text: string } | { op: 'key'; key: string }) => {
+    const last = queue.current.at(-1)
+    if (p.op === 'type' && last?.op === 'type') last.text += p.text
+    else queue.current.push(p)
+    void drain()
+  }
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.metaKey || e.ctrlKey || e.nativeEvent.isComposing) return // ⌘ and ⌃ keys stay the app's
+    if (e.key === 'Escape') return void (e.preventDefault(), e.currentTarget.blur())
+    if (e.repeat && draining.current) return void e.preventDefault() // a key held down: as fast as the device takes it, not a queue that runs on after it's let go
+    const key = SIM_KEYS[e.key]
+    if (key) put({ op: 'key', key })
+    else if ([...e.key].length === 1) put({ op: 'type', text: e.key }) // a letter, ⌥'s too; not Tab, F keys, Shift
+    else return
+    e.preventDefault() // a space would scroll
+  }
   // the box empties once it went (a failure keeps it to send again), unless more was typed meanwhile
   const type = () => text && void send({ op: 'type', text }).then(ok => ok && setText(t => (t === text ? '' : t)))
   if (!list) return <div className="muted small pad">Looking for simulators…</div>
@@ -813,8 +878,8 @@ function DeviceTab({ api }: { api: PanelApi }) {
     return (
       <div className="sim-none">
         <Icon name="phone" size={22} />
-        <b>No simulator or emulator is running</b>
-        <p className="muted small">Open Simulator (Xcode › Open Developer Tool), or start an Android emulator (Android Studio's Device Manager, or emulator -avd &lt;name&gt;), then look again. A phone plugged in with USB debugging shows too.</p>
+        <b>{only ? "This device isn't running" : 'No simulator or emulator is running'}</b>
+        <p className="muted small">Start one: an iPhone, an iPad or an Android emulator, from the ones this Mac has (or in Simulator or Android Studio). A phone plugged in with USB debugging shows too.</p>
         {list.why.map(w => (
           <p key={w} className="warn small">
             {w}
@@ -826,7 +891,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
           </button>
           {api.setup && (
             <button type="button" onClick={api.setup}>
-              What's needed…
+              Start a device…
             </button>
           )}
         </div>
@@ -835,7 +900,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
   return (
     <>
       <div className="sp-tools sim-tools">
-        {list.devices.length > 1 ? (
+        {!only && list.devices.length > 1 ? (
           <select value={dev.id} aria-label="Which device" onChange={e => choose(e.target.value)}>
             {list.devices.map(d => (
               <option key={d.id} value={d.id}>
@@ -852,10 +917,23 @@ function DeviceTab({ api }: { api: PanelApi }) {
         {SIM_KEY_WORDS.filter(k => !k[3] || dev.os === 'android').map(([key, label, icon]) => (
           <IconButton key={key} icon={icon} title={label} onClick={() => send({ op: 'key', key })} />
         ))}
-        <IconButton icon="camera" title="Screenshot into the agent's prompt" onClick={() => void toAgent()} />
+        {api.toPrompt && <IconButton icon="camera" title="Screenshot into the agent's prompt" onClick={() => void toAgent()} />}
         <IconButton icon="refresh" title="Look for devices again" onClick={() => void look()} />
+        {api.float && <IconButton icon="popOut" title="Float it in its own window, over every app" onClick={() => api.float!(dev.id)} />}
+        {api.setup && <IconButton icon="tablet" title="Start another device: an iPhone, an iPad or an Android emulator…" onClick={api.setup} />}
       </div>
-      <div className={`sim-screen ${busy ? 'busy' : ''}`}>
+      <div
+        className={`sim-screen ${busy ? 'busy' : ''}`}
+        tabIndex={0}
+        aria-label={`${dev.name}'s screen: click, then type`}
+        onKeyDown={onKey}
+        onPaste={e => {
+          const t = e.clipboardData.getData('text')
+          if (t) (e.preventDefault(), put({ op: 'type', text: t }))
+        }}
+        onFocus={() => setKeys(true)}
+        onBlur={() => setKeys(false)}
+      >
         {frame ? (
           <img
             ref={img}
@@ -871,6 +949,7 @@ function DeviceTab({ api }: { api: PanelApi }) {
         )}
       </div>
       {(err || said) && <div className="warn small pad">{err || said}</div>}
+      {sent && !(err || said) ? <div className="muted small pad sim-keys">The screenshot is in the agent's prompt</div> : keys && !(err || said) && <div className="muted small pad sim-keys">Your keys go to {dev.name} · Esc lets go</div>}
       <div className="sp-tools sim-type">
         <input value={text} placeholder="Type into it · Enter sends" spellCheck={false} onChange={e => setText(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.nativeEvent.isComposing && (text ? type() : send({ op: 'key', key: 'enter' }))} />
         <IconButton icon="enter" title="Return" onClick={() => send({ op: 'key', key: 'enter' })} />

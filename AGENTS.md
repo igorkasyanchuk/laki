@@ -119,7 +119,8 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `close` and its modal's `id`, `ui`, `data`, `size`, buttons' `style` and `close` (the `widget-say` event's `close`); 91: `prLabels`, `prLabel`, a PR's `labels`; 92:
 `tunnelStart` `hours`, a tunnel's `until`, `tunnelTick`; 93: `widgetWhat` (an RPC, its `hash`), `widgetSet` `seen`, `widgetFiles`' and `toolAsk`'s `hash`; `widgetLogs`/`widgetLog`/`widgetLogClear`, the store's `log` (`widgetSet` `log`), a widget's `log`, `keepLog` and `logErr`, `settings.widgetLogs`, `openIn` `log`; events `ship.done`, `flow.ended`, `limit.hit`, `tab.new`, `port.open`, `gate.held`, `widgetEmit`, `widgetEvents`, a workflow's `on`; gates: an action's `gate`, `ship`/`prAct`/`wsArchive` `force` and `{ held }`, `ship` async, a widget's `gates`, PRFix's `held`; repo extensions: a widget's `project`, `repo` and `changed`, `widgetTools` `ws`, `widgetNew`'s `repo`.; 94: `wsPeek`, `studioChats`/`studioChatRm`, Laki AI's asks one per chat (`AI_AT_ONCE`), `aiQuestion`/`aiPermission`
 `chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`; 98: a key per page (`widgets.ts` `urlKey`, an HMAC of the master `widgetKey`, which no view, page or URL has any more: a workspace's `artKey` for `/artifact/`, `planGet`'s `key` for `/plan/`, a widget's `key` for `/widget/<id>`; each route takes its own only, `urlKeyOk`); 99: the view's `imgKey`, `GET /img`; 100: a workflow item's `changed`, `flowTrust` refused from an agent, a run's `by`, an agent's event's action handler asked first (`toolAsk`); 101: To-dos
-(`todoListGet`/`todoListSave`), the side panel's Simulator (`sim`, `check`; settings' `simulator`); 102: a project's `simulator`, kept by `projectSet`. A
+(`todoListGet`/`todoListSave`), the side panel's Simulator (`sim`, `check`; settings' `simulator`); 102: a project's `simulator`, kept by `projectSet`; 103: `sim`
+`devices`, `start`, `stop`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -331,14 +332,25 @@ refuses an off one's `open`, `copy` and `say` with a toast), `widgetRm` (Setting
   a Mac; the panel asks for the next as one comes, `SIM_GAP` apart, none while hidden: `visibilitychange` starts them again), `shot` (`imageSave`'s path, for
   the prompt), `tap`/`swipe` (`x`, `y`, `x2`, `y2`: fractions of the picture; iOS points by `simPoints` (simctl's `getenv` `SIMULATOR_MAINSCREEN_*`: pixels over scale; idb's `describe-all` names no app on iOS 27's home screen),
   `iosPts`, Android pixels by the last frame's PNG header, `droidPx`), `type` (adb's `input text` single-quoted for the
-  device's sh, spaces `%s`), `key` (`IOS_KEYS`, `DROID_KEYS`: back and apps Android's); an iOS `shot` in points, as laki screen's;
+  device's sh, spaces `%s`), `key` (`IOS_KEYS`, `DROID_KEYS`: back and apps Android's, the arrows HID codes or DPAD); an iOS `shot` in points, as laki screen's;
+  `devices` (Settings › Simulators' `SimDevices`: `simDevices`, every `SimDev`: simctl's available devices of iOS
+  runtimes and each AVD (`avdsOf`, `avd:<name>`, `on` when an `emulator-*`'s `emu avd name` is it), running first, then
+  the newest iOS), `start`/`stop` (`power`: `simctl boot`/`shutdown` (an already-so error is none); an AVD's `emulator
+  -avd` spawned detached, `adb emu kill`; the page asks `devices` again 2 s after each answer until it says so,
+  `GOING_MAX`);
   `check` (Settings › Simulators, `SimSection`: `SimCheck`s, each `ok`, `says`, a `fix` command (a `›` menu path: no
   Copy) and `warn` (works without it, or none running): iOS `xcode` (`xcode-select -p` an app's, not the Command Line
   Tools), `simctl` (`list runtimes`: the license), `runtime`, `booted`, `idb` (and `idb_companion`); Android `adb`,
   `emulator` (`-list-avds`), `device` (`droidDevices`, shared with `list`)). adb and the emulator are `sdkTool`'s: PATH,
   else `$ANDROID_HOME`, `$ANDROID_SDK_ROOT`, Android Studio's folder. The tab shows with `settings.simulator` (off
   unless true; SidePanel's `sim`), a project's `config.simulator` over it (the app's only, kept by `projectSet`; ProjectSection's
-  *Simulator* select, `global.simulator` for its words), its empty state's *What's needed…* is `PanelApi.setup`. ponytail: frames polled, a drag one swipe;
+  *Simulator* select, `global.simulator` for its words), its empty state's *Start a device…* and the tablet button are
+  `PanelApi.setup`. `DeviceTab`: `list` again 5 s after the last; the device picked per workspace (`laki.sims`; none:
+  `laki.sim`, the last anywhere); the screen (`tabIndex` 0) takes keys while focused (`onKey`: `SIM_KEYS`, a
+  character typed, a paste; ⌘ and ⌃ the app's, Esc blurs; `queue`/`drain` one call at a time, letters meanwhile as one,
+  a held key's repeats dropped while one's on its way); `PanelApi.float` (preload's `floatSim`, main's `sim-float`:
+  `simWins`, one `panelWin` per device, `?window=sim&device=&ws=`, NewWindow.tsx `SimWindow`: `DeviceTab` `only`, its
+  camera `send` `enter: false` to the workspace's live agent). ponytail: frames polled, a drag one swipe;
   a stream (serve-sim, idb/axe video-stream, scrcpy) next;
 - `device` (`daemon/device.ts`; the CLI's `laki screen <op>`, MCP's `laki_device`; `DEVICE_OPS`): shot (the booted
   simulator, `xcrun simctl io <udid> screenshot`, or `app`'s frontmost window: CoreGraphics' window list through JXA
@@ -484,7 +496,10 @@ replace them), not on a host): what Laki is, `laki rename .`, `laki pr .`, `laki
 Claude gets `--settings <data>/claude-settings.json` and, on this Mac (not a host: no laki CLI there), `--plugin-dir
 <data>/claude-plugin` (`claudePlugin`, written by `writeHooks`): a plugin named laki whose `commands/new.md` is
 `/laki:new <task> [with <agent>]`, a new workspace in this project through `laki new .` (the CLI's `.`: the project of
-`$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's SKILL.md says the same for the other agents. Its hooks run `laki hook <state>`, using an absolute
+`$LAKI_WORKSPACE`'s workspace; `allowed-tools` lets it run only that `laki new` unasked); the laki skill's SKILL.md says the same for the other agents.
+Other modules add commands through `pluginFiles` (core can't import them): skill.ts' `commands/extension.md`,
+`/laki:extension <what>`, the laki-widget skill's guide (`widgetGuide`) with `LAKI_CLI` as its command and `laki
+widget` allowed. Its hooks run `laki hook <state>`, using an absolute
 node/Electron path and the CLI's path, and map to states:
 
 | hook | state |
@@ -1902,7 +1917,8 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   tab's `--laki-tab`) and as the tab's border, never under it; not on a phone or the pill looks), glass
   (`html.glass`) and the creative themes' looks (`[data-look=…]`, from a theme's `look`), some selectors also name
   Laki Go's classes. `applyTheme` takes a `Paint` (theme, `uiFont`, glass and its sliders `glassWindow`/`glassSide`/
-  `glassTerm` and `glassGlow`, and `sideClear`; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
+  `glassTerm` and `glassGlow`, and `sideClear`, and `motion`: `html[data-motion]`, Appearance's Animations, styles.css'
+  last block: none ends every animation and transition at once, high adds entrances, a stagger and presses; `paintOf` picks them from the settings, `paintKey` is what terminals watch). Glass sets
   see-through `--app-bg` (with the glow's radial gradients), `--side` and `--rail-bg` (`glassSide`) and `--term-bg` (`#rrggbbaa`: xterm reads only
   that); `sideClear` (Settings' *Sidebar see-through*, without glass) only `--side` and `--rail-bg`, with `html.side-clear`
   (a clear body, `.main` alone on `--app-bg`; glass in the app too: the sidebar's slider is over the desktop, not the Window one's background) and the window's blur (`blurred`; the new-workspace window never: `NewWindow`'s paint); what floats is nearly opaque, never `backdrop-filter` (over the see-through window Electron repaints it badly:
@@ -2058,7 +2074,8 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   the tab bar (`.desk-tabs`, shown once there's a tile or a tab): + (`addTab`, its name typed at once), a double-click
   renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, under the tiles there, in one `save`) or gives it
   an icon (`DeskTab.icon`, before its name: an `ICONS` name, or an emoji typed or pasted in the filter, `emojiOf`, its
-  `typed` item *Use 🚀*; *Icon…*, a submenu, `setIcon`; *No icon*), a
+  `typed` item *Use 🚀*; *Icon…*, a submenu, `setIcon`; *No icon*) or a color (`DeskTab.color`, `TAB_COLORS`,
+  `setColor`: its icon in it, else `.desk-dot`), a
   head dropped on a tab moves the tile there (`moveTo`: no cell, so under the tiles there), a tile's ⋯ › *Move to tab*
   too (or *A new tab*); Add puts one on the tab shown; *Fetch* only that tab's. Cells: a tile's `x`, `y` (`shared/types.ts`
   `deskLayout`: the one dragged or resized first, then the placed ones top to bottom, each pushed down past any it
@@ -2093,13 +2110,15 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   with the daemon's `screen` (40 lines, every 2.5 s while open and the page is visible; a `<pre>` whose newest lines
   show), *All* / *Working* / *Needs you* (App's `needsYou`); a click is `selectTab`. App.tsx passes a `BirdApi`.
 - **`Achievements.tsx`** (dialog `'achievements'`: the status bar's trophy at its end, `.sb-trophy`, ⌘K,
-  Settings › Achievements' *Open achievements*, `laki://achievements`): `shared/achievements.ts`' 42 (`ACHIEVEMENTS`, in
+  Settings › Achievements' *Open achievements*, `laki://achievements`): `shared/achievements.ts`' 54 (`ACHIEVEMENTS`, in
   `ACH_GROUPS`), each with its `how` and `go` (App's `achGo`: a page, Settings' section, the right panel's tab; an
   experimental page that's off: where it's turned on). App's `earn` unlocks one once, only for what's done from now on: a
   call that went well (api.ts `onCall`, `earnedBy`: its `rpc` and `ok`; a `{ held }` or `{ dirty }` answer isn't), a page
   opened (`pageEarns`), a number or value of the view that moved since the last view (`upsOf`/`wentUp`; the first view,
   and the first after a reconnect, only notes them; a value back to unset isn't), or by id (⌘J, timers, the sidebar's
-  filter, Changes once it wasn't on screen, a line's comment, a profile: Settings' save with more presets than in use);
+  filter, Changes or the Simulator once it wasn't on screen, a line's comment, a profile: Settings' save with more
+  presets than in use, Settings' Resources and Simulators sections, a video played; main's `earn` IPC, preload's `onEarn`:
+  the global hotkey, a bubble's click);
   a hidden one never. Kept in `settings.achievements` (`AchievementsKept`: `got`, `hidden`,
   `off`; `SETTINGS_KEPT`), written whole by App (`achSet`; `sent`, shown and built on until the view has it); Settings' own save leaves it out, so an
   unlock while it's open stays. The unlock toast (`.ach-toast`, over pages) groups one action's unlocks. Tested in
@@ -2190,7 +2209,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 | `src/renderer/src/Widgets.tsx` | the sidebar's widget grid, a widget's dialog, the sanitizer |
 | `src/renderer/src/WidgetStudio.tsx` | the extension studio: Laki AI's chat, the preview on sample data, the inspector, Undo, Try it live, Turn on |
 | `src/renderer/src/Extension.tsx` | an extension's page: its preview (live or its sample), settings and Laki AI's chat; New extension |
-| `src/renderer/src/NewWindow.tsx` | the new-workspace and AI windows (`?window=new`, `?window=ai`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
+| `src/renderer/src/NewWindow.tsx` | the new-workspace, AI, floated tab and floated simulator windows (`?window=new`, `ai`, `tab`, `sim`, main.tsx renders them instead of App): the page alone, its own socket, the theme without glass |
 | `src/renderer/src/Browser.tsx` | a Browsers workspace's page: a `<webview>` in `persist:browser` with an address bar |
 | `src/renderer/src/dock.ts` | Settings › Appearance › Dock icon: the mark and `icons/*.svg`, drawn to a PNG for main's `dock-icon` IPC (`app.dock.setIcon`; kept as userData's `dock-icon.png`, set as the next start begins) |
 | `widgets/` | the widgets that come with Laki (packaged with the app) |
@@ -2203,7 +2222,7 @@ shared with it: some class and variable names in `look.css` and `themes.ts` are 
 redirect followed, 2 MB read at most, `conn.ts` `readCapped`), kept 15 minutes, one not shown yet at random (`seen`: the last 500); no NSFW, spoilers or pinned posts; the picture as a data URL (8 MB); only on a click; `LAKI_MEME_API` is tests' fake (localhost only) |
 | `src/shared/conn.ts` | data dir, `daemon.json`, `ensureDaemon` (autostart), `rpc` |
 | `src/shared/types.ts` | view types shared by daemon, CLI and renderer |
-| `src/shared/achievements.ts` | the achievements (42): their groups, words, where each is done, and what earns each (a call, a page, the view) |
+| `src/shared/achievements.ts` | the achievements (54): their groups, words, where each is done, and what earns each (a call, a page, the view) |
 | `src/shared/when.ts` | scheduled tasks' times: English to a rule, the next run, the rule in words; `stamp` (dates in names, prompts, templates, actions) and `wsTitle` (a run's dated names) |
 | `src/cli/main.ts` | the `laki` CLI and `laki hook`; `help`: `laki`, `--help`/`-h`, `laki help <command> [sub]`, `<command> --help` (or after its sub), before any daemon (`usage.ts` `helpFor`: its USAGE lines, its alternatives' else, then `HELP`'s details and examples, for agents) |
 | `src/cli/mcp.ts` | `laki mcp`: the MCP server |

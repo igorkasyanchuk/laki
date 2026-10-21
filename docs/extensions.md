@@ -9,8 +9,9 @@ The quickest start: `laki widget new "Deploys" --kind list` (or Settings › Ext
 once on sample data; change its fetch and its `ui` from there (below: *Starters*).
 
 This page is the overview. The whole format, with every field and helper, is in Settings › Extensions › *New ▾ ›
-With Laki AI…* while Laki AI is off (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), and in
-[`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which both are made from. Two examples come with Laki,
+With Laki AI…* while Laki AI is off (*Copy the prompt*), in the *Extension creator* agent skill (Settings › Agent skill), in
+`/laki:extension <what it shows or does>` in Laki's Claude Code tabs, and in
+[`src/shared/widgetGuide.ts`](../src/shared/widgetGuide.ts), which they're all made from. Two examples come with Laki,
 in [`widgets/`](../widgets): `links` (a JS page, no fetch) and `my-prs` (a shell fetch with gh and jq, its `ui`, its
 sample).
 

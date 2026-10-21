@@ -6,7 +6,7 @@ import { execFileSync } from 'node:child_process'
 import { chmodSync, existsSync, lstatSync, mkdirSync, readFileSync, readlinkSync, rmSync, symlinkSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { test } from 'node:test'
-import type { SimCheck } from '../src/shared/types.ts'
+import type { SimCheck, SimDev } from '../src/shared/types.ts'
 import { connect, fresh, type Rig, until } from './helpers.ts'
 
 const script = (path: string, body: string) => (writeFileSync(path, body), chmodSync(path, 0o755))
@@ -183,7 +183,7 @@ exit 0
   assert.match((await rig.cli('screen', 'nope')).err, /no workspace|not found|no tab/i)
 })
 
-test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and swipes in points or pixels, typing, keys, a screenshot; refusals; Settings › Simulators\' checks', async t => {
+test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and swipes in points or pixels, typing, keys, a screenshot; refusals; Settings › Simulators\' checks and devices to start and stop', async t => {
   const rig = await fresh(t)
   const bin = join(rig.home, 'bin')
   const log = () => readFileSync(join(rig.home, 'sim.log'), 'utf8')
@@ -198,7 +198,8 @@ test('the Simulator tab: iOS Simulators and adb devices listed, frames, taps and
     join(bin, 'xcrun'),
     `#!/bin/sh
 echo "xcrun $*" >> "$HOME/sim.log"
-[ "$3" = devices ] && { echo '{"devices":{"iOS-26":[{"udid":"U-1","name":"iPhone 17","state":"Booted"},{"udid":"U-2","name":"iPad","state":"Shutdown"}]}}'; exit 0; }
+[ "$3" = devices ] && { echo '{"devices":{"com.apple.CoreSimulator.SimRuntime.iOS-26-0":[{"udid":"U-1","name":"iPhone 17","state":"Booted"},{"udid":"U-2","name":"iPad","state":"Shutdown"}],"com.apple.CoreSimulator.SimRuntime.watchOS-12-0":[{"udid":"W-1","name":"Watch","state":"Shutdown"}]}}'; exit 0; }
+{ [ "$2" = boot ] || [ "$2" = shutdown ]; } && exit 0
 [ "$3" = runtimes ] && { echo '{"runtimes":[{"name":"iOS 26.0","platform":"iOS","isAvailable":true},{"name":"watchOS 12.0","platform":"watchOS","isAvailable":true}]}'; exit 0; }
 [ "$2" = io ] && { echo '${PNG}' | base64 -d > "$6"; exit 0; }
 [ "$2" = getenv ] && case "$4" in *WIDTH) echo 1170 ;; *HEIGHT) echo 2532 ;; *SCALE) echo 3.000000 ;; esac && exit 0
@@ -218,7 +219,7 @@ exit 0
   const sdk = join(rig.home, process.platform === 'darwin' ? 'Library/Android/sdk' : 'Android/Sdk')
   mkdirSync(join(sdk, 'platform-tools'), { recursive: true })
   mkdirSync(join(sdk, 'emulator'), { recursive: true })
-  script(join(sdk, 'emulator/emulator'), '#!/bin/sh\necho "INFO    | Storing crashdata"\necho Pixel_9\n')
+  script(join(sdk, 'emulator/emulator'), '#!/bin/sh\necho "emulator $*" >> "$HOME/sim.log"\necho "INFO    | Storing crashdata"\necho Pixel_9\n')
   // a screen of 1080 by 2400 pixels (its header's; sips may not read the rest: it goes as it came)
   const png = Buffer.from(PNG, 'base64')
   png.writeUInt32BE(1080, 16)
@@ -263,8 +264,21 @@ exit 0
   await rig.rpc('sim', { op: 'swipe', device: droid, x: 0, y: 0, x2: 1, y2: 1 })
   await rig.rpc('sim', { op: 'type', device: droid, text: "it's a test" })
   await rig.rpc('sim', { op: 'key', device: droid, key: 'back' })
-  for (const l of ['adb -s emulator-5554 shell input tap 540 1200', 'adb -s emulator-5554 shell input swipe 0 0 1079 2399 300', "adb -s emulator-5554 shell input text 'it'\\''s%sa%stest'", 'adb -s emulator-5554 shell input keyevent KEYCODE_BACK'])
+  await rig.rpc('sim', { op: 'key', device: droid, key: 'left' }) // the Mac's arrows, on the screen
+  for (const l of ['adb -s emulator-5554 shell input tap 540 1200', 'adb -s emulator-5554 shell input swipe 0 0 1079 2399 300', "adb -s emulator-5554 shell input text 'it'\\''s%sa%stest'", 'adb -s emulator-5554 shell input keyevent KEYCODE_BACK', 'adb -s emulator-5554 shell input keyevent KEYCODE_DPAD_LEFT'])
     assert.ok(log().includes(`${l}\n`), `${l} in\n${log()}`)
+  // Settings › Simulators' devices: running first, then the newest iOS; iOS runtimes only; an AVD running by its name
+  const devs = (await rig.rpc('sim', { op: 'devices' })).devices as SimDev[]
+  assert.deepEqual(
+    devs.map(d => [d.id, d.on, d.runtime]),
+    [...(ios ? [['ios:U-1', true, 'iOS 26.0']] : []), ['avd:Pixel_9', true, undefined], ...(ios ? [['ios:U-2', false, 'iOS 26.0']] : [])],
+  )
+  await rig.rpc('sim', { op: 'start', device: 'avd:Pixel_9' })
+  await until(() => log().includes('emulator -avd Pixel_9\n'), 'the emulator started')
+  await rig.rpc('sim', { op: 'stop', device: 'avd:Pixel_9' })
+  assert.ok(log().includes('adb -s emulator-5554 emu kill\n'), 'stopped by its serial')
+  await assert.rejects(rig.rpc('sim', { op: 'start', device: 'avd:-x' }), /which device\?/, 'no option for the emulator')
+  await assert.rejects(rig.rpc('sim', { op: 'stop', device: droid }), /start and stop: an iOS Simulator/, 'a phone: not ours to stop')
   await assert.rejects(rig.rpc('sim', { op: 'tap', device: droid, x: 2, y: 0 }), /x: a fraction of the picture/)
   await assert.rejects(rig.rpc('sim', { op: 'key', device: droid, key: 'nope' }), /key: one of home, back/)
   await assert.rejects(rig.rpc('sim', { op: 'frame', device: 'ios:U 1; rm' }), /which device\?/)
@@ -276,7 +290,11 @@ exit 0
   await rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'home' })
   await rig.rpc('sim', { op: 'type', device: 'ios:U-1', text: '-n hi' })
   await assert.rejects(rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'back' }), /on iOS, one of home, lock/)
-  for (const l of ['xcrun simctl io U-1 screenshot --type=jpeg', 'xcrun simctl getenv U-1 SIMULATOR_MAINSCREEN_SCALE', 'idb ui tap --udid U-1 -- 195 211', 'idb ui button --udid U-1 -- HOME', 'idb ui text --udid U-1 -- -n hi']) assert.ok(log().includes(l), `${l} in\n${log()}`)
+  await rig.rpc('sim', { op: 'key', device: 'ios:U-1', key: 'up' })
+  await rig.rpc('sim', { op: 'start', device: 'ios:U-2' })
+  await rig.rpc('sim', { op: 'stop', device: 'ios:U-1' })
+  for (const l of ['xcrun simctl io U-1 screenshot --type=jpeg', 'xcrun simctl getenv U-1 SIMULATOR_MAINSCREEN_SCALE', 'idb ui tap --udid U-1 -- 195 211', 'idb ui button --udid U-1 -- HOME', 'idb ui text --udid U-1 -- -n hi', 'idb ui key --udid U-1 -- 82', 'xcrun simctl boot U-2', 'xcrun simctl shutdown U-1'])
+    assert.ok(log().includes(l), `${l} in\n${log()}`)
 })
 
 test('archived workspaces deleted after settings.archivedDays (their branch kept); copy ignored and untracked files into new worktrees', async t => {

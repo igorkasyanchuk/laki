@@ -5,7 +5,7 @@ import { chmodSync, existsSync, mkdirSync, readdirSync, readFileSync, rmdirSync,
 import { homedir } from 'node:os'
 import { join } from 'node:path'
 import { USAGE } from '../shared/usage.ts'
-import { cliArgv, cliEnv, dir, q, STORAGE_NOTE } from './core.ts'
+import { cliArgv, cliEnv, dir, LAKI_CLI, pluginFiles, q, STORAGE_NOTE } from './core.ts'
 import { widgetFormat } from '../shared/widgetGuide.ts'
 import { STARTER_KINDS } from '../shared/widgetStarters.ts'
 import { BUILTIN } from './widgets.ts'
@@ -156,6 +156,9 @@ own PR, once opened, is its PR); \`--link <url>\` when it's about that PR withou
 task here; say the workspace id it printed. In Laki's
 Claude Code tabs, \`/laki:new\` is a command of its own.
 
+\`/laki:extension <what>\` (or \`laki:extension\`): make or change a Laki extension (a widget) for it, with the
+laki-widget skill (\`laki widget …\`). In Laki's Claude Code tabs it's a command of its own too.
+
 A project can be on an SSH host (\`laki project add devbox:~/code/app\`; \`laki ls\` shows \`host:path\`): its
 workspaces' paths are on that machine, not this one, so read their work with \`laki diff\` and \`laki screen\`, not
 from the disk here. Its agents run there and have no \`laki\`.
@@ -227,13 +230,25 @@ more than 30 minutes late is skipped and logged as missed).
   }
 }
 
-// laki-widget: the widget creator, a skill of its own
+// laki-widget: the widget creator, a skill of its own; in Laki's claude tabs also /laki:extension, the plugin's command
+// (core's claudePlugin), the same guide with the CLI as its own command line
 const widgetSkill = (cli: string) => `---
 name: laki-widget
 description: Make Laki extensions, also called widgets (one and the same thing), the small live pages in the Laki app's sidebar, top bar or status bar (a clock, a count of PRs, a chart, a table) with a full view a click away, or buttons on its rail and sidebar foot (an icon, a label, a badge count, a click that runs an action), each fed by a shell command or a JS script on a schedule. Use when the user asks to create, change, debug or explain a Laki extension or widget (or a tile, panel, button or plugin for Laki's sidebar or rail).
 ---
 
-# Making a Laki extension (a widget)
+${widgetGuide(`Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`.`)}`
+pluginFiles.push(() => ({
+  'claude-plugin/commands/extension.md': `---
+description: Make or change a Laki extension (a widget): a live tile, a bar item or a button in Laki
+argument-hint: <what it shows or does>
+allowed-tools: Bash(${LAKI_CLI} widget:*)
+---
+Make or change a Laki extension for this request: $ARGUMENTS
+
+${widgetGuide(`Run the laki CLI as \`${LAKI_CLI}\`.`)}`,
+}))
+const widgetGuide = (run: string) => `# Making a Laki extension (a widget)
 
 Extension and widget are two names for one thing: the app says extension (Settings › Extensions), its files, ids and
 \`laki widget\` say widget. A user who asks for either means this. A widget is a folder; its name is the widget's id. Make new ones in Laki's own folder:
@@ -247,7 +262,7 @@ Don't edit those: copy one to a new id.
 ${widgetFormat()}
 ## Check your work
 
-Run the laki CLI through this launcher (an absolute path; keep the quotes): \`"${cli}"\`. Below, \`laki\` stands for it.
+${run} Below, \`laki\` stands for it.
 
     laki widget reload               # read the folders again (after any change) and fetch
     laki widget run <id>             # fetch now: "fetched" or the error

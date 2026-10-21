@@ -3,7 +3,7 @@
 import { FitAddon } from '@xterm/addon-fit'
 import { type FontWeight, Terminal } from '@xterm/xterm'
 import { type CSSProperties, Fragment, type KeyboardEvent as KeyEvent, type MouseEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react'
-import { aiOn, type AchievementsKept, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SimCheck, type SideStyle, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
+import { aiOn, type AchievementsKept, type Account, type StudioChat, type WidgetLogLine, COMPACT_DAYS, type Doctor, IMAGE_DAYS, type Memory, MEMORY_MAX, ACCOUNT_AGENTS, HOME_ACCOUNT, type AccountAgent, type AccountView, actionSlug, type AgentUsage, AGENT_NAMES, EFFORTS, isAccountAgent, MODELS, AGENT_VARS, AGENTS, type Agent, AI_CONTEXT_MAX, AI_MODEL, AI_STEPS, type AiBackend, type AiSettings, type AiTotals, type FixWhat, type NotifyKind, PR_BOTS, PR_PROMPTS, PR_SCAN, PR_TRIES, type Preset, REMOTE_TRIES, SLEEP_AFTER, type MergeMethod, type PRAllow, type PRMarks, prAllows, type ProcUse, type ProjectLook, type Resources, type SideLook, type SimCheck, type SideStyle, type SimDev, type TabView, VOICE_MODEL, type VoiceSettings, type Webhook, answerOk, ANSWER_WHY, type WidgetOption, type WidgetPlace, placesOf, type WidgetRuns, type WidgetSize, type WidgetView, type WidgetSource, type WidgetHide, webhookUrl } from '../../shared/types'
 import { ago } from '../../shared/widget'
 import { STARTER_KINDS, type StarterKind } from '../../shared/widgetStarters'
 import { type UiProblem, UI_TYPES } from '../../shared/widgetUi'
@@ -94,6 +94,7 @@ export const SIDE_STYLES: [SideStyle, string, string][] = [
   ['status', 'Status', 'an edge in the color of what its agent is doing, and a line under it that fills as the agent reports progress'],
 ]
 // Appearance's corners (--radius) and where the tabs go
+const MOTION: [NonNullable<AppSettings['motion']>, string][] = [['high', 'High: more of them'], ['low', 'Low (default)'], ['none', 'None']]
 const CORNERS: [string, string][] = [['', "Theme's"], ['0px', 'Square'], ['3px', 'Slight'], ['6px', 'Rounded'], ['10px', 'Round'], ['14px', 'Very round']]
 // where a workspace row's PR marks go: by the status circle, after the name, or with the GitHub mark
 const MARKS_AT: [NonNullable<PRMarks['at']>, string][] = [['end', "With GitHub's mark"], ['start', 'By the status circle'], ['name', 'After the name']]
@@ -1145,6 +1146,7 @@ const FIND: [string, string, string?][] = [
   ['appearance', 'Corners', 'radius rounded square'],
   ['appearance', 'Settings & Help size', 'zoom text font size small bigger larger readable page'],
   ['appearance', 'Tabs', 'tab bar position location top bottom left right vertical'],
+  ['appearance', 'Animations', 'motion animation movement reduce high low none effects transitions'],
   ['appearance', 'Project names', 'sidebar font case letter spacing size weight'],
   ['appearance', 'Rail', 'layout rail list slack kinds projects board schedule terminals browsers settings icons labels icons only'],
   ['appearance', 'Terminals', 'rail terminal shells button show hide list'],
@@ -1301,12 +1303,93 @@ export type ResourcesApi = {
 }
 // Simulators: the side panel's Simulator tab (settings.simulator), and what an iOS Simulator or an Android emulator needs
 // on this Mac (the daemon's sim check), each one missing with its fix to copy
-function SimSection({ check, on, onOn }: { check: () => Promise<SimCheck[]>; on: boolean; onOn: (v: boolean) => void }) {
+type SimApi = <T = unknown>(p: { op: string; device?: string; [k: string]: unknown }) => Promise<T>
+const GOING_MAX = 180_000 // a start or stop not seen done by then: its button back
+
+// Devices: every iOS Simulator and Android virtual device this Mac has, Start or Stop each (the daemon's sim devices,
+// start, stop); the side panel's Simulator tab shows the running ones. While one starts or stops, the list again every
+// 2 s until it says so
+function SimDevices({ sim }: { sim: SimApi }) {
+  const [devs, setDevs] = useState<SimDev[] | null>(null)
+  const [why, setWhy] = useState<string[]>([])
+  const [err, setErr] = useState('')
+  const [going, setGoing] = useState<Record<string, { op: 'start' | 'stop'; at: number }>>({})
+  // a failure says why as the next list would (err is Start's and Stop's own)
+  const load = () => sim<{ devices: SimDev[]; why: string[] }>({ op: 'devices' }).then(r => (setDevs(r.devices), setWhy(r.why)), e => (setDevs(d => d ?? []), setWhy([String(e?.message ?? e)])))
+  useEffect(() => void load(), [])
+  const waiting = Object.keys(going).length > 0
+  useEffect(() => {
+    if (!waiting) return
+    let on = true
+    let t: ReturnType<typeof setTimeout>
+    const again = () => (t = setTimeout(() => void load().finally(() => on && again()), 2000)) // 2 s after the last came: none piled up
+    again()
+    return () => ((on = false), clearTimeout(t))
+  }, [waiting])
+  useEffect(() => {
+    if (!devs) return
+    setGoing(g => {
+      const left = Object.fromEntries(Object.entries(g).filter(([id, w]) => Date.now() - w.at < GOING_MAX && devs.find(d => d.id === id)?.on !== (w.op === 'start')))
+      return Object.keys(left).length === Object.keys(g).length ? g : left
+    })
+  }, [devs])
+  const power = (d: SimDev) => {
+    const op = d.on ? 'stop' : 'start'
+    setErr('')
+    setGoing(g => ({ ...g, [d.id]: { op, at: Date.now() } }))
+    sim({ op, device: d.id }).then(load, e => (setErr(String(e?.message ?? e)), setGoing(({ [d.id]: _, ...g }) => g)))
+  }
+  const heads = (d: SimDev) => (d.on ? 'Running' : d.os === 'ios' ? (d.runtime ?? 'iOS') : 'Android')
+  return (
+    <Group
+      title="Devices"
+      hint="Start one and the side panel's Simulator tab shows it. More of them: Xcode › Window › Devices and Simulators (+), or Android Studio's Device Manager"
+      act={
+        <button type="button" onClick={() => void load()}>
+          Refresh
+        </button>
+      }
+    >
+      {err && <p className="warn small">{err}</p>}
+      {why.map(w => (
+        <p key={w} className="muted small">
+          {w}
+        </p>
+      ))}
+      {!devs ? (
+        <p className="muted small">Looking…</p>
+      ) : !devs.length ? (
+        <p className="muted small">None on this Mac: install Xcode (its iOS Simulator) or Android Studio and make a virtual device there.</p>
+      ) : (
+        devs.map((d, i) => {
+          const g = going[d.id]
+          return (
+            <Fragment key={d.id}>
+              {heads(d) !== (i ? heads(devs[i - 1]) : '') && <div className="sim-dev-head">{heads(d)}</div>}
+              <div className="sim-dev" data-on={d.on || undefined}>
+                <Icon name={/ipad/i.test(d.name) ? 'tablet' : 'smartphone'} />
+                <span className="sim-dev-name">
+                  {d.name}
+                  {d.on && <span className="muted"> · {d.runtime ?? 'Android'}</span>}
+                </span>
+                <button type="button" className={d.on ? '' : 'primary'} disabled={!!g} onClick={() => power(d)}>
+                  {g ? (g.op === 'start' ? 'Starting…' : 'Stopping…') : d.on ? 'Stop' : 'Start'}
+                </button>
+              </div>
+            </Fragment>
+          )
+        })
+      )}
+    </Group>
+  )
+}
+
+function SimSection({ sim, on, onOn }: { sim: SimApi; on: boolean; onOn: (v: boolean) => void }) {
   const [checks, setChecks] = useState<SimCheck[] | null>(null)
   const [err, setErr] = useState('')
   const [busy, setBusy] = useState(true)
   const [copied, setCopied] = useState('') // the check whose fix was just copied
-  const run = () => (setBusy(true), check().then(c => (setChecks(c), setErr('')), e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
+  const run = () => (setBusy(true), sim<{ checks: SimCheck[] }>({ op: 'check' }).then(r => (setChecks(r.checks), setErr('')), e => setErr(String(e?.message ?? e))).finally(() => setBusy(false)))
   useEffect(() => void run(), [])
   const again = (
     <button type="button" disabled={busy} onClick={run}>
@@ -1337,10 +1420,11 @@ function SimSection({ check, on, onOn }: { check: () => Promise<SimCheck[]>; on:
       <Group title="Side panel">
         <div className="setting-box">
           <Switch className="switch-row" on={on} onChange={onOn}>
-            <Says title="Simulator tab" hint="The side panel's Simulator: the booted simulators and adb's devices, one picked. Laki starts none: boot one in Simulator or Android Studio. A project's settings can turn it on or off just there" />
+            <Says title="Simulator tab" hint="The side panel's Simulator: the running simulators and adb's devices, one picked. Start one under Devices below (or in Simulator or Android Studio). A project's settings can turn it on or off just there" />
           </Switch>
         </div>
       </Group>
+      <SimDevices sim={sim} />
       {err && <p className="warn small">{err}</p>}
       <Group title="iOS" hint="Xcode's Simulator, on a Mac. idb adds taps, swipes and typing; without it the screen still shows" act={again}>
         {list('ios') ?? (busy && <p className="muted small">Checking…</p>)}
@@ -2747,7 +2831,7 @@ export function SettingsPage(p: {
   remote?: RemoteApi
   widgets?: WidgetsApi
   resources?: ResourcesApi
-  simulator?: () => Promise<SimCheck[]> // Simulators' checks: the daemon's sim check
+  simulator?: SimApi // Simulators: the daemon's sim (its checks, the devices to start and stop)
   webhookTest?: (w: Webhook) => Promise<unknown> // Phone pushes' Send test
   cli?: CliApi // General › Developer: the laki command in any shell
   uiReset?: () => Promise<unknown> // Reset the interface: the daemon's settings to their defaults (SETTINGS_KEPT kept), every extension off
@@ -3380,6 +3464,16 @@ export function SettingsPage(p: {
                     ))}
                   </select>
                 </label>
+                <label data-tip="High: pages, dialogs, menus and lists come in with a little motion, buttons give a little when pressed. None: nothing moves (spinners stand still)">
+                  Animations
+                  <select value={s.motion ?? 'low'} onChange={e => paint({ motion: e.target.value as AppSettings['motion'] })}>
+                    {MOTION.map(([v, name]) => (
+                      <option key={v} value={v}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               </div>
               </Group>
               <Group title="Rail" hint="Projects, Board, Schedule, Terminal and Browser on the left, with what needs you on each; the list beside it shows the one you pick">
@@ -3831,7 +3925,7 @@ export function SettingsPage(p: {
               set={o => set({ ...(o.mail !== undefined && { remoteMail: o.mail }), ...(o.auth !== undefined && { remoteAuth: o.auth }), ...(o.tries !== undefined && { remoteTries: o.tries }), ...(o.tsPin !== undefined && { remoteTsPin: o.tsPin }), ...(o.funnel !== undefined && { remoteFunnel: o.funnel }) })}
             />
           )}
-          {sec === 'simulator' && p.simulator && <SimSection check={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
+          {sec === 'simulator' && p.simulator && <SimSection sim={p.simulator} on={s.simulator === true} onOn={simulator => set({ simulator })} />}
           {sec === 'resources' && p.resources && <ResourcesSection api={p.resources} sleepAfter={s.sleepAfter ?? SLEEP_AFTER} onSleepAfter={sleepAfter => set({ sleepAfter })} />}
           {sec === 'achievements' && p.achievements && <AchievementsSection api={p.achievements} />}
           {sec === 'memory' && (

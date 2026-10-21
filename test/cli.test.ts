@@ -302,7 +302,7 @@ test('laki mcp: initialize, tools, a call, errors', async t => {
   assert.ok(v.workspaces.some((w: any) => w.id === 'mcp-ws'))
 })
 
-test('/laki:new: claude tabs get Laki’s plugin (its new command); laki new . is the tab’s own project', async t => {
+test('/laki:new and /laki:extension: claude tabs get Laki’s plugin (its commands); laki new . is the tab’s own project', async t => {
   const rig = await fresh(t)
   const p = await rig.rpc('projectAdd', { path: rig.repo })
   const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude' })
@@ -312,6 +312,11 @@ test('/laki:new: claude tabs get Laki’s plugin (its new command); laki new . i
   assert.match(cmd, /^---\ndescription: /)
   assert.match(cmd, /\$ARGUMENTS/)
   assert.match(cmd, / new \. --preset <agent> --prompt '<prompt>'/)
+  const ext = readFileSync(join(plugin, 'commands', 'extension.md'), 'utf8') // the laki-widget skill's guide, as a command
+  assert.match(ext, /^---\ndescription: Make or change a Laki extension/)
+  assert.match(ext, /allowed-tools: Bash\(.* widget:\*\)/)
+  assert.match(ext, /\$ARGUMENTS\n\n# Making a Laki extension/)
+  assert.match(ext, /Run the laki CLI as `\/usr\/bin\/env .*`\. Below/)
   const run = await until(() => rig.fakeLog().find(l => l.bin === 'claude'), 'claude')
   assert.equal(run.args[run.args.indexOf('--plugin-dir') + 1], plugin)
   // in a tab: . is its project; elsewhere it says so

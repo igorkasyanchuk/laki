@@ -10,6 +10,7 @@ type Bridge = {
   sound?(name: string): void
   browse?(r: object): Promise<unknown>
   onFocusTab(cb: (tab: string) => void): void
+  onEarn?(cb: (id: string) => void): void
   onBrowserTab?(cb: (url: string, front: boolean) => void): void // a Browsers page's link to a new tab: front, or in the background
   onBrowserKey?(cb: (key: string) => void): void // ⌘W or ⌘T pressed in a Browsers page (the page gets keys, not the app)
   pickFolder(): Promise<string | null>
@@ -28,6 +29,7 @@ type Bridge = {
   onAiShot?(cb: (png: string) => void): void // the AI window's: that screenshot (a PNG, base64)
   floatTab?(tab: string, on?: boolean): void // a tab in a window of its own over every app (main's tabWin), or back (on false)
   floating?(): Promise<string[]> // the tabs floated out
+  floatSim?(device: string, ws?: string): void // the side panel's simulator in a window of its own over every app (main's simWins)
   onFloating?(cb: (tabs: string[]) => void): void
   badge?(n: number, items?: { tab: string; label: string }[], tray?: boolean): void // the Dock's count; the menu bar's item
   floats?(items: object[], colors: Record<string, string>, opts?: { style: string; cards: boolean; add: boolean; menu: string; voiceTo: string }): void // the floating bubbles' workspaces (none, no buttons: hidden)

@@ -87,6 +87,9 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.equal(props.get('--ui-font'), `"Futura", ${UI_FALLBACK}`)
   assert.ok(classes.has('glass'))
   assert.equal(transparent(), false) // nothing shows through the terminals
+  assert.equal(html.dataset.motion, 'low') // Animations unset: the usual
+  applyTheme({ theme: 'circuit', motion: 'none' })
+  assert.equal(html.dataset.motion, 'none')
 
   // the default theme under glass: the stylesheet's colors, with the glow; see-through terminals
   applyTheme({ glass: true, uiFont: 'system' })
@@ -133,8 +136,8 @@ test('themes: applyTheme paints a theme, glass at its sliders, then the default 
   assert.deepEqual(preview(kraft), [kraft.c!.bg, kraft.c!.panel, kraft.c!.fg, kraft.c!.accent, ...kraft.ansi!.slice(1, 6)])
   assert.match(preview(THEMES.find(t => t.id === 'aurora')!)[0], /^linear-gradient\(135deg/)
   assert.equal(preview(THEMES[0])[0], '#0e1014')
-  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined })
-  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null]')
+  assert.deepEqual(paintOf({ theme: 'riso', fontSize: 14 } as any), { theme: 'riso', uiFont: undefined, accent: undefined, radius: undefined, glass: undefined, glassWindow: undefined, glassSide: undefined, glassTerm: undefined, glassGlow: undefined, sideClear: undefined, motion: undefined })
+  assert.equal(paintKey({ theme: 'riso' }), '["riso",null,null,null,null,null,null,null,null,null,null]')
 })
 
 test("the sidebar's video: YouTube links as embeds, anything else refused", () => {

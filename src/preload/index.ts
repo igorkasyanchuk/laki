@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('laki', {
   sound: (name: string) => ipcRenderer.send('sound', name), // a timer's end: a macOS sound
   browse: (r: object): Promise<unknown> => ipcRenderer.invoke('browse', r), // the agent browser's op (main's hidden window)
   onFocusTab: (cb: (tab: string) => void) => ipcRenderer.on('focus-tab', (_e, tab: string) => cb(tab)),
+  onEarn: (cb: (id: string) => void) => void ipcRenderer.on('earn', (_e, id: string) => cb(id)), // an achievement main saw: the global hotkey, a bubble's click
   onFront: (cb: (on: boolean) => void) => ipcRenderer.on('front', (_e, on: boolean) => cb(on)), // Laki in front of other apps, or not
   onBrowserTab: (cb: (url: string, front: boolean) => void) => ipcRenderer.on('browser-tab', (_e, url: string, front: boolean) => cb(url, front)), // a Browsers page's link to a new tab
   onBrowserKey: (cb: (key: string) => void) => ipcRenderer.on('browser-key', (_e, key: string) => cb(key)), // ⌘W or ⌘T while a Browsers page has the keyboard, or a menu bar item's key
@@ -29,6 +30,7 @@ contextBridge.exposeInMainWorld('laki', {
   },
   floatTab: (tab: string, on = true) => ipcRenderer.send('tab-float', tab, on), // a tab in a window of its own over every app, or back
   floating: (): Promise<string[]> => ipcRenderer.invoke('floating'), // the tabs in windows of their own
+  floatSim: (device: string, ws?: string) => ipcRenderer.send('sim-float', device, ws ?? ''), // a simulator in a window of its own
   onFloating: (cb: (tabs: string[]) => void) => ipcRenderer.on('floating', (_e, tabs: string[]) => cb(tabs)),
   // the Dock's count (agents that need a look) and the menu bar's item: the same count, those tabs, whether it's shown
   badge: (n: number, items?: { tab: string; label: string }[], tray?: boolean) => ipcRenderer.send('badge', n, items, tray),

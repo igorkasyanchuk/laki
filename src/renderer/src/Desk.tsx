@@ -10,7 +10,7 @@ import { DESK_COLS, DESK_ROW, DESK_TILE, type DeskTab, type DeskTile, deskLayout
 import { api as daemon, bridge } from './api'
 import { Modal } from './panels'
 import { type Img, PromptInput, useDraft } from './PromptInput'
-import { Icon, IconButton, isIconName, type MenuItem, ON, Page, useMenu } from './ui'
+import { colorVar, Icon, IconButton, isIconName, type MenuItem, ON, Page, TAB_COLORS, useMenu } from './ui'
 import { CellButton, status, type WidgetApi, WidgetBody } from './Widgets'
 
 export type DeskApi = WidgetApi & {
@@ -99,6 +99,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     if (n && n !== tabList.find(t => t.id === id)?.name) saveTabs(tabList.map(t => (t.id === id ? { ...t, name: n } : t)))
   }
   const setIcon = (id: string, icon?: string) => saveTabs(tabList.map(t => (t.id === id ? { ...t, icon } : t))) // none: undefined, which JSON leaves out
+  const setColor = (id: string, c: string) => saveTabs(tabList.map(t => (t.id === id ? { ...t, color: c === 'none' ? undefined : c } : t)))
   // a tab gone: its tiles to the first of the others, under the tiles there (their cells were another tab's)
   const removeTab = (id: string) => {
     const tabs = tabList.filter(t => t.id !== id)
@@ -133,6 +134,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
         items: [{ filter: 'Find an icon, or type an emoji', typed: q => (e => (e ? { label: `Use ${e}`, run: () => setIcon(t.id, e) } : null))(emojiOf(q)) }, ...ICON_NAMES.map(n => ({ label: n.replace(/([a-z])([A-Z0-9])/g, '$1 $2').toLowerCase(), icon: n, hint: t.icon === n ? ON : undefined, run: () => setIcon(t.id, n) }))],
       },
       ...(t.icon ? [{ label: 'No icon', icon: 'x', run: () => setIcon(t.id) } as MenuItem] : []),
+      { colors: TAB_COLORS, value: t.color, pick: c => setColor(t.id, c) },
       ...(tabList[0].id !== t.id ? [{ label: 'Move left', icon: 'chevronLeft', run: () => shiftTab(t.id, -1) } as MenuItem] : []),
       ...(tabList.at(-1)!.id !== t.id ? [{ label: 'Move right', icon: 'chevronRight', run: () => shiftTab(t.id, 1) } as MenuItem] : []),
       null,
@@ -312,7 +314,9 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
                 onDoubleClick={() => setNaming(t.id)}
                 onContextMenu={e => (e.preventDefault(), tabMenu(e, t))}
                 data-desk-tab={t.id}
+                style={colorVar(t.color)}
               >
+                {t.color && !isIconName(t.icon) && <span className="desk-dot" aria-hidden />}
                 {isIconName(t.icon) ? <Icon name={t.icon} size={13} /> : emojiOf(t.icon) && <span aria-hidden>{t.icon}</span>}
                 {t.name}
               </button>

@@ -1,13 +1,13 @@
-// Achievements (shared/achievements.ts): 42 to start, each one action; what earns each: a call, a page, the view moving
+// Achievements (shared/achievements.ts): 54, each one action; what earns each: a call, a page, the view moving
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 import { ACH_GROUPS, ACHIEVEMENTS, earnedBy, pageEarns, upsOf, wentUp } from '../src/shared/achievements.ts'
 import { ICONS } from '../src/shared/icons.ts'
 import type { View } from '../src/shared/types.ts'
 
-test('achievements: 42, unique, grouped, each with a way to earn it', () => {
-  assert.equal(ACHIEVEMENTS.length, 42)
-  assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, 42)
+test('achievements: 54, unique, grouped, each with a way to earn it', () => {
+  assert.equal(ACHIEVEMENTS.length, 54)
+  assert.equal(new Set(ACHIEVEMENTS.map(a => a.id)).size, 54)
   for (const a of ACHIEVEMENTS) {
     assert.ok(ACH_GROUPS.includes(a.group), a.id)
     assert.ok(a.icon in ICONS, `${a.id}: icon ${a.icon}`)
@@ -38,6 +38,10 @@ test('achievements: a call earns by its method and params', () => {
   assert.deepEqual(earnedBy('ship', { ws: 'w' }, { held: [{ why: 'no' }] }), []) // a gate held it: not shipped
   assert.deepEqual(earnedBy('wsArchive', { id: 'w', ifClean: true }, { dirty: 2 }), []) // asks first: not archived yet
   assert.deepEqual(earnedBy('wsArchive', { id: 'w' }, null), ['archive'])
+  assert.deepEqual(earnedBy('prViewed', { path: 'a', viewed: true }), ['viewed'])
+  assert.deepEqual(earnedBy('prViewed', { path: 'a', viewed: false }), []) // unticked
+  assert.deepEqual(earnedBy('fileWrite', { ws: 'w', path: 'a', text: '' }), ['edit'])
+  assert.deepEqual(earnedBy('meme', {}), ['meme'])
   assert.deepEqual(pageEarns('board'), ['board'])
   assert.deepEqual(pageEarns('about'), [])
 })
@@ -53,4 +57,7 @@ test("achievements: the view's numbers going up and values changing earn, never 
   assert.deepEqual(wentUp(b, upsOf(view({ settings: { theme: 'default' } }))), ['theme']) // Default picked is a pick
   const mem = upsOf(view({ projects: [{ id: 'p', name: 'p', path: '/p', memory: [{ id: 'm', text: 'x', at: 1, auto: true }] }] }))
   assert.deepEqual(wentUp(a, mem), []) // an agent's memory isn't yours
+  const own = upsOf(view({ projects: [{ id: 'p', name: 'p', path: '/p', config: { templates: [{ name: 't', text: 'x' }], actions: [{ name: 'a', text: 'x', target: 'claude' }] } }] }))
+  assert.deepEqual(wentUp(a, own).sort(), ['projectAction', 'projectTemplate']) // a project's own, not the global ones
+  assert.deepEqual(wentUp(a, upsOf(view({ settings: { actions: [{ name: 'a', text: 'x', target: 'shell' }], workflows: true, specs: false } }))).sort(), ['action', 'experimental'])
 })

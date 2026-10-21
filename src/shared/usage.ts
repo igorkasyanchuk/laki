@@ -180,7 +180,7 @@ event or a schedule only once the user allows it as it is. answer is the user's 
   widget: `Extensions (widgets): small live pages in the sidebar, bars and rail. An agent may list, check, render and use
 their tools, and change where one shows and its settings (laki widget set; not a secret, its source or network
 access); turning one on is the user's. Places: side, top, status, rail, foot, desk, panel, row (per workspace). To make
-one, use the laki-widget skill.
+one, use the laki-widget skill (/laki:extension in Laki's Claude Code tabs).
 
   laki widget set my-prs --place desk --size 3x2   a tile on the Desk, 3 cells across, 2 down
   laki widget set my-prs --every 10 repo=acme/api   fetch every 10 minutes, its repo setting

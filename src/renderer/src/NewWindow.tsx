@@ -10,6 +10,7 @@ import { AiPage } from './Ai'
 import { Glyph } from './Glyph'
 import { VoiceBar } from './PromptInput'
 import { NewWorkspace } from './panels'
+import { DeviceTab } from './SidePanel'
 import { FONT_SIZE, termLook } from './Settings'
 import { Term } from './Term'
 import { applyTheme, type Paint, paintKey, paintOf, transparent } from './themes'
@@ -19,7 +20,7 @@ import { AskHost, IconButton, load, Tips } from './ui'
 const paint = (p: Paint) => applyTheme({ ...p, glass: false, sideClear: 0 })
 // only in those windows: main.tsx imports this module in the app's too
 const which = new URLSearchParams(location.search).get('window')
-if (which === 'new' || which === 'ai' || which === 'tab') {
+if (which === 'new' || which === 'ai' || which === 'tab' || which === 'sim') {
   const last = load<string | Paint>('laki.theme', '') // the app's, until the daemon's settings arrive
   paint(typeof last === 'string' ? { theme: last } : last)
   if (which === 'new') document.documentElement.classList.add('new-window') // compact: styles.css' .new-window rules
@@ -62,6 +63,29 @@ export function TabWindow() {
       <div className="tab-win-body">
         <Term key={transparent() ? 'clear' : 'solid'} tab={t.id} fontSize={Math.min(32, Math.max(8, (s.fontSize ?? FONT_SIZE) + zoom))} onFile={p => void bridge?.openPath?.(p)} fontFamily={s.fontFamily} copyOnSelect={s.copyOnSelect !== false} editKeys={s.editKeys !== false} theme={paintKey(paintOf(s))} look={termLook(s)} />
       </div>
+    </div>
+  )
+}
+
+// a simulator floated out of the side panel (its window button): that device alone, live, in a window over every app
+// (main's simWins, ?window=sim&device=<id>&ws=<workspace>: the camera's screenshot goes to that workspace's agent)
+export function SimWindow() {
+  const view = useView()
+  const q = new URLSearchParams(location.search)
+  const [device, ws] = [q.get('device') ?? '', q.get('ws') ?? '']
+  useEffect(() => void (document.title = 'Simulator — Laki'), [])
+  if (!view) return null
+  return (
+    <div className="tab-window sim-window">
+      <div className="tab-win-head">
+        <b>Simulator</b>
+        <span className="grow" />
+        <IconButton icon="x" title="Close" onClick={() => window.close()} />
+      </div>
+      <div className="sim-win-body">
+        <DeviceTab only={device} api={{ sim: p => api.call('sim', p), ...(ws && { toPrompt: (text: string) => api.call('send', { target: view.tabs.find(t => t.workspace === ws && t.kind === 'agent' && t.status !== 'exited')?.id ?? ws, text, enter: false }) }) }} />
+      </div>
+      <Tips />
     </div>
   )
 }
