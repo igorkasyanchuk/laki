@@ -1970,6 +1970,56 @@ test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an a
   assert.equal((await item()).untrusted, undefined)
 })
 
+test("a repo's workflow that an event or its schedule didn't start says so once per file version, and counts what it skipped", async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  // as git brings it (before any event reads the list)
+  const file = join(rig.repo, '.laki/workflows/x.md')
+  mkdirSync(dirname(file), { recursive: true })
+  const text = '# X\nruns in: here · on: custom.x\n\n## start\nnext: say\n\n## say\nrun: echo hi\nok: e\nfail: e\n\n## e\nend: success\n'
+  writeFileSync(file, text)
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'here' })
+  const c = await rig.connect()
+  t.after(() => c.close())
+  const item = () => rig.rpc('flowList', { project: p.id }).then((l: any[]) => l.find(w => w.id === 'x'))
+  const told = () => c.events.filter(e => e.ev === 'flow' && e.kind === 'refused')
+  const runs = async () => ((await rig.rpc('state')).flows ?? []).filter((r: any) => r.workflow === 'x').length
+  await rig.rpc('widgetEmit', { name: 'x', ws: ws.id })
+  await rig.rpc('widgetEmit', { name: 'x', ws: ws.id })
+  await until(() => told().length === 1, 'told')
+  assert.deepEqual(told().map(e => [e.name, e.wf, e.on, e.changed, e.id]), [['X', { id: 'x', source: 'project', project: p.id }, 'custom.x', false, undefined]])
+  assert.equal((await item()).skipped, 2)
+  // its schedule: refused (the schedule's failed run says why), one more skipped, not told again
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'x', source: 'project', project: p.id, trigger: 'schedule x' }), /isn't allowed as it is yet/)
+  assert.equal((await item()).skipped, 3)
+  await sleep(300)
+  assert.equal(told().length, 1)
+  // allowed: the count goes, the next event starts it
+  await rig.rpc('flowTrust', { id: 'x', project: p.id, text })
+  assert.equal((await item()).skipped, undefined)
+  await rig.rpc('widgetEmit', { name: 'x', ws: ws.id })
+  await until(async () => (await runs()) === 1, 'started')
+  await until(async () => ((await rig.rpc('state')).flows ?? []).every((r: any) => r.status === 'done'), 'done')
+  // changed in the repo: told again, as changed
+  writeFileSync(file, text.replace('echo hi', 'echo changed'))
+  await rig.rpc('widgetEmit', { name: 'x', ws: ws.id })
+  await until(() => told().length === 2, 'told again')
+  assert.equal(told()[1].changed, true)
+  // an agent's event counts like any other (trust first)
+  const ag = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await rig.rpc('widgetEmit', { name: 'x', ws: ws.id, from: { tab: ag.id } })
+  assert.equal((await item()).skipped, 2)
+  // trusted, an agent's event refused for its run block: not a skip, nothing told
+  await rig.rpc('flowTrust', { id: 'x', project: p.id, text: readFileSync(file, 'utf8') })
+  await rig.rpc('widgetEmit', { name: 'x', ws: ws.id, from: { tab: ag.id } })
+  assert.match((await rig.rpc('widgetEvents'))[0].refused[0], /an agent sent the event/)
+  await sleep(300)
+  assert.equal(told().length, 2)
+  assert.equal((await item()).skipped, undefined)
+  assert.equal(await runs(), 1)
+})
+
 test("a worktree workflow on workspace.new, or on tab.new with a setup script, never starts itself on its own run's worktree", async t => {
   const rig = await fresh(t, { config: { setup: 'echo set up' } })
   const p = await rig.rpc('projectAdd', { path: rig.repo })

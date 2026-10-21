@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: a repo's workflow that isn't allowed yet (or changed since) tells you the first time an event or its
+  schedule doesn't start it, with *Look…*, and its row counts what it skipped.
 - Workflows: a *Wait* on CI that fails gives the next block the end of the failed GitHub Actions logs,
   `{{steps.<id>.log}}`, as *fix CI* sends them, so an agent sees why, not only which check.
 - Workflows: *Only when* tests filter the event that starts one (`only when: event.pr.draft equals "false"`), a

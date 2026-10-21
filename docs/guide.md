@@ -1181,7 +1181,9 @@ None come with Laki: *New workflow* ▾ makes one. *From scratch*: yours (any pr
 project's workflow that came with the repo (git brought it, or it changed since) is *not allowed*: events, schedules
 and agents don't start it until you Save it in its editor or *Allow…* it (which shows the file). Its banner says the
 event it starts on (*starts on `tab.new` once you allow it*), and that it changed when a pull or an agent's edit did;
-an edit asks again, and an agent can't allow one.
+an edit asks again, and an agent can't allow one. The first event or scheduled run it skips tells you once, with a
+notification and a note (*Look…* opens it; you allow it there, never from the note), and again only when the file
+changes; its row counts what it skipped since Laki started (*3 events skipped*).
 Your own Start runs it, saying it's from the repo. *With
 Laki AI…*: say what it should do; its chat asks you a few questions first (what starts it, its steps, where it routes,
 how it tells you), then writes it, and the workflow opens as it's written. A row's ⋯ copies or deletes it; so does the

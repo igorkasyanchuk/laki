@@ -26,7 +26,7 @@ import type { UiDo, UiProblem } from '../../shared/widgetUi'
 import { globMatch, pressOf } from '../../shared/widgetSchema'
 import { type ExtTab, ExtensionPage } from './Extension'
 import { ComparePage } from './Compare'
-import type { FlowStartAt } from './Workflows'
+import type { FlowStartAt, Sel as FlowSel } from './Workflows'
 import { FLOW_ENDED, type WorkflowItem } from '../../shared/workflow'
 import { Glyph, rollup } from './Glyph'
 import icon from './icon.svg'
@@ -171,7 +171,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'achievements' | 'bird' | 'ai' | 'calendar' | 'desk' | 'todos' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt; wf?: FlowSel } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -1016,6 +1016,16 @@ export function App() {
       } else if (m.ev === 'flow') {
         // a workflow run asks you, shows you something (a window, maybe a notification), or ended (a notify end, a failure)
         const s = viewRef.current?.settings
+        if (m.kind === 'refused') {
+          // a repo's workflow an event or its schedule didn't start (once per file version): Look… opens it, where its
+          // sheet shows the file before Allow; never an Allow here
+          if (s?.notify === false) return
+          const look = () => setDialog({ workflows: '', wf: m.wf })
+          const words = `${m.name} didn't start on ${m.on === 'schedule' ? 'its schedule' : m.on}: ${m.changed ? 'it changed in the repo since you allowed it' : "it comes with the repo and isn't allowed yet"}`
+          notify(`Workflow · ${m.name}`, words.slice(0, 200), '', look, s?.notifySound)
+          toast(words.slice(0, 160), look, 'Look…')
+          return
+        }
         const open = () => setDialog({ workflows: '', run: m.id })
         // a window (a Show you's unless modal: no; an end's with modal: yes) and a popover, each as the block says
         const win = m.kind === 'show' ? { run: m.id, name: m.name, title: m.text, body: m.body ?? '' } : { run: m.id, name: m.name, title: `${m.name}: ${m.status}`, body: m.text ?? '' }
@@ -3686,12 +3696,12 @@ export function App() {
           flowsOn && (
             <Suspense fallback={<Waiting title="Workflows" onClose={() => setDialog(null)} />}>
               <WorkflowsPage
-                key={o.run ?? (o.start ? JSON.stringify(o.start) : '')}
+                key={o.run ?? (o.start ? JSON.stringify(o.start) : o.wf ? JSON.stringify(o.wf) : '')}
                 view={view}
                 projects={view.projects.filter(p => !p.kind)}
                 presets={view.presets.filter(p => !p.off)}
                 actions={settings.actions}
-                at={{ run: o.run, start: o.start }}
+                at={{ run: o.run, start: o.start, wf: o.wf }}
                 onClose={() => setDialog(null)}
                 api={{
                   call,

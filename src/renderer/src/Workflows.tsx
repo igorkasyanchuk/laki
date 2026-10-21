@@ -28,7 +28,7 @@ export type WorkflowsApi = {
   globals?: Record<string, string> // Settings' flowVars: {{vars.NAME}} in every workflow
   setGlobals?: (v: Record<string, string>) => Promise<unknown>
 }
-type Sel = { id: string; source: WorkflowSource; project?: string }
+export type Sel = { id: string; source: WorkflowSource; project?: string }
 export type FlowStartAt = Sel & { ws?: string } // the page opened on a workflow's Run sheet, in that workspace
 const WHERE_TAGS: Record<string, string> = { worktree: 'worktree', main: 'project folder', here: 'a workspace you pick' }
 type Ext = { id: string; name: string; on: boolean; every?: number } // what an extension block can fetch
@@ -52,9 +52,9 @@ function agentActions(global: RunAction[] | undefined, projects: Project[], item
 }
 const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daemon's actions have no slug)
 
-export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt }; api: WorkflowsApi; onClose: () => void }) {
+export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
-  const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : { kind: 'index' })
+  const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : first?.wf ? { kind: 'wf', sel: first.wf } : { kind: 'index' }) // wf: a refused one's Look…
   const [starting, setStarting] = useState<WorkflowItem | null>(null)
   const [startWs, setStartWs] = useState(first?.start?.ws) // Run workflow › from a workspace's menu or ⌘K: that one, fixed
   const startIn = (w: WorkflowItem | null, ws?: string) => (setStartWs(ws), setStarting(w))
@@ -252,6 +252,7 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
                           <span className="tag">{w.blocks.length} blocks</span>
                           {w.byAgent && <span className="tag warn">by an agent</span>}
                           {w.untrusted && !w.byAgent && <span className="tag warn">{w.changed ? 'changed' : 'not allowed'}</span>}
+                          {w.untrusted && !!w.skipped && <span className="tag warn" data-tip="Events or scheduled runs that didn’t start it since Laki started">{w.skipped === 1 ? '1 event skipped' : `${w.skipped} events skipped`}</span>}
                           {drafts.has(keyOf(w)) && <span className="tag warn">unsaved changes</span>}
                         </span>
                       </button>

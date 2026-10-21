@@ -126,7 +126,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `FILE_MAX`), `todoAdd` `images` taking its paths, the socket's `maxPayload` 34 MB, a preset's `perm` and `fast` (a tab's unset: its
 profile's; `''`, `false`: none), Workflows and Specs & Brainstorms on unless `workflows`/`specs` is false (`flowsOn`, `specsOn`; the
 view's `flows` by default), cloud workspaces (`settings.cloud`): `wsNew` `codespace` (a machine type), `csMachines`, a workspace's
-`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`). A
+`codespace`, `csState` and `csError`; 105: workflows' `only when:` (`Workflow.when`, `whenProblem`), a run's `evWs` and `hops`; a failed wait's `steps.<id>.log` (core's `ciLogs`); the `flow` event's `kind: 'refused'`, a workflow item's `skipped`. A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
 - state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
@@ -1120,7 +1120,13 @@ main.ts maps an agent's tab to it) and `flowTrust` (`text`: the file as the shee
 `item`'s `untrusted` otherwise (`changed`: trusted once, another text now): `flowStart` refuses it for `by: 'agent'`, an `event` and a `schedule ` trigger, `eventHooks.flows`
 says so in `refused` (reading a project's file again at each event, not the 10 s list); the editor's banner (the `on:`
 event it starts on, or that it changed; *Allow…*: `choose` with the file), the index's *not allowed* / *changed* tag,
-StartRun's note.
+StartRun's note. `refused(wf, on)` (only at the listener's `untrusted` refusal, with the event's name, and `flowStart`'s
+for a `schedule ` trigger, `'schedule'`; never for other reasons, an agent's `flowStart` or a try) counts the skip in
+`skipped` (in memory, by `agentKey`; `item` gives an untrusted one's as `WorkflowItem.skipped`, the index's *n events
+skipped*; `flowStart` drops it from `r.flow`) and, once per file version (`told`: its `textHash`), broadcasts `flow`
+`kind: 'refused'` (`name`, `wf` `{id, source, project}`, `on`, `changed`; no `id`: not a run) and bumps `flowFiles.at`;
+`trust()` clears both. App's flow handler: a notification and a toast (*Look…*: the dialog's `wf`, `WorkflowsPage`'s
+`at.wf`, its editor; never an Allow there).
 `broadcast` `flow` (waiting, end with `notify` or a failure, show): App's notification and toast (api.ts reads a
 message with `ev` as an event, though it has an `id`: the run's). A tab an agent block sends a
 prompt gets `flow` (the run; `flowForget` clears it), and the status bar's `.sb-flow` shows the run of the focused tab, else of the

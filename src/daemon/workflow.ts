@@ -51,7 +51,8 @@ function item(text: string, id: string, source: WorkflowSource, project?: string
   const { workflow, problems } = parse(text, id)
   const was = source === 'project' ? state.flowTrust?.[agentKey(source, id, project)] : undefined
   const untrusted = source === 'project' && was !== textHash(text)
-  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(byAgent(agentKey(source, id, project)) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }) }) }
+  const k = agentKey(source, id, project)
+  return { ...workflow, source, project, path, text, problems: [...problems, ...check(workflow)], ...(byAgent(k) && { byAgent: true }), ...(untrusted && { untrusted: true, ...(was && { changed: true }), ...(skipped.get(k) && { skipped: skipped.get(k) }) }) }
 }
 // a project's workflow (.laki/workflows: the repo's, git may bring it) is trusted by its text's hash once you save it in
 // the editor or trust it in its sheet (flowTrust); one that isn't (new from git, changed since) never starts on an
@@ -59,7 +60,25 @@ function item(text: string, id: string, source: WorkflowSource, project?: string
 const textHash = (t: string) => createHash('sha256').update(t).digest('hex')
 function trust(source: WorkflowSource, id: string, project: string | undefined, text: string) {
   if (source !== 'project') return
-  state.flowTrust = { ...state.flowTrust, [agentKey(source, id, project)]: textHash(text) }
+  const k = agentKey(source, id, project)
+  state.flowTrust = { ...state.flowTrust, [k]: textHash(text) }
+  skipped.delete(k)
+  told.delete(k)
+}
+// an untrusted one an event or a schedule would have started: counted (skipped, the index's row), and told once per
+// workflow and file version (told: the text's hash): a notification and a toast, Look… opens it (never an Allow: you
+// read it first). In memory: a restart forgets them. ponytail: an open index's count moves on the first skip and as
+// the page opens, not at each one
+const skipped = new Map<string, number>()
+const told = new Map<string, string>()
+function refused(wf: WorkflowItem, on: string) {
+  const k = agentKey(wf.source, wf.id, wf.project)
+  skipped.set(k, (skipped.get(k) ?? 0) + 1)
+  if (told.get(k) === textHash(wf.text)) return
+  told.set(k, textHash(wf.text))
+  broadcast({ ev: 'flow', kind: 'refused', name: wf.name, wf: { id: wf.id, source: wf.source, project: wf.project }, on, changed: !!wf.changed })
+  flowFiles.at = Date.now()
+  changed()
 }
 export function flowTrust(o: Ref & { text: string }) {
   on()
@@ -390,6 +409,7 @@ export async function flowStart(o: Start) {
   // one an agent wrote: only the app's Start in its editor (editor, never an agent's) runs it until the user saves it;
   // not a schedule, an event, Run again, Run from here, the CLI or MCP
   if (wf.byAgent && (o.by === 'agent' || !o.editor)) throw new Error(`an agent wrote ${wf.name}: the user runs it first, from its editor in Laki's Workflows, or saves it there once they've read it`)
+  if (wf.untrusted && o.trigger?.startsWith('schedule ')) refused(wf, 'schedule')
   if (wf.untrusted && (o.by === 'agent' || o.event || o.trigger?.startsWith('schedule '))) throw new Error(`${wf.name} comes with the repo and isn't allowed as it is yet: open it in Laki's Workflows, read it, then Allow or Save it`)
   // each agent block's model, effort, permission mode and fast mode for its preset's agent, before any workspace is made
   for (const b of wf.blocks.filter(x => x.kind === 'agent')) {
@@ -417,7 +437,7 @@ export async function flowStart(o: Start) {
   const ahead = runs().filter(r => r.status === 'queued' && runOf(r, wf)).length
   const queue = busy >= atOnce || ahead > 0
   if (queue && ahead >= QUEUE_MAX) throw new Error(`${wf.name} has ${ahead} runs waiting their turn already (at once: ${atOnce}): stop one, or wait`)
-  const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, ...flow } = wf
+  const { source, project, path, text, problems, byAgent: _, untrusted: _u, changed: _c, skipped: _s, ...flow } = wf
   const r: FlowRun = { id: randomUUID().slice(0, 8), workflow: wf.id, source, flow: JSON.parse(JSON.stringify(flow)), project: proj.id, ...(pick && { pick: pick.id }), where: wf.where, session: wf.session, ...(o.dry && { dry: true }), task, trigger: o.trigger || 'you', ...((o.agent || o.by === 'agent') && { by: o.agent || 'agent' }), ...(o.evWs && { evWs: o.evWs }), ...(o.hops && { hops: o.hops }), status: queue ? 'queued' : 'running', visits: {}, vars: { task, project: proj.name, ...inputs, ...(o.event && eventVars(o.event)) }, tabs: {}, turns: 0, decisions: [], log: [], started: Date.now() }
   if (old) r.of = old.id
   if (old && o.from) Object.assign(r, { first: o.from.block, vars: { ...old.vars, ...r.vars }, visits: { ...old.visits }, tabs: { ...old.tabs }, ...(old.resume && { resume: { ...old.resume } }) }) // its state, that block next
@@ -1403,7 +1423,7 @@ eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
     if (!ws) { no('the event has no workspace, so no project'); continue }
     if (wf.problems.length) { no(wf.problems[0]); continue }
     if (wf.byAgent) { no('an agent wrote it: save it in Workflows first'); continue }
-    if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); continue }
+    if (wf.untrusted) { no(`from the repo, ${wf.changed ? 'changed since you allowed it' : 'not allowed as it is'}: open it in Workflows, then Allow or Save it`); refused(wf, name); continue }
     if (hops > HOPS_MAX) { no(`${hops} hops: a loop of events? dropped`); continue }
     // ponytail: no switch to let agents' events run commands; add one to the workflow's head if it's wanted
     if (agent && (bypass(wf).length || wf.blocks.some(b => b.kind === 'run' || b.kind === 'webhook' || b.kind === 'extension' || (b.kind === 'action' && OUTWARD.includes(b.action ?? ''))))) { no('an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'); continue }
