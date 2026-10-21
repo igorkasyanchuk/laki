@@ -1,12 +1,12 @@
 import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
-import { aiOn, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
+import { aiOn, jobOf, type Account, type StudioChat, type Gate, type GateHeld, type WidgetLogLine, type WidgetRuns, againOnEnter, placesOf, type RunScript, type AccountView, type CompactLogLine, AGENT_NAMES, API, HOME_ACCOUNT, isAccountAgent, RAIL_PINS, rowsOf, type WsSort, type Doctor, type LogLine, type MergeMethod, PR_SCAN, PR_TRIES, prAllows, prIn, type PR, type PRLabel, type Project, type ProjectLook, type Sep, type SideLook, type NotifyKind, type PlanKind, type PlanPin, type ProjectConfig, type Resources, type TabView, type View, type WidgetCtx, type WidgetMenu, type WidgetView, type WorkspaceView } from '../../shared/types'
 import { planTemplates, specPrompt } from '../../shared/plans'
 import { stamp } from '../../shared/when'
 import { api, bridge, daemonBase, reportView, type Msg, notify, type NotifyAction, onLakiLink, openExternal, openKeptLink, pageNow } from './api'
 import { DOCK_ICONS, dockPng } from './dock'
 import { BrowserPane } from './Browser'
-import { ago, type AutoKey, Avatar, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
-import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
+import { ago, type AutoKey, Avatar, type Check, CiMark, ciText, type FixWhat, InfoTab, type LabelApi, MERGE_WORDS, type PRAct, prState, PRStatus, REVIEW, reviewersText, type WsInfo } from './Info'
+import { About, AddProject, type Artifact, ArtifactsBar, ArtifactView, VIEWED, CiLog, Fun, Logs, OnboardBar, Onboarding, ProjectNotes, type Meme, NewWorkspace, type NewWsParams, Palette, type PaletteItem, Prompt, Ready, RemindDialog, SendLaterDialog, type Shot, StarLaki, STEPS, StopwatchBar, TimerBar, TimerDialog, Video, videoCommand, Welcome } from './panels'
 import { type AccountsApi, type AppInfo, FONT_SIZE, isSection, PAGE_ZOOMS, RAIL_ITEMS, railSorted, SettingsPage, type SkillInfo, termLook, type WidgetsApi } from './Settings'
 import { AiPage } from './Ai'
 import { Picker, PICKER_KEY } from './Picker'
@@ -166,7 +166,7 @@ function toolShow() {
     toolShow()
   })
 }
-type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt } | { note: string }
+type Dialog = null | 'new' | 'project' | 'palette' | 'onboard' | 'files' | 'ship' | 'custom' | 'settings' | 'help' | 'about' | 'board' | 'bird' | 'ai' | 'calendar' | 'desk' | 'schedules' | 'fun' | 'video' | 'timer' | { timer: string } | { timerNote: string } | { remind: string } | { sendLater: string; edit?: string; to?: string; text?: string; back?: 'ai' } | { timerCmd: string } | { schedules: string } | { compare: string } | { widget: string; back?: Dialog } | { extension: string; back?: Dialog; tab?: ExtTab; edit?: string } | { uikit: true; icons?: boolean; back?: Dialog } | { studio: string; back?: Dialog; first?: DeskAsk; key?: string } | { settings: string; script?: 'run'; spot?: string } | { section: string; spot?: string } | { rename: string } | { renameWs: string } | { sep: string; id?: string } | { logs: string; title: string; back?: Dialog } | { attachPr: string } | { ciLog: string; job: string; name: string; url?: string } | { notes: string } | { project: string; tab?: ProjectTab } | { specs: string; kind?: PlanKind; slug?: string } | { workflows: string; run?: string; start?: FlowStartAt } | { note: string }
 
 // the Scheduled tasks page: closed (undefined), all projects (''), or a project's (its ⋯ menu)
 const schedulesOf = (d: Dialog) => (d === 'schedules' ? '' : d && typeof d === 'object' && 'schedules' in d ? d.schedules : undefined)
@@ -1949,7 +1949,9 @@ export function App() {
     if (k === 'autoLand' && v && !(await ask(`Merge ${w.pr ? `PR #${w.pr.number}` : 'the PR'} when it's green?`, { text: `Laki will ${MERGE_WORDS[cfgOf(w)?.mergeMethod ?? 'squash'].toLowerCase()} it as you and delete its branch on GitHub, once every check passes, it has no conflicts, isn't a draft, is approved if the repo asks for a review and its agent isn't working.`, ok: 'Merge when green' }))) return
     call('wsSet', { id: w.id, [k]: v }).catch(() => {})
   }
-  const prFix = (w: WorkspaceView, what: FixWhat) => call('prFix', { ws: w.id, what }).then(() => toast('Sent to the agent'), () => {})
+  // job: only that check's (its Log's Send to the agent); whether it went
+  const prFix = (w: WorkspaceView, what: FixWhat, job?: string) => call('prFix', { ws: w.id, what, job }).then(() => (toast('Sent to the agent'), true), () => false)
+  const ciLog = (w: WorkspaceView, c: Check) => (job => (job ? setDialog({ ciLog: w.id, job, name: c.name, url: c.url }) : c.url && openExternal(c.url)))(jobOf(c.url)) // other CI: its page
   // GitHub asked again now, not at the next scan (every settings.prScan minutes)
   const refreshPR = () => call('prRefresh').then(() => done('PR status: fresh from GitHub'), () => {})
   // the PR section's Labels: the repo's, and one put on or taken off (gh pr edit, as you)
@@ -3225,6 +3227,7 @@ export function App() {
               onOpen={openExternal}
               onToggle={(k, v) => setAuto(ws, k, v)}
               onFix={what => prFix(ws, what)}
+              onLog={c => ciLog(ws, c)}
               onAct={(act, method) => prAct(ws, act, method)}
               onLabel={labelApi(ws)}
               root={artsIn === ws.id ? 'artifacts' : 'ws'}
@@ -3236,6 +3239,7 @@ export function App() {
                 onOpen={url => void openKeptLink(url).catch(fail) /* its .url links too: a file:/// one */}
                 onToggle={(k, v) => setAuto(ws, k, v)}
                 onFix={what => prFix(ws, what)}
+                onLog={c => ciLog(ws, c)}
                 onAct={(act, method) => prAct(ws, act, method)}
                 onLabel={labelApi(ws)}
                 onRename={() => setDialog({ renameWs: ws.id })}
@@ -3939,6 +3943,18 @@ export function App() {
           }}
         />
       ))(live.find(w => w.id === dialog.attachPr))}
+      {dialog && typeof dialog === 'object' && 'ciLog' in dialog && (w => w && (
+        <CiLog
+          key={dialog.job}
+          name={dialog.name}
+          url={dialog.url}
+          load={() => api.call<string>('prLog', { ws: w.id, job: dialog.job }) /* its failure shows in it, not as a toast */}
+          onSend={() => prFix(w, 'ci', dialog.job)}
+          onOpen={openExternal}
+          copy={copy}
+          onClose={() => setDialog(null)}
+        />
+      ))(live.find(w => w.id === dialog.ciLog))}
       {dialog && typeof dialog === 'object' && 'renameWs' in dialog && live.some(w => w.id === dialog.renameWs) && (
         <Prompt
           title="Rename workspace"

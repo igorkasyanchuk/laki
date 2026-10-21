@@ -145,6 +145,8 @@ export const PR_PROMPTS: Record<FixWhat, string> = {
   conflict:
     'PR #{{pr}} ({{url}}) has merge conflicts with {{base}}. Merge it in (git fetch origin {{base}}, then git merge origin/{{base}}; no rebase, no force push), resolve the conflicts keeping what both sides meant, run what you can locally, then commit and push the merge, then say what you changed.',
 }
+// a GitHub Actions check's job id, from its link (…/actions/runs/<run>/job/<id>): what gh run view --job takes; other CI: none
+export const jobOf = (url = '') => /\/actions\/runs\/\d+\/job\/(\d+)/.exec(url)?.[1]
 // the first GitHub PR a prompt names ("review https://github.com/o/r/pull/12"): the new workspace is named after it
 // and linked to it
 export const prIn = (text = '') => /https:\/\/github\.com\/[\w.-]+\/[\w.-]+\/pull\/\d+/.exec(text)?.[0]
@@ -690,5 +692,5 @@ export type PlanPin = { project: string; kind: PlanKind; slug: string; title: st
 // outlives app updates) gets a restart button in the status bar. Bump it when the renderer starts relying
 // on a new method or behavior of the daemon.
 export const RAIL_PINS = 5 // the rail's quick access: workspaces, terminals or browsers pinned there
-export const API = 95
+export const API = 96
 export const REPO = 'https://github.com/igorkasyanchuk/laki' // About's and Help's links, the widget schema's raw URL

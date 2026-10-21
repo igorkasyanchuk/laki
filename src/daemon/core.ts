@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { promisify } from 'node:util'
 import { dataDir } from '../shared/conn.ts'
-import { actionSlug, type Gate, type GateHeld, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
+import { actionSlug, type Gate, type GateHeld, FAST, PERMS, permArgs, againOnEnter, AGENT_NAMES, AGENTS, REMOTE_TRIES, SLEEP_AFTER, IMAGE_DAYS, isAccountAgent, API, type Agent, type Check, type Doctor, EFFORTS, agentVars, fillTemplate, fillVars, rowsOf, taskTitle, type FixWhat, jobOf, type LogLine, type Memory, MEMORY_AUTO_LEN, MEMORY_MAX, type PR, type PRLabel, PR_PROMPTS, PR_SCAN, PR_TRIES, type PRFix, prIn, type Preset, type PRAllow, prAllows, refsIn, RUN_SCRIPTS, type RunScript, MERGE_METHODS, type MergeMethod, type Proc, type ProcUse, type Project, type ProjectConfig, RAIL_PINS, REMOTE, type Remote, type Resources, type RunAction, type Schedule, type ScheduleRun, type Sep, type Settings, type Stat, type State, type Status, type Tab, type TabView, type Reminder, REMINDERS_MAX, type Template, type Todo, type Tunnel, type Link, type View, type Webhook, type Workspace, WS_SORTS, type WsSort, isAgent } from '../shared/types.ts'
 import { nextRun, parseAt, parseWhen, stamp, wsTitle } from '../shared/when.ts'
 import { type Edge, groupsOf, type Layout, move, tabsOf as paneTabs } from '../shared/layout.ts'
 import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../shared/workflow.ts'
@@ -3708,9 +3708,38 @@ function prPrompt(what: FixWhat, pr: PR) {
   return fillTemplate(String(state.settings?.prPrompts?.[what] ?? '').trim() || PR_PROMPTS[what], v)
 }
 
+// the end of a GitHub Actions job's failed steps' log (gh run view --log-failed): its last 80 lines without colors or
+// gh's job, step and time before each; steps: a "▸ <step>" line where each step's lines start
+async function failedLog(at: At, job: string, steps = false) {
+  const { stdout } = await exec(at, 'gh', ['run', 'view', '--job', job, '--log-failed'], { timeout: 30000, maxBuffer: 32 << 20 }).catch(e => {
+    throw new Error(`gh couldn't read the log: ${String(e.stderr || '').trim().split('\n')[0] || (e.killed ? 'no answer in 30 s' : 'it failed')}`)
+  })
+  let step: string | undefined
+  return stdout
+    .trimEnd()
+    .split('\n')
+    .slice(-80)
+    .flatMap(l => {
+      const s = /^[^\t]*\t([^\t]*)\t/.exec(l)?.[1]
+      const head = steps && s !== undefined && s !== step ? [`▸ ${(step = s)}`] : []
+      return [...head, l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/^[^\t]*\t[^\t]*\t\S+ ?/, '')]
+    })
+    .join('\n')
+    .trim()
+}
+
+// prLog: a failing check's log for the app (Info's and Review's Log), its steps named
+export async function prLog(o: { ws: string; job: string }) {
+  const ws = findWs(o.ws)
+  if (!prs.get(ws.id)) throw new Error(`${ws.id} has no PR`)
+  const job = String(o.job ?? '')
+  if (!/^\d+$/.test(job)) throw new Error('job: a GitHub Actions job id')
+  return failedLog(ws, job, true)
+}
+
 // prFix sends the PR's failing CI (with the end of the failed GitHub Actions logs), its open review comments or its
-// merge conflicts to the workspace's agent
-export async function prFix(o: { ws: string; what: FixWhat }) {
+// merge conflicts to the workspace's agent; job: only that check's (a check's Log › Send to the agent)
+export async function prFix(o: { ws: string; what: FixWhat; job?: string }) {
   const ws = findWs(o.ws)
   const pr = prs.get(ws.id)
   if (!pr) throw new Error(`${ws.id} has no PR`)
@@ -3726,23 +3755,16 @@ export async function prFix(o: { ws: string; what: FixWhat }) {
   }
   // gh exits non-zero while checks fail
   const { stdout } = await exec(ws, 'gh', ['pr', 'checks', String(pr.number), '--json', 'name,bucket,link'], { timeout: 20000 }).catch(e => ({ stdout: String(e.stdout ?? '') }))
-  const failing = (JSON.parse(stdout.trim() || '[]') as { name: string; bucket: string; link: string }[]).filter(c => c.bucket === 'fail')
-  if (!failing.length) throw new Error(`no failing checks on PR #${pr.number}`)
+  const failing = (JSON.parse(stdout.trim() || '[]') as { name: string; bucket: string; link: string }[]).filter(c => c.bucket === 'fail' && (!o.job || jobOf(c.link) === String(o.job)))
+  if (!failing.length) throw new Error(o.job ? `that check isn't failing on PR #${pr.number} now` : `no failing checks on PR #${pr.number}`)
   wsLog(ws, `fix CI: gh pr checks: ${failing.length} failing: ${failing.map(c => c.name).join(', ')}`)
   let body = ''
   let logs = 0
   for (const c of failing) {
     body += `\n## ${c.name}\n${c.link}\n`
-    const job = c.link?.match(/\/actions\/runs\/\d+\/job\/(\d+)/)?.[1]
+    const job = jobOf(c.link)
     if (job && logs < 3) {
-      const out = await exec(ws, 'gh', ['run', 'view', '--job', job, '--log-failed'], { timeout: 30000, maxBuffer: 32 << 20 }).then(r => r.stdout, () => '')
-      const tail = out
-        .trimEnd()
-        .split('\n')
-        .slice(-80)
-        .map(l => l.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '').replace(/^[^\t]*\t[^\t]*\t\S+ ?/, ''))
-        .join('\n')
-        .trim()
+      const tail = await failedLog(ws, job).catch(() => '')
       if (tail) {
         logs++
         body += `End of the failed steps' log (all of it: gh run view --job ${job} --log-failed):\n${tail}\n`

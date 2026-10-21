@@ -19,7 +19,9 @@ case "$1 $2" in
   "pr view") f pr.json || echo '{"number":42,"state":"OPEN","url":"https://example.invalid/pr/42","statusCheckRollup":[{"__typename":"CheckRun","status":"IN_PROGRESS","conclusion":""}]}' ;;
   "pr checks") f checks.json || echo '[]'; exit 8 ;;
   "pr review"|"pr close"|"pr merge"|"pr edit") f refuse >&2 && exit 1; exit 0 ;;
-  "run view") f run.log ;;
+  "run view") # --log-failed: $FAKE_GH/run-<job>.log, else run.log, else gh's 404
+    j=; p=; for a in "$@"; do [ "$p" = --job ] && j=$a; p=$a; done
+    f "run-$j.log" || f run.log || { echo 'failed to get run log: HTTP 404: Not Found (https://api.github.com/repos/o/r/actions/jobs/'"$j"'/logs)' >&2; exit 1; } ;;
   "api graphql") f graphql.json || exit 1 ;;
   "api user") f user || echo me ;;
   "label list") f labels.json || echo "[]" ;;

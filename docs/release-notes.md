@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- A failing check in Info and Review has **Log**: the end of its failed steps, so you see why CI is red before you
+  decide who fixes it. *Send to the agent* sends that check alone, *Copy*, *Open on GitHub*.
 - **Laki AI, Voice, My Desk, Bird view and Laki AI's glow are no longer experimental**: on by default. Turn one off in
   Settings › AI (Laki AI, its glow), Settings › Voice, or Settings › General › Pages (My Desk, Bird view).
 

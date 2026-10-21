@@ -45,6 +45,16 @@ writeFileSync(
     statusCheckRollup: [check('lint', 'SUCCESS', 'COMPLETED', 18), check('test (node 22)', 'FAILURE', 'COMPLETED', 72), check('build', 'SUCCESS', 'COMPLETED', 141), check('e2e', '', 'IN_PROGRESS'), check('deploy preview', 'SKIPPED')],
   }),
 )
+// the failing check's log (Info's Log) and gh pr checks' answer (its Send to the agent)
+const step = (name: string, lines: string[]) => lines.map(l => `test (node 22)\t${name}\t${ago(60)} ${l}`)
+writeFileSync(
+  join(home, 'gh/run.log'),
+  [
+    ...step('Run npm ci', ['added 312 packages in 9s']),
+    ...step('Run npm test', ['> shop@1.0.0 test', '> node --test', '', '\x1b[32m✔ total sums prices\x1b[0m (0.8ms)', '\x1b[31m✖ total rounds to cents\x1b[0m (1.2ms)', '  AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:', '', '  0.30000000000000004 !== 0.3', '', '      at TestContext.<anonymous> (file:///home/runner/work/shop/shop/src/cart.test.js:4:10)', 'ℹ tests 2', 'ℹ pass 1', 'ℹ fail 1', '##[error]Process completed with exit code 1.']),
+  ].join('\n') + '\n',
+)
+writeFileSync(join(home, 'gh/checks.json'), JSON.stringify([{ name: 'test (node 22)', bucket: 'fail', link: check('test (node 22)', 'FAILURE').detailsUrl }]))
 // review threads, for the side panel's Review tab; the PR's files as you've marked them viewed, for Changes
 const said = (login: string, body: string, secs = 7200) => ({ author: { login, __typename: 'User' }, authorAssociation: 'MEMBER', body, createdAt: ago(secs) })
 writeFileSync(

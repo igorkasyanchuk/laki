@@ -2,7 +2,7 @@
 // switches that send failing CI or new review comments to the agent. App.tsx maps a
 // workspace to WsInfo.
 import { type CSSProperties, type MouseEvent, type ReactNode } from 'react'
-import { MERGE_METHODS, type MergeMethod, type PRLabel, type PRPerm } from '../../shared/types'
+import { jobOf, MERGE_METHODS, type MergeMethod, type PRLabel, type PRPerm } from '../../shared/types'
 import { Folded } from './MarkdownView'
 import { shortPath } from './text'
 import { type Tunnel } from './Tunnel'
@@ -230,7 +230,8 @@ const CK: Record<Check['state'], { order: number; word: string; icon: IconName }
 }
 const took = (s: number) => (s < 60 ? `${s}s` : s < 3600 ? `${Math.floor(s / 60)}m ${s % 60}s` : `${Math.floor(s / 3600)}h ${Math.floor(s / 60) % 60}m`)
 
-function Checks({ pr, onOpen }: { pr: PRInfo; onOpen: (url: string) => void }) {
+// onLog: a failing GitHub Actions check's Log button (other CI has no job to read)
+function Checks({ pr, onOpen, onLog }: { pr: PRInfo; onOpen: (url: string) => void; onLog?: (c: Check) => void }) {
   const list = [...(pr.list ?? [])].sort((a, b) => CK[a.state].order - CK[b.state].order)
   const count = (s: Check['state']) => list.filter(c => c.state === s).length
   return (
@@ -242,13 +243,25 @@ function Checks({ pr, onOpen }: { pr: PRInfo; onOpen: (url: string) => void }) {
         </span>
       </h4>
       {!list.length && <span className="muted small">No checks</span>}
-      {list.map((c, i) => (
-        <a key={i} className={`pr-check ck-${c.state}`} href={c.url} data-tip={c.url && 'Its details and log'} onClick={e => (e.preventDefault(), c.url && onOpen(c.url))}>
-          <Icon name={CK[c.state].icon} />
-          <span className="pr-check-name">{c.name}</span>
-          {!!c.took && <span className="muted">{took(c.took)}</span>}
-        </a>
-      ))}
+      {list.map((c, i) => {
+        const row = (
+          <a key={i} className={`pr-check ck-${c.state}`} href={c.url} data-tip={c.url && 'Its details and log'} onClick={e => (e.preventDefault(), c.url && onOpen(c.url))}>
+            <Icon name={CK[c.state].icon} />
+            <span className="pr-check-name">{c.name}</span>
+            {!!c.took && <span className="muted">{took(c.took)}</span>}
+          </a>
+        )
+        return c.state === 'fail' && onLog && jobOf(c.url) ? (
+          <div key={i} className="pr-check-row">
+            {row}
+            <button className="pr-send" data-tip="The end of its failed steps' log" onClick={() => onLog(c)}>
+              <Icon name="fileText" /> Log
+            </button>
+          </div>
+        ) : (
+          row
+        )
+      })}
     </div>
   )
 }
@@ -262,7 +275,7 @@ const SEND: Record<FixWhat, [string, string]> = {
 
 // the PR: title, state, actions, its description, checks, and what the agent fixes (info panel, side panel)
 // threads: its open review threads (the side panel's), unknown in the info panel: Send review comments shows then
-export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach, onDetach, onLabel }: { w: WsInfo; threads?: number; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onAttach?: () => void; onDetach?: () => void; onLabel?: LabelApi }) {
+export function PRSection({ w, threads, onOpen, onToggle, onFix, onLog, onAct, onAttach, onDetach, onLabel }: { w: WsInfo; threads?: number; onOpen: (url: string) => void; onToggle: (k: AutoKey, v: boolean) => void; onFix: (what: FixWhat) => void; onLog?: (c: Check) => void; onAct: (act: PRAct, method?: MergeMethod) => void; onAttach?: () => void; onDetach?: () => void; onLabel?: LabelApi }) {
   const pr = w.pr
   const open = pr?.state === 'OPEN'
   const can = (k: PRPerm) => w.allow?.[k] ?? k !== 'land'
@@ -399,7 +412,7 @@ export function PRSection({ w, threads, onOpen, onToggle, onFix, onAct, onAttach
             </button>
           </div>
           {pr.body?.trim() && <Folded key={pr.url} text={pr.body.trim()} lines={6} />}
-          {open && <Checks pr={pr} onOpen={onOpen} />}
+          {open && <Checks pr={pr} onOpen={onOpen} onLog={onLog} />}
           {open && (
             <div className="pr-block">
               <h4>Let the agent fix</h4>
@@ -428,6 +441,7 @@ export function InfoTab(p: {
   onOpen: (url: string) => void
   onToggle: (k: AutoKey, v: boolean) => void
   onFix: (what: FixWhat) => void
+  onLog?: (c: Check) => void // a failing check's log
   onAct: (act: PRAct, method?: MergeMethod) => void
   onRename: () => void
   onAttach?: () => void // a git workspace on a branch, with no PR: Attach a PR…
@@ -531,7 +545,7 @@ export function InfoTab(p: {
           ))}
         </section>
 
-        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onAct={p.onAct} onAttach={p.onAttach} onDetach={p.onDetach} onLabel={p.onLabel} />
+        <PRSection w={w} onOpen={p.onOpen} onToggle={p.onToggle} onFix={p.onFix} onLog={p.onLog} onAct={p.onAct} onAttach={p.onAttach} onDetach={p.onDetach} onLabel={p.onLabel} />
       </div>
   )
 }

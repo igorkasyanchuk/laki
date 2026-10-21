@@ -140,6 +140,45 @@ export function Logs({ title, load, copy, onClose }: { title: string; load: () =
   )
 }
 
+// a failing check's log (Info's and Review's Log): the end of its failed steps, each step's name over its lines, read
+// again each time it opens; Send to the agent is Let the agent fix's message with this check's log only
+export function CiLog({ name, url, load, onSend, onOpen, copy, onClose }: { name: string; url?: string; load: () => Promise<string>; onSend: () => Promise<boolean>; onOpen: (url: string) => void; copy: (text: string) => void; onClose: () => void }) {
+  const [text, setText] = useState<string | null>(null)
+  const [err, setErr] = useState('')
+  const [sending, setSending] = useState(false)
+  const box = useRef<HTMLPreElement>(null)
+  const live = useRef(true) // still open: a send that ends after it closed closes nothing opened since
+  useEffect(() => {
+    live.current = true
+    load().then(t => live.current && setText(t), e => live.current && setErr(String(e?.message ?? e).split('\n')[0]))
+    return () => void (live.current = false)
+  }, [])
+  useEffect(() => void (box.current && (box.current.scrollTop = box.current.scrollHeight)), [text]) // the failure is at the end
+  const send = () => (setSending(true), onSend().then(ok => live.current && (ok ? onClose() : setSending(false))))
+  // ponytail: a log line of its own that starts with "▸ " is drawn as a step's name too
+  return (
+    <Modal title={`Log · ${name}`} onClose={onClose} wide>
+      <pre className="logs ci-log" ref={box}>
+        {err ? <span className="warn">{err}</span> : text === null ? <span className="muted">Reading the log…</span> : !text ? <span className="muted">No failed steps' log for it.</span> : text.split('\n').map((l, i) => (l.startsWith('▸ ') ? <b key={i}>{l}{'\n'}</b> : `${l}\n`))}
+      </pre>
+      <div className="row">
+        <span className="muted small grow">The last 80 lines of its failed steps</span>
+        {url && (
+          <button onClick={() => onOpen(url)}>
+            <Icon name="github" /> Open on GitHub
+          </button>
+        )}
+        <button disabled={!text} onClick={() => copy(text!)}>
+          <Icon name="copy" /> Copy
+        </button>
+        <button className="primary" disabled={sending} onClick={send}>
+          <Icon name="agent" /> {sending ? 'Sending…' : 'Send to the agent'}
+        </button>
+      </div>
+    </Modal>
+  )
+}
+
 // the sidebar's video, to watch while you work: a YouTube embed with its own controls (main gives it a Referer: a
 // file:// page has none, and YouTube refuses to play without one). Sandboxed: it can't take the window anywhere.
 // Minimized: only its bar, the video playing on

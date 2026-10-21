@@ -929,6 +929,9 @@ kbd { font-family: var(--mono); }
 .pr-check { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--fg); text-decoration: none; padding: 2px 6px; margin: 0 -6px; border-radius: var(--rs, 4px); }
 .pr-check[href]:hover { background: var(--hover); }
 .pr-check .icon-svg { flex: none; }
+.pr-check-row { display: flex; align-items: center; gap: 4px; }
+.pr-check-row > .pr-check { flex: 1; min-width: 0; margin-right: 0; }
+.pr-check-row > .pr-send { padding: 1px 8px; }
 .pr-check-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .ck-pass { --ck: var(--done); }
 .ck-fail { --ck: var(--error); }
@@ -1879,6 +1882,7 @@ button.board-name:hover { background: none; }
 /* development mode's logs (panels.tsx Logs) */
 .logs { height: min(60vh, 520px); overflow: auto; padding: 8px 10px; margin-bottom: 10px; border: 1px solid var(--line); border-radius: var(--radius); background: var(--bg); font: 11.5px/1.5 var(--mono); }
 .log-line { white-space: pre-wrap; overflow-wrap: anywhere; }
+.ci-log { margin-top: 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 /* a CSV file's Table (SidePanel.tsx CsvTable) */
 .csv { min-width: max-content; }
 .csv table { border-collapse: collapse; font: 12px/1.4 var(--mono); }

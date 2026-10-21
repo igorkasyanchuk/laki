@@ -76,6 +76,41 @@ test('PR feedback by hand: every kind of check, CI and review messages, threads 
   await until(async () => !(await rig.rpc('state')).workspaces[0].pr, 'PR dropped')
 })
 
+test("a failing check's log: prLog's tail with its steps named, refused without a PR; prFix's message the same, one check's with job", async t => {
+  const rig = await fresh(t)
+  const gh = rig.env.FAKE_GH
+  mkdirSync(gh)
+  writeFileSync(join(gh, 'pr.json'), 'no pull requests found')
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none' })
+  await assert.rejects(rig.rpc('prLog', { ws: ws.id, job: '1' }), /has no PR/)
+  writeFileSync(join(gh, 'pr.json'), JSON.stringify({ number: 7, state: 'OPEN', url: 'https://example.invalid/pr/7', headRefOid: 'abc', statusCheckRollup: [{ __typename: 'CheckRun', name: 'test', status: 'COMPLETED', conclusion: 'FAILURE', detailsUrl: job(1) }] }))
+  await until(async () => (await rig.rpc('state')).workspaces[0].pr, 'PR scanned')
+
+  // gh's lines: the job, the step and a time before each, colors; 85 of them, the last 80 kept
+  const line = (step: string, text: string) => `test\t${step}\t2026-10-06T10:00:00.1234567Z ${text}`
+  const lines = [...Array.from({ length: 10 }, (_, i) => line('Set up job', `setup ${i}`)), ...Array.from({ length: 74 }, (_, i) => line('Run npm test', `test ${i}`)), line('Run npm test', '\x1b[31mexpected 2, got 3\x1b[0m')]
+  writeFileSync(join(gh, 'run-1.log'), `${lines.join('\n')}\n`)
+  const setup = Array.from({ length: 5 }, (_, i) => `setup ${i + 5}`)
+  const tests = [...Array.from({ length: 74 }, (_, i) => `test ${i}`), 'expected 2, got 3']
+  assert.equal(await rig.rpc('prLog', { ws: ws.id, job: '1' }), ['▸ Set up job', ...setup, '▸ Run npm test', ...tests].join('\n'))
+  await assert.rejects(rig.rpc('prLog', { ws: ws.id, job: '--web' }), /job: a GitHub Actions job id/)
+  await assert.rejects(rig.rpc('prLog', { ws: ws.id, job: 3 }), /^Error: gh couldn't read the log: failed to get run log: HTTP 404: Not Found/)
+
+  // prFix: every failing check, the log without step names, as before; job: that check's only
+  writeFileSync(join(gh, 'checks.json'), JSON.stringify([{ name: 'test', bucket: 'fail', link: job(1) }, { name: 'e2e', bucket: 'fail', link: 'https://ci.invalid/2' }]))
+  const tab = await rig.rpc('tabNew', { ws: ws.id, preset: 'claude' })
+  await until(async () => (await rig.screen(tab.id)).includes('>'), 'claude up')
+  const ask = 'answer: CI fails on PR #7 (https://example.invalid/pr/7). Find the cause and fix it, run what you can locally, then commit and push the fix, then say what you changed.\n'
+  const logOf = `## test\n${job(1)}\nEnd of the failed steps' log (all of it: gh run view --job 1 --log-failed):\n${[...setup, ...tests].join('\n')}\n`
+  const said = (text: string) => until(async () => (await rig.tab(ws.id)).last === text && text, 'the message')
+  await rig.rpc('prFix', { ws: ws.id, what: 'ci' })
+  await said(`${ask}\n${logOf}\n## e2e\nhttps://ci.invalid/2\n`)
+  await rig.rpc('prFix', { ws: ws.id, what: 'ci', job: '1' })
+  await said(`${ask}\n${logOf}`)
+  await assert.rejects(rig.rpc('prFix', { ws: ws.id, what: 'ci', job: '2' }), /that check isn't failing on PR #7 now/)
+})
+
 test('a re-run check counts by its newest run (a queued one is the newest), prRefresh scans now', async t => {
   const rig = await fresh(t)
   const gh = rig.env.FAKE_GH
