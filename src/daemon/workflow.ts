@@ -198,6 +198,7 @@ export function flowRm(o: Ref) {
   writeFileSync(join(t, 'trash.json'), JSON.stringify({ id: o.id, source: o.source ?? 'yours', project: f.project, name, path: f.path, at, ...(byAgent(k) && { byAgent: true }) } satisfies Trashed))
   markAgent(k, false)
   if (state.flowStats?.[k]) delete state.flowStats[k], save() // its runs' tally goes with it (a restore starts over)
+  lastEvents.delete(k), skipped.delete(k), told.delete(k)
   flowFiles.at = Date.now()
   changed()
   return { ok: true, trash: basename(t) }
@@ -515,7 +516,6 @@ function next() {
 
 function enter(r: FlowRun, b: Block, again = false): void {
   if (!live(r)) return
-  if (spend(r)) return budgetAsk(r, b)
   if (!again) {
     const n = (r.visits[b.id] ?? 0) + 1
     if (b.max && n > b.max.n) {
@@ -526,6 +526,7 @@ function enter(r: FlowRun, b: Block, again = false): void {
     r.visits[b.id] = n
     if (r.tries?.[b.id]) delete r.tries[b.id] // entered anew: its tries again are its own
   }
+  if (spend(r)) return budgetAsk(r, b) // its visit counted: Give it more enters it again without one
   Object.assign(r, { cur: b.id, at: Date.now(), wait: undefined, status: 'running' })
   touch()
   work(r, b).catch(e => stuck(r, b, `${blockName(b)}: ${(e as Error).message}`))
@@ -1249,11 +1250,13 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
   if (w.kind === 'ask') return leave(r, b, label, `you: ${label}${typed ? ` · “${clip(typed, 80)}”` : ''}`, true), r
   if (o.n === w.options.length - 1) return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
   if (w.kind === 'stuck' && label.startsWith('Give it ') && r.budget) {
-    // its budget, past: half of its first one more, this run only
+    // its budget, past: half of its first one more, this run only; the block again, its visit and turns as they were
     const base = r.flow.budget ?? r.budget
     if (label.includes('$')) r.budget.usd = (r.budget.usd ?? 0) + (base.usd ?? 0) / 2
     else r.budget.ms = (r.budget.ms ?? 0) + (base.ms ?? 0) / 2
     say(r, `its budget: ${budgetText(r.budget)} now`)
+    decide(r, b, 'again', `you: ${label}`, true)
+    return enter(r, b, true), r
   }
   if (w.kind === 'stuck' && w.tab) {
     // a stalled agent: checked in on again (its clock on, without the time you took), skipped (its turn stopped first),
@@ -1273,7 +1276,8 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
   return r
 }
 // its working time (spent): brought up to date at each block, each flowTick and its end, what passed while it was
-// running since the last look. ponytail: a change of status between two looks counts as the later one's (a few seconds)
+// running since the last look (flowResume restarts the clock: Laki closed isn't working time). ponytail: a change of
+// status between two looks counts as the later one's (a few seconds); the Mac asleep mid-run counts
 function sample(r: FlowRun, now = Date.now()) {
   const from = r.clock ?? now
   if (r.status === 'running' && now > from) r.spent = (r.spent ?? 0) + (now - from)
@@ -1449,6 +1453,7 @@ export function flowTick(now = Date.now()) {
 let resumeLater = false
 const boot = Date.now() // runs started since were never cut short
 export function flowResume() {
+  for (const r of runs()) if (live(r) && r.clock) r.clock = Date.now() // its working time goes on from now
   resumeLater = !flowsOn(state.settings)
   if (resumeLater) return // off: they wait until it's on again
   const asks = (r: FlowRun) => r.status === 'waiting' && r.wait?.kind !== 'agent-ask' // yours wait on; an agent's ask was cut short with its turn
@@ -1535,10 +1540,12 @@ function fromEvent(wf: WorkflowItem, name: string, payload: Record<string, unkno
 const FLOW_HEARD = 5
 const heard = new Map<string, { at: number; payload: Record<string, unknown> }>()
 const lastEvents = new Map<string, FlowHeard[]>()
-function note(wf: WorkflowItem, e: FlowHeard) {
+function note(wf: WorkflowItem, e: FlowHeard, again = false) { // again: one already noted, its run or why since
   const k = agentKey(wf.source, wf.id, wf.project)
-  lastEvents.set(k, [e, ...(lastEvents.get(k) ?? [])].slice(0, FLOW_HEARD))
-  flowFiles.at = Date.now() // the page reads the list again
+  if (!again) lastEvents.set(k, [e, ...(lastEvents.get(k) ?? [])].slice(0, FLOW_HEARD))
+  const fresh = listening?.files === flowFiles.at
+  flowFiles.at = Date.now() // the page reads the list again; no file changed, so the listening list holds
+  if (fresh) listening!.files = flowFiles.at
   changed()
   return e
 }
@@ -1563,8 +1570,8 @@ eventHooks.flows = (name, payload, wsId, agent, hops = 0) => {
     out.flows.push(h.wf.id)
     const e = note(h.wf, { at: Date.now(), event: name, ...(ws && { ws: ws.id }) })
     flowStart(h.start).then(
-      r => ((e.run = r.id), (flowFiles.at = Date.now()), changed()),
-      err => ((e.why = (err as Error).message), log(`workflow ${h.wf.id} on ${name}: ${(err as Error).message}`)),
+      r => ((e.run = r.id), note(h.wf, e, true)),
+      err => ((e.why = (err as Error).message), note(h.wf, e, true), log(`workflow ${h.wf.id} on ${name}: ${(err as Error).message}`)),
     )
   }
   return out
@@ -1614,7 +1621,8 @@ export async function flowEvent(o: Ref & { event?: string; payload?: Record<stri
   const pick = o.ws ? picked(o.ws, wf.project ?? o.project) : undefined
   const project = pick?.project ?? wf.project ?? (o.project ? findProject(o.project).id : undefined)
   const last = [...heard.entries()].filter(([k]) => (project ? k === `${project}:${name}` : k.endsWith(`:${name}`))).map(([, v]) => v).sort((a, b) => b.at - a.at)[0]
-  const from = o.payload ? 'given' : o.use !== 'sample' && last ? 'last' : 'sample'
+  // an agent's try: never the last real one (another workspace's answer or question, which screen and send ask for)
+  const from = o.payload ? 'given' : o.use !== 'sample' && last && o.by !== 'agent' ? 'last' : 'sample'
   let payload: Record<string, unknown> = from === 'given' ? { event: name, at: Date.now(), ...o.payload } : from === 'last' ? last!.payload : sampleOf(name)
   if (pick && from !== 'last') payload = { ...payload, ws: eventWs(pick) } // the workspace you picked is the event's
   const wsId = (payload.ws as { id?: unknown } | undefined)?.id
@@ -1626,7 +1634,7 @@ export async function flowEvent(o: Ref & { event?: string; payload?: Record<stri
   const res = {
     name,
     from,
-    ...(last && { last: { at: last.at, ...(lastWs && { ws: lastWs }) } }),
+    ...(last && o.by !== 'agent' && { last: { at: last.at, ...(lastWs && { ws: lastWs }) } }),
     payload,
     vars: eventVars(payload),
     when: (now.when ?? []).map(t => ({ test: t, ok: !whenFails({ ...now, when: [t] }, payload) })),

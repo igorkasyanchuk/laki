@@ -125,7 +125,7 @@ export function budgetOf(v: string): Budget | string {
   return b
 }
 export const minutes = (ms: number) => (ms % 3600e3 === 0 ? `${ms / 3600e3}h` : `${+(ms / 60e3).toFixed(2)} min`)
-export const dollars = (usd: number) => `$${Number.isInteger(usd) ? usd : usd.toFixed(2)}`
+export const dollars = (usd: number) => `$${Number.isInteger(usd) ? usd : usd < 0.01 ? +usd.toFixed(4) : usd.toFixed(2)}` // a fraction of a cent too
 export const budgetText = (b: Budget) => [b.ms && minutes(b.ms), b.usd && dollars(b.usd)].filter(Boolean).join(', ')
 export type FlowHeard = { at: number; event: string; ws?: string; run?: string; why?: string } // an event it heard: started (run) or not (why)
 export type WorkflowItem = Workflow & { source: WorkflowSource; project?: string; path?: string; problems: string[]; text: string; byAgent?: boolean; untrusted?: boolean; changed?: boolean; skipped?: number; stats?: FlowStatsView; events?: FlowHeard[] } // the list's; events: the last FLOW_HEARD events its on: heard since Laki started, newest first; stats: its runs so far (flowStats, small); skipped: an untrusted one's events and scheduled runs that didn't start it since Laki started; byAgent: an agent wrote it (MCP), not saved by the user since; untrusted: a project's (the repo's) not trusted as it is (flowTrust); changed: trusted once, another text now (a pull, an agent's edit)
