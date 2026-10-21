@@ -924,7 +924,7 @@ names them in red, a dry run's log too. Core's `turnEnds` (in `turn()`'s idle/do
 `deliver`): this turn's answer as `steps.<id>.answer`, a
 `failed` turn the error exit, a usage limit `paused` (`wait.kind` limit) until `watchLimits`'s continue ends a turn. Run
 blocks: `$SHELL -lc` in the workspace with its env (`PORT`, `LAKI_WORKSPACE`, `LAKI_FLOW`, `LAKI_STORAGE_FOLDER`,
-`CI=1`), every variable shell-quoted, its own process group (`kill`), `timeout` (10 min); output's last 80 lines. Actions:
+`CI=1`), each `{{var}}` an env reference (`shared/workflow.ts` `shellFill`: bare `"$LAKI_V_n"`, in double quotes `$LAKI_V_n""`; in single quotes a `check` problem), its own process group (`kill`), `timeout` (10 min); output's last 80 lines. Actions:
 `ship` (its tab's `onExit`), `prAct`, `runDev`, `wsArchive`; outward ones (`OUTWARD`) `ask` `confirm` first unless
 `ask first: no`, a dry run says them. Extension blocks (`extension`: an id): `widgetUse` (reason `workflow`, the run's workspace for a scoped one), its data as
 `steps.<id>.data` and each top field `steps.<id>.<field>` (`ANSWER_MAX` each), an off one or a failed fetch the error exit. Save blocks (`keep`): text, `from` (a file or folder of the workspace, realpath inside it, `cpSync`) or `link` (http(s),

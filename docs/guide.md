@@ -1002,7 +1002,7 @@ extension block), a webhook or outward actions; `laki widget events` says why.
 A **workflow** is a graph of blocks Laki runs for a task: agents think inside their blocks, and Laki decides what
 happens between them. The blocks: *Agent* (a prompt to claude, codex or a preset, or one of Run ▾'s *agent actions*,
 picked from the sidebar's *Agent actions* or in the block, `use: <its slug>` in the file; it waits for the turn to end),
-*Run command* (`npm test`: ok or fail by its exit code), *If / else* (two ways, by what a block said: contains, matches,
+*Run command* (`npm test`: ok or fail by its exit code; its `{{…}}` go in as environment variables, never as text the shell reads: write them bare or in double quotes, not single), *If / else* (two ways, by what a block said: contains, matches,
 equals), *Case* (if / elsif / else: its branches in order, the first that holds wins, *else* last; each tests the case's
 variable or one of its own, so *if the change is only specs → approve, else → a full review* is a Case on what an agent
 answered: tell it to answer `only_specs` or `code`), *Ask you* (a question with buttons; words you add are `{{answer}}`), *Laki action* (open a PR, approve,

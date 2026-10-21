@@ -4,7 +4,7 @@ import { createServer } from 'node:http'
 import type { AddressInfo } from 'node:net'
 import { dirname, join } from 'node:path'
 import { test } from 'node:test'
-import { QUEUE_MAX, apiQuestions, inputVals, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
+import { QUEUE_MAX, apiQuestions, shellFill, inputVals, branchOf, check, exitsOf, FLOW_ENDED, flowVars, fromApi, holds, jsonFill, lastJson, outsOf, parse, renameBlock, runOf, toFile, varsFill } from '../src/shared/workflow.ts'
 import { fresh, sleep, until } from './helpers.ts'
 
 // every kind of block, loops limited by a max and an ask
@@ -1766,6 +1766,28 @@ test('workflows on an event: on: custom.x starts a run in the event’s project 
   r = await rig.rpc('widgetEmit', { name: 'deploy', ws: ws.id, from: { tab: ag.id } })
   assert.deepEqual(r.flows, [])
   assert.ok((await rig.rpc('widgetEvents'))[0].refused.includes('deploy: an agent sent the event, and it runs commands, a webhook, outward actions or an agent that never asks'))
+})
+
+test('run blocks: {{vars}} as env references (bare, in double quotes), never shell text; in single quotes a problem', async t => {
+  assert.deepEqual(shellFill(`echo {{a}} "x {{a}} {{b}}" '{{c}}' \\"{{a}}\\" {{none}}`, { a: '1', b: '2', c: '3' }), {
+    cmd: `echo "$LAKI_V_0" "x $LAKI_V_0"" $LAKI_V_1""" '{{c}}' \\""$LAKI_V_0"\\" {{none}}`,
+    env: { LAKI_V_0: '1', LAKI_V_1: '2' },
+    single: ['c'],
+  })
+  const wf = (cmd: string) => parse(`# R\nruns in: here\n\n## start\nnext: say\n\n## say\nrun: ${cmd}\nok: e\nfail: e\n\n## e\nend: success\n`).workflow
+  assert.match(check(wf("echo '{{event.pr.title}}'")).join(), /\{\{event\.pr\.title\}\} is inside single quotes/)
+  assert.deepEqual(check(wf('echo "{{event.pr.title}}" {{event.pr.title}}')), [])
+
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  await rig.rpc('settingsSet', { workflows: true })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'here' })
+  const title = `$(touch ${rig.home}/x1)\`touch ${rig.home}/x2\`;touch ${rig.home}/x3 "'`
+  await rig.rpc('flowSave', { id: 'quoted', text: `# Q\nruns in: here · on: custom.t\n\n## start\nnext: say\n\n## say\nrun: echo "[{{event.data.t}}]" {{event.data.t}}\nok: e\nfail: e\n\n## e\nend: success\n` })
+  await rig.rpc('widgetEmit', { name: 't', data: { t: title }, ws: ws.id })
+  const run = await until(async () => (x => x?.status === 'done' && x)((await rig.rpc('state')).flows?.find((x: any) => x.workflow === 'quoted')), 'its run done')
+  assert.equal((await rig.rpc('flowGet', { id: run.id })).vars['steps.say.output'], `[${title}] ${title}`)
+  for (const f of ['x1', 'x2', 'x3']) assert.ok(!existsSync(join(rig.home, f)), `${f}: nothing ran`)
 })
 
 test("a repo's workflow (.laki/workflows) starts on an event, a schedule or an agent's ask only once trusted as it is; an edit stops it; the app's Start runs it", async t => {

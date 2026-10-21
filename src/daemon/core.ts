@@ -1888,7 +1888,7 @@ export async function projectTrust(o: { id: string; hash?: string }) {
   if (p.host) await readHostCfg(p)
   const c = fileCfg(p)
   const hash = cfgHash(c)
-  if (o.hash === undefined) return { hash, text: JSON.stringify(c, null, 2), trusted: hash === p.trusted }
+  if (o.hash === undefined) return { hash, text: JSON.stringify(c, null, 2), trusted: !cfgWait(p) } // nothing to trust: as good as trusted
   if (o.hash !== hash) throw new Error(`${p.name}'s .laki.json changed since you looked: look at it again`)
   p.trusted = hash
   save()

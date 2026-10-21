@@ -11,8 +11,8 @@ import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, realpathSync,
 import { basename, dirname, join, resolve, sep } from 'node:path'
 import { agentVars, findAction, isAgent, type GateHeld, mergeActions, type RunAction, taskTitle, type Project, type Tab, type Workspace } from '../shared/types.ts'
 import { stamp } from '../shared/when.ts'
-import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
-import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, q, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
+import { ACTIONS, AGENT_TIMEOUT, apiQuestions, bypassIn, permOf, permWords, jsonFill, varsFill, BAD_EXITS, NUM_TESTS, SHOWN_MAX, blockName, branchOf, check, DECIDE_MODELS, exitsOf, fill, FLOW_ENDED, holds, ID, inputVals, jsonAsk, lastJson, OUTWARD, outAsk, outsOf, parse, RETRY_KINDS, SURE, runOf, QUEUE_MAX, RUNS_AT_ONCE, shellFill, TURNS, type Block, type FlowRun, type FlowStatus, type FlowWait, type Workflow, type WorkflowItem, type WorkflowSource } from '../shared/workflow.ts'
+import { addTab, answer as coreAnswer, broadcast, changed, dir, findProject, flowFiles, flowHooks, flowPhone, input as coreInput, isLive, findWs, killGroup, modelCheck, plainEnv, prAct, presets, prOf, projectConfig, runDev, save, scanPRs, send as coreSend, sessions, settingUp, shell, ship, state, storageOf, tabStatus, turnEnds, turnWaits, within, wsArchive, wsNew } from './core.ts'
 import { aiComplete, aiDecide } from './ai.ts'
 import { eventHooks, widgetEvent, widgetUse } from './widgets.ts'
 import { readCapped } from '../shared/conn.ts'
@@ -840,10 +840,9 @@ function command(r: FlowRun, b: Block) {
   if (ws.host) throw new Error('run blocks run on this Mac: not in an SSH host’s workspace')
   if (settingUp(ws)) return later(r, b, command)
   kill0(r) // never two at once
-  const vars = Object.fromEntries(Object.entries(varsOf(r)).map(([k, v]) => [k, q(v)])) // every value quoted: an answer is never shell
-  const cmd = fill(b.cmd ?? '', vars)
+  const { cmd, env: vals } = shellFill(b.cmd ?? '', varsOf(r)) // every value an env reference: an answer, a PR's title, never shell
   const storage = storageOf(ws)
-  const child = spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), LAKI_WORKSPACE: ws.id, LAKI_FLOW: r.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), CI: '1' } })
+  const child = spawn(shell, ['-lc', cmd], { cwd: ws.path, detached: true, stdio: ['ignore', 'pipe', 'pipe'], env: { ...plainEnv(), ...state.settings?.env, ...projectConfig(ws).env, PORT: String(ws.port), LAKI_WORKSPACE: ws.id, LAKI_FLOW: r.id, ...(storage && { LAKI_STORAGE_FOLDER: storage }), ...vals, CI: '1' } })
   procs.set(r.id, child)
   let out = ''
   const take = (d: Buffer) => (out = (out + d.toString()).slice(-64000))

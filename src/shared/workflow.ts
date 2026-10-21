@@ -447,6 +447,7 @@ export function check(wf: Workflow): string[] {
     if (b.kind === 'case') out.push(...caseProblems(b))
     if (b.kind === 'agent' && !b.text?.trim() && !b.use?.trim()) out.push(`${blockName(b)} has no prompt (or agent action)`)
     if (b.kind === 'run' && !b.cmd?.trim()) out.push(`${blockName(b)} has no command`)
+    if (b.kind === 'run') for (const n of new Set(shellFill(b.cmd ?? '', {}).single)) out.push(`${blockName(b)}: {{${n}}} is inside single quotes, where it never fills in: use double quotes or none`)
     if (b.kind !== 'agent' && (b.perm !== undefined || b.fast !== undefined)) out.push(`${blockName(b)}: perm: and fast: are for agent blocks`)
     if (b.kind === 'agent') {
       // offline: an agent's own name is checked, a preset's waits for the run (flowStart)
@@ -748,6 +749,44 @@ export function jsonFill(t: string, vars: Record<string, string | undefined>) {
 // {{name}} from a run's variables; an unknown one stays as it is
 export const fill = (text: string, vars: Record<string, string | undefined>) => String(text ?? '').replace(/\{\{\s*([\w.?-]+)\s*\}\}/g, (m, k: string) => vars[k] ?? m)
 
+// a run block's command, its {{vars}} as env references a shell never reads as code: unquoted "$LAKI_V_n", inside
+// double quotes $LAKI_V_n"" (the "" ends the name, in POSIX shells and fish alike), the values in env. Inside single
+// quotes none expands: single names those, a check() problem (left as written). One not set stays as written (fill's)
+export function shellFill(cmd: string, vars: Record<string, string | undefined>) {
+  const env: Record<string, string> = {}
+  const single: string[] = []
+  const names = new Map<string, string>()
+  const PH = /\{\{\s*([\w.?-]+)\s*\}\}/y
+  let out = ''
+  let quote = ''
+  for (let i = 0; i < cmd.length; ) {
+    PH.lastIndex = i
+    const m = PH.exec(cmd)
+    if (m) {
+      const v = vars[m[1]]
+      if (quote === "'") single.push(m[1])
+      if (v === undefined || quote === "'") out += m[0]
+      else {
+        const name = names.get(m[1]) ?? `LAKI_V_${names.size}`
+        if (!names.has(m[1])) names.set(m[1], name), (env[name] = v)
+        out += quote ? `$${name}""` : `"$${name}"`
+      }
+      i += m[0].length
+      continue
+    }
+    const c = cmd[i]
+    if (c === '\\' && quote !== "'") {
+      out += cmd.slice(i, i + 2) // an escaped character: never a quote
+      i += 2
+      continue
+    }
+    if ((c === "'" || c === '"') && (!quote || quote === c)) quote = quote ? '' : c
+    out += c
+    i++
+  }
+  return { cmd: out, env, single }
+}
+
 // ---------- runs
 
 export type FlowStatus = 'queued' | 'running' | 'waiting' | 'paused' | 'done' | 'stopped' | 'failed' // queued: past at once, no workspace yet
@@ -818,7 +857,7 @@ var <NAME>: <value> (any number of these lines: its variables, {{vars.NAME}}; th
 Then a "## <id>" per block (id: letters, digits, - _ ?). A block's first kind key sets its kind:
 - ## start, with "input: task" and "next: <block>": where it begins. {{task}} is what the user asked. Its inputs, besides the task, on one line: "inputs: issue:number, base:branch=main, reviewer?, size:choice(s|m|l)=m" (name[?][:kind][=default]; kinds text (the default), number, branch, choice(a|b|…); ? optional): each is {{inputs.<name>}}, asked for as the run starts (laki_workflow_run's inputs); a scheduled run takes the defaults.
 - agent: <preset: claude, codex…> · model: <opus…> · effort: <high…> · perm: auto|acceptEdits|plan|bypassPermissions · fast: yes · session: run|new|<agent block id> · use: <an agent action's slug: laki_workflows lists them>, then the prompt as "> " lines (timeout: <minutes>, 60 unless said: then Esc and its error way). Waits for the agent's turn to end; exits next, error. One that prints nothing for 10 minutes is nudged once, then asks the user (Nudge again, Try again, Skip it, Stop the run). Its answer is {{steps.<id>.answer}}; json: yes (JSON mode) tells it to end with one JSON object or list, and its answer is that JSON (bare in a decide's state, json() in a case's JS). session run (the default): the run's tab of that agent; <block id>: the same tab as that block. use: one of the user's agent actions (Run ▾'s, in Settings or the project's: laki_actions): its prompt goes first, the block's "> " lines after it (none needed). perm: how freely it acts (claude and codex; unset: the head's perm:, else the agent's own, which asks, and an unattended run stops at its first permission prompt): ${PERM_IDS.map(id => `${id} (${PERMS.claude!.find(p => p[0] === id)![2].replace(/;/g, ',')})`).join(', ')}; codex's are its sandbox and approvals in the same spirit (plan: read only). An agent can't start a workflow with a bypassPermissions block. fast: yes is fast mode (claude, codex: more speed, more usage). Blocks sharing a tab (session run of the same agent, or session: <block>) need the same perm and fast: the tab starts once.
-- run: <shell command> (in the run's folder; timeout: <minutes>). Exits ok (exit 0), fail. {{steps.<id>.output}}: its last lines.
+- run: <shell command> (in the run's folder; timeout: <minutes>). Exits ok (exit 0), fail. {{steps.<id>.output}}: its last lines. Its {{vars}} go in as environment variables, never as text the shell reads: write them bare or in double quotes ("{{event.pr.title}}"), never in single quotes (check says so).
 - ask: <question>, show: <text with {{vars}}>, then options "- <label> → <block>". Waits for the user; what they type is {{answer}}.
 - choice: <variable or block id> contains|matches|equals "<text>", or <variable> >=|<=|>|< <number> (if/else; "if:" is the same), then two options: the first when it holds, the second when not.
 - case: <variable or block id>, then its branches in order, the first that holds wins: "- contains|matches|equals "<text>" → <block>", a branch may test another variable ("- steps.size.output equals "0" → <block>"), a number's "- steps.triage.urgent.p >= 0.8 → <block>", a JS expression's "- js: num('steps.triage.urgency') >= 2 && vars['steps.triage.team'] === 'payments' → <block>" (vars: every variable, num(name), json(name)), and "- else → <block>" last (needed). if/elsif/else, or a switch on one value. To route on what an agent found, tell it to answer with one word (only_specs, code…) and test {{steps.<id>.answer}}.

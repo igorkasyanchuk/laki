@@ -4,6 +4,8 @@ version it builds, with the date. -->
 
 ## Next
 
+- Workflows: a Run command's `{{…}}` (a PR's title, an event's field, an agent's answer) go in as environment
+  variables, never as text the shell reads. One inside single quotes is now a problem the editor shows.
 - An agent's prompt reaches it through an environment variable, never quoted into a shell line: a prompt can't break
   out under fish. Variables typed into a fish shell tab are quoted fish's way.
 - Workflows: a project's workflow that came with the repo (or changed since) starts on an event, a schedule or an

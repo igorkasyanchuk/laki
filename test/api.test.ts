@@ -1014,6 +1014,6 @@ test("new worktrees: the page's base is the repo's main branch; Sync the base br
   const og = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'og', base: 'old' }) // pushed as it is: origin's
   assert.equal(og.base, 'origin/old')
   // a base that looks like an option never reaches git fetch
-  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'h', base: '--upload-pack=touch x' }), /git worktree add failed/)
+  await assert.rejects(rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'h', base: '--upload-pack=touch x' }), /a branch, not an option/)
   assert.equal(existsSync(join(rig.repo, 'x')), false)
 })
