@@ -1464,7 +1464,8 @@ export function App() {
   const settings = view?.settings ?? {}
   // Achievements (achievements.ts): each earned once, as you do it, into settings.achievements (got: when); earned
   // keeps them here too, so two at once don't write over each other. Off: none earned, no trophy, no toast
-  // ponytail: the whole object is written, so two windows earning in the same instant can lose one; a daemon method if it matters
+  // ponytail: the whole object is written, so two windows earning in the same instant can lose one; a daemon method if it matters.
+  // Only this window's calls count: the new-workspace and AI windows (NewWindow.tsx) earn nothing
   const achKept: AchievementsKept = settings.achievements ?? {}
   const achRef = useRef(achKept)
   achRef.current = achKept
@@ -3585,7 +3586,7 @@ export function App() {
             onClose={() => setDialog(null)}
             api={{
               go: achGo,
-              hide: (id, hide) => void achSet({ hidden: hide ? [...achHidden, id] : achHidden.filter(x => x !== id) }).catch(fail),
+              hide: (id, hide) => (h => void achSet({ hidden: hide ? [...h, id] : h.filter(x => x !== id) }).catch(fail))(achRef.current.hidden ?? []),
               off: () => void achSet({ off: true }).then(() => (setDialog(null), toast('Achievements off: Settings › Achievements turns them back on')), fail),
             }}
           />
@@ -3864,7 +3865,7 @@ export function App() {
       <VoiceBar />
       {dropping && <div className="drop-overlay">Drop a folder to add it as a project</div>}
       {unlocked.length > 0 && (
-        <button className="ach-toast" role="status" onClick={() => (setUnlocked([]), setDialog('achievements'))}>
+        <button className="ach-toast" aria-live="polite" onClick={() => (setUnlocked([]), setDialog('achievements'))}>
           <Icon name="trophy" size={14} />
           <span>
             Unlocked: <b>{ACHIEVEMENTS.find(a => a.id === unlocked.at(-1))?.title}</b>

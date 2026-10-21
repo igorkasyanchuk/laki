@@ -28,7 +28,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'jump', group: 'Agents', title: 'Jump to who needs you', how: '⌘J: the next tab waiting for you, wherever it is', icon: 'arrowRight' },
   { id: 'later', group: 'Agents', title: 'Send a message later', how: '⌘L: to an agent in 20 minutes or at 6pm', icon: 'clock' },
   { id: 'race', group: 'Agents', title: 'Race two agents', how: "The new-workspace page's More › Race: one prompt, a worktree each, then compare", icon: 'race', go: 'new', rpc: 'wsFan' },
-  { id: 'profile', group: 'Agents', title: 'Make an agent profile', how: 'An agent with its own model, effort or account', icon: 'agent', go: 'section:presets', up: v => v.presets.length },
+  { id: 'profile', group: 'Agents', title: 'Make an agent profile', how: 'An agent with its own model, effort or account', icon: 'agent', go: 'section:presets', up: v => v.settings.presets?.length ?? 0 }, // yours: the view's own grow as an agent lands on PATH
   { id: 'template', group: 'Agents', title: 'Write a prompt template', how: "A new workspace's prompt with your rules around it", icon: 'pencil', go: 'section:templates', up: v => (v.settings.templates?.length ?? 0) + count(v, p => p.config?.templates?.length ?? 0) },
   { id: 'memory', group: 'Agents', title: 'Give agents a rule', how: 'Global memory: what claude and codex should always know', icon: 'bulb', go: 'section:memory', up: v => (v.settings.memory?.length ?? 0) + count(v, p => p.memory?.filter(m => !m.auto).length ?? 0) },
 
@@ -36,7 +36,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'revert', group: 'Git & PRs', title: 'Revert a hunk', how: "In Changes, a hunk's Revert: take back one part, keep the rest", icon: 'undo', go: 'panel:changes', rpc: 'hunkUndo|fileUndo' },
   { id: 'comment', group: 'Git & PRs', title: 'Comment on a line', how: 'In Changes, click a line: a note to the agent or the PR', icon: 'messageDots', go: 'panel:changes' },
   { id: 'ship', group: 'Git & PRs', title: 'Ship it', how: "The toolbar's Ship: commit, push and open a PR in one go", icon: 'ship', go: 'ship', rpc: 'ship' },
-  { id: 'autofix', group: 'Git & PRs', title: 'Let the agent fix CI', how: "A PR's switches: failing checks, review comments and conflicts go to the agent", icon: 'ciFail', go: 'panel:info', rpc: 'wsSet', ok: p => [p.autoFix, p.autoReview, p.autoMerge, p.autoLand].includes(true) },
+  { id: 'autofix', group: 'Git & PRs', title: 'Let the agent fix CI', how: "A PR's switches: failing checks, review comments and conflicts go to the agent", icon: 'ciFail', go: 'panel:info', rpc: 'wsSet', ok: p => [p.autoFix, p.autoReview, p.autoMerge].includes(true) },
   { id: 'merge', group: 'Git & PRs', title: 'Approve or merge in Laki', how: "Info's PR: Approve, or Merge with squash, merge or rebase", icon: 'gitMerge', go: 'panel:info', rpc: 'prAct', ok: p => p.act !== 'close' },
   { id: 'archive', group: 'Git & PRs', title: 'Archive a finished one', how: "A workspace's ⋯ › Archive: the worktree goes, the branch stays, Undo brings it back", icon: 'archive', rpc: 'wsArchive' },
 
