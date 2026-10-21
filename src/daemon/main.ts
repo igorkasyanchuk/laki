@@ -5,6 +5,7 @@ import { execFileSync } from 'node:child_process'
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 import { chmodSync, existsSync, linkSync, mkdirSync, readFileSync, rmSync, statSync, unlinkSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type ServerResponse } from 'node:http'
+import type { Socket } from 'node:net'
 import { dirname, extname, join, normalize, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocketServer } from 'ws'
@@ -18,7 +19,7 @@ import { usage } from './usage.ts'
 import { planFile, planGet, planList, planNew, planPage, planRm, planSave, planUpload, planWrite } from './plans.ts'
 import { noteFile, noteGet, noteList, noteNew, noteRm, noteSave, noteUpload } from './notes.ts'
 import { flowAnswer, flowTest, flowForget, flowGet, flowHistory, flowList, flowRestore, flowResume, flowRevert, flowRm, flowSave, flowStart, flowStop, flowStopAll, flowTick, flowTrash, flowTrashTidy, flowTrust } from './workflow.ts'
-import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
+import { scanWidgets, stopAgents, widgetRemix, widgetRestore, widgetTrash, widgetTrashTidy, widgetSlug, widgetUndo, widgetAction, widgetEvent, widgetGrantRm, widgetPush, widgetStreamStop, widgetAsks, widgetPermission, widgetToolAnswer, answered, widgetToolCall, widgetTools, widgetCheck, widgetDev, widgetFileSave, widgetFiles, urlKeyOk, widgetMock, widgetNew, widgetPage, widgetReload, widgetRender, widgetRm, widgetRun, widgetRuns, widgetSet, widgetsStop, widgetTick, widgetWhat, widgetWrite, widgetLogs, widgetLog, widgetLogClear, widgetEmit, widgetEvents } from './widgets.ts'
 import { memoryCompact, memoryCompactLog, memoryTick } from './memory.ts'
 import { device } from './device.ts'
 
@@ -237,7 +238,7 @@ const api: Record<string, Handler> = {
   aiTick: p => aiTick(p.now), // tests move the clock
   aiKey: p => aiKey(p),
   voiceText: p => voiceText(p), // Settings › Voice's cloud: { audio: WAV in base64 } → { text }
-  send: p => core.send(p),
+  send: async p => (await crossAsk(p, 'send'), core.send(p)),
   queueClear: p => core.clearQueue(p.target),
   hook: p => core.hook(p),
   diff: p => core.diff(p.ws),
@@ -290,15 +291,15 @@ const api: Record<string, Handler> = {
   tunnelStart: p => core.tunnelStart(p),
   tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
-  screen: p => core.screen(p.target, p.lines, p.by, p.all === true),
+  screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
   input: (p, c) => core.input(p.tab, p.data, c),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
   view: (p, c) => c && core.setView(c, p),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
   watchLimits: p => core.watchLimits(p.now), // tests move the clock
-  scheduleSet: p => core.scheduleSet(p),
+  scheduleSet: ({ from, ...p }) => core.scheduleSet(core.agentCaller(from) ? { ...p, on: false } : p), // an agent's: off, until you turn it on (M5)
   scheduleRm: p => core.scheduleRm(p.id),
-  scheduleRun: p => core.scheduleRun(p.id),
+  scheduleRun: p => (notAgent(p, 'run a scheduled task now'), core.scheduleRun(p.id)),
   scheduleTick: p => core.scheduleTick(p.now), // tests move the clock
   remoteStart: p => core.remoteStart(p),
   remoteStop: () => core.remoteStop(),
@@ -370,7 +371,7 @@ const api: Record<string, Handler> = {
   flowRevert: p => flowRevert(p),
   flowStart: ({ caller, ...p }) => flowStart(core.agentCaller(caller) ? { ...p, by: 'agent', editor: false } : p), // the CLI in an agent's tab is an agent's start
   flowStop: p => flowStop(p),
-  flowAnswer: p => flowAnswer(p),
+  flowAnswer: p => (notAgent(p, "answer a workflow's question"), flowAnswer(p)),
   flowTest: p => flowTest(p), // the inspector's Test: one AI call, decision or webhook, alone
   flowGet: p => flowGet(p),
   flowForget: p => flowForget(p),
@@ -386,10 +387,46 @@ const remoteNo = (method: string, p: any) =>
   (method === 'widgetSet' && (p?.on === true || p?.net === true || p?.source !== undefined)) ||
   (method === 'settingsSet' && Object.keys(p ?? {}).some(k => REMOTE_KEYS.test(k) && JSON.stringify(p[k]) !== JSON.stringify((core.state.settings as any)?.[k])))
 
-async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote) {
+// M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
+// say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
+// FROM: from is the caller ({ ws, tab }); CALLER: caller is
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall'])
+const CALLER = new Set(['tabNew', 'wsNew', 'flowSave', 'flowStart'])
+const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's
+const local = new WeakMap<core.Conn, Socket>() // a WebSocket client with no Origin: its socket
+async function whoCalls(sock: Socket, method: string, p: any) {
+  if (!FROM.has(method) && !CALLER.has(method)) return p
+  let t = peers.get(sock)
+  if (!t) peers.set(sock, (t = core.tabOfPeer(sock.remotePort ?? 0).catch(() => undefined)))
+  const tab = await t
+  if (!tab) return p
+  const me = { ws: tab.workspace, tab: tab.id }
+  const o = p && typeof p === 'object' ? p : {}
+  return FROM.has(method) ? { ...o, from: { ...(o.from && typeof o.from === 'object' ? o.from : {}), ...me } } : { ...o, caller: me }
+}
+const notAgent = (p: any, what: string) => {
+  if (core.agentCaller(p.from)) throw new Error(`an agent can't ${what}: it's the user's (ask them)`)
+}
+// M5: an agent's send or screen into another workspace's tab: asked in the app first, as an extension's tool is (Always:
+// from that workspace into that one, until Laki restarts). ponytail: kept in memory
+const crossOk = new Set<string>()
+async function crossAsk(p: any, kind: 'send' | 'screen') {
+  const by = core.agentCaller(p.from)
+  const tab = by && core.resolveTarget(String(p.target ?? ''))
+  if (!by || !tab || tab.workspace === by || crossOk.has(`${kind}:${by}>${tab.workspace}`)) return
+  const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
+  if (!core.clients.size) throw new Error(`${name(tab.workspace)} is another workspace: the user allows that in Laki's window, and it isn't open`)
+  const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(tab.workspace), target: tab.name, text: kind === 'send' ? String(p.text ?? '').slice(0, 2000) : undefined, ws: by, tab: p.from.tab })
+  if (how === 'always') crossOk.add(`${kind}:${by}>${tab.workspace}`)
+  else if (how !== 'once') throw new Error(`${tab.name} is in ${name(tab.workspace)}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
+}
+
+async function call(method: string, params: any, c?: core.Conn, remote = !!c?.remote, sock = c && local.get(c)) {
   const h = Object.hasOwn(api, method) ? api[method] : undefined
   if (!h) throw new Error(`unknown method ${method}`)
   if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
+  if (sock) params = await whoCalls(sock, method, params)
   return await h(params ?? {}, c)
 }
 
@@ -434,7 +471,8 @@ const server = createServer(async (req, res) => {
   }
   try {
     const { method, params } = JSON.parse(body)
-    reply(200, { result: (await call(method, params, undefined, !!req.headers.origin && req.headers.origin === core.remoteOrigin())) ?? null })
+    const o = req.headers.origin
+    reply(200, { result: (await call(method, params, undefined, !!o && o === core.remoteOrigin(), o ? undefined : req.socket)) ?? null })
   } catch (e) {
     reply(200, { error: (e as Error).message })
   }
@@ -461,6 +499,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         ws.send(typeof msg === 'string' ? msg : JSON.stringify(msg)) // a string: JSON already (core's state, made once for all)
       },
     }
+    if (!req.headers.origin) local.set(c, req.socket)
     core.clients.add(c)
     core.hello(c)
     widgetAsks(c) // an extension's asks still waiting: this window shows them too

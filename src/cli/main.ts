@@ -363,7 +363,7 @@ async function main() {
     }
     case 'send': {
       const [target, ...words] = rest
-      const r = await rpc('send', { target, text: words.join(' '), whenIdle: !!flags['when-idle'] })
+      const r = await rpc('send', { target, text: words.join(' '), whenIdle: !!flags['when-idle'] }, 150000) // another workspace's from an agent: the user is asked first
       return out(r, r.sent ? 'sent' : `queued (${r.queued} waiting): sent when the agent finishes its turn`)
     }
     case 'progress': {
@@ -383,7 +383,7 @@ async function main() {
         const text = op === 'shot' ? r.path : op === 'windows' ? (r as { id: number; app: string; title: string }[]).map(w => `${w.app}${w.title ? `  ${w.title}` : ''}`).join('\n') : op === 'describe' ? JSON.stringify(r, null, 2) : 'ok'
         return out(r, text)
       }
-      const text = await rpc('screen', { target: rest[0], lines: Number(flags.lines) || 30 })
+      const text = await rpc('screen', { target: rest[0], lines: Number(flags.lines) || 30 }, 150000)
       return out(text, text)
     }
     case 'diff': {

@@ -131,9 +131,9 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_send',
-    description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. With when_idle it waits for the agent's turn to end. Agents only, and not while one asks the user something.",
+    description: "Type a message into an agent's tab, as if the user typed it and pressed Enter. With when_idle it waits for the agent's turn to end. Agents only, and not while one asks the user something. Another workspace's tab: the user is asked first.",
     inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), text: str('the message'), when_idle: { type: 'boolean', description: 'queue it until the agent finishes its turn' } }, ['target', 'text']),
-    run: a => rpc('send', { target: a.target, text: a.text, whenIdle: !!a.when_idle, agent: true }),
+    run: a => rpc('send', { target: a.target, text: a.text, whenIdle: !!a.when_idle, agent: true }, 150000), // another workspace's: the user is asked first
   },
   {
     name: 'laki_new_tab',
@@ -180,9 +180,9 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_screen',
-    description: "The last lines of a tab's terminal: what the agent or command shows now.",
+    description: "The last lines of a tab's terminal: what the agent or command shows now. Another workspace's tab: the user is asked first.",
     inputSchema: obj({ target: str('a workspace id (its agent) or <ws>/<tab>'), lines: { type: 'number', description: 'how many lines (default 40)' } }, ['target']),
-    run: a => rpc('screen', { target: a.target, lines: Number(a.lines) || 40 }),
+    run: a => rpc('screen', { target: a.target, lines: Number(a.lines) || 40 }, 150000),
   },
   {
     name: 'laki_diff',
@@ -201,7 +201,7 @@ export const tools = (rpc: Rpc, from?: string, who?: string): Tool[] => [ // who
   },
   {
     name: 'laki_schedule_add',
-    description: 'Schedule a prompt for an agent, once or on repeat, at times written in English. Only when the user asks for one: it starts agents later, unattended.',
+    description: 'Schedule a prompt for an agent, once or on repeat, at times written in English. Only when the user asks for one: it starts agents later, unattended. One an agent adds is saved off: the user turns it on in Laki.',
     inputSchema: obj(
       {
         project: str('a project id'),

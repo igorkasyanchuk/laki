@@ -2,9 +2,10 @@
 import assert from 'node:assert/strict'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { test } from 'node:test'
 import { dataDir } from '../src/shared/conn.ts'
-import { fresh, running, until } from './helpers.ts'
+import { connect, fresh, running, until } from './helpers.ts'
 
 test('data folder: ~/.laki, or the ~/.laki-electron a Mac already has; LAKI_HOME over both', t => {
   const was = process.env.LAKI_HOME
@@ -495,4 +496,48 @@ test("cli: an agent's laki new and laki tab can't start a command of its own (--
   assert.equal(mine.code, 0, mine.err)
   const n = await rig.cli('new', p.id, '--cmd', 'sleep 5', '--name', 'mine')
   assert.equal(n.code, 0, n.err)
+})
+
+// M5: who calls is the tab its process runs in, not what its env says
+test('cli: an agent is the tab its process is in, whatever its env says; outside any tab, you', async t => {
+  const rig = await fresh(t)
+  const p = await rig.rpc('projectAdd', { path: rig.repo })
+  const ws = await rig.rpc('wsNew', { project: p.id, preset: 'claude', local: true })
+  const tab = (await until(async () => (await rig.rpc('state')).tabs.find((x: any) => x.workspace === ws.id), 'its agent')).id
+  const { id } = await rig.rpc('widgetNew', { kind: 'number', name: 'Probe' })
+  await rig.rpc('widgetSet', { id, on: false })
+  const { hash } = await rig.rpc('widgetWhat', { id })
+  const laki = [process.execPath, '--experimental-strip-types', '--no-warnings', fileURLToPath(new URL('../src/cli/main.ts', import.meta.url))].join(' ')
+  const out = join(rig.home, 'agent-out')
+  await until(async () => (await rig.rpc('screen', { target: `${ws.id}/${tab}` })).includes('> '), 'its prompt')
+  // its Bash tool, with Laki's variables taken out
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run env -u LAKI_TAB -u LAKI_WORKSPACE ${laki} widget on ${id} --seen ${hash} > ${out} 2>&1; ${laki} schedule run nope >> ${out} 2>&1; echo done >> ${out}` })
+  await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'the agent ran it', 60000)
+  const said = readFileSync(out, 'utf8')
+  assert.match(said, /only you can turn an extension on/) // an agent's, by its process
+  assert.match(said, /an agent can't run a scheduled task now/)
+  assert.equal((await rig.rpc('state')).widgets.find((w: any) => w.id === id)?.on, false)
+  // the same command outside any tab: yours
+  const r = await rig.cli('widget', 'on', id, '--seen', hash)
+  assert.equal(r.out, `${id} on\n`, r.err)
+  // an agent's schedule is saved off
+  await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} schedule add ${p.id} --when "every day at 9am" check the build > ${out} 2>&1; echo done >> ${out}` })
+  await until(() => readFileSync(out, 'utf8').includes('done'), 'scheduled')
+  await until(async () => (await rig.rpc('state')).schedules?.length === 1, 'the task saved')
+  assert.equal((await rig.rpc('state')).schedules[0].on, false)
+  // another workspace's tab: the user is asked first in the app (toolAsk with cross); a no is a refusal, Allow once reads it
+  const other = await rig.rpc('wsNew', { project: p.id, preset: 'none', name: 'other' })
+  const shell = (await rig.rpc('tabNew', { ws: other.id })).id
+  const app = await connect(rig)
+  for (const [allow, said] of [['deny', /another workspace: the user said no/], ['once', /^(?![^]*another workspace)[^]*done/]] as const) {
+    rmSync(out, { force: true })
+    await rig.rpc('send', { target: `${ws.id}/${tab}`, text: `run ${laki} screen ${other.id}/${shell} > ${out} 2>&1; echo done >> ${out}` })
+    const ask = await until(() => app.events.find(m => m.ev === 'toolAsk' && m.cross === 'screen' && !m.seen), 'asked in the app', 30000)
+    ask.seen = true
+    assert.equal(ask.to, 'other')
+    await rig.rpc('widgetToolAnswer', { req: ask.req, allow })
+    await until(() => existsSync(out) && readFileSync(out, 'utf8').includes('done'), 'it went on', 30000)
+    assert.match(readFileSync(out, 'utf8'), said)
+  }
+  app.close()
 })

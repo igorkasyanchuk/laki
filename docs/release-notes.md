@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Laki tells an agent by the tab its process runs in, not by its environment: an agent that hides its variables still
+  can't turn an extension on, force a held ship, run a scheduled task now or answer a workflow's question. A task an
+  agent schedules is saved off, and an agent's send to, or screen read of, another workspace's tab asks you first.
 - Remote access's link opens once, in one tab (the page keeps a key of its own), and from the browser it can't start
   remote access again, install the laki command, change phone pushes, presets, env or extension folders, sign in
   accounts, turn an extension on or quit the daemon. Without an email it runs 24 hours at most; laki serve

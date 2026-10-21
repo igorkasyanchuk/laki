@@ -1925,7 +1925,7 @@ async function approve(w: Entry, action: string, o: { description: string; ask: 
 // an ask sent to the app's windows (and to each one that connects while it waits: widgetAsks), the first answer
 // (widgetToolAnswer), 'none' past LAKI_TOOL_WAIT; then the other windows' dialogs close
 const asks = new Map<string, { ev: string; req: string }>()
-async function answered(msg: { ev: string; req: string; [k: string]: unknown }) {
+export async function answered(msg: { ev: string; req: string; [k: string]: unknown }) {
   const { req } = msg
   asks.set(req, msg)
   broadcast(msg)

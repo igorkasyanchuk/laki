@@ -1687,7 +1687,13 @@ picture is where to tap. MCP's `laki_device` does the same.
 (projects, workspaces, tabs and their status), `laki_new_workspace` (also from an issue or a PR, or a race with
 `presets`), `laki_new_tab` (another agent in a workspace; `beside` a tab: a split in its tab), `laki_send`, `laki_attach_pr`, `laki_progress` (how far along the calling agent is, on its tab), `laki_screen`, `laki_diff`, `laki_browser` (the agent browser), `laki_schedules` and
 `laki_schedule_add`, with Specs & Brainstorms on `laki_plans`, `laki_plan_read`, `laki_plan_new` and `laki_plan_write`, and with Workflows on `laki_workflows`, `laki_workflow_write` (saved for you to read: until you save it in the app, only *Start* in its editor runs one an agent wrote; not a schedule, an event, Run again, the CLI or an agent) and `laki_workflow_run`. None deletes, archives or ships; `laki_send` reaches agents only, never a shell or a question an
-agent asks you. Add it with the command in
+agent asks you.
+
+Laki knows an agent by where its process runs (the tab it's in, or a shell tab that runs it), not by its environment,
+so an agent can't pass for you. What an agent may not do there, the CLI refuses it too: turn an extension on, force a
+held ship or merge, run a scheduled task now or answer a workflow's question. A task it schedules is saved off (you
+turn it on in Scheduled tasks). Sending to, or reading the screen of, a tab in another workspace asks you first in
+the app (*Allow once*, *Always from <its workspace> to that one* until Laki restarts, *Deny*). Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
 
 ```bash

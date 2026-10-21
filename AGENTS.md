@@ -1047,7 +1047,13 @@ ponytail: no fetch/for-each/judge blocks or schedules yet, a run command not on 
 protocol version; `tools/list`, `tools/call`, `ping`; notifications get no answer, other methods -32601). Each tool is
 one or two `rpc` calls (`tools(rpc)`: Laki AI passes the daemon's own); none deletes, archives or ships. Its `state` (also `laki ls --json`, which the skill has agents
 run) leaves out settings, projects' config, queued prompts and remote access's link: an agent's transcript keeps them. stdout is the protocol's, so the daemon starts at the first
-tool call (`ensureDaemon`), never before. `state` gives each project's `groups` (its seps' names) and `groupTemplates`
+tool call (`ensureDaemon`), never before. The caller (M5): main.ts' `whoCalls`, for a client with no Origin (`/rpc`'s
+`req.socket`, a WebSocket's `local`) and the `FROM` or `CALLER` methods, asks `core.tabOfPeer` (the socket's other end
+by `lsof -iTCP@127.0.0.1:<port>`, its parents by `ps` to a live session's PTY, per connection) and puts that tab in
+`from` or `caller` over what the env said; none found: the env's (yours, a cron job's). `scheduleSet` from an agent saves
+it off, `scheduleRun` and `flowAnswer` refuse one (`notAgent`), and `send`/`screen` into another workspace's tab ask
+(`crossAsk`: widgets.ts' `answered`, a `toolAsk` with `cross`, `from`, `to`, `target`, `text`; App's dialog and
+notification; `always`: `crossOk`, in memory). `state` gives each project's `groups` (its seps' names) and `groupTemplates`
 (a group's prompt template by the group's name), and each workspace's
 `group` (the sep above it, `rowsOf`); `laki_new_workspace` `group` (a name, any case, or an id: `groupOf`, refused
 when there's none of it) is `wsNew` `place`, its template the one used when none is given (one still in `kit`'s

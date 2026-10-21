@@ -90,6 +90,7 @@ const turn = text => {
     return
   }
   if (text.startsWith('mute')) return // a turn that ends without a hook or a word (a resumed chat's recap)
+  if (text.startsWith('run ')) process.stdout.write(require('child_process').spawnSync('/bin/sh', ['-c', text.slice(4)], { encoding: 'utf8' }).stdout.replace(/\n/g, '\r\n')) // its Bash tool: a child of this process
   if (text.startsWith('limit')) return void ((busy = false), process.stdout.write("You've hit your usage limit. Try again in 2 hours.\r\n> "), hook('StopFailure', { error: 'rate_limit', error_details: "You've hit your usage limit. Try again in 2 hours." })) // a usage limit: StopFailure
   setTimeout(() => {
     if (!busy) return
