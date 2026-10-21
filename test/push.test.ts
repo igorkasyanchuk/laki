@@ -258,15 +258,20 @@ test("answer from the phone: a workflow's Ask you pushed with its choices, a tap
   await until(async () => (await status(run.id)) === 'done', 'the tap answered Yes, the run went on')
   assert.equal((await rig.rpc('flowGet', { id: run.id })).vars.answer, 'Yes')
 
-  // answered in the app first: the tap after it does nothing
-  const two = await rig.rpc('flowStart', { workflow: 'pick', project: proj.id, task: 'again' })
+  // answered in the app first: the tap after it does nothing, though the next question has the same choices
+  await rig.rpc('flowSave', { id: 'two', text: '# Two\nruns in: main\n\n## start\ninput: task\nnext: q\n\n## q\nask: Ship it?\n- Yes → q2\n- No → n\n\n## q2\nask: Merge it?\n- Yes → y\n- No → n\n\n## y\nend: success\n\n## n\nend: stopped\n' })
+  const two = await rig.rpc('flowStart', { workflow: 'two', project: proj.id, task: 'again' })
   const k = await until(() => pushes()[1], 'its push')
-  await rig.rpc('flowAnswer', { id: two.id, n: 1 })
-  await until(async () => (await status(two.id)) === 'stopped', 'No: stopped')
-  queue.push(JSON.stringify({ event: 'message', id: 'm2', message: k.actions[0].body }))
+  await rig.rpc('flowAnswer', { id: two.id, n: 0 })
+  const k2 = await until(() => pushes()[2], 'the next question’s push')
+  assert.match(k2.message, /^Merge it\?/)
+  queue.push(JSON.stringify({ event: 'message', id: 'm2', message: k.actions[1].body }))
   await rig.rpc('phoneTick')
   await sleep(300)
-  assert.equal(await status(two.id), 'stopped')
+  assert.equal((await rig.rpc('flowGet', { id: two.id })).cur, 'q2', 'the old push’s No answered nothing')
+  queue.push(JSON.stringify({ event: 'message', id: 'm3', message: k2.actions[0].body }))
+  await rig.rpc('phoneTick')
+  await until(async () => (await status(two.id)) === 'done', 'its own push’s Yes did')
 
   // without Answer from the phone: the choices as text, no buttons
   await rig.rpc('settingsSet', { webhook: { url, format: 'ntfy' } })
@@ -274,5 +279,5 @@ test("answer from the phone: a workflow's Ask you pushed with its choices, a tap
   const plain = await until(() => posts.find(x => x.url === '/topic' && x.body.includes('plain')), 'a text push')
   assert.equal(plain.title, 'Workflow Pick in repo asks you')
   assert.equal(plain.body, 'Ship it?\nplain\n1. Yes\n2. No')
-  assert.equal(pushes().length, 2, 'no JSON with actions')
+  assert.equal(pushes().length, 3, 'no JSON with actions')
 })

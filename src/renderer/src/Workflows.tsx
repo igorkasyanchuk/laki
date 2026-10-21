@@ -52,7 +52,7 @@ function agentActions(global: RunAction[] | undefined, projects: Project[], item
 }
 const ref = (a: RunAction) => a.slug ?? a.name // what use: names (an older daemon's actions have no slug)
 
-export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; api: WorkflowsApi; onClose: () => void }) {
+export function WorkflowsPage({ view, projects, presets, actions, at: first, api, onClose }: { view: { flows?: FlowView[]; flowFiles?: number; flowHeard?: number; workspaces: WorkspaceView[]; tabs: { id: string }[]; widgets?: Ext[] }; projects: Project[]; presets: Preset[]; actions?: RunAction[]; at?: { run?: string; start?: FlowStartAt; wf?: Sel }; api: WorkflowsApi; onClose: () => void }) {
   const [list, setList] = useState<WorkflowItem[] | null>(null)
   const [at, setAt] = useState<At>(first?.run ? { kind: 'run', id: first.run } : first?.wf ? { kind: 'wf', sel: first.wf } : { kind: 'index' }) // wf: a refused one's Look…
   const [starting, setStarting] = useState<WorkflowItem | null>(null)
@@ -61,8 +61,8 @@ export function WorkflowsPage({ view, projects, presets, actions, at: first, api
   const [allRuns, setAllRuns] = useState(false)
   const [menu, openMenu] = useMenu()
   const refresh = () => api.call<WorkflowItem[]>('flowList', {}).then(setList, () => setList([]))
-  const endedRuns = (view.flows ?? []).filter(ended).length
-  useEffect(() => void refresh(), [view.flowFiles, endedRuns]) // and as a file changes (Laki AI's, an agent's), and as a run ends (its stats)
+  const lastEnd = Math.max(0, ...(view.flows ?? []).map(r => r.ended ?? 0))
+  useEffect(() => void refresh(), [view.flowFiles, view.flowHeard, lastEnd]) // and as a file changes (Laki AI's, an agent's), an event is heard, a run ends (its stats)
   // opened to start one: its Run sheet once the list is in
   const [asked, setAsked] = useState(first?.start)
   useEffect(() => {
@@ -433,7 +433,7 @@ function StatChips({ s }: { s: NonNullable<WorkflowItem['stats']> }) {
       <span className="tag" data-tip="Runs so far">{s.runs} {s.runs === 1 ? 'run' : 'runs'}</span>
       {s.ok !== undefined && <span className="tag" data-tip="Done, of the runs that ended in the last 30 days">✓ {Math.round(s.ok * 100)}%</span>}
       {s.ms !== undefined && <span className="tag" data-tip="A done run's median time">⏱ {dur(s.ms)}</span>}
-      {s.cost !== undefined && <span className="tag" data-tip="What a run spends on average: its AI calls and decisions (agents' turns aren't counted)">${s.cost < 0.01 ? s.cost.toFixed(4) : s.cost.toFixed(2)}</span>}
+      {s.cost !== undefined && <span className="tag" data-tip="What a run spends on average: its AI calls and decisions (agents' turns aren't counted)">{dollars(s.cost)}</span>}
     </>
   )
 }

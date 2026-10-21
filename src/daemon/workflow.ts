@@ -84,7 +84,7 @@ function refused(wf: WorkflowItem, on: string) {
   if (told.get(k) === textHash(wf.text)) return
   told.set(k, textHash(wf.text))
   broadcast({ ev: 'flow', kind: 'refused', name: wf.name, wf: { id: wf.id, source: wf.source, project: wf.project }, on, changed: !!wf.changed })
-  flowFiles.at = Date.now()
+  flowFiles.heard = Date.now()
   changed()
 }
 export function flowTrust(o: Ref & { text: string }) {
@@ -369,12 +369,14 @@ function varsOf(r: FlowRun): Record<string, string> {
 // an event's fields as {{event.<path>}}: each leaf by its path, an object or list also whole (JSON), 2000 keys at most
 function eventVars(ev: unknown) {
   const out: Record<string, string> = {}
+  let n = 0
   const walk = (v: unknown, k: string) => {
-    if (Object.keys(out).length >= 2000) return
+    if (n >= 2000) return
     if (v && typeof v === 'object') {
       out[k] = JSON.stringify(v)
+      n++
       for (const [kk, vv] of Object.entries(v)) walk(vv, `${k}.${kk}`)
-    } else if (v !== undefined && v !== null) out[k] = String(v)
+    } else if (v !== undefined && v !== null) (out[k] = String(v)), n++
   }
   walk(ev, 'event')
   return out
@@ -452,6 +454,9 @@ export async function flowStart(o: Start) {
   const inputs = inputVals(start?.inputs, Object.fromEntries(Object.entries(o.inputs ?? {}).map(([k, v]) => [k, String(v ?? '')]))) // defaults, checked: {{inputs.NAME}}
   const budget: Budget | string | undefined = o.budget === undefined ? wf.budget : String(o.budget).trim() ? budgetOf(String(o.budget)) : undefined
   if (typeof budget === 'string') throw new Error(budget)
+  // an agent's run: the user's budget, or a tighter one (each part at most the file's), never none or more
+  const own = wf.budget
+  if (o.by === 'agent' && own && (['ms', 'usd'] as const).some(k => own[k] !== undefined && !((budget?.[k] ?? Infinity) <= own[k]!))) throw new Error(`an agent can't raise ${wf.name}'s budget (${budgetText(own)}): give a lower one, or none`)
   // past at once: queued, behind the others waiting (a slot that frees goes to the oldest: next)
   const atOnce = wf.runs ?? RUNS_AT_ONCE
   const busy = runs().filter(r => going(r) && runOf(r, wf)).length
@@ -1250,10 +1255,11 @@ export async function flowAnswer(o: { id: string; n: number; text?: string }) {
   if (w.kind === 'ask') return leave(r, b, label, `you: ${label}${typed ? ` · “${clip(typed, 80)}”` : ''}`, true), r
   if (o.n === w.options.length - 1) return decide(r, b, 'stop', 'you stopped it', true), finish(r, 'stopped', 'you stopped it'), r
   if (w.kind === 'stuck' && label.startsWith('Give it ') && r.budget) {
-    // its budget, past: half of its first one more, this run only; the block again, its visit and turns as they were
+    // its budget, past: half of its first one more than it used (a turn may run past it), this run only; the block
+    // again, its visit and turns as they were
     const base = r.flow.budget ?? r.budget
-    if (label.includes('$')) r.budget.usd = (r.budget.usd ?? 0) + (base.usd ?? 0) / 2
-    else r.budget.ms = (r.budget.ms ?? 0) + (base.ms ?? 0) / 2
+    if (label.includes('$')) r.budget.usd = Math.max(r.budget.usd ?? 0, r.cost ?? 0) + (base.usd ?? 0) / 2
+    else r.budget.ms = Math.max(r.budget.ms ?? 0, r.spent ?? 0) + (base.ms ?? 0) / 2
     say(r, `its budget: ${budgetText(r.budget)} now`)
     decide(r, b, 'again', `you: ${label}`, true)
     return enter(r, b, true), r
@@ -1359,6 +1365,7 @@ function tally(r: FlowRun) {
 export function flowPause(o: Ref & { on: boolean }) {
   on()
   const wf = flowFind(o)
+  if (wf.source === 'builtin') throw template(wf.name)
   const k = agentKey(wf.source, wf.id, wf.project)
   const st = ((state.flowStats ??= {})[k] ??= { total: 0, recent: [], fails: 0 })
   if (o.on) (st.fails = 0), delete st.paused
@@ -1422,8 +1429,10 @@ export function flowTick(now = Date.now()) {
     if (!live(r)) continue
     const b = blockOf(r, r.cur)
     const ws = wsOf(r)
-    // past its budget: it asks now, unless an agent's turn is going (asked as it ends, at the next block)
-    if (b && spend(r, now) && r.status === 'running' && r.wait?.kind !== 'agent') {
+    // past its budget: it asks now when what it does can stop and run again (a command, a wait on checks, a retry's
+    // wait); else (an agent's turn, an AI call, a webhook, ship, a turn just ended) the next block asks
+    const stops = r.wait?.kind === 'wait' || r.wait?.kind === 'retry' || (r.wait?.kind === 'run' && procs.has(r.id))
+    if (b && spend(r, now) && r.status === 'running' && stops) {
       budgetAsk(r, b)
       continue
     }
@@ -1489,8 +1498,9 @@ flowHooks.start = o => flowStart(o)
 // loop), an only when: test that doesn't hold, and a second run for the workspace one came from (evWs) while one is live
 const log = (...a: unknown[]) => console.log(new Date().toISOString(), ...a) // daemon.log
 // its only when: tests on the event (held: a matches stops at 200 ms): the first that doesn't hold, or one that throws
-function whenFails(wf: Workflow, payload: Record<string, unknown>, v = eventVars(payload)) {
+function whenFails(wf: Workflow, payload: Record<string, unknown>, v?: Record<string, string>) {
   if (!wf.when?.length) return
+  v ??= eventVars(payload) // only with tests: every event asks each workflow listening
   for (const t of wf.when) {
     const br = branchOf(t)
     if (!br || br === 'else' || br.test === 'js' || !br.of) return `only when: ${t}? not a test` // check() says so first
@@ -1542,9 +1552,7 @@ const lastEvents = new Map<string, FlowHeard[]>()
 function note(wf: WorkflowItem, e: FlowHeard, again = false) { // again: one already noted, its run or why since
   const k = agentKey(wf.source, wf.id, wf.project)
   if (!again) lastEvents.set(k, [e, ...(lastEvents.get(k) ?? [])].slice(0, FLOW_HEARD))
-  const fresh = listening?.files === flowFiles.at
-  flowFiles.at = Date.now() // the page reads the list again; no file changed, so the listening list holds
-  if (fresh) listening!.files = flowFiles.at
+  flowFiles.heard = Date.now() // the Workflows page reads the list again
   changed()
   return e
 }
@@ -1610,14 +1618,14 @@ function sampleOf(name: string): Record<string, unknown> {
 // start: an untrusted repo workflow runs from the app's sheet (editor), never from the CLI; never a skip or a pause
 export async function flowEvent(o: Ref & { event?: string; payload?: Record<string, unknown>; use?: 'last' | 'sample'; ws?: string; go?: boolean; dry?: boolean; editor?: boolean; by?: 'agent'; agent?: string; budget?: string }) {
   on()
-  const wf = flowFind(o)
+  const pick = o.ws ? picked(o.ws, o.project) : undefined
+  const wf = flowFind({ id: o.id, source: o.source, project: pick?.project ?? o.project }) // the workspace's project's first, as flowStart
   if (wf.source === 'builtin') throw template(wf.name)
   const name = String(o.event || (wf.on === 'custom.*' ? 'custom.test' : wf.on) || '')
   if (!name) throw new Error(`${wf.name} has no on: name an event (laki flow run --event <name>)`)
   if (name === 'custom.*' || !eventOk(name)) throw new Error(`${name}? an event: laki widget events lists them, or custom.<name>`)
   if (o.payload !== undefined && (!o.payload || typeof o.payload !== 'object' || Array.isArray(o.payload))) throw new Error('the event: a JSON object')
   if (o.payload && JSON.stringify(o.payload).length > 64 << 10) throw new Error('the event: 64 KB at most')
-  const pick = o.ws ? picked(o.ws, wf.project ?? o.project) : undefined
   const project = pick?.project ?? wf.project ?? (o.project ? findProject(o.project).id : undefined)
   const last = [...heard.entries()].filter(([k]) => (project ? k === `${project}:${name}` : k.endsWith(`:${name}`))).map(([, v]) => v).sort((a, b) => b.at - a.at)[0]
   // an agent's try: never the last real one (another workspace's answer or question, which screen and send ask for)
@@ -1647,6 +1655,7 @@ export async function flowEvent(o: Ref & { event?: string; payload?: Record<stri
   return { ...res, run: run.id }
 }
 flowHooks.find = o => flowFind(o)
-// Answer from the phone (core's phoneTick): what a run waits on now (its choices), and a tap's answer
-flowHooks.waitKey = id => (r => (r?.status === 'waiting' && r.wait && 'options' in r.wait && r.wait.kind !== 'agent-ask' ? JSON.stringify(r.wait.options) : undefined))(runs().find(x => x.id === id))
+// Answer from the phone (core's phoneTick): what a run waits on now (its block, question and choices: a push for an
+// earlier question with the same choices never answers this one), and a tap's answer
+flowHooks.waitKey = id => (r => (r?.status === 'waiting' && r.wait && 'options' in r.wait && r.wait.kind !== 'agent-ask' ? JSON.stringify({ at: r.cur, q: r.wait.question, options: r.wait.options }) : undefined))(runs().find(x => x.id === id))
 flowHooks.answer = o => flowAnswer(o)

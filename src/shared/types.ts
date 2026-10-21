@@ -790,7 +790,7 @@ export type WidgetPlace = (typeof WIDGET_PLACES)[number]
 // presets: the agents a tab or workspace can start (Settings' presets, or every agent installed); api: the
 // daemon's API (none: older than API existed)
 // schedules and runs (newest first): scheduled tasks and their log
-export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; api?: number; built?: string; today?: Today } // built: its build's time (none from source); flowFiles: when a workflow file last changed; today: what the agents used today
+export type View = { projects: Project[]; workspaces: WorkspaceView[]; tabs: TabView[]; layouts?: Record<string, Layout[]>; presets: Preset[]; settings: Settings; remote?: Remote; schedules?: Schedule[]; runs?: ScheduleRun[]; todos?: Todo[]; reminders?: Reminder[]; widgets?: WidgetView[]; widgetHome?: string; imgKey?: string; flows?: FlowView[]; flowFiles?: number; flowHeard?: number; api?: number; built?: string; today?: Today } // built: its build's time (none from source); flowFiles: when a workflow file last changed; flowHeard: when a workflow last heard an event; today: what the agents used today
 // today's tokens and ≈ cost at API prices (core.ts' meters, <data>/usage-today.json), the workspaces that used most first
 export type Today = { tokens: number; cost: number; ws: { ws: string; tokens: number; cost: number }[] }
 

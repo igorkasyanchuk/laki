@@ -520,7 +520,7 @@ export function view(): View {
     widgets: widgetsView(),
     widgetHome: widgetHome(),
     imgKey: urlKey('img'), // main.ts' GET /img: an extension's https pictures for the app window (L7)
-    ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at }),
+    ...(flowsOn(state.settings) && { flows: state.flows?.map(flowView), flowFiles: flowFiles.at, flowHeard: flowFiles.heard }),
     api: API,
     built: BUILT,
     today: todayView(),
@@ -4096,7 +4096,7 @@ export async function phoneTick() {
       if (a.flow) {
         // a run's choice: its wait as pushed (0-based in flowAnswer)
         if (flowHooks.waitKey?.(a.flow) !== a.key || !flowHooks.answer) continue
-        const label = (JSON.parse(a.key) as string[])[tap.n - 1]
+        const label = (JSON.parse(a.key) as { options: string[] }).options[tap.n - 1]
         if (label === undefined) continue
         await flowHooks.answer({ id: a.flow, n: tap.n - 1 }).then(
           () => log(`answered run ${a.flow} from the phone: ${label}`),
@@ -4135,8 +4135,9 @@ export function flowAsk(run: { id: string; name: string; ws?: string }, question
   const w = state.settings?.webhook
   const ws = run.ws ? state.workspaces.find(x => x.id === run.ws) : undefined
   if (!w?.url?.trim() || w.waiting === false || ws?.muted) return
-  const nonce = options.length ? nonceFor(w) : undefined
-  if (nonce) awaiting.set(nonce, { flow: run.id, key: JSON.stringify(options), until: Date.now() + 864e5 }), listen(w)
+  const key = flowHooks.waitKey?.(run.id) // its block, question and choices, as phoneTick checks them
+  const nonce = key && options.length ? nonceFor(w) : undefined
+  if (nonce) awaiting.set(nonce, { flow: run.id, key: key!, until: Date.now() + 864e5 }), listen(w)
   const where = ws ? ws.name || ws.id : undefined
   pushTo(w, { event: 'waiting', workspace: where ?? 'Laki', tab: '', agent: `Workflow ${run.name}`, title: `Workflow ${run.name}${where ? ` in ${where}` : ''} asks you`, question: [question, show].filter(Boolean).join('\n').slice(0, 500), options: options.map((label, i) => ({ n: i + 1, label })), nonce, ...(nonce && { key: tapKey() }) }).catch(e => log(`push ${run.name}: ${e.message}`))
 }
@@ -5491,8 +5492,9 @@ const findSchedule = (id: string) => {
 
 type ScheduleIn = Partial<Pick<Schedule, 'id' | 'name' | 'project' | 'preset' | 'ws' | 'prompt' | 'when' | 'on' | 'workflow' | 'source' | 'widget' | 'action'>>
 const SCHEDULE_IN = ['name', 'project', 'preset', 'ws', 'prompt', 'when', 'on', 'workflow', 'source', 'widget', 'action'] as const
-// workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again
-export const flowFiles = { at: 0 }
+// workflows' files changed (workflow.ts' flowSave, flowRm: yours, Laki AI's, an agent's): the page reads them again;
+// heard: an event one heard, or a skip it counted (the Workflows page's, not every list's)
+export const flowFiles = { at: 0, heard: 0 }
 // workflows (workflow.ts, which imports this file, fills it in): a scheduled task's run of one
 export const flowHooks: { start?: (o: { workflow: string; source?: 'yours' | 'project'; project: string; task: string; trigger: string }) => Promise<{ id: string; ws?: string; status: string }>; find?: (o: { id: string; source?: 'yours' | 'project'; project: string }) => { name: string; source: 'yours' | 'project' | 'builtin'; where: string; blocks: FlowBlock[] }; waitKey?: (id: string) => string | undefined; answer?: (o: { id: string; n: number }) => Promise<unknown> } = {} // what a client sets: the daemon works out the rest
 

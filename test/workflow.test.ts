@@ -2194,7 +2194,7 @@ test('try it with an event: the last one heard, else a sample; its variables and
 
 test('workflow budget: the line reads back, check names a bad one; past its time (not while it waits for you) it asks, Give it more goes on, Stop ends it; a $ cap trips on an AI call; a dry run never stops', async t => {
   const head = (b: string) => `# B\nruns in: main · budget: ${b}\n\n## start\ninput: task\nnext: e\n\n## e\nend: success\n`
-  for (const [b, want, text] of [['60 min, $5', { ms: 3600e3, usd: 5 }, '1h, $5'], ['90 min', { ms: 5400e3 }, '90 min'], ['2h', { ms: 7200e3 }, '2h'], ['$0.50', { usd: 0.5 }, '$0.50'], ['45m, $1', { ms: 2700e3, usd: 1 }, '45 min, $1']] as const) {
+  for (const [b, want, text] of [['60 min, $5', { ms: 3600e3, usd: 5 }, '1h, $5'], ['90 min', { ms: 5400e3 }, '90 min'], ['2h', { ms: 7200e3 }, '2h'], ['$0.50', { usd: 0.5 }, '$0.5'], ['$0.125', { usd: 0.125 }, '$0.125'], ['45m, $1', { ms: 2700e3, usd: 1 }, '45 min, $1']] as const) {
     const { workflow, problems } = parse(head(b))
     assert.deepEqual([workflow.budget, problems], [want, []], b)
     assert.match(toFile(workflow), new RegExp(`· budget: ${text.replace('$', '\\$')}$`, 'm'))
@@ -2230,12 +2230,12 @@ test('workflow budget: the line reads back, check names a bad one; past its time
   assert.deepEqual(r.wait.options, ['Give it 0.5 min more', 'Stop the run'])
   await rig.rpc('flowAnswer', { id: run.id, n: 0 })
   r = await until(async () => (x => x.status === 'running' && x.cur === 'work' && x)(await get(run.id)), 'it goes on')
-  assert.deepEqual(r.budget, { ms: 90e3 })
+  assert.equal(r.budget.ms, r.spent + 30e3, 'half a minute more than it used (it ran past its minute)')
   assert.equal(r.visits.work, 1, 'more time is no new visit (a max: loop keeps its count)')
   assert.equal(r.flow.budget.ms, 60e3, 'the file’s, as it started')
   await rig.rpc('flowTick', { now: (now += 31e3) })
   r = await until(async () => (x => x.wait?.kind === 'stuck' && x)(await get(run.id)), 'past it again')
-  assert.equal(r.wait.question, 'its budget: 1.5 min used')
+  assert.match(r.wait.question, /^its budget: 1\.5\d? min used$/)
   await rig.rpc('flowAnswer', { id: run.id, n: 1 })
   assert.equal((await until(async () => (x => x.status !== 'waiting' && x)(await get(run.id)), 'stopped')).status, 'stopped')
 
@@ -2244,7 +2244,13 @@ test('workflow budget: the line reads back, check names a bad one; past its time
   const ai = await rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '$0.01' })
   r = await until(async () => (x => x.wait?.kind === 'stuck' && x)(await get(ai.id)), 'past $0.01')
   assert.deepEqual([r.wait.question, r.wait.options[0], r.cost], ['its budget: $0.01 spent on AI calls', 'Give it $0.005 more', 0.02])
-  await rig.rpc('flowAnswer', { id: ai.id, n: 1 })
+  await rig.rpc('flowAnswer', { id: ai.id, n: 0 }) // past it by a cent: more than it spent, not only than the cap
+  r = await until(async () => (x => x.status !== 'running' && x)(await get(ai.id)), 'it goes on')
+  assert.deepEqual([r.status, r.budget.usd], ['done', 0.025])
+  // an agent's run: the workflow's budget or a tighter one, never none or more
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '', by: 'agent' }), /an agent can't raise AI's budget \(\$5\)/)
+  await assert.rejects(rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '$50', by: 'agent' }), /an agent can't raise/)
+  assert.deepEqual((await rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '$1', by: 'agent', dry: true })).budget, { usd: 1 })
   const dry = await rig.rpc('flowStart', { workflow: 'ai', project: p.id, task: 'x', budget: '$0.01', dry: true })
   assert.equal((await until(async () => (x => x.status !== 'running' && x)(await get(dry.id)), 'the dry run ends')).status, 'done')
   assert.ok((await get(dry.id)).log.some((l: string) => l.includes("budget: $0.01 (a dry run doesn't stop for it)")))
