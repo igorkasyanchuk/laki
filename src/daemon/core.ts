@@ -1625,6 +1625,7 @@ export function apps() {
 // open a workspace's (or a project's) folder, or a file in it, in an app; 'editor' is the one in Settings, 'default'
 // macOS's for the file
 // log: an extension's log file (its Logs tab's Show in Finder)
+const LAUNCH = /\.(app|command|tool|terminal|workflow|pkg|mpkg|scpt|scptd|applescript|jar)\/?$/i
 export async function openIn(o: { ws?: string; project?: string; widget?: string; log?: boolean; app: string; file?: string }) {
   const file = !!(o.file && o.ws) || !!(o.widget && o.log)
   const path = o.widget && o.log ? widgetLogFile(o.widget) : file ? inside(findWs(o.ws!), o.file!) : o.ws ? findWs(o.ws).path : o.widget ? widgetDir(o.widget) : findProject(o.project ?? '').path
@@ -1646,7 +1647,9 @@ export async function openIn(o: { ws?: string; project?: string; widget?: string
   }
   const name = APPS[app] ?? BROWSERS[app]
   if (!name && app !== 'default') throw new Error(`no app ${app}`)
-  const args = app === 'default' || app === 'finder' ? [...(file && app === 'finder' ? ['-R'] : []), path] : ['-a', name, file && TERMINALS.includes(app) && !statSync(path, { throwIfNoEntry: false })?.isDirectory() ? dirname(path) : path]
+  // L11: a file that would run (an app, a .command, an executable) is shown in Finder, never opened, by default
+  const runs = file && app === 'default' && (LAUNCH.test(path) || (st => !!st?.isFile() && (st.mode & 0o111) !== 0)(statSync(path, { throwIfNoEntry: false })))
+  const args = app === 'default' || app === 'finder' ? [...((file && app === 'finder') || runs ? ['-R'] : []), path] : ['-a', name, file && TERMINALS.includes(app) && !statSync(path, { throwIfNoEntry: false })?.isDirectory() ? dirname(path) : path]
   await run('open', args).catch(fail)
 }
 

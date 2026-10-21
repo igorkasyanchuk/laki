@@ -4,6 +4,9 @@ version it builds, with the date. -->
 
 ## Next
 
+- Opening files is more careful: an HTML file from a terminal link or the Files menu is shown in Finder (an HTML
+  artifact opens in the browser through Laki's sandboxed page), Xcode projects and playgrounds are shown, not opened,
+  and Open in › its default app shows a .command, an app or an executable in Finder instead of running it.
 - A shared tab masks what looks like a token or a key (sk-…, ghp_…, a Bearer token, a JWT, ?token= in a URL) and shows
   pictures as links, and its popover says commands and output are shared as they are.
 - Phone pushes can send only who needs you (Settings › Phone pushes › What it sends): no question, choices or command

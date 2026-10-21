@@ -1392,13 +1392,15 @@ export function App() {
   // rest a document in its app, else shown in Finder
   const inViewer = (path: string) => settings.artifactsIn !== 'browser' && VIEWED.test(path)
   const artPage = (w: WorkspaceView, path: string) => (w.artKey && base !== null ? `${base}/artifact/${w.artKey}/${encodeURIComponent(w.id)}/${path.split('/').map(encodeURIComponent).join('/')}` : undefined) // its own key: one workspace's
-  const openArt = (w: WorkspaceView, path: string) => (inViewer(path) ? setArtView({ ws: w.id, path }) : void bridge?.openPath?.(`${w.storage}/${path}`))
+  // in the browser: an HTML one as the daemon's sandboxed page (L11: never a file: page), anything else by main's open-path
+  const inBrowser = (w: WorkspaceView, path: string) => (/\.html?$/i.test(path) && artPage(w, path) ? void bridge?.openExternal?.(artPage(w, path)!) : void bridge?.openPath?.(`${w.storage}/${path}`))
+  const openArt = (w: WorkspaceView, path: string) => (inViewer(path) ? setArtView({ ws: w.id, path }) : inBrowser(w, path))
   // an artifact's right click (Files' Artifacts, the status bar's strip and its big view): open it, Finder, the clipboard
   const artMenu = (w: WorkspaceView, path: string): MenuItem[] => {
     const full = `${w.storage}/${path}`
     return [
       ...(inViewer(path) ? [{ label: 'Open', icon: 'file', run: () => openArt(w, path) } as MenuItem] : []),
-      ...(bridge?.openPath ? [{ label: inViewer(path) ? 'Open in the browser' : 'Open', icon: inViewer(path) ? 'globe' : 'file', run: () => void bridge!.openPath!(full) } as MenuItem, { label: 'Show in Finder', icon: 'folder', run: () => revealArt(w, path) } as MenuItem, null] : []),
+      ...(bridge?.openPath ? [{ label: inViewer(path) ? 'Open in the browser' : 'Open', icon: inViewer(path) ? 'globe' : 'file', run: () => inBrowser(w, path) } as MenuItem, { label: 'Show in Finder', icon: 'folder', run: () => revealArt(w, path) } as MenuItem, null] : []),
       ...(bridge?.copyFile ? [{ label: 'Copy', icon: 'copy', key: 'c', sub: PICTURE.test(path) ? 'The picture' : 'The file: paste it in Finder, Slack or mail', run: () => void bridge!.copyFile!(full).then(k => (k === 'missing' ? toast(`${path} is gone`) : done(k === 'image' ? 'Picture copied' : 'File copied')), fail) } as MenuItem] : []),
       ...(PLAIN.test(path) ? [{ label: 'Copy text', icon: 'copy', key: 't', run: () => void api.call<FileContent>('fileRead', { ws: w.id, path, storage: true }).then(c => (c.text === undefined ? toast(`${path} isn't text`) : c.cut ? toast(`${path} is too big to copy as text: Copy puts the file itself there`) : copy(c.text)), fail) } as MenuItem] : []),
       { label: 'Copy path', icon: 'copy', key: 'p', run: () => copy(full) },

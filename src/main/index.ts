@@ -1016,8 +1016,10 @@ ipcMain.on('open-external', (e, url: string) => {
 // a terminal's ⌘-clicked file:// link (claude's paths), the app window's only: { rel } for a file inside root (the
 // workspace: the app's preview), a folder in Finder, a document in its app; anything that could run (an app, a script, no
 // extension) only shown in Finder. Links followed first: their target's name is what counts
-const DOCS = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|html?|pdf|png|jpe?g|gif|webp|svg|heic|mp4|mov|webm|mp3|m4a|wav)$/i
-const BUNDLE = /\.(app|bundle|framework|plugin|kext|pkg|mpkg|prefpane|workflow|action|saver|appex)\/?$/i
+// opened in their app; anything else revealed. Not HTML (L11: a page from a repo runs in the browser as a file: page;
+// an artifact's goes through the daemon's sandboxed /artifact/ page instead), nor a bundle that runs or builds
+const DOCS = /\.(md|markdown|txt|log|json|jsonl|ya?ml|toml|csv|tsv|xml|pdf|png|jpe?g|gif|webp|svg|heic|mp4|mov|webm|mp3|m4a|wav)$/i
+const BUNDLE = /\.(app|bundle|framework|plugin|kext|pkg|mpkg|prefpane|workflow|action|saver|appex|xcodeproj|xcworkspace|playground)\/?$/i
 ipcMain.handle('open-path', async (e, path: unknown, root: unknown) => {
   const from = (win && e.sender === win.webContents) || [...tabWins.values()].some(w => !w.isDestroyed() && w.webContents === e.sender) // the app's window, or a floated tab's
   if (!from || typeof path !== 'string' || !path.startsWith('/')) return 'missing'

@@ -1271,7 +1271,7 @@ The menu bar's File, Edit, View and Go menus list most of these, and Laki › Se
 | ⌘F | find in the terminal |
 | ⌘S | save the file you're editing in the preview |
 | ⌘⏎ / ⇧⏎ | a new line in an agent's prompt (⏎ sends it), also one started in a terminal tab |
-| ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app or a script: shown in Finder). A web link opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's |
+| ⌘-click | a file or folder link in a terminal (Claude Code's paths): a file of the workspace opens in the preview, a folder in Finder, another document in its app (an app, a script, an Xcode project or an HTML page: shown in Finder). A web link opens on a click, or on ⌘-click in an app that takes the mouse (Codex): a plain click there is the app's |
 | ⌘← / ⌘→, ⌥← / ⌥→, ⌘⌫ | in a terminal: the line's start / end, a word back / on, delete the line (Settings › Terminal) |
 | ⌘E | open in the editor |
 | ⌘B | hide / show the sidebar |

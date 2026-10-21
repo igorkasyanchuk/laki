@@ -196,6 +196,11 @@ test('apps and open in: Finder, an app, a file, the editor; errors', async t => 
   const opened = readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('open '))
   const readme = join(ws.path, 'README.md')
   assert.deepEqual(opened, [`open ${p.path}`, `open -a Zed ${readme}`, `open -a Antigravity ${ws.path}`, `open -a Cursor ${ws.path}`, `open ${readme}`, `open -a Safari ${readme}`, `open -R ${readme}`, `open -a Terminal ${ws.path}`, `open -a Terminal ${join(ws.path, 'docs')}`])
+  // L11: a file that would run, by default: shown in Finder, not opened
+  writeFileSync(join(ws.path, 'go.command'), 'echo hi')
+  writeFileSync(join(ws.path, 'build'), '#!/bin/sh\necho hi', { mode: 0o755 })
+  for (const f of ['go.command', 'build']) await rig.rpc('openIn', { ws: ws.id, app: 'default', file: f })
+  assert.deepEqual(readFileSync(rig.env.FAKE_LOG, 'utf8').split('\n').filter(l => l.startsWith('open ')).slice(-2), [`open -R ${join(ws.path, 'go.command')}`, `open -R ${join(ws.path, 'build')}`])
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'zed', file: 'gone.txt' }), /The file \S+gone\.txt does not exist\./)
   await assert.rejects(rig.rpc('openIn', { ws: ws.id, app: 'emacs' }), /no app emacs/)
   await rig.rpc('settingsSet', { editor: 'custom' })

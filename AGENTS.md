@@ -121,7 +121,7 @@ block's `retry`/`retryOn`, an agent block's `timeout` and stall check (a stuck's
 `chat`, `aiState` without `elsewhere`; 95: workflows: an agent block's `perm` and `fast`, the head's `perm`; `flowStart` `ws`, `runs in: here`, a run's `pick`; `flowStart` `again` and `from`, a run's `of` and `first`; `flowRm` to the trash (its `trash`), `flowTrash`/`flowRestore`/`flowTrashTidy`, `flowHistory`/`flowRevert`; a run's `resumed` (after a restart: `RESUMED` to its agent's resumed chat); the head's `when done:` (`DONES`); 96: `prLog`, `prFix` `job`; 97: `projectTrust`, a project's `cfgWait`; 98: a key per page (`widgets.ts` `urlKey`, an HMAC of the master `widgetKey`, which no view, page or URL has any more: a workspace's `artKey` for `/artifact/`, `planGet`'s `key` for `/plan/`, a widget's `key` for `/widget/<id>`; each route takes its own only, `urlKeyOk`). A
 setting the renderer adds needs no bump: `settingsSet` keeps any field.
 
-- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file; with a `file`, Finder reveals it and a terminal opens its folder);
+- state: `ping`, `state`, `hook`, `watchLimits`, `shutdown`, `settingsSet` (merged into `state.settings`), `apps` (installed apps a folder can open in, `APPS`, and browsers, `BROWSERS`, flagged `browser`: only for a file), `openIn` (an app id, `editor`: the one in Settings, or `default`: macOS's for the file, but one that would run, `LAUNCH` or executable, is revealed (L11); with a `file`, Finder reveals it and a terminal opens its folder);
 - projects and workspaces: `projectAdd`/`projectRm`, `projectSet` (name, config, `notes`: the user's Markdown, the
   project's ⋯ › Notes (`ProjectNotes`, panels.tsx), its page and Settings, left out of MCP's and `ls --json`'s state; `memory`:
   the project page's Memory, the whole list (the user's `MEMORY_MAX`, refused past it unless it had more; agents'
@@ -608,7 +608,7 @@ the code, the seconds it ran, its last lines.
   `storage` (the folder as the root, `inside`'s checks), a click shows one big, ← → the others; the folder's folders first,
   a click goes in (`dir`), the head's path or ← back out), none at 0. Its `.url` files
   (`urlOf`: http(s), or `file:///`) are `WorkspaceView.links` (newest first): Info's *links* rows, and first in the gallery,
-  where a click opens them in the browser (the renderer's `openKeptLink`: a `file:///` one through main's `open-path`; `openExternal`, every other link's, never opens files). `keepPublished`, at each turn's end (`turn`'s idle/done/failed), writes
+  where a click opens them in the browser (the renderer's `openKeptLink`: a `file:///` one through main's `open-path`; `openExternal`, every other link's, never opens files; an HTML artifact *in the browser*, `inBrowser`: the daemon's sandboxed `/artifact/` page, never a `file:` page, L11). `keepPublished`, at each turn's end (`turn`'s idle/done/failed), writes
   `<title>.url` for each link the agent published and the folder hasn't (`sameUrl`): its publish tools' (`publishedBy`, from
   claude's PostToolUse payload, buffered as `Runtime.published`: the Artifact tool's publish, not its read/list/asset, or an
   `mcp__` tool named publish/deploy/upload/share: the first https link it returned, named by its `title`/`name`/file) and
@@ -1759,7 +1759,7 @@ never refreshed (that can sign the agent out), an expired one isn't sent. Each a
   elsewhere, no `bridge`, a tap too), `file://` (or a
   bare absolute path) on ⌘-click (⌃ too, unless the mouse is captured) (`allowNonHttpProtocols`, a `title` hint on hover): App's `openPath`, a file of the
   tab's workspace in the preview, else main's `open-path` (the app window's only: a folder in Finder, a document of
-  `DOCS` in its app, anything else, bundles too, revealed). Files dropped on it (`bridge.pathOf`) are
+  `DOCS` in its app (not HTML: L11), anything else, bundles (`BUNDLE`: an Xcode project and a playground too) too, revealed). Files dropped on it (`bridge.pathOf`) are
   pasted as their paths, shell-quoted when they need it; its `preventDefault` keeps the window's folder drop out.
 - **`shared/layout.ts`** (the daemon's too): tabs, tmux style. A UI tab is a split tree whose leaves are daemon tabs (sessions), so a
   session is in exactly one tab and nothing nests. Pure functions: `groupsOf` (stored tabs minus ended
