@@ -62,4 +62,6 @@ test("to-dos: a file that doesn't read is never saved over with an empty list", 
   await rig.rpc('settingsSet', { todoList: true })
   writeFileSync(join(rig.data, 'todo-list.json'), '{"blocks": [')
   await assert.rejects(rig.rpc('todoListGet'), /doesn't read as JSON/)
+  writeFileSync(join(rig.data, 'todo-list.json'), '{}') // JSON, but no list
+  await assert.rejects(rig.rpc('todoListGet'), /doesn't read as JSON/)
 })

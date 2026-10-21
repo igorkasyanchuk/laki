@@ -784,11 +784,14 @@ function DeviceTab({ api }: { api: PanelApi }) {
     } catch {}
   }
   const send = (p: { op: string; [k: string]: unknown }) => {
-    if (!dev) return
+    if (!dev) return Promise.resolve(false)
     setBusy(true)
-    api
+    return api
       .sim({ ...p, device: dev.id })
-      .then(() => setSaid(''), e => setSaid(String(e?.message ?? e)))
+      .then(
+        () => (setSaid(''), true),
+        e => (setSaid(String(e?.message ?? e)), false),
+      )
       .finally(() => setBusy(false))
   }
   // where on the picture, as fractions of it (the image keeps its own shape: its box is the picture)
@@ -811,7 +814,8 @@ function DeviceTab({ api }: { api: PanelApi }) {
       .sim<{ path: string }>({ op: 'shot', device: dev.id })
       .then(r => api.toPrompt(`A screenshot of the ${dev.name} ${dev.os === 'ios' ? 'simulator' : 'emulator'}: ${r.path}`))
       .catch(e => setSaid(String(e?.message ?? e)))
-  const type = () => text && (send({ op: 'type', text }), setText(''))
+  // the box empties once it went (a failure keeps it to send again), unless more was typed meanwhile
+  const type = () => text && void send({ op: 'type', text }).then(ok => ok && setText(t => (t === text ? '' : t)))
   if (!list) return <div className="muted small pad">Looking for simulators…</div>
   if (!dev)
     return (

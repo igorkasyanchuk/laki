@@ -9,8 +9,8 @@ test("the Desk's tiles: each in its cell, gaps kept, one in the way pushed down,
   const at = (l: ReturnType<typeof deskLayout>) => Object.fromEntries(l.map(t => [t.id, [t.x, t.y, t.w, t.h]]))
   // none placed (before cells): row by row, as the grid's flow did
   assert.deepEqual(at(deskLayout([{ id: 'a', w: 4, h: 6 }, { id: 'b', w: 6, h: 2 }, { id: 'c', w: 4, h: 3 }])), { a: [0, 0, 4, 6], b: [4, 0, 6, 2], c: [4, 2, 4, 3] }, "c doesn't fit beside b: under it, as CSS grid's sparse flow")
-  // a gap stays where it was left
-  assert.deepEqual(at(deskLayout([{ id: 'a', w: 4, h: 2, x: 8, y: 10 }])), { a: [8, 10, 4, 2] })
+  // a gap stays where it was left, a new one too: it goes under the placed ones, not into the gap
+  assert.deepEqual(at(deskLayout([{ id: 'a', w: 4, h: 2, x: 8, y: 10 }, { id: 'n', w: 4, h: 6 }])), { a: [8, 10, 4, 2], n: [0, 12, 4, 6] })
   // the one dragged keeps its cell; one it overlaps moves down past it, and one under that past it in turn
   const l = deskLayout(
     [
@@ -21,6 +21,10 @@ test("the Desk's tiles: each in its cell, gaps kept, one in the way pushed down,
     'c',
   )
   assert.deepEqual(at(l), { c: [2, 2, 4, 2], a: [0, 4, 4, 4], b: [0, 8, 4, 4] })
+  // a tab never arranged (none placed): its first drag pins the others where the flow had them, then moves the one
+  // dragged (Desk.tsx' at); only one it overlaps moves down
+  const base = deskLayout([{ id: 'a', w: 4, h: 6 }, { id: 'b', w: 6, h: 2 }, { id: 'c', w: 4, h: 3 }])
+  assert.deepEqual(at(deskLayout(base.map(t => (t.id === 'a' ? { ...t, x: 8, y: 0 } : t)), 'a')), { a: [8, 0, 4, 6], b: [4, 6, 6, 2], c: [4, 2, 4, 3] })
   // out of the grid: back in it; a new one in the first spot it fits after the placed ones
   assert.deepEqual(at(deskLayout([{ id: 'a', w: 20, h: 0, x: -3, y: -1 }, { id: 'n', w: 4, h: 6 }])), { a: [0, 0, 12, 1], n: [0, 1, 4, 6] })
 })

@@ -143,11 +143,13 @@ export function todoListGet(): TodoList {
     if ((e as { code?: string }).code === 'ENOENT') return { blocks: [], md: '', at: 0 } // none yet
     throw e
   }
+  let l: Partial<TodoList> | null = null
   try {
-    return JSON.parse(text)
-  } catch {
-    throw new Error(`To-dos: ${listFile} doesn't read as JSON; fix or move it (it isn't written over meanwhile)`) // never an empty list saved over it
-  }
+    l = JSON.parse(text)
+  } catch {}
+  // never an empty list saved over it
+  if (!l || !Array.isArray(l.blocks)) throw new Error(`To-dos: ${listFile} doesn't read as JSON; fix or move it (it isn't written over meanwhile)`)
+  return { blocks: l.blocks, md: String(l.md ?? ''), at: Number(l.at) || 0 }
 }
 export function todoListSave(p: { blocks?: unknown[]; md?: string }) {
   listOn()

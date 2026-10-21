@@ -2144,6 +2144,7 @@ html.picking, html.picking * { cursor: crosshair !important; }
 .desk-empty > .icon-svg { color: var(--accent-ink); }
 .narrow .desk-grid { grid-template-columns: 1fr; }
 .narrow .desk-tile { grid-column: 1 / -1 !important; grid-row: span var(--h) !important; } /* one column, top to bottom: the style's order */
+.narrow .desk-head { touch-action: auto; cursor: default; } /* no cells to drag it to (Desk.tsx' move): the page scrolls */
 /* a project's Memory: Compact now and its log (Project.tsx MemoryList) */
 .mem-compact { display: inline-flex; gap: 4px; margin-left: auto; }
 .mem-compact button { padding: 2px 8px; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }

@@ -118,7 +118,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
     // a tile with no tab is the first tab's: pinned where it is, so it doesn't follow another tab moved first
     save([...tiles, ...mine.filter(s => !tiles.some(t => t.id === s.id))].map(t => ({ ...t, tab: tabOf(t) })), tabs)
   }
-  // a tile to another tab: the first spot there it fits
+  // a tile to another tab: under the tiles there
   const moveTo = (id: string, to: string, tabs?: DeskTab[]) => {
     const t = tiles.find(x => x.id === id)
     if (!t) return
@@ -138,14 +138,17 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
       null,
       ...(tabList.length > 1 ? [{ label: `Remove the tab (its tiles go to ${tabList.find(x => x.id !== t.id)!.name})`, icon: 'x', run: () => removeTab(t.id) } as MenuItem] : []),
     ])
-  // where this tab's tiles are: each in its cell, the one moved or resized where the pointer has it
-  const laid = deskLayout(
-    shown.map(t => (live?.id === t.id ? live : t)),
-    live?.id,
-  )
+  // where this tab's tiles are, each in its cell (one not placed yet: where the grid's flow had it, under the placed
+  // ones); with one moved or resized (at): the others pinned where they are first, then it where the pointer has it
+  const base = deskLayout(shown)
+  const at = (t: DeskTile) => deskLayout(base.map(x => (x.id === t.id ? t : x)), t.id)
+  const laid = live ? at(live) : base
   const cellW = (el: HTMLElement) => (el.clientWidth - GAP * (DESK_COLS - 1)) / DESK_COLS
   // after a move or a resize: every tile of the tab saved in its cell, so the ones it pushed down stay there
-  const keep = (t: DeskTile) => (to => save(tiles.map(x => to.find(y => y.id === x.id) ?? x)))(deskLayout(shown.map(x => (x.id === t.id ? t : x)), t.id))
+  const keep = (t: DeskTile) => (to => save(tiles.map(x => to.find(y => y.id === x.id) ?? x)))(at(t))
+  // a drag's end saves with the tiles as they are then (a view that came meanwhile: Laki AI placed one, another window)
+  const ends = useRef({ keep, moveTo })
+  ends.current = { keep, moveTo }
   // a drag of a tile's head or corner until it ends, every way once: the capture goes with a release, a cancel, and a
   // release the page never got (outside the window, over its title bar or a frame: Chromium drops the capture at the
   // next move, with no pointerup); the window's blur and Esc too, which keep where it got to. Near the page's top or
@@ -209,7 +212,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
         const [w, h] = [clamp(Math.round((at.x + dx - r.left + GAP) / (cell + GAP)), 2, DESK_COLS - t.x), clamp(Math.round((at.y + dy - r.top + GAP) / (DESK_ROW + GAP)), 2, 30)]
         if (w !== now.w || h !== now.h) setLive((now = { ...t, w, h })) // a scroll's every event: only a new size draws
       },
-      () => (now !== t && keep(now), setLive(null)),
+      () => (now !== t && ends.current.keep(now), setLive(null)),
     )
     setLive(t)
   }
@@ -217,7 +220,8 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
   // it goes; onto a tab of the bar: to that tab. Under 4px it's a click
   const move = (e: ReactPointerEvent, t: DeskTile & { x: number; y: number }) => {
     const el = grid.current
-    if (!el || e.button !== 0 || (e.target as HTMLElement).closest('button')) return
+    // a phone's one column (.narrow) has no cells to put it in: the tiles keep the desktop's
+    if (!el || e.button !== 0 || el.closest('.narrow') || (e.target as HTMLElement).closest('button')) return
     e.preventDefault()
     const cell = cellW(el)
     const g = el.getBoundingClientRect()
@@ -239,7 +243,7 @@ export function DeskPage({ widgets, wsName, tiles: saved = [], tabs: savedTabs =
         const [x, y] = [clamp(Math.round((at.x - ox - r.left) / (cell + GAP)), 0, DESK_COLS - t.w), Math.max(0, Math.round((at.y - oy - r.top) / (DESK_ROW + GAP)))]
         if (x !== now.x || y !== now.y) setLive((now = { ...t, x, y }))
       },
-      () => (to ? moveTo(t.id, to) : now !== t && keep(now), setLive(null), setDrag(null), setOver(null)),
+      () => (to ? ends.current.moveTo(t.id, to) : now !== t && ends.current.keep(now), setLive(null), setDrag(null), setOver(null)),
     )
   }
   const addable = widgets.filter(w => !here.includes(w))

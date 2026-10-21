@@ -2035,11 +2035,7 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   rail's count: rung reminders not ticked off. `Page` `esc={false}`; `.cal-bar` on the page (‹ *Today* ›, the title,
   Week / Month, *+ Reminder*); a day's click: `sel`, `aside.cal-side` (that day's tasks, runs and reminders, *Remind me
   this day*). App.tsx passes a `CalendarApi`.
-- **`Desk.tsx`**: (cells: a tile's `x`, `y`, `shared/types.ts` `deskLayout`: the one dragged or resized first, then the
-  placed ones top to bottom pushed down past any they overlap, then the unplaced as CSS grid's sparse flow would; the
-  head's pointer drag (`move`, 4 px, `track`: capture, Esc, blur, edge scroll) to the cell under it, onto a
-  `[data-desk-tab]`: that tab; every tile of the tab saved in its cell after (`keep`); rendered in the saved order,
-  placed by `grid-column`/`grid-row`, `order` for a phone's one column) My Desk (the user's word; the code's is Desk: `settings.desk`, on unless false (Settings › General › Pages); the rail's My Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
+- **`Desk.tsx`**: My Desk (the user's word; the code's is Desk: `settings.desk`, on unless false (Settings › General › Pages); the rail's My Desk, ⌘K; dialog `'desk'`): the extensions with `desk`
   among their `places` as tiles in a 12-column grid (`DESK_COLS`, rows `DESK_ROW`), `settings.deskTiles` their order and
   sizes (`SETTINGS_KEPT`; one placed here without one: `DESK_TILE`, last), and tabs: `settings.deskTabs` (`DeskTab`,
   `SETTINGS_KEPT`; none: one, `MAIN`), a tile's `tab` (none, or a tab gone: the first), the one shown `laki.deskTab`;
@@ -2047,9 +2043,15 @@ false), Approve, then GitHub and ⋯ (checks, files, *Close pull request…*) sq
   renames, a right click (`tabMenu`) moves it, removes it (its tiles to the first of the others, in one `save`) or gives it
   an icon (`DeskTab.icon`, before its name: an `ICONS` name, or an emoji typed or pasted in the filter, `emojiOf`, its
   `typed` item *Use 🚀*; *Icon…*, a submenu, `setIcon`; *No icon*), a
-  head dropped on a tab moves the tile there (`moveTo`: last), a tile's ⋯ › *Move to tab* too (or *A new tab*); Add
-  puts one on the tab shown; *Fetch* only that tab's. A head dragged onto another tile puts it
-  before it (HTML5 drag), the corner resizes it (pointer, snapped to cells; it ends at `lostpointercapture`, which a
+  head dropped on a tab moves the tile there (`moveTo`: no cell, so under the tiles there), a tile's ⋯ › *Move to tab*
+  too (or *A new tab*); Add puts one on the tab shown; *Fetch* only that tab's. Cells: a tile's `x`, `y` (`shared/types.ts`
+  `deskLayout`: the one dragged or resized first, then the placed ones top to bottom, each pushed down past any it
+  overlaps, then the unplaced as CSS grid's sparse flow would, under the placed ones: a gap left stays; Desk's `at` pins
+  the tab's tiles where they are before one moves, so a tab never arranged keeps its flow); the head's pointer drag
+  (`move`, 4 px, `track`: capture, Esc, blur, edge scroll; none on a phone's one column, `.narrow`) to the cell under it,
+  onto a `[data-desk-tab]`: that tab; every tile of the tab saved in its cell after (`keep`, through `ends`: the tiles
+  as they are at the drag's end); rendered in the saved order, placed by `grid-column`/`grid-row`, `order` for a phone's
+  one column; the corner resizes it (pointer, snapped to cells; it ends at `lostpointercapture`, which a
   release, a cancel and a release the page never got (outside the window, over its title bar: Chromium drops the
   capture at the next move, no pointerup) all bring, or the window's blur or Esc: the size kept); a tile shows the full view when there is
   one (`WidgetBody` `full`), else the preview; Add: the others, turned on with `desk` added; *Take it off*: its only

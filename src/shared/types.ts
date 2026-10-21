@@ -540,13 +540,14 @@ type DeskBox = { x: number; y: number; w: number; h: number }
 const overlap = (a: DeskBox, b: DeskBox) => a.x < b.x + b.w && b.x < a.x + a.w && a.y < b.y + b.h && b.y < a.y + a.h
 // where a tab's tiles go, gaps kept: first, the one being dragged or resized, where it is; then each placed one where it
 // is, top to bottom, pushed down past any it overlaps; then the rest (none placed yet: as the grid's flow put them, row
-// by row from the last one) in the first spot after it they fit
+// by row from the last one) in the first spot after it they fit, under the placed ones: a gap you left stays one
 export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T & DeskBox)[] {
   const done: (T & DeskBox)[] = []
   const free = (b: DeskBox) => !done.some(d => overlap(d, b))
   const placed = (t: T) => t.x !== undefined && t.y !== undefined
   const rest = tiles.filter(t => t.id !== first)
   let [cy, cx] = [0, 0]
+  let under = true // the first not placed goes under the placed ones
   for (const t of [...tiles.filter(t => t.id === first), ...rest.filter(placed).sort((a, b) => a.y! - b.y! || a.x! - b.x!), ...rest.filter(t => !placed(t))]) {
     const [w, h] = [Math.min(DESK_COLS, Math.max(1, Math.round(t.w) || 1)), Math.max(1, Math.round(t.h) || 1)]
     let b: DeskBox | undefined
@@ -554,6 +555,7 @@ export function deskLayout<T extends DeskTile>(tiles: T[], first?: string): (T &
       b = { x: Math.min(DESK_COLS - w, Math.max(0, Math.round(t.x!))), y: Math.max(0, Math.round(t.y!)), w, h }
       while (!free(b)) b.y = Math.max(...done.filter(d => overlap(d, b!)).map(d => d.y + d.h))
     } else {
+      if (under) (under = false), (cy = Math.max(0, ...done.map(d => d.y + d.h)))
       for (let y = cy; !b; y++) for (let x = y === cy ? cx : 0; !b && x + w <= DESK_COLS; x++) if (free({ x, y, w, h })) b = { x, y, w, h }
       ;[cy, cx] = [b.y, b.x + w]
     }

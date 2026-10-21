@@ -53,11 +53,17 @@ async function shot(cmd: string, args: (file: string) => string[], fail: (e: unk
 
 const simctl = (args: string[]) => run('xcrun', ['simctl', ...args], { timeout: 30000 })
 // a simulator's screen in points: its own env, its pixels over its scale (idb's describe-all names no app on iOS 27's
-// home screen, and needs idb)
+// home screen, and needs idb); kept per device, whose screen never changes
+const simPts = new Map<string, { width: number; height: number }>()
 async function simPoints(udid: string) {
-  const [w, h, s] = await Promise.all(['WIDTH', 'HEIGHT', 'SCALE'].map(async k => Number((await simctl(['getenv', udid, `SIMULATOR_MAINSCREEN_${k}`])).stdout)))
+  const kept = simPts.get(udid)
+  if (kept) return kept
+  const env = (k: string) => simctl(['getenv', udid, `SIMULATOR_MAINSCREEN_${k}`]).then(r => Number(r.stdout), e => Promise.reject(new Error(`xcrun simctl: ${said(e)}`)))
+  const [w, h, s] = await Promise.all(['WIDTH', 'HEIGHT', 'SCALE'].map(env))
   if (!(w > 0 && h > 0 && s > 0)) throw new Error("simctl didn't say the screen's size")
-  return { width: w / s, height: h / s }
+  const pts = { width: w / s, height: h / s }
+  simPts.set(udid, pts)
+  return pts
 }
 async function booted(): Promise<{ udid: string; name: string }> {
   const r = await simctl(['list', 'devices', 'booted', '-j']).catch(e => Promise.reject(new Error(`xcrun simctl: ${said(e)} (Xcode, and xcode-select pointing at it)`)))
@@ -118,12 +124,12 @@ export async function device(p: { op: string; app?: string; x?: unknown; y?: unk
 // The side panel's Simulator (SidePanel.tsx' DeviceTab): a booted iOS Simulator's or an Android emulator's (or a phone
 // on adb's) screen, a frame at a time, and taps, swipes, typing and buttons into it. iOS: simctl's screenshot and idb's
 // hands (as above); Android: adb's screencap and input. A device is ios:<udid> or android:<serial>; a spot comes as a
-// fraction of the picture, made points (iOS: simPoints, kept per device) or pixels (Android: the last
+// fraction of the picture, made points (iOS: simPoints) or pixels (Android: the last
 // frame's). On a Mac sips makes each frame a JPEG at most FRAME_MAX tall; elsewhere it goes as it came
 // ponytail: a frame per call (the panel asks for the next as one comes, ~3 a second) and input at 0.3-0.6 s a call, a
 // drag one swipe at its release; a stream (serve-sim, idb or axe video-stream, scrcpy's server) and live touches next
 const FRAME_MAX = 1000
-const SIM_ID = /^(ios|android):([\w.:-]{1,200})$/
+const SIM_ID = /^(ios|android):(\w[\w.:-]{0,199})$/ // no leading -: it goes to simctl, idb and adb as an argument
 const adb = (serial: string | null, args: string[]) =>
   run('adb', [...(serial ? ['-s', serial] : []), ...args], { timeout: 30000, encoding: 'buffer', maxBuffer: 64 << 20 }).catch(e =>
     Promise.reject(new Error((e as { code?: string }).code === 'ENOENT' ? "adb isn't on PATH: Android Studio's SDK platform-tools (or brew install android-platform-tools)" : `adb: ${said({ stderr: String((e as { stderr?: Buffer }).stderr ?? ''), message: (e as Error).message })}`)),
@@ -133,7 +139,6 @@ const deviceOf = (id: unknown) => {
   if (!m) throw new Error('which device? ios:<udid> or android:<serial>, from sim list')
   return { os: m[1] as 'ios' | 'android', id: m[2], key: m[0] }
 }
-const iosPts = new Map<string, { width: number; height: number }>() // a simulator's screen in points
 const droidPx = new Map<string, { width: number; height: number }>() // an Android screen's pixels, as its last frame
 const pngSize = (b: Buffer) => (b.length > 24 && b.readUInt32BE(12) === 0x49484452 ? { width: b.readUInt32BE(16), height: b.readUInt32BE(20) } : undefined)
 const frac = (v: unknown, what: string) => {
@@ -171,13 +176,7 @@ export async function sim(p: { op: string; device?: string; x?: unknown; y?: unk
     return { devices, why }
   }
   const d = deviceOf(p.device)
-  // a simulator's screen in points, kept: taps go by it, and a shot's picture
-  const points = async () => {
-    let pts = iosPts.get(d.key)
-    if (!pts) iosPts.set(d.key, (pts = await simPoints(d.id)))
-    return pts
-  }
-  if (op === 'shot' && d.os === 'ios') return { path: (await shot('xcrun', f => ['simctl', 'io', d.id, 'screenshot', f], e => `xcrun simctl: ${said(e)}`, points)).path } // in points, as laki screen's
+  if (op === 'shot' && d.os === 'ios') return { path: (await shot('xcrun', f => ['simctl', 'io', d.id, 'screenshot', f], e => `xcrun simctl: ${said(e)}`, () => simPoints(d.id))).path } // in points, as laki screen's
   if (op === 'frame' || op === 'shot') {
     const tmp = mkdtempSync(join(tmpdir(), 'laki-sim-'))
     try {
@@ -210,7 +209,7 @@ export async function sim(p: { op: string; device?: string; x?: unknown; y?: unk
       await idb(k[0], d.id, k[1])
       return { ok: true }
     }
-    const pts = await points()
+    const pts = await simPoints(d.id) // taps go by the screen in points
     const at = (x: unknown, y: unknown) => [String(Math.round(frac(x, 'x') * pts.width)), String(Math.round(frac(y, 'y') * pts.height))]
     if (op === 'tap') await idb('tap', d.id, ...at(p.x, p.y))
     else await idb('swipe', d.id, ...at(p.x, p.y), ...at(p.x2, p.y2))
