@@ -18,12 +18,16 @@ const flush = (t: Term) => new Promise<void>(r => t.write('', r))
 async function client(rig: Parameters<typeof connect>[0], tab: string) {
   const c = await connect(rig)
   const term = new headless.Terminal({ cols: 100, rows: 30, scrollback: 5000, allowProposedApi: true })
-  const r = await c.call('attach', { tab, cols: 100, rows: 30 })
-  term.write(r.snapshot)
+  // listening before the reply: data in the same chunk as it is dispatched before the await returns
+  let early: string[] | null = []
   c.ws.on('message', raw => {
     const m = JSON.parse(String(raw))
-    if (m.ev === 'data' && m.tab === tab) term.write(m.d)
+    if (m.ev === 'data' && m.tab === tab) early ? early.push(m.d) : term.write(m.d)
   })
+  const r = await c.call('attach', { tab, cols: 100, rows: 30 })
+  term.write(r.snapshot)
+  for (const d of early) term.write(d)
+  early = null
   return { c, term }
 }
 

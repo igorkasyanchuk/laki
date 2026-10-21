@@ -18,6 +18,7 @@ import { type Block as FlowBlock, FLOW_ENDED, flowView, inputVals } from '../sha
 import { accountEnv, accountFor, accountIds, accountNamed, accounts, homeDir, loginCmd } from './accounts.ts'
 import { chatOf, redact, type Said, shareBody, shareMd, sharePage, transcriptOf } from './share.ts'
 import { limitReset } from './limits.ts'
+import { procParent, procPeer } from './peer.ts'
 import { pushTo, replies } from './push.ts'
 import { type Client, Session } from './session.ts'
 import { type GateBy, gatesKey, urlKey, scanWidgets, widgetDir, widgetEvent, widgetGates, widgetLogFile, widgetHome, widgetsGone, widgetsOff, widgetsView, widgetTick, widgetTools, widgetName, widgetUse, widgetUseCheck } from './widgets.ts'
@@ -4033,24 +4034,40 @@ const agentTab = (from?: { ws?: unknown; tab?: unknown }) => {
   return t && (t.kind === 'agent' || shellAgents.has(t.id)) ? t : undefined
 }
 export const agentCaller = (from?: { ws?: unknown; tab?: unknown }) => agentTab(from)?.workspace
+// a tab whose agent asks something now (a permission prompt, a menu): what's typed there answers it
+export const asking = (id: string) => rtOf(id).status === 'waiting' || shellAgents.get(id)?.status === 'waiting'
 // that agent's name, for its events' from.agent: the tab's agent (claude…), else the one its shell runs
 export const callerAgent = (from?: { ws?: unknown; tab?: unknown }) => (t => t && (t.preset ?? shellAgents.get(t.id)?.agent ?? 'agent'))(agentTab(from))
 // an agent an RPC says it is (MCP's, Laki AI's): it may add one, never take one off
 export const agentIn = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim().slice(0, 40) : undefined)
 export const fromAgent = (agent?: string) => (agent ? { from: { agent } } : {}) // an event's from, an agent's
 // M5: the tab a local connection comes from, by its process, not its env (an agent's env -u LAKI_TAB changes nothing):
-// the socket's other end (lsof), up its parents (ps) to a tab's own process. None: no tab's (your terminal, the app,
-// Laki AI's, a cron job). ponytail: an lsof and a ps per connection asked about (main.ts' WHO methods only); a process
-// that left its tab's tree (setsid and a double fork: launchd's then) reads as yours, as a cron job's would
-export async function tabOfPeer(port: number): Promise<Tab | undefined> {
-  const lsof = await run('lsof', ['-nP', `-iTCP@127.0.0.1:${port}`, '-sTCP:ESTABLISHED', '-Fp']).catch(e => ({ stdout: String(e?.stdout ?? '') }))
-  const pid = lsof.stdout.split('\n').map(l => (l[0] === 'p' ? Number(l.slice(1)) : 0)).find(p => p && p !== process.pid) // both ends match: ours left out
-  if (!pid) return
+// the socket's other end (lsof; Linux: /proc, procPeer), up its parents (ps; /proc/<pid>/stat) to a tab's own process.
+// undefined: a process in no tab (your terminal, the app, Laki AI's, a cron job); no process at all (it closed, or the
+// port can't be read) throws WHO: main.ts refuses the call, never takes it for yours. ponytail: an lsof and a ps per
+// connection asked about (main.ts' FROM and CALLER methods only); a process that left its tab's tree (setsid and a
+// double fork: launchd's then) reads as yours, as a cron job's would
+export const WHO = "couldn't tell who's calling: try again"
+export async function tabOfPeer(port: number, proc = process.platform === 'linux' ? '/proc' : ''): Promise<Tab | undefined> {
+  let pid: number | undefined
+  let up: (p: number) => Promise<number>
+  if (proc) {
+    pid = await procPeer(port, daemonPort, proc)
+    up = p => procParent(p, proc)
+  } else {
+    // macOS's own, by path: a daemon with no PATH (the app's, its login shell failing) still finds them
+    const lsof = await run('/usr/sbin/lsof', ['-nP', `-iTCP@127.0.0.1:${port}`, '-sTCP:ESTABLISHED', '-Fpn']).catch(e => ({ stdout: String(e?.stdout ?? '') }))
+    let p = 0 // the process whose end is that port's (ours, the daemon's, has the other)
+    for (const l of lsof.stdout.split('\n')) if (l[0] === 'p') p = Number(l.slice(1)); else if (l.startsWith(`n127.0.0.1:${port}->`)) pid = p
+    const { stdout } = pid && pid !== process.pid ? await run('/bin/ps', ['-axo', 'pid=,ppid=']).catch(() => ({ stdout: '' })) : { stdout: '' }
+    const pp = new Map([...psRows(stdout)].map(([p, x]) => [p, Number(x)]))
+    up = async p => pp.get(p) ?? 0
+  }
+  if (!pid) throw new Error(WHO)
+  if (pid === process.pid) return // the daemon's own process: laki serve's, in it (yours)
   const roots = new Map<number, string>()
   for (const [id, s] of sessions) if (!s.exited) roots.set(s.pty.pid, id)
-  const { stdout } = await run('ps', ['-axo', 'pid=,ppid=']).catch(() => ({ stdout: '' }))
-  const up = new Map([...psRows(stdout)].map(([p, pp]) => [p, Number(pp)]))
-  for (let p = pid, n = 0; p > 1 && n < 100; p = up.get(p) ?? 0, n++) if (roots.has(p)) return state.tabs.find(t => t.id === roots.get(p))
+  for (let p = pid, n = 0; p > 1 && n < 100; p = await up(p), n++) if (roots.has(p)) return state.tabs.find(t => t.id === roots.get(p))
 }
 let shellTicking = false // a tick waits on ps and screens: the next one doesn't start meanwhile
 export async function shellTick() {

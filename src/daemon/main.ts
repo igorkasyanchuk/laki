@@ -95,7 +95,8 @@ const originOk = (o: string | undefined) => o === undefined || origins.has(o) ||
 const { same } = core
 // remote access's token only from its page: a client with no Origin (curl past Cloudflare's sign-in) needs ours
 // ponytail: any program of the same user can read daemon.json's token: a Keychain item or a peer check if that matters
-const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (same(t, token) || (!!o && o === core.remoteOrigin() && same(t, core.remoteToken())))
+// M5: remote access's Origin takes its token only: ours with it would skip the caller check (whoCalls) as a phone's page
+const tokenOk = (t: string | null | undefined, o: string | undefined) => !!t && (!!o && o === core.remoteOrigin() ? same(t, core.remoteToken()) : same(t, token))
 // the Host a request names: this daemon's own address, or remote access's while it runs. A page on another site whose
 // name was pointed at 127.0.0.1 (DNS rebinding) names its own: turned away on every route
 let port = 0
@@ -244,7 +245,7 @@ const api: Record<string, Handler> = {
   reminderTick: p => core.reminderTick(p.now), // tests move the clock
   tabClose: p => core.closeTab(p.id),
   tabSet: p => core.tabSet(p),
-  settingsSet: p => core.settingsSet(p),
+  settingsSet: ({ from: _, ...p }) => core.settingsSet(p), // from: whoCalls', not a setting
   openIn: p => core.openIn(p),
   apps: () => core.apps(),
   wsSet: p => core.wsSet(p),
@@ -333,7 +334,7 @@ const api: Record<string, Handler> = {
   tunnelStop: p => core.tunnelStop(p),
   ship: p => core.ship(p.ws, p.message, { force: p.force === true, from: p.from }),
   screen: async p => (await crossAsk(p, 'screen'), core.screen(p.target, p.lines, p.by, p.all === true)),
-  input: (p, c) => core.input(p.tab, p.data, c),
+  input: async (p, c) => (await crossAsk(p, 'send', p.tab, p.data), core.input(p.tab, p.data, c)),
   resize: (p, c) => core.resize(p.tab, p.cols, p.rows, c),
   view: (p, c) => c && core.setView(c, p),
   detach: (p, c) => c && core.sessions.get(p.tab)?.detach(c),
@@ -435,16 +436,33 @@ const remoteNo = (method: string, p: any) =>
 
 // M5: a local client's caller by its process (core.tabOfPeer), for the methods that ask who: what the CLI and laki mcp
 // say (from, caller: $LAKI_TAB) only names a tab; a process in a tab is that tab's, an agent's whatever its env says.
+// Every local connection, its Origin or not (any tab can read daemon.json's token and say Origin: file://), but remote
+// access's page (its own token, REMOTE_NO): the app's window is Electron's process, in no tab, so yours (a dev app
+// started from a Laki tab counts as that tab). Looked up once per connection as a method first needs it (a WebSocket's
+// as it opens), never for a hook's; nothing found, or the client gone before the answer (its port may be another
+// process's by then), is refused: it fails closed. ponytail: a process that leaves its tab's tree (a double fork,
+// launchctl submit, open x.command, a tmux server) still counts as you; per-tab tokens are the real fix.
 // FROM: from is the caller ({ ws, tab }); CALLER: caller is
-const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore'])
+const FROM = new Set(['wsArchive', 'prAct', 'ship', 'send', 'screen', 'scheduleSet', 'scheduleRun', 'flowAnswer', 'widgetSet', 'widgetCheck', 'widgetRun', 'widgetAction', 'widgetDev', 'widgetEmit', 'widgetToolCall', 'widgetNew', 'widgetRestore', 'widgetToolAnswer', 'aiAnswer', 'answer', 'input', 'attach', 'widgetFileSave', 'remoteStart', 'settingsSet'])
 const CALLER = new Set(['tabNew', 'wsNew', 'run', 'flowSave', 'flowStart', 'flowTrust'])
-const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's
-const local = new WeakMap<core.Conn, Socket>() // a WebSocket client with no Origin: its socket
+const peers = new WeakMap<Socket, ReturnType<typeof core.tabOfPeer>>() // per connection: a CLI call's, laki mcp's, the app's
+const local = new WeakMap<core.Conn, Socket>() // a WebSocket client but remote access's: its socket
+const peerOf = (sock: Socket) => {
+  let t = peers.get(sock)
+  if (!t) {
+    const p = (t = core.tabOfPeer(sock.remotePort ?? 0))
+    peers.set(sock, p)
+    p.catch(() => peers.get(sock) === p && peers.delete(sock)) // not found: asked again at the next call, not refused for good
+  }
+  return t
+}
 async function whoCalls(sock: Socket, method: string, p: any) {
   if (!FROM.has(method) && !CALLER.has(method)) return p
-  let t = peers.get(sock)
-  if (!t) peers.set(sock, (t = core.tabOfPeer(sock.remotePort ?? 0).catch(() => undefined)))
-  const tab = await t
+  const tab = await peerOf(sock).catch(() => null)
+  if (tab === null || sock.readableEnded || sock.destroyed) {
+    log(`${method} refused: ${core.WHO} (port ${sock.remotePort})`) // a legit caller refused shows here
+    throw new Error(core.WHO)
+  }
   if (!tab) return p
   const me = { ws: tab.workspace, tab: tab.id }
   const o = p && typeof p === 'object' ? p : {}
@@ -453,17 +471,27 @@ async function whoCalls(sock: Socket, method: string, p: any) {
 const notAgent = (p: any, what: string) => {
   if (core.agentCaller(p.from)) throw new Error(`an agent can't ${what}: it's the user's (ask them)`)
 }
+// M5: the user's alone, from an agent's tab (by its process): answering an ask (an extension's, Laki AI's, an agent's
+// menu: its own included), an extension's files, remote access, the settings remote access can't change either, and keys
+// into a tab whose agent asks something (they'd answer it)
+const AGENT_NO: Record<string, string> = { widgetToolAnswer: 'answer what Laki asks', aiAnswer: "answer Laki AI's questions", answer: "answer an agent's question", widgetFileSave: "edit an extension's files", remoteStart: 'start remote access' }
+function agentNo(method: string, p: any) {
+  if (method === 'settingsSet' && remoteNo(method, p)) notAgent(p, 'change that setting')
+  else if (method === 'input' && core.asking(String(p.tab))) notAgent(p, 'type into a tab that asks something')
+  else if (AGENT_NO[method]) notAgent(p, AGENT_NO[method])
+}
 // M5: an agent's send or screen into another workspace's tab: asked in the app first, as an extension's tool is (Always:
 // from that workspace into that one, until Laki restarts). ponytail: kept in memory
 const crossOk = new Set<string>()
-async function crossAsk(p: any, kind: 'send' | 'screen') {
+// keys (input) ask as a send does, a terminal attached to as a screen read
+async function crossAsk(p: any, kind: 'send' | 'screen', target = p.target, text = p.text) {
   const by = core.agentCaller(p.from)
-  const tab = by && core.resolveTarget(String(p.target ?? ''))
+  const tab = by && core.resolveTarget(String(target ?? ''))
   if (!by || !tab || tab.workspace === by || crossOk.has(`${kind}:${by}>${tab.workspace}`)) return
   const name = (id: string) => core.state.workspaces.find(w => w.id === id)?.name ?? id
   if (!core.clients.size) throw new Error(`${name(tab.workspace)} is another workspace: the user allows that in Laki's window, and it isn't open`)
   const agent = core.state.tabs.find(t => t.id === p.from.tab)?.name ?? 'An agent'
-  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(tab.workspace), target: tab.name, text: kind === 'send' ? String(p.text ?? '').slice(0, 2000) : undefined, ws: by, tab: p.from.tab })
+  const how = await answered({ ev: 'toolAsk', req: randomBytes(8).toString('hex'), cross: kind, agent, from: name(by), to: name(tab.workspace), target: tab.name, text: kind === 'send' ? String(text ?? '').slice(0, 2000) : undefined, ws: by, tab: p.from.tab })
   if (how === 'always') crossOk.add(`${kind}:${by}>${tab.workspace}`)
   else if (how !== 'once') throw new Error(`${tab.name} is in ${name(tab.workspace)}, another workspace: ${how === 'deny' ? 'the user said no' : 'no answer from the user'}`)
 }
@@ -473,6 +501,7 @@ async function call(method: string, params: any, c?: core.Conn, remote = !!c?.re
   if (!h) throw new Error(`unknown method ${method}`)
   if (remote && remoteNo(method, params)) throw new Error(`not over remote access: do that on the Mac itself (${method})`)
   if (sock) params = await whoCalls(sock, method, params)
+  if (sock) agentNo(method, params ?? {})
   return await h(params ?? {}, c)
 }
 
@@ -519,7 +548,8 @@ const server = createServer(async (req, res) => {
   try {
     const { method, params } = JSON.parse(body)
     const o = req.headers.origin
-    reply(200, { result: (await call(method, params, undefined, !!o && o === core.remoteOrigin(), o ? undefined : req.socket)) ?? null })
+    const remote = !!o && o === core.remoteOrigin()
+    reply(200, { result: (await call(method, params, undefined, remote, remote ? undefined : req.socket)) ?? null })
   } catch (e) {
     reply(200, { error: (e as Error).message })
   }
@@ -560,7 +590,7 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         ws.send(typeof msg === 'string' ? msg : JSON.stringify(msg)) // a string: JSON already (core's state, made once for all)
       },
     }
-    if (!req.headers.origin) local.set(c, req.socket)
+    if (!c.remote) local.set(c, req.socket), peerOf(req.socket).catch(() => {}) // looked up as it opens: the app's first keys don't wait
     core.clients.add(c)
     core.hello(c)
     widgetAsks(c) // an extension's asks still waiting: this window shows them too
@@ -573,6 +603,12 @@ server.on('upgrade', (req: IncomingMessage, socket, head) => {
         return
       }
       if (m.method === 'attach') {
+        const sock = local.get(c)
+        try {
+          if (sock) await crossAsk(await whoCalls(sock, 'attach', { target: m.params?.tab }), 'screen') // another workspace's terminal: asked, as a screen read
+        } catch (e) {
+          return c.send({ id: m.id, error: (e as Error).message })
+        }
         try {
           core.wake(m.params?.tab) // a look wakes an agent put to sleep
         } catch (e) {

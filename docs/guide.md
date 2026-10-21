@@ -1763,11 +1763,13 @@ a spot in the picture is where to tap. MCP's `laki_device` does the same.
 agent asks you.
 
 Laki knows an agent by where its process runs (the tab it's in, or a shell tab that runs it), not by its environment,
-so an agent can't pass for you. What an agent may not do there, the CLI refuses it too: turn an extension on, force a
-held ship, merge or archive, run a scheduled task now, answer a workflow's question, or start a command of its own
-(`laki new` or `laki tab` with `--cmd` or a command profile: an agent or a shell only). A task it schedules is saved
-off (you turn it on in Scheduled tasks). Sending to, or reading the screen of, a tab in another workspace asks you first in
-the app (*Allow once*, *Always from <its workspace> to that one* until Laki restarts, *Deny*). Add it with the command in
+the daemon's token or the Origin it sends, so an agent can't pass for you; a call Laki can't place is refused (*couldn't
+tell who's calling: try again*). What an agent may not do there, the CLI refuses it too: turn an extension on, force a
+held ship, merge or archive, run a scheduled task now, answer a workflow's question, Laki's or Laki AI's questions or
+another agent's menu, type into a tab that asks something, edit an extension's files, start remote access or change the
+settings it can't change either, or start a command of its own (`laki new` or `laki tab` with `--cmd` or a command
+profile: an agent or a shell only). A task it schedules is saved off (you turn it on in Scheduled tasks). Sending or
+typing to, or reading the screen of, a tab in another workspace asks you first in the app (*Allow once*, *Always from <its workspace> to that one* until Laki restarts, *Deny*). Add it with the command in
 *Settings › Agent skill* (it has the app's paths), or with the CLI on your PATH:
 
 ```bash

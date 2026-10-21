@@ -524,6 +524,7 @@ test('remote access: the page, one email for some hours, a token of its own; gon
   assert.equal(await ping(tok, url), 200)
   assert.equal(await ping(tok, 'https://evil.example'), 403)
   assert.equal(await ping(tok), 401) // no Origin: not its page
+  assert.equal(await ping(rig.info().token, url), 401) // ours with its Origin: it'd skip the caller check as the phone's page (M5)
   await assert.rejects(connect(rig, undefined, tok))
   const c = await connect(rig, url, tok)
   assert.equal(await c.call('ping'), 'pong')
